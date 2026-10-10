@@ -6,12 +6,9 @@ import type {
 import {
   SettingsError,
   UnsupportedAuthenticationError,
-} from '../../../lib/auth/errors';
-import {
-  type AuthHandlerContext,
-  handlerFor,
-} from '../../../lib/auth/handlers';
-import { LoginLock } from '../../../lib/auth/loginLock';
+} from '@mcp-abap-adt/lib/auth';
+import { type AuthHandlerContext, handlerFor } from '../../auth/handlers';
+import { LoginLock } from '../../auth/loginLock';
 
 function context(over: Partial<AuthHandlerContext> = {}) {
   const calls: { browser: string; port?: number }[] = [];

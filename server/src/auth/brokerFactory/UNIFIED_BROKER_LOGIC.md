@@ -1,6 +1,6 @@
 # Unified AuthBroker Creation Logic
 
-How `AuthBrokerFactory` (`src/lib/auth/brokerFactory.ts`) builds a destination's broker and
+How `AuthBrokerFactory` (`server/src/auth/brokerFactory.ts`) builds a destination's broker and
 credential, and which destination a request is served from. The server's connections come from
 `IDestinations`: `settingsFor(destination)` and `getProvider(destination)`. Nothing reads a token
 before connecting: the provider is the credential, and it renews itself.
@@ -28,7 +28,7 @@ before connecting: the provider is the credential, and it renews itself.
 An env file is chosen by `--env-path` / `MCP_ENV_PATH` / `--env` (or their YAML keys) only: nothing
 is looked up in the working directory. The factory is built once, in the launcher.
 
-## Where a destination lives (`src/lib/auth/destinationStores.ts`)
+## Where a destination lives (`server/src/auth/destinationStores.ts`)
 
 | Mode | Means (service key store) | Secret (session store) |
 |------|---------------------------|------------------------|
@@ -36,7 +36,7 @@ is looked up in the working directory. The factory is built once, in the launche
 | **Named, ABAP key** (`--mcp=X`, `x-mcp-destination: X`) | `sessions/X.env` over `service-keys/X.json`, field by field | `sessions/X.env` with `--unsafe`, else in memory |
 | **Named, XSUAA key** (root `url`, `clientid`, `clientsecret`, no `uaa`) | the same, with the system's URL from `XSUAA_MCP_URL` in `sessions/X.env` only | the same |
 
-A named destination's name becomes a file name, so it is vetted first (`destinationName.ts`): only
+A named destination's name becomes a file name, so it is vetted first (`src/lib/auth/destinationName.ts`): only
 letters, digits, `_`, `.`, `-`; no separator, no `..`, no leading dot, not empty. A refusal names
 the source (`--mcp`, `x-mcp-destination`, `destination`) and never quotes the name.
 
@@ -60,7 +60,7 @@ the source (`--mcp`, `x-mcp-destination`, `destination`) and never quotes the na
 - The first connect of a destination runs inside a per-destination lock, so two first logins do
   not race for the callback port.
 
-## Handlers (`src/lib/auth/handlers/`)
+## Handlers (`server/src/auth/handlers/`)
 
 | Handler | `authType` / `grantType` | Needs | Adds |
 |---------|-------------------------|-------|------|

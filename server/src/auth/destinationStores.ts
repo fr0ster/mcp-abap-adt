@@ -22,10 +22,12 @@ import type {
   ISessionStore,
 } from '@mcp-abap-adt/interfaces-auth-broker';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import {
+  assertDestinationName,
+  DestinationRefusal,
+  type DestinationSystemContext,
+} from '@mcp-abap-adt/lib/auth';
 import * as dotenv from 'dotenv';
-import { assertDestinationName } from './destinationName';
-import { DestinationRefusal } from './errors';
-import type { DestinationSystemContext } from './IAuthBrokerFactory.js';
 
 export type DestinationMode =
   | {

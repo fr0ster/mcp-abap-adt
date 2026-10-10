@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the five packages of this repository to npm, in dependency order.
+# Publish the six packages of this repository to npm, in dependency order.
 #
 # Usage: npm run release:publish            (add --dry-run to rehearse)
 #
@@ -24,12 +24,13 @@ for arg in "$@"; do
 done
 
 # Order matters and is not cosmetic: server/tsconfig.json resolves
-# @mcp-abap-adt/lib through paths into ../dist, so the server cannot build
-# until the library has.
+# @mcp-abap-adt/lib through paths into ../dist, and @mcp-abap-adt/http into
+# ../http/dist, so the server cannot build until both have.
 PACKAGES=(
   "."
   "./compact-readonly"
   "./compact-modify"
+  "./http"
   "./server"
   "./compact"
 )

@@ -28,11 +28,14 @@
       "@mcp-abap-adt/lib/compact-shared": ["./src/lib/compact/index.ts"],
       "@mcp-abap-adt/lib/utils": ["./src/lib/utils.ts"],
       "@mcp-abap-adt/lib/config": ["./src/lib/config/index.ts"],
+      "@mcp-abap-adt/lib/auth": ["./src/lib/auth/index.ts"],
       "@mcp-abap-adt/compact-readonly": ["./compact-readonly/src/index.ts"],
       "@mcp-abap-adt/compact-readonly/routes": ["./compact-readonly/src/handlers/compactReadRoutes.ts"],
       "@mcp-abap-adt/compact-modify": ["./compact-modify/src/index.ts"],
       "@mcp-abap-adt/compact-modify/routes": ["./compact-modify/src/handlers/compactWriteRoutes.ts"],
-      "@mcp-abap-adt/core/launcher": ["./server/src/launcher.ts"]
+      "@mcp-abap-adt/core/launcher": ["./server/src/launcher.ts"],
+      "@mcp-abap-adt/core/auth": ["./server/src/auth/index.ts"],
+      "@mcp-abap-adt/http": ["./http/src/index.ts"]
     }
   },
   "include": [

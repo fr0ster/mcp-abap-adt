@@ -1,8 +1,7 @@
 {
-  "name": "@mcp-abap-adt/core",
-  "mcpName": "io.github.fr0ster/mcp-abap-adt",
+  "name": "@mcp-abap-adt/http",
   "version": "17.1.0",
-  "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports; connects to the system over HTTP, RFC or SNC (passwordless). RFC and SNC need the SAP NW RFC SDK at install time. The compact variant is @mcp-abap-adt/compact.",
+  "description": "The HTTP transports of the MCP ABAP ADT server: Express apps serving the ADT tools of @mcp-abap-adt/lib over MCP Streamable HTTP and SSE, with DNS rebinding protection and TLS.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -19,12 +18,7 @@
     "mcp",
     "model-context-protocol",
     "mcp-server",
-    "abap-cloud",
-    "sap-btp",
-    "xsuaa",
-    "jwt-auth",
-    "service-key",
-    "crud"
+    "streamable-http"
   ],
   "engines": {
     "node": ">=22.0.0",
@@ -37,34 +31,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js"
-    },
-    "./launcher": {
-      "types": "./dist/launcher.d.ts",
-      "import": "./dist/launcher.js",
-      "require": "./dist/launcher.js"
-    },
-    "./auth": {
-      "types": "./dist/auth/index.d.ts",
-      "import": "./dist/auth/index.js",
-      "require": "./dist/auth/index.js"
     }
-  },
-  "typesVersions": {
-    "*": {
-      "launcher": [
-        "dist/launcher.d.ts"
-      ],
-      "auth": [
-        "dist/auth/index.d.ts"
-      ]
-    }
-  },
-  "bin": {
-    "mcp-abap-adt": "./bin/mcp-abap-adt.js"
   },
   "files": [
     "dist/",
-    "bin/",
     "README.md",
     "LICENSE"
   ],
@@ -77,17 +47,9 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/auth-broker": "^4.1.0",
-    "@mcp-abap-adt/auth-stores": "^3.3.0",
-    "@mcp-abap-adt/connection": "^11.0.0",
-    "@mcp-abap-adt/http": "^17.1.0",
-    "@mcp-abap-adt/interfaces-auth": "^3.2.0",
-    "@mcp-abap-adt/interfaces-auth-broker": "^1.2.0",
-    "@mcp-abap-adt/interfaces-utils": "^1.1.1",
     "@mcp-abap-adt/lib": "^17.0.0",
     "@mcp-abap-adt/logger": "^0.4.1",
     "@modelcontextprotocol/sdk": "^1.32.0",
-    "dotenv": "^18.0.5",
     "express": "^5.2.1"
   },
   "jest": {
@@ -116,7 +78,6 @@
       "^@mcp-abap-adt/lib/auth$": "<rootDir>/../src/lib/auth/index.ts",
       "^@mcp-abap-adt/lib/logger$": "<rootDir>/../src/lib/handlerLogger.ts",
       "^@mcp-abap-adt/lib/request-context$": "<rootDir>/../src/lib/requestContext.ts",
-      "^@mcp-abap-adt/http$": "<rootDir>/../http/src/index.ts",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     }
   },

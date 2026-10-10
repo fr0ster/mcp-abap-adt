@@ -159,7 +159,7 @@ const settings = await destinations.settingsFor('trial');
 const credential = await destinations.getProvider('trial');
 ```
 
-The four supported authentications -- basic, SNC, `jwt` / `authorization_code`, `jwt` / `none` -- are the handlers in `src/lib/auth/handlers/`.
+The four supported authentications -- basic, SNC, `jwt` / `authorization_code`, `jwt` / `none` -- are the handlers in `server/src/auth/handlers/` (`@mcp-abap-adt/core`).
 
 ## Server Classes
 

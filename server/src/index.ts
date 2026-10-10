@@ -5,8 +5,5 @@
  * own application, you want `@mcp-abap-adt/lib` instead: it carries the
  * handlers and the embeddable server under Apache-2.0, and no transport.
  */
-export * from './dnsRebindingProtection.js';
-export * from './SseServer.js';
+export * from '@mcp-abap-adt/http';
 export * from './StdioServer.js';
-export * from './StreamableHttpServer.js';
-export * from './tlsUtils.js';

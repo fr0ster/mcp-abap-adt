@@ -146,7 +146,7 @@ if (ENV_PATHS.length === 0) {
 
     beforeAll(() => {
       workdir = mkdtempSync(join(tmpdir(), 'mcp-live-'));
-      installPackedRelease(workdir, ['.', 'server']);
+      installPackedRelease(workdir, ['.', 'http', 'server']);
       bin = installedFile(workdir, 'core', 'bin', 'mcp-abap-adt.js');
     });
 

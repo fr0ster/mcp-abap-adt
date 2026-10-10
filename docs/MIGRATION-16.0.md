@@ -203,7 +203,7 @@ from a broker uses the broker's own token API with a provider of its own. The ne
 `@mcp-abap-adt/interfaces-auth-broker` contract (the secret alone, with `issuedFor` and `issuedBy`).
 
 An embedder that has its own credential passes it as `ConnectionContext.credential`; the server builds
-nothing from `settings.authType`. See [UNIFIED_BROKER_LOGIC.md](../src/lib/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md)
+nothing from `settings.authType`. See [UNIFIED_BROKER_LOGIC.md](../server/src/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md)
 and [CONNECTION_ISOLATION.md](architecture/CONNECTION_ISOLATION.md).
 
 `getPlatformPaths` no longer returns the working directory. `BaseMcpServer.setConnectionContext` builds no

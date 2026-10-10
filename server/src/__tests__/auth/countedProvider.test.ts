@@ -9,7 +9,7 @@ import {
   countedProvider,
   ProviderGate,
   SHUTDOWN_REFUSAL,
-} from '../../../lib/auth/countedProvider';
+} from '../../auth/countedProvider';
 
 const OK: AuthOutcome = { ok: true };
 const OOPS: AuthOutcome = {

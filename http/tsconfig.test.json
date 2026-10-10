@@ -15,45 +15,42 @@
     "declarationMap": true,
     "sourceMap": true,
     "types": [
-      "node"
+      "node",
+      "jest"
     ],
-    "rootDir": "./src",
+    "rootDir": "..",
     "outDir": "./dist",
     "noImplicitAny": false,
     "paths": {
       "@mcp-abap-adt/lib": [
-        "../dist/index.d.ts"
+        "../src/index.ts"
       ],
       "@mcp-abap-adt/lib/handlers": [
-        "../dist/lib/handlers/index.d.ts"
+        "../src/lib/handlers/index.ts"
       ],
       "@mcp-abap-adt/lib/utils": [
-        "../dist/lib/utils.d.ts"
+        "../src/lib/utils.ts"
       ],
       "@mcp-abap-adt/lib/embeddable": [
-        "../dist/embeddable/index.d.ts"
+        "../src/embeddable/index.ts"
       ],
       "@mcp-abap-adt/lib/config": [
-        "../dist/lib/config/index.d.ts"
+        "../src/lib/config/index.ts"
       ],
       "@mcp-abap-adt/lib/auth": [
-        "../dist/lib/auth/index.d.ts"
+        "../src/lib/auth/index.ts"
       ],
       "@mcp-abap-adt/lib/logger": [
-        "../dist/lib/handlerLogger.d.ts"
+        "../src/lib/handlerLogger.ts"
       ],
       "@mcp-abap-adt/lib/request-context": [
-        "../dist/lib/requestContext.d.ts"
-      ],
-      "@mcp-abap-adt/http": [
-        "../http/dist/index.d.ts"
+        "../src/lib/requestContext.ts"
       ]
-    }
+    },
+    "noEmit": true
   },
   "include": [
     "src/**/*"
   ],
-  "exclude": [
-    "src/__tests__/**"
-  ]
+  "exclude": []
 }

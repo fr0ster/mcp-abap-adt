@@ -13,9 +13,11 @@
  * Requires: auth_broker.unsafe: true in test-config.yaml
  */
 
+// First, for its effect: the sibling packages below resolve to their sources.
+import './helpers/packageSources';
 import * as path from 'node:path';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
-import { AuthBrokerFactory } from '../../lib/auth/brokerFactory';
+import { AuthBrokerFactory } from '@mcp-abap-adt/core/auth';
 import { describeAuthError } from '../../lib/auth/errors';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { testConfigPathFromEnv } from './helpers/testConfigPath';

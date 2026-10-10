@@ -45,6 +45,9 @@
       ],
       "@mcp-abap-adt/lib/request-context": [
         "../src/lib/requestContext.ts"
+      ],
+      "@mcp-abap-adt/http": [
+        "../http/src/index.ts"
       ]
     },
     "noEmit": true

@@ -14,29 +14,31 @@
 import { AuthBroker, DestinationConfigError } from '@mcp-abap-adt/auth-broker';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-import { getPlatformPaths } from '../stores/platformPaths';
+import {
+  assertDestinationName,
+  type DestinationSystemContext,
+  errorClassOf,
+  getPlatformPaths,
+  type IAuthBrokerFactory,
+  SettingsError,
+  type SettleReport,
+  type VettedAuthentication,
+  vetMeans,
+} from '@mcp-abap-adt/lib/auth';
 import { countedProvider, ProviderGate } from './countedProvider';
-import { assertDestinationName } from './destinationName';
 import {
   type DestinationMode,
   type DestinationStores,
   readDestinationSystemContext,
   storesFor,
 } from './destinationStores';
-import { errorClassOf, SettingsError } from './errors';
 import {
   type AuthenticationHandler,
   type AuthHandlerContext,
   handlerFor,
 } from './handlers';
-import type {
-  DestinationSystemContext,
-  IAuthBrokerFactory,
-  SettleReport,
-} from './IAuthBrokerFactory.js';
 import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
 import { LoginLock } from './loginLock';
-import { type VettedAuthentication, vetMeans } from './vocabulary';
 
 /** The destination an `--env` file is served as. */
 const ENV_FILE_DESTINATION = 'default';

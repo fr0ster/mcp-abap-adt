@@ -97,12 +97,13 @@ describe('the published bins start from an installed package', () => {
 
     workdir = mkdtempSync(join(tmpdir(), 'mcp-bin-smoke-'));
 
-    // Pack all five, because each depends on the others by version and the
+    // Pack all six, because each depends on the others by version and the
     // versions being released are not on the registry yet. `compact` is here
     // because a third bin is a third chance to ship a launcher that cannot find
     // its own manifest.
     installPackedRelease(workdir, [
       '.',
+      'http',
       'server',
       'compact-readonly',
       'compact-modify',

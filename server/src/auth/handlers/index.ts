@@ -3,8 +3,10 @@
  * means a handler here, the docs' table and a test; nothing else.
  */
 
-import { UnsupportedAuthenticationError } from '../errors';
-import type { VettedAuthentication } from '../vocabulary.js';
+import {
+  UnsupportedAuthenticationError,
+  type VettedAuthentication,
+} from '@mcp-abap-adt/lib/auth';
 import { basicHandler } from './basic';
 import { jwtAuthorizationCodeHandler } from './jwtAuthorizationCode';
 import { jwtNoneHandler } from './jwtNone';

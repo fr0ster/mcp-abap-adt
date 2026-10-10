@@ -1,11 +1,10 @@
+import { SseServer, StreamableHttpServer } from '@mcp-abap-adt/http';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
-  AuthBrokerFactory,
   assertDestinationName,
   browserCallbackStrategy,
   describeAuthError,
   errorClassOf,
-  type IAuthBrokerFactoryConfig,
   type IDestinations,
 } from '@mcp-abap-adt/lib/auth';
 import type { HandlerSet, IServerConfig } from '@mcp-abap-adt/lib/config';
@@ -28,10 +27,9 @@ import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
+import { AuthBrokerFactory, type IAuthBrokerFactoryConfig } from './auth';
 import { CORE_VERSION } from './coreVersion.js';
-import { SseServer } from './SseServer.js';
 import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';
-import { StreamableHttpServer } from './StreamableHttpServer.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
 
 const stderrLogger: ILogger = {
@@ -626,7 +624,7 @@ export async function launch(
 
   if (config.transport === 'sse') {
     const server = new SseServer(handlersRegistry, factory, {
-      version: options.version,
+      version: options.version ?? CORE_VERSION,
       host: config.host,
       port: config.port,
       ssePath: config.ssePath,
@@ -653,7 +651,7 @@ export async function launch(
 
   // http
   const server = new StreamableHttpServer(handlersRegistry, factory, {
-    version: options.version,
+    version: options.version ?? CORE_VERSION,
     host: config.host,
     port: config.port,
     enableJsonResponse: config.httpJsonResponse,

@@ -2,8 +2,8 @@ import type { AuthBrokerConfig } from '@mcp-abap-adt/auth-broker';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
 import type { DestinationGrant } from '@mcp-abap-adt/interfaces-auth-broker';
+import type { AuthType } from '@mcp-abap-adt/lib/auth';
 import type { LoginLock } from '../loginLock.js';
-import type { AuthType } from '../vocabulary.js';
 
 /**
  * What a handler may use to build its broker options. (Not `HandlerContext`:

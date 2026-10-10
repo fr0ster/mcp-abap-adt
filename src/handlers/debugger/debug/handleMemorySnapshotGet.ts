@@ -20,6 +20,7 @@ export const SNAPSHOT_VIEW_PROPERTIES = {
   },
   max_objects: {
     type: 'integer',
+    minimum: 1,
     default: 50,
     description: 'Objects in a ranking, children or references answer.',
   },
@@ -47,11 +48,9 @@ export function requireKey(args: { key?: string; view?: string }): string {
   return args.key;
 }
 
-/** The limit of a view: the schema states its default, not that it is at least 1. */
+/** The limit of a view, or the default the schema states; its minimum is the schema's. */
 export function maxObjectsOf(args: { max_objects?: number }): number {
-  const max = args.max_objects ?? 50;
-  if (max < 1) throw new Error('max_objects: 1 or more');
-  return max;
+  return args.max_objects ?? 50;
 }
 
 export async function handleMemorySnapshotGet(

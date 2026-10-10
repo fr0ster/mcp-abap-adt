@@ -29,6 +29,7 @@ export const TOOL_DEFINITION = {
       },
       breakpoints: {
         ...BREAKPOINTS_PROPERTY.breakpoints,
+        minItems: 1,
         description:
           'abap: a line, an exception class, an ABAP statement or a message, each with an optional condition. amdp: object_name (the class) and line of each.',
       },

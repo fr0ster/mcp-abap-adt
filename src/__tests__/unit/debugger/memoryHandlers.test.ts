@@ -134,19 +134,6 @@ describe('MemorySnapshotGet', () => {
       expect(conn.requests).toHaveLength(0);
     },
   );
-  it.each([0, -3])(
-    'max_objects %p is an error that sends nothing',
-    async (max_objects) => {
-      const conn = recordingConnection([]);
-      const r: any = await handleMemorySnapshotGet(ctx(conn), {
-        snapshot_id: 'S1',
-        view: 'ranking',
-        max_objects,
-      });
-      expect(r.isError).toBe(true);
-      expect(conn.requests).toHaveLength(0);
-    },
-  );
   it('raw is the document as sent', async () => {
     const r: any = await handleMemorySnapshotGet(ctx(ok()), {
       snapshot_id: 'S1',
@@ -195,19 +182,14 @@ describe('MemorySnapshotDelta', () => {
     });
     expect(sent(c)).toContain('maxNumberOfReferences=50');
   });
-  it('a missing key or a limit below 1 sends nothing', async () => {
-    for (const extra of [
-      { view: 'children' },
-      { view: 'ranking', max_objects: 0 },
-    ] as const) {
-      const conn = recordingConnection([]);
-      const r: any = await handleMemorySnapshotDelta(ctx(conn), {
-        from_id: 'A1',
-        to_id: 'B2',
-        ...extra,
-      });
-      expect(r.isError).toBe(true);
-      expect(conn.requests).toHaveLength(0);
-    }
+  it('a missing key sends nothing', async () => {
+    const conn = recordingConnection([]);
+    const r: any = await handleMemorySnapshotDelta(ctx(conn), {
+      from_id: 'A1',
+      to_id: 'B2',
+      view: 'children',
+    });
+    expect(r.isError).toBe(true);
+    expect(conn.requests).toHaveLength(0);
   });
 });

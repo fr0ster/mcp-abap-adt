@@ -2096,7 +2096,7 @@
   {
     "group": "debug",
     "name": "DebugSetBreakpoints",
-    "inputs": "state_handle*, breakpoints, detail",
+    "inputs": "state_handle*, breakpoints*, detail",
     "available_in": "cloud, onprem"
   },
   {

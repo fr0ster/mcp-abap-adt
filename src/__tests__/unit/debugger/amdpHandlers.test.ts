@@ -134,15 +134,13 @@ describe('AMDP debugger handlers', () => {
     });
   });
 
-  it('start without stop_existing does not stop an existing one; at least one breakpoint', async () => {
+  it('start without stop_existing does not stop an existing one', async () => {
     const f = fakeAmdp();
     const { context } = install(f.amdp);
     await handleAmdpDebugStart(context, {
       breakpoints: [{ class_name: 'ZCL_A', line: 1 }],
     });
     expect((f.calls[0][1] as any).stopExisting).toBe(false);
-    const r: any = await handleAmdpDebugStart(context, { breakpoints: [] });
-    expect(r.isError).toBe(true);
   });
 
   it('set breakpoints replaces the list on the session', async () => {

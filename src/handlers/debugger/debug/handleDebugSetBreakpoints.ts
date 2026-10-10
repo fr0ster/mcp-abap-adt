@@ -19,10 +19,10 @@ export const TOOL_DEFINITION = {
     type: 'object',
     properties: {
       ...STATE_HANDLE_PROPERTY,
-      ...BREAKPOINTS_PROPERTY,
+      breakpoints: { ...BREAKPOINTS_PROPERTY.breakpoints, minItems: 1 },
       ...DETAIL_PROPERTY,
     },
-    required: ['state_handle'],
+    required: ['state_handle', 'breakpoints'],
   },
 } as const;
 

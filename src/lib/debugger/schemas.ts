@@ -90,6 +90,7 @@ export const BREAKPOINTS_PROPERTY = {
 export const AMDP_BREAKPOINTS_PROPERTY = {
   breakpoints: {
     type: 'array',
+    minItems: 1,
     description: 'Lines in SQLScript methods of a class.',
     items: {
       type: 'object',
@@ -130,16 +131,13 @@ export type RunArg = ArgsOf<{
 }>['run'];
 
 /**
- * The breakpoints the session takes. Kept here, not in the schema: at least one
- * (the schema states no minimum), and which fields one breakpoint needs depends
- * on its kind.
+ * The breakpoints the session takes. Kept here, not in the schema: which fields
+ * one breakpoint needs depends on its kind. How many a tool takes is its
+ * schema's `minItems`.
  */
 export function breakpointsFromArgs(
-  raw: readonly BreakpointArg[] | undefined,
+  raw: readonly BreakpointArg[],
 ): IDebuggerBreakpoint[] {
-  if (!raw || raw.length === 0) {
-    throw new Error('breakpoints: give at least one');
-  }
   return raw.map((b, i) => {
     const condition = b.condition ? { condition: b.condition } : {};
     if (b.exception_class) {
@@ -186,13 +184,10 @@ export function breakpointsFromArgs(
   });
 }
 
-/** The AMDP breakpoints the session takes: at least one, which the schema does not state. */
+/** The AMDP breakpoints the session takes; at least one is the schema's `minItems`. */
 export function amdpBreakpointsFromArgs(
   raw: readonly AmdpBreakpointArg[],
 ): AmdpBreakpoint[] {
-  if (raw.length === 0) {
-    throw new Error('breakpoints: give at least one');
-  }
   return raw.map((b) => ({ class_name: b.class_name, line: b.line }));
 }
 

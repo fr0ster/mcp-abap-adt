@@ -3458,6 +3458,7 @@ class Fake {
   notifyInDispose = false;    // the part tells the state synchronously from inside dispose
   finishing = false;          // the part's cleanup is still running on its own
   lateFailures: string[] = [];
+  throwWhileFinishing = false; // dispose throws, while its cleanup goes on finishing (AMDP: a refused clear, the last batch pending)
   private notify: () => void = () => {};
   constructor(readonly n: number) {
     this.state.attach({
@@ -3466,6 +3467,7 @@ class Fake {
       failures: () => this.lateFailures,
       dispose: async () => {
         this.disposed++;
+        if (this.throwWhileFinishing) { this.throwWhileFinishing = false; this.finishing = true; throw new Error('clear refused'); }
         if (this.failDispose) throw new Error('listener still up');
         if (this.lateFailures.length) return;                       // a retry that cannot undo it either: still held, not finishing
         if (this.finishLater) { this.finishLater = false; this.finishing = true; return; }
@@ -3637,6 +3639,21 @@ describe('InstancePool', () => {
     held.failLate('release debuggee D1: busy');     // the last batch arrived; its release failed
     expect(await shutting).toEqual([`${held.stateHandle}: release debuggee D1: busy`]);
     expect(held.disposed).toBe(2);                   // retried once
+  });
+
+  it('a disposal that throws while its cleanup is still finishing: shutdown waits for it, then reports only what is left', async () => {
+    const pool = new InstancePool<Fake>();
+    const a = await holding(pool);
+    const b = await holding(pool, 'B');
+    a.throwWhileFinishing = true;
+    b.throwWhileFinishing = true;
+    let done = false;
+    const shutting = pool.shutdown().then((f) => { done = true; return f; });
+    await tick();
+    expect(done).toBe(false);                        // both still finishing
+    a.set(false);                                    // a's last batch closed everything
+    b.failLate('release debuggee D1: busy');         // b's did not
+    expect(await shutting).toEqual([`${b.stateHandle}: release debuggee D1: busy`]);
   });
 
   it('a request that leaves nothing behind leaves no entry in the pool', async () => {
@@ -3862,12 +3879,14 @@ export class InstancePool<T extends Poolable> {
     await Promise.allSettled([...this.evicting.values()]);
     const owned = [...new Set<T>([...this.held.keys(), ...this.retained])];
     for (const instance of owned) await this.evict(instance);
-    await Promise.allSettled(owned.filter((i) => !this.failed.has(i)).map((i) => this.settled(i)));
+    // Every instance settles first — a disposal that threw may still have cleanup finishing on its own.
+    await Promise.allSettled(owned.map((i) => this.settled(i)));
     for (const instance of owned) {
-      if (this.failed.has(instance) || !instance.holdsState()) continue;
-      await this.evict(instance);                    // a cleanup failed after its disposal returned: once more
+      if (!instance.holdsState()) { this.failed.delete(instance); continue; }
+      this.failed.delete(instance);
+      await this.evict(instance);                    // what is still held after settling: once more
       await this.settled(instance);
-      if (instance.holdsState()) {
+      if (instance.holdsState() && !this.failed.has(instance)) {
         this.failed.set(instance, `${instance.stateHandle}: ${instance.state.failures().join('; ') || 'state is still held'}`);
       }
     }
@@ -4775,6 +4794,8 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | | 3 (AMDP restart test ids) | the fake answers `nextSync()`; the test never counts ids by hand |
 | | 4 (retry tests without failure) | the tests wait for the failed attempt before restoring, then check retry and closure |
 | | (subscriptions) | `onChange` answers its unsubscribe; `settled()` unsubscribes |
+
+| Seventh (on `9218a035`) | shutdown after a disposal that threw | every owned instance settles before the retry; the failure recorded by the throw is replaced by what is left after settling and one retry |
 
 **Placeholders.** The only `<…>` tokens are in run commands, where local config and scratchpad values go. They are deliberately not written down: plans name no system.
 

@@ -287,4 +287,84 @@ describe('DebugSession', () => {
     expect(a.value.refused.map((r) => r.error)).toEqual(['first', 'second']);
     expect(world.calls).toContain('validate:1');
   });
+
+  describe('a cleanup that fails is reported, never a silent success', () => {
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown) => unhandled.push(reason);
+    beforeEach(() => {
+      unhandled.length = 0;
+      process.on('unhandledRejection', onUnhandled);
+    });
+    afterEach(() => process.off('unhandledRejection', onUnhandled));
+    /** Lets Node run its rejection bookkeeping, which fake timers do not cover. */
+    const settle = () =>
+      new Promise<void>((resolve) =>
+        jest.requireActual('timers').setImmediate(resolve),
+      );
+
+    it('a close that throws while a later conflict drops the listener: the conflict once, then idle', async () => {
+      const world = fakeWorld();
+      const { session } = await listening(world);
+      let attempts = 0;
+      world.ports.closeConnection = async () => {
+        attempts++;
+        throw new Error('close failed');
+      };
+      world.polls[1].resolve(CONFLICT());
+      await until(() => attempts >= 1);
+      await jest.advanceTimersByTimeAsync(0);
+      await settle();
+      expect(unhandled).toEqual([]);
+      await expect(session.wait(0)).rejects.toThrow(/SY 530/);
+      expect((await session.wait(0)).state).toBe('idle');
+    });
+
+    it('an attach refused whose connection will not close: the failure is reported and the listener dropped', async () => {
+      const world = fakeWorld();
+      world.attachAnswers.push(async () =>
+        refusedResponse('Debuggee already attached'),
+      );
+      const { session } = await listening(world);
+      const realClose = world.ports.closeConnection;
+      world.ports.closeConnection = async (c) => {
+        if (c === world.opened[1]) throw new Error('close failed');
+        return realClose(c);
+      };
+      world.polls[1].resolve(LISTEN_CATCH());
+      await until(() => world.closed.includes(world.opened[0]));
+      await settle();
+      expect(unhandled).toEqual([]);
+      await expect(session.wait(0)).rejects.toThrow(/close failed/);
+      expect(await session.wait(0)).toMatchObject({
+        state: 'ended',
+        reason: 'attach_refused',
+      });
+      expect((await session.wait(0)).state).toBe('idle');
+      expect(world.polls).toHaveLength(2);
+    });
+
+    it('a refused start reports the breakpoint it could not delete, and keeps it armed', async () => {
+      const world = fakeWorld();
+      world.override.deleteBreakpoint = async () =>
+        refusedResponse('Breakpoint is locked');
+      const session = new DebugSession(world.ports, IDS).bind('origin');
+      const started = session.start('refuse', {
+        breakpoints: [
+          {
+            kind: 'line',
+            uri: '/sap/bc/adt/oo/classes/zcl_cv_dbg_measure/source/main#start=32',
+          },
+        ],
+      });
+      await until(() => world.polls.length === 1);
+      world.polls[0].resolve(CONFLICT());
+      const error = await started.catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(DebugListenerError);
+      expect((error as Error).message).toMatch(/SY 530/);
+      expect((error as Error).message).toMatch(
+        /not undone: .*Breakpoint is locked/,
+      );
+      expect(session.listBreakpoints()).toHaveLength(1);
+    });
+  });
 });

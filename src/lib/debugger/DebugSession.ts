@@ -315,30 +315,58 @@ export class DebugSession<O = unknown> {
           ...(armed ? { breakpoints: armed.value } : {}),
         };
       } catch (error) {
-        // A refused or failed start leaves nothing it armed. Each undo runs whatever the other did.
-        await this.dropListener().catch(() => undefined);
-        await this.undoArmed(identity, placedHere()).catch(() => undefined);
-        throw error;
+        // A refused or failed start leaves nothing it armed. Each undo runs whatever the other did,
+        // and what could not be undone is named in the error the start fails with.
+        const failures: string[] = [];
+        await this.dropListener().catch((e) => {
+          failures.push(
+            `the listener's connection was not closed: ${thrown(e)}`,
+          );
+        });
+        failures.push(...(await this.undoArmed(identity, placedHere())));
+        if (failures.length === 0) throw error;
+        const notUndone = `not undone: ${failures.join('; ')}`;
+        if (error instanceof Error) {
+          error.message = `${error.message}; ${notUndone}`;
+          throw error;
+        }
+        throw new DebugListenerError(`${thrown(error)}; ${notUndone}`);
       }
     });
   }
 
-  /** A refused start leaves nothing armed: what it placed is deleted; what cannot be stays for DebugStop. */
+  /**
+   * A refused start leaves nothing armed: what it placed is deleted; what cannot be
+   * stays armed for DebugStop. Never throws: it answers what it could not undo.
+   */
   private async undoArmed(
     identity: IDebuggerIdentity,
     placed: BreakpointReading[],
-  ): Promise<void> {
+  ): Promise<string[]> {
+    const failures: string[] = [];
     const control = this.control?.debugger;
     for (const p of placed) {
       const deleted = control
         ? await control.deleteBreakpoint(identity, p.id!).catch(asFailure)
         : undefined;
       if (deleted?.ok) this.armed.delete(p.id!);
+      else
+        failures.push(
+          `breakpoint ${p.id} is still armed: ${deleted ? messageOf(deleted) : 'no connection to delete it on'}`,
+        );
     }
     if (this.armed.size === 0 && this.control) {
-      await this.close(this.control.connection);
-      this.control = undefined;
+      try {
+        await this.close(this.control.connection);
+        this.control = undefined;
+      } catch (e) {
+        // The control stays, so a later cleanup closes it again.
+        failures.push(
+          `the breakpoints' connection was not closed: ${thrown(e)}`,
+        );
+      }
     }
+    return failures;
   }
 
   private poll(
@@ -349,15 +377,25 @@ export class DebugSession<O = unknown> {
     return listener.debugger.listen(identity, { holdSeconds }).catch(asFailure);
   }
 
+  /** Never rejects: whatever throws in it becomes the listener's failure, reported by the next wait. */
   private async loop(listener: Listener, generation: number): Promise<void> {
-    const identity = await this.identity();
-    for (;;) {
-      if (!this.owns(listener, generation) || this.current) return;
-      const answer = await this.poll(listener, identity, LISTEN_HOLD_SECONDS);
-      const goOn = await this.mutate(() =>
-        this.onPoll(listener, generation, answer),
-      );
-      if (!goOn) return;
+    try {
+      const identity = await this.identity();
+      for (;;) {
+        if (!this.owns(listener, generation) || this.current) return;
+        const answer = await this.poll(listener, identity, LISTEN_HOLD_SECONDS);
+        const goOn = await this.mutate(() =>
+          this.onPoll(listener, generation, answer),
+        );
+        if (!goOn) return;
+      }
+    } catch (error) {
+      // A stale loop must not drop a newer listener; one already dropped has its failure set.
+      if (this.listener === listener || this.listener === undefined) {
+        this.failure ??= thrown(error);
+        await this.dropListener().catch(() => undefined);
+      }
+      this.notify();
     }
   }
 
@@ -433,7 +471,8 @@ export class DebugSession<O = unknown> {
       };
       return true;
     } catch (error) {
-      await this.close(connection);
+      // Best effort: the failure and the drop below must happen whatever the close does.
+      await this.close(connection).catch(() => undefined);
       this.failure = thrown(error);
       await this.dropListener();
       return false;

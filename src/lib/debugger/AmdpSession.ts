@@ -19,6 +19,7 @@ import type {
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
+  type AmdpBreakpointState,
   type AmdpEvent,
   locationId,
   readAmdpEvents,
@@ -185,7 +186,7 @@ export class AmdpSession<O = unknown> {
     stopExisting: boolean;
     breakpoints: AmdpBreakpoint[];
     run?: RunTarget;
-  }): Promise<{ mainId: string; breakpoints: string[] }> {
+  }): Promise<{ mainId: string; breakpoints: AmdpBreakpointState[] }> {
     return this.mutate(async () => {
       if (this.open || this.closing)
         throw new DebugStateError(
@@ -252,7 +253,10 @@ export class AmdpSession<O = unknown> {
   }
 
   /** Sends a sync and waits, inside this call, for its own SYNC_BREAKPOINTS. */
-  private async sync(open: Open, list: AmdpBreakpoint[]): Promise<string[]> {
+  private async sync(
+    open: Open,
+    list: AmdpBreakpoint[],
+  ): Promise<AmdpBreakpointState[]> {
     const breakpoints = list.map((b) => ({
       clientId: randomUUID(),
       uri: lineUriOf(
@@ -292,7 +296,7 @@ export class AmdpSession<O = unknown> {
     }
     const event = this.syncs.get(requestId);
     this.syncs.delete(requestId);
-    if (event) return event.states;
+    if (event) return event.breakpoints;
     if (open.readFailed !== undefined) {
       open.failureReported = true;
       throw new DebugListenerError(open.readFailed);
@@ -435,7 +439,9 @@ export class AmdpSession<O = unknown> {
   }
 
   // --- commands ------------------------------------------------------------------
-  setBreakpoints(list: AmdpBreakpoint[]): Promise<DebugView<string[]>> {
+  setBreakpoints(
+    list: AmdpBreakpoint[],
+  ): Promise<DebugView<AmdpBreakpointState[]>> {
     return this.mutate(async () => {
       const states = await this.sync(this.requireOpen(), list);
       return { value: states, raw: JSON.stringify(states) };

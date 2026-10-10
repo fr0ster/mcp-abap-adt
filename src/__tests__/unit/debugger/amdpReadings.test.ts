@@ -49,7 +49,7 @@ describe('AMDP readings', () => {
     expect(readAmdpEvents(SYNCED('Q1'))[0]).toMatchObject({
       kind: 'SYNC_BREAKPOINTS',
       requestId: 'Q1',
-      states: ['PENDING'],
+      breakpoints: [{ state: 'PENDING' }],
     });
   });
   it("each event keeps its whole body — a child's self-closing tag does not end it", () => {
@@ -95,9 +95,9 @@ describe('AMDP readings', () => {
         corpusSidecar('amdp-debugger--02-sync-breakpoints').response.headers
           .location,
       );
-      expect(e.states).toEqual(['PENDING', 'PENDING']);
+      expect(e.breakpoints.map((b) => b.state)).toEqual(['PENDING', 'PENDING']);
     });
-    it('a toggle batch reads as one event per breakpoint, each VALID', () => {
+    it('a toggle batch reads as one event per breakpoint, each VALID, with its place and no reason', () => {
       const events = readAmdpEvents(
         corpusBody('amdp-debugger--04-events-toggle-breakpoints'),
       );
@@ -105,7 +105,33 @@ describe('AMDP readings', () => {
         'ON_TOGGLE_BREAKPOINTS',
         'ON_TOGGLE_BREAKPOINTS',
       ]);
-      expect(events.flatMap((e) => e.states)).toEqual(['VALID', 'VALID']);
+      expect(events.flatMap((e) => e.breakpoints)).toEqual([
+        { class_name: 'ZMCP_DBG_AMDP', line: 37, state: 'VALID' },
+        { class_name: 'ZMCP_DBG_AMDP', line: 27, state: 'VALID' },
+      ]);
+      expect(terseAmdpEvent(events[0]).breakpoints).toEqual([
+        { class_name: 'ZMCP_DBG_AMDP', line: 37, state: 'VALID' },
+      ]);
+    });
+    it('an INVALID breakpoint and the reason the system gives reach the terse event', () => {
+      const invalid = corpusBody('amdp-debugger--04-events-toggle-breakpoints')
+        .replace('amdpdbg:state="VALID"', 'amdpdbg:state="INVALID"')
+        .replace(
+          'amdpdbg:errorMessage=""',
+          'amdpdbg:errorMessage="No executable statement at this line"',
+        );
+      const [first, second] = readAmdpEvents(invalid);
+      expect(terseAmdpEvent(first).breakpoints).toEqual([
+        {
+          class_name: 'ZMCP_DBG_AMDP',
+          line: 37,
+          state: 'INVALID',
+          errorMessage: 'No executable statement at this line',
+        },
+      ]);
+      expect(terseAmdpEvent(second).breakpoints).toEqual([
+        { class_name: 'ZMCP_DBG_AMDP', line: 27, state: 'VALID' },
+      ]);
     });
     it('the start names the session in Location and the HANA session in the body', () => {
       const start = corpusSidecar('amdp-debugger--01-start');

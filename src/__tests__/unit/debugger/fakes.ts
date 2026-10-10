@@ -56,6 +56,8 @@ export function fakeWorld() {
         },
         stopListener: async () => {
           calls.push('stopListener');
+          // As the system does: the open poll answers, empty, once the listener is stopped.
+          for (const p of polls) p.resolve(LISTEN_NOTHING());
           return DONE();
         },
         attach: async (_u: string, id: string, o: any) => {

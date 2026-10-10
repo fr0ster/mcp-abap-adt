@@ -46,7 +46,7 @@ function fakeAmdp() {
             debuggeeId: 'D1',
             line: 14,
             variables: [{ name: 'LV_I', value: '1' }],
-            states: [],
+            breakpoints: [],
             body: '<b/>',
           },
         ],

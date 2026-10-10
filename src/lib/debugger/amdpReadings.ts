@@ -21,14 +21,39 @@ const text = (v: unknown): string =>
       ? String((v as Record<string, unknown>)['#text'] ?? '')
       : String(v);
 
+/** A breakpoint as the system reports it: where, its state, and its reason when it gives one. */
+export interface AmdpBreakpointState {
+  class_name?: string;
+  line?: number;
+  state: string;
+  errorMessage?: string;
+}
+
 export interface AmdpEvent {
   kind: string;
   requestId: string;
   debuggeeId: string;
   line?: number;
   variables: Array<{ name: string; value: string }>;
-  states: string[];
+  breakpoints: AmdpBreakpointState[];
   body: string;
+}
+
+const lineOf = (uri: unknown): number | undefined => {
+  const start = /#start=(\d+)/.exec(text(uri))?.[1];
+  return start ? Number(start) : undefined;
+};
+
+function breakpointState(b: any): AmdpBreakpointState {
+  const name = text(b.name);
+  const line = lineOf(b.uri);
+  const errorMessage = text(b.errorMessage).trim();
+  return {
+    ...(name ? { class_name: name } : {}),
+    ...(line !== undefined ? { line } : {}),
+    state: text(b.state),
+    ...(errorMessage ? { errorMessage } : {}),
+  };
 }
 
 // A mainResponse either closes itself or runs to its closing tag — a child's `/>` does not end it.
@@ -62,18 +87,17 @@ export function readAmdpEvents(xml: string): AmdpEvent[] {
   const rows: any[] = root.mainResponse ?? [];
   const bodies = [...xml.matchAll(MAIN_RESPONSE)].map((m) => m[0]);
   return rows.map((r, i) => {
-    const position = deep(r, 'abapPosition')[0];
-    const start = /#start=(\d+)/.exec(text(position?.uri))?.[1];
+    const line = lineOf(deep(r, 'abapPosition')[0]?.uri);
     return {
       kind: text(r.kind),
       requestId: text(r.requestId),
       debuggeeId: text(r.debuggeeId),
-      ...(start ? { line: Number(start) } : {}),
+      ...(line !== undefined ? { line } : {}),
       variables: deep(r, 'variable').map((v: any) => ({
         name: text(v.name),
         value: text(v.isNullValue) === 'true' ? 'NULL' : text(v),
       })),
-      states: deep(r, 'breakpoint').map((b: any) => text(b.state)),
+      breakpoints: deep(r, 'breakpoint').map(breakpointState),
       body: bodies[i] ?? '',
     };
   });
@@ -130,6 +154,7 @@ export function terseAmdpEvent(e: AmdpEvent): {
   debuggeeId?: string;
   line?: number;
   variables: Array<{ name: string; value: string }>;
+  breakpoints?: AmdpBreakpointState[];
 } {
   return {
     kind: e.kind,
@@ -137,5 +162,7 @@ export function terseAmdpEvent(e: AmdpEvent): {
     ...(e.debuggeeId ? { debuggeeId: e.debuggeeId } : {}),
     ...(e.line !== undefined ? { line: e.line } : {}),
     variables: e.variables,
+    // An INVALID breakpoint and the system's reason reach the model.
+    ...(e.breakpoints.length ? { breakpoints: e.breakpoints } : {}),
   };
 }

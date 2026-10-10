@@ -1,3 +1,4 @@
+import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
@@ -94,9 +95,45 @@ describe('AmdpSession', () => {
     w.reads[0].resolve(okResponse(SYNCED('Q1')));
     await expect(s).resolves.toMatchObject({
       mainId: '0123456789ABCDEF0123456789ABCDEF',
-      breakpoints: ['PENDING'],
+      breakpoints: [{ state: 'PENDING' }],
     });
     await until(() => w.calls.includes('run'));
+  });
+
+  it("the start answers each breakpoint's state and the system's reason for one it refused", async () => {
+    const w = world();
+    const s = w.session.start({
+      stopExisting: true,
+      breakpoints: [
+        { class_name: 'ZMCP_DBG_AMDP', line: 27 },
+        { class_name: 'ZMCP_DBG_AMDP', line: 37 },
+      ],
+    });
+    await until(() => w.reads.length === 1);
+    const recorded = corpusBody('amdp-debugger--03-events-sync-breakpoints');
+    const requestId = /amdpdbg:requestId="([^"]+)"/.exec(recorded)![1];
+    w.reads[0].resolve(
+      okResponse(
+        recorded
+          .replace(requestId, 'Q1')
+          .replace('amdpdbg:state="PENDING"', 'amdpdbg:state="INVALID"')
+          .replace(
+            'amdpdbg:errorMessage=""',
+            'amdpdbg:errorMessage="No executable statement at this line"',
+          ),
+      ),
+    );
+    await expect(s).resolves.toMatchObject({
+      breakpoints: [
+        {
+          class_name: 'ZMCP_DBG_AMDP',
+          line: 27,
+          state: 'INVALID',
+          errorMessage: 'No executable statement at this line',
+        },
+        { class_name: 'ZMCP_DBG_AMDP', line: 37, state: 'PENDING' },
+      ],
+    });
   });
 
   it('an ON_BREAK arrives through wait; a step addresses its debuggee, then the debuggee is moving', async () => {
@@ -163,7 +200,9 @@ describe('AmdpSession', () => {
     await until(() => w.reads.length === 1);
     const waiting = w.session.wait(30);
     w.reads[0].resolve(okResponse(SYNCED('Q1')));
-    await expect(s).resolves.toMatchObject({ breakpoints: ['PENDING'] });
+    await expect(s).resolves.toMatchObject({
+      breakpoints: [{ state: 'PENDING' }],
+    });
     await jest.advanceTimersByTimeAsync(30_000);
     expect((await waiting).state).toBe('waiting');
   });

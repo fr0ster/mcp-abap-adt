@@ -346,6 +346,48 @@ describe('DebugSession lifecycle', () => {
     );
   });
 
+  it('stop returns only once the open poll has answered: the system has let go of the listener', async () => {
+    const { session, world } = await started();
+    // The system accepts the stop but has not answered the open poll yet.
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      return okResponse(undefined);
+    };
+    let done = false;
+    const stopping = session.stop().then(() => {
+      done = true;
+    });
+    await until(() => world.calls.includes('stopListener'));
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(done).toBe(false);
+    const listenerConnection = world.opened[1];
+    expect(world.closed).not.toContain(listenerConnection);
+    world.polls[1].resolve(LISTEN_NOTHING());
+    await stopping;
+    expect(world.closed).toContain(listenerConnection);
+    expect(session.holdsState()).toBe(false);
+  });
+
+  it('a failed answer of the stopped poll is a cleanup failure, named, kept for the next stop', async () => {
+    const { session, world } = await started();
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      world.polls[1].resolve(refusedResponse('poll broke'));
+      return okResponse(undefined);
+    };
+    await expect(session.stop()).rejects.toThrow(
+      /the listener's last poll: .*poll broke/,
+    );
+    expect(session.failures()).toEqual([
+      expect.stringMatching(/the listener's last poll/),
+    ]);
+    expect(session.holdsState()).toBe(true);
+    delete world.override.stopListener;
+    await session.stop();
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
   it('a stale loop that throws after stop records no failure', async () => {
     const { session, world } = await started();
     await session.stop();

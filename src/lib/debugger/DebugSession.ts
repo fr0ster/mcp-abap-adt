@@ -99,6 +99,8 @@ export class DebugCleanupError extends Error {}
 interface Listener {
   connection: IAbapConnection;
   debugger: Debugger;
+  /** The poll SAP holds open, until it answers: a stop waits for it. */
+  open?: Promise<IAdtResponse<string>>;
 }
 interface Stop {
   connection: IAbapConnection;
@@ -399,7 +401,14 @@ export class DebugSession<O = unknown> {
     identity: IDebuggerIdentity,
     holdSeconds: number,
   ): Promise<IAdtResponse<string>> {
-    return listener.debugger.listen(identity, { holdSeconds }).catch(asFailure);
+    const answer = listener.debugger
+      .listen(identity, { holdSeconds })
+      .catch(asFailure);
+    listener.open = answer;
+    void answer.then(() => {
+      if (listener.open === answer) listener.open = undefined;
+    });
+    return answer;
   }
 
   /** Never rejects: whatever throws in it becomes the listener's failure, reported by the next wait. */
@@ -816,6 +825,7 @@ export class DebugSession<O = unknown> {
 
   /**
    * Everything off — DebugStop, dispose, shutdown. Required, not best effort.
+   * A stopped listener counts as off once the system answered its open poll.
    * Never throws anything but DebugCleanupError, and whatever failed stays for the next stop.
    */
   stop(): Promise<void> {
@@ -853,12 +863,22 @@ export class DebugSession<O = unknown> {
             else failures.push(`breakpoint ${id}: ${messageOf(deleted)}`);
           }
           if (this.listener) {
+            const open = this.listener.open; // taken before the stop: its answer may come at once
             const stopped = await control
               .stopListener(identity)
               .catch(asFailure);
             if (stopped.ok) {
               const listener = this.listener;
               this.listener = undefined;
+              // Accepted is not done: SAP lets go of the user's listener when it answers the
+              // open poll (130–570 ms after the stop, at most the poll's hold, measured on
+              // premise 2026-10-11). Until then a start of another ideId meets 409
+              // conflictDetected, so the stop returns only after that answer.
+              if (open) {
+                const last = await open;
+                if (!last.ok)
+                  failures.push(`the listener's last poll: ${messageOf(last)}`);
+              }
               await this.closeOrKeep(
                 listener.connection,
                 "the listener's connection",

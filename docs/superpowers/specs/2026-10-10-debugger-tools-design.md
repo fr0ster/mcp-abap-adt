@@ -50,6 +50,17 @@ the handlers are thin over it.
   its own. The cost: breakpoints of an instance that dies without cleaning up
   stay under an identity nobody recreates, which is why shutdown cleanup is
   required, not best effort.
+
+  **The user may set them.** `SAP_DEBUG_TERMINAL_ID` and `SAP_DEBUG_IDE_ID`
+  (the destination's `.env` or the process environment, for stdio), or over HTTP
+  the headers `x-sap-debug-terminal-id` and `x-sap-debug-ide-id` for the MCP
+  session — the way `SAP_RESPONSIBLE` and `x-sap-responsible` are taken. Either
+  one set replaces only its own random default. Two cases want it: sharing an
+  IDE's debugging (the same `ideId` never conflicts), and finding again, after a
+  restart, the breakpoints a previous instance left under those ids. What a
+  shared id brings — shared catches, no conflict between the two — is the user's
+  choice and responsibility (D1). The values are not validated here: SAP judges
+  them, and its refusal reaches the user as a tool error.
 - **the conflict mode** — `refuse` or `takeOver`, set by the tool that started the
   listener (D6), passed to `AbapDebugger` as its constructor option.
 - **the breakpoints set** — kept by the server, because SAP answers no listing

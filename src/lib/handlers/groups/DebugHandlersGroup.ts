@@ -1,4 +1,32 @@
 import {
+  TOOL_DEFINITION as AmdpDebugCancel_Tool,
+  handleAmdpDebugCancel,
+} from '../../../handlers/debugger/debug/handleAmdpDebugCancel';
+import {
+  TOOL_DEFINITION as AmdpDebugGetTable_Tool,
+  handleAmdpDebugGetTable,
+} from '../../../handlers/debugger/debug/handleAmdpDebugGetTable';
+import {
+  TOOL_DEFINITION as AmdpDebugSetBreakpoints_Tool,
+  handleAmdpDebugSetBreakpoints,
+} from '../../../handlers/debugger/debug/handleAmdpDebugSetBreakpoints';
+import {
+  TOOL_DEFINITION as AmdpDebugStart_Tool,
+  handleAmdpDebugStart,
+} from '../../../handlers/debugger/debug/handleAmdpDebugStart';
+import {
+  TOOL_DEFINITION as AmdpDebugStep_Tool,
+  handleAmdpDebugStep,
+} from '../../../handlers/debugger/debug/handleAmdpDebugStep';
+import {
+  TOOL_DEFINITION as AmdpDebugStop_Tool,
+  handleAmdpDebugStop,
+} from '../../../handlers/debugger/debug/handleAmdpDebugStop';
+import {
+  TOOL_DEFINITION as AmdpDebugWait_Tool,
+  handleAmdpDebugWait,
+} from '../../../handlers/debugger/debug/handleAmdpDebugWait';
+import {
   TOOL_DEFINITION as DebugCreateMemorySnapshot_Tool,
   handleDebugCreateMemorySnapshot,
 } from '../../../handlers/debugger/debug/handleDebugCreateMemorySnapshot';
@@ -183,6 +211,35 @@ export class DebugHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DebugListSessions_Tool,
         handler: (args: any) => handleDebugListSessions(this.context, args),
+      },
+      {
+        toolDefinition: AmdpDebugStart_Tool,
+        handler: (args: any) => handleAmdpDebugStart(this.context, args),
+      },
+      {
+        toolDefinition: AmdpDebugSetBreakpoints_Tool,
+        handler: (args: any) =>
+          handleAmdpDebugSetBreakpoints(this.context, args),
+      },
+      {
+        toolDefinition: AmdpDebugWait_Tool,
+        handler: (args: any) => handleAmdpDebugWait(this.context, args),
+      },
+      {
+        toolDefinition: AmdpDebugStep_Tool,
+        handler: (args: any) => handleAmdpDebugStep(this.context, args),
+      },
+      {
+        toolDefinition: AmdpDebugGetTable_Tool,
+        handler: (args: any) => handleAmdpDebugGetTable(this.context, args),
+      },
+      {
+        toolDefinition: AmdpDebugCancel_Tool,
+        handler: (args: any) => handleAmdpDebugCancel(this.context, args),
+      },
+      {
+        toolDefinition: AmdpDebugStop_Tool,
+        handler: (args: any) => handleAmdpDebugStop(this.context, args),
       },
       {
         toolDefinition: MemorySnapshotList_Tool,

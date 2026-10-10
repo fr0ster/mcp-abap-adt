@@ -98,13 +98,18 @@ export function readAmdpPreview(xml: string): {
   return { columns: names, rows };
 }
 
+/** Shortens by count, never by precision: the ids that tell events apart stay. */
 export function terseAmdpEvent(e: AmdpEvent): {
   kind: string;
+  requestId?: string;
+  debuggeeId?: string;
   line?: number;
   variables: Array<{ name: string; value: string }>;
 } {
   return {
     kind: e.kind,
+    ...(e.requestId ? { requestId: e.requestId } : {}),
+    ...(e.debuggeeId ? { debuggeeId: e.debuggeeId } : {}),
     ...(e.line !== undefined ? { line: e.line } : {}),
     variables: e.variables,
   };

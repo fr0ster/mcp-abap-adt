@@ -32,6 +32,8 @@ describe('AMDP readings', () => {
     ]);
     expect(terseAmdpEvent(e)).toEqual({
       kind: 'ON_BREAK',
+      requestId: 'R1',
+      debuggeeId: 'D1',
       line: 14,
       variables: e.variables,
     });

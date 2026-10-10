@@ -78,6 +78,18 @@ import {
   TOOL_DEFINITION as DebugWait_Tool,
   handleDebugWait,
 } from '../../../handlers/debugger/debug/handleDebugWait';
+import {
+  handleMemorySnapshotDelta,
+  TOOL_DEFINITION as MemorySnapshotDelta_Tool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotDelta';
+import {
+  handleMemorySnapshotGet,
+  TOOL_DEFINITION as MemorySnapshotGet_Tool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotGet';
+import {
+  handleMemorySnapshotList,
+  TOOL_DEFINITION as MemorySnapshotList_Tool,
+} from '../../../handlers/debugger/debug/handleMemorySnapshotList';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -171,6 +183,18 @@ export class DebugHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DebugListSessions_Tool,
         handler: (args: any) => handleDebugListSessions(this.context, args),
+      },
+      {
+        toolDefinition: MemorySnapshotList_Tool,
+        handler: (args: any) => handleMemorySnapshotList(this.context, args),
+      },
+      {
+        toolDefinition: MemorySnapshotGet_Tool,
+        handler: (args: any) => handleMemorySnapshotGet(this.context, args),
+      },
+      {
+        toolDefinition: MemorySnapshotDelta_Tool,
+        handler: (args: any) => handleMemorySnapshotDelta(this.context, args),
       },
     ];
   }

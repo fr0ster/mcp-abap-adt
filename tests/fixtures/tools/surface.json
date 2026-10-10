@@ -2194,5 +2194,23 @@
     "name": "DebugListSessions",
     "inputs": "detail",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "MemorySnapshotList",
+    "inputs": "user, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "MemorySnapshotGet",
+    "inputs": "snapshot_id*, view, key, max_objects, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "MemorySnapshotDelta",
+    "inputs": "from_id*, to_id*, view, key, max_objects, detail",
+    "available_in": "cloud, onprem"
   }
 ]

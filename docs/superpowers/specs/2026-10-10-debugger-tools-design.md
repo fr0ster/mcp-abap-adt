@@ -21,7 +21,7 @@ The library already does every request (measured on premise, SAP_BASIS 758 and
 
 | # | Decision |
 |---|---|
-| D1 | **One MCP server = one connection to the SAP system it exposes.** Debugger state lives in the server process; no per-user registry, no session handles in tool arguments. |
+| D1 | **One MCP server = one user session** (one connection to the SAP system it exposes). Debugger state lives in the server process; no per-user registry, no session handles in tool arguments. What only the consumer controls — opening parallel sessions, several servers for the same SAP user — is not ours to manage: SAP's own answer (a listener conflict) reaches the model as it is, and nothing more is done about it. |
 | D2 | **Both scenarios**: the model starts the program, or someone else does. The listener lives in the background; the model asks whether something was caught. |
 | D3 | **Attach automatically** when the listener catches a debuggee: a debuggee is attachable only while it waits, and seconds between two model calls can lose it. |
 | D4 | **Idle timeout 5 minutes**: an attached debuggee no tool call has touched for 5 minutes is let go (`stepContinue`), so a suspended request of someone else does not hang until its session dies. |
@@ -211,3 +211,6 @@ An IDE debugging the same SAP user must be closed during these runs.
   AMDP cell substring — not measured.
 - Debugger state shared across server processes, or across users of one HTTP
   server (D1).
+- Coordinating several servers or sessions of the same SAP user (D1): what the
+  consumer opens is the consumer's to control; two of them meet as SAP's
+  listener conflict, reported as `conflict`.

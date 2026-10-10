@@ -1,3 +1,4 @@
+import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import {
   locationId,
   readAmdpEvents,
@@ -22,6 +23,12 @@ describe('AMDP readings', () => {
         headers: { Location: '/x/y/ABCDEF0123456789ABCDEF0123456789' },
       }),
     ).toBe('ABCDEF0123456789ABCDEF0123456789');
+  });
+  it('the sync names its request by a bare id in Location', () => {
+    expect(
+      locationId({ headers: { location: 'ABCDEF0123456789ABCDEF0123456789' } }),
+    ).toBe('ABCDEF0123456789ABCDEF0123456789');
+    expect(locationId({ headers: {} })).toBe('');
   });
   it('an ON_BREAK: kind, line, debuggee, variables (NULL for a null)', () => {
     const [e] = readAmdpEvents(BREAK);
@@ -76,5 +83,38 @@ describe('AMDP readings', () => {
     expect(
       readAmdpPreview('<dataPreview:tableData xmlns:dataPreview="z"/>'),
     ).toEqual({ columns: [], rows: [] });
+  });
+
+  describe('recorded on a system', () => {
+    it('the events answer is a mainResponseList: a sync carries its request id and every state', () => {
+      const [e] = readAmdpEvents(
+        corpusBody('amdp-debugger--03-events-sync-breakpoints'),
+      );
+      expect(e.kind).toBe('SYNC_BREAKPOINTS');
+      expect(e.requestId).toBe(
+        corpusSidecar('amdp-debugger--02-sync-breakpoints').response.headers
+          .location,
+      );
+      expect(e.states).toEqual(['PENDING', 'PENDING']);
+    });
+    it('a toggle batch reads as one event per breakpoint, each VALID', () => {
+      const events = readAmdpEvents(
+        corpusBody('amdp-debugger--04-events-toggle-breakpoints'),
+      );
+      expect(events.map((e) => e.kind)).toEqual([
+        'ON_TOGGLE_BREAKPOINTS',
+        'ON_TOGGLE_BREAKPOINTS',
+      ]);
+      expect(events.flatMap((e) => e.states)).toEqual(['VALID', 'VALID']);
+    });
+    it('the start names the session in Location and the HANA session in the body', () => {
+      const start = corpusSidecar('amdp-debugger--01-start');
+      const read = readAmdpStart({
+        headers: start.response.headers,
+        data: corpusBody('amdp-debugger--01-start'),
+      });
+      expect(read.mainId).toMatch(/^[0-9A-F]{32}$/);
+      expect(read.hanaSession).toContain(':');
+    });
   });
 });

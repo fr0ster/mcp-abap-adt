@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><amdpdbg:startParameters xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger"><amdpdbg:parameter amdpdbg:key="HANA_SESSION_ID" amdpdbg:value="sap.example.local:30103:225615"/></amdpdbg:startParameters>

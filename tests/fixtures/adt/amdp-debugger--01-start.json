@@ -1,0 +1,24 @@
+{
+  "case": "amdp-debugger",
+  "step": 1,
+  "stepTag": "start",
+  "capturedAt": "2026-10-11",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/amdp/debugger/main?stopExisting=true&requestUser=SAPUSER01&cascadeMode=NONE",
+    "params": null,
+    "headers": {
+      "Accept": "application/vnd.sap.adt.amdp.dbg.startmain.v1+xml"
+    },
+    "headersNote": "On premise (2026-10-11), through this package's debugger sessions (DEBUG_HTTP_WIRE); user, system and host replaced by placeholders; Location headers as measured by a separate probe the same day. Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/vnd.sap.adt.amdp.dbg.startmain.v1+xml; charset=utf-8",
+      "location": "/sap/bc/adt/amdp/debugger/main/0CC47A1E68C11FE1B19DE6B249E4B5CB"
+    },
+    "bodyFile": "amdp-debugger--01-start.body.xml"
+  }
+}

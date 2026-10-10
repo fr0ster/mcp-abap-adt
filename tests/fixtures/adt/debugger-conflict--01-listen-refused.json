@@ -1,0 +1,23 @@
+{
+  "case": "debugger-conflict",
+  "step": 1,
+  "stepTag": "listen-refused",
+  "capturedAt": "2026-10-11",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger/listeners?debuggingMode=user&requestUser=SAPUSER01&terminalId=92508D5E282C99B37F3C8F31B7C10B1B&ideId=EB021234FB83552BCB3DD0B71D12A71D&timeout=3&checkConflict=true&isNotifiedOnConflict=true",
+    "params": null,
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml"
+    },
+    "headersNote": "On premise (2026-10-11), through this package's debugger sessions (DEBUG_HTTP_WIRE); user, system and host replaced by placeholders; Location headers as measured by a separate probe the same day. Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-conflict--01-listen-refused.body.xml"
+  }
+}

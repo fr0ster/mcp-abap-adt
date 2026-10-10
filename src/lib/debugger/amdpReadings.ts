@@ -35,37 +35,62 @@ export interface AmdpEvent {
 const MAIN_RESPONSE =
   /<(?:[\w.-]+:)?mainResponse\b(?:[^>]*?\/>|[^>]*>[\s\S]*?<\/(?:[\w.-]+:)?mainResponse>)/g;
 
+/**
+ * Every value under `key` at any depth: the event's parts sit at different
+ * depths by kind (a sync's breakpoints under value/syncBreakpoints/breakpoints,
+ * measured on premise 2026-10-11), and the reading must not depend on that.
+ */
+function deep(node: unknown, key: string): any[] {
+  if (!node || typeof node !== 'object') return [];
+  if (Array.isArray(node)) return node.flatMap((n) => deep(n, key));
+  const found: any[] = [];
+  for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+    if (k === key) found.push(...(Array.isArray(v) ? v : [v]));
+    else found.push(...deep(v, key));
+  }
+  return found;
+}
+
 export function readAmdpEvents(xml: string): AmdpEvent[] {
   if (!xml?.trim()) return [];
   const doc = parser.parse(xml);
-  const root = doc.events && typeof doc.events === 'object' ? doc.events : doc;
+  // The system answers a mainResponseList (measured on premise, 2026-10-11).
+  const root =
+    [doc.mainResponseList, doc.events].find(
+      (r) => r && typeof r === 'object',
+    ) ?? doc;
   const rows: any[] = root.mainResponse ?? [];
   const bodies = [...xml.matchAll(MAIN_RESPONSE)].map((m) => m[0]);
   return rows.map((r, i) => {
-    const start = /#start=(\d+)/.exec(text(r.abapPosition?.uri))?.[1];
+    const position = deep(r, 'abapPosition')[0];
+    const start = /#start=(\d+)/.exec(text(position?.uri))?.[1];
     return {
       kind: text(r.kind),
       requestId: text(r.requestId),
       debuggeeId: text(r.debuggeeId),
       ...(start ? { line: Number(start) } : {}),
-      variables: (r.variable ?? []).map((v: any) => ({
+      variables: deep(r, 'variable').map((v: any) => ({
         name: text(v.name),
         value: text(v.isNullValue) === 'true' ? 'NULL' : text(v),
       })),
-      states: (r.breakpoint ?? []).map((b: any) => text(b.state)),
+      states: deep(r, 'breakpoint').map((b: any) => text(b.state)),
       body: bodies[i] ?? '',
     };
   });
 }
 
-/** The last path segment of `Location`. */
+/**
+ * The last path segment of `Location` — or the whole of it: the start names
+ * its session by a path, the breakpoint sync its request by a bare id
+ * (measured on premise, 2026-10-11).
+ */
 export function locationId(wire: {
   headers?: Record<string, unknown>;
 }): string {
   const location = String(
     wire.headers?.location ?? wire.headers?.Location ?? '',
-  );
-  return /\/([^/?]+)\/?(?:\?.*)?$/.exec(location)?.[1] ?? '';
+  ).trim();
+  return /(?:^|\/)([^/?]+)\/?(?:\?.*)?$/.exec(location)?.[1] ?? '';
 }
 
 export function readAmdpStart(wire: {

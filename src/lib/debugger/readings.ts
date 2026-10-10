@@ -341,3 +341,50 @@ export function terseVariables(r: VariablesReading) {
     ...(v.metaType === 'table' ? { rows: v.tableLines } : {}),
   }));
 }
+
+const exceptionParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '',
+  removeNSPrefix: true,
+  parseTagValue: false,
+  parseAttributeValue: false,
+  isArray: (name) => name === 'entry',
+});
+
+/**
+ * A failed answer as the model reads it: the failure's line, then what SAP's
+ * exception document says beyond it — the conflict text, the localized
+ * message, the subtype and the T100 key. The transport's line alone ("status
+ * code 409") does not tell a conflict from a take-over (measured on premise,
+ * 2026-10-11: both are 409, told apart only by the document).
+ */
+export function failureText(error: {
+  message: string;
+  response?: { data?: unknown };
+}): string {
+  const data = error.response?.data;
+  const xml = typeof data === 'string' ? data : '';
+  if (!xml.includes('exception')) return error.message;
+  let doc: Node;
+  try {
+    doc = exceptionParser.parse(xml)?.exception ?? {};
+  } catch {
+    return error.message;
+  }
+  const entries: Node[] = doc.properties?.entry ?? [];
+  const entry = (key: string) =>
+    text(entries.find((e) => e.key === key)?.['#text']).trim();
+  const localized = text(
+    doc.localizedMessage?.['#text'] ?? doc.localizedMessage,
+  ).trim();
+  const said = entry('conflictText') || localized;
+  const subType = entry('com.sap.adt.communicationFramework.subType');
+  const t100 = [entry('T100KEY-ID'), entry('T100KEY-NO')]
+    .filter(Boolean)
+    .join(' ');
+  const tags = [subType, t100].filter(Boolean).join(', ');
+  const told = [said, tags && `[${tags}]`].filter(Boolean).join(' ');
+  return told && !error.message.includes(told)
+    ? `${error.message}: ${told}`
+    : error.message;
+}

@@ -1,6 +1,7 @@
 import { corpusBody } from '../../../lib/adtCorpus';
 import {
   breakpointKey,
+  failureText,
   readAttach,
   readBreakpoints,
   readDebuggee,
@@ -257,5 +258,25 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
     expect(t.unresolvable_conditions).toEqual([
       { id: a.reachedBreakpoints[0].id, condition: 'X = 1' },
     ]);
+  });
+
+  describe('a failed answer keeps what SAP said (recorded 409s)', () => {
+    const failed = (name: string) => ({
+      message: 'Request failed with status code 409',
+      response: { data: corpusBody(name) },
+    });
+    it('a refused listener: the conflict text, the subtype and the T100 key', () => {
+      expect(failureText(failed('debugger-conflict--01-listen-refused'))).toBe(
+        'Request failed with status code 409: Another session (user SAPUSER01) exists with global debugging scope for user SAPUSER01 [conflictDetected, SY 530]',
+      );
+    });
+    it('a poll taken over: the subtype tells it from a refusal', () => {
+      expect(
+        failureText(failed('debugger-conflict--02-poll-taken-over')),
+      ).toContain('[conflictNotification, SY 530]');
+    });
+    it('no exception document: the line as it was', () => {
+      expect(failureText({ message: 'socket hang up' })).toBe('socket hang up');
+    });
   });
 });

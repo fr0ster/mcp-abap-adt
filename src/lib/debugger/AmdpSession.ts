@@ -36,6 +36,7 @@ import {
   WAIT_MAX_SECONDS,
 } from './DebugSession';
 import { lineUriOf } from './objectUri';
+import { failureText } from './readings';
 import { Serial } from './serial';
 
 export type AmdpDebuggerT = AmdpDebugger<typeof amdpDebuggerDocuments>;
@@ -76,7 +77,7 @@ interface Open {
 const bodyOf = (a: IAdtResponse<unknown>): string =>
   a.ok ? String(a.getResult().value ?? '') : '';
 const messageOf = (a: IAdtResponse<unknown>): string =>
-  a.ok ? '' : a.getError().message;
+  a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const asFailure = (e: unknown) =>
   ({

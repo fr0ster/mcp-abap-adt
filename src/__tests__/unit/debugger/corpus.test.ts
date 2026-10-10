@@ -8,6 +8,8 @@ describe('the debugger answers recorded on a system', () => {
     'debugger-message-and-objects',
     'debugger-terminate',
     'memory-snapshot-list',
+    'amdp-debugger',
+    'debugger-conflict',
   ])('%s is in the corpus', (prefix) => {
     expect(corpusCases(prefix).length).toBeGreaterThan(0);
   });

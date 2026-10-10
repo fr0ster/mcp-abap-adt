@@ -30,6 +30,7 @@ import {
   type BreakpointReading,
   breakpointKey,
   type DebuggeeReading,
+  failureText,
   readAttach,
   readBreakpoints,
   readDebuggee,
@@ -108,7 +109,7 @@ interface Stop {
 const bodyOf = (a: IAdtResponse<unknown>): string =>
   a.ok ? String(a.getResult().value ?? '') : '';
 const messageOf = (a: IAdtResponse<unknown>): string =>
-  a.ok ? '' : a.getError().message;
+  a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const asFailure = (e: unknown) =>
   ({

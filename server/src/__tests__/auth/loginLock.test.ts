@@ -5,7 +5,7 @@ import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
-import { LoginLock, oneLoginAtATime } from '../../../lib/auth/loginLock';
+import { LoginLock, oneLoginAtATime } from '../../auth/loginLock';
 
 const request = {} as AuthorizationRequest;
 

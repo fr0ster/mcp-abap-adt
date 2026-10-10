@@ -44,9 +44,6 @@
       ],
       "@mcp-abap-adt/lib/request-context": [
         "../dist/lib/requestContext.d.ts"
-      ],
-      "@mcp-abap-adt/http": [
-        "../http/dist/index.d.ts"
       ]
     }
   },

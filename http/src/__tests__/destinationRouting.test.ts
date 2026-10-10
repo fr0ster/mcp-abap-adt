@@ -30,8 +30,8 @@ import {
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
+import { inspectionOnlyDestinations } from '../../../server/src/StdioServer.js';
 import { SseServer } from '../SseServer.js';
-import { inspectionOnlyDestinations } from '../StdioServer.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 const emptyRegistry = new CompositeHandlersRegistry([]);

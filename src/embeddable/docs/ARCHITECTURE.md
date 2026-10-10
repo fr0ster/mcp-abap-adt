@@ -141,10 +141,10 @@ A destination -- `service-keys/trial.json` and `sessions/trial.env` -- is read f
 
 ### Destinations Setup
 
-The destinations are an `AuthBrokerFactory` (`@mcp-abap-adt/lib/auth`), built once. It builds one `AuthBroker` per destination on first use; the stores come from the destination's mode (an env file, or a named destination) and the browser login strategy is passed in -- the library has no default:
+The destinations are an `AuthBrokerFactory` (`@mcp-abap-adt/core/auth`), built once. It builds one `AuthBroker` per destination on first use; the stores come from the destination's mode (an env file, or a named destination) and the browser login strategy is passed in -- the library has no default:
 
 ```typescript
-import { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import { AuthBrokerFactory } from '@mcp-abap-adt/core/auth';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 
 const destinations = new AuthBrokerFactory({
@@ -159,7 +159,7 @@ const settings = await destinations.settingsFor('trial');
 const credential = await destinations.getProvider('trial');
 ```
 
-The four supported authentications -- basic, SNC, `jwt` / `authorization_code`, `jwt` / `none` -- are the handlers in `src/lib/auth/handlers/`.
+The four supported authentications -- basic, SNC, `jwt` / `authorization_code`, `jwt` / `none` -- are the handlers in `server/src/auth/handlers/` (`@mcp-abap-adt/core`).
 
 ## Server Classes
 

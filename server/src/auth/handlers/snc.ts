@@ -1,4 +1,4 @@
-import { SettingsError } from '../errors';
+import { SettingsError } from '@mcp-abap-adt/lib/auth';
 import type { AuthenticationHandler } from './types.js';
 
 export const sncHandler: AuthenticationHandler = {

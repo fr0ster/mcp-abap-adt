@@ -27,14 +27,14 @@ import type {
   IAuthProvider,
   IAuthRejection,
 } from '@mcp-abap-adt/interfaces-auth';
-import { AuthBrokerFactory } from '../../../lib/auth/brokerFactory';
-import { SHUTDOWN_REFUSAL } from '../../../lib/auth/countedProvider';
 import {
   describeAuthError,
   UnsupportedAuthenticationError,
-} from '../../../lib/auth/errors';
-import type { IAuthBrokerFactoryConfig } from '../../../lib/auth/IAuthBrokerFactoryConfig';
-import { vetMeans } from '../../../lib/auth/vocabulary';
+  vetMeans,
+} from '@mcp-abap-adt/lib/auth';
+import { AuthBrokerFactory } from '../../auth/brokerFactory';
+import { SHUTDOWN_REFUSAL } from '../../auth/countedProvider';
+import type { IAuthBrokerFactoryConfig } from '../../auth/IAuthBrokerFactoryConfig';
 
 const constructed = AuthBrokerCtor as unknown as jest.Mock;
 /** The fs module itself: `import * as` yields a copy whose getters cannot be spied. */

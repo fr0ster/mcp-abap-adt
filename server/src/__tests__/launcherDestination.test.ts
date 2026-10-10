@@ -22,19 +22,16 @@ jest.mock('@mcp-abap-adt/auth-broker', () => {
   };
 });
 
+import { SseServer, StreamableHttpServer } from '@mcp-abap-adt/http';
 import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
-import {
-  AuthBrokerFactory,
-  browserCallbackStrategy,
-} from '@mcp-abap-adt/lib/auth';
+import { browserCallbackStrategy } from '@mcp-abap-adt/lib/auth';
 import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
+import { AuthBrokerFactory } from '../auth';
 import { factoryConfigFrom, launch } from '../launcher.js';
-import { SseServer } from '../SseServer.js';
 import { StdioServer } from '../StdioServer.js';
-import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 const constructed = (
   jest.requireMock('@mcp-abap-adt/auth-broker') as { AuthBroker: jest.Mock }

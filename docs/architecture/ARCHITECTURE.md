@@ -106,7 +106,7 @@ This allows `IAdtObject<TConfig, TState>` to provide a uniform CRUD interface ac
 | Attribute | Value |
 |:---|:---|
 | **Responsibility** | Turns the connection headers of a request into settings and a credential, or names the destination the request asks for |
-| **Where** | `src/lib/credentialSources.ts` (`credentialFromHeaders`), `server/src/destinationRequest.ts` (`destinationFromHeader`) |
+| **Where** | `src/lib/credentialSources.ts` (`credentialFromHeaders`), `http/src/destinationRequest.ts` (`destinationFromHeader`) |
 | **Runtime role** | Used by the HTTP and SSE transport servers; stdio has no request headers |
 
 Per request, in this order:
@@ -162,7 +162,7 @@ The server calls `getProvider(destination)` and hands the provider to the connec
 | **Runtime role** | Built by the broker for a destination; the connector calls its four methods |
 | **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios`, `express`, `open` |
 
-The server supports four authentications, each served by one handler (`src/lib/auth/handlers/`):
+The server supports four authentications, each served by one handler (`server/src/auth/handlers/`):
 
 | Authentication | `SAP_AUTH_TYPE` / `SAP_GRANT_TYPE` | Provider |
 |:---|:---|:---|
@@ -456,7 +456,7 @@ The system has three distinct IoC boundaries:
 `mcp-abap-adt/src/server/launcher.ts` is the single composition root for the main server. It:
 
 1. Reads configuration (CLI, YAML, env)
-2. Chooses the stores of a destination (`src/lib/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
+2. Chooses the stores of a destination (`server/src/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
 3. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
 4. Assembles one `AuthBroker` per destination via `AuthBrokerFactory`, on first use
 5. Creates handler groups with `HandlerContext`
@@ -493,7 +493,7 @@ const broker = new AuthBroker({
 To add an authentication the server serves:
 
 1. **Implement or reuse an `IAuthProvider`** (`prepare`, `establish`, `authorize`, `rejected`; none may throw -- each answers `{ ok: true }` or a refusal)
-2. **Add an `AuthenticationHandler`** in `src/lib/auth/handlers/` that tells the broker what the destination needs, and register it in `HANDLERS`
+2. **Add an `AuthenticationHandler`** in `server/src/auth/handlers/` that tells the broker what the destination needs, and register it in `HANDLERS`
 3. Add its row to the table in section 2.6 and a test; the rest of the system remains unchanged -- the connector presents whatever `IAuthProvider` it is given
 
 An embedder that has its own credential passes it as `ConnectionContext.credential` and the server builds nothing from settings.

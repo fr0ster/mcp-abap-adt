@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { keyShapeOf, storesFor } from '../../../lib/auth/destinationStores';
+import { keyShapeOf, storesFor } from '../../auth/destinationStores';
 
 const URL_ = 'https://system.example.test';
 const XSUAA_URL = 'https://xsuaa-system.example.test';

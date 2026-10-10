@@ -90,4 +90,28 @@ describe('the state logger', () => {
     provokeObserverFailure(instance.state as never);
     expect(lines.join('')).toContain('observer broke');
   });
+
+  it('a stdio server given only a logger reports its state to that logger, not to a defaulted silent one', () => {
+    const lines: string[] = [];
+    const logger = {
+      info: () => {},
+      warn: () => {},
+      debug: () => {},
+      error: (m: string) => lines.push(m),
+    };
+    const server = new StdioServer(registry(), destinations, { logger });
+    provokeObserverFailure(server.state as never);
+    expect(lines.join('')).toContain('observer broke');
+  });
+
+  it('an HTTP server without any logger: its pool instances report on stderr', () => {
+    const server = new StreamableHttpServer(registry(), destinations, {});
+    const instance = (
+      server as unknown as {
+        createPerRequestServer(): { state: unknown };
+      }
+    ).createPerRequestServer();
+    provokeObserverFailure(instance.state as never);
+    expect(written.join('')).toContain('observer broke');
+  });
 });

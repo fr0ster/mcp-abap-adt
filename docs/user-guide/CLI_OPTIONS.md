@@ -218,7 +218,8 @@ See [Authentication & Destinations](AUTHENTICATION.md) for the four supported au
 State an instance holds between tool calls — a debug session: breakpoints, the listener, a
 stopped debuggee — ends after this many minutes without a tool call on that instance: a complete
 stop, the same as `DebugStop`, and its `state_handle` is no longer available. Default **30**,
-and never less: a value under 30, a fraction or a non-number is refused at startup. CLI wins
+and never less; at most **35791** (about 24.8 days, the longest a timer can hold). A value
+under 30 or over 35791, a fraction or a non-number is refused at startup. CLI wins
 over the environment, which wins over YAML.
 
 What counts as activity: a tool call on the instance. The bound counts from the end of the last

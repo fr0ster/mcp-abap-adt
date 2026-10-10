@@ -13,6 +13,8 @@ const asText = (value: unknown) => ({
  * terse / full / raw of one reading. `extraOf` — the handle and the SAP ids a
  * start answers — joins every detail: merged into terse and full, and as a
  * block of its own beside SAP's document under raw, so no detail loses it.
+ * `failureExtraOf` joins an error answer as a block of its own: a start that
+ * failed but left something held answers the handle that stops it.
  */
 export async function debugAnswer<T>(
   args: unknown,
@@ -20,6 +22,7 @@ export async function debugAnswer<T>(
   terse: (v: T) => unknown,
   full: (v: T) => unknown = (v) => v,
   extraOf: () => Record<string, unknown> = () => ({}),
+  failureExtraOf: () => Record<string, unknown> = () => ({}),
 ): Promise<McpResult> {
   try {
     const view = await work();
@@ -40,7 +43,11 @@ export async function debugAnswer<T>(
         : { value: projected, ...extra };
     return { isError: false, content: [asText(merged)] };
   } catch (error) {
-    return return_error(error) as McpResult;
+    const failed = return_error(error) as McpResult;
+    const extra = failureExtraOf();
+    return Object.keys(extra).length > 0
+      ? { ...failed, content: [...failed.content, asText(extra)] }
+      : failed;
   }
 }
 
@@ -51,6 +58,7 @@ export async function debugStateAnswer(
   args: unknown,
   work: () => Promise<DebugState>,
   extraOf: () => Record<string, unknown> = () => ({}),
+  failureExtraOf: () => Record<string, unknown> = () => ({}),
 ): Promise<McpResult> {
   return debugAnswer(
     args,
@@ -81,5 +89,6 @@ export async function debugStateAnswer(
     },
     (s) => s,
     extraOf,
+    failureExtraOf,
   );
 }

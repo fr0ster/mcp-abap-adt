@@ -2,7 +2,7 @@ import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
-import type { StateLogger } from '@mcp-abap-adt/lib/state';
+import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CORE_VERSION } from './coreVersion.js';
@@ -34,7 +34,8 @@ export class StdioServer extends BaseMcpServer {
       version: opts?.version ?? CORE_VERSION,
       logger: opts?.logger ?? noopLogger,
       stateIdleMinutes: opts?.stateIdleMinutes,
-      stateLogger: opts?.stateLogger,
+      // From the options as given: the silent default above is never the state's.
+      stateLogger: stateLoggerOf(opts ?? {}),
     });
   }
 

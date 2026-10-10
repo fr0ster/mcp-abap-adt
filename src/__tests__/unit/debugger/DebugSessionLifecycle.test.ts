@@ -209,6 +209,116 @@ describe('DebugSession lifecycle', () => {
     });
   });
 
+  describe('a close that throws outside a stop is kept for the next stop and recorded', () => {
+    function closeFails(world: ReturnType<typeof fakeWorld>) {
+      const realClose = world.ports.closeConnection;
+      const gate = { refuse: true };
+      world.ports.closeConnection = async (c) => {
+        if (gate.refuse) throw new Error('close refused');
+        return realClose(c);
+      };
+      return gate;
+    }
+    function noUnhandled() {
+      const seen: unknown[] = [];
+      const on = (e: unknown) => seen.push(e);
+      process.on('unhandledRejection', on);
+      return {
+        seen,
+        off: () => process.off('unhandledRejection', on),
+      };
+    }
+
+    it("the run's close: no unhandled rejection; the run still reports; the connection is kept and named", async () => {
+      const watch = noUnhandled();
+      try {
+        const world = fakeWorld();
+        const { session } = await started(
+          { kind: 'class', name: 'ZCL_X' },
+          IDS,
+          world,
+        );
+        const gate = closeFails(world);
+        world.run.resolve({ ok: true, output: 'total 6' });
+        await jest.advanceTimersByTimeAsync(0);
+        await jest.advanceTimersByTimeAsync(0);
+        expect(watch.seen).toEqual([]);
+        expect(await session.wait(0)).toMatchObject({
+          state: 'ended',
+          reason: 'run_finished',
+        });
+        expect(session.failures().join()).toMatch(
+          /the run's connection was not closed: close refused/,
+        );
+        expect(session.holdsState()).toBe(true);
+        gate.refuse = false;
+        await expect(session.stop()).resolves.toBeUndefined();
+        expect(session.holdsState()).toBe(false);
+        expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      } finally {
+        watch.off();
+      }
+    });
+
+    it('a listener dropped on a failed poll: its connection is kept and named', async () => {
+      const world = fakeWorld();
+      const { session } = await started(undefined, IDS, world);
+      const gate = closeFails(world);
+      world.polls[1].resolve(refusedResponse('session gone'));
+      await jest.advanceTimersByTimeAsync(0);
+      await expect(session.wait(0)).rejects.toThrow(/session gone/);
+      expect(session.failures().join()).toMatch(
+        /the listener's connection was not closed: close refused/,
+      );
+      expect(session.holdsState()).toBe(true);
+      gate.refuse = false;
+      await expect(session.stop()).resolves.toBeUndefined();
+      expect(session.holdsState()).toBe(false);
+      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    });
+
+    it('an attach that throws: the attach connection is kept and named', async () => {
+      const world = fakeWorld();
+      world.attachAnswers.push(async () => {
+        throw new Error('attach broke');
+      });
+      const { session } = await started(undefined, IDS, world);
+      const gate = closeFails(world);
+      world.polls[1].resolve(LISTEN_CATCH());
+      await until(() => world.calls.some((c) => c.startsWith('attach:')));
+      await jest.advanceTimersByTimeAsync(0);
+      await expect(session.wait(0)).rejects.toThrow(/attach broke/);
+      expect(session.failures().join()).toMatch(
+        /the debuggee's connection was not closed: close refused/,
+      );
+      gate.refuse = false;
+      await expect(session.stop()).resolves.toBeUndefined();
+      expect(session.holdsState()).toBe(false);
+      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    });
+
+    it('an attach overtaken by a newer generation whose release fails: the failed release is recorded', async () => {
+      const world = fakeWorld();
+      const attach = deferred<any>();
+      world.attachAnswers.push(() => attach.promise);
+      const { session } = await started(undefined, IDS, world);
+      world.polls[1].resolve(LISTEN_CATCH());
+      await until(() => world.calls.some((c) => c.startsWith('attach:')));
+      (session as any).generation++; // the listener moved on while the attach ran
+      world.override.step = async () => refusedResponse('work process busy');
+      attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
+      await jest.advanceTimersByTimeAsync(0);
+      await jest.advanceTimersByTimeAsync(0);
+      expect(session.failures().join()).toMatch(
+        /the debuggee was not released: work process busy/,
+      );
+      expect(session.holdsState()).toBe(true);
+      delete world.override.step;
+      await expect(session.stop()).resolves.toBeUndefined();
+      expect(session.holdsState()).toBe(false);
+    });
+  });
+
   it('stated ids: a start that failed before reconciling reconciles on the next start', async () => {
     const world = fakeWorld();
     const realOpen = world.ports.openConnection;

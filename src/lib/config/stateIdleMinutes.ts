@@ -1,13 +1,14 @@
 /**
  * The idle bound on held state, in its three forms: `--state-idle-minutes`,
  * `MCP_STATE_IDLE_MINUTES`, and the top-level YAML key `state-idle-minutes`.
- * CLI beats env beats YAML, as for the auth parameters. A value under 30, not
- * a whole number, or not a number is refused at startup, named in the form it
+ * CLI beats env beats YAML, as for the auth parameters. A value under 30, over
+ * 35791, not a whole number, or not a number is refused at startup, named in the form it
  * was given.
  */
 
 import {
   DEFAULT_STATE_IDLE_MINUTES,
+  MAX_STATE_IDLE_MINUTES,
   parseStateIdleMinutes,
 } from '../state/idleBound.js';
 
@@ -26,7 +27,9 @@ function readCli(argv: readonly string[]): string | undefined {
     if (arg === STATE_IDLE_CLI) {
       const next = argv[i + 1];
       if (next === undefined || next.startsWith('--')) {
-        throw new Error(`${STATE_IDLE_CLI} needs a value=<minutes>`);
+        throw new Error(
+          `${STATE_IDLE_CLI} needs a value: ${STATE_IDLE_CLI}=<minutes>`,
+        );
       }
       return next;
     }
@@ -70,7 +73,8 @@ export function validateStateIdleYaml(yaml: Record<string, unknown>): string[] {
 export function stateIdleHelp(): string {
   return `HELD STATE:
   ${`${STATE_IDLE_CLI}=<minutes>`.padEnd(33)}Held state (a debug session) ends after this many minutes
-                                   without a tool call. Default and minimum: 30; a whole number.
+                                   without a tool call. Default and minimum: 30; maximum: ${MAX_STATE_IDLE_MINUTES};
+                                   a whole number.
                                    Activity is a tool call on the instance; a call in flight
                                    (a wait on the server) pauses the bound, and a listener's own
                                    background re-poll does not count.

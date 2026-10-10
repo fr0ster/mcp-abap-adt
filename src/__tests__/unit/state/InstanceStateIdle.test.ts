@@ -89,7 +89,9 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     expect(s.handle).not.toBe(handle);
     expect(() => s.check(handle)).toThrow(StateUnavailableError);
     expect(l.info).toHaveLength(1);
-    expect(l.info[0]).toContain('30 minutes without a call');
+    expect(l.info[0]).toContain(
+      'ended by the idle bound (30 minutes without a call)',
+    );
     expect(l.info[0]).not.toContain(handle);
   });
 
@@ -365,6 +367,8 @@ describe('InstanceState — an expiry whose cleanup is still finishing', () => {
     held = false;
     tell(); // the last batch arrived
     expect(l.info).toHaveLength(2);
-    expect(l.info[1]).toMatch(/ended after 30 minutes without a call/);
+    expect(l.info[1]).toMatch(
+      /ended by the idle bound \(30 minutes without a call\)/,
+    );
   });
 });

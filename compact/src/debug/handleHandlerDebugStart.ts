@@ -5,6 +5,7 @@ import {
   breakpointsFromArgs,
   debugAnswer,
   debugStateAnswer,
+  heldStateHandle,
   RUN_PROPERTY,
   requireDebugger,
   runFromArgs,
@@ -17,7 +18,7 @@ import { refuseOtherKind } from './shared';
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugStart',
   available_in: ['onprem', 'cloud'] as const,
-  description: `Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. take_over: abap — ${TAKE_OVER_SENTENCE}; amdp — ends an AMDP session of this user left behind. ${USER_MODE_SENTENCE}`,
+  description: `Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. take_over: abap — ${TAKE_OVER_SENTENCE.replace(/\.$/, '')}; amdp — ends an AMDP session of this user left behind. ${USER_MODE_SENTENCE}`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -74,6 +75,7 @@ export async function handleHandlerDebugStart(
       (v) => v,
       (v) => v,
       () => ({ state_handle: context.state!.handle }),
+      () => heldStateHandle(context),
     );
   }
   return debugStateAnswer(
@@ -91,5 +93,6 @@ export async function handleHandlerDebugStart(
       terminal_id: context.debugger!().abap.ids.terminalId,
       ide_id: context.debugger!().abap.ids.ideId,
     }),
+    () => heldStateHandle(context),
   );
 }

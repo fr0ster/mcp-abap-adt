@@ -9,9 +9,15 @@
 
 export const DEFAULT_STATE_IDLE_MINUTES = 30;
 export const MIN_STATE_IDLE_MINUTES = 30;
+/**
+ * The largest bound a timer can hold: `setTimeout` takes at most 2^31-1 ms,
+ * and above that it fires after 1 ms — every session would end at once.
+ */
+export const MAX_STATE_IDLE_MINUTES = Math.floor((2 ** 31 - 1) / 60_000);
 
 /**
- * The bound as a whole number of minutes, at least 30; anything else is a
+ * The bound as a whole number of minutes, at least 30 and at most 35791
+ * (the timer's limit); anything else is a
  * misconfiguration and refused, never clamped. `name` is the form the value
  * was given in (`--state-idle-minutes`, the env variable, the YAML key, the
  * option), for the refusal.
@@ -31,6 +37,11 @@ export function parseStateIdleMinutes(raw: unknown, name: string): number {
   ) {
     throw new Error(
       `Invalid ${name}: "${String(raw)}". Must be a whole number of minutes, at least ${MIN_STATE_IDLE_MINUTES}`,
+    );
+  }
+  if (value > MAX_STATE_IDLE_MINUTES) {
+    throw new Error(
+      `Invalid ${name}: "${String(raw)}". Must be at most ${MAX_STATE_IDLE_MINUTES} minutes, the longest a timer can hold`,
     );
   }
   return value;

@@ -176,3 +176,70 @@ describe('the idle bound: a tool call is the user activity', () => {
     expect(() => at(29)).toThrow(/at least 30/);
   });
 });
+
+describe('where the state reports', () => {
+  /** An observer that throws on the next change makes the state report. */
+  const provoke = (server: BaseMcpServer) => {
+    server.state.onChange(() => {
+      throw new Error('observer broke');
+    });
+    server.state.attach({
+      holdsState: () => false,
+      pending: () => false,
+      failures: () => [],
+      dispose: async () => {},
+      observe: () => {},
+    });
+  };
+  const logger = () => ({
+    info: jest.fn(),
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn(),
+  });
+  let written: string[];
+  let spy: jest.SpyInstance;
+  beforeEach(() => {
+    written = [];
+    spy = jest
+      .spyOn(process.stderr, 'write')
+      .mockImplementation((chunk: unknown) => {
+        written.push(String(chunk));
+        return true;
+      });
+  });
+  afterEach(() => spy.mockRestore());
+
+  it("an embedder's explicit logger receives the state's lines when no state logger is given", () => {
+    const log = logger();
+    const server = new EmbeddableMcpServer({
+      connection: new MockAbapConnection() as any,
+      exposition: ['readonly'],
+      logger: log,
+    } as any);
+    provoke(server);
+    expect(log.error).toHaveBeenCalledWith(
+      expect.stringContaining('observer broke'),
+    );
+    expect(written.join('')).not.toContain('observer broke');
+  });
+
+  it('no logger given: stderr', () => {
+    provoke(make());
+    expect(written.join('')).toContain('observer broke');
+  });
+
+  it('an explicit state logger wins over the logger', () => {
+    const log = logger();
+    const lines: string[] = [];
+    const server = new EmbeddableMcpServer({
+      connection: new MockAbapConnection() as any,
+      exposition: ['readonly'],
+      logger: log,
+      stateLogger: { error: (m: string) => lines.push(m) },
+    } as any);
+    provoke(server);
+    expect(lines.join('')).toContain('observer broke');
+    expect(log.error).not.toHaveBeenCalled();
+  });
+});

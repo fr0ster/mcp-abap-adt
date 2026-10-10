@@ -48,6 +48,34 @@ describe('stateIdleMinutes — CLI, env, YAML', () => {
     },
   );
 
+  it('35791 is the maximum: a larger value would overflow the timer and is refused, naming the maximum', () => {
+    expect(readStateIdleMinutes(['--state-idle-minutes=35791'], {}, null)).toBe(
+      35791,
+    );
+    expect(readStateIdleMinutes([], { [ENV]: '35791' }, null)).toBe(35791);
+    expect(() =>
+      readStateIdleMinutes(['--state-idle-minutes=35792'], {}, null),
+    ).toThrow(/--state-idle-minutes.*at most 35791/);
+    expect(() => readStateIdleMinutes([], { [ENV]: '35792' }, null)).toThrow(
+      /at most 35791/,
+    );
+    expect(() =>
+      readStateIdleMinutes([], {}, { 'state-idle-minutes': 35792 }),
+    ).toThrow(/state-idle-minutes \(config file\).*at most 35791/);
+    expect(
+      validateYamlConfig({ 'state-idle-minutes': 35792 } as never).valid,
+    ).toBe(false);
+    expect(ServerConfigManager.generateHelp()).toContain('35791');
+  });
+
+  it('a bare --state-idle-minutes says how to give the value', () => {
+    expect(() =>
+      readStateIdleMinutes(['--state-idle-minutes'], {}, null),
+    ).toThrow(
+      '--state-idle-minutes needs a value: --state-idle-minutes=<minutes>',
+    );
+  });
+
   it('a YAML number under 30 or fractional is refused by the YAML validation too', () => {
     for (const v of [29, 0, -1, 30.5, 'abc']) {
       const r = validateYamlConfig({ 'state-idle-minutes': v } as never);
@@ -119,7 +147,7 @@ describe('ArgumentsParser reads stateIdleMinutes like its neighbours', () => {
       .slice(0, block.indexOf('env: MCP_STATE_IDLE_MINUTES'))
       .replace(/\s+/g, ' ');
     expect(text).toMatch(
-      /tool call\. Default and minimum: 30; a whole number\. /,
+      /tool call\. Default and minimum: 30; maximum: 35791; a whole number\. /,
     );
     expect(text).toMatch(/does not count\. $/);
   });

@@ -214,6 +214,41 @@ describe('debugger handlers', () => {
     expect(context.state.holdsState()).toBe(false);
   });
 
+  it('a refused start that could not undo everything answers the handle with its error, so the model can stop it', async () => {
+    const { world, context } = install();
+    world.override.deleteBreakpoint = async () => CONFLICT();
+    const started = handleDebugStartListener(context as any, {
+      breakpoints: [
+        { object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 32 },
+      ],
+    });
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(CONFLICT());
+    const r: any = await started;
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toMatch(/not undone/);
+    expect(context.state.holdsState()).toBe(true);
+    const all = r.content.map((c: any) => c.text).join('\n');
+    expect(all).toContain(context.state.handle);
+    delete world.override.deleteBreakpoint;
+    const stopped: any = await handleDebugStop(context as any, {
+      state_handle: context.state.handle,
+    });
+    expect(stopped.isError).toBeFalsy();
+    expect(context.state.holdsState()).toBe(false);
+  });
+
+  it('a refused start that left nothing answers no handle', async () => {
+    const { world, context } = install();
+    const started = handleDebugStartListener(context as any, {});
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(CONFLICT());
+    const r: any = await started;
+    expect(r.isError).toBe(true);
+    expect(r.content).toHaveLength(1);
+    expect(r.content[0].text).not.toContain(context.state.handle);
+  });
+
   it("a second start reaches SAP, and SAP's answer (a conflict, scripted) reaches the model; nothing of ours refuses it", async () => {
     const world = fakeWorld();
     const instance = () => {

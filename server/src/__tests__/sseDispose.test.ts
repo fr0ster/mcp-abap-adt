@@ -113,7 +113,7 @@ describe('SseServer disposes the instance of a session', () => {
     expect(shutdown).toHaveBeenCalledTimes(1);
   });
 
-  it('a close during stop()\'s drain does not dispose twice, and stop() reports its failure', async () => {
+  it("a close during stop()'s drain does not dispose twice, and stop() reports its failure", async () => {
     const release = deferred<string[]>();
     shutdown.mockReturnValue(release.promise);
     const routes: Record<string, any> = {};
@@ -163,6 +163,64 @@ describe('SseServer disposes the instance of a session', () => {
     await expect(sse.stop()).rejects.toThrow(/a session was left/);
     expect(logger.error).toHaveBeenCalledWith(
       expect.stringContaining('a session was left'),
+    );
+  });
+
+  it('a close that leaves something is written through the state logger: stderr when only the silent transport logger is set', async () => {
+    shutdown.mockResolvedValue(['a debuggee was left']);
+    const written: string[] = [];
+    const stderr = jest
+      .spyOn(process.stderr, 'write')
+      .mockImplementation((chunk: unknown) => {
+        written.push(String(chunk));
+        return true;
+      });
+    const routes: Record<string, any> = {};
+    const app: any = {
+      get: (p: string, h: any) => {
+        routes[p] = h;
+      },
+      post: jest.fn(),
+    };
+    const sse = make({ app });
+    sse.registerRoutes(app);
+    const res = fakeRes();
+    await routes['/sse']({ headers: {}, query: {} }, res);
+    res.emit('close');
+    await expect(sse.stop()).rejects.toThrow(/a debuggee was left/);
+    stderr.mockRestore();
+    expect(written.join('')).toContain('a debuggee was left');
+  });
+
+  it('a close that leaves something goes to the state logger given, not the transport logger', async () => {
+    shutdown.mockResolvedValue(['a listener was left']);
+    const lines: string[] = [];
+    const logger = {
+      error: jest.fn(),
+      debug: jest.fn(),
+      info: jest.fn(),
+      warn: jest.fn(),
+    };
+    const routes: Record<string, any> = {};
+    const app: any = {
+      get: (p: string, h: any) => {
+        routes[p] = h;
+      },
+      post: jest.fn(),
+    };
+    const sse = make({
+      app,
+      logger,
+      stateLogger: { error: (m: string) => lines.push(m) },
+    });
+    sse.registerRoutes(app);
+    const res = fakeRes();
+    await routes['/sse']({ headers: {}, query: {} }, res);
+    res.emit('close');
+    await expect(sse.stop()).rejects.toThrow(/a listener was left/);
+    expect(lines.join('')).toContain('a listener was left');
+    expect(logger.error).not.toHaveBeenCalledWith(
+      expect.stringContaining('a listener was left'),
     );
   });
 });

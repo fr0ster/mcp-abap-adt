@@ -67,6 +67,19 @@ export const stderrStateLogger: StateLogger = {
   },
 };
 
+/**
+ * The state logger a server uses: the state logger given; else the logger an
+ * embedder passed EXPLICITLY (a host's own logger is where it looks); else
+ * stderr. A host that defaults its transport logger to a silent one must not
+ * pass that default here — it passes nothing, and stderr answers.
+ */
+export function stateLoggerOf(options: {
+  stateLogger?: StateLogger;
+  logger?: StateLogger;
+}): StateLogger {
+  return options.stateLogger ?? options.logger ?? stderrStateLogger;
+}
+
 export interface InstanceStateOptions {
   logger?: StateLogger;
   /**
@@ -248,7 +261,8 @@ export class InstanceState {
     if (emptied && this.idleEnding) {
       this.idleEnding = false;
       this.log.info?.(
-        `instance state: held state ended after ${this.idleMinutes} minutes without a call`,
+        // "by the idle bound", not "after N minutes": a call may have arrived while the cleanup finished.
+        `instance state: held state ended by the idle bound (${this.idleMinutes} minutes without a call)`,
       );
     }
     if (emptied) for (const l of [...this.emptyListeners]) this.tell(l);

@@ -200,7 +200,7 @@ describe('DebugSession', () => {
     await until(() => world.polls.length === 3);
     expect(await session.wait(0)).toMatchObject({
       state: 'ended',
-      reason: 'attach_refused',
+      reason: 'attach_impossible',
       message: expect.stringMatching(/cannot be attached/),
     });
     expect(world.calls.some((c) => c.startsWith('attach:'))).toBe(false);
@@ -356,28 +356,34 @@ describe('DebugSession', () => {
       expect((await session.wait(0)).state).toBe('idle');
     });
 
-    it('an attach refused whose connection will not close: the failure is reported and the listener dropped', async () => {
+    it('an attach refused whose connection will not close: the connection is kept and named, and the listener goes on', async () => {
       const world = fakeWorld();
       world.attachAnswers.push(async () =>
         refusedResponse('Debuggee already attached'),
       );
       const { session } = await listening(world);
       const realClose = world.ports.closeConnection;
+      let refuse = true;
       world.ports.closeConnection = async (c) => {
-        if (c === world.opened[1]) throw new Error('close failed');
+        if (refuse && c === world.opened[1]) throw new Error('close failed');
         return realClose(c);
       };
       world.polls[1].resolve(LISTEN_CATCH());
-      await until(() => world.closed.includes(world.opened[0]));
+      await until(() => world.polls.length === 3);
       await settle();
       expect(unhandled).toEqual([]);
-      await expect(session.wait(0)).rejects.toThrow(/close failed/);
       expect(await session.wait(0)).toMatchObject({
         state: 'ended',
         reason: 'attach_refused',
       });
-      expect((await session.wait(0)).state).toBe('idle');
-      expect(world.polls).toHaveLength(2);
+      expect((await session.wait(0)).state).toBe('listening');
+      expect(session.failures().join()).toMatch(
+        /the debuggee's connection was not closed: close failed/,
+      );
+      refuse = false;
+      await session.stop();
+      expect(session.holdsState()).toBe(false);
+      expect(new Set(world.closed)).toEqual(new Set(world.opened));
     });
 
     it('a refused start reports the breakpoint it could not delete, and keeps it armed', async () => {

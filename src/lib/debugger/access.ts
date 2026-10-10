@@ -31,3 +31,16 @@ export function requireDebugger(
   instance.amdp.bind(context);
   return instance;
 }
+
+/**
+ * For a start's error answer: the handle, while the state still holds
+ * something (a start that could not undo everything) — the model stops it
+ * with this handle. Nothing held: nothing to answer.
+ */
+export function heldStateHandle(
+  context: HandlerContext,
+): Record<string, unknown> {
+  return context.state?.holdsState()
+    ? { state_handle: context.state.handle }
+    : {};
+}

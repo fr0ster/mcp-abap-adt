@@ -1,5 +1,5 @@
 // src/handlers/debugger/debug/handleDebugTakeOverListener.ts
-import { requireDebugger } from '../../../lib/debugger/access';
+import { heldStateHandle, requireDebugger } from '../../../lib/debugger/access';
 import { debugStateAnswer } from '../../../lib/debugger/answer';
 import {
   BREAKPOINTS_PROPERTY,
@@ -47,5 +47,6 @@ export async function handleDebugTakeOverListener(
       terminal_id: context.debugger!().abap.ids.terminalId,
       ide_id: context.debugger!().abap.ids.ideId,
     }),
+    () => heldStateHandle(context),
   );
 }

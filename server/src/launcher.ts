@@ -225,11 +225,6 @@ function showHelp(options: LauncherOptions = {}): void {
 export interface LauncherOptions {
   /** Built against the launcher's own base context, once, at startup. */
   extraGroups?: (context: HandlerContext) => IHandlerGroup[];
-  /**
-   * Groups whose tools hold state in the server instance (the compact facade's
-   * debugger tools). Built against the launcher's own base context, once.
-   */
-  statefulGroups?: (context: HandlerContext) => IHandlerGroup[];
   /** Overrides the configured exposition, for a command with a fixed tool list. */
   exposition?: readonly HandlerSet[];
   /** The command's own name, for USAGE in `--help`. */
@@ -549,10 +544,6 @@ export async function launch(
   if (exposition.includes('debug')) {
     overridingGroups.push(new DebugHandlersGroup(baseContext));
   }
-  for (const group of options.statefulGroups?.(baseContext) ?? []) {
-    overridingGroups.push(group);
-  }
-
   for (const group of options.extraGroups?.(baseContext) ?? []) {
     overridingGroups.push(group);
   }

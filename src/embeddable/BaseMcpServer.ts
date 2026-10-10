@@ -28,7 +28,7 @@ import {
 import {
   InstanceState,
   type StateLogger,
-  stderrStateLogger,
+  stateLoggerOf,
 } from '../lib/state/InstanceState.js';
 import { systemContextFromConfiguration } from '../lib/systemContext.js';
 import {
@@ -97,8 +97,9 @@ export abstract class BaseMcpServer extends McpServer {
     stateIdleMinutes?: number;
     /**
      * Where the state's lifecycle lines go (the bound's end of a state, a
-     * failed cleanup, a failing observer). Default: stderr, always on — never
-     * the transport logger, which a host may silence.
+     * failed cleanup, a failing observer). Default: the `logger` passed
+     * explicitly, else stderr, always on — never a transport logger a host
+     * defaulted to silence (such a host passes this option itself).
      */
     stateLogger?: StateLogger;
   }) {
@@ -106,7 +107,7 @@ export abstract class BaseMcpServer extends McpServer {
     this.logger = options.logger ?? getDefaultLogger();
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
-      logger: options.stateLogger ?? stderrStateLogger,
+      logger: stateLoggerOf(options),
     });
     this.systemType = options.systemType;
     this.systemContextResolver =

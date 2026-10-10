@@ -13,7 +13,7 @@ import {
   requestContextFromHeaders,
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
-import type { StateLogger } from '@mcp-abap-adt/lib/state';
+import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
@@ -138,7 +138,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   /** The instances that hold state between requests (spec D9). */
   private readonly pool = new InstancePool<PerRequestServerApi>();
   private readonly stateIdleMinutes?: number;
-  private readonly stateLogger?: StateLogger;
+  private readonly stateLogger: StateLogger;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -152,10 +152,11 @@ export class StreamableHttpServer extends BaseMcpServer {
       logger: opts?.logger ?? noopLogger,
       // Validated by the base: a misconfiguration stops the start.
       stateIdleMinutes: opts?.stateIdleMinutes,
-      stateLogger: opts?.stateLogger,
+      // From the options as given: the silent default above is never the state's.
+      stateLogger: stateLoggerOf(opts ?? {}),
     });
     this.stateIdleMinutes = opts?.stateIdleMinutes;
-    this.stateLogger = opts?.stateLogger;
+    this.stateLogger = stateLoggerOf(opts ?? {});
     this.version = opts?.version ?? CORE_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;

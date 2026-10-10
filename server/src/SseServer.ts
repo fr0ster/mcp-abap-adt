@@ -17,6 +17,7 @@ import {
 import {
   parseStateIdleMinutes,
   type StateLogger,
+  stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
@@ -131,7 +132,7 @@ export class SseServer {
   private readonly allowedOrigins?: string[];
   private readonly enableDnsRebindingProtection?: boolean;
   private readonly stateIdleMinutes?: number;
-  private readonly stateLogger?: StateLogger;
+  private readonly stateLogger: StateLogger;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -157,7 +158,8 @@ export class SseServer {
       opts?.stateIdleMinutes === undefined
         ? undefined
         : parseStateIdleMinutes(opts.stateIdleMinutes, 'stateIdleMinutes');
-    this.stateLogger = opts?.stateLogger;
+    // From the options as given: the silent default of `this.logger` is never the state's.
+    this.stateLogger = stateLoggerOf(opts ?? {});
   }
 
   /**
@@ -447,7 +449,8 @@ export class SseServer {
       // session when its last event batch arrives); stop() waits for it.
       const closing = server.shutdownState().then((left) => {
         if (left.length) {
-          this.logger.error(
+          // The state's line: always written (stderr unless an embedder chose a logger).
+          this.stateLogger.error(
             `[SSE CLOSE] state cleanup for session ${sessionId} left: ${left.join('; ')}`,
           );
         }

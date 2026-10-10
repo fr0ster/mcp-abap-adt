@@ -132,6 +132,32 @@ describe('AMDP debugger handlers', () => {
     });
   });
 
+  it('a refused start answers the handle with its error while the state holds something, and none when it holds nothing', async () => {
+    const f = fakeAmdp();
+    f.amdp.start = async () => {
+      throw new Error('socket hang up; not undone: stop: not stopped');
+    };
+    const { context, state } = install(f.amdp);
+    const r: any = await handleAmdpDebugStart(context, {
+      breakpoints: [{ class_name: 'zcl_a', line: 14 }],
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content.map((c: any) => c.text).join('\n')).toContain(
+      state.handle,
+    );
+    const g = fakeAmdp();
+    g.amdp.holdsState = () => false;
+    g.amdp.start = async () => {
+      throw new Error('socket hang up');
+    };
+    const other = install(g.amdp);
+    const r2: any = await handleAmdpDebugStart(other.context, {
+      breakpoints: [{ class_name: 'zcl_a', line: 14 }],
+    });
+    expect(r2.isError).toBe(true);
+    expect(r2.content).toHaveLength(1);
+  });
+
   it('start without stop_existing does not stop an existing one', async () => {
     const f = fakeAmdp();
     const { context } = install(f.amdp);

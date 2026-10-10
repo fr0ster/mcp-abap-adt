@@ -74,7 +74,8 @@ export type EndReason =
   | 'debuggee_ended'
   | 'terminated'
   | 'run_finished'
-  | 'attach_refused';
+  | 'attach_refused'
+  | 'attach_impossible';
 export type DebugState =
   | { state: 'idle' }
   | { state: 'listening' }
@@ -321,14 +322,12 @@ export class DebugSession<O = unknown> {
         failures.push(...(await this.releaseLocked()));
         const run = this.run;
         this.run = undefined;
-        await this.close(run?.connection).catch((e) => {
-          failures.push(`the run's connection was not closed: ${thrown(e)}`);
-        });
-        await this.dropListener().catch((e) => {
-          failures.push(
-            `the listener's connection was not closed: ${thrown(e)}`,
-          );
-        });
+        const runKept = await this.closeOrRecord(
+          run?.connection,
+          "the run's connection",
+        );
+        if (runKept) failures.push(runKept);
+        failures.push(...(await this.dropListener()));
         failures.push(...(await this.undoArmed(identity, placedHere())));
         if (failures.length === 0) throw error;
         const notUndone = `not undone: ${failures.join('; ')}`;
@@ -354,12 +353,11 @@ export class DebugSession<O = unknown> {
     if (!released.ok)
       return [`the debuggee was not released: ${messageOf(released)}`];
     this.current = undefined;
-    try {
-      await this.close(stop.connection);
-      return [];
-    } catch (e) {
-      return [`the debuggee's connection was not closed: ${thrown(e)}`];
-    }
+    const kept = await this.closeOrRecord(
+      stop.connection,
+      "the debuggee's connection",
+    );
+    return kept ? [kept] : [];
   }
 
   /**
@@ -383,15 +381,14 @@ export class DebugSession<O = unknown> {
         );
     }
     if (this.armed.size === 0 && this.control) {
-      try {
-        await this.close(this.control.connection);
-        this.control = undefined;
-      } catch (e) {
-        // The control stays, so a later cleanup closes it again.
-        failures.push(
-          `the breakpoints' connection was not closed: ${thrown(e)}`,
-        );
-      }
+      const control = this.control;
+      this.control = undefined;
+      // A close that throws keeps the connection for the next stop.
+      const kept = await this.closeOrRecord(
+        control.connection,
+        "the breakpoints' connection",
+      );
+      if (kept) failures.push(kept);
     }
     return failures;
   }
@@ -422,7 +419,7 @@ export class DebugSession<O = unknown> {
       // already has its failure set.
       if (this.owns(listener, generation)) {
         this.failure ??= thrown(error);
-        await this.dropListener().catch(() => undefined);
+        await this.dropListener(); // a close that throws is kept and recorded
       }
       this.notify();
     }
@@ -459,7 +456,7 @@ export class DebugSession<O = unknown> {
     if (debuggee.attachImpossible) {
       this.notices.push({
         state: 'ended',
-        reason: 'attach_refused',
+        reason: 'attach_impossible',
         message: 'the debuggee cannot be attached (SAP: attach impossible)',
       });
       return false;
@@ -480,14 +477,19 @@ export class DebugSession<O = unknown> {
           reason: 'attach_refused',
           message: messageOf(attached),
         });
-        await this.close(connection);
+        await this.closeOrRecord(connection, "the debuggee's connection");
         return false;
       }
       if (generation !== this.generation) {
-        await dbg
+        // Overtaken while attaching: released at once; a release that fails is recorded.
+        const released = await dbg
           .step('stepContinue', { analyse: analyseDebuggeeEnd })
-          .catch(() => undefined);
-        await this.close(connection);
+          .catch(asFailure);
+        if (!released.ok)
+          this.cleanupFailures.push(
+            `the debuggee was not released: ${messageOf(released)}`,
+          );
+        await this.closeOrRecord(connection, "the debuggee's connection");
         return false;
       }
       const stack = await dbg.getStack();
@@ -510,19 +512,24 @@ export class DebugSession<O = unknown> {
       };
       return true;
     } catch (error) {
-      // Best effort: the failure and the drop below must happen whatever the close does.
-      await this.close(connection).catch(() => undefined);
+      // The failure and the drop below happen whatever the close does; a close that throws is kept.
+      await this.closeOrRecord(connection, "the debuggee's connection");
       this.failure = thrown(error);
       await this.dropListener();
       return false;
     }
   }
 
-  protected async dropListener(): Promise<void> {
+  /** Never throws: a close that throws is kept for the next stop, recorded, and answered. */
+  protected async dropListener(): Promise<string[]> {
     const listener = this.listener;
     this.listener = undefined;
     this.generation++;
-    await this.close(listener?.connection);
+    const kept = await this.closeOrRecord(
+      listener?.connection,
+      "the listener's connection",
+    );
+    return kept ? [kept] : [];
   }
 
   // --- waiting ----------------------------------------------------------------
@@ -752,6 +759,20 @@ export class DebugSession<O = unknown> {
     }
   }
 
+  /**
+   * Outside stop: the same keep-for-retry close, recorded in failures() so
+   * the state stays held until a stop closes it. Never throws; answers the failure.
+   */
+  private async closeOrRecord(
+    connection: IAbapConnection | undefined,
+    what: string,
+  ): Promise<string | undefined> {
+    const failures: string[] = [];
+    await this.closeOrKeep(connection, what, failures);
+    this.cleanupFailures.push(...failures);
+    return failures[0];
+  }
+
   protected async beforeFirstListen(
     identity: IDebuggerIdentity,
   ): Promise<void> {
@@ -768,26 +789,28 @@ export class DebugSession<O = unknown> {
     this.run = { generation };
     void (async () => {
       let connection: IAbapConnection | undefined;
-      let outcome: RunOutcome;
+      let outcome: RunOutcome | undefined;
       try {
         connection = await this.open();
-        if (this.run?.generation !== generation) return;
-        this.run.connection = connection;
-        outcome = await this.ports.run(connection, target);
+        if (this.run?.generation === generation) {
+          this.run.connection = connection;
+          outcome = await this.ports.run(connection, target);
+        }
       } catch (error) {
         outcome = { ok: false, message: thrown(error) };
-      } finally {
-        await this.close(connection);
       }
-      if (this.run?.generation !== generation) return;
-      this.run = undefined;
-      this.notices.push({
-        state: 'ended',
-        reason: 'run_finished',
-        run: outcome,
-      });
+      // A close that throws keeps the connection for the next stop and is recorded.
+      await this.closeOrRecord(connection, "the run's connection");
+      if (outcome && this.run?.generation === generation) {
+        this.run = undefined;
+        this.notices.push({
+          state: 'ended',
+          reason: 'run_finished',
+          run: outcome,
+        });
+      }
       this.notify();
-    })();
+    })().catch(() => this.notify());
   }
 
   /**

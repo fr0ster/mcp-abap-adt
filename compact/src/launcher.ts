@@ -40,10 +40,11 @@ HANDLER EXPOSITION:
                                          update, delete, activate, lock, unlock,
                                          unit-test run or profiler run is in the
                                          list at all, so a client cannot call one.
-                                   - debug: beside ro or rw, the four debugger
-                                         verbs (HandlerDebugStart, ...Wait,
-                                         ...View, ...Step). They catch every
-                                         request of the connected SAP user.
+                                   - debug: beside ro or rw, never alone,
+                                         the four debugger verbs
+                                         (HandlerDebugStart, ...Wait, ...View,
+                                         ...Step). They catch every request
+                                         of the connected SAP user.
 
                                    The object-oriented sets (readonly, high, low)
                                    belong to \`mcp-abap-adt\`; this command serves the
@@ -88,10 +89,11 @@ function expositionValues(argv: readonly string[]): string[] | undefined {
 }
 
 /**
- * Which half of the facade: the last of `ro`/`rw` in the list, `rw` when none.
- * A value outside `ro`, `rw`, `debug` is refused by name rather than defaulted,
- * because starting with a different tool list than the one that was asked for is
- * the failure this is meant to prevent.
+ * Which half of the facade: the last of `ro`/`rw` in the list, `rw` when the flag
+ * is absent. A value outside `ro`, `rw`, `debug` is refused by name rather than
+ * defaulted, because starting with a different tool list than the one that was
+ * asked for is the failure this is meant to prevent — and so is `debug` alone: it
+ * names no half, and taking `rw` for it would open the write tools unasked.
  */
 export function parseCompactExposition(
   argv: readonly string[],
@@ -107,12 +109,40 @@ export function parseCompactExposition(
       );
     }
   }
-  return base ?? 'rw';
+  if (!base) {
+    throw new Error(
+      "--exposition=debug alone names no half of the facade: add 'ro' or 'rw' beside it (for example ro,debug).",
+    );
+  }
+  return base;
 }
 
 /** Whether the four debugger verbs are served: `debug` in the `--exposition` list. */
 export function parseCompactDebug(argv: readonly string[]): boolean {
   return expositionValues(argv)?.includes('debug') ?? false;
+}
+
+/**
+ * The groups this command hands the core launcher, through `extraGroups` — the
+ * option every published core launcher takes: its half of the facade, and the
+ * debugger verbs when `debug` is listed. Each is a real group, never an object
+ * literal wrapping the entries: the launcher sets the per-request context on the
+ * group that owns an entry, and only a `BaseHandlerGroup` reads `this.context`
+ * when the handler runs. A literal closing over the startup context is exactly the
+ * defect review caught on PR #240 — a server running every call against the
+ * connection it had before it connected.
+ */
+export function compactExtraGroups(
+  argv: readonly string[],
+): (context: never) => object[] {
+  const exposition = parseCompactExposition(argv);
+  const debug = parseCompactDebug(argv);
+  return (context) => [
+    exposition === 'ro'
+      ? new CompactReadOnlyHandlersGroup(context)
+      : new CompactHandlersGroup(context),
+    ...(debug ? [new CompactDebugHandlersGroup(context)] : []),
+  ];
 }
 
 export async function main(): Promise<void> {
@@ -125,14 +155,13 @@ export async function main(): Promise<void> {
     return;
   }
 
-  const exposition = parseCompactExposition(process.argv.slice(2));
+  const extraGroups = compactExtraGroups(process.argv.slice(2));
 
   const { main: launch } = require('@mcp-abap-adt/core/launcher') as {
     main: (options: {
       program?: string;
       helpExposition?: string;
       extraGroups?: (context: never) => unknown[];
-      statefulGroups?: (context: never) => unknown[];
       exposition?: readonly string[];
       includeSearch?: boolean;
       version?: string;
@@ -145,21 +174,7 @@ export async function main(): Promise<void> {
     helpExposition: HELP_EXPOSITION,
     exposition: [],
     includeSearch: false,
-    // Both branches build a real group, never an object literal wrapping the
-    // entries: the launcher sets the per-request context on the group that owns an
-    // entry, and only a `BaseHandlerGroup` reads `this.context` when the handler
-    // runs. A literal closing over the startup context is exactly the defect review
-    // caught on PR #240 — a server running every call against the connection it had
-    // before it connected.
-    statefulGroups: (context) =>
-      parseCompactDebug(process.argv.slice(2))
-        ? [new CompactDebugHandlersGroup(context as never)]
-        : [],
-    extraGroups: (context) => [
-      exposition === 'ro'
-        ? new CompactReadOnlyHandlersGroup(context as never)
-        : new CompactHandlersGroup(context as never),
-    ],
+    extraGroups,
   });
 }
 

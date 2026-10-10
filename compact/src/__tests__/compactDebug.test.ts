@@ -6,7 +6,11 @@ import type { TOOL_DEFINITION as Start } from '../debug/handleHandlerDebugStart'
 import type { TOOL_DEFINITION as Step } from '../debug/handleHandlerDebugStep';
 import type { TOOL_DEFINITION as View } from '../debug/handleHandlerDebugView';
 import type { TOOL_DEFINITION as Wait } from '../debug/handleHandlerDebugWait';
-import { parseCompactDebug, parseCompactExposition } from '../launcher';
+import {
+  compactExtraGroups,
+  parseCompactDebug,
+  parseCompactExposition,
+} from '../launcher';
 
 /** What each verb takes: the compiler checks every call below against its schema. */
 interface VerbArgs {
@@ -29,13 +33,30 @@ describe('compact debug', () => {
   it('--exposition takes debug beside ro or rw', () => {
     expect(parseCompactExposition(['--exposition=ro,debug'])).toBe('ro');
     expect(parseCompactDebug(['--exposition=ro,debug'])).toBe(true);
-    expect(parseCompactExposition(['--exposition=debug'])).toBe('rw');
+    expect(() => parseCompactExposition(['--exposition=debug'])).toThrow(
+      /debug.*alone.*add 'ro' or 'rw'/,
+    );
+    expect(() => parseCompactExposition(['--exposition', 'debug'])).toThrow(
+      /add 'ro' or 'rw'/,
+    );
     expect(parseCompactExposition(['--exposition=debug,ro,rw'])).toBe('rw');
     expect(parseCompactDebug(['--exposition=rw'])).toBe(false);
     expect(parseCompactDebug([])).toBe(false);
     expect(() => parseCompactExposition(['--exposition=high'])).toThrow();
     expect(() => parseCompactExposition(['--exposition=ro,high'])).toThrow();
     expect(() => parseCompactDebug(['--exposition='])).toThrow(/no value/);
+  });
+  it('the debug group reaches the core launcher through extraGroups, beside its half of the facade', () => {
+    const names = (argv: string[]) =>
+      compactExtraGroups(argv)({ connection: undefined } as never).map(
+        (g) => g.constructor.name,
+      );
+    expect(names(['--exposition=ro,debug'])).toEqual([
+      'CompactReadOnlyHandlersGroup',
+      'CompactDebugHandlersGroup',
+    ]);
+    expect(names(['--exposition=rw'])).toEqual(['CompactHandlersGroup']);
+    expect(names([])).toEqual(['CompactHandlersGroup']);
   });
   it('the start describes user mode and taking over as facts', () => {
     const start = entries.find(
@@ -47,6 +68,7 @@ describe('compact debug', () => {
     expect(start.toolDefinition.description).toMatch(
       /Displaces another debugger/,
     );
+    expect(start.toolDefinition.description).not.toMatch(/[.;,][.;,]/);
   });
   it('every session verb requires state_handle', () => {
     for (const e of entries.filter(
@@ -296,6 +318,37 @@ describe('compact debug verbs on the fake sessions', () => {
       breakpoints: ['PENDING'],
       state_handle: t.state.handle,
     });
+  });
+
+  it('a refused start answers the handle with its error while the state holds something', async () => {
+    const t = install();
+    const abap = (t.state as any).parts[0].abap;
+    abap.start = async () => {
+      t.abapHeld.on = true;
+      throw new Error('conflict; not undone: breakpoint is still armed');
+    };
+    const r = await t.call('HandlerDebugStart', {
+      kind: 'abap',
+      breakpoints: [{ exception_class: 'cx_a' }],
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content.map((c: any) => c.text).join('\n')).toContain(
+      t.state.handle,
+    );
+    const t2 = install();
+    const amdp = (t2.state as any).parts[0].amdp;
+    amdp.start = async () => {
+      t2.amdpHeld.on = true;
+      throw new Error('socket hang up; not undone: stop: not stopped');
+    };
+    const r2 = await t2.call('HandlerDebugStart', {
+      kind: 'amdp',
+      breakpoints: [{ object_name: 'zcl_a', line: 14 }],
+    });
+    expect(r2.isError).toBe(true);
+    expect(r2.content.map((c: any) => c.text).join('\n')).toContain(
+      t2.state.handle,
+    );
   });
 
   it('a start is refused while the instance holds the other kind', async () => {

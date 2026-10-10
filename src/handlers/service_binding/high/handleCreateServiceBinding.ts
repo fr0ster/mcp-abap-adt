@@ -1,56 +1,30 @@
 /**
- * CreateServiceBinding Handler - Create ABAP Service Binding, then activate
- * and generate its service
+ * CreateServiceBinding Handler - Create an ABAP service binding; when asked,
+ * activate it and read the service group it publishes.
  *
- * Uses AdtClient.getServiceBinding().{create,activate,generateServiceBinding}
- * from @mcp-abap-adt/adt-clients 19.
+ * Uses AdtClient.getServiceBinding().{create, activate, getServiceGroup}
+ * from @mcp-abap-adt/adt-clients 27.
  *
- * **The pre-migration handler's `create()` was already a composite the .d.ts
- * comment still half-describes and the shipped `.js` no longer is.**
- * `AdtServiceBinding.create()`'s doc comment says "Create the binding, and
- * activate and generate its service... What the chain does after it — the
- * check, the activation, the generation — is this implementation's business
- * and reaches a caller only if it fails" — but `AdtService.js`'s `create()`
- * body (around line 226) issues exactly one request, `createRequest`, and
- * nothing else. The comment is stale against the compiled behaviour; the
- * compiled behaviour is what this handler is built against. `create()` now
- * posts the shell only, matching the general v19 rule ("one member, one
- * endpoint call") and this repository's own create/update split.
+ * **`create()` is one request.** It posts the binding and nothing else; until
+ * adt-clients 27 its doc comment still described a create-activate-generate
+ * chain the compiled member had stopped running. This handler composes the
+ * rest: `create()`, then — unless `activate` is `false` — `activate()` and a
+ * read of the service group.
  *
- * The pre-migration composite's three captured results —
- * `state.createResult`, `state.readResult`, `state.generatedInfoResult` —
- * are rebuilt as a sequence: `create()`, then, only when `activate` is
- * requested (as `activateOnCreate` used to gate it), `activate()` and
- * `generateServiceBinding()`. `generateServiceBinding` accepts no
- * `options.analyse` at all (confirmed against its declared signature and its
- * one-request `generateRequest` body) — its verdict is the library's
- * unjudged HTTP-status default, the same absence `classifyServiceBinding`
- * and the node-structure members in this migration share.
+ * **The last step reads, it does not generate.** It was
+ * `generateServiceBinding()` until adt-clients 27, which sent the very `GET`
+ * of the service group that `getServiceGroup()` sends and generated nothing;
+ * 27 removed that name. The read stays because it is a useful check after an
+ * activation: a binding whose service group cannot be read is reported as the
+ * refusal it is, rather than as a success.
  *
- * **Assumption, not corpus-verified:** no captured fixture in
- * `tests/fixtures/adt/` covers a service-binding create, so the order
- * "activate before generate" follows ADT's general rule that only an active
- * object's OData service can be generated, not a recorded trace. Flagged
- * here for verification against a real system rather than asserted as fact.
- *
- * **No rollback, and the reason is the system, not a preference.** The
- * pre-19 chain deleted the half-created binding when a later step failed,
- * and whether to reproduce that was left open through this migration. It is
- * settled: there is none, because in ABAP there is nothing here to roll back
- * to. Rollback is an SQL and LUW concept — it undoes *data* changes inside a
- * unit of work, and repository object operations over ADT are not one.
- * Deleting an object that was created is not an undo: it is a second
- * operation, with its own request, its own refusal and its own outcome, and
- * calling it a rollback hides that.
- *
- * So each step answers for itself. A failed `create()` leaves nothing
- * behind — the object was never made, and there is nothing to undo. A failed
- * activate or generate leaves a binding that exists and is not yet usable,
- * which is a fact the caller gets: the answer is the failing step's own,
- * naming which step it was, so they can activate it, generate it, delete it,
- * or leave it. Deleting it here would discard a created object on a verdict
- * the caller never saw, and an activation ADT declined is not evidence that
- * the binding is unwanted.
+ * **No rollback, and the reason is the system, not a preference.** Rollback is
+ * an SQL and LUW concept; repository object operations over ADT are not one.
+ * Deleting an object that was created is a second operation with its own
+ * outcome, not an undo. So each step answers for itself: a failed `create()`
+ * leaves nothing behind, and a failed activation or read leaves a binding that
+ * exists and is not yet usable — the answer is that step's own, naming it, so
+ * the caller can activate it, delete it, or leave it.
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
@@ -127,7 +101,7 @@ export const TOOL_DEFINITION = {
       activate: {
         type: 'boolean',
         description:
-          'Activate and generate the service binding after create. Default: true.',
+          'Activate the service binding after create, then read its service group. Default: true.',
         default: true,
       },
       response_format: {
@@ -232,33 +206,23 @@ export async function handleCreateServiceBinding(
         return activated as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      const generated = await obj.generateServiceBinding(
+      const group = await obj.getServiceGroup(
         {
+          objectname: serviceBindingName,
           serviceType,
-          bindingName: serviceBindingName,
-          serviceName,
-          serviceVersion,
-          serviceDefinitionName,
+          servicename: serviceName,
+          serviceversion: serviceVersion,
+          srvdname: serviceDefinitionName,
         },
         { analyse: analyseException },
       );
-      if (!generated.ok) {
-        return generated as unknown as IAdtResponse<
-          AdtReading<unknown>,
-          IAdtError
-        >;
+      if (!group.ok) {
+        return group as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      // **The answer is the create's own.** `AdtServiceBinding.create()`'s
-      // own doc comment: "The answer is the create's own. What the chain
-      // does after it — the check, the activation, the generation — is
-      // this implementation's business and reaches a caller only if it
-      // fails." That sentence describes a chain the compiled `create()` no
-      // longer runs internally (see this file's header), but the RULE it
-      // states is still the one this handler's own composed chain follows:
-      // a create+activate+generate that all succeed report the create's
-      // answer, not generate's — generate's own document (a service group
-      // read, not a write) reaches the caller only through a refusal.
+      // **The answer is the create's own.** A create, activation and read
+      // that all succeed report the create's answer: the service group's
+      // document reaches the caller only through a refusal.
       return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
     },
     project(detail, terseWrite),

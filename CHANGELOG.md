@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **On `@mcp-abap-adt/adt-clients` 27.0.0** (with `adt-strategies` 0.8.1,
+  `interfaces-adt` 13.2.0 and `interfaces-adt-connection` 2.0.0). Every factory
+  of the client now answers a contract; what that changed here:
+  - **`CreateServiceBinding`'s last step reads the service group.** It called
+    `generateServiceBinding`, which sent that very read and generated nothing;
+    27 removed the name. The step stays — after an activation, a binding whose
+    service group cannot be read is reported as the refusal it is — and the
+    `activate` parameter now says what it does: activate, then read the group.
+  - **A class and a behavior implementation create carry no responsible
+    person** (adt-clients 26.0.1): SAP stores that attribute on them as the
+    creator. The responsible person still travels on every other create; the
+    system-context tests now drive a message class, and pin that a class
+    create sends none and is not refused.
+  - The result-set table gives the new slots (ATC check variants, the ABAP and
+    AMDP debuggers, memory snapshots) a reading.
+
 ## [17.1.0] - 2026-10-06
 
 A personal portable build of both servers; no change to what the servers do.

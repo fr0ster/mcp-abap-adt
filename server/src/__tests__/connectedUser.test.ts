@@ -14,11 +14,14 @@ jest.mock('@mcp-abap-adt/lib/utils', () => ({
 }));
 const getSystemInformation = jest.fn();
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
+  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
   getSystemInformation: (...a: unknown[]) => getSystemInformation(...a),
 }));
 
+import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { logger } from '@mcp-abap-adt/lib/utils';
 import { connectedUserOf } from '../connectedUser';
+import { StreamableHttpServer } from '../StreamableHttpServer';
 
 const headers = {
   'x-sap-url': 'https://sap.invalid',
@@ -77,5 +80,29 @@ describe('connectedUserOf', () => {
     expect(String(warn.mock.calls[0][0])).toContain('TypeError');
     expect(String(warn.mock.calls[0][0])).not.toContain('secret');
     warn.mockRestore();
+  });
+
+  it("the server's owner lookups leave no connection open — answered, refused or failed", async () => {
+    const server = new StreamableHttpServer(
+      new CompositeHandlersRegistry([]),
+      { settingsFor: jest.fn(), getProvider: jest.fn() },
+      { host: '127.0.0.1', port: 0 },
+    );
+    const ownerOf = (routesToState: boolean) =>
+      (
+        server as unknown as {
+          ownerOf: (h: unknown, d: undefined, r: boolean) => Promise<unknown>;
+        }
+      ).ownerOf(headers, undefined, routesToState);
+    getSystemInformation.mockResolvedValue({ userName: 'SAPUSER01' });
+    await ownerOf(false);
+    await ownerOf(true);
+    await ownerOf(true);
+    connect.mockRejectedValueOnce(new Error('401'));
+    expect(await ownerOf(true)).toBeNull();
+    getSystemInformation.mockRejectedValueOnce(new Error('500'));
+    expect(await ownerOf(true)).toBeNull();
+    expect(built.length).toBe(5);
+    expect(disconnect).toHaveBeenCalledTimes(built.length);
   });
 });

@@ -82,7 +82,9 @@ http:            # or sse:
     - an `x-sap-*` request with a user and password must present the same
       ones (a keyed hash; the key is generated per process and never stored);
     - a token request must belong to the same SAP user, as answered by SAP
-      itself for that token;
+      itself for that token. SAP is asked again on every call that carries a
+      handle, so a token SAP no longer accepts (expired or revoked) reaches
+      nothing;
     - a destination request must name the same destination.
   - A handle travels in tool arguments, so it ends up in the model's context
     and in chat transcripts. Treat it as internal.

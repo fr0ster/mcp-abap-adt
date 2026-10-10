@@ -260,9 +260,11 @@ export class StreamableHttpServer extends BaseMcpServer {
           throw err;
         }
 
-        // Only a tools/call can create or use state: no other request asks SAP for its owner.
+        // Only a tools/call can create or use state: no other request asks SAP
+        // for its owner. A call that carries a handle may reach held state, so
+        // its token is verified by SAP now, not by an earlier answer.
         const owner = callsTools(req.body)
-          ? await this.ownerOf(req.headers, destination)
+          ? await this.ownerOf(req.headers, destination, handle !== undefined)
           : null;
 
         const authSource = destination
@@ -497,13 +499,17 @@ export class StreamableHttpServer extends BaseMcpServer {
    * - an `x-sap-*` basic request: `basic:` + HMAC-SHA256 of url, client,
    *   login and password, keyed by a per-process secret;
    * - an `x-sap-*` token request: `user:` + url, client and the SAP user SAP
-   *   answers on the request's own token (never an unverified claim);
+   *   answers on the request's own token (never an unverified claim). A call
+   *   that may reach held state (`routesToState`) asks SAP every time, so a
+   *   token SAP refuses now — expired or revoked — reaches nothing; a call
+   *   that creates state may take the answer SAP gave this token before;
    * - otherwise, or a token SAP refuses: null — no state can be created.
    * Nothing here is logged.
    */
   private async ownerOf(
     headers: Headers,
     destination: string | undefined,
+    routesToState: boolean,
   ): Promise<string | null> {
     if (destination) return `dest:${destination}`;
     if (!this.hasSapConnectionHeaders(headers)) return null;
@@ -520,7 +526,7 @@ export class StreamableHttpServer extends BaseMcpServer {
       const key = createHash('sha256')
         .update(JSON.stringify([url, client, token]))
         .digest('hex');
-      const user = await this.userOfToken(key, headers);
+      const user = await this.userOfToken(key, headers, routesToState);
       return user ? `user:${JSON.stringify([url, client, user])}` : null;
     }
     const login = get('x-sap-login') ?? '';
@@ -531,19 +537,29 @@ export class StreamableHttpServer extends BaseMcpServer {
     return `basic:${mac}`;
   }
 
-  /** The SAP user of a token, cached by the token's hash; a refusal is not cached. */
+  /**
+   * The SAP user of a token, through the one seam that asks SAP
+   * (`connectedUser`). `fresh`: SAP is asked now — the answer kept for the
+   * token's hash is not used. Concurrent lookups of one token share one SAP
+   * call. A refusal, or no user, is not kept, and it ends the answer kept
+   * before: a token SAP refuses now creates nothing either.
+   */
   private async userOfToken(
     key: string,
     headers: Headers,
+    fresh: boolean,
   ): Promise<string | undefined> {
-    const known = this.tokenUsers.get(key);
-    if (known) return known;
+    if (!fresh) {
+      const known = this.tokenUsers.get(key);
+      if (known) return known;
+    }
     let lookup = this.tokenLookups.get(key);
     if (!lookup) {
       lookup = this.connectedUser(headers)
         .catch(() => undefined)
         .then((user) => {
           if (user) this.tokenUsers.set(key, user);
+          else this.tokenUsers.delete(key);
           return user;
         })
         .finally(() => this.tokenLookups.delete(key));

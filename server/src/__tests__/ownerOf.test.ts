@@ -42,12 +42,17 @@ function make(
   return (
     headers: Record<string, string>,
     destination?: string,
+    routesToState = false,
   ): Promise<string | null> =>
     (
       server as unknown as {
-        ownerOf: (h: unknown, d?: string) => Promise<string | null>;
+        ownerOf: (
+          h: unknown,
+          d: string | undefined,
+          r: boolean,
+        ) => Promise<string | null>;
       }
-    ).ownerOf(headers, destination);
+    ).ownerOf(headers, destination, routesToState);
 }
 
 const basic = (login: string, password: string) => ({
@@ -149,6 +154,48 @@ describe('StreamableHttpServer.ownerOf', () => {
     answer('SAPUSER01');
     const [x, y] = await both;
     expect(x).toBe(y);
+    expect(connectedUser).toHaveBeenCalledTimes(1);
+  });
+
+  it('a call routed to held state asks SAP each time, and a refusal then is no owner', async () => {
+    let user: string | undefined = 'SAPUSER01';
+    const connectedUser = jest.fn(async () => {
+      if (!user) throw new Error('401 Unauthorized');
+      return user;
+    });
+    const ownerOf = make(connectedUser);
+    const token = bearer(tokenClaiming('SAPUSER01', 'a'));
+    const first = await ownerOf(token);
+    expect(await ownerOf(token, undefined, true)).toBe(first);
+    expect(await ownerOf(token, undefined, true)).toBe(first);
+    expect(connectedUser).toHaveBeenCalledTimes(3);
+    user = undefined;
+    expect(await ownerOf(token, undefined, true)).toBeNull();
+    // The refusal also ends the answer kept for calls that create state.
+    expect(await ownerOf(token)).toBeNull();
+    expect(connectedUser).toHaveBeenCalledTimes(5);
+  });
+
+  it('concurrent calls routed to held state with one token share one lookup', async () => {
+    let answer!: (u: string) => void;
+    const connectedUser = jest.fn(
+      () =>
+        new Promise<string>((r) => {
+          answer = r;
+        }),
+    );
+    const ownerOf = make(connectedUser);
+    const token = bearer(tokenClaiming('SAPUSER01', 'a'));
+    const all = Promise.all([
+      ownerOf(token, undefined, true),
+      ownerOf(token, undefined, true),
+      ownerOf(token),
+    ]);
+    await new Promise((r) => setImmediate(r));
+    answer('SAPUSER01');
+    const [x, y, z] = await all;
+    expect(x).toBe(y);
+    expect(z).toBe(x);
     expect(connectedUser).toHaveBeenCalledTimes(1);
   });
 });

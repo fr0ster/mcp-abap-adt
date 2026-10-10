@@ -1,6 +1,11 @@
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
+import {
+  connectedUserOf,
+  errorClassOf,
+  type IDestinations,
+} from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -23,6 +28,13 @@ import {
   FirstConnectLock,
 } from './destinationRequest.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
+import {
+  BatchWithHandleError,
+  handleOf,
+  InstancePool,
+  type Poolable,
+  PoolClosedError,
+} from './InstancePool.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
 export interface StreamableHttpServerOptions {
@@ -79,6 +91,37 @@ export interface StreamableHttpServerOptions {
   allowedOrigins?: string[];
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
+  /**
+   * The SAP user an `x-sap-*` token request logs on as, as SAP answers it
+   * (`systeminformation` on a connection built from the request's headers);
+   * undefined when SAP names none, a rejection when SAP refuses the token.
+   * Defaults to asking SAP. The owner of the request's state is this user,
+   * never a claim read from the token.
+   */
+  connectedUser?: (
+    headers: Record<string, string | string[] | undefined>,
+  ) => Promise<string | undefined>;
+}
+
+type Headers = Record<string, string | string[] | undefined>;
+
+/** What the pool keeps of a per-request server, and what the request handler drives on it. */
+interface PerRequestServerApi extends Poolable {
+  connect: BaseMcpServer['connect'];
+  idle(): Promise<void>;
+  setConnectionContextPublic: (
+    destination: string,
+    destinations: IDestinations,
+  ) => Promise<void>;
+  setConnectionContextFromHeadersPublic: (headers: Headers) => void;
+  connectPublic: () => Promise<unknown>;
+}
+
+/** Whether the body carries a `tools/call` — the only method that can create or use state. */
+function callsTools(body: unknown): boolean {
+  const one = (m: unknown) =>
+    (m as { method?: unknown } | null | undefined)?.method === 'tools/call';
+  return Array.isArray(body) ? body.some(one) : one(body);
 }
 
 /**
@@ -106,6 +149,20 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly enableDnsRebindingProtection?: boolean;
   /** Per-destination lock around the first connect: it serialises the first login. */
   private readonly firstConnect = new FirstConnectLock();
+  /** The instances that hold state between requests (spec D9). */
+  private readonly pool = new InstancePool<PerRequestServerApi>();
+  /** Keys the owner of a basic request; per process, never stored or logged. */
+  private readonly ownerSecret = randomBytes(32);
+  /** SHA-256 of (url, client, token) → the SAP user SAP answered for it. No timer. */
+  private readonly tokenUsers = new Map<string, string>();
+  /** Lookups in flight, so concurrent requests with one token ask SAP once. */
+  private readonly tokenLookups = new Map<
+    string,
+    Promise<string | undefined>
+  >();
+  private readonly connectedUser: (
+    headers: Headers,
+  ) => Promise<string | undefined>;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -130,6 +187,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
+    this.connectedUser = opts?.connectedUser ?? connectedUserOf;
     // Register handlers once for shared MCP server
     this.registerHandlers(this.handlersRegistry);
   }
@@ -161,8 +219,8 @@ export class StreamableHttpServer extends BaseMcpServer {
       }
 
       try {
-        const server = this.createPerRequestServer();
         let destination: string | undefined;
+        let fromHeaders = false;
 
         // Priority 1: x-mcp-destination (only with --allow-destination-header),
         // refused when it is not a destination name
@@ -178,9 +236,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         // The settings and the credential come from the headers, no destination
         else if (this.hasSapConnectionHeaders(req.headers)) {
           destination = undefined;
-          if (!isPing) {
-            server.setConnectionContextFromHeadersPublic(req.headers);
-          }
+          fromHeaders = true;
         }
         // Priority 3: Use default destination
         else if (this.defaultDestination) {
@@ -196,22 +252,25 @@ export class StreamableHttpServer extends BaseMcpServer {
           return;
         }
 
-        // Skip SAP connection setup for ping — it's a protocol-level check,
-        // no need to acquire JWT tokens or contact the SAP system
-        if (!isPing && destination) {
-          // The first request of a destination connects inside the lock:
-          // two first logins must not race for the same callback port
-          const chosen = destination;
-          await this.firstConnect.run(
-            chosen,
-            () => server.setConnectionContextPublic(chosen, this.destinations),
-            () => server.connectPublic(),
-          );
+        let handle: string | undefined;
+        try {
+          handle = handleOf(req.body);
+        } catch (err) {
+          if (err instanceof BatchWithHandleError) {
+            res.status(400).send(err.message);
+            return;
+          }
+          throw err;
         }
+
+        // Only a tools/call can create or use state: no other request asks SAP for its owner.
+        const owner = callsTools(req.body)
+          ? await this.ownerOf(req.headers, destination)
+          : null;
 
         const authSource = destination
           ? `destination=${destination}`
-          : this.hasSapConnectionHeaders(req.headers)
+          : fromHeaders
             ? 'x-sap-* headers'
             : 'none';
         if (!isPing) {
@@ -220,22 +279,74 @@ export class StreamableHttpServer extends BaseMcpServer {
           );
         }
 
-        const transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: undefined, // stateless mode to avoid ID collisions
-          enableJsonResponse: this.enableJsonResponse,
-        });
+        await this.pool.serve(
+          { handle, owner },
+          () => this.createPerRequestServer(),
+          async (server) => {
+            // A client that left while this request waited for the lease gets nothing.
+            if (res.destroyed) return;
+            const transport = new StreamableHTTPServerTransport({
+              sessionIdGenerator: undefined, // stateless mode to avoid ID collisions
+              enableJsonResponse: this.enableJsonResponse,
+            });
+            let transportClosed: Promise<void> | undefined;
+            const closeTransport = () => {
+              transportClosed ??= transport.close().catch(() => undefined);
+              return transportClosed;
+            };
+            const disconnected = new Promise<void>((resolve) =>
+              res.once('close', () => {
+                void closeTransport();
+                resolve();
+              }),
+            );
+            try {
+              // The request's own credentials, every time — also on a kept instance.
+              if (!isPing && fromHeaders) {
+                server.setConnectionContextFromHeadersPublic(req.headers);
+              } else if (!isPing && destination) {
+                // Skip SAP connection setup for ping — it's a protocol-level check.
+                // The first request of a destination connects inside the lock:
+                // two first logins must not race for the same callback port
+                const chosen = destination;
+                await this.firstConnect.run(
+                  chosen,
+                  () =>
+                    server.setConnectionContextPublic(
+                      chosen,
+                      this.destinations,
+                    ),
+                  () => server.connectPublic(),
+                );
+              }
 
-        res.on('close', () => {
-          void transport.close();
-        });
-
-        await server.connect(transport);
-        // Scope what the request states — x-sap-language, x-sap-responsible,
-        // x-sap-master-system — to this request's dispatch, so it cannot
-        // leak into other requests/modes via a process-global cache (#110).
-        await runWithRequestContext(
-          requestContextFromHeaders(req.headers),
-          () => transport.handleRequest(req, res, req.body),
+              await server.connect(transport);
+              // Scope what the request states — x-sap-language, x-sap-responsible,
+              // x-sap-master-system — to this request's dispatch, so it cannot
+              // leak into other requests/modes via a process-global cache (#110).
+              const dispatch = runWithRequestContext(
+                requestContextFromHeaders(req.headers),
+                () => transport.handleRequest(req, res, req.body),
+              );
+              // JSON mode answers when the handler has; SSE mode when the stream
+              // ends. A client that disconnects first must not hold the lease on
+              // a dispatch that waits for a handler.
+              let failed: { error: unknown } | undefined;
+              await Promise.race([
+                dispatch.catch((error) => {
+                  failed = { error };
+                }),
+                disconnected,
+              ]);
+              // A dispatch that failed is answered below, as before the pool.
+              if (failed) throw failed.error;
+            } finally {
+              await closeTransport();
+              // The instance goes back only when its tool handlers have settled:
+              // they do not consume the transport's abort signal.
+              await server.idle();
+            }
+          },
         );
         if (!isPing) {
           console.error(
@@ -243,6 +354,10 @@ export class StreamableHttpServer extends BaseMcpServer {
           );
         }
       } catch (err) {
+        if (err instanceof PoolClosedError) {
+          if (!res.headersSent) res.status(503).send(err.message);
+          return;
+        }
         const answer = destinationFailureAnswer(err);
         if (!answer.known) {
           // No words for it: its class only — a message may quote a file (H4).
@@ -360,16 +475,84 @@ export class StreamableHttpServer extends BaseMcpServer {
   }
 
   /**
-   * Stops taking connections (shutdown, step 1). Requests already running are
-   * not waited for, nor is an open stream: the factory's gate holds them.
-   * Embedded on an external app, there is no listener of its own to stop.
+   * Stops taking connections (shutdown, step 1), then the pool: no request is
+   * admitted any more, the running ones finish, every instance that holds
+   * state is disposed and waited for (no timer). Rejects with what could not
+   * be undone. Embedded on an external app, there is no listener of its own
+   * to stop, but the pool is still ours to drain.
    */
   async stop(): Promise<void> {
     const server = this.standaloneServer;
-    if (!server) return;
-    this.standaloneServer = undefined;
-    server.close();
-    server.closeIdleConnections();
+    if (server) {
+      this.standaloneServer = undefined;
+      server.close();
+      server.closeIdleConnections();
+    }
+    const failures = await this.pool.shutdown();
+    if (failures.length) {
+      throw new Error(`state cleanup failed: ${failures.join('; ')}`);
+    }
+  }
+
+  /**
+   * Who the request's state belongs to (spec D15) — a handle is no key:
+   * - a destination request: `dest:<destination>`;
+   * - an `x-sap-*` basic request: `basic:` + HMAC-SHA256 of url, client,
+   *   login and password, keyed by a per-process secret;
+   * - an `x-sap-*` token request: `user:` + url, client and the SAP user SAP
+   *   answers on the request's own token (never an unverified claim);
+   * - otherwise, or a token SAP refuses: null — no state can be created.
+   * Nothing here is logged.
+   */
+  private async ownerOf(
+    headers: Headers,
+    destination: string | undefined,
+  ): Promise<string | null> {
+    if (destination) return `dest:${destination}`;
+    if (!this.hasSapConnectionHeaders(headers)) return null;
+    const get = (name: string): string | undefined => {
+      const value = headers[name] ?? headers[name.toUpperCase()];
+      return Array.isArray(value) ? value[0] : value;
+    };
+    const url = get('x-sap-url') ?? '';
+    const client = get('x-sap-client') ?? '';
+    // The fields are joined as a JSON array: a separator inside a header value
+    // cannot make two credentials one owner.
+    const token = get('x-sap-jwt-token');
+    if (token) {
+      const key = createHash('sha256')
+        .update(JSON.stringify([url, client, token]))
+        .digest('hex');
+      const user = await this.userOfToken(key, headers);
+      return user ? `user:${JSON.stringify([url, client, user])}` : null;
+    }
+    const login = get('x-sap-login') ?? '';
+    const password = get('x-sap-password') ?? '';
+    const mac = createHmac('sha256', this.ownerSecret)
+      .update(JSON.stringify([url, client, login, password]))
+      .digest('hex');
+    return `basic:${mac}`;
+  }
+
+  /** The SAP user of a token, cached by the token's hash; a refusal is not cached. */
+  private async userOfToken(
+    key: string,
+    headers: Headers,
+  ): Promise<string | undefined> {
+    const known = this.tokenUsers.get(key);
+    if (known) return known;
+    let lookup = this.tokenLookups.get(key);
+    if (!lookup) {
+      lookup = this.connectedUser(headers)
+        .catch(() => undefined)
+        .then((user) => {
+          if (user) this.tokenUsers.set(key, user);
+          return user;
+        })
+        .finally(() => this.tokenLookups.delete(key));
+      this.tokenLookups.set(key, lookup);
+    }
+    return lookup;
   }
 
   /**
@@ -387,17 +570,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     return !!(hasUrl && (hasJwtAuth || hasBasicAuth));
   }
 
-  private createPerRequestServer(): {
-    connect: BaseMcpServer['connect'];
-    setConnectionContextPublic: (
-      destination: string,
-      destinations: IDestinations,
-    ) => Promise<void>;
-    setConnectionContextFromHeadersPublic: (
-      headers: Record<string, string | string[] | undefined>,
-    ) => void;
-    connectPublic: () => Promise<unknown>;
-  } {
+  private createPerRequestServer(): PerRequestServerApi {
     class PerRequestServer extends BaseMcpServer {
       constructor(
         private readonly registry: IHandlersRegistry,

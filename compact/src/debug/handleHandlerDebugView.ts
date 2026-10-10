@@ -6,7 +6,7 @@ import {
   terseStop,
   terseVariables,
 } from '@mcp-abap-adt/lib/debugger';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import type { ArgsOf, HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { branchByKind, failedAnswer } from './shared';
 
 export const TOOL_DEFINITION = {
@@ -38,7 +38,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleHandlerDebugView(
   context: HandlerContext,
-  args: any,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const wrongKind = (kind: string) =>
     debugAnswer(
@@ -59,8 +59,9 @@ export async function handleHandlerDebugView(
         return debugAnswer(
           args,
           async () => {
-            const name = Array.isArray(args.names) ? args.names[0] : undefined;
-            if (typeof name !== 'string' || !name.trim())
+            // The schema cannot tie names to what: a table needs its first entry.
+            const name = args.names?.[0];
+            if (!name?.trim())
               throw new Error('names: the table variable to read, first entry');
             return d.amdp.getTable(name);
           },
@@ -76,12 +77,13 @@ export async function handleHandlerDebugView(
               (stop) => terseStop(stop.debuggee, stop.stack),
             );
           case 'variables': {
-            const byName = Array.isArray(args.names) && args.names.length > 0;
+            const names = args.names?.length ? args.names : undefined;
+            const byName = names !== undefined;
             return debugAnswer(
               args,
               async () =>
-                byName
-                  ? d.abap.getVariables(args.names.map(String))
+                names
+                  ? d.abap.getVariables(names)
                   : d.abap.getChildVariables(['@ROOT']),
               (v) => {
                 if (byName) return terseVariables(v);

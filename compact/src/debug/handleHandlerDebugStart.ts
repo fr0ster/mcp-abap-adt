@@ -11,7 +11,7 @@ import {
   TAKE_OVER_SENTENCE,
   USER_MODE_SENTENCE,
 } from '@mcp-abap-adt/lib/debugger';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import type { ArgsOf, HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { refuseOtherKind } from './shared';
 
 export const TOOL_DEFINITION = {
@@ -47,24 +47,24 @@ export const TOOL_DEFINITION = {
 
 export async function handleHandlerDebugStart(
   context: HandlerContext,
-  args: any,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  if (args?.kind === 'amdp') {
+  if (args.kind === 'amdp') {
     return debugAnswer(
       args,
       async () => {
         refuseOtherKind(context, 'amdp');
         const d = requireDebugger(context, args, { create: 'amdp' });
-        // The compact items name the class `object_name`; the session takes `class_name`.
+        // The compact items name the class `object_name`; the session takes
+        // `class_name`. The schema serves both kinds, so it cannot require them.
         const r = await d.amdp.start({
-          stopExisting: args.take_over === true,
+          stopExisting: args.take_over ?? false,
           breakpoints: amdpBreakpointsFromArgs(
-            Array.isArray(args.breakpoints)
-              ? args.breakpoints.map((b: any) => ({
-                  class_name: b?.object_name,
-                  line: b?.line,
-                }))
-              : args.breakpoints,
+            args.breakpoints.map((b, i) => {
+              if (!b.object_name || b.line === undefined)
+                throw new Error(`breakpoints[${i}]: object_name and line`);
+              return { class_name: b.object_name, line: b.line };
+            }),
           ),
           run: runFromArgs(args.run),
         });
@@ -80,7 +80,7 @@ export async function handleHandlerDebugStart(
     async () => {
       refuseOtherKind(context, 'abap');
       const d = requireDebugger(context, args, { create: 'abap' });
-      return d.abap.start(args.take_over === true ? 'takeOver' : 'refuse', {
+      return d.abap.start(args.take_over ? 'takeOver' : 'refuse', {
         breakpoints: breakpointsFromArgs(args.breakpoints),
         run: runFromArgs(args.run),
       });

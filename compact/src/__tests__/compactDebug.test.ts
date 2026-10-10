@@ -1,6 +1,20 @@
 import { DebuggerInstance } from '@mcp-abap-adt/lib/debugger';
+import type { ArgsOf } from '@mcp-abap-adt/lib/handlers';
 import { InstanceState } from '@mcp-abap-adt/lib/state';
 import { compactDebugEntries } from '../debug/group';
+import type { TOOL_DEFINITION as Start } from '../debug/handleHandlerDebugStart';
+import type { TOOL_DEFINITION as Step } from '../debug/handleHandlerDebugStep';
+import type { TOOL_DEFINITION as View } from '../debug/handleHandlerDebugView';
+import type { TOOL_DEFINITION as Wait } from '../debug/handleHandlerDebugWait';
+
+/** What each verb takes: the compiler checks every call below against its schema. */
+interface VerbArgs {
+  HandlerDebugStart: ArgsOf<typeof Start.inputSchema>;
+  HandlerDebugWait: ArgsOf<typeof Wait.inputSchema>;
+  HandlerDebugView: ArgsOf<typeof View.inputSchema>;
+  HandlerDebugStep: ArgsOf<typeof Step.inputSchema>;
+}
+
 import { parseCompactDebug, parseCompactExposition } from '../launcher';
 
 describe('compact debug', () => {
@@ -209,11 +223,11 @@ function install() {
   const instance = new DebuggerInstance({ abap: a.abap, amdp: m.amdp });
   state.attach(instance);
   const context = { connection: {}, state, debugger: () => instance } as any;
-  const call = (name: string, args: unknown) =>
+  const call = <K extends keyof VerbArgs>(name: K, args: VerbArgs[K]) =>
     (
       compactDebugEntries(() => context).find(
         (e) => e.toolDefinition.name === name,
-      )!.handler as unknown as (args: unknown) => Promise<any>
+      )!.handler as unknown as (args: VerbArgs[K]) => Promise<any>
     )(args);
   return {
     state,
@@ -418,7 +432,7 @@ describe('compact debug verbs on the fake sessions', () => {
     const t = install();
     t.abapHeld.on = true;
     const h = t.state.handle;
-    for (const action of ['into', 'over', 'return', 'continue'])
+    for (const action of ['into', 'over', 'return', 'continue'] as const)
       await t.call('HandlerDebugStep', { state_handle: h, action });
     expect(t.abap.map((c) => c[1])).toEqual([
       'stepInto',
@@ -491,7 +505,12 @@ describe('compact debug verbs on the fake sessions', () => {
     ).toEqual({ state: 'moving' });
     await t.call('HandlerDebugStep', { state_handle: h, action: 'continue' });
     await t.call('HandlerDebugStep', { state_handle: h, action: 'terminate' });
-    for (const action of ['into', 'return', 'run_to_line', 'jump_to_line']) {
+    for (const action of [
+      'into',
+      'return',
+      'run_to_line',
+      'jump_to_line',
+    ] as const) {
       const r = await t.call('HandlerDebugStep', { state_handle: h, action });
       expect(r.isError).toBe(true);
     }

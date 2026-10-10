@@ -1,6 +1,7 @@
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -26,16 +27,17 @@ export const TOOL_DEFINITION = {
 
 export async function handleAmdpDebugGetTable(
   context: HandlerContext,
-  args: any,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return debugAnswer(
     args,
     async () => {
-      if (typeof args.variable !== 'string' || !args.variable.trim())
+      // A blank name is a value the schema admits; it names no variable.
+      if (!args.variable.trim())
         throw new Error('variable: the name of a table variable');
       return requireDebugger(context, args, 'use').amdp.getTable(
         args.variable,
-        args.query ? String(args.query) : undefined,
+        args.query || undefined,
       );
     },
     (v) => v.rows,

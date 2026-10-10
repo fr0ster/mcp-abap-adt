@@ -7,6 +7,7 @@ import {
   runFromArgs,
   USER_MODE_SENTENCE,
 } from '../../../lib/debugger/schemas';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -30,13 +31,16 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-export async function handleAmdpDebugStart(context: HandlerContext, args: any) {
+export async function handleAmdpDebugStart(
+  context: HandlerContext,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+) {
   return debugAnswer(
     args,
     async () => {
       const d = requireDebugger(context, args, { create: 'amdp' });
       const r = await d.amdp.start({
-        stopExisting: args.stop_existing === true,
+        stopExisting: args.stop_existing ?? false,
         breakpoints: amdpBreakpointsFromArgs(args.breakpoints),
         run: runFromArgs(args.run),
       });

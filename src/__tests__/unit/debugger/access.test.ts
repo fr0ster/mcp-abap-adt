@@ -65,9 +65,9 @@ describe('requireDebugger under a host', () => {
     expect(abap.bind).not.toHaveBeenCalled();
     expect(amdp.bind).not.toHaveBeenCalled();
   });
-  it("a handle that is not this instance's and a missing handle get the same answer", () => {
+  it("a handle that is not this instance's and an empty handle get the same answer", () => {
     const { context } = ctx(true);
-    const answers = ['0'.repeat(32), undefined].map((h) => {
+    const answers = ['0'.repeat(32), ''].map((h) => {
       try {
         requireDebugger(context, { state_handle: h }, 'use');
         return 'served';

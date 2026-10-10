@@ -2,6 +2,7 @@ import { MemorySnapshots } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readSnapshotList } from '../../../lib/debugger/memoryReadings';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -28,7 +29,7 @@ const NO_AUTHORIZATION =
 
 export async function handleMemorySnapshotList(
   context: HandlerContext,
-  args: { user?: string; detail?: string },
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const snapshots = new MemorySnapshots(context.connection, context.logger);
   return debugAnswer(
@@ -36,7 +37,7 @@ export async function handleMemorySnapshotList(
     async () => {
       const answer = await snapshots.list({
         analyse: analyseException,
-        ...(args.user ? { user: String(args.user).toUpperCase() } : {}),
+        ...(args.user ? { user: args.user.toUpperCase() } : {}),
       });
       if (!answer.ok) throw new Error(answer.getError().message);
       const raw = String(answer.getResult().value ?? '');

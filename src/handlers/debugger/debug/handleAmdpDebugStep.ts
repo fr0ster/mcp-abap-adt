@@ -1,6 +1,7 @@
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -25,15 +26,13 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-export async function handleAmdpDebugStep(context: HandlerContext, args: any) {
+export async function handleAmdpDebugStep(
+  context: HandlerContext,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+) {
   return debugAnswer(
     args,
-    async () => {
-      // Anything but the two values is a typo, not a continue.
-      if (args.action !== 'over' && args.action !== 'continue')
-        throw new Error('action: over or continue');
-      return requireDebugger(context, args, 'use').amdp.step(args.action);
-    },
+    async () => requireDebugger(context, args, 'use').amdp.step(args.action),
     (v) => ({ state: v }),
   );
 }

@@ -2,6 +2,7 @@ import { MemorySnapshots } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -18,7 +19,7 @@ export const SNAPSHOT_VIEW_PROPERTIES = {
     description: 'Object key, for children and references.',
   },
   max_objects: {
-    type: 'number',
+    type: 'integer',
     default: 50,
     description: 'Objects in a ranking, children or references answer.',
   },
@@ -40,37 +41,29 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
+/** The key the children and references views need; the schema cannot tie it to the view. */
 export function requireKey(args: { key?: string; view?: string }): string {
   if (!args.key) throw new Error(`view ${args.view}: give key`);
-  return String(args.key);
+  return args.key;
 }
 
-/** The limit of a view: undefined is the default, anything that is not a positive number is an error. */
-export function maxObjectsOf(args: { max_objects?: unknown }): number {
-  if (args.max_objects === undefined || args.max_objects === null) return 50;
-  const max = Number(args.max_objects);
-  if (!Number.isFinite(max) || max < 1)
-    throw new Error('max_objects: a number of 1 or more');
-  return Math.trunc(max);
+/** The limit of a view: the schema states its default, not that it is at least 1. */
+export function maxObjectsOf(args: { max_objects?: number }): number {
+  const max = args.max_objects ?? 50;
+  if (max < 1) throw new Error('max_objects: 1 or more');
+  return max;
 }
 
 export async function handleMemorySnapshotGet(
   context: HandlerContext,
-  args: {
-    snapshot_id: string;
-    view?: string;
-    key?: string;
-    max_objects?: number;
-    detail?: string;
-  },
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const snapshots = new MemorySnapshots(context.connection, context.logger);
   const opts = { analyse: analyseException };
   return debugAnswer(
     args,
     async () => {
-      if (!args.snapshot_id) throw new Error('snapshot_id is required');
-      const id = String(args.snapshot_id);
+      const id = args.snapshot_id;
       const answer = await (() => {
         switch (args.view ?? 'overview') {
           case 'header':
@@ -92,10 +85,6 @@ export async function handleMemorySnapshotGet(
               ...opts,
               maxNumberOfReferences: maxObjectsOf(args),
             });
-          default:
-            throw new Error(
-              'view: header, overview, ranking, children or references',
-            );
         }
       })();
       if (!answer.ok) throw new Error(answer.getError().message);

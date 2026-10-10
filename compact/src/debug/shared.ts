@@ -35,7 +35,7 @@ export function refuseOtherKind(
  */
 export function branchByKind<R>(
   context: HandlerContext,
-  args: unknown,
+  args: { state_handle: string },
   branches: {
     abap: (d: DebuggerInstance) => R;
     amdp: (d: DebuggerInstance) => R;

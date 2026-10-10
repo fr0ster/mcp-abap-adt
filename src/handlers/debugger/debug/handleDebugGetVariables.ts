@@ -3,6 +3,7 @@ import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseVariables } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -35,20 +36,16 @@ export const TOOL_DEFINITION = {
 
 export async function handleDebugGetVariables(
   context: HandlerContext,
-  args: any,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const parents =
-    Array.isArray(args.parents) && args.parents.length
-      ? args.parents.map(String)
-      : ['@ROOT'];
-  const byName = Array.isArray(args.names) && args.names.length;
+  const parents = args.parents?.length ? args.parents : ['@ROOT'];
+  const names = args.names?.length ? args.names : undefined;
+  const byName = names !== undefined;
   return debugAnswer(
     args,
     async () => {
       const a = requireDebugger(context, args, 'use').abap;
-      return byName
-        ? a.getVariables(args.names.map(String))
-        : a.getChildVariables(parents);
+      return names ? a.getVariables(names) : a.getChildVariables(parents);
     },
     (v) => {
       if (byName) return terseVariables(v);

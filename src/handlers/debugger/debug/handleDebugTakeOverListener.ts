@@ -9,6 +9,7 @@ import {
   TAKE_OVER_SENTENCE,
   USER_MODE_SENTENCE,
 } from '../../../lib/debugger/schemas';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -28,14 +29,14 @@ export const TOOL_DEFINITION = {
 
 export async function handleDebugTakeOverListener(
   context: HandlerContext,
-  args: any,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return debugStateAnswer(
     args,
     async () => {
       const d = requireDebugger(context, args, { create: 'abap' });
       return d.abap.start('takeOver', {
-        ...(Array.isArray(args.breakpoints) && args.breakpoints.length
+        ...(args.breakpoints?.length
           ? { breakpoints: breakpointsFromArgs(args.breakpoints) }
           : {}),
         run: runFromArgs(args.run),

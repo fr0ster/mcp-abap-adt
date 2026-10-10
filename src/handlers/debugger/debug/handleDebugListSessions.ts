@@ -1,6 +1,7 @@
 // src/handlers/debugger/debug/handleDebugListSessions.ts
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -16,7 +17,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleDebugListSessions(
   context: HandlerContext,
-  args: any,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   return debugAnswer(
     args,

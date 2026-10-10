@@ -2,6 +2,7 @@ import { MemorySnapshots } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 import {
@@ -37,24 +38,15 @@ export const TOOL_DEFINITION = {
 
 export async function handleMemorySnapshotDelta(
   context: HandlerContext,
-  args: {
-    from_id: string;
-    to_id: string;
-    view?: string;
-    key?: string;
-    max_objects?: number;
-    detail?: string;
-  },
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   const snapshots = new MemorySnapshots(context.connection, context.logger);
   const opts = { analyse: analyseException };
   return debugAnswer(
     args,
     async () => {
-      if (!args.from_id || !args.to_id)
-        throw new Error('from_id and to_id are required');
-      const from = String(args.from_id);
-      const to = String(args.to_id);
+      const from = args.from_id;
+      const to = args.to_id;
       const answer = await (() => {
         switch (args.view ?? 'overview') {
           case 'overview':
@@ -74,8 +66,6 @@ export async function handleMemorySnapshotDelta(
               ...opts,
               maxNumberOfReferences: maxObjectsOf(args),
             });
-          default:
-            throw new Error('view: overview, ranking, children or references');
         }
       })();
       if (!answer.ok) throw new Error(answer.getError().message);

@@ -6,7 +6,7 @@ import {
   STATE_HANDLE_PROPERTY,
   terseAmdpEvent,
 } from '@mcp-abap-adt/lib/debugger';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import type { ArgsOf, HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { branchByKind, failedAnswer } from './shared';
 
 export const TOOL_DEFINITION = {
@@ -27,15 +27,9 @@ export const TOOL_DEFINITION = {
 
 export async function handleHandlerDebugWait(
   context: HandlerContext,
-  args: any,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const seconds = () => {
-    const s = args.hold_seconds === undefined ? 10 : Number(args.hold_seconds);
-    // A value that is no number would wait 0 ms and look like an answer: refuse it.
-    if (!Number.isFinite(s))
-      throw new Error('hold_seconds: a number of seconds');
-    return s;
-  };
+  const seconds = () => args.hold_seconds ?? 10;
   return branchByKind(
     context,
     args,

@@ -5,6 +5,7 @@ import {
   HOLD_SECONDS_PROPERTY,
   STATE_HANDLE_PROPERTY,
 } from '../../../lib/debugger/schemas';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -24,17 +25,15 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-export async function handleAmdpDebugWait(context: HandlerContext, args: any) {
+export async function handleAmdpDebugWait(
+  context: HandlerContext,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+) {
   return debugAnswer(
     args,
     async () => {
       const d = requireDebugger(context, args, 'use');
-      const seconds =
-        args.hold_seconds === undefined ? 10 : Number(args.hold_seconds);
-      // A value that is no number would wait 0 ms and look like an answer: refuse it.
-      if (!Number.isFinite(seconds))
-        throw new Error('hold_seconds: a number of seconds');
-      const s = await d.amdp.wait(seconds);
+      const s = await d.amdp.wait(args.hold_seconds ?? 10);
       return {
         value: s,
         raw:

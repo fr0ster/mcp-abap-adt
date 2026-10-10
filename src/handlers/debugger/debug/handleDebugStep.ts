@@ -2,6 +2,7 @@
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugStateAnswer } from '../../../lib/debugger/answer';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
+import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
@@ -33,10 +34,11 @@ const STEPS = {
   continue: 'stepContinue',
 } as const;
 
-export async function handleDebugStep(context: HandlerContext, args: any) {
-  return debugStateAnswer(args, async () => {
-    const method = STEPS[String(args.action) as keyof typeof STEPS];
-    if (!method) throw new Error('action: into, over, return or continue');
-    return requireDebugger(context, args, 'use').abap.step(method);
-  });
+export async function handleDebugStep(
+  context: HandlerContext,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+) {
+  return debugStateAnswer(args, async () =>
+    requireDebugger(context, args, 'use').abap.step(STEPS[args.action]),
+  );
 }

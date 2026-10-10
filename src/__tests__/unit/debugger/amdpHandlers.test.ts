@@ -134,14 +134,14 @@ describe('AMDP debugger handlers', () => {
     });
   });
 
-  it('start without stop_existing does not stop an existing one; breakpoints are required', async () => {
+  it('start without stop_existing does not stop an existing one; at least one breakpoint', async () => {
     const f = fakeAmdp();
     const { context } = install(f.amdp);
     await handleAmdpDebugStart(context, {
       breakpoints: [{ class_name: 'ZCL_A', line: 1 }],
     });
     expect((f.calls[0][1] as any).stopExisting).toBe(false);
-    const r: any = await handleAmdpDebugStart(context, {});
+    const r: any = await handleAmdpDebugStart(context, { breakpoints: [] });
     expect(r.isError).toBe(true);
   });
 
@@ -184,18 +184,7 @@ describe('AMDP debugger handlers', () => {
     });
   });
 
-  it('wait refuses a hold_seconds that is no number', async () => {
-    const f = fakeAmdp();
-    const { context, state } = install(f.amdp);
-    const r: any = await handleAmdpDebugWait(context, {
-      state_handle: state.handle,
-      hold_seconds: 'soon',
-    });
-    expect(r.isError).toBe(true);
-    expect(f.calls).toEqual([]);
-  });
-
-  it('step passes over and continue; anything else is an error', async () => {
+  it('step passes over and continue', async () => {
     const f = fakeAmdp();
     const { context, state } = install(f.amdp);
     const a: any = await handleAmdpDebugStep(context, {
@@ -211,17 +200,9 @@ describe('AMDP debugger handlers', () => {
       ['step', 'continue'],
     ]);
     expect(json(a)).toEqual({ state: 'moving' });
-    for (const action of ['ovr', undefined, 'into']) {
-      const r: any = await handleAmdpDebugStep(context, {
-        state_handle: state.handle,
-        action,
-      });
-      expect(r.isError).toBe(true);
-    }
-    expect(f.calls).toHaveLength(2);
   });
 
-  it('get table passes the variable and the query; a missing variable is an error', async () => {
+  it('get table passes the variable and the query; a blank variable is an error', async () => {
     const f = fakeAmdp();
     const { context, state } = install(f.amdp);
     const r: any = await handleAmdpDebugGetTable(context, {
@@ -238,7 +219,7 @@ describe('AMDP debugger handlers', () => {
       ['getTable', 'lt_x', undefined],
     ]);
     expect(json(r)).toEqual([{ A: '1' }]);
-    for (const variable of [undefined, '', '  ', 5]) {
+    for (const variable of ['', '  ']) {
       const e: any = await handleAmdpDebugGetTable(context, {
         state_handle: state.handle,
         variable,
@@ -261,7 +242,12 @@ describe('AMDP debugger handlers', () => {
   it("every tool but the start refuses a handle that is not the instance's", async () => {
     const f = fakeAmdp();
     const { context } = install(f.amdp);
-    const args = { state_handle: 'NOPE', action: 'over', variable: 'v' };
+    const args = {
+      state_handle: 'NOPE',
+      action: 'over' as const,
+      variable: 'v',
+      breakpoints: [{ class_name: 'ZCL_A', line: 1 }],
+    };
     for (const h of [
       handleAmdpDebugSetBreakpoints,
       handleAmdpDebugWait,

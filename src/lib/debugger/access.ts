@@ -8,16 +8,24 @@ import type { DebuggerInstance } from './DebuggerInstance';
  */
 export function requireDebugger(
   context: HandlerContext,
-  args: unknown,
+  args: { state_handle: string },
+  mode: 'use',
+): DebuggerInstance;
+export function requireDebugger(
+  context: HandlerContext,
+  args: object,
+  mode: { create: 'abap' | 'amdp' },
+): DebuggerInstance;
+export function requireDebugger(
+  context: HandlerContext,
+  args: { state_handle?: string },
   mode: { create: 'abap' | 'amdp' } | 'use',
 ): DebuggerInstance {
   if (!context.state || !context.debugger) {
     throw new Error('debugging is not served by this server');
   }
   if (mode === 'use') {
-    context.state.check(
-      (args as { state_handle?: unknown } | undefined)?.state_handle,
-    );
+    context.state.check(args.state_handle);
   } else {
     context.state.admit(mode.create);
   }

@@ -9,7 +9,7 @@ import {
   lineUriOf,
   STATE_HANDLE_PROPERTY,
 } from '@mcp-abap-adt/lib/debugger';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import type { ArgsOf, HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { branchByKind, failedAnswer } from './shared';
 
 export const TOOL_DEFINITION = {
@@ -50,11 +50,14 @@ const STEPS = {
   continue: 'stepContinue',
 } as const;
 
+const isStep = (action: string): action is keyof typeof STEPS =>
+  action in STEPS;
+
 export async function handleHandlerDebugStep(
   context: HandlerContext,
-  args: any,
+  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
-  const action = String(args.action);
+  const action = args.action;
   // The state ends once nothing is held; both kinds are stopped by the instance.
   const stopped = (d: DebuggerInstance) =>
     debugAnswer(
@@ -102,15 +105,24 @@ export async function handleHandlerDebugStep(
         return refused('amdp');
       },
       abap: (d) => {
-        if (action in STEPS) {
-          return debugStateAnswer(args, async () =>
-            d.abap.step(STEPS[action as keyof typeof STEPS]),
-          );
+        if (isStep(action)) {
+          return debugStateAnswer(args, async () => d.abap.step(STEPS[action]));
         }
         if (action === 'run_to_line' || action === 'jump_to_line') {
           return debugStateAnswer(args, async () => {
-            let target: BreakpointTarget = args;
-            if (!args.object_type || !args.object_name) {
+            // The schema cannot tie line to these two actions.
+            const line = args.line;
+            if (line === undefined)
+              throw new Error(`line: needed for ${action}`);
+            let target: BreakpointTarget;
+            if (args.object_type && args.object_name) {
+              target = {
+                object_type: args.object_type,
+                object_name: args.object_name,
+                include: args.include,
+                parent_name: args.parent_name,
+              };
+            } else {
               // No object given: the line is in the object the debuggee stands in.
               const top = (await d.abap.getStack()).value.stack.frames[0];
               const here = top ? addressOf(top.uri) : undefined;
@@ -122,7 +134,7 @@ export async function handleHandlerDebugStep(
             }
             return d.abap.stepToLine(
               action === 'jump_to_line' ? 'stepJumpToLine' : 'stepRunToLine',
-              lineUriOf(target, Number(args.line)),
+              lineUriOf(target, line),
             );
           });
         }

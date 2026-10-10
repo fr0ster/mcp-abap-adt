@@ -243,9 +243,14 @@ open PR #207 (`feat/debugger`, "AbapDebugger", from a fork) is still on 25.0.1 w
      refusal?: unknown;
    }
    ```
-3. **`@mcp-abap-adt/connection` 14.1.0** (`mcp-abap-connection`; on `interfaces-adt-connection
-   ^2.1.0` — connection's own move to the 2.x line comes with it; its notes measured 0 new errors
-   against 2.0.0; if its exported types change, it is 15.0.0, connection's call):
+3. **`@mcp-abap-adt/connection` 15.0.0** (`mcp-abap-connection`; **a major**, on
+   `interfaces-adt-connection ^2.1.0`). connection re-exports `AbapConnection = IAbapConnection`;
+   on interfaces-adt-connection 2 the alias's `makeAdtRequest` answers `IAdtWireResponse<unknown,
+   unknown>` by default instead of `any`, so a consumer reading `answer.data.field` through the
+   alias stops compiling — a breaking change of connection's own exports, released as such, with
+   no compatibility shim. connection's `docs/MIGRATION-15.0.md` (owed by that repository) says
+   what a consumer does: name the type (`makeAdtRequest<T>(…)`, `IAdtWireResponse<T>`) or narrow
+   `unknown`; and documents the signal below.
    - **the request's signal is checked at every send boundary, on HTTP and RFC**: before the first
      send; after `authorize()` answers; after the logon — `establish()` and, over RFC,
      `conversation.open()` in `openOwn` / `loggedOn`, kept and throwaway conversations alike;
@@ -292,9 +297,22 @@ open PR #207 (`feat/debugger`, "AbapDebugger", from a fork) is still on 25.0.1 w
 **Order**: 0 (debugger releases) → 1 → 2 → 3 (on 1) and 4 (on 1, 2 and 26.0.0) → 5 (independent of
 1–4) → this server's 18.0.0. Each is published before the next is built against it (H7). **The
 server's own move to interfaces-adt 13 / interfaces-adt-connection 2 comes with it**: lib's ranges
-become `^13.2.0` / `^2.1.0`, and the one error interfaces-adt-connection 2.0.0's notes measured in
-this repository (a test helper's `makeAdtRequest` stub) is fixed in the move. The goal's *Out of
-scope* names these releases.
+become `^13.2.0` / `^2.1.0` and connection `^15.0.0`. In the move the server fixes what that costs it:
+the test helper's `makeAdtRequest` stub interfaces-adt-connection 2.0.0's notes measured, and every
+read of an answer's `data` through `AbapConnection` in the 8 files of `src` that import the alias
+(`BaseMcpServer.ts`, `EmbeddableMcpServer.ts`, `clients.ts`, …) — typed or narrowed, never cast to
+`any`. The goal's *Out of scope* names these releases.
+
+**Other consumers of connection's public types** (checked read-only; none is a prerequisite):
+
+| Consumer | Uses | What it needs for connection 15 |
+|---|---|---|
+| auth-broker 5.0.1 | `devDependencies` `^14.0.0`; tests only (`src/__tests__/broker/connection14.test.ts`, `live/adtProbe.ts`, `live/getProvider.live.test.ts`); README examples name connection 14 | nothing to release; its tests and README move to 15 in its own next change (or with 5.1.0) |
+| auth-providers 6.0.1, auth-stores 4.0.0, auth-errors 2.2.0 | no import of connection | nothing |
+| adt-clients | `devDependencies` `^10.0.2`, test harness and scripts; its source types come from interfaces-adt-connection | its interfaces-adt-connection 2 move (26.0.0) already meets the `unknown` default; its dev range moves to `^15` with 26.1.0 |
+| cloud-llm-hub | runtime `^10.0.3`, `lib ^16`, interfaces-adt-connection `^1.0.1`; `AbapConnection` and `SapConfig` types (`srv/mcp-manager.ts`), connectors and CSRF constants (`srv/connections/*`), its own `CloudSdkAbapConnection` with `makeAdtRequest<T = any>` | when it takes lib 18: connection `^15`, interfaces-adt-connection `^2.1`; reads through `AbapConnection` typed or narrowed; its own `makeAdtRequest<T = any>` still satisfies the interface; honour the request signal (§5.2) — its own change |
+| mcp-abap-adt-proxy, calm server | proxy on connection `^9.4`; calm none | out of scope (goal); each migrates in its own change |
+| this server's embedders | `EmbeddableMcpServerOptions.connection: AbapConnection` | the migration note (§12): the alias's `unknown` default |
 
 ### 3.2 The packages
 
@@ -326,7 +344,7 @@ whose graph reaches them. *Break:* import `AuthBrokerFactory` into lib → red.
 | `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.1.0` (prerequisite, D30) | core only |
 | `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^4.0.0` | core only |
 | `@mcp-abap-adt/auth-providers` | `^5.4.0` | `^6.0.1` | lib, core |
-| `@mcp-abap-adt/connection` | `^11.0.0` | `^14.1.0` (prerequisite) | lib |
+| `@mcp-abap-adt/connection` | `^11.0.0` | `^15.0.0` (prerequisite, a major) | lib |
 | `@mcp-abap-adt/adt-clients` | `~25.0.1` | `^26.1.0` (prerequisite, on the debugger release) | lib |
 | `@mcp-abap-adt/interfaces-adt-connection` | `^1.0.1` | `^2.1.0` (prerequisite) | lib |
 | `@mcp-abap-adt/interfaces-adt` | `^12.0.1` | `^13.2.0` (prerequisite) | lib |
@@ -961,7 +979,9 @@ its table**. The help, the YAML template and the validation come from it.
   factory's — the server passes it and promises nothing more for a connection that ignores it;
   `ConnectionContext`; `lib/auth` lost the destination layer (now `core/auth`); `IAuthBrokerFactoryConfig`'s
   required options; `StreamableHttpServer` moved to `@mcp-abap-adt/http` and lost its destinations
-  argument; the chain's own migrations (auth-providers 6, broker 5, connection 12–14).
+  argument; `AbapConnection` (connection 15 on interfaces-adt-connection 2) answers `unknown` by
+  default — name the type or narrow it; the chain's own migrations (auth-providers 6, broker 5,
+  connection 12–15).
 
 **Updated**: `README.md`, `server/README.md`, a new `http/README.md`, `CHANGELOG.md` (18.0.0, with
 §15's measurements), `docs/user-guide/AUTHENTICATION.md` (stdio only; HTTP headers; the
@@ -979,7 +999,7 @@ launcher's help.
   one PR, one major release**.
 - **The server waits for its prerequisites** (§3.1) — the user's debugger releases first
   (interfaces-adt 13.1.0, adt-clients 26.0.0), then interfaces-adt-connection 2.1.0,
-  interfaces-adt 13.2.0, connection 14.1.0, adt-clients 26.1.0 and auth-broker 5.1.0 — then
+  interfaces-adt 13.2.0, connection 15.0.0, adt-clients 26.1.0 and auth-broker 5.1.0 — then
   releases per `RELEASE.md`: manifests and
   sibling ranges, metadata, CHANGELOG and docs, `npm ci`, build, `test:check`, `npm test`
   (binSmoke), each package's own tests, `release:dry` ending `Published: 6  Skipped: 0`; the
@@ -1083,13 +1103,13 @@ connection, which is disconnected, and no provider is constructed; without it,
    lookup and succeeds; a failed lookup is not memoised either. *Breaks:* run the lookup under the
    first caller's signal (the second is refused); memoise the attempt before it settles (the later
    request inherits the abort).
-3. **A cancelled mutation is never sent** (M1, M6; with connection 14.1.0 and adt-clients 25.1.0):
+3. **A cancelled mutation is never sent** (M1, M6; with connection 15.0.0 and adt-clients 26.1.0):
    a server-built connection against the stand-in; R1 and R2 `POST`; R1 cancelled while both wait in
    `rejected()`, and separately in `authorize()`: no `POST` of R1 after its abort, R1 answered
    `request_aborted`, R2 `200`. Over HTTP in core and in the HTTP package; RFC's boundaries are
    connection's tests (§3.1).
 4. **Releases are not cancelled (D40)**, through real handlers against the stand-in (adt-clients
-   25.1.0, connection 14.1.0): `UpdateServiceDefinition` (its `withLock` release is
+   26.1.0, connection 15.0.0): `UpdateServiceDefinition` (its `withLock` release is
    `obj.unlock` of the signalled client) cancelled after the lock answered and before the update —
    the stand-in's log holds the `LOCK`, then the `UNLOCK`, and no update; the same for one handler
    per listed release site and for an adt-clients-internal release (`withLock` of a high-level
@@ -1218,14 +1238,14 @@ request like any request.
 | D22 | ownership of a handed-over fresh connection passes to the server |
 | D27, D47 | "server text" is an authorization server's or IdP's; ADT's own authorization errors reach the client as ADT errors |
 | D39 | `--transport` removed entirely, refused naming the binary to use |
-| §3.1 | the prerequisites on the current lines, after the debugger releases; the goal's *Out of scope* names them |
+| §3.1 | the prerequisites on the current lines, after the debugger releases; the goal's *Out of scope* names them; connection is 15.0.0, a major, no compatibility shim |
 
 **Questions for the user** (the spec is written on each recommendation):
 
 | # | Question | Recommendation |
 |---|---|---|
 | 1 | D30, auth-broker 5.1.0's contract: bind a handed-over credential only when its session holds **no** binding at all; a present, different binding stays refused | yes — the one case 5.0.1 refuses that a user meets on upgrade, without opening the copy-to-another-destination hole the binding exists for |
-| 2 | §3.1: the adt-clients debugger release is assumed to be **26.0.0** (a major for the interfaces-adt 13 move) and this change's adt-clients release 26.1.0 on top; connection's move to interfaces-adt-connection 2 assumed a minor (14.1.0) | confirm the numbers with the debugger PR's release |
+| 2 | §3.1: the adt-clients debugger release is assumed to be **26.0.0** (a major for the interfaces-adt 13 move) and this change's adt-clients release 26.1.0 on top | confirm the numbers with the debugger PR's release |
 
 **Possible later improvements**, each its own change in its repository: auth-stores
 `EnvDestinationStore.fromContent` / key stores `fromKey` (projections from content read once); the

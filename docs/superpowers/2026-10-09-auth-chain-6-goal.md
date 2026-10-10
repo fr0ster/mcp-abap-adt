@@ -12,7 +12,7 @@ The server `mcp-abap-adt` stands on the auth chain as it is published now:
 | auth-broker | 5.0.x |
 | auth-providers | 6.0.x |
 | auth-stores | 4.0.x |
-| connection | 14.x, with a per-request signal (below) |
+| connection | 15.0.x — a major on interfaces-adt-connection 2, with a per-request signal (below) |
 | interfaces-auth | 7.5.x |
 | auth-errors | 2.2.x |
 
@@ -243,8 +243,8 @@ never hides one and never guesses one.
     the request options, and the code of an aborted request;
   - `@mcp-abap-adt/interfaces-adt` 13.2.0 — the signal in the client's options,
     and the authentication refusal kept on a failure;
-  - `@mcp-abap-adt/connection` 14.1.0 — the signal honoured at every send
-    boundary, HTTP and RFC;
+  - `@mcp-abap-adt/connection` 15.0.0 — a major on interfaces-adt-connection 2,
+    with the signal honoured at every send boundary, HTTP and RFC;
   - `@mcp-abap-adt/adt-clients` 26.1.0 — the signal on every request, releases
     never cancelled, the refusal kept;
   - `@mcp-abap-adt/auth-broker` 5.1.0 — a handed-over token without a binding

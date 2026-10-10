@@ -18,7 +18,6 @@ const part = () => {
       dispose: async () => {
         held = false;
       },
-      describe: () => (held ? [{ kind: 'abap' }] : []),
       observe: (f: () => void) => {
         cb = f;
       },
@@ -35,10 +34,6 @@ describe('InstanceState', () => {
     expect(s.holdsState()).toBe(false);
     a.set(true);
     expect(s.holdsState()).toBe(true);
-    expect(s.describe()).toEqual({
-      state_handle: s.handle,
-      states: [{ kind: 'abap' }],
-    });
   });
   it('check: this handle and something held; otherwise not available — the same answer', () => {
     const s = new InstanceState();
@@ -95,7 +90,6 @@ describe('InstanceState', () => {
       holdsState: () => held,
       pending: () => finishing,
       failures: () => failures,
-      describe: () => [],
       observe: (f) => {
         tell = f;
       },
@@ -141,7 +135,6 @@ describe('InstanceState — what failed is named', () => {
       holdsState: () => true,
       pending: () => false,
       failures: () => ['close: refused'],
-      describe: () => [{ kind: 'abap' }],
       observe: () => {},
       dispose: async () => {
         throw new Error('close: refused');
@@ -151,13 +144,12 @@ describe('InstanceState — what failed is named', () => {
       holdsState: () => false,
       pending: () => false,
       failures: () => [],
-      describe: () => [],
       observe: () => {},
       dispose: async () => {},
     });
     await expect(s.dispose()).rejects.toThrow('close: refused');
     expect(s.holdsState()).toBe(true);
-    expect(s.describe().states).toEqual([{ kind: 'abap' }]);
+    expect(s.failures()).toEqual(['close: refused']);
   });
   it('shutdown with nothing left answers nothing; with no failure recorded it answers the disposal error', async () => {
     const empty = new InstanceState();
@@ -170,7 +162,6 @@ describe('InstanceState — what failed is named', () => {
       holdsState: () => true,
       pending: () => false,
       failures: () => [],
-      describe: () => [],
       observe: () => {},
       dispose: async () => {
         throw new Error('refused');
@@ -220,7 +211,6 @@ describe('InstanceState — isolation', () => {
       holdsState: () => false,
       pending: () => false,
       failures: () => [],
-      describe: () => [],
       observe: () => {},
       dispose: () => {
         throw new Error('sync refusal');
@@ -230,7 +220,6 @@ describe('InstanceState — isolation', () => {
       holdsState: () => false,
       pending: () => false,
       failures: () => [],
-      describe: () => [],
       observe: () => {},
       dispose: second,
     });
@@ -254,7 +243,6 @@ describe('InstanceState — isolation', () => {
         await gate;
         held = false;
       },
-      describe: () => [],
       observe: () => {},
     });
     const first = s.shutdown();

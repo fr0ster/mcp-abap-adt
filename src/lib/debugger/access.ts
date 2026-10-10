@@ -2,9 +2,8 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import type { DebuggerInstance } from './DebuggerInstance';
 
 /**
- * create: a starting tool — nothing of ours limits it; parallel sessions are
- * bounded by SAP on the stated terminal and IDE ids (same ids: SAP's conflict
- * or take-over reaches the model as it is).
+ * create: a starting tool — nothing of ours refuses it; SAP's answer to a
+ * listener of the same user (see `ids.ts`) reaches the model as it is.
  * use: the handle must be this instance's with state held. Either way the
  * sessions are bound to this call's context.
  */

@@ -623,24 +623,6 @@ export class AmdpSession<O = unknown> {
   failures(): string[] {
     return [...this.cleanupFailures];
   }
-
-  describe(): {
-    kind: 'amdp';
-    state: 'idle' | 'waiting' | 'stopped' | 'closing';
-    debuggee?: string;
-  } {
-    return {
-      kind: 'amdp' as const,
-      state: this.debuggeeId
-        ? ('stopped' as const)
-        : this.open
-          ? ('waiting' as const)
-          : this.closing
-            ? ('closing' as const)
-            : ('idle' as const),
-      ...(this.debuggeeId ? { debuggee: this.debuggeeId } : {}),
-    };
-  }
 }
 
 /** The original error, with what could not be undone appended. */

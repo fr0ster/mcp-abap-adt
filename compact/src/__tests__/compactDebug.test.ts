@@ -101,7 +101,6 @@ function fakeAbap(held: { on: boolean }) {
       return this;
     },
     observe() {},
-    describe: () => ({ kind: 'abap' }),
     ids: { terminalId: 'T', ideId: 'I' },
     start: async (mode: unknown, o: unknown) => {
       calls.push(['start', mode, o]);
@@ -171,7 +170,6 @@ function fakeAmdp(held: { on: boolean }) {
       return this;
     },
     observe() {},
-    describe: () => ({ kind: 'amdp' }),
     start: async (o: unknown) => {
       calls.push(['start', o]);
       held.on = true;

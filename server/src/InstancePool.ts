@@ -8,9 +8,9 @@
  * an instance once: the one the request's `state_handle` names, or a new one.
  * The handle identifies an LLM session's state and is a bearer secret:
  * whoever holds it reaches the instance, like a session cookie; keeping it
- * safe is the deployer's. There is no owner: parallel debug sessions are
- * bounded by SAP on the stated terminal and IDE ids, which are the consumer's
- * to choose. One request at a time per instance (the SDK binds one
+ * safe is the deployer's. There is no owner and no limit of ours: two
+ * listeners of one SAP user meet as SAP answers them (see the debugger's
+ * `ids.ts`). One request at a time per instance (the SDK binds one
  * transport).
  * An instance that holds nothing is disposed once, after its work; a disposal
  * that fails keeps the instance for a retry. Nothing expires on a clock.

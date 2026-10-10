@@ -24,7 +24,6 @@ function fakeAmdp() {
     bind() {
       return this;
     },
-    describe: () => ({ kind: 'amdp' }),
     observe: (f: () => void) => {
       tell = f;
     },
@@ -83,7 +82,6 @@ function install(amdp: any = fakeAmdp().amdp, abapHolds = false) {
       return this;
     },
     observe() {},
-    describe: () => ({ kind: 'abap' }),
     ids: {},
   } as any;
   const instance = new DebuggerInstance({ abap, amdp });
@@ -283,7 +281,6 @@ describe('AMDP debugger handlers', () => {
           return this;
         },
         observe() {},
-        describe: () => ({}),
         ids: {},
       } as any,
       amdp: new AmdpSession({} as any),

@@ -138,17 +138,6 @@ describe('DebugSession lifecycle', () => {
     );
   });
 
-  it('describe says what is held, with the ids', async () => {
-    const { session } = await started();
-    expect(session.describe()).toEqual({
-      kind: 'abap',
-      state: 'listening',
-      breakpoints: 0,
-      terminal_id: IDS.terminalId,
-      ide_id: IDS.ideId,
-    });
-  });
-
   describe('a close that throws during stop', () => {
     function closeFailsOnce(world: ReturnType<typeof fakeWorld>) {
       const realClose = world.ports.closeConnection;
@@ -184,7 +173,6 @@ describe('DebugSession lifecycle', () => {
       closeFailsOnce(world);
       await expect(session.stop()).rejects.toThrow(DebugCleanupError);
       expect(session.holdsState()).toBe(true);
-      expect(session.describe().state).toBe('idle');
       await expect(session.stop()).resolves.toBeUndefined();
       expect(
         world.calls.filter((c) => c === 'step:stepContinue:analysed'),

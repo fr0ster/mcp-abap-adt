@@ -9,11 +9,6 @@
 import { randomBytes } from 'node:crypto';
 import { logger as processLogger } from '../logger';
 
-export interface StateDescription {
-  kind: string;
-  [field: string]: unknown;
-}
-
 /**
  * One stateful part of an instance.
  * pending: cleanup is still finishing on its own (an AMDP session waits for
@@ -25,7 +20,6 @@ export interface StatePart {
   pending(): boolean;
   failures(): string[];
   dispose(): Promise<void>;
-  describe(): StateDescription[];
   observe(onChange: () => void): void;
 }
 
@@ -88,13 +82,6 @@ export class InstanceState {
 
   failures(): string[] {
     return this.parts.flatMap((p) => p.failures());
-  }
-
-  describe(): { state_handle: string; states: StateDescription[] } {
-    return {
-      state_handle: this.current,
-      states: this.parts.flatMap((p) => p.describe()),
-    };
   }
 
   /** For a call on existing state: the handle must be this one and something must be held. */

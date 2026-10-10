@@ -13,7 +13,6 @@ const fake = (holds: boolean) =>
     bind() {
       return this;
     },
-    describe: () => ({ kind: 'abap' }),
     stop: async () => {},
     observe: () => {},
     ids: { terminalId: 'T', ideId: 'I' },
@@ -30,7 +29,7 @@ function ctx(holds: boolean) {
 }
 
 describe('requireDebugger', () => {
-  it('create admits the kind and gives the debugger', () => {
+  it('create gives the debugger, whatever the state holds', () => {
     const { context, dbg } = ctx(false);
     expect(requireDebugger(context, {}, { create: 'abap' })).toBe(dbg);
   });
@@ -48,9 +47,6 @@ describe('requireDebugger', () => {
       requireDebugger({ connection: {} as any }, {}, { create: 'abap' }),
     ).toThrow(/debugging is not served/);
   });
-});
-
-describe('requireDebugger', () => {
   it('a start is not limited by anything of ours: it binds the sessions and answers the debugger', () => {
     const abap = { ...fake(false), bind: jest.fn() };
     const amdp = { ...fake(false), bind: jest.fn() };
@@ -94,9 +90,5 @@ describe('DebuggerInstance', () => {
     await expect(dbg.stop()).rejects.toThrow(
       'abap: close refused; amdp: release refused',
     );
-  });
-  it('describes only the sessions that hold state', () => {
-    const dbg = new DebuggerInstance({ abap: fake(true), amdp: fake(false) });
-    expect(dbg.describe()).toEqual([{ kind: 'abap' }]);
   });
 });

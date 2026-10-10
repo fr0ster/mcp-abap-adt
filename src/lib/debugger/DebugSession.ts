@@ -875,18 +875,4 @@ export class DebugSession<O = unknown> {
   failures(): string[] {
     return [...this.cleanupFailures];
   }
-
-  describe() {
-    return {
-      kind: 'abap' as const,
-      state: this.current
-        ? ('stopped' as const)
-        : this.listener
-          ? ('listening' as const)
-          : ('idle' as const),
-      breakpoints: this.armed.size,
-      terminal_id: this.ids.terminalId,
-      ide_id: this.ids.ideId,
-    };
-  }
 }

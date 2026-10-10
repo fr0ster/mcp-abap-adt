@@ -304,7 +304,7 @@ describe('AmdpSession', () => {
     ).rejects.toThrow(/bad uri/);
     expect(w.calls).toContain('stop');
     expect(w.calls).not.toContain('run');
-    expect(w.session.describe().state).toBe('closing');
+    expect(w.session.pending()).toBe(true); // retired: the last event batch still owed
     w.reads[0].resolve(okResponse('')); // the last batch
     await until(() => w.closed.length === 2);
     expect(w.session.holdsState()).toBe(false);
@@ -437,7 +437,7 @@ describe('AmdpSession', () => {
     const w = await started();
     w.dbg.stop = async () => refusedResponse('not stopped');
     w.reads[1].resolve(refusedResponse('session gone'));
-    await until(() => w.session.describe().state === 'closing'); // retired, the stop still owed
+    await until(() => w.session.failures().length > 0); // retired, the stop still owed
     expect(w.session.pending()).toBe(false);
     await expect(w.session.wait(0)).rejects.toThrow(
       /session gone; not undone: stop: not stopped/,
@@ -451,10 +451,6 @@ describe('AmdpSession', () => {
     w.session.observe(heard);
     w.reads[1].resolve(okResponse(BREAK));
     await until(() => heard.mock.calls.length > 0);
-    expect(w.session.describe()).toEqual({
-      kind: 'amdp',
-      state: 'stopped',
-      debuggee: 'D1',
-    });
+    expect(await w.session.wait(0)).toMatchObject({ state: 'event' });
   });
 });

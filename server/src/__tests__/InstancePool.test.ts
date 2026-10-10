@@ -44,7 +44,6 @@ class Fake {
         this.held = false;
         if (this.notifyInDispose) this.notify();
       },
-      describe: () => (this.held ? [{ kind: 'abap' }] : []),
       observe: (f) => {
         this.notify = f;
       },

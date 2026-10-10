@@ -214,7 +214,7 @@ describe('debugger handlers', () => {
     expect(context.state.holdsState()).toBe(false);
   });
 
-  it('two instances with the same stated ids: the second start reaches SAP and meets its conflict; nothing of ours refuses it', async () => {
+  it("a second start reaches SAP, and SAP's answer (a conflict, scripted) reaches the model; nothing of ours refuses it", async () => {
     const world = fakeWorld();
     const instance = () => {
       const state = new InstanceState();
@@ -223,12 +223,6 @@ describe('debugger handlers', () => {
         amdp: new AmdpSession({} as any),
       });
       state.attach(dbg);
-      // What a per-user registry would have said: another instance holds the kind.
-      (state as any).host = {
-        owner: 'O',
-        reserve: () => 'F'.repeat(32),
-        peers: () => [],
-      };
       return { state, connection: {} as any, debugger: () => dbg };
     };
     const first = instance();
@@ -239,7 +233,7 @@ describe('debugger handlers', () => {
     expect((await a).isError).toBeFalsy();
     const b = handleDebugStartListener(second as any, {});
     await until(() => world.polls.length === 3);
-    // SAP answers the second listener with the same ids: its conflict reaches the model as it is.
+    // The fake scripts SAP's answer to the second listener; which ids SAP keys on is not this test's.
     world.polls[2].resolve(CONFLICT());
     const r: any = await b;
     expect(r.isError).toBe(true);

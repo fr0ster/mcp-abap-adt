@@ -1,5 +1,5 @@
 import type { HandlerContext } from '../../handlers/interfaces';
-import type { StateDescription, StatePart } from '../state/InstanceState';
+import type { StatePart } from '../state/InstanceState';
 import { AmdpSession } from './AmdpSession';
 import { DebugCleanupError, DebugSession } from './DebugSession';
 import { type DebuggerIds, resolveDebuggerIds } from './ids';
@@ -36,14 +36,6 @@ export class DebuggerInstance implements StatePart {
   observe(onChange: () => void): void {
     this.abap.observe(onChange);
     this.amdp.observe(onChange);
-  }
-
-  /** The sessions held; the ABAP one carries the SAP ids. */
-  describe(): StateDescription[] {
-    return [
-      ...(this.abap.holdsState() ? [this.abap.describe()] : []),
-      ...(this.amdp.holdsState() ? [this.amdp.describe()] : []),
-    ];
   }
 
   /** Stops both; what either could not undo is reported, named, and stays for another stop. */

@@ -3,6 +3,10 @@ import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
+  AMDP_BREAK_LINE,
+  AMDP_MAIN_ID,
+  AMDP_STOPPED,
+  amdpBreak,
   AMDP_BREAK as BREAK,
   deferred,
   AMDP_END as END,
@@ -17,6 +21,8 @@ function world() {
   const closed: unknown[] = [];
   const run = deferred<any>();
   let syncN = 0;
+  /** The system's answer to an accepted stop: the open event read ends with STOP. Off, a test answers it. */
+  const sim = { stopAnswersRead: true };
   const dbg = {
     start: async (u: string, o: any) => {
       calls.push(`start:${u}:${o.stopExisting}`);
@@ -29,7 +35,7 @@ function world() {
     },
     syncBreakpoints: async (_m: string, b: any[]) => {
       calls.push(`sync:${b.length}`);
-      return okResponse({ headers: { location: `/x/Q${++syncN}` } });
+      return okResponse({ headers: { location: `Q${++syncN}` } }); // a bare id, as the system answers a sync
     },
     step: async (_m: string, d: string, s: string) => {
       calls.push(`step:${d}:${s}`);
@@ -41,6 +47,9 @@ function world() {
     },
     stop: async () => {
       calls.push('stop');
+      // As the system does: an accepted stop answers the open event read with STOP.
+      if (sim.stopAnswersRead)
+        for (const r of reads) r.resolve(okResponse(AMDP_STOPPED));
       return okResponse({});
     },
     getDataPreview: async (o: any) => {
@@ -63,7 +72,7 @@ function world() {
   }).bind('origin');
   /** The request id the next sync will be answered with. */
   const nextSync = () => `Q${syncN + 1}`;
-  return { session, reads, calls, closed, dbg, run, nextSync };
+  return { session, reads, calls, closed, dbg, run, nextSync, sim };
 }
 
 describe('AmdpSession', () => {
@@ -94,8 +103,11 @@ describe('AmdpSession', () => {
     expect(w.calls).not.toContain('run');
     w.reads[0].resolve(okResponse(SYNCED('Q1')));
     await expect(s).resolves.toMatchObject({
-      mainId: '0123456789ABCDEF0123456789ABCDEF',
-      breakpoints: [{ state: 'PENDING' }],
+      mainId: AMDP_MAIN_ID,
+      breakpoints: [
+        { class_name: 'ZMCP_DBG_AMDP', line: 27, state: 'PENDING' },
+        { class_name: 'ZMCP_DBG_AMDP', line: 37, state: 'PENDING' },
+      ],
     });
     await until(() => w.calls.includes('run'));
   });
@@ -142,7 +154,7 @@ describe('AmdpSession', () => {
     w.reads[1].resolve(okResponse(BREAK));
     await expect(waiting).resolves.toMatchObject({
       state: 'event',
-      events: [{ kind: 'ON_BREAK', line: 14 }],
+      events: [{ kind: 'ON_BREAK', line: AMDP_BREAK_LINE }],
     });
     await w.session.step('continue');
     expect(w.calls).toContain('step:D1:continue');
@@ -162,18 +174,47 @@ describe('AmdpSession', () => {
     );
   });
 
-  it('stop releases a suspended debuggee before the stop, returns without waiting for the poll, and the last batch closes everything', async () => {
+  it('stop releases a suspended debuggee before the stop and returns only once the open read answered and its last batch closed everything', async () => {
     const w = await started();
     w.reads[1].resolve(okResponse(BREAK));
     await until(() => w.reads.length === 3);
-    await w.session.stop(); // returns while reads[2] is still open
-    expect(w.calls.indexOf('delete:D1')).toBeGreaterThan(-1);
+    w.sim.stopAnswersRead = false;
+    let done = false;
+    const stopping = w.session.stop().then(() => {
+      done = true;
+    });
+    await until(() => w.calls.includes('stop'));
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(done).toBe(false); // the system has not answered the read yet
     expect(w.calls.indexOf('delete:D1')).toBeLessThan(w.calls.indexOf('stop'));
-    expect(w.session.holdsState()).toBe(true); // closing
-    w.reads[2].resolve(okResponse(BREAK.replace('D1', 'D2')));
-    await until(() => w.closed.length === 2);
+    w.reads[2].resolve(okResponse(amdpBreak('D2'))); // a break in the last batch
+    await stopping;
     expect(w.calls).toContain('delete:D2');
+    expect(w.closed).toHaveLength(2);
     expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('a stop the system refused does not wait for the read: it fails at once and is kept for the next stop', async () => {
+    const w = await started();
+    const realStop = w.dbg.stop;
+    w.dbg.stop = async () => {
+      w.calls.push('stop');
+      return refusedResponse('stop refused');
+    };
+    await expect(w.session.stop()).rejects.toThrow(/stop: .*stop refused/);
+    expect(w.session.holdsState()).toBe(true);
+    w.dbg.stop = realStop;
+    await w.session.stop();
+    expect(w.closed).toHaveLength(2);
+    expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('an accepted stop ends with the STOP event the system answers the read with', async () => {
+    const w = await started();
+    await w.session.stop();
+    expect(w.closed).toHaveLength(2);
+    expect(w.session.holdsState()).toBe(false);
+    expect(w.session.pending()).toBe(false);
   });
 
   it('a break that arrives while a step is answered is not lost', async () => {
@@ -182,7 +223,7 @@ describe('AmdpSession', () => {
     await until(() => w.reads.length === 3);
     const real = w.dbg.step;
     w.dbg.step = async (...a: any[]) => {
-      w.reads[2].resolve(okResponse(BREAK.replace('D1', 'D3')));
+      w.reads[2].resolve(okResponse(amdpBreak('D3')));
       await until(() => w.reads.length === 4);
       return real(...(a as [any, any, any]));
     };
@@ -201,7 +242,7 @@ describe('AmdpSession', () => {
     const waiting = w.session.wait(30);
     w.reads[0].resolve(okResponse(SYNCED('Q1')));
     await expect(s).resolves.toMatchObject({
-      breakpoints: [{ state: 'PENDING' }],
+      breakpoints: [{ state: 'PENDING' }, { state: 'PENDING' }],
     });
     await jest.advanceTimersByTimeAsync(30_000);
     expect((await waiting).state).toBe('waiting');
@@ -222,7 +263,7 @@ describe('AmdpSession', () => {
     await until(() => w.reads.length === before + 1);
     w.reads[before].resolve(okResponse(SYNCED(expected)));
     await expect(s).resolves.toMatchObject({
-      mainId: '0123456789ABCDEF0123456789ABCDEF',
+      mainId: AMDP_MAIN_ID,
     });
   });
 
@@ -236,9 +277,7 @@ describe('AmdpSession', () => {
       return refusedResponse('clear refused');
     };
     await expect(w.session.stop()).rejects.toThrow(/clear refused/);
-    expect(refusedClears).toBe(1);
-    w.reads[1].resolve(okResponse('<amdpdbg:events xmlns:amdpdbg="x"/>')); // the last batch arrives
-    await until(() => refusedClears === 2); // its own attempt failed too
+    await until(() => refusedClears === 2); // the last batch's own attempt failed too
     await until(() => !w.session.pending());
     expect(w.session.holdsState()).toBe(true); // not closed: the clear is still owed
     expect(w.closed).toHaveLength(0);
@@ -250,16 +289,19 @@ describe('AmdpSession', () => {
 
   it('a release that fails in the last batch is retried by the next stop', async () => {
     const w = await started();
-    await w.session.stop();
+    w.sim.stopAnswersRead = false;
+    const stopping = w.session.stop();
+    await until(() => w.calls.includes('stop'));
     const realDelete = w.dbg.deleteDebuggee;
     let refusedDeletes = 0;
     w.dbg.deleteDebuggee = async () => {
       refusedDeletes++;
       return refusedResponse('busy');
     };
-    w.reads[1].resolve(okResponse(BREAK));
-    await until(() => refusedDeletes === 1); // the last batch's release was attempted and failed
-    await until(() => !w.session.pending());
+    w.reads[1].resolve(okResponse(BREAK)); // the last batch carries a break
+    await expect(stopping).rejects.toThrow(/release debuggee D1: busy/);
+    expect(refusedDeletes).toBe(1);
+    expect(w.session.pending()).toBe(false);
     expect(w.session.failures()).toEqual(['release debuggee D1: busy']);
     expect(w.closed).toHaveLength(0);
     w.dbg.deleteDebuggee = realDelete;
@@ -333,7 +375,7 @@ describe('AmdpSession', () => {
     w.dbg.syncBreakpoints = async (_m: string, b: any[]) =>
       b.length
         ? refusedResponse('bad uri')
-        : okResponse({ headers: { location: '/x/C' } });
+        : okResponse({ headers: { location: 'C' } });
     await expect(
       w.session.start({
         stopExisting: true,
@@ -343,8 +385,7 @@ describe('AmdpSession', () => {
     ).rejects.toThrow(/bad uri/);
     expect(w.calls).toContain('stop');
     expect(w.calls).not.toContain('run');
-    expect(w.session.pending()).toBe(true); // retired: the last event batch still owed
-    w.reads[0].resolve(okResponse('')); // the last batch
+    // The accepted stop ended the open read (STOP), and that last batch closed both sessions.
     await until(() => w.closed.length === 2);
     expect(w.session.holdsState()).toBe(false);
   });
@@ -387,9 +428,8 @@ describe('AmdpSession', () => {
       if (refuse) throw new Error('logoff failed');
       return realClose(c);
     };
-    await w.session.stop();
-    w.reads[1].resolve(okResponse(''));
-    await until(() => !w.session.pending());
+    await expect(w.session.stop()).rejects.toThrow(/logoff failed/);
+    expect(w.session.pending()).toBe(false);
     expect(w.session.failures()).toEqual([
       "the events' connection was not closed: logoff failed",
       "the commands' connection was not closed: logoff failed",

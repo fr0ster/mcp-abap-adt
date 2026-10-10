@@ -24,3 +24,27 @@ it('any document parses, its namespaces dropped', () => {
     x: { y: '1' },
   });
 });
+
+it('the memory sizes and a created snapshot, as recorded, read as their documents', () => {
+  expect(
+    readXmlDocument(corpusBody('debugger-memory--01-memory-sizes')),
+  ).toEqual({
+    memorySizes: {
+      abap: expect.objectContaining({ staticVariables: expect.any(String) }),
+      internal: expect.objectContaining({ used: expect.any(String) }),
+      external: expect.objectContaining({
+        numberOfInternalSessions: '1',
+      }),
+    },
+  });
+  expect(
+    readXmlDocument(corpusBody('debugger-memory--02-create-memory-snapshot')),
+  ).toEqual({
+    action: expect.objectContaining({
+      name: 'memorySnapshot',
+      isError: 'false',
+      messageKind: 'info',
+      data: expect.stringContaining('abDbgMemory_'),
+    }),
+  });
+});

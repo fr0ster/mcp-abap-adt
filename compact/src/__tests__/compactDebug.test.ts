@@ -214,7 +214,7 @@ function fakeAmdp(held: { on: boolean }) {
             debuggeeId: 'D1',
             line: 14,
             variables: [],
-            states: [],
+            breakpoints: [],
             body: '<b/>',
           },
         ],

@@ -7,7 +7,11 @@ import {
   terseAmdpEvent,
 } from '../../../lib/debugger/amdpReadings';
 import {
+  AMDP_BREAK_LINE,
+  AMDP_MAIN_ID,
+  AMDP_STOPPED,
   AMDP_BREAK as BREAK,
+  AMDP_END as END,
   AMDP_START as START,
   AMDP_SYNCED as SYNCED,
 } from './fakes';
@@ -15,8 +19,8 @@ import {
 describe('AMDP readings', () => {
   it('the start names the session in Location and the HANA session in the body', () => {
     expect(readAmdpStart(START)).toEqual({
-      mainId: '0123456789ABCDEF0123456789ABCDEF',
-      hanaSession: '123',
+      mainId: AMDP_MAIN_ID,
+      hanaSession: 'sap.example.local:30103:225615',
     });
     expect(
       locationId({
@@ -30,45 +34,76 @@ describe('AMDP readings', () => {
     ).toBe('ABCDEF0123456789ABCDEF0123456789');
     expect(locationId({ headers: {} })).toBe('');
   });
-  it('an ON_BREAK: kind, line, debuggee, variables (NULL for a null)', () => {
+  it('an ON_BREAK: kind, line, debuggee, every variable at any depth', () => {
     const [e] = readAmdpEvents(BREAK);
-    expect(e).toMatchObject({ kind: 'ON_BREAK', debuggeeId: 'D1', line: 14 });
+    expect(e).toMatchObject({
+      kind: 'ON_BREAK',
+      requestId: '',
+      debuggeeId: 'D1',
+      line: AMDP_BREAK_LINE,
+    });
     expect(e.variables).toEqual([
+      { name: '::CURRENT_OBJECT_NAME', value: 'ZMCP_DBG_AMDP=>SUM_TO' },
+      { name: '::CURRENT_OBJECT_SCHEMA', value: 'SAPHANADB' },
+      { name: '::ROWCOUNT', value: '0' },
+      { name: 'EV_STEPS', value: '0' },
+      { name: 'EV_TOTAL', value: '0' },
+      { name: 'IV_LIMIT', value: '3' },
       { name: 'LV_I', value: '1' },
-      { name: 'LV_N', value: 'NULL' },
     ]);
+    expect(e.breakpoints).toEqual([]);
     expect(terseAmdpEvent(e)).toEqual({
       kind: 'ON_BREAK',
-      requestId: 'R1',
       debuggeeId: 'D1',
-      line: 14,
+      line: AMDP_BREAK_LINE,
       variables: e.variables,
     });
+  });
+  it('a variable the system marks null reads NULL', () => {
+    const xml = BREAK.replace(
+      'amdpdbg:name="LV_I" amdpdbg:type="INTEGER" amdpdbg:isNullValue="false"',
+      'amdpdbg:name="LV_I" amdpdbg:type="INTEGER" amdpdbg:isNullValue="true"',
+    );
+    expect(xml).not.toBe(BREAK);
+    expect(readAmdpEvents(xml)[0].variables).toContainEqual({
+      name: 'LV_I',
+      value: 'NULL',
+    });
+  });
+  it('an ON_EXECUTION_END names the debuggee that ended', () => {
+    expect(readAmdpEvents(END)).toEqual([
+      expect.objectContaining({
+        kind: 'ON_EXECUTION_END',
+        debuggeeId: 'D1',
+        variables: [],
+        breakpoints: [],
+      }),
+    ]);
+  });
+  it('a stopped session answers the open read with a STOP event', () => {
+    expect(readAmdpEvents(AMDP_STOPPED).map((e) => e.kind)).toEqual(['STOP']);
   });
   it('a SYNC_BREAKPOINTS carries its request id and the states', () => {
     expect(readAmdpEvents(SYNCED('Q1'))[0]).toMatchObject({
       kind: 'SYNC_BREAKPOINTS',
       requestId: 'Q1',
-      breakpoints: [{ state: 'PENDING' }],
+      breakpoints: [{ state: 'PENDING' }, { state: 'PENDING' }],
     });
   });
   it("each event keeps its whole body — a child's self-closing tag does not end it", () => {
-    const xml = SYNCED('Q1').replace(
-      '</amdpdbg:events>',
-      '<amdpdbg:mainResponse amdpdbg:kind="ON_EXECUTION_END" amdpdbg:debuggeeId="D1"/></amdpdbg:events>',
+    const [first, second] = readAmdpEvents(
+      corpusBody('amdp-debugger--04-events-toggle-breakpoints'),
     );
-    const [sync, end] = readAmdpEvents(xml);
-    expect(sync.body).toMatch(
-      /^<amdpdbg:mainResponse[\s\S]*<\/amdpdbg:mainResponse>$/,
-    );
-    expect(sync.body).toContain('amdpdbg:state="PENDING"');
-    expect(end.body).toBe(
-      '<amdpdbg:mainResponse amdpdbg:kind="ON_EXECUTION_END" amdpdbg:debuggeeId="D1"/>',
-    );
+    for (const e of [first, second])
+      expect(e.body).toMatch(
+        /^<amdpdbg:mainResponse[\s\S]*<\/amdpdbg:mainResponse>$/,
+      );
+    expect(first.body).toContain('#start=37');
+    expect(second.body).toContain('#start=27');
+    expect(readAmdpEvents(END)[0].body).toContain('<amdpdbg:value/>');
   });
   it('no events in an empty answer', () => {
     expect(readAmdpEvents('')).toEqual([]);
-    expect(readAmdpEvents('<amdpdbg:events xmlns:amdpdbg="x"/>')).toEqual([]);
   });
   it('a data preview becomes rows', () => {
     const xml =
@@ -132,6 +167,22 @@ describe('AMDP readings', () => {
       expect(terseAmdpEvent(second).breakpoints).toEqual([
         { class_name: 'ZMCP_DBG_AMDP', line: 27, state: 'VALID' },
       ]);
+    });
+    it('the table function stops as a debuggee of its own; its table variable reads as a count', () => {
+      const [e] = readAmdpEvents(
+        corpusBody('amdp-debugger--07-events-on-break-table-function'),
+      );
+      expect(e).toMatchObject({ kind: 'ON_BREAK', line: 37 });
+      expect(e.debuggeeId).toMatch(/:2$/);
+      expect(e.variables).toContainEqual({
+        name: 'LT_ROWS',
+        value: 'TABLE[0]',
+      });
+    });
+    it('the data preview of a table variable reads as rows', () => {
+      expect(
+        readAmdpPreview(corpusBody('amdp-debugger--08-data-preview-table')),
+      ).toEqual({ columns: ['N', 'SQUARE'], rows: [{ N: '1', SQUARE: '1' }] });
     });
     it('the start names the session in Location and the HANA session in the body', () => {
       const start = corpusSidecar('amdp-debugger--01-start');

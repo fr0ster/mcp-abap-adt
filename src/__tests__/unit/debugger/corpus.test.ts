@@ -10,6 +10,7 @@ describe('the debugger answers recorded on a system', () => {
     'memory-snapshot-list',
     'amdp-debugger',
     'debugger-conflict',
+    'debugger-memory',
   ])('%s is in the corpus', (prefix) => {
     expect(corpusCases(prefix).length).toBeGreaterThan(0);
   });

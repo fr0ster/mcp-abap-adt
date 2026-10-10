@@ -4,12 +4,14 @@
  * in the background so a wait is bounded by its own hold. A sync is answered
  * with a request id and confirmed by its SYNC_BREAKPOINTS event, correlated
  * apart from the public event queue; a run starts only after that. A stop never
- * releases a suspended debuggee (measured), so stop() deletes it first. Closing
- * a connection does not cancel a request in flight (the connector dispatches
- * its logoff and returns), so stop() does not wait for the event poll: the read
- * loop, when its last batch arrives, releases a break it carries and closes both
- * connections. Nothing ends on a timer of ours; the one bounded wait is a sync's
- * confirmation, inside its own call, at WAIT_MAX_SECONDS.
+ * releases a suspended debuggee (measured), so stop() deletes it first. A stop
+ * the system accepted ends the open event read (a STOP event ~260 ms later,
+ * measured on premise 2026-10-11), so stop() returns once that read answered
+ * and the read loop, with its last batch, released a break it carries and
+ * closed both connections. A stop that was not accepted does not wait: the
+ * read then ends when the system says. Nothing ends on a timer of ours; the
+ * one bounded wait is a sync's confirmation, inside its own call, at
+ * WAIT_MAX_SECONDS.
  */
 import { randomUUID } from 'node:crypto';
 import type {
@@ -71,6 +73,7 @@ interface Open {
   cleared: boolean; // the empty breakpoint sync was answered ok
   stopped: boolean; // the stop request was answered ok
   readDone: boolean; // the read loop's last batch was handled
+  reading?: Promise<IAdtResponse<unknown>>; // the event read the system holds open
   readFailed?: string; // the event read failed: a sync waiting for confirmation hears it at once
   failureReported: boolean; // that failure was already thrown by a sync
 }
@@ -330,9 +333,9 @@ export class AmdpSession<O = unknown> {
   private async readLoop(open: Open): Promise<void> {
     try {
       for (;;) {
-        const answer = await open.onEvents
-          .getEvents(open.mainId)
-          .catch(asFailure);
+        const reading = open.onEvents.getEvents(open.mainId).catch(asFailure);
+        open.reading = reading;
+        const answer = await reading;
         let events: AmdpEvent[] = [];
         let failed = answer.ok ? undefined : messageOf(answer);
         if (answer.ok) {
@@ -544,15 +547,24 @@ export class AmdpSession<O = unknown> {
    * connections close when the read loop's last batch has arrived and nothing
    * is left to undo. Never throws anything but DebugCleanupError.
    */
-  stop(): Promise<void> {
-    return this.mutate(async () => {
+  async stop(): Promise<void> {
+    let ending: Open | undefined;
+    await this.mutate(async () => {
       const failures: string[] = [];
       try {
         for (const c of [...this.unclosed])
           await this.closeOrKeep(c, 'a connection', failures);
         if (this.open) this.retire(this.open);
-        if (this.closing)
-          failures.push(...(await this.finishClosing(this.closing, [])));
+        if (this.closing) {
+          const open = this.closing;
+          failures.push(...(await this.finishClosing(open, [])));
+          // Accepted: the system answers the open read now. Its answer is awaited here; the
+          // read loop handles it as the last batch once this call leaves the serial.
+          if (open.stopped && !open.readDone && open.reading) {
+            await open.reading;
+            ending = open;
+          }
+        }
       } catch (error) {
         failures.push(thrown(error));
       } finally {
@@ -572,6 +584,25 @@ export class AmdpSession<O = unknown> {
         this.cleanupFailures = failures;
       }
       if (failures.length) throw new DebugCleanupError(failures.join('; '));
+    });
+    // The read already answered: its last batch is in the serial behind this call,
+    // and what it could not undo is this stop's failure too.
+    if (ending) {
+      await this.lastBatchHandled(ending);
+      if (this.cleanupFailures.length)
+        throw new DebugCleanupError(this.cleanupFailures.join('; '));
+    }
+  }
+
+  private lastBatchHandled(open: Open): Promise<void> {
+    return new Promise((resolve) => {
+      const check = () => {
+        if (!open.readDone) return;
+        this.waiters.delete(check);
+        resolve();
+      };
+      this.waiters.add(check);
+      check();
     });
   }
 

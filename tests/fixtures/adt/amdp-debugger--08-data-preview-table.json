@@ -1,0 +1,24 @@
+{
+  "case": "amdp-debugger",
+  "step": 8,
+  "stepTag": "data-preview-table",
+  "capturedAt": "2026-10-11",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/datapreview/amdpdebugger?rowNumber=100&sessionId=sap.example.local%3A30103%3A232940&debuggerId=0CC47A1E68C11FE1B19E90DB3E2EF5CB&debuggeeId=sap.example.local%3A30103%3A232940%3A225057%3A2&variableName=LT_ROWS",
+    "params": null,
+    "headers": {
+      "Accept": "application/xml, application/vnd.sap.adt.datapreview.table.v1+xml",
+      "Content-Type": "text/plain"
+    },
+    "headersNote": "On premise (2026-10-11), through this package's debugger sessions (DEBUG_HTTP_WIRE); user, system and host replaced by placeholders. The wire log prints no response headers: content-type is the one the request accepted. Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/vnd.sap.adt.datapreview.table.v1+xml"
+    },
+    "bodyFile": "amdp-debugger--08-data-preview-table.body.xml"
+  }
+}

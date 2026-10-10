@@ -1,6 +1,7 @@
 /**
- * AMDP debugger documents, in the shapes the adt-clients AMDP integration
- * test reads (measured on premise and on the cloud, 2026-10-09).
+ * AMDP debugger documents, as the system sends them (recorded on premise,
+ * 2026-10-11: the start, a sync and its events, a break, the end of a
+ * debuggee, a stop, a data preview).
  */
 import { XMLParser } from 'fast-xml-parser';
 
@@ -81,9 +82,9 @@ export function readAmdpEvents(xml: string): AmdpEvent[] {
   const doc = parser.parse(xml);
   // The system answers a mainResponseList (measured on premise, 2026-10-11).
   const root =
-    [doc.mainResponseList, doc.events].find(
-      (r) => r && typeof r === 'object',
-    ) ?? doc;
+    doc.mainResponseList && typeof doc.mainResponseList === 'object'
+      ? doc.mainResponseList
+      : doc;
   const rows: any[] = root.mainResponse ?? [];
   const bodies = [...xml.matchAll(MAIN_RESPONSE)].map((m) => m[0]);
   return rows.map((r, i) => {

@@ -6,6 +6,7 @@ const parser = new XMLParser({
   attributeNamePrefix: '',
   removeNSPrefix: true,
   parseTagValue: false,
+  ignoreDeclaration: true, // the `<?xml …?>` line carries nothing a reader needs
   isArray: (n) => n === 'snapshot',
 });
 

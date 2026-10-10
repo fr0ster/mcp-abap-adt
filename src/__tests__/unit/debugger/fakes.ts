@@ -1,5 +1,5 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { corpusBody } from '../../../lib/adtCorpus';
+import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import type {
   Debugger,
   DebugSessionPorts,
@@ -132,9 +132,9 @@ export function fakeWorld() {
           okResponse('<dbg:watchpoints xmlns:dbg="x"/>'),
         deleteWatchpoint: async () => DONE(),
         getMemorySizes: async () =>
-          okResponse('<dbg:memorySizes xmlns:dbg="x"/>'),
+          okResponse(corpusBody('debugger-memory--01-memory-sizes')),
         createMemorySnapshot: async () =>
-          okResponse('<dbg:action xmlns:dbg="x"/>'),
+          okResponse(corpusBody('debugger-memory--02-create-memory-snapshot')),
       } as Record<string, any>,
       { get: (target, key: string) => override[key] ?? target[key] },
     ) as unknown as Debugger;
@@ -171,17 +171,40 @@ export function fakeWorld() {
   };
 }
 
-// AMDP debugger answers, in the shapes the adt-clients AMDP integration test
-// reads them; Task 14 replaces these with recorded answers.
+// AMDP debugger answers as recorded on premise (2026-10-11, sanitised): the
+// start, the events of one sync, a break, the end of a debuggee and a stop.
+// Only the ids a test addresses are put in: a sync's request id, a debuggee.
+const RECORDED_DEBUGGEE = /amdpdbg:debuggeeId="([^"]+)"/.exec(
+  corpusBody('amdp-debugger--05-events-on-break'),
+)![1];
+const withDebuggee = (xml: string, debuggeeId: string) =>
+  xml.split(RECORDED_DEBUGGEE).join(debuggeeId);
+
 export const AMDP_START = {
-  headers: {
-    location: '/sap/bc/adt/amdp/debugger/main/0123456789ABCDEF0123456789ABCDEF',
-  },
-  data: '<amdpdbg:startResponse xmlns:amdpdbg="x"><amdpdbg:property amdpdbg:key="HANA_SESSION_ID" amdpdbg:value="123"/></amdpdbg:startResponse>',
+  headers: corpusSidecar('amdp-debugger--01-start').response.headers,
+  data: corpusBody('amdp-debugger--01-start'),
 };
-export const AMDP_SYNCED = (requestId: string) =>
-  `<amdpdbg:events xmlns:amdpdbg="x"><amdpdbg:mainResponse amdpdbg:kind="SYNC_BREAKPOINTS" amdpdbg:requestId="${requestId}"><amdpdbg:breakpoint amdpdbg:state="PENDING"/></amdpdbg:mainResponse></amdpdbg:events>`;
-export const AMDP_BREAK =
-  '<amdpdbg:events xmlns:amdpdbg="x" xmlns:adtcore="y"><amdpdbg:mainResponse amdpdbg:kind="ON_BREAK" amdpdbg:requestId="R1" amdpdbg:debuggeeId="D1"><amdpdbg:abapPosition adtcore:uri="/sap/bc/adt/oo/classes/zcl_a/source/main#start=14"/><amdpdbg:variable amdpdbg:name="LV_I">1</amdpdbg:variable><amdpdbg:variable amdpdbg:name="LV_N" amdpdbg:isNullValue="true"/></amdpdbg:mainResponse></amdpdbg:events>';
-export const AMDP_END =
-  '<amdpdbg:events xmlns:amdpdbg="x"><amdpdbg:mainResponse amdpdbg:kind="ON_EXECUTION_END" amdpdbg:requestId="R2" amdpdbg:debuggeeId="D1"/></amdpdbg:events>';
+/** The session id the recorded start names in its Location. */
+export const AMDP_MAIN_ID = String(AMDP_START.headers.location)
+  .split('/')
+  .pop()!;
+/** The recorded SYNC_BREAKPOINTS event, under the request id a sync was answered with. */
+export const AMDP_SYNCED = (requestId: string) => {
+  const xml = corpusBody('amdp-debugger--03-events-sync-breakpoints');
+  const recorded = /amdpdbg:requestId="([^"]+)"/.exec(xml)![1];
+  return xml.split(recorded).join(requestId);
+};
+/** The recorded ON_BREAK (line 27 of the probe class), for the debuggee named. */
+export const amdpBreak = (debuggeeId = 'D1') =>
+  withDebuggee(corpusBody('amdp-debugger--05-events-on-break'), debuggeeId);
+/** The recorded ON_EXECUTION_END, for the debuggee named. */
+export const amdpEnd = (debuggeeId = 'D1') =>
+  withDebuggee(
+    corpusBody('amdp-debugger--06-events-on-execution-end'),
+    debuggeeId,
+  );
+export const AMDP_BREAK = amdpBreak();
+export const AMDP_BREAK_LINE = 27;
+export const AMDP_END = amdpEnd();
+/** What the open event read answers once the session is stopped. */
+export const AMDP_STOPPED = corpusBody('amdp-debugger--09-events-stop');

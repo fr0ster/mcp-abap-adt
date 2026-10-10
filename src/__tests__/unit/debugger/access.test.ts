@@ -52,13 +52,20 @@ describe('requireDebugger', () => {
 
 describe('requireDebugger under a host', () => {
   it('a request with no identity cannot create state, and the debugger is not bound', () => {
-    const { context, state } = ctx(false);
+    const abap = { ...fake(false), bind: jest.fn() };
+    const amdp = { ...fake(false), bind: jest.fn() };
+    const state = new InstanceState();
+    const dbg = new DebuggerInstance({ abap, amdp });
+    state.attach(dbg);
     state.host = { owner: null, reserve: () => undefined, peers: () => [] };
+    const context = { connection: {} as any, state, debugger: () => dbg };
     expect(() => requireDebugger(context, {}, { create: 'amdp' })).toThrow(
       /no identity/,
     );
+    expect(abap.bind).not.toHaveBeenCalled();
+    expect(amdp.bind).not.toHaveBeenCalled();
   });
-  it("another owner's handle and an unknown one get the same answer", () => {
+  it("a handle that is not this instance's and a missing handle get the same answer", () => {
     const { context } = ctx(true);
     const answers = ['0'.repeat(32), undefined].map((h) => {
       try {

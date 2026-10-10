@@ -7,6 +7,7 @@
  * state ends by an explicit stop, the host, the backend or process shutdown.
  */
 import { randomBytes } from 'node:crypto';
+import { logger as processLogger } from '../logger';
 
 export interface StateDescription {
   kind: string;
@@ -58,7 +59,18 @@ export class StateCleanupError extends Error {
 const newHandle = () => randomBytes(16).toString('hex').toUpperCase();
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** Where a failing observer is reported. */
+export interface StateLogger {
+  error(message: string): void;
+}
+
 export class InstanceState {
+  private readonly log: StateLogger;
+
+  constructor(options: { logger?: StateLogger } = {}) {
+    this.log = options.logger ?? processLogger;
+  }
+
   private current = newHandle();
   private readonly parts: StatePart[] = [];
   private readonly emptyListeners: Array<() => void> = [];
@@ -130,9 +142,11 @@ export class InstanceState {
 
   /**
    * A complete stop was asked: the handle is invalidated for good once nothing
-   * is held — now, or when an asynchronous part finishes. Until then the old
-   * handle still serves, so a stop that could not undo everything can be
-   * retried with it.
+   * is held — now, or when an asynchronous part finishes. The request stands
+   * until the instance is empty, whichever path empties it: a stop that could
+   * not undo everything keeps the handle valid for a retry, and the handle
+   * ends when that retry, the backend, the host or any later cleanup empties
+   * the instance.
    */
   endWhenEmpty(): void {
     this.endRequested = true;
@@ -161,14 +175,24 @@ export class InstanceState {
       this.current = newHandle(); // the old handle is invalid for good
       this.endRequested = false;
     }
-    if (emptied) for (const l of [...this.emptyListeners]) l();
-    for (const l of [...this.changeListeners]) l();
+    if (emptied) for (const l of [...this.emptyListeners]) this.tell(l);
+    for (const l of [...this.changeListeners]) this.tell(l);
+  }
+
+  /** An observer that throws is reported; it never turns the part's transition into a failure. */
+  private tell(listener: () => void): void {
+    try {
+      listener();
+    } catch (error) {
+      this.log.error(`instance state: an observer failed: ${messageOf(error)}`);
+    }
   }
 
   /** Disposes every part; throws a StateCleanupError naming what failed. */
   async dispose(): Promise<void> {
     const results = await Promise.allSettled(
-      this.parts.map((p) => p.dispose()),
+      // A synchronous throw of one part must not skip the others.
+      this.parts.map((p) => Promise.resolve().then(() => p.dispose())),
     );
     this.changed();
     const failures = results.flatMap((r) =>

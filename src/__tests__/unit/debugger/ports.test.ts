@@ -11,6 +11,10 @@ describe('the request user', () => {
   });
   it('falls back to the login — the scope login before the process login — never the responsible', async () => {
     const conn = recordingConnection([{ status: 404, data: '' }]);
+    const saved = {
+      SAP_USERNAME: process.env.SAP_USERNAME,
+      SAP_RESPONSIBLE: process.env.SAP_RESPONSIBLE,
+    };
     process.env.SAP_USERNAME = 'processlogin';
     process.env.SAP_RESPONSIBLE = 'SOMEONEELSE';
     try {
@@ -19,8 +23,10 @@ describe('the request user', () => {
         await expect(requestUserOf(conn as any)).resolves.toBe('SCOPELOGIN');
       });
     } finally {
-      delete process.env.SAP_USERNAME;
-      delete process.env.SAP_RESPONSIBLE;
+      for (const [name, value] of Object.entries(saved)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
     }
   });
 });

@@ -202,3 +202,51 @@ describe('InstanceState — what failed is named', () => {
     expect(() => new InstanceState().admit('amdp')).not.toThrow();
   });
 });
+
+describe('InstanceState — isolation', () => {
+  it('a throwing listener is logged and never reaches the part that changed, nor the other listeners', () => {
+    const errors: string[] = [];
+    const s = new InstanceState({
+      logger: { error: (m: string) => errors.push(m) },
+    });
+    const a = part();
+    s.attach(a.p);
+    const after = jest.fn();
+    s.onChange(() => {
+      throw new Error('observer broke');
+    });
+    s.onEmpty(() => {
+      throw new Error('empty observer broke');
+    });
+    s.onChange(after);
+    expect(() => a.set(true)).not.toThrow();
+    expect(() => a.set(false)).not.toThrow();
+    expect(after).toHaveBeenCalledTimes(2);
+    expect(errors.some((e) => e.includes('observer broke'))).toBe(true);
+    expect(errors.some((e) => e.includes('empty observer broke'))).toBe(true);
+  });
+  it('a part whose dispose throws synchronously does not skip the others, and is named', async () => {
+    const s = new InstanceState();
+    const second = jest.fn(async () => {});
+    s.attach({
+      holdsState: () => false,
+      pending: () => false,
+      failures: () => [],
+      describe: () => [],
+      observe: () => {},
+      dispose: () => {
+        throw new Error('sync refusal');
+      },
+    });
+    s.attach({
+      holdsState: () => false,
+      pending: () => false,
+      failures: () => [],
+      describe: () => [],
+      observe: () => {},
+      dispose: second,
+    });
+    await expect(s.dispose()).rejects.toThrow('sync refusal');
+    expect(second).toHaveBeenCalledTimes(1);
+  });
+});

@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
 import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
@@ -17,7 +17,6 @@ import {
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
-import { connectedUserOf } from './connectedUser.js';
 import { CORE_VERSION } from './coreVersion.js';
 import {
   destinationFailureAnswer,
@@ -88,16 +87,6 @@ export interface StreamableHttpServerOptions {
   allowedOrigins?: string[];
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
-  /**
-   * The SAP user an `x-sap-*` token request logs on as, as SAP answers it
-   * (`systeminformation` on a connection built from the request's headers);
-   * undefined when SAP names none, a rejection when SAP refuses the token.
-   * Defaults to asking SAP. The owner of the request's state is this user,
-   * never a claim read from the token.
-   */
-  connectedUser?: (
-    headers: Record<string, string | string[] | undefined>,
-  ) => Promise<string | undefined>;
 }
 
 type Headers = Record<string, string | string[] | undefined>;
@@ -112,13 +101,6 @@ interface PerRequestServerApi extends Poolable {
   ) => Promise<void>;
   setConnectionContextFromHeadersPublic: (headers: Headers) => void;
   connectPublic: () => Promise<unknown>;
-}
-
-/** Whether the body carries a `tools/call` — the only method that can create or use state. */
-function callsTools(body: unknown): boolean {
-  const one = (m: unknown) =>
-    (m as { method?: unknown } | null | undefined)?.method === 'tools/call';
-  return Array.isArray(body) ? body.some(one) : one(body);
 }
 
 /**
@@ -148,18 +130,8 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly firstConnect = new FirstConnectLock();
   /** The instances that hold state between requests (spec D9). */
   private readonly pool = new InstancePool<PerRequestServerApi>();
-  /** Keys the owner of a basic request; per process, never stored or logged. */
+  /** Keys the owner scope of a basic request; per process, never stored or logged. */
   private readonly ownerSecret = randomBytes(32);
-  /** SHA-256 of (url, client, token) → the SAP user SAP answered for it. No timer. */
-  private readonly tokenUsers = new Map<string, string>();
-  /** Lookups in flight, so concurrent requests with one token ask SAP once. */
-  private readonly tokenLookups = new Map<
-    string,
-    Promise<string | undefined>
-  >();
-  private readonly connectedUser: (
-    headers: Headers,
-  ) => Promise<string | undefined>;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -184,7 +156,6 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
-    this.connectedUser = opts?.connectedUser ?? connectedUserOf;
     // Register handlers once for shared MCP server
     this.registerHandlers(this.handlersRegistry);
   }
@@ -260,12 +231,9 @@ export class StreamableHttpServer extends BaseMcpServer {
           throw err;
         }
 
-        // Only a tools/call can create or use state: no other request asks SAP
-        // for its owner. A call that carries a handle may reach held state, so
-        // its token is verified by SAP now, not by an earlier answer.
-        const owner = callsTools(req.body)
-          ? await this.ownerOf(req.headers, destination, handle !== undefined)
-          : null;
+        // The owner scopes listing and the per-owner limit; the handle alone
+        // reaches its instance (a bearer secret).
+        const owner = this.ownerOf(req.headers, destination);
 
         const authSource = destination
           ? `destination=${destination}`
@@ -494,78 +462,40 @@ export class StreamableHttpServer extends BaseMcpServer {
   }
 
   /**
-   * Who the request's state belongs to (spec D15) — a handle is no key:
+   * The scope of the request's state — for listing an owner's states and the
+   * per-owner limit, never an authorization: the handle is a bearer secret
+   * (spec D15). Taken only where it is known for free:
    * - a destination request: `dest:<destination>`;
    * - an `x-sap-*` basic request: `basic:` + HMAC-SHA256 of url, client,
    *   login and password, keyed by a per-process secret;
-   * - an `x-sap-*` token request: `user:` + url, client and the SAP user SAP
-   *   answers on the request's own token (never an unverified claim). A call
-   *   that may reach held state (`routesToState`) asks SAP every time, so a
-   *   token SAP refuses now — expired or revoked — reaches nothing; a call
-   *   that creates state may take the answer SAP gave this token before;
-   * - otherwise, or a token SAP refuses: null — no state can be created.
-   * Nothing here is logged.
+   * - otherwise (a token request, or none): null — the request may still
+   *   create state; it lists only its own instance and takes no slot.
+   * Nothing is asked of SAP, and nothing here is logged.
    */
-  private async ownerOf(
+  private ownerOf(
     headers: Headers,
     destination: string | undefined,
-    routesToState: boolean,
-  ): Promise<string | null> {
+  ): string | null {
     if (destination) return `dest:${destination}`;
     if (!this.hasSapConnectionHeaders(headers)) return null;
     const get = (name: string): string | undefined => {
       const value = headers[name] ?? headers[name.toUpperCase()];
       return Array.isArray(value) ? value[0] : value;
     };
-    const url = get('x-sap-url') ?? '';
-    const client = get('x-sap-client') ?? '';
+    if (get('x-sap-jwt-token')) return null;
     // The fields are joined as a JSON array: a separator inside a header value
     // cannot make two credentials one owner.
-    const token = get('x-sap-jwt-token');
-    if (token) {
-      const key = createHash('sha256')
-        .update(JSON.stringify([url, client, token]))
-        .digest('hex');
-      const user = await this.userOfToken(key, headers, routesToState);
-      return user ? `user:${JSON.stringify([url, client, user])}` : null;
-    }
-    const login = get('x-sap-login') ?? '';
-    const password = get('x-sap-password') ?? '';
     const mac = createHmac('sha256', this.ownerSecret)
-      .update(JSON.stringify([url, client, login, password]))
+      .update(
+        JSON.stringify([
+          get('x-sap-url') ?? '',
+          get('x-sap-client') ?? '',
+          get('x-sap-login') ?? '',
+          get('x-sap-password') ?? '',
+        ]),
+      )
       .digest('hex');
     return `basic:${mac}`;
-  }
-
-  /**
-   * The SAP user of a token, through the one seam that asks SAP
-   * (`connectedUser`). `fresh`: SAP is asked now — the answer kept for the
-   * token's hash is not used. Concurrent lookups of one token share one SAP
-   * call. A refusal, or no user, is not kept, and it ends the answer kept
-   * before: a token SAP refuses now creates nothing either.
-   */
-  private async userOfToken(
-    key: string,
-    headers: Headers,
-    fresh: boolean,
-  ): Promise<string | undefined> {
-    if (!fresh) {
-      const known = this.tokenUsers.get(key);
-      if (known) return known;
-    }
-    let lookup = this.tokenLookups.get(key);
-    if (!lookup) {
-      lookup = this.connectedUser(headers)
-        .catch(() => undefined)
-        .then((user) => {
-          if (user) this.tokenUsers.set(key, user);
-          else this.tokenUsers.delete(key);
-          return user;
-        })
-        .finally(() => this.tokenLookups.delete(key));
-      this.tokenLookups.set(key, lookup);
-    }
-    return lookup;
   }
 
   /**

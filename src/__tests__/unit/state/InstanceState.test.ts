@@ -84,10 +84,12 @@ describe('InstanceState', () => {
     await s.dispose();
     expect(seen).toHaveBeenCalledTimes(1);
   });
-  it('admit: refuses without an identity; refuses with the holder handle when another instance holds the kind', () => {
+  it('admit: without an owner admits and reserves nothing; refuses with the holder handle when another instance holds the kind', () => {
     const s = new InstanceState();
-    s.host = { owner: null, reserve: () => undefined, peers: () => [] };
-    expect(() => s.admit('abap')).toThrow(/no identity/);
+    const reserve = jest.fn(() => 'OTHERHANDLE');
+    s.host = { owner: null, reserve, peers: () => [] };
+    expect(() => s.admit('abap')).not.toThrow();
+    expect(reserve).not.toHaveBeenCalled();
     s.host = { owner: 'O', reserve: () => 'OTHERHANDLE', peers: () => [] };
     expect(() => s.admit('abap')).toThrow(/OTHERHANDLE/);
     s.host = { owner: 'O', reserve: () => undefined, peers: () => [] };

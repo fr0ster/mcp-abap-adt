@@ -31,15 +31,20 @@ export interface StatePart {
 
 /** What the host lends an instance for one request; stdio and SSE lend none. */
 export interface StateHost {
-  /** The request's owner, or null when the request carries no identity to keep state under. */
+  /**
+   * The request's owner: a scope for listing an owner's states and for the
+   * per-owner limit, never an authorization — the handle is a bearer secret.
+   * Null when the request carries no scope known for free (a token request):
+   * it may still create state, lists only its own instance and takes no slot.
+   */
   readonly owner: string | null;
   /** Atomically reserves the owner's slot of a kind for this handle; answers the holder's handle when another instance holds it. */
   reserve(kind: string, handle: string): string | undefined;
-  /** Every state the owner holds in the pool, this instance's included. */
+  /** Every state the owner holds in the pool, this instance's included; with no owner, this instance's alone. */
   peers(): Array<{ state_handle: string; states: StateDescription[] }>;
 }
 
-/** An unknown handle, another owner's handle and a handle whose state is gone all get this one answer. */
+/** An unknown handle and a handle whose state is gone get this one answer. */
 export class StateUnavailableError extends Error {
   constructor() {
     super('state is not available');
@@ -115,12 +120,10 @@ export class InstanceState {
     };
   }
 
-  /** For a state-creating call: refuses without an identity; reserves the kind, refusing with the holder's handle. */
+  /** For a state-creating call: reserves the owner's slot of the kind, refusing with the holder's handle. */
   admit(kind: string): void {
     if (!this.host) return; // stdio, SSE: one instance per session
-    if (this.host.owner === null) {
-      throw new Error('this request carries no identity to keep state under');
-    }
+    if (this.host.owner === null) return; // no scope: no per-owner limit applies
     const holder = this.host.reserve(kind, this.current);
     if (holder && holder !== this.current) {
       throw new Error(

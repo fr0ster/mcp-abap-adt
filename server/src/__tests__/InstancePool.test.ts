@@ -102,7 +102,7 @@ describe('handleOf', () => {
 });
 
 describe('InstancePool', () => {
-  async function holding(pool: InstancePool<Fake>, owner = 'A') {
+  async function holding(pool: InstancePool<Fake>, owner: string | null = 'A') {
     let inst!: Fake;
     await pool.serve({ owner }, create, async (i) => {
       inst = i;
@@ -135,19 +135,14 @@ describe('InstancePool', () => {
     expect(i0.disposed).toBe(1);
   });
 
-  it('another owner, or an unknown handle, gets a fresh instance', async () => {
+  it('an unknown handle gets a fresh instance', async () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
-    for (const req of [
-      { handle: held.stateHandle, owner: 'B' },
-      { handle: 'NOPE', owner: 'A' },
-    ]) {
-      let got!: Fake;
-      await pool.serve(req, create, async (i) => {
-        got = i;
-      });
-      expect(got).not.toBe(held);
-    }
+    let got!: Fake;
+    await pool.serve({ handle: 'NOPE', owner: 'A' }, create, async (i) => {
+      got = i;
+    });
+    expect(got).not.toBe(held);
   });
 
   it('serves one instance one request at a time; a queued request whose instance left the pool gets a new one', async () => {
@@ -372,40 +367,63 @@ describe('InstancePool', () => {
     expect(held.disposed).toBe(1);
   });
 
-  it('another owner and an unknown handle get the same answer: a fresh instance whose state is not available', async () => {
+  it('the handle is a bearer secret: it reaches its instance from another owner and from none; the entry keeps its owner', async () => {
     const pool = new InstancePool<Fake>();
     const a = await holding(pool, 'A');
-    const b = await holding(pool, 'B');
-    const answers: string[] = [];
-    for (const req of [
-      { handle: a.stateHandle, owner: 'B' },
-      { handle: b.stateHandle, owner: 'A' },
-      { handle: a.stateHandle, owner: null },
-      { handle: 'NOPE', owner: 'A' },
-    ]) {
-      await pool.serve(req, create, async (i) => {
-        expect(i).not.toBe(a);
-        expect(i).not.toBe(b);
-        try {
-          i.state.check(req.handle);
-          answers.push('available');
-        } catch (e) {
-          answers.push((e as Error).message);
-        }
+    for (const owner of ['B', null]) {
+      let got!: Fake;
+      await pool.serve({ handle: a.stateHandle, owner }, create, async (i) => {
+        got = i;
+        expect(() => i.state.check(a.stateHandle)).not.toThrow();
       });
+      expect(got).toBe(a);
     }
-    expect(answers).toEqual(Array(4).fill('state is not available'));
-    expect(pool.size()).toBe(2);
-    // The owners' own handles still route to their instances.
-    let mine!: Fake;
+    // Not re-keyed: A's listing still has it; B's does not.
+    await pool.serve({ owner: 'A' }, create, async (i) => {
+      expect(i.state.host!.peers().map((p) => p.state_handle)).toEqual([
+        a.stateHandle,
+      ]);
+    });
+    await pool.serve({ owner: 'B' }, create, async (i) => {
+      expect(i.state.host!.peers()).toEqual([]);
+    });
+  });
+
+  it('an unknown handle gets a fresh instance whose state is not available', async () => {
+    const pool = new InstancePool<Fake>();
+    await holding(pool, 'A');
+    await pool.serve({ handle: 'NOPE', owner: 'A' }, create, async (i) => {
+      expect(() => i.state.check('NOPE')).toThrow('state is not available');
+    });
+  });
+
+  it('listing is scoped by owner: an owner sees its own states; no owner sees only its own instance', async () => {
+    const pool = new InstancePool<Fake>();
+    const a1 = await holding(pool, 'A');
+    const a2 = await holding(pool, 'A');
+    const b = await holding(pool, 'B');
+    const n = await holding(pool, null);
+    await pool.serve({ owner: 'A' }, create, async (i) => {
+      expect(
+        i.state
+          .host!.peers()
+          .map((p) => p.state_handle)
+          .sort(),
+      ).toEqual([a1.stateHandle, a2.stateHandle].sort());
+    });
     await pool.serve(
-      { handle: b.stateHandle, owner: 'B' },
+      { handle: n.stateHandle, owner: null },
       create,
       async (i) => {
-        mine = i;
+        expect(i.state.host!.peers().map((p) => p.state_handle)).toEqual([
+          n.stateHandle,
+        ]);
       },
     );
-    expect(mine).toBe(b);
+    await pool.serve({ owner: null }, create, async (i) => {
+      expect(i.state.host!.peers()).toEqual([]);
+    });
+    expect(b.stateHandle).toBeTruthy();
   });
 
   it('a failed start on an instance that holds another kind releases only the failed slot', async () => {
@@ -433,17 +451,30 @@ describe('InstancePool', () => {
     });
   });
 
-  it('a request without an owner keeps nothing and takes no slot', async () => {
+  it('a request without an owner creates state, is kept, and takes no slot', async () => {
     const pool = new InstancePool<Fake>();
     let inst!: Fake;
     await pool.serve({ owner: null }, create, async (i) => {
       inst = i;
-      expect(() => i.state.admit('abap')).toThrow();
+      expect(() => i.state.admit('abap')).not.toThrow();
       i.set(true);
     });
-    expect(pool.size()).toBe(0);
-    expect(inst.disposed).toBe(1);
+    expect(pool.size()).toBe(1);
+    expect(inst.disposed).toBe(0);
     expect((pool as any).slots.size).toBe(0);
+    // A second one without an owner is not limited either.
+    await pool.serve({ owner: null }, create, async (i) => {
+      expect(() => i.state.admit('abap')).not.toThrow();
+    });
+    let again!: Fake;
+    await pool.serve(
+      { handle: inst.stateHandle, owner: null },
+      create,
+      async (i) => {
+        again = i;
+      },
+    );
+    expect(again).toBe(inst);
   });
 
   it('follows handle rotation: the old handle stops routing, the new one routes', async () => {

@@ -5,9 +5,13 @@
  * and state lives in an instance (measured for the debugger: a continuous
  * poll, an attach within seconds, the attaching ABAP session; over RFC nothing
  * carries that session to another connection). So per request the host takes
- * an instance once: the one the request's `state_handle` names, when the owner
- * matches, or a new one. One request at a time per instance (the SDK binds one
- * transport). Slots hold the per-owner limit; a reservation in progress counts.
+ * an instance once: the one the request's `state_handle` names, or a new one.
+ * The handle is a bearer secret — whoever holds it reaches the instance, like
+ * a session cookie; keeping it safe is the deployer's. The owner is a scope,
+ * not an authorization: it lists an owner's states and holds the per-owner
+ * limit in slots (a reservation in progress counts); a request with none
+ * lists only its own instance and takes no slot. One request at a time per
+ * instance (the SDK binds one transport).
  * An instance that holds nothing is disposed once, after its work; a disposal
  * that fails keeps the instance for a retry. Nothing expires on a clock.
  *
@@ -64,7 +68,8 @@ export function handleOf(body: unknown): string | undefined {
 
 interface Held<T> {
   instance: T;
-  owner: string;
+  /** The scope of the request that created the state; a later bearer's does not re-key it. */
+  owner: string | null;
   /** The handle the index files this entry under; follows rotation. */
   handle: string;
   /** The lease: requests on this instance queue here. */
@@ -112,7 +117,7 @@ export class InstancePool<T extends Poolable> {
     return entry && entry.instance.stateHandle === handle ? entry : undefined;
   }
 
-  private keep(instance: T, owner: string): void {
+  private keep(instance: T, owner: string | null): void {
     if (this.held.has(instance)) return;
     const entry: Held<T> = {
       instance,
@@ -171,10 +176,14 @@ export class InstancePool<T extends Poolable> {
           state_handle: string;
           states: StateDescription[];
         }> = [];
-        for (const e of this.held.values()) {
-          if (e.owner === owner) mine.push(e.instance.state.describe());
+        if (owner !== null) {
+          for (const e of this.held.values()) {
+            if (e.owner === owner) mine.push(e.instance.state.describe());
+          }
         }
-        if (!this.held.has(instance) && instance.holdsState()) {
+        // This instance's own state, once: also when it is another scope's.
+        const own = this.held.get(instance);
+        if ((owner === null || own?.owner !== owner) && instance.holdsState()) {
           mine.push(instance.state.describe());
         }
         return mine;
@@ -203,8 +212,9 @@ export class InstancePool<T extends Poolable> {
     work: (instance: T) => Promise<void>,
   ): Promise<void> {
     const entry = request.handle ? this.byHandle(request.handle) : undefined;
-    // An unknown handle and another owner's handle get the same: a new instance.
-    if (!entry || entry.owner !== request.owner) {
+    // The handle is a bearer secret: it reaches its instance whoever sends it.
+    // An unknown handle gets a new instance, which answers `state is not available`.
+    if (!entry) {
       return this.run(create(), request.owner, work);
     }
     const turn = entry.tail.then(() =>
@@ -246,7 +256,7 @@ export class InstancePool<T extends Poolable> {
   /** After a request: slots of kinds not held are released; what holds state is kept; the rest is disposed. */
   private async settle(instance: T, owner: string | null): Promise<void> {
     this.releaseSlots(instance, instance.state.kindsHeld());
-    if (instance.holdsState() && owner !== null) {
+    if (instance.holdsState()) {
       this.keep(instance, owner);
       return;
     }

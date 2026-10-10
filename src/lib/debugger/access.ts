@@ -2,7 +2,7 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import type { DebuggerInstance } from './DebuggerInstance';
 
 /**
- * create: a starting tool — the kind is admitted (identity, per-owner slot);
+ * create: a starting tool — the kind is admitted (the per-owner slot, when the request has an owner);
  * use: the handle must be this instance's with state held. Either way the
  * sessions are bound to this call's context.
  */

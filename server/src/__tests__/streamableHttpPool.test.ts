@@ -295,13 +295,10 @@ describe.each([
   },
 );
 
-describe('StreamableHttpServer pool over real HTTP: a token request', () => {
+describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secret', () => {
   let server: StreamableHttpServer;
   let url: URL;
   let previousType: string | undefined;
-  /** What SAP answers for the token now: a user, or a refusal. */
-  let sapAnswer: () => Promise<string | undefined>;
-  let lookups: number;
 
   beforeEach(async () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -310,15 +307,9 @@ describe('StreamableHttpServer pool over real HTTP: a token request', () => {
       .mockResolvedValue({} as never);
     previousType = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = 'onprem';
-    lookups = 0;
-    sapAnswer = async () => 'SAPUSER01';
     server = new StreamableHttpServer(probes, stubDestinations, {
       host: '127.0.0.1',
       port: 0,
-      connectedUser: () => {
-        lookups++;
-        return sapAnswer();
-      },
     });
     await server.start();
     const { port } = (
@@ -334,15 +325,25 @@ describe('StreamableHttpServer pool over real HTTP: a token request', () => {
     jest.restoreAllMocks();
   });
 
-  async function call(name: string, args: Args = {}) {
+  const token = {
+    'x-sap-url': 'https://sap.invalid',
+    'x-sap-client': '100',
+    'x-sap-jwt-token': 'header.payload.signature',
+  };
+  const basic = (password: string) => ({
+    'x-sap-url': 'https://sap.invalid',
+    'x-sap-client': '100',
+    'x-sap-login': 'SAPUSER01',
+    'x-sap-password': password,
+  });
+
+  async function call(
+    headers: Record<string, string>,
+    name: string,
+    args: Args = {},
+  ) {
     const transport = new StreamableHTTPClientTransport(url, {
-      requestInit: {
-        headers: {
-          'x-sap-url': 'https://sap.invalid',
-          'x-sap-client': '100',
-          'x-sap-jwt-token': 'header.payload.signature',
-        },
-      },
+      requestInit: { headers },
     });
     const client = new Client({ name: 'pool-test', version: '1.0.0' });
     await client.connect(transport);
@@ -357,53 +358,34 @@ describe('StreamableHttpServer pool over real HTTP: a token request', () => {
     }
   }
 
-  async function hold(): Promise<string> {
-    const r = await call('PoolProbeHold');
-    if (r.isError) throw new Error(r.text);
-    return JSON.parse(r.text).state_handle;
-  }
-
-  it('a token SAP accepted once and refuses now does not reach the held instance', async () => {
-    const handle = await hold();
-    expect(await call('PoolProbeEcho', { state_handle: handle })).toEqual({
-      text: handle,
-      isError: false,
-    });
-    sapAnswer = async () => {
-      throw new Error('401 Unauthorized');
-    };
-    const r = await call('PoolProbeEcho', { state_handle: handle });
-    expect(r.isError).toBe(true);
-    expect(r.text).toContain('state is not available');
-    // The held state is untouched: still pooled, still answering a token SAP accepts.
+  it('a token request (no owner) creates state; its handle reaches it from any credentials', async () => {
+    const held = await call(token, 'PoolProbeHold');
+    if (held.isError) throw new Error(held.text);
+    const handle = JSON.parse(held.text).state_handle;
+    for (const headers of [token, basic('one'), basic('two')]) {
+      expect(
+        await call(headers, 'PoolProbeEcho', { state_handle: handle }),
+      ).toEqual({
+        text: handle,
+        isError: false,
+      });
+    }
     expect(
       (server as unknown as { pool: { size(): number } }).pool.size(),
     ).toBe(1);
-    sapAnswer = async () => 'SAPUSER01';
+  });
+
+  it('a basic request creates state; another login reaches it with the handle, and nobody without it', async () => {
+    const held = await call(basic('one'), 'PoolProbeHold');
+    if (held.isError) throw new Error(held.text);
+    const handle = JSON.parse(held.text).state_handle;
     expect(
-      (await call('PoolProbeEcho', { state_handle: handle })).isError,
-    ).toBe(false);
-  });
-
-  it('a token SAP now answers for another user does not reach the held instance', async () => {
-    const handle = await hold();
-    sapAnswer = async () => 'SAPUSER02';
-    const r = await call('PoolProbeEcho', { state_handle: handle });
-    expect(r.text).toContain('state is not available');
-  });
-
-  it('every call routed to held state asks SAP; a call that creates state may use the answer already given', async () => {
-    const handle = await hold();
-    expect(lookups).toBe(1);
-    for (let i = 0; i < 3; i++) {
-      expect(
-        (await call('PoolProbeEcho', { state_handle: handle })).isError,
-      ).toBe(false);
-    }
-    expect(lookups).toBe(4);
-    await call('PoolProbeRelease', { state_handle: handle });
-    expect(lookups).toBe(5);
-    await hold();
-    expect(lookups).toBe(5);
+      (await call(basic('two'), 'PoolProbeEcho', { state_handle: handle }))
+        .text,
+    ).toBe(handle);
+    const other = await call(token, 'PoolProbeEcho', {
+      state_handle: 'F'.repeat(32),
+    });
+    expect(other.text).toContain('state is not available');
   });
 });

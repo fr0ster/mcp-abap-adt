@@ -1,8 +1,16 @@
 /**
- * Who a request's state belongs to (spec D15): a handle is no key, so the
- * owner is proven by the request's own credentials — the destination, an HMAC
- * of a basic login, or the SAP user SAP answers on a token. Never a claim.
+ * The owner of a request's state is a scope — for listing an owner's states
+ * and the per-owner limit — taken where it is known for free: the
+ * destination, or an HMAC of a basic login. It authorizes nothing: the handle
+ * is a bearer secret. A token request has no owner, and no SAP call is made
+ * to find one.
  */
+
+const createAbapConnection = jest.fn();
+jest.mock('@mcp-abap-adt/lib/utils', () => ({
+  ...jest.requireActual('@mcp-abap-adt/lib/utils'),
+  createAbapConnection: (...a: unknown[]) => createAbapConnection(...a),
+}));
 
 import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
@@ -21,38 +29,18 @@ const silent = {
   error: jest.fn(),
 };
 
-/** An unsigned token whose payload claims a user; nothing reads it as one. */
-const tokenClaiming = (user: string, nonce: string) =>
-  [
-    Buffer.from('{"alg":"none"}').toString('base64url'),
-    Buffer.from(JSON.stringify({ user_name: user, nonce })).toString(
-      'base64url',
-    ),
-    '',
-  ].join('.');
-
-function make(
-  connectedUser?: (h: Record<string, unknown>) => Promise<string | undefined>,
-) {
+function make() {
   const server = new StreamableHttpServer(
     new CompositeHandlersRegistry([]),
     stubDestinations,
-    { host: '127.0.0.1', port: 0, logger: silent as never, connectedUser },
+    { host: '127.0.0.1', port: 0, logger: silent as never },
   );
-  return (
-    headers: Record<string, string>,
-    destination?: string,
-    routesToState = false,
-  ): Promise<string | null> =>
+  return (headers: Record<string, string>, destination?: string) =>
     (
       server as unknown as {
-        ownerOf: (
-          h: unknown,
-          d: string | undefined,
-          r: boolean,
-        ) => Promise<string | null>;
+        ownerOf: (h: unknown, d: string | undefined) => string | null;
       }
-    ).ownerOf(headers, destination, routesToState);
+    ).ownerOf(headers, destination);
 }
 
 const basic = (login: string, password: string) => ({
@@ -60,11 +48,6 @@ const basic = (login: string, password: string) => ({
   'x-sap-client': '100',
   'x-sap-login': login,
   'x-sap-password': password,
-});
-const bearer = (token: string) => ({
-  'x-sap-url': URL,
-  'x-sap-client': '100',
-  'x-sap-jwt-token': token,
 });
 
 describe('StreamableHttpServer.ownerOf', () => {
@@ -74,26 +57,29 @@ describe('StreamableHttpServer.ownerOf', () => {
       jest.spyOn(console, m).mockImplementation(() => {}),
     );
     for (const f of Object.values(silent)) f.mockClear();
+    createAbapConnection.mockClear();
   });
   afterEach(() => {
-    // Nothing is logged: no credential, token, user or owner reaches a log line.
+    // Nothing is logged: no credential or owner reaches a log line.
     for (const s of spies) expect(s).not.toHaveBeenCalled();
     for (const f of Object.values(silent)) expect(f).not.toHaveBeenCalled();
+    // No SAP call is made for ownership.
+    expect(createAbapConnection).not.toHaveBeenCalled();
     jest.restoreAllMocks();
   });
 
-  it('a destination request is owned by its destination; a request with no identity by nobody', async () => {
+  it('a destination request is scoped by its destination; a request with no identity by nothing', () => {
     const ownerOf = make();
-    expect(await ownerOf({}, 'DEST01')).toBe('dest:DEST01');
-    expect(await ownerOf({})).toBeNull();
-    expect(await ownerOf({ 'x-sap-url': URL })).toBeNull();
+    expect(ownerOf({}, 'DEST01')).toBe('dest:DEST01');
+    expect(ownerOf({})).toBeNull();
+    expect(ownerOf({ 'x-sap-url': URL })).toBeNull();
   });
 
-  it('basic: the same login with another password is another owner; the secret never shows', async () => {
+  it('basic: the same login with another password is another owner; the secret never shows', () => {
     const ownerOf = make();
-    const a = await ownerOf(basic('SAPUSER01', 'secret-one'));
-    const again = await ownerOf(basic('SAPUSER01', 'secret-one'));
-    const other = await ownerOf(basic('SAPUSER01', 'secret-two'));
+    const a = ownerOf(basic('SAPUSER01', 'secret-one'));
+    const again = ownerOf(basic('SAPUSER01', 'secret-one'));
+    const other = ownerOf(basic('SAPUSER01', 'secret-two'));
     expect(a).toMatch(/^basic:[0-9a-f]{64}$/);
     expect(again).toBe(a);
     expect(other).not.toBe(a);
@@ -101,101 +87,20 @@ describe('StreamableHttpServer.ownerOf', () => {
     expect(a).not.toContain('SAPUSER01');
   });
 
-  it('basic: another process (another secret) gives another owner for the same credentials', async () => {
-    expect(await make()(basic('SAPUSER01', 'p'))).not.toBe(
-      await make()(basic('SAPUSER01', 'p')),
+  it('basic: another process (another secret) gives another owner for the same credentials', () => {
+    expect(make()(basic('SAPUSER01', 'p'))).not.toBe(
+      make()(basic('SAPUSER01', 'p')),
     );
   });
 
-  it('two tokens for which SAP answers the same user are one owner; each token is asked once', async () => {
-    const connectedUser = jest.fn(async () => 'SAPUSER01');
-    const ownerOf = make(connectedUser);
-    const first = await ownerOf(bearer(tokenClaiming('SAPUSER01', 'a')));
-    const refreshed = await ownerOf(bearer(tokenClaiming('SAPUSER01', 'b')));
-    const firstAgain = await ownerOf(bearer(tokenClaiming('SAPUSER01', 'a')));
-    expect(first).toBe(refreshed);
-    expect(firstAgain).toBe(first);
-    expect(first).toContain('SAPUSER01');
-    expect(first?.startsWith('user:')).toBe(true);
-    expect(connectedUser).toHaveBeenCalledTimes(2);
-  });
-
-  it('the owner is the user SAP answers, not the one the token claims', async () => {
-    const ownerOf = make(async () => 'SAPUSER02');
-    const owner = await ownerOf(bearer(tokenClaiming('SAPUSER01', 'a')));
-    expect(owner).toContain('SAPUSER02');
-    expect(owner).not.toContain('SAPUSER01');
-  });
-
-  it('a token whose claimed user SAP does not answer gives no owner — refused or unnamed — and is asked again next time', async () => {
-    const refusing = jest.fn(async () => {
-      throw new Error('401 Unauthorized');
-    });
-    const ownerOf = make(refusing);
-    const token = tokenClaiming('SAPUSER01', 'a');
-    expect(await ownerOf(bearer(token))).toBeNull();
-    expect(await ownerOf(bearer(token))).toBeNull();
-    expect(refusing).toHaveBeenCalledTimes(2);
-    expect(await make(async () => undefined)(bearer(token))).toBeNull();
-  });
-
-  it('concurrent requests with one token ask SAP once', async () => {
-    let answer!: (u: string) => void;
-    const connectedUser = jest.fn(
-      () =>
-        new Promise<string>((r) => {
-          answer = r;
-        }),
-    );
-    const ownerOf = make(connectedUser);
-    const token = tokenClaiming('SAPUSER01', 'a');
-    const both = Promise.all([ownerOf(bearer(token)), ownerOf(bearer(token))]);
-    await new Promise((r) => setImmediate(r));
-    answer('SAPUSER01');
-    const [x, y] = await both;
-    expect(x).toBe(y);
-    expect(connectedUser).toHaveBeenCalledTimes(1);
-  });
-
-  it('a call routed to held state asks SAP each time, and a refusal then is no owner', async () => {
-    let user: string | undefined = 'SAPUSER01';
-    const connectedUser = jest.fn(async () => {
-      if (!user) throw new Error('401 Unauthorized');
-      return user;
-    });
-    const ownerOf = make(connectedUser);
-    const token = bearer(tokenClaiming('SAPUSER01', 'a'));
-    const first = await ownerOf(token);
-    expect(await ownerOf(token, undefined, true)).toBe(first);
-    expect(await ownerOf(token, undefined, true)).toBe(first);
-    expect(connectedUser).toHaveBeenCalledTimes(3);
-    user = undefined;
-    expect(await ownerOf(token, undefined, true)).toBeNull();
-    // The refusal also ends the answer kept for calls that create state.
-    expect(await ownerOf(token)).toBeNull();
-    expect(connectedUser).toHaveBeenCalledTimes(5);
-  });
-
-  it('concurrent calls routed to held state with one token share one lookup', async () => {
-    let answer!: (u: string) => void;
-    const connectedUser = jest.fn(
-      () =>
-        new Promise<string>((r) => {
-          answer = r;
-        }),
-    );
-    const ownerOf = make(connectedUser);
-    const token = bearer(tokenClaiming('SAPUSER01', 'a'));
-    const all = Promise.all([
-      ownerOf(token, undefined, true),
-      ownerOf(token, undefined, true),
-      ownerOf(token),
-    ]);
-    await new Promise((r) => setImmediate(r));
-    answer('SAPUSER01');
-    const [x, y, z] = await all;
-    expect(x).toBe(y);
-    expect(z).toBe(x);
-    expect(connectedUser).toHaveBeenCalledTimes(1);
+  it('a token request has no owner, and nothing asks SAP for one', () => {
+    const ownerOf = make();
+    expect(
+      ownerOf({
+        'x-sap-url': URL,
+        'x-sap-client': '100',
+        'x-sap-jwt-token': 'header.payload.signature',
+      }),
+    ).toBeNull();
   });
 });

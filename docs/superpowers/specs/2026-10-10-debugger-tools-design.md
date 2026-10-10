@@ -37,10 +37,19 @@ the handlers are thin over it.
 
 `DebugSession` owns:
 
-- **identity** — `{requestUser, terminalId, ideId}`, one per process. The user is
-  the connection's ABAP user (`systeminformation` where the login is not it, as on
-  the cloud); `terminalId` and `ideId` are stable hashes of the system URL and the
-  user, 32 upper-case hex characters.
+- **identity** — `{requestUser, terminalId, ideId}`, one per server instance. The
+  user is the connection's ABAP user (`systeminformation` where the login is not
+  it, as on the cloud). `terminalId` and `ideId` are **generated per instance**,
+  random, 32 upper-case hex characters — never derived from the URL and the user.
+  One user may open several MCP sessions with the same credentials (several to
+  one HTTP server, or several servers); identical ids would never conflict (the
+  same `ideId` never does, measured), so two instances would silently share one
+  listener's catches and delete each other's breakpoints. Distinct ids make them
+  meet as SAP's listener conflict instead — `conflict` under `refuse`, a
+  deliberate displacement under take over — and keep each instance's breakpoints
+  its own. The cost: breakpoints of an instance that dies without cleaning up
+  stay under an identity nobody recreates, which is why shutdown cleanup is
+  required, not best effort.
 - **the conflict mode** — `refuse` or `takeOver`, set by the tool that started the
   listener (D6), passed to `AbapDebugger` as its constructor option.
 - **the breakpoints set** — kept by the server, because SAP answers no listing

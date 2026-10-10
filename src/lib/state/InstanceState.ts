@@ -3,11 +3,14 @@
  *
  * Generic on purpose: the host keeps instances by this handle (MCP SEP-2567 —
  * no protocol session; state named by an explicit handle), whatever the state
- * is. The debugger is one part; locks will be another. Nothing expires here:
- * state ends by an explicit stop, the host, the backend or process shutdown.
+ * is. The debugger is one part; locks will be another. State ends by an
+ * explicit stop, the host, the backend, process shutdown — or the idle bound
+ * (`idleBound.ts`): the user's one exception to "no timeouts", counted from
+ * the end of the last tool call and paused while any call runs.
  */
 import { randomBytes } from 'node:crypto';
 import { logger as processLogger } from '../logger';
+import { DEFAULT_STATE_IDLE_MINUTES, parseStateIdleMinutes } from './idleBound';
 
 /**
  * One stateful part of an instance.
@@ -43,16 +46,32 @@ export class StateCleanupError extends Error {
 const newHandle = () => randomBytes(16).toString('hex').toUpperCase();
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-/** Where a failing observer is reported. */
+/** Where a failing observer, and the idle bound's end of the state, are reported. */
 export interface StateLogger {
   error(message: string): void;
+  info?(message: string): void;
+}
+
+export interface InstanceStateOptions {
+  logger?: StateLogger;
+  /**
+   * The idle bound: held state ends after this many minutes without a tool
+   * call. A whole number, at least 30 (the default); anything else is refused.
+   */
+  idleMinutes?: number;
 }
 
 export class InstanceState {
   private readonly log: StateLogger;
+  /** The idle bound, in minutes. */
+  readonly idleMinutes: number;
 
-  constructor(options: { logger?: StateLogger } = {}) {
+  constructor(options: InstanceStateOptions = {}) {
     this.log = options.logger ?? processLogger;
+    this.idleMinutes =
+      options.idleMinutes === undefined
+        ? DEFAULT_STATE_IDLE_MINUTES
+        : parseStateIdleMinutes(options.idleMinutes, 'stateIdleMinutes');
   }
 
   private current = newHandle();
@@ -61,6 +80,13 @@ export class InstanceState {
   private readonly changeListeners = new Set<() => void>();
   private wasHolding = false;
   private endRequested = false;
+  /** Tool calls of this instance still running: while any runs, the bound does not. */
+  private callsInFlight = 0;
+  private idleTimer: ReturnType<typeof setTimeout> | undefined;
+  /** A disposal is running (the bound's own included): the bound waits for its outcome. */
+  private disposing = 0;
+  /** The host let the instance go: the bound is never armed again. */
+  private closed = false;
 
   get handle(): string {
     return this.current;
@@ -121,6 +147,67 @@ export class InstanceState {
     };
   }
 
+  /** A tool call entered: the user is active; the bound pauses until every call has ended. */
+  callStarted(): void {
+    this.callsInFlight++;
+    this.disarm();
+  }
+
+  /** A tool call settled: the bound counts from here. */
+  callEnded(): void {
+    if (this.callsInFlight > 0) this.callsInFlight--;
+    this.reviewBound();
+  }
+
+  /**
+   * Armed only while something is held and nothing runs. A change of a part
+   * (a listener's own re-poll) never restarts a running bound: only a call does.
+   */
+  private reviewBound(): void {
+    if (
+      this.closed ||
+      this.disposing > 0 ||
+      this.callsInFlight > 0 ||
+      !this.holdsState()
+    ) {
+      this.disarm();
+      return;
+    }
+    if (this.idleTimer) return;
+    this.idleTimer = setTimeout(() => {
+      this.idleTimer = undefined;
+      void this.expire();
+    }, this.idleMinutes * 60_000);
+    this.idleTimer.unref(); // never keeps the process alive
+  }
+
+  private disarm(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    this.idleTimer = undefined;
+  }
+
+  /**
+   * The user has not called for the whole bound: a complete stop, the same as
+   * the stop tools' — the handle ends once nothing is held. What the disposal
+   * could not undo is reported and kept for a retry (the bound arms again).
+   * The handle is a bearer secret and never reaches the log.
+   */
+  private async expire(): Promise<void> {
+    const minutes = this.idleMinutes;
+    this.endWhenEmpty();
+    try {
+      await this.dispose();
+      this.log.info?.(
+        `instance state: held state ended after ${minutes} minutes without a call`,
+      );
+    } catch (error) {
+      const failures = this.failures();
+      this.log.error(
+        `instance state: held state ended after ${minutes} minutes without a call, but its cleanup failed (kept for a retry): ${failures.length ? failures.join('; ') : messageOf(error)}`,
+      );
+    }
+  }
+
   /** Every transition goes through here; state is updated before anyone is told. */
   private changed(): void {
     const holding = this.holdsState();
@@ -130,6 +217,7 @@ export class InstanceState {
       this.current = newHandle(); // the old handle is invalid for good
       this.endRequested = false;
     }
+    this.reviewBound();
     if (emptied) for (const l of [...this.emptyListeners]) this.tell(l);
     for (const l of [...this.changeListeners]) this.tell(l);
   }
@@ -145,11 +233,18 @@ export class InstanceState {
 
   /** Disposes every part; throws a StateCleanupError naming what failed. */
   async dispose(): Promise<void> {
-    const results = await Promise.allSettled(
-      // A synchronous throw of one part must not skip the others.
-      this.parts.map((p) => Promise.resolve().then(() => p.dispose())),
-    );
-    this.changed();
+    this.disposing++;
+    this.disarm();
+    let results: PromiseSettledResult<void>[];
+    try {
+      results = await Promise.allSettled(
+        // A synchronous throw of one part must not skip the others.
+        this.parts.map((p) => Promise.resolve().then(() => p.dispose())),
+      );
+    } finally {
+      this.disposing--;
+    }
+    this.changed(); // what is still held arms the bound again, for a retry
     const failures = results.flatMap((r) =>
       r.status === 'rejected' ? [messageOf(r.reason)] : [],
     );
@@ -178,6 +273,8 @@ export class InstanceState {
    * session settles when its last event batch arrives.
    */
   shutdown(): Promise<string[]> {
+    this.closed = true; // the host lets the instance go: no bound any more
+    this.disarm();
     // One run at a time: a second caller (a session's late close beside the
     // host's drain) gets the run in flight, so dispose never runs twice at once.
     if (!this.shuttingDown) {

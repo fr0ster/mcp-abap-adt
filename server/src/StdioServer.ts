@@ -10,6 +10,8 @@ export interface StdioServerOptions {
   name?: string;
   version?: string;
   logger?: Logger;
+  /** The idle bound on held state, in minutes (at least 30, default 30). */
+  stateIdleMinutes?: number;
 }
 
 /**
@@ -28,6 +30,7 @@ export class StdioServer extends BaseMcpServer {
       name: opts?.name ?? 'mcp-abap-adt',
       version: opts?.version ?? CORE_VERSION,
       logger: opts?.logger ?? noopLogger,
+      stateIdleMinutes: opts?.stateIdleMinutes,
     });
   }
 

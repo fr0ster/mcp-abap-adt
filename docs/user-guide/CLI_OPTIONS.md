@@ -211,6 +211,25 @@ mcp-abap-adt --transport=http --mcp=TRIAL --allow-destination-header
 
 See [Authentication & Destinations](AUTHENTICATION.md) for the four supported authentications.
 
+## Held State
+
+**--state-idle-minutes=\<minutes\>** (env `MCP_STATE_IDLE_MINUTES`, YAML `state-idle-minutes`)
+
+State an instance holds between tool calls — a debug session: breakpoints, the listener, a
+stopped debuggee — ends after this many minutes without a tool call on that instance: a complete
+stop, the same as `DebugStop`, and its `state_handle` is no longer available. Default **30**,
+and never less: a value under 30, a fraction or a non-number is refused at startup. CLI wins
+over the environment, which wins over YAML.
+
+What counts as activity: a tool call on the instance. The bound counts from the end of the last
+call and is paused while any call is in flight, so a wait on the SAP system is never timed; the
+listener's own background re-polls do not count. It exists because the listener re-polls by
+itself, so SAP's own session timeout never ends an abandoned debug session.
+
+```bash
+mcp-abap-adt --exposition=readonly,debug --state-idle-minutes=60
+```
+
 ## HTTP Server Options
 
 Used with `--transport=http` or `--transport=streamable-http`.

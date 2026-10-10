@@ -13,6 +13,7 @@ import {
   requestContextFromHeaders,
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
+import { parseStateIdleMinutes } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
@@ -33,6 +34,11 @@ import {
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
 export interface StreamableHttpServerOptions {
+  /**
+   * The idle bound on held state, in minutes: each instance's state ends
+   * after this long without a tool call. At least 30; default 30.
+   */
+  stateIdleMinutes?: number;
   /**
    * Host to bind to (only used when no external app is provided)
    * @default "127.0.0.1"
@@ -129,6 +135,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly firstConnect = new FirstConnectLock();
   /** The instances that hold state between requests (spec D9). */
   private readonly pool = new InstancePool<PerRequestServerApi>();
+  private readonly stateIdleMinutes?: number;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -140,7 +147,10 @@ export class StreamableHttpServer extends BaseMcpServer {
       name: 'mcp-abap-adt',
       version: opts?.version ?? CORE_VERSION,
       logger: opts?.logger ?? noopLogger,
+      // Validated by the base: a misconfiguration stops the start.
+      stateIdleMinutes: opts?.stateIdleMinutes,
     });
+    this.stateIdleMinutes = opts?.stateIdleMinutes;
     this.version = opts?.version ?? CORE_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
@@ -475,8 +485,9 @@ export class StreamableHttpServer extends BaseMcpServer {
         private readonly registry: IHandlersRegistry,
         version: string,
         logger: Logger,
+        stateIdleMinutes: number | undefined,
       ) {
-        super({ name: 'mcp-abap-adt', version, logger });
+        super({ name: 'mcp-abap-adt', version, logger, stateIdleMinutes });
         this.registerHandlers(this.registry);
       }
 
@@ -502,6 +513,7 @@ export class StreamableHttpServer extends BaseMcpServer {
       this.handlersRegistry,
       this.version,
       this.logger,
+      this.stateIdleMinutes,
     );
   }
 }

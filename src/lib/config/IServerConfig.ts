@@ -137,6 +137,13 @@ export interface IServerConfig {
    */
   systemTypeSource?: string;
 
+  /**
+   * The idle bound on held state: it ends after this many minutes without a
+   * tool call (`--state-idle-minutes`, `MCP_STATE_IDLE_MINUTES`,
+   * `state-idle-minutes`). A whole number, at least 30; default 30.
+   */
+  stateIdleMinutes?: number;
+
   // ============================================================================
   // LEGACY FIELDS (for v1 backward compatibility)
   // ============================================================================

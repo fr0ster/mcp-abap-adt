@@ -141,3 +141,38 @@ describe('idle(): every tool call of the instance has settled', () => {
     await client.close();
   });
 });
+
+describe('the idle bound: a tool call is the user activity', () => {
+  it('the call marks its start when it enters and its end when it settles — the connection wait included', async () => {
+    const conn = gate();
+    const handler = gate();
+    const server = new GatedServer(handler.opened, conn.opened);
+    const started = jest.spyOn(server.state, 'callStarted');
+    const ended = jest.spyOn(server.state, 'callEnded');
+    const client = await connected(server);
+    const calling = client.callTool({ name: 'Gated', arguments: {} });
+    for (let i = 0; i < 5 && started.mock.calls.length === 0; i++) await tick();
+    expect(started).toHaveBeenCalledTimes(1);
+    expect(ended).not.toHaveBeenCalled(); // still acquiring its connection
+    conn.open();
+    for (let i = 0; i < 5; i++) await tick();
+    expect(ended).not.toHaveBeenCalled(); // the handler waits on the server
+    handler.open();
+    await calling;
+    await server.idle();
+    expect(ended).toHaveBeenCalledTimes(1);
+    await client.close();
+  });
+
+  it('an embedder passes the bound; under 30 is refused at construction', () => {
+    const at = (stateIdleMinutes: number) =>
+      new EmbeddableMcpServer({
+        connection: new MockAbapConnection() as any,
+        exposition: ['readonly'],
+        stateIdleMinutes,
+      } as any);
+    expect(make().state.idleMinutes).toBe(30);
+    expect(at(45).state.idleMinutes).toBe(45);
+    expect(() => at(29)).toThrow(/at least 30/);
+  });
+});

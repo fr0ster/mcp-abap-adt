@@ -76,7 +76,7 @@ export abstract class BaseMcpServer extends McpServer {
   private destinationSystemContext: DestinationSystemContext | undefined;
 
   /** What this instance holds between tool calls, and its handle (MCP SEP-2567). */
-  readonly state = new InstanceState();
+  readonly state: InstanceState;
 
   private debuggerInstance?: DebuggerInstance;
 
@@ -89,9 +89,16 @@ export abstract class BaseMcpServer extends McpServer {
     logger?: Logger;
     systemType?: SapEnvironment;
     systemContextResolver?: SystemContextResolver | null;
+    /** The idle bound on held state, in minutes: at least 30, default 30. */
+    stateIdleMinutes?: number;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
+    // The instance's own logger: the bound's end of a state reaches the host's log.
+    this.state = new InstanceState({
+      idleMinutes: options.stateIdleMinutes,
+      logger: this.logger,
+    });
     this.systemType = options.systemType;
     this.systemContextResolver =
       options.systemContextResolver === undefined
@@ -382,12 +389,18 @@ export abstract class BaseMcpServer extends McpServer {
           };
 
           // Tracked from its entry — before the connection is acquired — so
-          // idle() cannot miss a call still acquiring its connection.
+          // idle() cannot miss a call still acquiring its connection. The same
+          // entry and end are the user activity the state's idle bound counts:
+          // it pauses while the call runs and counts from its end.
           const wrappedHandler = (args: unknown) => {
+            this.state.callStarted();
             const call = runCall(args);
             this.inFlight.add(call);
             call
-              .finally(() => this.inFlight.delete(call))
+              .finally(() => {
+                this.inFlight.delete(call);
+                this.state.callEnded();
+              })
               .catch(() => undefined); // runCall answers every failure; nothing rejects unhandled
             return call;
           };

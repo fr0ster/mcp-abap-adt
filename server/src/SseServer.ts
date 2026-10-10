@@ -14,6 +14,7 @@ import {
   requestContextFromHeaders,
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
+import { parseStateIdleMinutes } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
@@ -27,6 +28,11 @@ import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
 export interface SseServerOptions {
+  /**
+   * The idle bound on held state, in minutes: each instance's state ends
+   * after this long without a tool call. At least 30; default 30.
+   */
+  stateIdleMinutes?: number;
   /**
    * Host to bind to (only used when no external app is provided)
    * @default "127.0.0.1"
@@ -119,6 +125,7 @@ export class SseServer {
   private readonly allowedHosts?: string[];
   private readonly allowedOrigins?: string[];
   private readonly enableDnsRebindingProtection?: boolean;
+  private readonly stateIdleMinutes?: number;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -139,6 +146,11 @@ export class SseServer {
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
+    // Refused here, at startup, rather than at a session's first request.
+    this.stateIdleMinutes =
+      opts?.stateIdleMinutes === undefined
+        ? undefined
+        : parseStateIdleMinutes(opts.stateIdleMinutes, 'stateIdleMinutes');
   }
 
   /**
@@ -334,8 +346,14 @@ export class SseServer {
         private readonly registry: IHandlersRegistry,
         readonly loggerImpl: Logger,
         readonly ver: string,
+        stateIdleMinutes: number | undefined,
       ) {
-        super({ name: 'mcp-abap-adt-sse', version: ver, logger: loggerImpl });
+        super({
+          name: 'mcp-abap-adt-sse',
+          version: ver,
+          logger: loggerImpl,
+          stateIdleMinutes,
+        });
       }
       async init(
         dest: string | undefined,
@@ -360,6 +378,7 @@ export class SseServer {
       this.handlersRegistry,
       this.logger,
       this.version,
+      this.stateIdleMinutes,
     );
     try {
       await server.init(

@@ -13,7 +13,9 @@
  * `ids.ts`). One request at a time per instance (the SDK binds one
  * transport).
  * An instance that holds nothing is disposed once, after its work; a disposal
- * that fails keeps the instance for a retry. Nothing expires on a clock.
+ * that fails keeps the instance for a retry. The pool keeps no clock: the
+ * idle bound is the instance state's own (`InstanceState`), and an instance it
+ * empties leaves through `onEmpty` like any other.
  *
  * The pool knows `InstanceState` and nothing of what the state is.
  */

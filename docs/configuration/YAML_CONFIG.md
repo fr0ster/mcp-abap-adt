@@ -69,6 +69,10 @@ browser-auth-port: 61001
 # Honour the x-mcp-destination header (HTTP/SSE only)
 allow-destination-header: false
 
+# Held state (a debug session) ends after this many minutes without a tool call
+# (a whole number, at least 30; default 30)
+state-idle-minutes: 30
+
 # HTTP/StreamableHTTP transport options
 http:
   port: 3000
@@ -106,8 +110,9 @@ sse:
 | `browser` | string | `system` | Browser for a login: `chrome`, `edge`, `firefox`, `system`, `headless`, `none` |
 | `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |
 | `allow-destination-header` | boolean | `false` | Honour the `x-mcp-destination` header (HTTP/SSE only) |
+| `state-idle-minutes` | number | `30` | Held state (a debug session) ends after this many minutes without a tool call; a whole number, at least 30. A call in flight pauses it; a listener's own background re-poll does not count |
 
-A value that is not valid (a port outside 1-65535, an unknown `connection-type`, `system-type` or flag value) is **refused at startup**, naming the key, instead of being ignored.
+A value that is not valid (a port outside 1-65535, an unknown `connection-type`, `system-type` or flag value, a `state-idle-minutes` under 30 or not a whole number) is **refused at startup**, naming the key, instead of being ignored.
 
 ### Configuration only (no secrets)
 

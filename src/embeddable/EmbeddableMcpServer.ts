@@ -121,6 +121,15 @@ export interface EmbeddableMcpServerOptions {
    * @default defaultSystemContextResolver
    */
   systemContextResolver?: SystemContextResolver | null;
+
+  /**
+   * The idle bound on held state (a debug session): it ends after this many
+   * minutes without a tool call on this instance. A call in flight pauses
+   * it; a listener's own background re-poll does not count. A whole number,
+   * at least 30; anything else is refused at construction.
+   * @default 30
+   */
+  stateIdleMinutes?: number;
 }
 
 /**
@@ -157,6 +166,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       logger: options.logger,
       systemType: options.systemType,
       systemContextResolver: options.systemContextResolver,
+      stateIdleMinutes: options.stateIdleMinutes,
     });
 
     this.injectedConnection = options.connection;

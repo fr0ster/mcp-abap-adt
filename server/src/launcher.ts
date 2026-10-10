@@ -33,8 +33,8 @@ import { CORE_VERSION } from './coreVersion.js';
 import { SseServer } from './SseServer.js';
 import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';
 import { StreamableHttpServer } from './StreamableHttpServer.js';
-import { closeInstanceState } from './stateClose.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
+import { closeInstanceState } from './stateClose.js';
 
 const stderrLogger: ILogger = {
   info: (...args: any[]) => console.error(...args),
@@ -621,6 +621,7 @@ export async function launch(
 
     const server = new StdioServer(handlersRegistry, destinations, {
       version: options.version,
+      stateIdleMinutes: config.stateIdleMinutes,
       logger: loggerForTransport,
     });
     activeServer = server;
@@ -646,6 +647,7 @@ export async function launch(
   if (config.transport === 'sse') {
     const server = new SseServer(handlersRegistry, factory, {
       version: options.version,
+      stateIdleMinutes: config.stateIdleMinutes,
       host: config.host,
       port: config.port,
       ssePath: config.ssePath,
@@ -673,6 +675,7 @@ export async function launch(
   // http
   const server = new StreamableHttpServer(handlersRegistry, factory, {
     version: options.version,
+    stateIdleMinutes: config.stateIdleMinutes,
     host: config.host,
     port: config.port,
     enableJsonResponse: config.httpJsonResponse,

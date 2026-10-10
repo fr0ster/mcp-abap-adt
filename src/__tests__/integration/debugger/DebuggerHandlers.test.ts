@@ -526,6 +526,8 @@ describe('Debugger handlers (integration)', () => {
       ]);
       if (left.length) measure('cleanup', 'instance shutdown', left);
     }
+    // A pause between cases: what one case left at the system settles before the next starts.
+    await pause(5000);
   }, getTimeout('long'));
 
   afterAll(async () => {
@@ -702,6 +704,48 @@ describe('Debugger handlers (integration)', () => {
         });
         expect(after.isError).toBe(true);
         expect(after.text).toContain('state is not available');
+      });
+    },
+    getTimeout('long'),
+  );
+
+  // --- 1b. the pool's trigger: a stop, then at once a start in a new instance -----------
+
+  it(
+    'stop then start at once in a new instance (as a pool does): the start is clean',
+    async () => {
+      await tester.run(async () => {
+        const mode = tester.isHardMode() ? 'hard' : 'soft';
+        const rounds: unknown[] = [];
+        for (let i = 0; i < 3; i++) {
+          const a = newInstance();
+          const first = await call(a, 'DebugStartListener', {});
+          expect(first.isError).toBe(false);
+          // Past the short first poll: the long poll is open when the stop comes.
+          await pause(4000);
+          const stop = await call(a, 'DebugStop', {
+            state_handle: first.json.state_handle,
+          });
+          timing(`${mode} pool.stop(listening)`, stop.ms);
+          expect(stop.isError).toBe(false);
+          const b = newInstance();
+          const next = await call(b, 'DebugStartListener', {});
+          timing(`${mode} pool.start-after-stop`, next.ms);
+          rounds.push({
+            stop_ms: Math.round(stop.ms),
+            next: next.isError ? next.text.slice(0, 400) : next.json?.state,
+          });
+          expect(next.isError).toBe(false);
+          const stopB = await call(b, 'DebugStop', {
+            state_handle: next.json.state_handle,
+          });
+          expect(stopB.isError).toBe(false);
+        }
+        measure(
+          'pool',
+          `${mode}: stop, then a new instance starts at once`,
+          rounds,
+        );
       });
     },
     getTimeout('long'),
@@ -1034,17 +1078,17 @@ describe('Debugger handlers (integration)', () => {
           state_handle: handle,
         });
         timing('soft memory.sizes', sizes.ms);
-        measure('5', 'memory sizes', sizes.isError ? sizes.text : 'ok');
+        measure('5', 'memory sizes', sizes.isError ? sizes.text : sizes.json);
         expect(sizes.isError).toBe(false);
         const snap = await call(inst, 'DebugCreateMemorySnapshot', {
           state_handle: handle,
         });
         timing('soft memory.create-snapshot', snap.ms);
-        measure('5', 'create a snapshot', snap.isError ? snap.text : 'ok');
+        measure('5', 'create a snapshot', snap.isError ? snap.text : snap.json);
         expect(snap.isError).toBe(false);
         const list = await call(inst, 'MemorySnapshotList', {});
         timing('soft memory.list', list.ms);
-        measure('5', 'snapshot list', list.isError ? list.text : 'ok');
+        measure('5', 'snapshot list', list.isError ? list.text : list.json);
         expect(list.isError).toBe(false);
         const stop = await call(inst, 'DebugStop', { state_handle: handle });
         expect(stop.isError).toBe(false);
@@ -1120,28 +1164,66 @@ describe('Debugger handlers (integration)', () => {
         }
         measure('7', 'after each step over', overs);
 
-        // Continue from break to break until the table function stands with a row in its table.
+        // Continue from break to break. An ON_EXECUTION_END ends one debuggee; the table
+        // function is a debuggee of its own, so after an end the next break is waited for,
+        // not continued from. At the table function's second break its table holds a row.
         let table: Answer | undefined;
         let tfHits = 0;
-        let last: any;
-        for (let i = 0; i < 12; i++) {
-          const go = await call(inst, 'AmdpDebugStep', {
-            state_handle: handle,
-            action: 'continue',
-          });
-          expect(go.isError).toBe(false);
-          last = await until(handle, ['ON_BREAK', 'ON_EXECUTION_END']);
-          timing('soft amdp.continue(break→next event)', go.ms + last.ms);
-          if (last.hit?.kind === 'ON_BREAK' && last.hit.line === AMDP_LINE.tf) {
-            tfHits++;
-            if (tfHits === 2) {
-              table = await call(inst, 'AmdpDebugGetTable', {
-                state_handle: handle,
-                variable: 'LT_ROWS',
-              });
-              timing('soft amdp.get-table', table.ms);
+        let finished: any;
+        let executionEnds = 0;
+        let atBreak = true; // the step-overs left the procedure at a break
+        for (let i = 0; i < 24 && !finished; i++) {
+          let goMs = 0;
+          if (atBreak) {
+            const go = await call(inst, 'AmdpDebugStep', {
+              state_handle: handle,
+              action: 'continue',
+            });
+            if (go.isError) {
+              measure('7', 'continue refused', go.text.slice(0, 300));
               break;
             }
+            goMs = go.ms;
+            atBreak = false;
+          }
+          const t0 = now();
+          const a = await call(inst, 'AmdpDebugWait', {
+            state_handle: handle,
+            hold_seconds: 30,
+          });
+          if (a.isError) {
+            measure('7', 'wait failed', a.text.slice(0, 300));
+            break;
+          }
+          if (a.json?.state === 'ended') {
+            finished = a.json;
+            timing('soft amdp.wait(run_finished)', goMs + now() - t0);
+            break;
+          }
+          const batch: any[] = a.json?.events ?? [];
+          events.push(...batch);
+          for (const e of batch) {
+            if (e.kind === 'ON_EXECUTION_END') {
+              executionEnds++;
+              timing('soft amdp.continue→ON_EXECUTION_END', goMs + now() - t0);
+              measure('7', `ON_EXECUTION_END #${executionEnds}`, e);
+            }
+            if (e.kind === 'ON_BREAK') {
+              atBreak = true;
+              timing('soft amdp.continue→ON_BREAK', goMs + now() - t0);
+              if (e.line === AMDP_LINE.tf) {
+                tfHits++;
+                if (tfHits === 1)
+                  measure('7', 'first break in the table function', e);
+              }
+            }
+          }
+          if (atBreak && tfHits === 2 && !table) {
+            table = await call(inst, 'AmdpDebugGetTable', {
+              state_handle: handle,
+              variable: 'LT_ROWS',
+            });
+            timing('soft amdp.get-table', table.ms);
           }
         }
         measure(
@@ -1150,38 +1232,6 @@ describe('Debugger handlers (integration)', () => {
           table ? (table.json ?? table.text.slice(0, 600)) : 'not reached',
         );
         expect(table?.isError).toBe(false);
-
-        // The final continues: to the end of every debuggee, and the run's outcome.
-        let finished: any;
-        for (let i = 0; i < 12 && !finished; i++) {
-          const go = await call(inst, 'AmdpDebugStep', {
-            state_handle: handle,
-            action: 'continue',
-          });
-          if (go.isError) {
-            measure('7', 'continue refused', go.text.slice(0, 300));
-            break;
-          }
-          const t0 = now();
-          for (let j = 0; j < 4; j++) {
-            const a = await call(inst, 'AmdpDebugWait', {
-              state_handle: handle,
-              hold_seconds: 30,
-            });
-            if (a.json?.state === 'ended') {
-              finished = a.json;
-              break;
-            }
-            const batch: any[] = a.json?.events ?? [];
-            events.push(...batch);
-            if (batch.some((e) => e.kind === 'ON_BREAK')) break;
-          }
-          if (finished)
-            timing(
-              'soft amdp.continue(to the end, run_finished)',
-              go.ms + now() - t0,
-            );
-        }
         measure('7', 'the run as reported', finished);
         expect(finished?.reason).toBe('run_finished');
         expect(String(finished?.run?.output)).toContain(AMDP_OUTPUT);

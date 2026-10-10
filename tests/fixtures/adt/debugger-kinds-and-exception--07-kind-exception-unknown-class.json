@@ -1,0 +1,27 @@
+{
+  "case": "debugger-kinds-and-exception",
+  "step": 7,
+  "stepTag": "kind-exception-unknown-class",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger/breakpoints",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger/breakpoints",
+    "headers": {
+      "Accept": "*/*",
+      "X-sap-adt-sessiontype": "stateful",
+      "Content-Type": "application/xml"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<dbg:breakpoints xmlns:dbg=\"http://www.sap.com/adt/debugger\" xmlns:adtcore=\"http://www.sap.com/adt/core\" debuggingMode=\"user\" scope=\"external\" requestUser=\"SAPUSER01\" terminalId=\"4D43504142414454000000000000DB01\" ideId=\"mcp-abap-adt\">\n  <breakpoint kind=\"exception\" enabled=\"true\" exceptionClass=\"ZCX_DOES_NOT_EXIST_7Q4\"/>\n</dbg:breakpoints>"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "238",
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "bodyFile": "debugger-kinds-and-exception--07-kind-exception-unknown-class.body.xml"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "case": "debugger-conversation",
+  "step": 27,
+  "stepTag": "variables-at-write",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger?method=getVariables",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger?method=getVariables",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml",
+      "X-sap-adt-sessiontype": "stateful",
+      "Content-Type": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.debugger.Variables"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><asx:abap xmlns:asx=\"http://www.sap.com/abapxml\" version=\"1.0\"><asx:values><DATA><STPDA_ADT_VARIABLE><ID>LV_COUNTER</ID></STPDA_ADT_VARIABLE></DATA></asx:values></asx:abap>"
+  },
+  "response": {
+    "status": 500,
+    "headers": {
+      "content-length": "408",
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-conversation--27-variables-at-write.body.xml"
+  }
+}

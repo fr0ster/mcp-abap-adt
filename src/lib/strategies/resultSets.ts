@@ -230,6 +230,36 @@ export const READING_BY_SLOT = {
   switched: structured,
   runtimeState: structured,
   checkState: structured,
+
+  // Arrived with adt-clients 26.1.0 (`listCheckVariants`): a
+  // `nameditem:namedItemList`.
+  checkVariants: structured,
+
+  // Arrived with adt-clients 26.0.0: the ABAP and AMDP debuggers and memory
+  // snapshots. Generic readings so a `resultsFor` over their sets gets
+  // something rather than a throw; the debugger tools read through their own.
+  // Every ABAP debugger answer is a document except the deletes, the cursor
+  // move and the termination, which answer nothing to read (`done`). The AMDP
+  // start answers the debugger id in `Location` and the database session in
+  // the body, a command only a request id in `Location`.
+  breakpoints: structured,
+  listener: structured,
+  attach: structured,
+  stack: structured,
+  variables: structured,
+  step: structured,
+  done: statusOnly,
+  watchpoints: structured,
+  memory: structured,
+  started: verbatim,
+  events: structured,
+  command: statusOnly,
+  preview: structured,
+  snapshot: structured,
+  overview: structured,
+  rankingList: structured,
+  children: structured,
+  references: structured,
 } satisfies Record<string, IResultStrategy<unknown>>;
 
 /**

@@ -28,10 +28,9 @@
  *        is a different endpoint the body never calls; testing it as a
  *        second step would assert a sequence that does not exist.
  *      - `handleCreateServiceBinding.ts` is a genuine sequence:
- *        `create()`'s own `.d.ts` comment claims it "activates and
- *        generates" but its shipped body is one request only
- *        (`createRequest`) — this handler composes `activate()` and
- *        `generateServiceBinding()` itself, gated on `activate !== false`.
+ *        `create()` is one request (`createRequest`) — this handler
+ *        composes `activate()` and `getServiceGroup()` itself, gated on
+ *        `activate !== false`.
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
@@ -390,14 +389,14 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
   });
 });
 
-describe('SHAPE 4b — CreateServiceBinding: create, then activate and generate', () => {
+describe('SHAPE 4b — CreateServiceBinding: create, then activate and read the service group', () => {
   const args = {
     service_binding_name: 'ZSB',
     service_definition_name: 'ZSD',
     package_name: 'ZPKG',
   };
 
-  it('calls create, activate and generateServiceBinding in order when activate is not disabled', async () => {
+  it('calls create, activate and getServiceGroup in order when activate is not disabled', async () => {
     const order: string[] = [];
     fakeClient = fakeClientOf({
       create: async () => {
@@ -408,27 +407,27 @@ describe('SHAPE 4b — CreateServiceBinding: create, then activate and generate'
         order.push('activate');
         return okResponse(reading(undefined, '', 200));
       },
-      generateServiceBinding: async () => {
-        order.push('generate');
+      getServiceGroup: async () => {
+        order.push('serviceGroup');
         return okResponse(reading(undefined, '', 200));
       },
     });
     const result: any = await handleCreateServiceBinding(context as any, args);
-    expect(order).toEqual(['create', 'activate', 'generate']);
+    expect(order).toEqual(['create', 'activate', 'serviceGroup']);
     expect(result.isError).toBe(false);
   });
 
   // The "answer is the create's own" fix bites only past `terse`: both a
-  // correct handler and one that (wrongly) answered `generated`'s response
+  // correct handler and one that (wrongly) answered the service group's response
   // say the same word, `'SUCCESS'`, at the default detail — `terseWrite`
   // only reads the HTTP status, not which step it came from. `detail: 'full'`
   // is what actually shows which document travelled back to the caller.
-  it("answers create's own document at detail:'full', not generate's", async () => {
+  it("answers create's own document at detail:'full', not the service group's", async () => {
     fakeClient = fakeClientOf({
       create: async () => okResponse(reading('<CREATED_DOCUMENT/>')),
       activate: async () => okResponse(reading(undefined, '', 200)),
-      generateServiceBinding: async () =>
-        okResponse(reading({ marker: 'GENERATED_DOCUMENT' })),
+      getServiceGroup: async () =>
+        okResponse(reading({ marker: 'GROUP_DOCUMENT' })),
     });
     const result: any = await handleCreateServiceBinding(context as any, {
       ...args,
@@ -437,16 +436,16 @@ describe('SHAPE 4b — CreateServiceBinding: create, then activate and generate'
     expect(result.isError).toBe(false);
     const text = result.content[0].text;
     expect(text).toContain('CREATED_DOCUMENT');
-    expect(text).not.toContain('GENERATED_DOCUMENT');
+    expect(text).not.toContain('GROUP_DOCUMENT');
   });
 
-  it('stops at the first refused step and never reaches activate/generate', async () => {
+  it('stops at the first refused step and never reaches activate or the read', async () => {
     const activate = jest.fn();
-    const generate = jest.fn();
+    const readGroup = jest.fn();
     fakeClient = fakeClientOf({
       create: async () => refusedResponse('Name already exists'),
       activate,
-      generateServiceBinding: generate,
+      getServiceGroup: readGroup,
     });
     const result: any = await handleCreateServiceBinding(context as any, args);
     expect(result.isError).toBe(true);
@@ -454,16 +453,16 @@ describe('SHAPE 4b — CreateServiceBinding: create, then activate and generate'
       'Name already exists',
     );
     expect(activate).not.toHaveBeenCalled();
-    expect(generate).not.toHaveBeenCalled();
+    expect(readGroup).not.toHaveBeenCalled();
   });
 
-  it('skips activate/generate when activate: false', async () => {
+  it('skips activate and the read when activate: false', async () => {
     const activate = jest.fn();
-    const generate = jest.fn();
+    const readGroup = jest.fn();
     fakeClient = fakeClientOf({
       create: async () => okResponse(reading(undefined, '', 200)),
       activate,
-      generateServiceBinding: generate,
+      getServiceGroup: readGroup,
     });
     const result: any = await handleCreateServiceBinding(context as any, {
       ...args,
@@ -471,7 +470,7 @@ describe('SHAPE 4b — CreateServiceBinding: create, then activate and generate'
     });
     expect(result.isError).toBe(false);
     expect(activate).not.toHaveBeenCalled();
-    expect(generate).not.toHaveBeenCalled();
+    expect(readGroup).not.toHaveBeenCalled();
   });
 });
 

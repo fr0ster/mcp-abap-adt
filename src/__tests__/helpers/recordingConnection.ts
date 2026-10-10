@@ -1,5 +1,6 @@
 import type {
   IAbapConnection,
+  IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 
@@ -65,7 +66,11 @@ export function recordingConnection(
       return null;
     },
     setSessionType() {},
-    async makeAdtRequest(options) {
+    // Generic, as interfaces-adt-connection 2.0.0 declares it: a stub that
+    // returns a fixed shape must say so for whatever `T` the caller asked.
+    async makeAdtRequest<T = unknown, D = unknown>(
+      options: IAbapRequestOptions,
+    ): Promise<IAdtWireResponse<T, D>> {
       requests.push({
         method: options.method,
         url: options.url,
@@ -81,7 +86,7 @@ export function recordingConnection(
         status: answer?.status ?? 200,
         statusText: answer?.statusText ?? 'OK',
         headers: answer?.headers ?? {},
-      };
+      } as IAdtWireResponse<T, D>;
     },
   };
 }

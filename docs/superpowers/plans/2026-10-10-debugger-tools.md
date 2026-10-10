@@ -1564,6 +1564,7 @@ git commit -m "feat(debugger): DebugSession — short first poll, auto-attach, s
 
 ```ts
   stop(): Promise<void>;          // throws DebugCleanupError listing what could not be undone; idempotent
+  failures(): string[];           // what the last stop could not undo
   holdsState(): boolean;          // listener | stop | armed breakpoints | unreported notice | pending run | failure | failed cleanup
   describe(): { kind: 'abap'; state: 'idle' | 'listening' | 'stopped'; breakpoints: number; terminal_id: string; ide_id: string };
 ```
@@ -1784,6 +1785,8 @@ Expected: FAIL. `stop`, `holdsState` and `describe` are missing, and no run happ
       || !!this.run || this.failure !== undefined || this.cleanupFailures.length > 0;
   }
 
+  failures(): string[] { return [...this.cleanupFailures]; }
+
   describe() {
     return {
       kind: 'abap' as const,
@@ -1862,6 +1865,8 @@ export class AmdpSession<O = unknown> {
   cancel(): Promise<void>;
   stop(): Promise<void>;
   holdsState(): boolean;                       // open | closing | unread events | pending run | failure | failed cleanup
+  pending(): boolean;                          // closing, its last event batch not yet arrived
+  failures(): string[];                        // what a cleanup could not undo
   describe(): { kind: 'amdp'; state: 'idle' | 'waiting' | 'stopped' | 'closing'; debuggee?: string };
   observe(onChange: () => void): void;         // called after every state change
   startRun(target: RunTarget): void;
@@ -1963,7 +1968,9 @@ function world() {
     requestUser: async () => 'SAPUSER01',
     run: async () => { calls.push('run'); return run.promise; },
   }).bind('origin');
-  return { session, reads, calls, closed, dbg, run };
+  /** The request id the next sync will be answered with. */
+  const nextSync = () => `Q${syncN + 1}`;
+  return { session, reads, calls, closed, dbg, run, nextSync };
 }
 
 describe('AmdpSession', () => {
@@ -2050,37 +2057,47 @@ describe('AmdpSession', () => {
     await expect(w.session.wait(0)).rejects.toThrow(/session gone/);
     expect((await w.session.wait(0)).state).toBe('idle');
     const before = w.reads.length;
+    const expected = w.nextSync();                   // the failure path's stop sent no sync; ask the fake, never count by hand
     const s = w.session.start({ stopExisting: true, breakpoints: [{ class_name: 'ZCL_A', line: 14 }] });
     await until(() => w.reads.length === before + 1);
-    w.reads[before].resolve(okResponse(SYNCED('Q2')));
+    w.reads[before].resolve(okResponse(SYNCED(expected)));
     await expect(s).resolves.toMatchObject({ mainId: '0123456789ABCDEF0123456789ABCDEF' });
   });
 
   it('a breakpoint clear that fails survives the last batch and is retried by the next stop', async () => {
     const w = await started();
     const realSync = w.dbg.syncBreakpoints;
-    w.dbg.syncBreakpoints = async (m: string, b: any[]) => (b.length === 0 ? refusedResponse('clear refused') : realSync(m, b));
+    let refusedClears = 0;
+    w.dbg.syncBreakpoints = async (m: string, b: any[]) => (b.length === 0 ? (refusedClears++, refusedResponse('clear refused')) : realSync(m, b));
     await expect(w.session.stop()).rejects.toThrow(/clear refused/);
+    expect(refusedClears).toBe(1);
     w.reads[1].resolve(okResponse('<amdpdbg:events xmlns:amdpdbg="x"/>'));   // the last batch arrives
-    await until(() => w.reads.length >= 2);
+    await until(() => refusedClears === 2);                   // its own attempt failed too
+    await until(() => !w.session.pending());
     expect(w.session.holdsState()).toBe(true);                // not closed: the clear is still owed
+    expect(w.closed).toHaveLength(0);
     w.dbg.syncBreakpoints = realSync;
     await w.session.stop();
     expect(w.session.holdsState()).toBe(false);
+    expect(w.closed).toHaveLength(2);
   });
 
   it('a release that fails in the last batch is retried by the next stop', async () => {
     const w = await started();
     await w.session.stop();
     const realDelete = w.dbg.deleteDebuggee;
-    w.dbg.deleteDebuggee = async () => refusedResponse('busy');
+    let refusedDeletes = 0;
+    w.dbg.deleteDebuggee = async () => (refusedDeletes++, refusedResponse('busy'));
     w.reads[1].resolve(okResponse(BREAK));
-    await until(() => w.session.describe().state === 'closing');
-    expect(w.session.holdsState()).toBe(true);
+    await until(() => refusedDeletes === 1);                  // the last batch's release was attempted and failed
+    await until(() => !w.session.pending());
+    expect(w.session.failures()).toEqual(['release debuggee D1: busy']);
+    expect(w.closed).toHaveLength(0);
     w.dbg.deleteDebuggee = realDelete;
     await w.session.stop();
     expect(w.calls).toContain('delete:D1');
     expect(w.session.holdsState()).toBe(false);
+    expect(w.closed).toHaveLength(2);
   });
 
   it('a cleanup that fails is reported', async () => {
@@ -2504,6 +2521,10 @@ export class AmdpSession<O = unknown> {
       || this.runGeneration !== undefined || this.failure !== undefined || this.cleanupFailures.length > 0;
   }
 
+  /** Still finishing on its own: stopped, the last event batch not yet arrived. */
+  pending(): boolean { return !!this.closing && !this.closing.readDone; }
+  failures(): string[] { return [...this.cleanupFailures]; }
+
   describe() {
     return {
       kind: 'amdp' as const,
@@ -2560,7 +2581,8 @@ The instance's handle and its "holds state" verdict are generic (spec D1, D9). `
 ```ts
 // src/lib/state/InstanceState.ts
 export interface StateDescription { kind: string; [field: string]: unknown }
-export interface StatePart { holdsState(): boolean; dispose(): Promise<void>; describe(): StateDescription[]; observe(onChange: () => void): void }
+/** pending: cleanup is still finishing on its own (an AMDP session waits for its last event batch). failures: what a cleanup could not undo, kept for a retry. */
+export interface StatePart { holdsState(): boolean; pending(): boolean; failures(): string[]; dispose(): Promise<void>; describe(): StateDescription[]; observe(onChange: () => void): void }
 /** What the host lends an instance for one request (Task 9); stdio and SSE lend none. */
 export interface StateHost {
   /** The request's owner, or null when the request carries no identity to keep state under. */
@@ -2584,7 +2606,10 @@ export class InstanceState {
   /** A complete stop was asked: the handle is invalidated for good when nothing is held — now, or when an asynchronous part finishes. */
   endWhenEmpty(): void;
   kindsHeld(): string[];                   // the kinds the parts describe as held
+  pending(): boolean;                      // some part is still finishing a cleanup on its own
+  failures(): string[];                    // what the parts could not undo
   onEmpty(listener: () => void): void;     // fires once per transition from holding to empty
+  onChange(listener: () => void): () => void;   // every change; answers its unsubscribe
   dispose(): Promise<void>;                // every part; throws an aggregate of what failed; reconciles afterwards
 }
 // handlers/interfaces.ts
@@ -2615,7 +2640,7 @@ const part = () => {
   let held = false; let cb: () => void = () => {};
   return {
     set: (v: boolean) => { held = v; cb(); },
-    p: { holdsState: () => held, dispose: async () => { held = false; }, describe: () => (held ? [{ kind: 'abap' }] : []), observe: (f: () => void) => { cb = f; } },
+    p: { holdsState: () => held, pending: () => false, failures: () => [], dispose: async () => { held = false; }, describe: () => (held ? [{ kind: 'abap' }] : []), observe: (f: () => void) => { cb = f; } },
   };
 };
 
@@ -2680,7 +2705,7 @@ import { requireDebugger } from '../../../lib/debugger/access';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { InstanceState, StateUnavailableError } from '../../../lib/state/InstanceState';
 
-const fake = (holds: boolean) => ({ holdsState: () => holds, bind() { return this; }, describe: () => ({ kind: 'abap' }), stop: async () => {}, observe: () => {}, ids: { terminalId: 'T', ideId: 'I' } }) as any;
+const fake = (holds: boolean) => ({ holdsState: () => holds, pending: () => false, failures: () => [], bind() { return this; }, describe: () => ({ kind: 'abap' }), stop: async () => {}, observe: () => {}, ids: { terminalId: 'T', ideId: 'I' } }) as any;
 function ctx(holds: boolean) {
   const state = new InstanceState();
   const dbg = new DebuggerInstance({ abap: fake(holds), amdp: fake(false) });
@@ -2806,7 +2831,8 @@ Expected: FAIL, "Cannot find module".
 import { randomBytes } from 'node:crypto';
 
 export interface StateDescription { kind: string; [field: string]: unknown }
-export interface StatePart { holdsState(): boolean; dispose(): Promise<void>; describe(): StateDescription[]; observe(onChange: () => void): void }
+/** pending: cleanup is still finishing on its own (an AMDP session waits for its last event batch). failures: what a cleanup could not undo, kept for a retry. */
+export interface StatePart { holdsState(): boolean; pending(): boolean; failures(): string[]; dispose(): Promise<void>; describe(): StateDescription[]; observe(onChange: () => void): void }
 export interface StateHost {
   readonly owner: string | null;
   reserve(kind: string, handle: string): string | undefined;
@@ -2835,6 +2861,8 @@ export class InstanceState {
   }
 
   holdsState(): boolean { return this.parts.some((p) => p.holdsState()); }
+  pending(): boolean { return this.parts.some((p) => p.pending()); }
+  failures(): string[] { return this.parts.flatMap((p) => p.failures()); }
   kindsHeld(): string[] { return [...new Set(this.parts.flatMap((p) => p.describe().map((d) => d.kind)))]; }
   describe() { return { state_handle: this.current, states: this.parts.flatMap((p) => p.describe()) }; }
 
@@ -2856,6 +2884,12 @@ export class InstanceState {
 
   onEmpty(listener: () => void): void { this.emptyListeners.push(listener); }
 
+  private readonly changeListeners = new Set<() => void>();
+  onChange(listener: () => void): () => void {
+    this.changeListeners.add(listener);
+    return () => this.changeListeners.delete(listener);
+  }
+
   /** Every transition goes through here; state is updated before anyone is told. */
   private changed(): void {
     const holding = this.holdsState();
@@ -2866,6 +2900,7 @@ export class InstanceState {
       this.current = newHandle();                    // the old handle is invalid for good
     }
     if (emptied) for (const l of this.emptyListeners) l();
+    for (const l of [...this.changeListeners]) l();
   }
 
   async dispose(): Promise<void> {
@@ -2957,6 +2992,8 @@ export class DebuggerInstance implements StatePart {
     this.amdp = sessions.amdp;
   }
   holdsState(): boolean { return this.abap.holdsState() || this.amdp.holdsState(); }
+  pending(): boolean { return this.amdp.pending(); }
+  failures(): string[] { return [...this.abap.failures(), ...this.amdp.failures()]; }
   observe(onChange: () => void): void { this.abap.observe(onChange); this.amdp.observe(onChange); }
   describe(): StateDescription[] {
     const ids = { terminal_id: this.abap.ids.terminalId, ide_id: this.abap.ids.ideId };
@@ -3419,14 +3456,18 @@ class Fake {
   failDispose = false;
   finishLater = false;        // dispose resolves while the part still holds (AMDP closing)
   notifyInDispose = false;    // the part tells the state synchronously from inside dispose
+  finishing = false;          // the part's cleanup is still running on its own
+  lateFailures: string[] = [];
   private notify: () => void = () => {};
   constructor(readonly n: number) {
     this.state.attach({
       holdsState: () => this.held,
+      pending: () => this.finishing,
+      failures: () => this.lateFailures,
       dispose: async () => {
         this.disposed++;
         if (this.failDispose) throw new Error('listener still up');
-        if (this.finishLater) return;
+        if (this.finishLater) { this.finishing = true; return; }
         this.held = false;
         if (this.notifyInDispose) this.notify();
       },
@@ -3434,7 +3475,9 @@ class Fake {
       observe: (f) => { this.notify = f; },
     });
   }
-  set(v: boolean) { this.held = v; this.notify(); }
+  set(v: boolean) { this.held = v; if (!v) this.finishing = false; this.notify(); }
+  /** The cleanup finished on its own but could not undo everything. */
+  failLate(message: string) { this.finishing = false; this.lateFailures = [message]; this.notify(); }
   get stateHandle() { return this.state.handle; }
   holdsState() { return this.state.holdsState(); }
   dispose() { return this.state.dispose(); }
@@ -3584,6 +3627,25 @@ describe('InstancePool', () => {
     expect(await shutting).toEqual([]);
   });
 
+  it('a cleanup that fails after its disposal returned is retried once and reported; shutdown ends', async () => {
+    const pool = new InstancePool<Fake>();
+    const held = await holding(pool);
+    held.finishLater = true;
+    const shutting = pool.shutdown();
+    await tick();
+    held.failLate('release debuggee D1: busy');     // the last batch arrived; its release failed
+    expect(await shutting).toEqual([`${held.stateHandle}: release debuggee D1: busy`]);
+    expect(held.disposed).toBe(2);                   // retried once
+  });
+
+  it('a request that leaves nothing behind leaves no entry in the pool', async () => {
+    const pool = new InstancePool<Fake>();
+    await pool.serve({ owner: 'A' }, create, async () => {});
+    expect((pool as any).busy.size).toBe(0);
+    expect((pool as any).retained.size).toBe(0);
+    expect(pool.size()).toBe(0);
+  });
+
   it('a part that empties synchronously inside dispose re-enters the eviction harmlessly: disposed once', async () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
@@ -3721,7 +3783,9 @@ export class InstancePool<T extends Poolable> {
     instance.state.host = this.hostFor(owner, instance);
     this.busy.set(instance, (this.busy.get(instance) ?? 0) + 1);
     try { await work(instance); } finally {
-      this.busy.set(instance, (this.busy.get(instance) ?? 1) - 1);
+      const left = (this.busy.get(instance) ?? 1) - 1;
+      if (left > 0) this.busy.set(instance, left);
+      else this.busy.delete(instance);              // no entry stays for an instance nobody works on
       await this.settle(instance, owner);
     }
   }
@@ -3776,23 +3840,36 @@ export class InstancePool<T extends Poolable> {
     return eviction;
   }
 
-  private emptied(instance: T): Promise<void> {
-    if (!instance.holdsState()) return Promise.resolve();
-    return new Promise((resolve) => instance.state.onEmpty(() => resolve()));
+  /** Settled: holds nothing, or nothing is finishing on its own any more. The subscription ends with it. */
+  private settled(instance: T): Promise<void> {
+    const done = () => !instance.holdsState() || !instance.state.pending();
+    if (done()) return Promise.resolve();
+    return new Promise((resolve) => {
+      const off = instance.state.onChange(() => { if (done()) { off(); resolve(); } });
+    });
   }
 
   /**
    * Stop admission; let running requests and disposals finish; dispose what is
-   * held or retained; wait for what is still finishing (an AMDP session ends
-   * when its last event batch arrives — measured in Task 14); report what failed.
+   * held or retained; wait until each has settled (an AMDP session finishes
+   * when its last event batch arrives — measured in Task 14); retry once what
+   * still holds after a late failure; report what is still left.
    */
   async shutdown(): Promise<string[]> {
     this.admitting = false;
     await Promise.allSettled([...this.active]);
     await Promise.allSettled([...this.evicting.values()]);
-    const owned = new Set<T>([...this.held.keys(), ...this.retained]);
+    const owned = [...new Set<T>([...this.held.keys(), ...this.retained])];
     for (const instance of owned) await this.evict(instance);
-    await Promise.allSettled([...owned].filter((i) => !this.failed.has(i)).map((i) => this.emptied(i)));
+    await Promise.allSettled(owned.filter((i) => !this.failed.has(i)).map((i) => this.settled(i)));
+    for (const instance of owned) {
+      if (this.failed.has(instance) || !instance.holdsState()) continue;
+      await this.evict(instance);                    // a cleanup failed after its disposal returned: once more
+      await this.settled(instance);
+      if (instance.holdsState()) {
+        this.failed.set(instance, `${instance.stateHandle}: ${instance.state.failures().join('; ') || 'state is still held'}`);
+      }
+    }
     return [...this.failed.values()];
   }
 }
@@ -4282,7 +4359,7 @@ it('the group serves the seven AMDP tools', () => {
 
 it('a step without a session is not available', async () => {
   const state = new InstanceState();
-  const instance = new DebuggerInstance({ abap: { holdsState: () => false, bind() { return this; }, observe() {}, describe: () => ({}), ids: {} } as any, amdp: new AmdpSession({} as any) });
+  const instance = new DebuggerInstance({ abap: { holdsState: () => false, pending: () => false, failures: () => [], bind() { return this; }, observe() {}, describe: () => ({}), ids: {} } as any, amdp: new AmdpSession({} as any) });
   state.attach(instance);
   const r: any = await handleAmdpDebugStep({ connection: {}, state, debugger: () => instance } as any, { state_handle: state.handle, action: 'over' });
   expect(r.isError).toBe(true);
@@ -4691,6 +4768,12 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | | 4 (attach exception in start) | `report()` inside the protected part; each rollback step runs on its own |
 | | 5 (`idle()` before connection) | the wrapper is tracked from its entry |
 | | 6 (re-entry before the guard) | the eviction promise is registered before `dispose()` |
+
+| Sixth (on `bc99e2d3`) | 1 (late cleanup failure invisible to shutdown) | `StatePart.pending()`/`failures()`; shutdown waits until settled, retries once what still holds, reports it |
+| | 2 (`busy` retained every instance) | the entry is deleted at zero |
+| | 3 (AMDP restart test ids) | the fake answers `nextSync()`; the test never counts ids by hand |
+| | 4 (retry tests without failure) | the tests wait for the failed attempt before restoring, then check retry and closure |
+| | (subscriptions) | `onChange` answers its unsubscribe; `settled()` unsubscribes |
 
 **Placeholders.** The only `<…>` tokens are in run commands, where local config and scratchpad values go. They are deliberately not written down: plans name no system.
 

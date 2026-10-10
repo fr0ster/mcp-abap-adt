@@ -2222,7 +2222,7 @@ export class AmdpSession<O = unknown> {
 
   /** Every change goes through here: one at a time, and observers hear of it afterwards — whatever it did. */
   private mutate<T>(work: () => Promise<T>): Promise<T> {
-    return this.mutate(async () => {
+    return this.serial.run(async () => {
       try { return await work(); } finally { this.notify(); }
     });
   }

@@ -21,7 +21,7 @@ The library already does every request (measured on premise, SAP_BASIS 758 and
 
 | # | Decision |
 |---|---|
-| D1 | **One MCP server = one user session** (one connection to the SAP system it exposes). Debugger state lives in the server process; no per-user registry, no session handles in tool arguments. Every session from the server to ABAP is exclusive to that server instance — the listener's and the stop's connections included; the rest is the MCP standard's. What only the consumer controls — opening parallel sessions, several servers for the same SAP user — is not ours to manage: SAP's own answer (a listener conflict) reaches the model as it is, and nothing more is done about it. |
+| D1 | **One MCP server = one user session** (one connection to the SAP system it exposes). Debugger state lives in the server process; no per-user registry, no session handles in tool arguments. Every session from the server to ABAP is exclusive to that server instance — the listener's and the stop's connections included; the rest is the MCP standard's. What only the consumer controls — opening parallel sessions, several servers for the same SAP user — is not ours to manage: the user's responsibility. SAP's listener conflict is caught and returned to the user as a tool error carrying SAP's message; nothing more is done about it. |
 | D2 | **Both scenarios**: the model starts the program, or someone else does. The listener lives in the background; the model asks whether something was caught. |
 | D3 | **Attach automatically** when the listener catches a debuggee: a debuggee is attachable only while it waits, and seconds between two model calls can lose it. |
 | D4 | **Idle timeout 5 minutes**: an attached debuggee no tool call has touched for 5 minutes is let go (`stepContinue`), so a suspended request of someone else does not hang until its session dies. |
@@ -45,7 +45,7 @@ the handlers are thin over it.
   one HTTP server, or several servers); identical ids would never conflict (the
   same `ideId` never does, measured), so two instances would silently share one
   listener's catches and delete each other's breakpoints. Distinct ids make them
-  meet as SAP's listener conflict instead — `conflict` under `refuse`, a
+  meet as SAP's listener conflict instead — a tool error under `refuse`, a
   deliberate displacement under take over — and keep each instance's breakpoints
   its own. The cost: breakpoints of an instance that dies without cleaning up
   stay under an identity nobody recreates, which is why shutdown cleanup is
@@ -77,11 +77,19 @@ there only once an instance lives per MCP session (the HTTP split in #287).
 **Shutdown** (stdin closed, signal, or `DebugStop`): breakpoints deleted, the
 listener stopped, a current debuggee released, every connection closed.
 
-**Failures as states, not throws.** A refused listener (409, another debugger
-holds the user's debugging) is kept and reported by the next `Wait` as
-`conflict`; the listener is not restarted. A debuggee that ended
-(`debuggeeEnded`, `terminateDebuggee`, read through `analyseDebuggeeEnd`) is the
-end of a stop: the listener resumes.
+**A conflict is an error; a debuggee's end is not.** A listener conflict is the
+user's to resolve (D1), so it is caught and returned as a tool error carrying
+SAP's message, never turned into a state:
+
+- **at the start** — another debugger holds the user's debugging and `refuse` is
+  answered 409: `DebugStartListener` (`HandlerDebugStart`) fails; nothing is
+  armed and nothing is run;
+- **later** — another debugger took the user over and our poll is answered 409
+  `conflictNotification`: the next `DebugWait` fails with that message, and the
+  listener is not restarted.
+
+A debuggee that ended (`debuggeeEnded`, `terminateDebuggee`, read through
+`analyseDebuggeeEnd`) is the end of a stop, not an error: the listener resumes.
 
 ## 2. Core tools
 
@@ -97,7 +105,7 @@ parameters.
 | `DebugListBreakpoints` | The set the server keeps. |
 | `DebugStartListener` | Starts the background listener refusing to displace another debugger. Optional `run`: a class or report to start in the background. |
 | `DebugTakeOverListener` | The same, displacing another debugger of the user (an IDE). |
-| `DebugWait` | Waits up to `hold_seconds` (≤ 30) and answers the state: `listening`, `stopped`, `conflict` or `ended`. |
+| `DebugWait` | Waits up to `hold_seconds` (≤ 30) and answers the state: `listening`, `stopped` or `ended`. A listener conflict is a tool error with SAP's message. |
 | `DebugGetStack` | The current stop's stack. |
 | `DebugSetStackPosition` | The frame variables are read in. |
 | `DebugGetVariables` | By name, or the children of a parent: locals, globals, an object's attributes, a table's rows by index. |
@@ -184,7 +192,7 @@ and that taking over displaces another debugger, such as an IDE.
   injected as fakes and fake timers:
   - listening → caught → attached, the listener standing;
   - 5 minutes idle → `stepContinue` → listening again;
-  - `conflict` kept, not restarted;
+  - a conflict at the start fails the start tool, a later one fails the next `Wait`; the listener is not restarted;
   - `debuggeeEnded` ends the stop, not as an error;
   - a background run ends as `ended` with its output;
   - `DebugStop` and shutdown clean up everything;
@@ -200,7 +208,7 @@ and that taking over displaces another debugger, such as an IDE.
 - a probe class created and deleted by the test;
 - ABAP chain: `DebugStartListener` with `run` → `Wait` → `stopped` on the line →
   stack and variables → `Step` → `StepToLine` → `Wait` → `ended` with the output;
-- conflict: a second listener under the same user, refusing, sees `conflict`;
+- conflict: a second listener under the same user, refusing, fails with SAP's conflict message;
 - AMDP: start → breakpoint → `Wait` → `ON_BREAK` → table → `continue` →
   `ON_EXECUTION_END`;
 - memory: sizes and a snapshot at a stop;
@@ -228,4 +236,4 @@ An IDE debugging the same SAP user must be closed during these runs.
   server (D1).
 - Coordinating several servers or sessions of the same SAP user (D1): what the
   consumer opens is the consumer's to control; two of them meet as SAP's
-  listener conflict, reported as `conflict`.
+  listener conflict, returned as a tool error.

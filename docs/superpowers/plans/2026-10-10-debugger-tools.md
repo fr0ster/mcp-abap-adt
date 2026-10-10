@@ -1204,13 +1204,20 @@ export class DebugSession<O = unknown> {
   private changed?: () => void;
   observe(onChange: () => void): void { this.changed = onChange; }
   protected notify(): void { for (const w of [...this.waiters]) w(); this.changed?.(); }
+
+  /** Every change goes through here: one at a time, and observers hear of it afterwards — whatever it did. */
+  protected mutate<T>(work: () => Promise<T>): Promise<T> {
+    return this.serial.run(async () => {
+      try { return await work(); } finally { this.notify(); }
+    });
+  }
   private owns(listener: Listener, generation: number): boolean {
     return this.listener === listener && this.generation === generation;
   }
 
   // --- breakpoints ------------------------------------------------------------
   setBreakpoints(list: IDebuggerBreakpoint[]): Promise<DebugView<BreakpointsAnswer>> {
-    return this.serial.run(() => this.armLocked(list));
+    return this.mutate(() => this.armLocked(list));
   }
 
   /** Inside the serial. */
@@ -1223,6 +1230,7 @@ export class DebugSession<O = unknown> {
       const raw = valueOf(answer);
       const rows = readBreakpoints(raw);
       const placed = rows.filter((r) => r.id);
+      for (const p of placed) this.armed.set(p.id!, p);   // recorded at once: whatever happens next, they can be undone
       const placedKeys = new Set(placed.map(breakpointKey));
       const unmatched = list.filter((b) => !placedKeys.has(breakpointKey(b)));
       const errors = rows.filter((r) => r.error);
@@ -1235,18 +1243,17 @@ export class DebugSession<O = unknown> {
           continue;
         }
         for (const requested of asked) { // ambiguous within the kind: ask each on its own
-          const one = await dbg.setBreakpoints(identity, [requested], { validationOnly: true });
-          const error = one.ok ? readBreakpoints(valueOf(one)).find((r) => r.error)?.error : messageOf(one);
+          const one = await dbg.setBreakpoints(identity, [requested], { validationOnly: true }).catch(asFailure);
+          const error = one.ok ? readBreakpoints(valueOf(one)).find((r) => r.error)?.error : `the reason could not be read: ${messageOf(one)}`;
           refused.push({ requested, error: error ?? 'refused without a reason' });
         }
       }
-      for (const p of placed) this.armed.set(p.id!, p);
       return { value: { placed, refused }, raw };
     }
   }
 
   deleteBreakpoint(id: string): Promise<void> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const answer = await (await this.controlDebugger()).deleteBreakpoint(await this.identity(), id);
       if (!answer.ok) throw new DebugRequestError(messageOf(answer));
       this.armed.delete(id);
@@ -1257,27 +1264,33 @@ export class DebugSession<O = unknown> {
 
   // --- listener -----------------------------------------------------------------
   start(mode: IDebuggerListenerConflict, options: { breakpoints?: IDebuggerBreakpoint[]; run?: RunTarget } = {}): Promise<DebugState & { breakpoints?: BreakpointsAnswer }> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       if (this.listener || this.current) throw new DebugStateError('a listener is already running for this debug session');
       const identity = await this.identity();
       this.mode = mode;
       this.failure = undefined;
       await this.beforeFirstListen(identity);               // Task 5: reconciliation
-      const armed = options.breakpoints?.length ? await this.armLocked(options.breakpoints) : undefined;
-      const connection = await this.open();
-      const listener: Listener = { connection, debugger: this.ports.abapDebugger(connection, mode) };
-      const generation = ++this.generation;
-      this.listener = listener;
-      const first = await this.poll(listener, identity, FIRST_POLL_HOLD_SECONDS);
-      if (!first.ok) {
+      const before = new Set(this.armed.keys());
+      const placedHere = () => [...this.armed.values()].filter((b) => !before.has(b.id!));
+      let armed: DebugView<BreakpointsAnswer> | undefined;
+      try {
+        armed = options.breakpoints?.length ? await this.armLocked(options.breakpoints) : undefined;
+        const connection = await this.open();
+        const listener: Listener = { connection, debugger: this.ports.abapDebugger(connection, mode) };
+        const generation = ++this.generation;
+        this.listener = listener;
+        const first = await this.poll(listener, identity, FIRST_POLL_HOLD_SECONDS);
+        if (!first.ok) throw new DebugListenerError(messageOf(first));
+        const caught = readDebuggee(valueOf(first));
+        if (caught) await this.attachTo(caught, valueOf(first), generation);
+        if (!this.current && this.owns(listener, generation)) void this.loop(listener, generation);
+        if (options.run && this.owns(listener, generation)) this.startRun(options.run, generation); // Task 5
+      } catch (error) {
+        // A refused or failed start leaves nothing it armed: the listener goes, what it placed is deleted.
         await this.dropListener();
-        await this.undoArmed(identity, armed?.value.placed ?? []);
-        throw new DebugListenerError(messageOf(first));
+        await this.undoArmed(identity, placedHere());
+        throw error;
       }
-      const caught = readDebuggee(valueOf(first));
-      if (caught) await this.attachTo(caught, valueOf(first), generation);
-      if (!this.current && this.owns(listener, generation)) void this.loop(listener, generation);
-      if (options.run && this.owns(listener, generation)) this.startRun(options.run, generation); // Task 5
       return { ...this.report(), ...(armed ? { breakpoints: armed.value } : {}) };
     });
   }
@@ -1301,7 +1314,7 @@ export class DebugSession<O = unknown> {
     for (;;) {
       if (!this.owns(listener, generation) || this.current) return;
       const answer = await this.poll(listener, identity, LISTEN_HOLD_SECONDS);
-      const goOn = await this.serial.run(() => this.onPoll(listener, generation, answer));
+      const goOn = await this.mutate(() => this.onPoll(listener, generation, answer));
       if (!goOn) return;
     }
   }
@@ -1384,10 +1397,11 @@ export class DebugSession<O = unknown> {
     if (this.failure !== undefined) {
       const message = this.failure;
       this.failure = undefined;
+      this.changed?.();                      // consuming it may leave nothing held
       throw new DebugListenerError(message);
     }
     const notice = this.notices.shift();
-    if (notice) return notice;
+    if (notice) { this.changed?.(); return notice; }
     if (this.current) return { state: 'stopped', stop: this.current.view };
     return this.listener ? { state: 'listening' } : { state: 'idle' };
   }
@@ -1425,14 +1439,14 @@ export class DebugSession<O = unknown> {
   }
 
   step(method: IDebuggerStepMethod): Promise<DebugState> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const stop = this.requireStop();
       return this.afterMove(stop, await stop.debugger.step(method, { analyse: analyseDebuggeeEnd }));
     });
   }
 
   stepToLine(method: IDebuggerStepToLineMethod, uri: string): Promise<DebugState> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const stop = this.requireStop();
       return this.afterMove(stop, await stop.debugger.stepToLine(method, uri, { analyse: analyseDebuggeeEnd }));
     });
@@ -1440,7 +1454,7 @@ export class DebugSession<O = unknown> {
 
   /** The default strategy answers nothing for `done`: success is the end itself. */
   terminate(): Promise<DebugState> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const stop = this.requireStop();
       const answer = await stop.debugger.terminateDebuggee({ analyse: analyseDebuggeeEnd });
       if (!answer.ok) throw new DebugRequestError(messageOf(answer));
@@ -1450,7 +1464,7 @@ export class DebugSession<O = unknown> {
   }
 
   getStack(): Promise<DebugView<StopView>> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const stop = this.requireStop();
       const stack = await stop.debugger.getStack();
       if (!stack.ok) throw new DebugRequestError(messageOf(stack));
@@ -1460,7 +1474,7 @@ export class DebugSession<O = unknown> {
   }
 
   setStackPosition(position: number): Promise<DebugView<StopView>> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const stop = this.requireStop();
       const moved = await stop.debugger.setStackPosition(position);
       if (!moved.ok) throw new DebugRequestError(messageOf(moved));
@@ -1472,7 +1486,7 @@ export class DebugSession<O = unknown> {
   }
 
   private variables(call: (d: Debugger) => Promise<IAdtResponse<string>>): Promise<DebugView<VariablesReading>> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const answer = await call(this.requireStop().debugger);
       if (!answer.ok) throw new DebugRequestError(messageOf(answer));
       return { value: readVariables(valueOf(answer)), raw: valueOf(answer) };
@@ -1483,7 +1497,7 @@ export class DebugSession<O = unknown> {
   setVariable(name: string, value: string) { return this.variables((d) => d.setVariableValue(name.toUpperCase(), value)); }
 
   private document(call: (d: Debugger) => Promise<IAdtResponse<unknown>>): Promise<DebugView<string>> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const answer = await call(this.requireStop().debugger);
       if (!answer.ok) throw new DebugRequestError(messageOf(answer));
       return { value: valueOf(answer), raw: valueOf(answer) };
@@ -1691,7 +1705,7 @@ Expected: FAIL. `stop`, `holdsState` and `describe` are missing, and no run happ
 
   /** Everything off — DebugStop, dispose, shutdown. Required, not best effort. */
   stop(): Promise<void> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       this.generation++;
       const failures: string[] = [];
       const stop = this.current;
@@ -2163,6 +2177,9 @@ interface Open {
   mainId: string; hanaSession: string;
   stopping: boolean;           // stop() was sent; the read loop finishes the cleanup
   released: Set<string>;       // debuggees already deleted
+  unreleased: Set<string>;     // debuggees whose deletion failed: kept, with the command session, for a retry
+  stopped: boolean;            // the stop request was answered ok
+  readDone: boolean;           // the read loop has returned
 }
 
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -2203,8 +2220,15 @@ export class AmdpSession<O = unknown> {
   }
   private notify(): void { for (const w of [...this.waiters]) w(); this.changed?.(); }
 
+  /** Every change goes through here: one at a time, and observers hear of it afterwards — whatever it did. */
+  private mutate<T>(work: () => Promise<T>): Promise<T> {
+    return this.mutate(async () => {
+      try { return await work(); } finally { this.notify(); }
+    });
+  }
+
   start(options: { stopExisting: boolean; breakpoints: AmdpBreakpoint[]; run?: RunTarget }) {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       if (this.open || this.closing) throw new DebugStateError('an AMDP debug session is already running for this debug session');
       const origin = this.requireOrigin();
       const user = (await this.ports.requestUser(origin)).toUpperCase();
@@ -2219,7 +2243,7 @@ export class AmdpSession<O = unknown> {
         throw new DebugListenerError(started.getError().message);
       }
       const { mainId, hanaSession } = readAmdpStart(started.getResult().value as any);
-      const open: Open = { events, commands, onEvents, onCommands, mainId, hanaSession, stopping: false, released: new Set() };
+      const open: Open = { events, commands, onEvents, onCommands, mainId, hanaSession, stopping: false, released: new Set(), unreleased: new Set(), stopped: false, readDone: false };
       this.open = open;
       this.failure = undefined;
       this.generation++;
@@ -2255,16 +2279,22 @@ export class AmdpSession<O = unknown> {
       const answer = await open.onEvents.getEvents(open.mainId).catch(failed);
       const events = answer.ok ? readAmdpEvents(String(answer.getResult().value ?? '')) : [];
       if (open.stopping || this.open !== open) {
-        await this.finishClosing(open, events);      // stop() was sent: this was the last batch
+        open.readDone = true;
+        await this.serial.run(() => this.finishClosing(open, events));   // stop() was sent: this was the last batch
+        this.notify();
         return;
       }
       if (!answer.ok) {
+        // The event session failed: the AMDP session ends — through the same retained cleanup as a stop.
+        open.readDone = true;
         this.failure = answer.getError().message;
-        this.open = undefined;
-        this.debuggeeId = undefined;
-        await open.onCommands.stop(open.mainId).catch(() => undefined);
-        await this.ports.closeConnection(open.events);
-        await this.ports.closeConnection(open.commands);
+        await this.serial.run(async () => {
+          if (this.debuggeeId) open.unreleased.add(this.debuggeeId);
+          this.open = undefined;
+          this.closing = open;
+          this.debuggeeId = undefined;
+          await this.finishClosing(open, events);
+        });
         this.notify();
         return;
       }
@@ -2278,22 +2308,34 @@ export class AmdpSession<O = unknown> {
     }
   }
 
-  /** The read loop's last turn after a stop: release a break it carried, then close both sessions. */
+  /**
+   * Inside the serial: release every break known to be suspended — the last
+   * batch's and any kept from a failed attempt — stop the session if that was
+   * not answered yet, and close both sessions only when nothing is left. What
+   * fails stays in `closing` for the next stop().
+   */
   private async finishClosing(open: Open, lastBatch: AmdpEvent[]): Promise<void> {
-    for (const e of lastBatch) {
-      if (e.kind !== 'ON_BREAK' || open.released.has(e.debuggeeId)) continue;
-      const a = await open.onCommands.deleteDebuggee(open.mainId, e.debuggeeId).catch(failed);
-      if (a.ok) open.released.add(e.debuggeeId);
-      else this.cleanupFailures.push(`release debuggee ${e.debuggeeId}: ${a.getError().message}`);
+    for (const e of lastBatch) if (e.kind === 'ON_BREAK' && !open.released.has(e.debuggeeId)) open.unreleased.add(e.debuggeeId);
+    const failures: string[] = [];
+    for (const id of [...open.unreleased]) {
+      const a = await open.onCommands.deleteDebuggee(open.mainId, id).catch(failed);
+      if (a.ok) { open.unreleased.delete(id); open.released.add(id); }
+      else failures.push(`release debuggee ${id}: ${a.getError().message}`);
     }
+    if (!open.stopped) {
+      const stopped = await open.onCommands.stop(open.mainId).catch(failed);
+      if (stopped.ok) open.stopped = true;
+      else failures.push(`stop: ${stopped.getError().message}`);
+    }
+    this.cleanupFailures = failures;
+    if (failures.length || !open.readDone) return;     // kept: retried by stop(), or finished by the read loop
     await this.ports.closeConnection(open.events);
     await this.ports.closeConnection(open.commands);
     if (this.closing === open) this.closing = undefined;
-    this.notify();
   }
 
   setBreakpoints(list: AmdpBreakpoint[]): Promise<DebugView<string[]>> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const states = await this.sync(this.requireOpen(), list);
       return { value: states, raw: JSON.stringify(states) };
     });
@@ -2317,7 +2359,7 @@ export class AmdpSession<O = unknown> {
   }
 
   step(step: 'over' | 'continue'): Promise<DebugView<string>> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const open = this.requireOpen();
       const debuggee = this.requireDebuggee();
       const breaksBefore = this.breaks;
@@ -2330,7 +2372,7 @@ export class AmdpSession<O = unknown> {
   }
 
   getTable(variable: string, query?: string) {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const open = this.requireOpen();
       const answer = await open.onCommands.getDataPreview({
         sessionId: open.hanaSession, debuggerId: open.mainId, debuggeeId: this.requireDebuggee(),
@@ -2343,7 +2385,7 @@ export class AmdpSession<O = unknown> {
   }
 
   cancel(): Promise<void> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const open = this.requireOpen();
       const debuggee = this.requireDebuggee();
       const answer = await open.onCommands.deleteDebuggee(open.mainId, debuggee);
@@ -2355,35 +2397,32 @@ export class AmdpSession<O = unknown> {
 
   /**
    * Releases a suspended debuggee, empties the breakpoints, stops the session.
-   * What fails stays for a retry (holdsState) and is thrown as DebugCleanupError.
-   * The connections close when the read loop's last batch arrives.
+   * A second call retries what a first left (`closing`). The connections close
+   * when the read loop's last batch has arrived and nothing is left to undo.
    */
   stop(): Promise<void> {
-    return this.serial.run(async () => {
+    return this.mutate(async () => {
       const failures: string[] = [];
       const open = this.open;
       if (open) {
-        await open.onCommands.syncBreakpoints(open.mainId, []).catch(() => undefined);
-        if (this.debuggeeId && !open.released.has(this.debuggeeId)) {
-          const a = await open.onCommands.deleteDebuggee(open.mainId, this.debuggeeId).catch(failed);
-          if (a.ok) open.released.add(this.debuggeeId);
-          else failures.push(`release debuggee ${this.debuggeeId}: ${a.getError().message}`);
-        }
-        const stopped = await open.onCommands.stop(open.mainId).catch(failed);
-        if (!stopped.ok) failures.push(`stop: ${stopped.getError().message}`);
-        if (!failures.length) {
-          open.stopping = true;            // the read loop finishes the cleanup on its last batch
-          this.closing = open;
-          this.open = undefined;
-          this.debuggeeId = undefined;
-        }
+        const cleared = await open.onCommands.syncBreakpoints(open.mainId, []).catch(failed);
+        if (!cleared.ok) failures.push(`clear breakpoints: ${cleared.getError().message}`);
+        if (this.debuggeeId && !open.released.has(this.debuggeeId)) open.unreleased.add(this.debuggeeId);
+        open.stopping = true;
+        this.closing = open;
+        this.open = undefined;
+        this.debuggeeId = undefined;
       }
+      const closing = this.closing;
+      if (closing) {
+        await this.finishClosing(closing, []);
+        failures.push(...this.cleanupFailures);
+      }
+      this.cleanupFailures = failures;
       this.runGeneration = undefined;
       this.queue = [];
       this.notices = [];
       this.failure = undefined;
-      this.cleanupFailures = failures;
-      this.notify();
       if (failures.length) throw new DebugCleanupError(failures.join('; '));
     });
   }
@@ -2487,9 +2526,11 @@ export class InstanceState {
   admit(kind: string): void;
   /** For a call on existing state: the handle must be this one and something must be held. */
   check(handle: unknown): void;
-  rotateIfEmpty(): void;                   // after a complete stop: the old handle is invalid for good
-  onEmpty(listener: () => void): void;     // the host learns that an instance holds nothing any more
-  dispose(): Promise<void>;                // every part; throws an aggregate of what failed
+  /** A complete stop was asked: the handle is invalidated for good when nothing is held — now, or when an asynchronous part finishes. */
+  endWhenEmpty(): void;
+  kindsHeld(): string[];                   // the kinds the parts describe as held
+  onEmpty(listener: () => void): void;     // fires once per transition from holding to empty
+  dispose(): Promise<void>;                // every part; throws an aggregate of what failed; reconciles afterwards
 }
 // handlers/interfaces.ts
 export interface HandlerContext { connection: IAbapConnection; logger?: ILogger; state?: InstanceState; debugger?: () => DebuggerInstance }
@@ -2539,11 +2580,26 @@ describe('InstanceState', () => {
     a.set(false);
     expect(() => s.check(s.handle)).toThrow('state is not available');
   });
-  it('rotateIfEmpty invalidates the old handle for good', () => {
+  it('endWhenEmpty invalidates the old handle at once when nothing is held', () => {
     const s = new InstanceState(); const a = part(); s.attach(a.p);
-    const old = s.handle; s.rotateIfEmpty();
+    const old = s.handle; s.endWhenEmpty();
     expect(s.handle).not.toBe(old);
     a.set(true); expect(() => s.check(old)).toThrow(StateUnavailableError);
+  });
+  it('endWhenEmpty while a part still finishes: the old handle serves until it empties, then never again', () => {
+    const s = new InstanceState(); const a = part(); s.attach(a.p); a.set(true);
+    const old = s.handle; s.endWhenEmpty();
+    expect(() => s.check(old)).not.toThrow();       // a retry of the stop may still use it
+    a.set(false);                                   // the asynchronous part finished
+    expect(s.handle).not.toBe(old);
+    a.set(true); expect(() => s.check(old)).toThrow(StateUnavailableError);
+  });
+  it('attach samples a part already holding; dispose that empties it fires onEmpty', async () => {
+    const s = new InstanceState(); const a = part(); a.set(true);
+    s.attach(a.p);
+    const seen = jest.fn(); s.onEmpty(seen);
+    await s.dispose();
+    expect(seen).toHaveBeenCalledTimes(1);
   });
   it('admit: refuses without an identity; refuses with the holder handle when another instance holds the kind', () => {
     const s = new InstanceState();
@@ -2637,6 +2693,16 @@ describe('debug answers', () => {
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toContain('SY 530');
   });
+  it('the handle survives every detail: merged under terse and full, a block of its own under raw', async () => {
+    const view = { value: { state: 'listening' }, raw: '<x/>' };
+    for (const detail of ['terse', 'full']) {
+      const r = await debugAnswer({ detail }, async () => view, (v) => v, (v) => v, () => ({ state_handle: 'H' }));
+      expect(JSON.parse(r.content[0].text)).toMatchObject({ state_handle: 'H' });
+    }
+    const raw = await debugAnswer({ detail: 'raw' }, async () => view, (v) => v, (v) => v, () => ({ state_handle: 'H' }));
+    expect(raw.content[0].text).toBe('<x/>');
+    expect(JSON.parse(raw.content[1].text)).toEqual({ state_handle: 'H' });
+  });
   it('extra fields (handle, ids) join a state', async () => {
     const r = await debugStateAnswer({}, async () => ({ state: 'listening' }), () => ({ state_handle: 'H' }));
     expect(JSON.parse(r.content[0].text)).toEqual({ state: 'listening', state_handle: 'H' });
@@ -2702,6 +2768,7 @@ export class InstanceState {
   private readonly parts: StatePart[] = [];
   private readonly emptyListeners: Array<() => void> = [];
   private wasHolding = false;
+  private endRequested = false;
   host?: StateHost;
 
   get handle(): string { return this.current; }
@@ -2709,14 +2776,15 @@ export class InstanceState {
   attach(part: StatePart): void {
     this.parts.push(part);
     part.observe(() => this.changed());
+    this.changed();                                  // sample a part that already holds
   }
 
   holdsState(): boolean { return this.parts.some((p) => p.holdsState()); }
-
+  kindsHeld(): string[] { return [...new Set(this.parts.flatMap((p) => p.describe().map((d) => d.kind)))]; }
   describe() { return { state_handle: this.current, states: this.parts.flatMap((p) => p.describe()) }; }
 
   admit(kind: string): void {
-    if (!this.host) return;                            // stdio, SSE: one instance per session
+    if (!this.host) return;                          // stdio, SSE: one instance per session
     if (this.host.owner === null) throw new Error('this request carries no identity to keep state under');
     const holder = this.host.reserve(kind, this.current);
     if (holder && holder !== this.current) throw new Error(`a ${kind} debug session is already open: state_handle ${holder}`);
@@ -2726,20 +2794,28 @@ export class InstanceState {
     if (typeof handle !== 'string' || handle !== this.current || !this.holdsState()) throw new StateUnavailableError();
   }
 
-  rotateIfEmpty(): void {
-    if (!this.holdsState()) this.current = newHandle();
+  endWhenEmpty(): void {
+    this.endRequested = true;
+    this.changed();
   }
 
   onEmpty(listener: () => void): void { this.emptyListeners.push(listener); }
 
+  /** Every transition goes through here; state is updated before anyone is told. */
   private changed(): void {
     const holding = this.holdsState();
-    if (this.wasHolding && !holding) for (const l of this.emptyListeners) l();
+    const emptied = this.wasHolding && !holding;
     this.wasHolding = holding;
+    if (!holding && this.endRequested) {
+      this.endRequested = false;
+      this.current = newHandle();                    // the old handle is invalid for good
+    }
+    if (emptied) for (const l of this.emptyListeners) l();
   }
 
   async dispose(): Promise<void> {
     const results = await Promise.allSettled(this.parts.map((p) => p.dispose()));
+    this.changed();
     const failures = results.flatMap((r) => (r.status === 'rejected' ? [r.reason instanceof Error ? r.reason.message : String(r.reason)] : []));
     if (failures.length) throw new Error(failures.join('; '));
   }
@@ -2872,32 +2948,49 @@ import { return_error } from '../utils';
 import type { DebugState, DebugView } from './DebugSession';
 import { terseStop } from './readings';
 
-const text = (value: unknown): McpResult => ({
-  isError: false,
-  content: [{ type: 'text', text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) }],
-});
+const asText = (value: unknown) => ({ type: 'text' as const, text: typeof value === 'string' ? value : JSON.stringify(value, null, 2) });
 
-export async function debugAnswer<T>(args: unknown, work: () => Promise<DebugView<T>>, terse: (v: T) => unknown, full: (v: T) => unknown = (v) => v): Promise<McpResult> {
+/**
+ * terse / full / raw of one reading. `extraOf` — the handle and the SAP ids a
+ * start answers — joins every detail: merged into terse and full, and as a
+ * block of its own beside SAP's document under raw, so no detail loses it.
+ */
+export async function debugAnswer<T>(
+  args: unknown,
+  work: () => Promise<DebugView<T>>,
+  terse: (v: T) => unknown,
+  full: (v: T) => unknown = (v) => v,
+  extraOf: () => Record<string, unknown> = () => ({}),
+): Promise<McpResult> {
   try {
     const view = await work();
+    const extra = extraOf();
     const detail = detailOf(args);
-    if (detail === 'raw') return text(view.raw);
-    return text(detail === 'full' ? full(view.value) : terse(view.value));
+    if (detail === 'raw') {
+      return { isError: false, content: [asText(view.raw), ...(Object.keys(extra).length ? [asText(extra)] : [])] };
+    }
+    const projected = detail === 'full' ? full(view.value) : terse(view.value);
+    const merged = Object.keys(extra).length && projected && typeof projected === 'object' && !Array.isArray(projected)
+      ? { ...(projected as Record<string, unknown>), ...extra }
+      : Object.keys(extra).length ? { value: projected, ...extra } : projected;
+    return { isError: false, content: [asText(merged)] };
   } catch (error) {
     return return_error(error) as McpResult;
   }
 }
 
 export async function debugStateAnswer(args: unknown, work: () => Promise<DebugState>, extraOf: () => Record<string, unknown> = () => ({})): Promise<McpResult> {
-  let extra: Record<string, unknown> = {};
-  return debugAnswer(args, async () => {
-    const state = await work();
-    extra = extraOf();
-    const raw = state.state === 'stopped' ? [state.stop.raw.debuggee, state.stop.raw.attach, state.stop.raw.stack].join('\n') : JSON.stringify(state);
-    return { value: state, raw };
-  },
-  (s) => ({ ...(s.state === 'stopped' ? { state: 'stopped', ...terseStop(s.stop.debuggee, s.stop.stack), ...(s.stop.stackError ? { stack_error: s.stop.stackError } : {}) } : s), ...extra }),
-  (s) => ({ ...s, ...extra }));
+  return debugAnswer(
+    args,
+    async () => {
+      const state = await work();
+      const raw = state.state === 'stopped' ? [state.stop.raw.debuggee, state.stop.raw.attach, state.stop.raw.stack].join('\n') : JSON.stringify(state);
+      return { value: state, raw };
+    },
+    (s) => (s.state === 'stopped' ? { state: 'stopped', ...terseStop(s.stop.debuggee, s.stop.stack), ...(s.stop.stackError ? { stack_error: s.stop.stackError } : {}) } : s),
+    (s) => s,
+    extraOf,
+  );
 }
 ```
 
@@ -3042,14 +3135,23 @@ export * from './serial';
   holdsState(): boolean { return this.state.holdsState(); }
   /** Undoes what the instance holds; awaited by every host before it lets the instance go. */
   dispose(): Promise<void> { return this.state.dispose(); }
+
+  private readonly inFlight = new Set<Promise<unknown>>();
+  /** Resolves when every tool handler of this instance has settled — a host releases the instance only then. */
+  async idle(): Promise<void> {
+    while (this.inFlight.size) await Promise.allSettled([...this.inFlight]);
+  }
 ```
 
-Where the context is built (l.257-261), add `state: this.state, debugger: () => this.debuggerFor()`.
+Where the context is built (l.257-261), add `state: this.state, debugger: () => this.debuggerFor()`. In the same `wrappedHandler`, track the handler's promise: `this.inFlight.add(handlerPromise)` after it is created, and `handlerPromise.finally(() => this.inFlight.delete(handlerPromise))`.
+
+Add to `baseMcpServerState.test.ts`: `idle()` resolves only after a handler that is still running settles. Register one tool whose handler awaits a gate, call it through a connected `InMemoryTransport` pair from the SDK, and check that `idle()` is pending until the gate opens.
 
 `package.json`: add the `./debugger` and `./state` exports after `./compact-shared` (`types`/`import`/`require` → `./dist/lib/<dir>/index.{d.ts,js}`), and both under `typesVersions["*"]`.
 
 Add both subpaths to the places that resolve lib's subpaths, so the server and compact packages and the tests reach them the way they reach `@mcp-abap-adt/lib/handlers`:
-- the jest `moduleNameMapper` in `package.json`: `"^@mcp-abap-adt/lib/debugger$": "<rootDir>/src/lib/debugger/index.ts"` and `"^@mcp-abap-adt/lib/state$": "<rootDir>/src/lib/state/index.ts"`;
+- the jest `moduleNameMapper` in the root `package.json`: `"^@mcp-abap-adt/lib/debugger$": "<rootDir>/src/lib/debugger/index.ts"` and `"^@mcp-abap-adt/lib/state$": "<rootDir>/src/lib/state/index.ts"`;
+- the jest `moduleNameMapper` in `server/package.json` (its own config, l.95-104; the server's tests run from `server/` with `npx jest`): `"^@mcp-abap-adt/lib/debugger$": "<rootDir>/../src/lib/debugger/index.ts"` and `"^@mcp-abap-adt/lib/state$": "<rootDir>/../src/lib/state/index.ts"`;
 - `paths` in `server/tsconfig.json` and `compact/tsconfig.json`: `"@mcp-abap-adt/lib/debugger": ["../dist/lib/debugger/index.d.ts"]` and `"@mcp-abap-adt/lib/state": ["../dist/lib/state/index.d.ts"]`.
 
 - [ ] **Step 6: Run the folders, the type check and the build**
@@ -3118,7 +3220,7 @@ Add a `--exposition=readonly,debug` case beside the existing exposition parser t
 
 - [ ] **Step 2: Run them and see them fail**
 
-Run: `npx jest src/__tests__/unit/debugger/exposition.test.ts server/src/__tests__/sseDispose.test.ts`
+Run: `npx jest src/__tests__/unit/debugger/exposition.test.ts && (cd server && npx jest src/__tests__/sseDispose.test.ts)`
 Expected: FAIL.
 
 - [ ] **Step 3: Implement**
@@ -3185,7 +3287,7 @@ Add that after the listener stops, keeping the existing body. The launcher's SSE
 
 - [ ] **Step 4: Run them and see them pass; run the ratchets (the group is still empty)**
 
-Run: `npx jest src/__tests__/unit/debugger/ server/src/__tests__/ src/__tests__/unit/toolSurface.test.ts src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts`
+Run: `npx jest src/__tests__/unit/debugger/ src/__tests__/unit/toolSurface.test.ts src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts && (cd server && npx jest)`
 Expected: PASS.
 
 - [ ] **Step 5: Commit**
@@ -3253,7 +3355,7 @@ class Fake {
   constructor(readonly n: number) {
     this.state.attach({
       holdsState: () => this.held,
-      dispose: async () => { this.disposed++; if (this.failDispose) throw new Error('listener still up'); this.set(false); },
+      dispose: async () => { this.disposed++; if (this.failDispose) throw new Error('listener still up'); this.held = false; },
       describe: () => (this.held ? [{ kind: 'abap' }] : []),
       observe: (f) => { this.notify = f; },
     });
@@ -3347,6 +3449,45 @@ describe('InstancePool', () => {
     await pool.serve({ owner: 'B' }, create, async (i) => { expect(() => i.state.admit('abap')).not.toThrow(); });
   });
 
+  it('a reservation in progress holds the slot: a concurrent start of the owner is told the holder', async () => {
+    const pool = new InstancePool<Fake>();
+    const g = gate();
+    let firstHandle = '';
+    const first = pool.serve({ owner: 'A' }, create, async (i) => { i.state.admit('abap'); firstHandle = i.stateHandle; await g.p; i.set(true); });
+    await tick();
+    await pool.serve({ owner: 'A' }, create, async (i) => { expect(() => i.state.admit('abap')).toThrow(firstHandle); });
+    g.open();
+    await first;
+  });
+
+  it('a failed start releases its slot', async () => {
+    const pool = new InstancePool<Fake>();
+    await pool.serve({ owner: 'A' }, create, async (i) => { i.state.admit('abap'); /* nothing held: the start failed */ });
+    await pool.serve({ owner: 'A' }, create, async (i) => { expect(() => i.state.admit('abap')).not.toThrow(); });
+  });
+
+  it('an instance emptied during its own request is disposed once, after the request', async () => {
+    const pool = new InstancePool<Fake>();
+    const held = await holding(pool);
+    let disposedDuringWork = -1;
+    await pool.serve({ handle: held.stateHandle, owner: 'A' }, create, async (i) => { i.set(false); await tick(); disposedDuringWork = i.disposed; });
+    expect(disposedDuringWork).toBe(0);
+    expect(held.disposed).toBe(1);
+    expect(pool.size()).toBe(0);
+  });
+
+  it('a disposal that fails keeps the instance; shutdown retries and reports what still failed', async () => {
+    const pool = new InstancePool<Fake>();
+    const held = await holding(pool);
+    held.failDispose = true;
+    held.set(false);                                  // empties: eviction runs and fails
+    await tick();
+    expect(pool.size()).toBe(1);                      // kept for a retry
+    held.failDispose = false;
+    expect(await pool.shutdown()).toEqual([]);        // the retry succeeded
+    expect(pool.size()).toBe(0);
+  });
+
   it('shutdown stops admission, waits for an active lease, disposes held instances and reports failures', async () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
@@ -3368,7 +3509,7 @@ describe('InstancePool', () => {
 
 - [ ] **Step 2: Run them and see them fail**
 
-Run: `npx jest server/src/__tests__/InstancePool.test.ts`
+Run: `cd server && npx jest src/__tests__/InstancePool.test.ts`
 Expected: FAIL, "Cannot find module".
 
 The server imports lib only through its published subpaths (`server/tsconfig.json` `rootDir` is `server/src`). The `@mcp-abap-adt/lib/state` path and jest mapping were added in Task 7. Run `npm run build` before these tests so `dist` holds the state module.
@@ -3385,8 +3526,10 @@ The server imports lib only through its published subpaths (`server/tsconfig.jso
  * poll, an attach within seconds, the attaching ABAP session; over RFC nothing
  * carries that session to another connection). So per request the host takes
  * an instance once: the one the request's `state_handle` names, when the owner
- * matches, or a new one. One transport at a time per instance (the SDK binds
- * one). An instance that holds nothing is disposed; nothing expires on a clock.
+ * matches, or a new one. One request at a time per instance (the SDK binds one
+ * transport). Slots hold the per-owner limit; a reservation in progress counts.
+ * An instance that holds nothing is disposed once, after its work; a disposal
+ * that fails keeps the instance for a retry. Nothing expires on a clock.
  */
 import type { InstanceState, StateDescription, StateHost } from '@mcp-abap-adt/lib/state';
 
@@ -3405,12 +3548,16 @@ export function handleOf(body: unknown): string | undefined {
 }
 
 interface Held<T> { instance: T; owner: string; tail: Promise<unknown> }
+interface Slot<T> { instance: T; pending: boolean }
 
 export class InstancePool<T extends Poolable> {
-  private readonly held = new Map<T, Held<T>>();                // by instance
-  private readonly slots = new Map<string, T>();                // `${owner}|${kind}` → holder
+  private readonly held = new Map<T, Held<T>>();
+  private readonly slots = new Map<string, Slot<T>>();          // `${owner}|${kind}`
+  private readonly busy = new Map<T, number>();                 // requests working on an instance
+  private readonly subscribed = new WeakSet<object>();
+  private readonly evicting = new Map<T, Promise<void>>();
+  private readonly failed = new Map<T, string>();               // disposal failed: kept for a retry
   private readonly active = new Set<Promise<unknown>>();
-  private readonly disposalFailures: string[] = [];
   private admitting = true;
 
   size(): number { return this.held.size; }
@@ -3426,9 +3573,10 @@ export class InstancePool<T extends Poolable> {
       reserve: (kind) => {
         if (owner === null) return undefined;
         const key = `${owner}|${kind}`;
-        const holder = this.slots.get(key);
-        if (holder && holder !== instance && holder.holdsState()) return holder.stateHandle;
-        this.slots.set(key, instance);
+        const slot = this.slots.get(key);
+        const occupied = slot && slot.instance !== instance && (slot.pending || slot.instance.state.kindsHeld().includes(kind));
+        if (occupied) return slot.instance.stateHandle;
+        this.slots.set(key, { instance, pending: true });
         return undefined;
       },
       peers: () => {
@@ -3447,47 +3595,74 @@ export class InstancePool<T extends Poolable> {
     try { await run; } finally { this.active.delete(run); }
   }
 
-  private async route(request: { handle?: string; owner: string | null }, create: () => T, work: (instance: T) => Promise<void>): Promise<void> {
+  private route(request: { handle?: string; owner: string | null }, create: () => T, work: (instance: T) => Promise<void>): Promise<void> {
     const entry = request.handle ? this.byHandle(request.handle) : undefined;
-    if (!entry || entry.owner !== request.owner) return this.fresh(request.owner, create(), work);
-    const turn = entry.tail.then(async () => {
-      // Revalidate: the instance may have left the pool while this request waited.
-      if (this.held.get(entry.instance) !== entry) return this.fresh(request.owner, create(), work);
-      entry.instance.state.host = this.hostFor(request.owner, entry.instance);
-      try { await work(entry.instance); } finally { await this.settle(entry.instance, request.owner); }
-    });
+    if (!entry || entry.owner !== request.owner) return this.run(create(), request.owner, work);
+    const turn = entry.tail.then(() =>
+      // Revalidate: the instance may have left the pool, or be leaving it, while this request waited.
+      this.held.get(entry.instance) === entry && !this.evicting.has(entry.instance)
+        ? this.run(entry.instance, request.owner, work)
+        : this.run(create(), request.owner, work),
+    );
     entry.tail = turn.catch(() => undefined);
     return turn;
   }
 
-  private async fresh(owner: string | null, instance: T, work: (instance: T) => Promise<void>): Promise<void> {
+  private async run(instance: T, owner: string | null, work: (instance: T) => Promise<void>): Promise<void> {
+    if (!this.subscribed.has(instance)) {
+      this.subscribed.add(instance);
+      instance.state.onEmpty(() => { if (!this.busy.get(instance)) void this.evict(instance); });
+    }
     instance.state.host = this.hostFor(owner, instance);
-    try { await work(instance); } finally { await this.settle(instance, owner); }
+    this.busy.set(instance, (this.busy.get(instance) ?? 0) + 1);
+    try { await work(instance); } finally {
+      this.busy.set(instance, (this.busy.get(instance) ?? 1) - 1);
+      await this.settle(instance, owner);
+    }
   }
 
-  /** After a request: keep what holds state, dispose the rest. */
+  /** After a request: slots of kinds not held are released; what holds state is kept; the rest is disposed. */
   private async settle(instance: T, owner: string | null): Promise<void> {
+    const kinds = instance.state.kindsHeld();
+    for (const [key, slot] of this.slots) {
+      if (slot.instance !== instance) continue;
+      slot.pending = false;
+      if (!kinds.includes(key.slice(key.lastIndexOf('|') + 1))) this.slots.delete(key);
+    }
     if (instance.holdsState() && owner !== null) {
-      if (!this.held.has(instance)) {
-        this.held.set(instance, { instance, owner, tail: Promise.resolve() });
-        instance.state.onEmpty(() => void this.evict(instance));
-      }
+      if (!this.held.has(instance)) this.held.set(instance, { instance, owner, tail: Promise.resolve() });
       return;
     }
-    await this.evict(instance);
+    if (!this.busy.get(instance)) await this.evict(instance);
   }
 
-  private async evict(instance: T): Promise<void> {
-    this.held.delete(instance);
-    for (const [key, holder] of this.slots) if (holder === instance) this.slots.delete(key);
-    await instance.dispose().catch((e) => this.disposalFailures.push(`${instance.stateHandle}: ${e instanceof Error ? e.message : String(e)}`));
+  /** Once per instance: dispose it; on success it leaves the pool, on failure it stays for a retry. */
+  private evict(instance: T): Promise<void> {
+    const running = this.evicting.get(instance);
+    if (running) return running;
+    const eviction = (async () => {
+      try {
+        await instance.dispose();
+        this.failed.delete(instance);
+        this.held.delete(instance);
+        for (const [key, slot] of this.slots) if (slot.instance === instance) this.slots.delete(key);
+      } catch (e) {
+        this.failed.set(instance, `${instance.stateHandle}: ${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        this.evicting.delete(instance);
+      }
+    })();
+    this.evicting.set(instance, eviction);
+    return eviction;
   }
 
+  /** Stop admission, let running requests and disposals finish, dispose what is held; what still failed. */
   async shutdown(): Promise<string[]> {
     this.admitting = false;
     await Promise.allSettled([...this.active]);
+    await Promise.allSettled([...this.evicting.values()]);
     for (const instance of [...this.held.keys()]) await this.evict(instance);
-    return this.disposalFailures.splice(0);
+    return [...this.failed.values()];
   }
 }
 ```
@@ -3496,7 +3671,7 @@ An instance with state but a `null` owner is never kept. It cannot get state any
 
 - [ ] **Step 4: Run them and see them pass**
 
-Run: `npx jest server/src/__tests__/InstancePool.test.ts`
+Run: `cd server && npx jest src/__tests__/InstancePool.test.ts`
 Expected: PASS.
 
 - [ ] **Step 5: Use the pool in `StreamableHttpServer`**
@@ -3515,19 +3690,26 @@ Rework the request handler (l.164-240) in this order:
 ```ts
         await this.pool.serve({ handle, owner }, () => this.createPerRequestServer(), async (server) => {
           const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: this.enableJsonResponse });
-          const responded = new Promise<void>((resolve) => { res.once('close', () => resolve()); res.once('finish', () => resolve()); });
+          let transportClosed: Promise<void> | undefined;
+          const closeTransport = () => (transportClosed ??= transport.close().catch(() => undefined));
+          const disconnected = new Promise<void>((resolve) => res.once('close', () => { void closeTransport(); resolve(); }));
           try {
             // the existing connection-context block, on `server`: the request's own credentials, every time
             await server.connect(transport);
-            await runWithRequestContext(requestContextFromHeaders(req.headers), () => transport.handleRequest(req, res, req.body));
-            await responded;              // the lease lasts until the response is done…
+            const dispatch = runWithRequestContext(requestContextFromHeaders(req.headers), () => transport.handleRequest(req, res, req.body));
+            // JSON mode answers when the handler has; SSE mode when the stream ends. A client that
+            // disconnects first must not hold the lease on a dispatch that waits for a handler.
+            await Promise.race([dispatch.catch(() => undefined), disconnected]);
           } finally {
-            await transport.close();      // …and the transport goes, so the next request can bind its own
+            await closeTransport();
+            // The instance goes back only when its tool handlers have settled: they do not consume
+            // the transport's abort signal (a debugger wait finishes its own bounded hold).
+            await server.idle();
           }
         });
 ```
 
-Here `this.pool = new InstancePool<PerRequestServer>()`, and `PerRequestServer` exposes `state`, `stateHandle`, `holdsState()` and `dispose()` from `BaseMcpServer`.
+Here `this.pool = new InstancePool<PerRequestServer>()`, and `PerRequestServer` exposes `state`, `stateHandle`, `holdsState()`, `dispose()` and `idle()` from `BaseMcpServer` (Task 7).
 
 The SDK aborts a handler's signal when its transport closes. The background listener is not a request handler and does not consume those signals (checked: `protocol.js:252-268`), so a transport close after a response does not touch it.
 
@@ -3558,9 +3740,10 @@ Over real HTTP, open a new SDK `StreamableHTTPClientTransport` client per call, 
 2. Echo with another handle: `state is not available`.
 3. Gate, then Echo at once: Echo answers only after the test opens the gate. This proves the lease order.
 4. Release, then Echo with the old handle: not available, and the pool size is 0.
-5. Hold, then `server.stop()`: the instance was disposed.
+5. **A client that disconnects during a held request.** Gate, then abort the client's request (`AbortController` on its fetch) while the gate is closed. The server's transport is closed at once (spy on `close`). A second Echo with the handle waits until the test opens the gate, because the lease lasts until the handler settled. This runs in both JSON and SSE modes.
+6. Hold, then `server.stop()`: the instance was disposed.
 
-Run: `npx jest server/src/__tests__/streamableHttpPool.test.ts`
+Run: `cd server && npx jest src/__tests__/streamableHttpPool.test.ts`
 Expected: PASS.
 
 - [ ] **Step 7: Commit**
@@ -3658,8 +3841,8 @@ To make that work, change `debugStateAnswer`'s third parameter (Task 7) from a f
 | `DebugDeleteWatchpoint` | `...STATE_HANDLE_PROPERTY`, `watchpoint_id: {type:'string'}` | `Removes a watchpoint.` | `debugAnswer(args, async () => { await U.abap.deleteWatchpoint(String(args.watchpoint_id)); return { value: { deleted: args.watchpoint_id }, raw: '' }; }, (v) => v)` |
 | `DebugGetMemorySizes` | `...STATE_HANDLE_PROPERTY` | `Memory the stopped debuggee uses. Needs a stopped debuggee.` | `debugAnswer(args, async () => U.abap.getMemorySizes(), readXmlDocument, readXmlDocument)` |
 | `DebugCreateMemorySnapshot` | `...STATE_HANDLE_PROPERTY` | `Writes a memory snapshot of the stopped debuggee and answers the file written.` | `debugAnswer(args, async () => U.abap.createMemorySnapshot(), readXmlDocument, readXmlDocument)` |
-| `DebugStop` | `...STATE_HANDLE_PROPERTY` | `Ends a debug session — ABAP and AMDP: releases a stopped debuggee, removes its breakpoints, stops listening, closes its connections; what could not be undone is reported and stays for another stop.` | `debugAnswer(args, async () => { await U.stop(); context.state!.rotateIfEmpty(); return { value: { state: 'idle' }, raw: '' }; }, (v) => v)` |
-| `DebugListSessions` | none | `Debug sessions this server holds for the caller, with their handles, kinds, states and SAP ids.` | `debugAnswer(args, async () => { if (!context.state) throw new Error('debugging is not served by this server'); const l = context.state.host?.peers() ?? (context.state.holdsState() ? [context.state.describe()] : []); return { value: l, raw: JSON.stringify(l) }; }, (v) => v)` |
+| `DebugStop` | `...STATE_HANDLE_PROPERTY` | `Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes the connections; what could not be undone stays for another stop.` | `debugAnswer(args, async () => { const d = requireDebugger(context, args, 'use'); context.state!.endWhenEmpty(); await d.stop(); return { value: { state: 'stopped' }, raw: '' }; }, (v) => v)` |
+| `DebugListSessions` | none | `Debug sessions this server holds for the caller.` | `debugAnswer(args, async () => { if (!context.state) throw new Error('debugging is not served by this server'); const l = context.state.host?.peers() ?? (context.state.holdsState() ? [context.state.describe()] : []); return { value: l, raw: JSON.stringify(l) }; }, (v) => v)` |
 
 Write `U` out in each file as `requireDebugger(context, args, 'use')`, inside the work.
 
@@ -3735,6 +3918,17 @@ describe('debugger handlers', () => {
     expect(waited.at.include).toBe('ZCL_CV_DBG_MEASURE============CM002');
     expect(waited.frames).toHaveLength(5);
     expect((await handleDebugGetStack(context as any, { state_handle: state.handle, detail: 'raw' })).content[0].text).toContain('<dbg:stack');
+  });
+
+  it('every detail of the start answers the state handle', async () => {
+    for (const detail of ['terse', 'full', 'raw']) {
+      const { world, state, context } = install();
+      const started = handleDebugStartListener(context as any, { detail });
+      await until(() => world.polls.length === 1);
+      world.polls[0].resolve(LISTEN_NOTHING());
+      const r: any = await started;
+      expect(r.content.map((c: any) => c.text).join('\n')).toContain(state.handle);
+    }
   });
 
   it("a line breakpoint's URI is built from type, name and line", async () => {
@@ -3932,7 +4126,7 @@ Rules for every tool in the table: the description starts with `[debug] ` and st
 
 | Tool | Properties besides detail | Description after `[debug] ` | Body |
 |---|---|---|---|
-| `AmdpDebugStart` | `stop_existing: {type:'boolean', default:false, description:'Ends an AMDP debug session of this user left behind.'}`, `...AMDP_BREAKPOINTS_PROPERTY` (required), `...RUN_PROPERTY` | `Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. ${USER_MODE_SENTENCE}` | `debugAnswer(args, async () => { const d = requireDebugger(context, args, { create: 'amdp' }); const r = await d.amdp.start({ stopExisting: args.stop_existing === true, breakpoints: amdpBreakpointsFromArgs(args.breakpoints), run: runFromArgs(args.run) }); return { value: { state_handle: context.state!.handle, ...r }, raw: JSON.stringify(r) }; }, (v) => v)` |
+| `AmdpDebugStart` | `stop_existing: {type:'boolean', default:false, description:'Ends an AMDP debug session of this user left behind.'}`, `...AMDP_BREAKPOINTS_PROPERTY` (required), `...RUN_PROPERTY` | `Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. ${USER_MODE_SENTENCE}` | `debugAnswer(args, async () => { const d = requireDebugger(context, args, { create: 'amdp' }); const r = await d.amdp.start({ stopExisting: args.stop_existing === true, breakpoints: amdpBreakpointsFromArgs(args.breakpoints), run: runFromArgs(args.run) }); return { value: r, raw: JSON.stringify(r) }; }, (v) => v, (v) => v, () => ({ state_handle: context.state!.handle }))` |
 | `AmdpDebugSetBreakpoints` | `...STATE_HANDLE_PROPERTY`, `...AMDP_BREAKPOINTS_PROPERTY` | `Replaces the AMDP breakpoints of a debug session, as confirmed by the system. ${USER_MODE_SENTENCE}` | `debugAnswer(args, () => requireDebugger(context, args, 'use').amdp.setBreakpoints(amdpBreakpointsFromArgs(args.breakpoints)), (v) => ({ breakpoints: v }))` |
 | `AmdpDebugWait` | `...STATE_HANDLE_PROPERTY`, `...HOLD_SECONDS_PROPERTY` | `AMDP events of a debug session after waiting up to hold_seconds.` | `debugAnswer(args, async () => { const s = await requireDebugger(context, args, 'use').amdp.wait(Number(args.hold_seconds ?? 10)); return { value: s, raw: s.state === 'event' ? s.events.map((e) => e.body).join('\n') : JSON.stringify(s) }; }, (s) => (s.state === 'event' ? { state: 'event', events: s.events.map(terseAmdpEvent) } : s))` |
 | `AmdpDebugStep` | `...STATE_HANDLE_PROPERTY`, `action: {type:'string', enum:['over','continue']}` | `Steps the stopped AMDP debuggee over a statement or on to the next stop.` | `debugAnswer(args, () => requireDebugger(context, args, 'use').amdp.step(args.action === 'over' ? 'over' : 'continue'), (v) => ({ state: v }))` |
@@ -4013,7 +4207,7 @@ git commit -m "feat(debugger): AMDP debugger tools"
 | `HandlerDebugStart` | `kind*: abap\|amdp`, `breakpoints*` (abap: `BREAKPOINTS_PROPERTY` items; amdp: `{object_name, line}`), `take_over?`, `run?`, `detail` | `Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. take_over: abap — ${TAKE_OVER_SENTENCE}; amdp — ends an AMDP session of this user left behind. ${USER_MODE_SENTENCE}` | abap: as the ABAP listener start with `take_over ? 'takeOver' : 'refuse'` (`requireDebugger(context, args, {create:'abap'})`). amdp: as the AMDP start, mapping `{object_name, line}` to `{class_name, line}` (`{create:'amdp'}`). Refused when the instance already holds the other kind. |
 | `HandlerDebugWait` | `state_handle*`, `hold_seconds?`, `detail` | `State of a debug session after waiting up to hold_seconds; for AMDP, its events.` | AMDP: as `AmdpDebugWait`; else as `DebugWait`. |
 | `HandlerDebugView` | `state_handle*`, `what*: stack\|variables\|memory\|table`, `names?`, `detail` | `The stopped debuggee: stack, variables (by name, or the scopes), memory, or an AMDP table variable's rows.` | `stack` → `abap.getStack` + `terseStop`; `variables` → `getVariables(names)` or `getChildVariables(['@ROOT'])`; `memory` → `getMemorySizes` + `readXmlDocument`; `table` → `amdp.getTable(names[0])`. |
-| `HandlerDebugStep` | `state_handle*`, `action*: into\|over\|return\|continue\|run_to_line\|jump_to_line\|terminate\|stop`, `line?`, `object_type?`, `object_name?`, `include?`, `parent_name?`, `detail` | `Moves the stopped debuggee (into, over, return, continue, run or jump to a line), ends it where it stands, or ends the debug session.` | AMDP: `over`/`continue` → `amdp.step`, `terminate` → `cancel`, `stop` → `instance.stop()` then `context.state.rotateIfEmpty()`. ABAP: the four steps → `step`; `run_to_line`/`jump_to_line` → `stepToLine(lineUriOf(target, line))`, where `target` is the given object or, when none is given, `addressOf(top frame uri)` — refused if that is undefined; `terminate` → `terminate`; `stop` → `instance.stop()` then `context.state.rotateIfEmpty()`. |
+| `HandlerDebugStep` | `state_handle*`, `action*: into\|over\|return\|continue\|run_to_line\|jump_to_line\|terminate\|stop`, `line?`, `object_type?`, `object_name?`, `include?`, `parent_name?`, `detail` | `Moves the stopped debuggee (into, over, return, continue, run or jump to a line), ends it where it stands, or ends the debug session.` | AMDP: `over`/`continue` → `amdp.step`, `terminate` → `cancel`, `stop` → `context.state.endWhenEmpty()` then `instance.stop()`. ABAP: the four steps → `step`; `run_to_line`/`jump_to_line` → `stepToLine(lineUriOf(target, line))`, where `target` is the given object or, when none is given, `addressOf(top frame uri)` — refused if that is undefined; `terminate` → `terminate`; `stop` → `context.state.endWhenEmpty()` then `instance.stop()`. |
 
 `compact/src/launcher.ts`:
 
@@ -4341,21 +4535,33 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | | 7 | owner index, slots, `peers` |
 | | 8 | a lease revalidates its entry |
 | | 9 | transport close in `finally`, after the response |
-| | 11 | `rotateIfEmpty` |
+| | 11 | `endWhenEmpty` |
 | | 12 | a start rolls back what it armed |
 | | 13 | Task 15 |
 | | 14, 17 | the `override` proxy; reads indexed relative; gated tests |
 | | 15 | sync correlated apart; the step–break race |
 | | 16 | descriptions |
 
+| Fourth (on `3f12c5eb`) | 1 (empty-state notifications) | `InstanceState.attach` samples the part, `dispose` reconciles, `changed` updates before telling; sessions notify after every change (`mutate`) and when `report()` consumes |
+| | 2 (reservations) | a pending reservation holds the slot; slots are released per kind after each request |
+| | 3 (eviction vs leases) | one `onEmpty` subscription per instance; eviction waits for the instance's requests; one disposal at a time |
+| | 4 (failed or unfinished disposal) | a failed instance stays held for a retry; `shutdown` drains disposals and retries them |
+| | 5 (asynchronous AMDP end) | `InstanceState.endWhenEmpty`: the handle is invalidated when the last part empties, synchronously or later |
+| | 6 (final-batch cleanup) | `unreleased` and `stopped` are kept on `closing`; `stop()` retries; an event-read failure goes through the same path; the breakpoint clear is checked |
+| | 7 (raw start answers) | `debugAnswer(…, extraOf)`: under raw, the handle is a block of its own beside SAP's document |
+| | 8 (disconnect during dispatch) | dispatch races the disconnect; the transport closes at once; `BaseMcpServer.idle()` holds the lease until the handlers settle; tested in JSON and SSE modes |
+| | 9 (exceptions after arming) | placements are recorded at once; the whole start after arming rolls back |
+| | 10 (server jest mapping) | `server/package.json` gains `/state` and `/debugger`; server tests run from `server/` |
+| | 11 (descriptions) | `DebugStop` and `DebugListSessions` no longer list their answer |
+
 **Placeholders.** The only `<…>` tokens are in run commands, where local config and scratchpad values go. They are deliberately not written down: plans name no system.
 
 **Type consistency.**
-- `InstanceState`: `handle`, `holdsState`, `describe`, `admit`, `check`, `rotateIfEmpty`, `onEmpty`, `dispose`, `host`.
+- `InstanceState`: `handle`, `holdsState`, `describe`, `admit`, `check`, `endWhenEmpty`, `onEmpty`, `dispose`, `host`.
 - `StateHost`: `owner`, `reserve`, `peers`.
 - `DebuggerInstance` (a `StatePart`): `abap`, `amdp`, `stop`, `dispose`, `describe`, `observe`.
 - `DebugSession`: `start(mode, {breakpoints, run})`, `wait`, `stop`, `holdsState`, `describe`, `observe`, `ids`.
 - `AmdpSession`: `start({stopExisting, breakpoints, run})`, `setBreakpoints`, `startRun`, `observe`.
 - `requireDebugger(context, args, {create} | 'use')`.
-- `debugAnswer(args, work, terse, full?)` and `debugStateAnswer(args, work, extraOf?)`.
+- `debugAnswer(args, work, terse, full?, extraOf?)` and `debugStateAnswer(args, work, extraOf?)`.
 - `InstancePool.serve({handle, owner}, create, work)` and `shutdown()`.

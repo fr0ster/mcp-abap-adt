@@ -148,5 +148,29 @@
     "name": "HandlerGetData",
     "inputs": "object_name, sql_query, max_rows",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDebugStart",
+    "inputs": "kind*, breakpoints*, take_over, run, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDebugWait",
+    "inputs": "state_handle*, hold_seconds, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDebugView",
+    "inputs": "state_handle*, what*, names, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDebugStep",
+    "inputs": "state_handle*, action*, object_type, object_name, line, include, parent_name, detail",
+    "available_in": "cloud, onprem"
   }
 ]

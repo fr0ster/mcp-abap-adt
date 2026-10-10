@@ -6,6 +6,7 @@
     "paths": {
       "@mcp-abap-adt/lib": ["../dist/index.d.ts"],
       "@mcp-abap-adt/lib/handlers": ["../dist/lib/handlers/index.d.ts"],
+      "@mcp-abap-adt/lib/compact-shared": ["../dist/lib/compact/index.d.ts"],
       "@mcp-abap-adt/lib/config": ["../dist/lib/config/index.d.ts"],
       "@mcp-abap-adt/lib/debugger": ["../dist/lib/debugger/index.d.ts"],
       "@mcp-abap-adt/lib/state": ["../dist/lib/state/index.d.ts"],

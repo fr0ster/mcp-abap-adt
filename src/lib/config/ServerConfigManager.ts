@@ -202,7 +202,7 @@ export class ServerConfigManager {
   /**
    * Parse handler exposition from command line
    * Format: --exposition=readonly,high — a comma-separated list of
-   * `readonly`, `high` and `low`, of which `high` and `low` are mutually
+   * `readonly`, `high`, `low` and `debug`, of which `high` and `low` are mutually
    * exclusive (`validateExposition` refuses the pair).
    *
    * `compact` is still ACCEPTED here on purpose, so `validateExposition` can refuse
@@ -219,7 +219,11 @@ export class ServerConfigManager {
       .map((s) => s.trim())
       .filter(
         (s): s is HandlerSet =>
-          s === 'readonly' || s === 'high' || s === 'low' || s === 'compact',
+          s === 'readonly' ||
+          s === 'high' ||
+          s === 'low' ||
+          s === 'compact' ||
+          s === 'debug',
       );
   }
 
@@ -234,7 +238,7 @@ export class ServerConfigManager {
     return `
 HANDLER EXPOSITION:
   --exposition=<sets>              Comma-separated handler sets to expose
-                                   Options: readonly, high, low
+                                   Options: readonly, high, low, debug
                                    Default: readonly,high
 
                                    Handler Sets:
@@ -245,6 +249,9 @@ HANDLER EXPOSITION:
                                                (safe create/update via ADT)
                                    - low:      Update*Low, Delete*, Activate*
                                                (direct/dangerous operations)
+                                   - debug:    the debugger tools; opt-in, never part of the
+                                               default. A breakpoint or a listener catches
+                                               every request of the connected SAP user
                                    - search:   SearchObject (included with readonly)
                                    - system:   GetWhereUsed, GetTypeInfo, GetObjectInfo,
                                                GetAbapAST, GetSession, etc.
@@ -255,6 +262,7 @@ HANDLER EXPOSITION:
                                    --exposition=readonly,high  (readonly + high + search + system)
                                    --exposition=readonly,low   (readonly + low + search + system)
                                    --exposition=high           (high only, NO search/system)
+                                   --exposition=readonly,debug (readonly + debug + search + system)
 
                                    'high' and 'low' are mutually exclusive and the
                                    pair is refused at startup, so there is no value

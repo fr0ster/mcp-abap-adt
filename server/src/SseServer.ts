@@ -106,6 +106,8 @@ export class SseServer {
   private readonly postPath: string;
   private readonly defaultDestination?: string;
   private readonly sessions = new Map<string, SessionEntry>();
+  /** Disposals of closed sessions still running; stop() waits for them. */
+  private readonly closingSessions = new Set<Promise<string[]>>();
   /** Per-destination lock around the first connect: it serialises the first login. */
   private readonly firstConnect = new FirstConnectLock();
   private readonly logger: Logger;
@@ -257,13 +259,33 @@ export class SseServer {
    * Stops taking connections (shutdown, step 1). Requests already running are
    * not waited for, nor is an open stream: the factory's gate holds them.
    * Embedded on an external app, there is no listener of its own to stop.
+   * It then waits for the state of every session to be gone, and rejects with
+   * what could not be undone.
    */
   async stop(): Promise<void> {
     const server = this.standaloneServer;
-    if (!server) return;
-    this.standaloneServer = undefined;
-    server.close();
-    server.closeIdleConnections();
+    if (server) {
+      this.standaloneServer = undefined;
+      server.close();
+      server.closeIdleConnections();
+    }
+
+    // Every open session's instance is disposed, and the sessions that closed
+    // earlier are waited for (no timer): on an external app there is no
+    // listener here, but the sessions are still ours to drain.
+    const pending = [...this.closingSessions];
+    for (const [id, entry] of this.sessions) {
+      pending.push(
+        entry.server
+          .shutdownState()
+          .then((left) => left.map((l) => `${id}: ${l}`)),
+      );
+    }
+    this.sessions.clear();
+    const failures = (await Promise.all(pending)).flat();
+    if (failures.length) {
+      throw new Error(`state cleanup failed: ${failures.join('; ')}`);
+    }
   }
 
   private async handleGet(req: any, res: any): Promise<void> {
@@ -389,6 +411,18 @@ export class SseServer {
       this.sessions.delete(sessionId);
       void transport.close();
       void server.close();
+      // The session's instance is owned until its state is gone: it settles on its own (an AMDP
+      // session when its last event batch arrives); stop() waits for it.
+      const closing = server.shutdownState().then((left) => {
+        if (left.length) {
+          this.logger.error(
+            `[SSE CLOSE] state cleanup for session ${sessionId} left: ${left.join('; ')}`,
+          );
+        }
+        return left.map((l) => `${sessionId}: ${l}`);
+      });
+      this.closingSessions.add(closing);
+      void closing.finally(() => this.closingSessions.delete(closing));
     });
   }
 

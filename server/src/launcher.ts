@@ -17,6 +17,7 @@ import {
 import type { HandlerContext, IHandlerGroup } from '@mcp-abap-adt/lib/handlers';
 import {
   CompositeHandlersRegistry,
+  DebugHandlersGroup,
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -215,6 +216,11 @@ function showHelp(options: LauncherOptions = {}): void {
 export interface LauncherOptions {
   /** Built against the launcher's own base context, once, at startup. */
   extraGroups?: (context: HandlerContext) => IHandlerGroup[];
+  /**
+   * Groups whose tools hold state in the server instance (the compact facade's
+   * debugger tools). Built against the launcher's own base context, once.
+   */
+  statefulGroups?: (context: HandlerContext) => IHandlerGroup[];
   /** Overrides the configured exposition, for a command with a fixed tool list. */
   exposition?: readonly HandlerSet[];
   /** The command's own name, for USAGE in `--help`. */
@@ -531,6 +537,12 @@ export async function launch(
   if (exposition.includes('low')) {
     overridingGroups.push(new LowLevelHandlersGroup(baseContext));
   }
+  if (exposition.includes('debug')) {
+    overridingGroups.push(new DebugHandlersGroup(baseContext));
+  }
+  for (const group of options.statefulGroups?.(baseContext) ?? []) {
+    overridingGroups.push(group);
+  }
 
   for (const group of options.extraGroups?.(baseContext) ?? []) {
     overridingGroups.push(group);
@@ -614,7 +626,18 @@ export async function launch(
     // Under stdio a signal is not the end of input: the factory's gate holds.
     installShutdown({
       factory,
-      servers: [],
+      servers: [
+        {
+          // The instance owns what it holds (a listener, a session) until it is
+          // gone; the close waits for that and reports what was left.
+          close: async () => {
+            const left = await server.shutdownState();
+            if (left.length) {
+              throw new Error(`state cleanup failed: ${left.join('; ')}`);
+            }
+          },
+        },
+      ],
       onStdinEnd: true,
       exit: deps.exit,
       stderr: deps.stderr,

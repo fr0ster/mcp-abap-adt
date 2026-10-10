@@ -20,7 +20,7 @@ export interface YamlConfig {
   'allow-destination-header'?: boolean;
   'connection-type'?: string;
   'system-type'?: string;
-  // Handler sets: readonly, high, low. `compact` is recognised and refused —
+  // Handler sets: readonly, high, low, debug. `compact` is recognised and refused —
   // that facade is the @mcp-abap-adt/compact command.
   exposition?: string | string[];
   http?: {

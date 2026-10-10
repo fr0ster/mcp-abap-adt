@@ -26,6 +26,6 @@ export async function handleDebugGetStack(
   return debugAnswer(
     args,
     async () => requireDebugger(context, args, 'use').abap.getStack(),
-    (stop) => terseStop(stop.debuggee, stop.stack),
+    (stop) => terseStop(stop.debuggee, stop.stack, stop.attach),
   );
 }

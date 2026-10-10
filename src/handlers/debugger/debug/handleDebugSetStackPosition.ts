@@ -37,6 +37,6 @@ export async function handleDebugSetStackPosition(
       requireDebugger(context, args, 'use').abap.setStackPosition(
         args.position,
       ),
-    (s) => terseStop(s.debuggee, s.stack),
+    (s) => terseStop(s.debuggee, s.stack, s.attach),
   );
 }

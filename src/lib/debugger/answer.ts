@@ -75,7 +75,7 @@ export async function debugStateAnswer(
         >;
       return {
         ...rest,
-        ...terseStop(stop.debuggee, stop.stack),
+        ...terseStop(stop.debuggee, stop.stack, stop.attach),
         ...(stop.stackError ? { stack_error: stop.stackError } : {}),
       };
     },

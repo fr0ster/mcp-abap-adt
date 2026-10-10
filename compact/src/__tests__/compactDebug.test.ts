@@ -87,6 +87,12 @@ function fakeAbap(held: { on: boolean }) {
   const calls: Array<[string, ...unknown[]]> = [];
   const stop = {
     debuggee: { uri: URI, program: 'P', include: 'I', line: 9 },
+    attach: {
+      isPostMortem: false,
+      isNonExclusive: false,
+      isDebuggeeChanged: false,
+      reachedBreakpoints: [],
+    },
     stack: { cursor: 0, frames: [frame] },
   };
   const stopped = {

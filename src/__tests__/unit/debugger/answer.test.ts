@@ -1,5 +1,11 @@
+import { corpusBody } from '../../../lib/adtCorpus';
 import { debugAnswer, debugStateAnswer } from '../../../lib/debugger/answer';
 import { DebugListenerError } from '../../../lib/debugger/DebugSession';
+import {
+  readAttach,
+  readDebuggee,
+  readStack,
+} from '../../../lib/debugger/readings';
 
 describe('debug answers', () => {
   const view = { value: { a: 1, b: 2 }, raw: '<x/>' };
@@ -89,5 +95,37 @@ describe('debug answers', () => {
       state: 'listening',
       state_handle: 'H',
     });
+  });
+  it('a stop answer names the flags SAP raised under terse and carries them all under full (debugger-run-to-line--02-listen, --03-attach, --04-stack)', async () => {
+    const stop = {
+      debuggee: readDebuggee(
+        corpusBody('debugger-run-to-line--02-listen').replace(
+          '<IS_ATTACH_IMPOSSIBLE>false<',
+          '<IS_ATTACH_IMPOSSIBLE>true<',
+        ),
+      )!,
+      attach: readAttach(
+        corpusBody('debugger-run-to-line--03-attach').replace(
+          'isPostMortem="false"',
+          'isPostMortem="true"',
+        ),
+      ),
+      stack: readStack(corpusBody('debugger-run-to-line--04-stack')),
+      raw: { debuggee: '', attach: '', stack: '' },
+    };
+    const work = async () => ({ state: 'stopped' as const, stop });
+    const terse = JSON.parse(
+      (await debugStateAnswer({}, work)).content[0].text,
+    );
+    expect(terse).toMatchObject({
+      state: 'stopped',
+      attach_impossible: true,
+      is_post_mortem: true,
+    });
+    const full = JSON.parse(
+      (await debugStateAnswer({ detail: 'full' }, work)).content[0].text,
+    );
+    expect(full.stop.debuggee.attachImpossible).toBe(true);
+    expect(full.stop.attach.isPostMortem).toBe(true);
   });
 });

@@ -186,6 +186,43 @@ describe('DebugSession', () => {
     expect(world.closed).toHaveLength(1); // the attach connection
   });
 
+  it('a catch SAP says cannot be attached is not attached: ended, and the listener polls again (debugger-run-to-line--02-listen with IS_ATTACH_IMPOSSIBLE true)', async () => {
+    const world = fakeWorld();
+    const { session } = await listening(world);
+    world.polls[1].resolve(
+      okResponse(
+        corpusBody('debugger-run-to-line--02-listen').replace(
+          '<IS_ATTACH_IMPOSSIBLE>false<',
+          '<IS_ATTACH_IMPOSSIBLE>true<',
+        ),
+      ),
+    );
+    await until(() => world.polls.length === 3);
+    expect(await session.wait(0)).toMatchObject({
+      state: 'ended',
+      reason: 'attach_refused',
+      message: expect.stringMatching(/cannot be attached/),
+    });
+    expect(world.calls.some((c) => c.startsWith('attach:'))).toBe(false);
+  });
+
+  it('a step answer updates what the stop says of the session (debugger-conversation--17-stepinto with isDebuggeeChanged true)', async () => {
+    const { session, world } = await stopped();
+    world.stepAnswers.push(
+      okResponse(
+        corpusBody('debugger-conversation--17-stepinto').replace(
+          'isDebuggeeChanged="false"',
+          'isDebuggeeChanged="true"',
+        ),
+      ),
+    );
+    const state = await session.step('stepInto');
+    expect(state).toMatchObject({
+      state: 'stopped',
+      stop: { attach: { isDebuggeeChanged: true } },
+    });
+  });
+
   it('an attach that throws is a listener failure, not a silent stop', async () => {
     const world = fakeWorld();
     world.attachAnswers.push(async () => {

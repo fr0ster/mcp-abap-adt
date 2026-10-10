@@ -454,6 +454,16 @@ export class DebugSession<O = unknown> {
     rawDebuggee: string,
     generation: number,
   ): Promise<boolean> {
+    // SAP says this catch cannot be attached: report it as SAP decided instead of a failed attach.
+    // The listener goes on polling; the run continues as SAP decides.
+    if (debuggee.attachImpossible) {
+      this.notices.push({
+        state: 'ended',
+        reason: 'attach_refused',
+        message: 'the debuggee cannot be attached (SAP: attach impossible)',
+      });
+      return false;
+    }
     let connection: IAbapConnection | undefined;
     try {
       const identity = await this.identity();
@@ -586,6 +596,11 @@ export class DebugSession<O = unknown> {
     const stack = await stop.debugger.getStack();
     stop.view = {
       ...stop.view,
+      // The step answer does not carry isPostMortem; the stop's own stays.
+      attach: {
+        ...readAttach(bodyOf(answer)),
+        isPostMortem: stop.view.attach.isPostMortem,
+      },
       stack: stack.ok ? readStack(bodyOf(stack)) : stop.view.stack,
       ...(stack.ok
         ? { stackError: undefined }

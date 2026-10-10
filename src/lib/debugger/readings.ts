@@ -43,12 +43,42 @@ export interface DebuggeeReading {
   objectName: string;
   instance: string;
   kind: string;
+  /** SAP says this catch cannot be attached; the session does not try. */
+  attachImpossible: boolean;
+  /** Present when the catch is a short dump (post-mortem), not a breakpoint. */
+  dump?: DumpReading;
+  /** Which listener identity caught it (empty in every recorded catch). */
+  terminalId: string;
+  ideId: string;
+  /** Whether attaching needs the server routing. */
+  isSameServer: boolean;
+  canAdtCrossServer: boolean;
 }
+export interface DumpReading {
+  id: string;
+  uri: string;
+  date: string;
+  time: string;
+  host: string;
+  user: string;
+}
+/** A breakpoint SAP reached; the condition is set when SAP could not evaluate it. */
+export interface ReachedBreakpoint {
+  id: string;
+  unresolvableCondition?: string;
+  /** Meaning not evident from the corpus (empty in every recorded answer): kept as SAP sent it. */
+  unresolvableConditionErrorOffset?: string;
+}
+/** The attach answer, and the step answer, which carries the same session fields. */
 export interface AttachReading {
   debugSessionId: string;
   isSteppingPossible: boolean;
   isTerminationPossible: boolean;
-  reachedBreakpoints: string[];
+  isPostMortem: boolean;
+  isNonExclusive: boolean;
+  /** Only the step answer carries it. */
+  isDebuggeeChanged: boolean;
+  reachedBreakpoints: ReachedBreakpoint[];
 }
 export interface FrameReading {
   position: number;
@@ -93,6 +123,8 @@ export type DebuggeeEnd = 'debuggeeEnded' | 'terminateDebuggee';
 export function readDebuggee(xml: string): DebuggeeReading | undefined {
   const row = parse(xml)?.abap?.values?.DATA?.STPDA_DEBUGGEE?.[0];
   if (!row) return undefined;
+  const dumpId = text(row.DUMP_ID);
+  const dumpUri = text(row.DUMP_URI);
   return {
     debuggeeId: text(row.DEBUGGEE_ID),
     user: text(row.DEBUGGEE_USER),
@@ -104,17 +136,46 @@ export function readDebuggee(xml: string): DebuggeeReading | undefined {
     objectName: text(row.NAME),
     instance: text(row.INSTANCE_NAME),
     kind: text(row.DBGEE_KIND),
+    attachImpossible: bool(row.IS_ATTACH_IMPOSSIBLE),
+    ...(dumpId || dumpUri
+      ? {
+          dump: {
+            id: dumpId,
+            uri: dumpUri,
+            date: text(row.DUMP_DATE),
+            time: text(row.DUMP_TIME),
+            host: text(row.DUMP_HOST),
+            user: text(row.DUMP_UNAME),
+          },
+        }
+      : {}),
+    terminalId: text(row.TERMINAL_ID),
+    ideId: text(row.IDE_ID),
+    isSameServer: bool(row.IS_SAME_SERVER),
+    canAdtCrossServer: bool(row.CAN_ADT_CROSS_SERVER),
   };
 }
 
 export function readAttach(xml: string): AttachReading {
-  const a = parse(xml)?.attach ?? {};
-  const reached = a.reachedBreakpoints?.breakpoint ?? [];
+  const doc = parse(xml);
+  const a = doc?.attach ?? doc?.step ?? {};
+  const reached: Node[] = a.reachedBreakpoints?.breakpoint ?? [];
   return {
     debugSessionId: text(a.debugSessionId),
     isSteppingPossible: bool(a.isSteppingPossible),
     isTerminationPossible: bool(a.isTerminationPossible),
-    reachedBreakpoints: reached.map((b: Node) => text(b.id)),
+    isPostMortem: bool(a.isPostMortem),
+    isNonExclusive: bool(a.isNonExclusive),
+    isDebuggeeChanged: bool(a.isDebuggeeChanged),
+    reachedBreakpoints: reached.map((b) => {
+      const condition = text(b.unresolvableCondition);
+      const offset = text(b.unresolvableConditionErrorOffset);
+      return {
+        id: text(b.id),
+        ...(condition ? { unresolvableCondition: condition } : {}),
+        ...(offset ? { unresolvableConditionErrorOffset: offset } : {}),
+      };
+    }),
   };
 }
 
@@ -221,7 +282,15 @@ export function placeOf(frame: FrameReading): PlaceReading {
   };
 }
 
-export function terseStop(debuggee: DebuggeeReading, stack: StackReading) {
+/**
+ * Terse shortens by count, never by precision: a flag SAP raised is always named,
+ * one it did not raise is left out.
+ */
+export function terseStop(
+  debuggee: DebuggeeReading,
+  stack: StackReading,
+  attach: AttachReading,
+) {
   const top = stack.frames[0];
   const at: PlaceReading = top
     ? placeOf(top)
@@ -234,7 +303,33 @@ export function terseStop(debuggee: DebuggeeReading, stack: StackReading) {
         include: debuggee.include,
         include_line: debuggee.line,
       };
-  return { at, frames: stack.frames.slice(0, 5).map(placeOf) };
+  const unresolvable = attach.reachedBreakpoints.filter(
+    (b) => b.unresolvableCondition,
+  );
+  return {
+    at,
+    frames: stack.frames.slice(0, 5).map(placeOf),
+    ...(debuggee.attachImpossible ? { attach_impossible: true } : {}),
+    ...(debuggee.dump ? { dump: debuggee.dump } : {}),
+    // DEBUGGEE is the ordinary catch (every recorded one); any other kind relates to the dump.
+    ...(debuggee.kind && debuggee.kind !== 'DEBUGGEE'
+      ? { kind: debuggee.kind }
+      : {}),
+    ...(attach.isPostMortem ? { is_post_mortem: true } : {}),
+    ...(attach.isNonExclusive ? { is_non_exclusive: true } : {}),
+    ...(attach.isDebuggeeChanged ? { is_debuggee_changed: true } : {}),
+    ...(unresolvable.length
+      ? {
+          unresolvable_conditions: unresolvable.map((b) => ({
+            id: b.id,
+            condition: b.unresolvableCondition,
+            ...(b.unresolvableConditionErrorOffset
+              ? { error_offset: b.unresolvableConditionErrorOffset }
+              : {}),
+          })),
+        }
+      : {}),
+  };
 }
 
 export function terseVariables(r: VariablesReading) {

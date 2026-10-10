@@ -74,7 +74,7 @@ export async function handleHandlerDebugView(
             return debugAnswer(
               args,
               async () => d.abap.getStack(),
-              (stop) => terseStop(stop.debuggee, stop.stack),
+              (stop) => terseStop(stop.debuggee, stop.stack, stop.attach),
             );
           case 'variables': {
             const names = args.names?.length ? args.names : undefined;

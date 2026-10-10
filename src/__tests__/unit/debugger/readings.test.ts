@@ -112,6 +112,7 @@ describe('readings of the debugger documents (recorded answers)', () => {
     const t = terseStop(
       readDebuggee(corpusBody('debugger-run-to-line--02-listen'))!,
       readStack(corpusBody('debugger-run-to-line--04-stack')),
+      readAttach(corpusBody('debugger-run-to-line--03-attach')),
     );
     expect(t.at).toEqual({
       address: {
@@ -141,6 +142,120 @@ describe('readings of the debugger documents (recorded answers)', () => {
       ),
     ).toEqual([
       { id: 'LV_COUNTER', name: 'LV_COUNTER', type: 'I', value: '241' },
+    ]);
+  });
+});
+
+describe('fields SAP answers that were dropped (recorded answers)', () => {
+  const LISTEN = 'debugger-run-to-line--02-listen';
+  const ATTACH = 'debugger-run-to-line--03-attach';
+  const STEP = 'debugger-conversation--17-stepinto';
+  const stack = () => readStack(corpusBody('debugger-run-to-line--04-stack'));
+
+  it('the catch: attach possibility, listener identity and server routing (debugger-run-to-line--02-listen)', () => {
+    const d = readDebuggee(corpusBody(LISTEN))!;
+    expect(d.attachImpossible).toBe(false);
+    expect(d.terminalId).toBe('');
+    expect(d.ideId).toBe('');
+    expect(d.isSameServer).toBe(true);
+    expect(d.canAdtCrossServer).toBe(true);
+    expect(d.kind).toBe('DEBUGGEE');
+    expect(d.dump).toBeUndefined(); // DUMP_ID and DUMP_URI are empty there
+  });
+
+  it('an impossible attach is read from IS_ATTACH_IMPOSSIBLE (the element of debugger-run-to-line--02-listen, set true)', () => {
+    const xml = corpusBody(LISTEN).replace(
+      '<IS_ATTACH_IMPOSSIBLE>false<',
+      '<IS_ATTACH_IMPOSSIBLE>true<',
+    );
+    expect(readDebuggee(xml)!.attachImpossible).toBe(true);
+  });
+
+  it('a short dump catch carries the dump (the DUMP_* elements of debugger-run-to-line--02-listen, filled)', () => {
+    const xml = corpusBody(LISTEN)
+      .replace('<DUMP_ID/>', '<DUMP_ID>ID1</DUMP_ID>')
+      .replace('<DUMP_URI/>', '<DUMP_URI>/dump/uri</DUMP_URI>')
+      .replace('<DUMP_UNAME/>', '<DUMP_UNAME>SAPUSER01</DUMP_UNAME>');
+    expect(readDebuggee(xml)!.dump).toMatchObject({
+      id: 'ID1',
+      uri: '/dump/uri',
+      user: 'SAPUSER01',
+      date: '0000-00-00',
+      time: '00:00:00',
+      host: '',
+    });
+  });
+
+  it('the attach: post-mortem, non-exclusive, and the reached breakpoint with its condition (debugger-run-to-line--03-attach)', () => {
+    const a = readAttach(corpusBody(ATTACH));
+    expect(a.isPostMortem).toBe(false);
+    expect(a.isNonExclusive).toBe(false);
+    expect(a.reachedBreakpoints).toEqual([
+      {
+        id: 'KIND=0.SOURCETYPE=ABAP.MAIN_PROGRAM=ZCL_CV_DBG_MEASURE============CP.INCLUDE=ZCL_CV_DBG_MEASURE============CM002.LINE_NR=9',
+      },
+    ]);
+  });
+
+  it('a condition SAP could not evaluate stays with its breakpoint (attribute of debugger-run-to-line--03-attach, filled)', () => {
+    const xml = corpusBody(ATTACH)
+      .replace('unresolvableCondition=""', 'unresolvableCondition="X = 1"')
+      .replace(
+        'unresolvableConditionErrorOffset=""',
+        'unresolvableConditionErrorOffset="4"',
+      )
+      .replace('isPostMortem="false"', 'isPostMortem="true"');
+    const a = readAttach(xml);
+    expect(a.isPostMortem).toBe(true);
+    expect(a.reachedBreakpoints[0]).toMatchObject({
+      unresolvableCondition: 'X = 1',
+      unresolvableConditionErrorOffset: '4',
+    });
+  });
+
+  it('the step answer says whether the debuggee changed (debugger-conversation--17-stepinto)', () => {
+    const s = readAttach(corpusBody(STEP));
+    expect(s.isDebuggeeChanged).toBe(false);
+    expect(s.isNonExclusive).toBe(false);
+    expect(s.isSteppingPossible).toBe(true);
+    expect(
+      readAttach(
+        corpusBody(STEP).replace(
+          'isDebuggeeChanged="false"',
+          'isDebuggeeChanged="true"',
+        ),
+      ).isDebuggeeChanged,
+    ).toBe(true);
+  });
+
+  it('terse without flags adds nothing', () => {
+    const t = terseStop(
+      readDebuggee(corpusBody(LISTEN))!,
+      stack(),
+      readAttach(corpusBody(ATTACH)),
+    );
+    expect(Object.keys(t).sort()).toEqual(['at', 'frames']);
+  });
+
+  it('terse with the flags names them', () => {
+    const d = readDebuggee(
+      corpusBody(LISTEN)
+        .replace('<IS_ATTACH_IMPOSSIBLE>false<', '<IS_ATTACH_IMPOSSIBLE>true<')
+        .replace('<DUMP_ID/>', '<DUMP_ID>ID1</DUMP_ID>')
+        .replace('<DUMP_URI/>', '<DUMP_URI>/dump/uri</DUMP_URI>'),
+    )!;
+    const a = readAttach(
+      corpusBody(ATTACH)
+        .replace('unresolvableCondition=""', 'unresolvableCondition="X = 1"')
+        .replace('isPostMortem="false"', 'isPostMortem="true"'),
+    );
+    const t = terseStop(d, stack(), a) as any;
+    expect(t.attach_impossible).toBe(true);
+    expect(t.dump).toMatchObject({ id: 'ID1', uri: '/dump/uri' });
+    expect(t.is_post_mortem).toBe(true);
+    expect(t.kind).toBeUndefined(); // DEBUGGEE is the ordinary catch
+    expect(t.unresolvable_conditions).toEqual([
+      { id: a.reachedBreakpoints[0].id, condition: 'X = 1' },
     ]);
   });
 });

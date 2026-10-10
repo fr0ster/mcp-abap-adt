@@ -16,7 +16,7 @@ export const TOOL_DEFINITION = {
     properties: {
       ...STATE_HANDLE_PROPERTY,
       position: {
-        type: 'number',
+        type: 'integer',
         description:
           'Frame position as the stack numbers it; the stopped frame has the highest position.',
       },

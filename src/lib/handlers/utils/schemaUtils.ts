@@ -53,19 +53,20 @@ export function jsonSchemaToZod(jsonSchema: any): any {
         } else {
           zodType = z.string();
         }
-      } else if (
-        propSchema.type === 'number' ||
-        propSchema.type === 'integer'
-      ) {
+      } else if (propSchema.type === 'number') {
         zodType = z.number();
+      } else if (propSchema.type === 'integer') {
+        zodType = z.number().int();
       } else if (propSchema.type === 'boolean') {
         zodType = z.boolean();
       } else if (propSchema.type === 'array') {
         const items = propSchema.items;
         if (items?.type === 'string') {
           zodType = z.array(z.string());
-        } else if (items?.type === 'number' || items?.type === 'integer') {
+        } else if (items?.type === 'number') {
           zodType = z.array(z.number());
+        } else if (items?.type === 'integer') {
+          zodType = z.array(z.number().int());
         } else if (items?.type === 'boolean') {
           zodType = z.array(z.boolean());
         } else if (items?.type === 'object' && items.properties) {
@@ -93,11 +94,10 @@ export function jsonSchemaToZod(jsonSchema: any): any {
               } else {
                 nestedZodType = z.string();
               }
-            } else if (
-              nestedPropSchema.type === 'number' ||
-              nestedPropSchema.type === 'integer'
-            ) {
+            } else if (nestedPropSchema.type === 'number') {
               nestedZodType = z.number();
+            } else if (nestedPropSchema.type === 'integer') {
+              nestedZodType = z.number().int();
             } else if (nestedPropSchema.type === 'boolean') {
               nestedZodType = z.boolean();
             } else {
@@ -137,11 +137,10 @@ export function jsonSchemaToZod(jsonSchema: any): any {
             } else {
               nestedZodType = z.string();
             }
-          } else if (
-            nestedPropSchema.type === 'number' ||
-            nestedPropSchema.type === 'integer'
-          ) {
+          } else if (nestedPropSchema.type === 'number') {
             nestedZodType = z.number();
+          } else if (nestedPropSchema.type === 'integer') {
+            nestedZodType = z.number().int();
           } else if (nestedPropSchema.type === 'boolean') {
             nestedZodType = z.boolean();
           } else {

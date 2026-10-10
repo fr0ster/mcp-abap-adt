@@ -679,9 +679,17 @@ documented limit.
 
 **(D33)**
 
-- **core**: stop taking input; close the provider gate (minted answer, D17); abort every live
-  request; dispose every strategy the factory composed; drain the counted calls; `flush({ signal })`
-  the broker — **no deadline of the server's choosing** (`SHUTDOWN_DEADLINE_MS` and the drain's
+- **One registry of live tools, both transports.** lib's tool wrapper (`BaseMcpServer`, the one
+  wrapper every package uses) registers each tool call — its controller and its settlement — in
+  one process-wide registry in lib (`src/lib/activeTools.ts`), across every server instance;
+  core's and http's shutdowns use it, and neither has a second implementation. A tool **settles**
+  when its handler's promise settles — after its releases (D40) were sent and answered.
+- **core**, in this order: stop taking input; abort every registered tool; **await their
+  settlement** — the provider gate is still open, so a release can still be authorized with the
+  credential held (a refresh included), but no interactive login starts once the shutdown began
+  (the login wrapper answers `interactive-login` `aborted` with the shutdown sentence); then close
+  the provider gate (minted answer, D17); dispose every strategy the factory composed; drain the
+  counted calls; `flush({ signal })` the broker — **no deadline of the server's choosing** (`SHUTDOWN_DEADLINE_MS` and the drain's
   timer, `countedProvider.ts:69-82`, are removed); exit `0`, or `1` with one stderr line per fact
   (`"<destination>": <reason>`, the reason `classify(entry, 'persisting-tokens').reason`).
 - **What starts and what forces it**: the first trigger — `SIGTERM`, `SIGINT`, the end of stdin —
@@ -690,8 +698,8 @@ documented limit.
   YAML `shutdown-timeout`, **no default**), ends it early — exit `1`, naming what was pending.
   What that costs is documented with the option: a pending write is lost, and a discarded refresh
   token can come back.
-- **http**: stop listening; abort every live tool request — tracked across the per-request
-  server instances, not per instance; **await their cleanup** — each aborted tool's releases
+- **http**: stop listening; abort every registered tool (the same registry, across the
+  per-request server instances); **await their settlement** — each aborted tool's releases
   (D40: an unlock, sent outside the request's signal) land before exit, so a shutdown never leaves
   a SAP lock held; then exit `0`. The same escapes as core and no others: a `SIGTERM` / `SIGINT`
   after the start, or `--shutdown-timeout`, ends the wait early — exit `1`, naming the requests
@@ -1149,7 +1157,10 @@ connection, which is disconnected, and no provider is constructed; without it,
   stand-in's log holds the `UNLOCK` before the process exits, exit `0`; a second `SIGTERM` while the
   `UNLOCK` is held exits `1` at once naming the request. *Breaks:* restore the 30 s deadline; count
   `close` as a second trigger; exit http without awaiting the aborted tools (the `UNLOCK` is
-  missing).
+  missing). **stdio**, for the full and the compact tool set: a tool awaiting its `UNLOCK` (held at
+  the stand-in) with **no provider call in flight**, and a store whose flush completes at once —
+  the `UNLOCK` lands before exit; *break:* drain and flush without awaiting the tools' settlement
+  (the `UNLOCK` is missing); close the gate before the tools settle (the `UNLOCK` is refused).
 - `--renewal=refresh-only`: no login; `renewal-declined` with the server's sentence.
 - **Read once per process (D3)**: the settings are read once; a failed read is not kept.
 

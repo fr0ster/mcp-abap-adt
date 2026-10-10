@@ -272,6 +272,20 @@ stays agnostic because we do not know who indexes it, where, or how.
   kind of literal appears; the generated prefixes are there because the first
   version of the pattern missed `LZOK_FG_…F01` and the test found it.
 
+## The state handle
+
+`state_handle` identifies an LLM session's state — not a user, not an MCP
+session. Whoever continues the LLM session presents it; protecting it (HTTPS,
+isolation, logs) is the deployer's, and SECURITY.md says so. There is no owner:
+no caller proof, no per-user listing, no per-user limit. Parallel debug sessions
+are bounded by what SAP keys them on — the terminal id and IDE id the consumer
+states (same pair → SAP's conflict or take-over reaches the model; a different
+pair → another listener). SAP has no per-user-name limit, and neither do we.
+
+This holds for this repository (stated by the user 2026-10-10); a handle in
+another project may mean something else, and the global MCP rules still apply
+there.
+
 ## Plans and Specs
 
 Plans under `docs/superpowers/plans/` and specs under `docs/superpowers/specs/` are kept in the tree only while active — i.e. not yet implemented and not cancelled. Once a plan/spec has been fully implemented OR cancelled, delete the file. History lives in git; these directories hold only work in progress.

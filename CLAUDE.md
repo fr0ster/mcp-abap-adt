@@ -277,10 +277,31 @@ stays agnostic because we do not know who indexes it, where, or how.
 `state_handle` identifies an LLM session's state — not a user, not an MCP
 session. Whoever continues the LLM session presents it; protecting it (HTTPS,
 isolation, logs) is the deployer's, and SECURITY.md says so. There is no owner:
-no caller proof, no per-user listing, no per-user limit. Parallel debug sessions
-are bounded by what SAP keys them on — the terminal id and IDE id the consumer
-states (same pair → SAP's conflict or take-over reaches the model; a different
-pair → another listener). SAP has no per-user-name limit, and neither do we.
+no caller proof, no per-user listing, no per-user registry of ours.
+
+What bounds parallel debug sessions is SAP's listener conflict, measured on
+premise (2026-10-10, both conflict modes, all four combinations of the ids):
+
+- the same `ideId` never conflicts, whatever the `terminalId`: both listeners
+  stay, and the newer one catches;
+- another `ideId` of the same SAP user conflicts: under refuse
+  (`checkConflict=true&isNotifiedOnConflict=true`) the newcomer gets `409
+  conflictDetected` and the first one keeps listening; under take-over the
+  newcomer is accepted and the first one's poll returns `409
+  conflictNotification`;
+- the `terminalId` changed nothing in either mode;
+- a breakpoint caught for whichever listener of that user was active — under
+  take-over the newcomer caught a breakpoint only the first one had set.
+
+Both ids are random per instance by default, so a second instance of the same
+SAP user meets the conflict and its answer reaches the model as it is; a shared
+id is the consumer's explicit choice. The idle bound on waiting for the user
+(not under 30 minutes, the user's exception to "no timeouts") ends a forgotten
+session.
+
+The debugger here debugs what it starts itself, under `debuggingMode=user`.
+Request-based (terminal) debugging, other users' requests and attaching to a
+process we did not start wait on adt-clients (fr0ster/mcp-abap-adt-clients#217).
 
 This holds for this repository (stated by the user 2026-10-10); a handle in
 another project may mean something else, and the global MCP rules still apply

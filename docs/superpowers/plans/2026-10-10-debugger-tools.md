@@ -5,12 +5,12 @@
 **Goal:** A model debugs ABAP and AMDP through the server. It can set breakpoints, catch a program at one, read the stack, variables and memory, step, and release the program. This works both when the model starts the program and when someone else does. It ships for every transport: stdio, SSE, Streamable HTTP (through a pool of instances), and compact.
 
 **Architecture:**
-- **The state lives in the server instance.** Each `BaseMcpServer` instance lazily owns one debugger instance: a `DebugSession` (ABAP), an `AmdpSession`, an opaque handle (`debug_session`) and the SAP ids (`terminalId`/`ideId`), which go into the constructor.
-- **Handlers reach it through `HandlerContext.debugger`.** The starting tools return the handle, and every other session tool requires it.
+- **The state lives in the server instance.** Each `BaseMcpServer` owns an `InstanceState`: the generic handle (`state_handle`) and the verdict «holds state», over every stateful part. The debugger is its first part, a `DebugSession` (ABAP) and an `AmdpSession`; the SAP ids (`terminalId`/`ideId`) go into `DebugSession`'s constructor.
+- **Handlers reach it through `HandlerContext.state` and `HandlerContext.debugger`.** The starting tools return the handle, and every other session tool requires it.
 - **Who keeps the instance between calls depends on the transport.**
   - stdio: the process. A restarted process recovers only the ids.
   - SSE: the SSE session, one instance per GET connection, disposed when it closes.
-  - Streamable HTTP: `InstancePool` in `server/src`. Per request it takes the instance named by `debug_session` (owner checked) or a new one, keeps it while `holdsState()` and disposes it otherwise.
+  - Streamable HTTP: `InstancePool` in `server/src`. Per request it takes the instance named by `state_handle` (owner checked) or a new one, keeps it while `holdsState()` and disposes it otherwise.
 
 **Tech Stack:**
 - TypeScript 6, Jest 30 + ts-jest, fast-xml-parser 5.
@@ -23,7 +23,7 @@
 ## Global Constraints
 
 - **State lives in the instance, never in a module global.** One debugger instance per `BaseMcpServer` instance (D1). One process may hold several server instances, so module-level state is forbidden.
-- **Handle.** `debug_session` is 32 upper-case hex characters from `crypto.randomBytes(16)`. The starting tools return it: `DebugStartListener`, `DebugTakeOverListener`, `AmdpDebugStart` and compact `HandlerDebugStart`. Every session tool takes it as a required argument. A handle that is not this instance's is answered `debug session is not available`. Memory snapshot tools take none.
+- **Handle.** `state_handle` belongs to the instance and is generic: locks will use it too. It is 32 upper-case hex characters from `crypto.randomBytes(16)`, and after a complete stop it is invalidated for good. The starting tools return it: `DebugStartListener`, `DebugTakeOverListener`, `AmdpDebugStart` and compact `HandlerDebugStart`. Every session tool takes it as a required argument. A handle that is not this instance's, or one whose state is gone, is answered `state is not available`. Memory snapshot tools take none.
 - **Ids.** `terminalId`/`ideId` go into `DebugSession`'s constructor and are never tool arguments. Sources, first match wins:
   1. header `x-sap-debug-terminal-id` / `x-sap-debug-ide-id`;
   2. destination `.env` `SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID`;
@@ -45,8 +45,9 @@
 - **Streamable HTTP pool.**
   - The pool takes an instance once per request, which is one stateless MCP session.
   - One transport at a time per instance (a lease); a second request for the same handle waits.
-  - A JSON-RPC batch carrying `debug_session` is refused.
-  - The owner is the destination plus the SAP user.
+  - A JSON-RPC batch carrying `state_handle` is refused.
+  - The owner is the destination for a destination request, and url, client and login (or the token's user) for an `x-sap-*` request; a request with no identity cannot create state.
+  - The pool indexes instances by owner, so one ABAP and one AMDP session per owner, and the listing of an owner's sessions, hold across the pool.
   - Shutdown order: stop admission, drain the leases, dispose every pooled instance, report failures, then settle the providers.
 - **Descriptions** describe the function, never its use: no other tool's name, no workflow, no list of answer fields. They name nothing concrete.
   - Every tool that sets breakpoints or starts a listener says, as a fact, that it catches every request of the connected SAP user. The take-over tools say they displace another debugger of that user.
@@ -61,7 +62,7 @@
 
 1. **A start that is refused.** Under `refuse`, an IDE listening for the user makes the start tool fail. Nothing stays armed: no listener connection stays open and no run starts. *Pinned in Task 4.*
 2. **Stop during a long poll, during an attach, or during a stack read.** No stop is resurrected, no connection leaks, and no poll follows the stop. *Pinned in Tasks 4–5.*
-3. **A foreign or stale handle.** Another instance's handle, a handle after `DebugStop`, and garbage all get `debug session is not available`, and nothing is sent to SAP. *Pinned in Task 7.*
+3. **A foreign or stale handle.** Another instance's handle, a handle after `DebugStop`, and garbage all get `state is not available`, and nothing is sent to SAP. *Pinned in Tasks 7 and 10.*
 4. **Breakpoint answers reordered and with refusals.** Matching is by content. A refusal that is ambiguous within its kind is re-asked one by one with `validationOnly`. *Pinned in Task 4.*
 5. **Two requests at once for one pooled instance, and shutdown with instances in the pool.** The second request waits for the first (one transport at a time). Shutdown disposes every pooled instance and reports what failed. *Pinned in Task 9.*
 
@@ -70,6 +71,7 @@
 ## File structure
 
 **Create (lib):**
+- `src/lib/state/InstanceState.ts`, `src/lib/state/index.ts` — the instance's state and handle, generic; published as `@mcp-abap-adt/lib/state`.
 - `src/lib/debugger/ids.ts` — ids, the handle, the stated overrides.
 - `src/lib/debugger/objectUri.ts` — source URI from `{object_type, object_name, include?, parent_name?}`, and its inverse `addressOf(uri)`.
 - `src/lib/debugger/readings.ts` — ABAP debugger documents → readings; terse projections.
@@ -78,7 +80,7 @@
 - `src/lib/debugger/DebugSession.ts` — the ABAP state machine.
 - `src/lib/debugger/AmdpSession.ts` — the AMDP state machine.
 - `src/lib/debugger/ports.ts` — the live ports: connections, debuggers, request user, run.
-- `src/lib/debugger/DebuggerInstance.ts` — handle + ids + both sessions + `holdsState()` + `dispose()` + `describe()`.
+- `src/lib/debugger/DebuggerInstance.ts` — both sessions as one part of the instance state: `holdsState()`, `dispose()`, `describe()`, `observe()`.
 - `src/lib/debugger/access.ts` — `requireDebugger(context, args, mode)`.
 - `src/lib/debugger/answer.ts` — `debugAnswer`, `debugStateAnswer`.
 - `src/lib/debugger/schemas.ts` — shared schema fragments and warnings.
@@ -123,7 +125,7 @@
 - Test config templates:
   - `tests/test-config.yaml.template`;
   - `docs/development/tests/test-config.yaml.template`.
-- Docs (Task 15).
+- Docs (Task 17).
 
 ---
 
@@ -775,7 +777,10 @@ export class DebugSession<O = unknown> {
   constructor(ports: DebugSessionPorts<O>, ids: DebuggerIds & { stated?: boolean });
   readonly ids: DebuggerIds & { stated?: boolean };
   bind(origin: O): this;
-  start(mode: IDebuggerListenerConflict, run?: RunTarget): Promise<DebugState>;
+  /** Arms the given breakpoints, listens (a short first poll decides), then runs; a refused start undoes what it armed. */
+  start(mode: IDebuggerListenerConflict, options?: { breakpoints?: IDebuggerBreakpoint[]; run?: RunTarget }): Promise<DebugState & { breakpoints?: BreakpointsAnswer }>;
+  /** Called after every state change — the instance state uses it to learn that nothing is held any more. */
+  observe(onChange: () => void): void;
   wait(holdSeconds?: number): Promise<DebugState>;
   setBreakpoints(list: IDebuggerBreakpoint[]): Promise<DebugView<BreakpointsAnswer>>;
   deleteBreakpoint(id: string): Promise<void>;
@@ -841,8 +846,10 @@ export function fakeWorld() {
   const stepAnswers: any[] = [];
   const attachAnswers: Array<() => Promise<any>> = [];
   let validationAnswers: Array<() => any> = [];
-  const make = (): Debugger =>
-    ({
+  /** Members put here replace the fake's on every debugger, cached ones included. */
+  const override: Record<string, any> = {};
+  const make = (): Debugger => new Proxy(
+    {
       listen: (_i: unknown, o: any) => { calls.push(`listen:${o?.holdSeconds}`); const d = deferred<any>(); polls.push(Object.assign(d, { hold: o?.holdSeconds })); return d.promise; },
       stopListener: async () => { calls.push('stopListener'); return DONE(); },
       attach: async (_u: string, id: string, o: any) => { calls.push(`attach:${id}:${o?.server}`); return (attachAnswers.shift() ?? (async () => okResponse(corpusBody('debugger-run-to-line--03-attach'))))(); },
@@ -864,7 +871,9 @@ export function fakeWorld() {
       deleteWatchpoint: async () => DONE(),
       getMemorySizes: async () => okResponse('<dbg:memorySizes xmlns:dbg="x"/>'),
       createMemorySnapshot: async () => okResponse('<dbg:action xmlns:dbg="x"/>'),
-    }) as unknown as Debugger;
+    } as Record<string, any>,
+    { get: (target, key: string) => override[key] ?? target[key] },
+  ) as unknown as Debugger;
   const ports: DebugSessionPorts<string> = {
     openConnection: async () => { const c = { id: opened.length } as unknown as IAbapConnection; opened.push(c); return c; },
     closeConnection: async (c) => { closed.push(c); },
@@ -872,7 +881,7 @@ export function fakeWorld() {
     requestUser: async () => 'SAPUSER01',
     run: async () => run.promise,
   };
-  return { ports, polls, opened, closed, calls, run, stepAnswers, attachAnswers,
+  return { ports, polls, opened, closed, calls, run, stepAnswers, attachAnswers, override,
     setValidationAnswers: (a: Array<() => any>) => { validationAnswers = a; } };
 }
 ```
@@ -918,13 +927,25 @@ describe('DebugSession', () => {
     const world = fakeWorld();
     const ran = jest.spyOn(world.ports, 'run');
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const started = session.start('refuse', { kind: 'class', name: 'ZCL_X' });
+    const started = session.start('refuse', { run: { kind: 'class', name: 'ZCL_X' } });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT());
     await expect(started).rejects.toThrow(DebugListenerError);
     expect(world.closed).toEqual(world.opened);
     expect(ran).not.toHaveBeenCalled();
     expect((await session.wait(0)).state).toBe('idle');
+  });
+
+  it('a refused start undoes the breakpoints it armed', async () => {
+    const world = fakeWorld();
+    const session = new DebugSession(world.ports, IDS).bind('origin');
+    const started = session.start('refuse', { breakpoints: [{ kind: 'line', uri: '/sap/bc/adt/oo/classes/zcl_cv_dbg_measure/source/main#start=32' }] });
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(CONFLICT());
+    await expect(started).rejects.toThrow(DebugListenerError);
+    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:KIND=0.'))).toBe(true);
+    expect(session.listBreakpoints()).toEqual([]);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
   });
 
   it('a debuggee caught on the first poll is attached at once', async () => {
@@ -1163,10 +1184,15 @@ export class DebugSession<O = unknown> {
     return { requestUser: this.user, terminalId: this.ids.terminalId, ideId: this.ids.ideId };
   }
   protected async open(): Promise<IAbapConnection> { return this.ports.openConnection(this.requireOrigin()); }
+  /**
+   * Closes once. The connector's `disconnect()` never throws by contract (it
+   * dispatches the logoff and returns); a port that does throw leaves the
+   * connection unmarked, so a later cleanup tries again.
+   */
   protected async close(connection: IAbapConnection | undefined): Promise<void> {
     if (!connection || this.closedConnections.has(connection)) return;
-    this.closedConnections.add(connection);
     await this.ports.closeConnection(connection);
+    this.closedConnections.add(connection);
   }
   protected async controlDebugger(): Promise<Debugger> {
     if (!this.control) {
@@ -1175,14 +1201,21 @@ export class DebugSession<O = unknown> {
     }
     return this.control.debugger;
   }
-  protected notify(): void { for (const w of [...this.waiters]) w(); }
+  private changed?: () => void;
+  observe(onChange: () => void): void { this.changed = onChange; }
+  protected notify(): void { for (const w of [...this.waiters]) w(); this.changed?.(); }
   private owns(listener: Listener, generation: number): boolean {
     return this.listener === listener && this.generation === generation;
   }
 
   // --- breakpoints ------------------------------------------------------------
   setBreakpoints(list: IDebuggerBreakpoint[]): Promise<DebugView<BreakpointsAnswer>> {
-    return this.serial.run(async () => {
+    return this.serial.run(() => this.armLocked(list));
+  }
+
+  /** Inside the serial. */
+  private async armLocked(list: IDebuggerBreakpoint[]): Promise<DebugView<BreakpointsAnswer>> {
+    {
       const identity = await this.identity();
       const dbg = await this.controlDebugger();
       const answer = await dbg.setBreakpoints(identity, list);
@@ -1209,7 +1242,7 @@ export class DebugSession<O = unknown> {
       }
       for (const p of placed) this.armed.set(p.id!, p);
       return { value: { placed, refused }, raw };
-    });
+    }
   }
 
   deleteBreakpoint(id: string): Promise<void> {
@@ -1223,13 +1256,14 @@ export class DebugSession<O = unknown> {
   listBreakpoints(): BreakpointReading[] { return [...this.armed.values()]; }
 
   // --- listener -----------------------------------------------------------------
-  start(mode: IDebuggerListenerConflict, run?: RunTarget): Promise<DebugState> {
+  start(mode: IDebuggerListenerConflict, options: { breakpoints?: IDebuggerBreakpoint[]; run?: RunTarget } = {}): Promise<DebugState & { breakpoints?: BreakpointsAnswer }> {
     return this.serial.run(async () => {
       if (this.listener || this.current) throw new DebugStateError('a listener is already running for this debug session');
       const identity = await this.identity();
       this.mode = mode;
       this.failure = undefined;
       await this.beforeFirstListen(identity);               // Task 5: reconciliation
+      const armed = options.breakpoints?.length ? await this.armLocked(options.breakpoints) : undefined;
       const connection = await this.open();
       const listener: Listener = { connection, debugger: this.ports.abapDebugger(connection, mode) };
       const generation = ++this.generation;
@@ -1237,14 +1271,25 @@ export class DebugSession<O = unknown> {
       const first = await this.poll(listener, identity, FIRST_POLL_HOLD_SECONDS);
       if (!first.ok) {
         await this.dropListener();
+        await this.undoArmed(identity, armed?.value.placed ?? []);
         throw new DebugListenerError(messageOf(first));
       }
       const caught = readDebuggee(valueOf(first));
       if (caught) await this.attachTo(caught, valueOf(first), generation);
       if (!this.current && this.owns(listener, generation)) void this.loop(listener, generation);
-      if (run && this.owns(listener, generation)) this.startRun(run, generation); // Task 5
-      return this.report();
+      if (options.run && this.owns(listener, generation)) this.startRun(options.run, generation); // Task 5
+      return { ...this.report(), ...(armed ? { breakpoints: armed.value } : {}) };
     });
+  }
+
+  /** A refused start leaves nothing armed: what it placed is deleted; what cannot be stays for DebugStop. */
+  private async undoArmed(identity: IDebuggerIdentity, placed: BreakpointReading[]): Promise<void> {
+    const control = this.control?.debugger;
+    for (const p of placed) {
+      const deleted = control ? await control.deleteBreakpoint(identity, p.id!).catch(asFailure) : undefined;
+      if (deleted?.ok) this.armed.delete(p.id!);
+    }
+    if (this.armed.size === 0 && this.control) { await this.close(this.control.connection); this.control = undefined; }
   }
 
   private poll(listener: Listener, identity: IDebuggerIdentity, holdSeconds: number): Promise<IAdtResponse<string>> {
@@ -1473,7 +1518,7 @@ git commit -m "feat(debugger): DebugSession — short first poll, auto-attach, s
 ### Task 5: `DebugSession` — stop, background run, reconciliation, `holdsState`, `describe`
 
 **Files:**
-- Modify: `src/lib/debugger/DebugSession.ts` (replace the two Task 5 hooks; add `stop`, `holdsState`, `describe`)
+- Modify: `src/lib/debugger/DebugSession.ts` (replace the bodies of the two Task 5 hooks in place — they are plain methods of this class, no `override`; add `stop`, `holdsState`, `describe`)
 - Test: `src/__tests__/unit/debugger/DebugSessionLifecycle.test.ts`
 
 **Interfaces:**
@@ -1501,7 +1546,7 @@ describe('DebugSession lifecycle', () => {
 
   async function started(run?: { kind: 'class' | 'program'; name: string }, ids: any = IDS, world = fakeWorld()) {
     const session = new DebugSession(world.ports, ids).bind('origin');
-    const s = session.start('refuse', run);
+    const s = session.start('refuse', run ? { run } : {});
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
@@ -1568,11 +1613,26 @@ describe('DebugSession lifecycle', () => {
     const world = fakeWorld();
     const { session } = await started(undefined, IDS, world);
     await session.setBreakpoints([{ kind: 'line', uri: '/sap/bc/adt/oo/classes/zcl_cv_dbg_measure/source/main#start=32' }]);
-    const dbg = world.ports.abapDebugger;
-    world.ports.abapDebugger = (c, m) => Object.assign(dbg(c, m), { deleteBreakpoint: async () => refusedResponse('not authorised') }) as any;
+    world.override.deleteBreakpoint = async () => refusedResponse('not authorised');
     await expect(session.stop()).rejects.toThrow(DebugCleanupError);
     expect(session.listBreakpoints()).toHaveLength(1);
     expect(session.holdsState()).toBe(true);
+    delete world.override.deleteBreakpoint;
+    await expect(session.stop()).resolves.toBeUndefined();   // the retry undoes what was left
+    expect(session.holdsState()).toBe(false);
+  });
+
+  it('a release that fails keeps the stop for a retry', async () => {
+    const world = fakeWorld();
+    const { session } = await started(undefined, IDS, world);
+    world.polls[1].resolve(LISTEN_CATCH());
+    await until(() => world.calls.includes('getStack'));
+    world.override.step = async () => refusedResponse('work process busy');
+    await expect(session.stop()).rejects.toThrow(/work process busy/);
+    expect((await session.wait(0)).state).toBe('stopped');
+    delete world.override.step;
+    await session.stop();
+    expect(session.holdsState()).toBe(false);
   });
 
   it('stated ids: the first start stops a predecessor listener under those ids', async () => {
@@ -1600,14 +1660,14 @@ Expected: FAIL. `stop`, `holdsState` and `describe` are missing, and no run happ
   private reconciled = false;
   private cleanupFailures: string[] = [];
 
-  protected override async beforeFirstListen(identity: IDebuggerIdentity): Promise<void> {
+  protected async beforeFirstListen(identity: IDebuggerIdentity): Promise<void> {
     if (!this.ids.stated || this.reconciled) return;
     this.reconciled = true;
     // A predecessor under these ids may have left a listener (D12); its absence is no failure.
     await (await this.controlDebugger()).stopListener(identity).catch(() => undefined);
   }
 
-  protected override startRun(target: RunTarget, generation: number): void {
+  protected startRun(target: RunTarget, generation: number): void {
     this.run = { generation };
     void (async () => {
       let connection: IAbapConnection | undefined;
@@ -1635,11 +1695,14 @@ Expected: FAIL. `stop`, `holdsState` and `describe` are missing, and no run happ
       this.generation++;
       const failures: string[] = [];
       const stop = this.current;
-      this.current = undefined;
       if (stop) {
         const released = await stop.debugger.step('stepContinue', { analyse: analyseDebuggeeEnd }).catch(asFailure);
-        if (!released.ok) failures.push(`release the debuggee: ${messageOf(released)}`);
-        await this.close(stop.connection);
+        if (released.ok) {
+          this.current = undefined;
+          await this.close(stop.connection);
+        } else {
+          failures.push(`release the debuggee: ${messageOf(released)}`);   // kept: a later stop retries
+        }
       }
       if (this.armed.size > 0 || this.listener) {
         try {
@@ -1652,23 +1715,28 @@ Expected: FAIL. `stop`, `holdsState` and `describe` are missing, and no run happ
           }
           if (this.listener) {
             const stopped = await control.stopListener(identity).catch(asFailure);
-            if (!stopped.ok) failures.push(`listener: ${messageOf(stopped)}`);
+            if (stopped.ok) {
+              const listener = this.listener;
+              this.listener = undefined;
+              await this.close(listener.connection);
+            } else {
+              failures.push(`listener: ${messageOf(stopped)}`);           // kept: a later stop retries
+            }
           }
         } catch (error) {
           failures.push(thrown(error));
         }
       }
-      const listener = this.listener;
-      this.listener = undefined;
-      await this.close(listener?.connection);
-      await this.close(this.control?.connection);
-      this.control = undefined;
+      if (!failures.length) {
+        await this.close(this.control?.connection);
+        this.control = undefined;
+      }
       await this.close(this.run?.connection);
       this.run = undefined;
       this.failure = undefined;
       this.notices.length = 0;
       this.cleanupFailures = failures;
-      this.notify();
+      this.notify();   // also tells the instance state (observe) that this part may hold nothing now
       if (failures.length) throw new DebugCleanupError(failures.join('; '));
     });
   }
@@ -1755,8 +1823,10 @@ export class AmdpSession<O = unknown> {
   getTable(variable: string, query?: string): Promise<DebugView<{ rows: Array<Record<string, string>>; columns: string[] }>>;
   cancel(): Promise<void>;
   stop(): Promise<void>;
-  holdsState(): boolean;
-  describe(): { kind: 'amdp'; state: 'idle' | 'waiting' | 'stopped'; debuggee?: string };
+  holdsState(): boolean;                       // open | closing | unread events | pending run | failure | failed cleanup
+  describe(): { kind: 'amdp'; state: 'idle' | 'waiting' | 'stopped' | 'closing'; debuggee?: string };
+  observe(onChange: () => void): void;         // called after every state change
+  startRun(target: RunTarget): void;
 }
 ```
 
@@ -1766,7 +1836,13 @@ export class AmdpSession<O = unknown> {
 - `ON_BREAK` names the stopped debuggee.
   - A `step` makes the debuggee moving, so the debuggee id is cleared until the next `ON_BREAK`.
   - `ON_EXECUTION_END` clears it as well.
-- A stop never releases a suspended debuggee. So `stop()` sends an empty breakpoint sync first, deletes the known debuggee, then sends `stop`. After that it closes the event connection, which aborts the poll. It deletes a debuggee that the last batch of events named, and only then closes the command connection. Failures are collected and thrown as `DebugCleanupError`.
+- **Stopping.** A stop never releases a suspended debuggee, so `stop()` first sends an empty breakpoint sync, then deletes the known debuggee, then sends `stop`.
+  - Closing a connection does not cancel a request that is still in flight, so `stop()` does not wait for the event poll.
+  - The read loop's next batch is its last. In that turn it releases a break the batch carries and closes both connections.
+  - Until then `holdsState()` is true (`closing`).
+  - A failure is kept for a retry and thrown as `DebugCleanupError`.
+- **Sync confirmation.** `SYNC_BREAKPOINTS` events are correlated by request id, apart from the public event queue, so a concurrent `wait()` cannot take one away from the sync that is waiting for it.
+- **Step and break race.** A step clears the debuggee only when no `ON_BREAK` arrived while the step was being answered.
 - A failed event read is a terminal failure. The session is stopped (best effort) and closed. The next `wait` throws it once, and a new `start` is allowed after that.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1894,19 +1970,39 @@ describe('AmdpSession', () => {
     await expect(w.session.getTable('LT_ROWS')).rejects.toThrow(/no AMDP debuggee/);
   });
 
-  it('stop releases a suspended debuggee before the stop; a break in the last batch is deleted too', async () => {
+  it('stop releases a suspended debuggee before the stop, returns without waiting for the poll, and the last batch closes everything', async () => {
     const w = await started();
     w.reads[1].resolve(okResponse(BREAK));
     await until(() => w.reads.length === 3);
-    const stopping = w.session.stop();
-    await until(() => w.calls.includes('stop'));
-    w.reads[2].resolve(okResponse(BREAK.replace('D1', 'D2')));
-    await stopping;
+    await w.session.stop();                                  // returns while reads[2] is still open
     expect(w.calls.indexOf('delete:D1')).toBeGreaterThan(-1);
     expect(w.calls.indexOf('delete:D1')).toBeLessThan(w.calls.indexOf('stop'));
+    expect(w.session.holdsState()).toBe(true);               // closing
+    w.reads[2].resolve(okResponse(BREAK.replace('D1', 'D2')));
+    await until(() => w.closed.length === 2);
     expect(w.calls).toContain('delete:D2');
-    expect(w.closed).toHaveLength(2);
     expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('a break that arrives while a step is answered is not lost', async () => {
+    const w = await started();
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.reads.length === 3);
+    const real = w.dbg.step;
+    w.dbg.step = async (...a: any[]) => { w.reads[2].resolve(okResponse(BREAK.replace('D1', 'D3'))); await until(() => w.reads.length === 4); return real(...(a as [any, any, any])); };
+    await w.session.step('continue');
+    await expect(w.session.getTable('LT_ROWS')).resolves.toBeDefined();   // D3 is stopped
+  });
+
+  it('a wait does not take the sync confirmation away from the start', async () => {
+    const w = world();
+    const s = w.session.start({ stopExisting: true, breakpoints: [{ class_name: 'ZCL_A', line: 14 }] });
+    await until(() => w.reads.length === 1);
+    const waiting = w.session.wait(30);
+    w.reads[0].resolve(okResponse(SYNCED('Q1')));
+    await expect(s).resolves.toMatchObject({ breakpoints: ['PENDING'] });
+    await jest.advanceTimersByTimeAsync(30_000);
+    expect((await waiting).state).toBe('waiting');
   });
 
   it('a failed event read fails the next wait once, closes the session, and allows a new start', async () => {
@@ -1915,15 +2011,18 @@ describe('AmdpSession', () => {
     await until(() => w.closed.length === 2);
     await expect(w.session.wait(0)).rejects.toThrow(/session gone/);
     expect((await w.session.wait(0)).state).toBe('idle');
-    await started(w);
+    const before = w.reads.length;
+    const s = w.session.start({ stopExisting: true, breakpoints: [{ class_name: 'ZCL_A', line: 14 }] });
+    await until(() => w.reads.length === before + 1);
+    w.reads[before].resolve(okResponse(SYNCED('Q2')));
+    await expect(s).resolves.toMatchObject({ mainId: '0123456789ABCDEF0123456789ABCDEF' });
   });
 
   it('a cleanup that fails is reported', async () => {
     const w = await started();
     w.dbg.stop = async () => refusedResponse('not stopped');
-    const stopping = w.session.stop();
-    w.reads[1].resolve(okResponse('<amdpdbg:events xmlns:amdpdbg="x"/>'));
-    await expect(stopping).rejects.toThrow(DebugCleanupError);
+    await expect(w.session.stop()).rejects.toThrow(DebugCleanupError);
+    expect(w.session.holdsState()).toBe(true);               // kept for a retry
   });
 });
 ```
@@ -2022,12 +2121,16 @@ export function readSnapshotList(xml: string) {
 ```ts
 // src/lib/debugger/AmdpSession.ts
 /**
- * The AMDP debugger's state — one per server instance (D1), one AMDP session
- * at a time. Events on one session, commands on another (measured); events are
- * read in the background so a wait is bounded by its own hold. A sync is
- * answered with a request id and confirmed by its SYNC_BREAKPOINTS event; a
- * run starts only after that. A stop never releases a suspended debuggee
- * (measured), so stop() deletes it first. Nothing ends on a timer of ours.
+ * The AMDP debugger's state — one per server instance, one AMDP session at a
+ * time. Events on one session, commands on another (measured); events are read
+ * in the background so a wait is bounded by its own hold. A sync is answered
+ * with a request id and confirmed by its SYNC_BREAKPOINTS event, correlated
+ * apart from the public event queue; a run starts only after that. A stop never
+ * releases a suspended debuggee (measured), so stop() deletes it first. Closing
+ * a connection does not cancel a request in flight (the connector dispatches
+ * its logoff and returns), so stop() does not wait for the event poll: the read
+ * loop, when its last batch arrives, releases a break it carries and closes both
+ * connections. Nothing ends on a timer of ours.
  */
 import { randomUUID } from 'node:crypto';
 import type { AmdpDebugger, amdpDebuggerDocuments } from '@mcp-abap-adt/adt-clients';
@@ -2057,26 +2160,34 @@ export type AmdpState =
 interface Open {
   events: IAbapConnection; commands: IAbapConnection;
   onEvents: AmdpDebuggerT; onCommands: AmdpDebuggerT;
-  mainId: string; hanaSession: string; generation: number;
-  reading?: Promise<void>; lastBatch: AmdpEvent[];
+  mainId: string; hanaSession: string;
+  stopping: boolean;           // stop() was sent; the read loop finishes the cleanup
+  released: Set<string>;       // debuggees already deleted
 }
 
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const failed = (e: unknown) => ({ ok: false as const, getError: () => ({ message: thrown(e) }) }) as any;
 
 export class AmdpSession<O = unknown> {
   private readonly serial = new Serial();
   private origin?: O;
   private open?: Open;
-  private generation = 0;
+  private closing?: Open;                       // stopped, its read loop not yet finished
   private debuggeeId?: string;
+  private breaks = 0;                           // counts ON_BREAK, to tell a stop that came during a step
   private queue: AmdpEvent[] = [];
+  private readonly syncs = new Map<string, AmdpEvent>();   // SYNC_BREAKPOINTS by request id, apart from the queue
   private notices: AmdpState[] = [];
   private failure?: string;
+  private cleanupFailures: string[] = [];
   private runGeneration?: number;
+  private generation = 0;
   private readonly waiters = new Set<() => void>();
+  private changed?: () => void;
 
   constructor(private readonly ports: AmdpSessionPorts<O>) {}
   bind(origin: O): this { this.origin = origin; return this; }
+  observe(onChange: () => void): void { this.changed = onChange; }
 
   private requireOrigin(): O {
     if (this.origin === undefined) throw new DebugStateError('the debugger has no connection yet');
@@ -2090,11 +2201,11 @@ export class AmdpSession<O = unknown> {
     if (!this.debuggeeId) throw new DebugStateError('no AMDP debuggee is stopped');
     return this.debuggeeId;
   }
-  private notify(): void { for (const w of [...this.waiters]) w(); }
+  private notify(): void { for (const w of [...this.waiters]) w(); this.changed?.(); }
 
   start(options: { stopExisting: boolean; breakpoints: AmdpBreakpoint[]; run?: RunTarget }) {
     return this.serial.run(async () => {
-      if (this.open) throw new DebugStateError('an AMDP debug session is already running for this debug session');
+      if (this.open || this.closing) throw new DebugStateError('an AMDP debug session is already running for this debug session');
       const origin = this.requireOrigin();
       const user = (await this.ports.requestUser(origin)).toUpperCase();
       const events = await this.ports.openConnection(origin);
@@ -2108,45 +2219,45 @@ export class AmdpSession<O = unknown> {
         throw new DebugListenerError(started.getError().message);
       }
       const { mainId, hanaSession } = readAmdpStart(started.getResult().value as any);
-      const open: Open = { events, commands, onEvents, onCommands, mainId, hanaSession, generation: ++this.generation, lastBatch: [] };
+      const open: Open = { events, commands, onEvents, onCommands, mainId, hanaSession, stopping: false, released: new Set() };
       this.open = open;
       this.failure = undefined;
-      open.reading = this.readLoop(open);
+      this.generation++;
+      void this.readLoop(open);
       const states = await this.sync(open, options.breakpoints);
       if (options.run) this.startRun(options.run);
       return { mainId, breakpoints: states };
     });
   }
 
-  /** Sends a sync and waits, inside this call, for its SYNC_BREAKPOINTS. */
+  /** Sends a sync and waits, inside this call, for its own SYNC_BREAKPOINTS. */
   private async sync(open: Open, list: AmdpBreakpoint[]): Promise<string[]> {
     const breakpoints = list.map((b) => ({ clientId: randomUUID(), uri: lineUriOf({ object_type: 'CLAS', object_name: b.class_name }, b.line) }));
     const answer = await open.onCommands.syncBreakpoints(open.mainId, breakpoints);
     if (!answer.ok) throw new DebugRequestError(answer.getError().message);
     const requestId = locationId(answer.getResult().value as any);
-    const deadline = WAIT_MAX_SECONDS * 1000;
-    const found = () => this.queue.find((e) => e.kind === 'SYNC_BREAKPOINTS' && e.requestId === requestId);
-    if (!found()) {
+    const settled = () => this.syncs.has(requestId) || this.open !== open || this.failure !== undefined;
+    if (!settled()) {
       await new Promise<void>((resolve) => {
-        const done = () => { if (!found() && this.open === open && this.failure === undefined) return; clearTimeout(t); this.waiters.delete(done); resolve(); };
-        const t = setTimeout(() => { this.waiters.delete(done); resolve(); }, deadline);
+        const done = () => { if (!settled()) return; clearTimeout(t); this.waiters.delete(done); resolve(); };
+        const t = setTimeout(() => { this.waiters.delete(done); resolve(); }, WAIT_MAX_SECONDS * 1000);
         this.waiters.add(done);
       });
     }
-    const event = found();
-    if (!event) throw new DebugRequestError('the breakpoints were sent but their outcome did not arrive within this call; nothing was run');
-    this.queue = this.queue.filter((e) => e !== event);
+    const event = this.syncs.get(requestId);
+    this.syncs.delete(requestId);
+    if (!event) throw new DebugRequestError('the breakpoints were sent but the system did not confirm them within this call; nothing was run');
     return event.states;
   }
 
   private async readLoop(open: Open): Promise<void> {
-    while (this.open === open && open.generation === this.generation) {
-      let answer: any;
-      try { answer = await open.onEvents.getEvents(open.mainId); }
-      catch (e) { answer = { ok: false, getError: () => ({ message: thrown(e) }) }; }
+    for (;;) {
+      const answer = await open.onEvents.getEvents(open.mainId).catch(failed);
       const events = answer.ok ? readAmdpEvents(String(answer.getResult().value ?? '')) : [];
-      open.lastBatch = events;
-      if (this.open !== open) return;  // stop() owns the rest
+      if (open.stopping || this.open !== open) {
+        await this.finishClosing(open, events);      // stop() was sent: this was the last batch
+        return;
+      }
       if (!answer.ok) {
         this.failure = answer.getError().message;
         this.open = undefined;
@@ -2158,11 +2269,27 @@ export class AmdpSession<O = unknown> {
         return;
       }
       for (const e of events) {
-        if (e.kind === 'ON_BREAK') this.debuggeeId = e.debuggeeId;
+        if (e.kind === 'SYNC_BREAKPOINTS') { this.syncs.set(e.requestId, e); continue; }
+        if (e.kind === 'ON_BREAK') { this.debuggeeId = e.debuggeeId; this.breaks++; }
         if (e.kind === 'ON_EXECUTION_END' && e.debuggeeId === this.debuggeeId) this.debuggeeId = undefined;
+        this.queue.push(e);
       }
-      if (events.length) { this.queue.push(...events); this.notify(); }
+      this.notify();
     }
+  }
+
+  /** The read loop's last turn after a stop: release a break it carried, then close both sessions. */
+  private async finishClosing(open: Open, lastBatch: AmdpEvent[]): Promise<void> {
+    for (const e of lastBatch) {
+      if (e.kind !== 'ON_BREAK' || open.released.has(e.debuggeeId)) continue;
+      const a = await open.onCommands.deleteDebuggee(open.mainId, e.debuggeeId).catch(failed);
+      if (a.ok) open.released.add(e.debuggeeId);
+      else this.cleanupFailures.push(`release debuggee ${e.debuggeeId}: ${a.getError().message}`);
+    }
+    await this.ports.closeConnection(open.events);
+    await this.ports.closeConnection(open.commands);
+    if (this.closing === open) this.closing = undefined;
+    this.notify();
   }
 
   setBreakpoints(list: AmdpBreakpoint[]): Promise<DebugView<string[]>> {
@@ -2182,10 +2309,10 @@ export class AmdpSession<O = unknown> {
         this.waiters.add(done);
       });
     }
-    if (this.failure !== undefined) { const m = this.failure; this.failure = undefined; throw new DebugListenerError(m); }
-    if (this.queue.length) return { state: 'event', events: this.queue.splice(0) };
+    if (this.failure !== undefined) { const m = this.failure; this.failure = undefined; this.notify(); throw new DebugListenerError(m); }
+    if (this.queue.length) { const events = this.queue.splice(0); this.notify(); return { state: 'event', events }; }
     const notice = this.notices.shift();
-    if (notice) return notice;
+    if (notice) { this.notify(); return notice; }
     return this.open ? { state: 'waiting' } : { state: 'idle' };
   }
 
@@ -2193,9 +2320,11 @@ export class AmdpSession<O = unknown> {
     return this.serial.run(async () => {
       const open = this.requireOpen();
       const debuggee = this.requireDebuggee();
+      const breaksBefore = this.breaks;
       const answer = await open.onCommands.step(open.mainId, debuggee, step);
       if (!answer.ok) throw new DebugRequestError(answer.getError().message);
-      this.debuggeeId = undefined; // moving until the next ON_BREAK
+      // Moving until the next ON_BREAK — unless one already arrived while the step was answered.
+      if (this.breaks === breaksBefore) this.debuggeeId = undefined;
       return { value: 'moving', raw: '' };
     });
   }
@@ -2216,40 +2345,44 @@ export class AmdpSession<O = unknown> {
   cancel(): Promise<void> {
     return this.serial.run(async () => {
       const open = this.requireOpen();
-      const answer = await open.onCommands.deleteDebuggee(open.mainId, this.requireDebuggee());
+      const debuggee = this.requireDebuggee();
+      const answer = await open.onCommands.deleteDebuggee(open.mainId, debuggee);
       if (!answer.ok) throw new DebugRequestError(answer.getError().message);
+      open.released.add(debuggee);
       this.debuggeeId = undefined;
     });
   }
 
+  /**
+   * Releases a suspended debuggee, empties the breakpoints, stops the session.
+   * What fails stays for a retry (holdsState) and is thrown as DebugCleanupError.
+   * The connections close when the read loop's last batch arrives.
+   */
   stop(): Promise<void> {
     return this.serial.run(async () => {
-      const open = this.open;
-      this.open = undefined;
-      this.generation++;
-      this.runGeneration = undefined;
       const failures: string[] = [];
+      const open = this.open;
       if (open) {
-        const deleted = new Set<string>();
-        const del = async (id: string) => {
-          if (deleted.has(id)) return;
-          deleted.add(id);
-          const a = await open.onCommands.deleteDebuggee(open.mainId, id).catch((e) => ({ ok: false, getError: () => ({ message: thrown(e) }) }) as any);
-          if (!a.ok) failures.push(`release debuggee ${id}: ${a.getError().message}`);
-        };
         await open.onCommands.syncBreakpoints(open.mainId, []).catch(() => undefined);
-        if (this.debuggeeId) await del(this.debuggeeId);
-        const stopped = await open.onCommands.stop(open.mainId).catch((e) => ({ ok: false, getError: () => ({ message: thrown(e) }) }) as any);
+        if (this.debuggeeId && !open.released.has(this.debuggeeId)) {
+          const a = await open.onCommands.deleteDebuggee(open.mainId, this.debuggeeId).catch(failed);
+          if (a.ok) open.released.add(this.debuggeeId);
+          else failures.push(`release debuggee ${this.debuggeeId}: ${a.getError().message}`);
+        }
+        const stopped = await open.onCommands.stop(open.mainId).catch(failed);
         if (!stopped.ok) failures.push(`stop: ${stopped.getError().message}`);
-        await this.ports.closeConnection(open.events);          // aborts the event poll
-        await open.reading?.catch(() => undefined);
-        for (const e of open.lastBatch) if (e.kind === 'ON_BREAK') await del(e.debuggeeId);
-        await this.ports.closeConnection(open.commands);
+        if (!failures.length) {
+          open.stopping = true;            // the read loop finishes the cleanup on its last batch
+          this.closing = open;
+          this.open = undefined;
+          this.debuggeeId = undefined;
+        }
       }
-      this.debuggeeId = undefined;
+      this.runGeneration = undefined;
       this.queue = [];
       this.notices = [];
       this.failure = undefined;
+      this.cleanupFailures = failures;
       this.notify();
       if (failures.length) throw new DebugCleanupError(failures.join('; '));
     });
@@ -2273,20 +2406,21 @@ export class AmdpSession<O = unknown> {
   }
 
   holdsState(): boolean {
-    return !!this.open || this.queue.length > 0 || this.notices.length > 0 || this.runGeneration !== undefined || this.failure !== undefined;
+    return !!this.open || !!this.closing || this.queue.length > 0 || this.notices.length > 0
+      || this.runGeneration !== undefined || this.failure !== undefined || this.cleanupFailures.length > 0;
   }
 
   describe() {
     return {
       kind: 'amdp' as const,
-      state: this.debuggeeId ? ('stopped' as const) : this.open ? ('waiting' as const) : ('idle' as const),
+      state: this.debuggeeId ? ('stopped' as const) : this.open ? ('waiting' as const) : this.closing ? ('closing' as const) : ('idle' as const),
       ...(this.debuggeeId ? { debuggee: this.debuggeeId } : {}),
     };
   }
 }
 ```
 
-In the "stop releases …" test, the last event poll (`reads[2]`) is resolved only after `stop` was sent. So `stop()` must wait for `open.reading` to see that batch before it deletes `D2`. In the fake, closing the event connection does not abort the read; the test resolves it by hand. In production, closing the connection aborts the read, and `reading` resolves with the failure path. That path is skipped because `this.open !== open`.
+`stop()` never waits for the event poll. Closing a connection does not cancel a request in flight: the connector's `disconnect()` dispatches the logoff and returns (`AbstractAbapConnection.js:366-396`), and `HttpTransport.close()` is empty. So a wait there could last as long as the server holds the poll. The read loop owns the end instead: its next batch is the last one, and in that turn it releases a break the batch carries and closes both connections. Until then `holdsState()` stays true (`closing`), and the instance state hears the change through `observe`. Whether SAP ends an open event poll when the session is stopped is measured in Task 14.
 
 - [ ] **Step 5: Run them and see them pass**
 
@@ -2302,10 +2436,13 @@ git commit -m "feat(debugger): AmdpSession — run after its sync is confirmed, 
 
 ---
 
-### Task 7: The debugger in the server instance — ports, `DebuggerInstance`, access, answers
+### Task 7: State in the server instance — `InstanceState`, the debugger as one of its parts, access, answers
+
+The instance's handle and its "holds state" verdict are generic (spec D1, D9). `InstanceState` in `src/lib/state/` owns them. The debugger is its first part; locks will be the next. The pool (Task 9) knows only `InstanceState`, never the debugger.
 
 **Files:**
 - Create:
+  - `src/lib/state/InstanceState.ts`, `src/lib/state/index.ts`
   - `src/lib/debugger/ports.ts`
   - `src/lib/debugger/DebuggerInstance.ts`
   - `src/lib/debugger/access.ts`
@@ -2314,117 +2451,148 @@ git commit -m "feat(debugger): AmdpSession — run after its sync is confirmed, 
   - `src/lib/debugger/index.ts`
 - Modify:
   - `src/handlers/interfaces.ts:8` (`HandlerContext`)
-  - `src/embeddable/BaseMcpServer.ts` (constructor fields, the context built at l.257-261, new `dispose`/`holdsState`/`debugHandle`)
-  - `package.json` (`exports["./debugger"]`, `typesVersions["*"].debugger`)
+  - `src/embeddable/BaseMcpServer.ts` (state, the context at l.257-261, `stateHandle`/`holdsState`/`dispose`)
+  - `package.json` (exports and typesVersions: `./debugger`, `./state`)
 - Test:
+  - `src/__tests__/unit/state/InstanceState.test.ts`
   - `src/__tests__/unit/debugger/ports.test.ts`
   - `src/__tests__/unit/debugger/access.test.ts`
   - `src/__tests__/unit/debugger/answer.test.ts`
-  - `src/__tests__/unit/debugger/baseMcpServerDebugger.test.ts`
+  - `src/__tests__/unit/debugger/baseMcpServerState.test.ts`
 
 **Interfaces:**
 - Produces:
 
 ```ts
-// handlers/interfaces.ts
-export interface HandlerContext { connection: IAbapConnection; logger?: ILogger; debugger?: () => DebuggerInstance }
-// ports.ts
-export async function requestUserOf(connection: IAbapConnection): Promise<string>;   // systeminformation → login; never the responsible
-export function liveDebugPorts(): DebugSessionPorts<HandlerContext>;
-export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext>;
-// DebuggerInstance.ts
-export class DebuggerInstance {
-  constructor(sessions: { abap: DebugSession<HandlerContext>; amdp: AmdpSession<HandlerContext> }, handle?: string);
-  readonly handle: string;             // 32 upper-case hex
-  readonly abap: DebugSession<HandlerContext>;
-  readonly amdp: AmdpSession<HandlerContext>;
-  holdsState(): boolean;               // abap || amdp
-  describe(): Array<{ debug_session: string; terminal_id: string; ide_id: string } & ({ kind: 'abap'; state: string; breakpoints: number } | { kind: 'amdp'; state: string; debuggee?: string })>;
-  stop(): Promise<void>;               // both kinds; DebugCleanupError aggregating both
-  dispose(): Promise<void>;            // = stop()
+// src/lib/state/InstanceState.ts
+export interface StateDescription { kind: string; [field: string]: unknown }
+export interface StatePart { holdsState(): boolean; dispose(): Promise<void>; describe(): StateDescription[]; observe(onChange: () => void): void }
+/** What the host lends an instance for one request (Task 9); stdio and SSE lend none. */
+export interface StateHost {
+  /** The request's owner, or null when the request carries no identity to keep state under. */
+  readonly owner: string | null;
+  /** Atomically reserves the owner's slot of a kind for this handle; answers the holder's handle when another instance holds it. */
+  reserve(kind: string, handle: string): string | undefined;
+  /** Every state the owner holds in the pool, this instance's included. */
+  peers(): Array<{ state_handle: string; states: StateDescription[] }>;
 }
-export function createDebuggerInstance(ids?: DebuggerIds & { stated: boolean }): DebuggerInstance;  // live ports; ids resolved in the caller's scope
+export class StateUnavailableError extends Error {}   // 'state is not available'
+export class InstanceState {
+  get handle(): string;                    // 32 upper-case hex; a new one after rotate()
+  host?: StateHost;                        // set by the host per request
+  attach(part: StatePart): void;
+  holdsState(): boolean;
+  describe(): { state_handle: string; states: StateDescription[] };
+  /** For a state-creating call: refuses without an identity; reserves the kind (refusing with the holder's handle). */
+  admit(kind: string): void;
+  /** For a call on existing state: the handle must be this one and something must be held. */
+  check(handle: unknown): void;
+  rotateIfEmpty(): void;                   // after a complete stop: the old handle is invalid for good
+  onEmpty(listener: () => void): void;     // the host learns that an instance holds nothing any more
+  dispose(): Promise<void>;                // every part; throws an aggregate of what failed
+}
+// handlers/interfaces.ts
+export interface HandlerContext { connection: IAbapConnection; logger?: ILogger; state?: InstanceState; debugger?: () => DebuggerInstance }
+// DebuggerInstance.ts — a StatePart
+export class DebuggerInstance implements StatePart {
+  constructor(sessions: { abap: DebugSession<HandlerContext>; amdp: AmdpSession<HandlerContext> });
+  readonly abap: DebugSession<HandlerContext>; readonly amdp: AmdpSession<HandlerContext>;
+  holdsState(): boolean; describe(): StateDescription[]; observe(cb: () => void): void;
+  stop(): Promise<void>; dispose(): Promise<void>;
+}
+export function createDebuggerInstance(ids?: DebuggerIds & { stated: boolean }): DebuggerInstance;
 // access.ts
-export class DebugSessionUnavailableError extends Error {}   // message: 'debug session is not available'
-export function requireDebugger(context: HandlerContext, args: unknown, mode: 'create' | 'use'): DebuggerInstance;
-// answer.ts
-export async function debugAnswer<T>(args: unknown, work: () => Promise<DebugView<T>>, terse: (v: T) => unknown, full?: (v: T) => unknown): Promise<McpResult>;
-export async function debugStateAnswer(args: unknown, work: () => Promise<DebugState>, extra?: Record<string, unknown>): Promise<McpResult>;
-// schemas.ts
-export const DEBUG_SESSION_PROPERTY, HOLD_SECONDS_PROPERTY, BREAKPOINTS_PROPERTY, AMDP_BREAKPOINTS_PROPERTY, RUN_PROPERTY;
-export const USER_MODE_SENTENCE: string;   // a fact of the function
-export const TAKE_OVER_SENTENCE: string;
-export function breakpointsFromArgs(raw: unknown): IDebuggerBreakpoint[];
-export function amdpBreakpointsFromArgs(raw: unknown): AmdpBreakpoint[];
-export function runFromArgs(raw: unknown): RunTarget | undefined;
+export function requireDebugger(context: HandlerContext, args: unknown, mode: { create: 'abap' | 'amdp' } | 'use'): DebuggerInstance;
+// ports.ts, answer.ts, schemas.ts — as below (STATE_HANDLE_PROPERTY replaces any debugger-specific handle)
 // BaseMcpServer
-get debugHandle(): string | undefined;   // set once the instance has a debugger
-holdsState(): boolean;
-dispose(): Promise<void>;                // awaited; stops both kinds; throws DebugCleanupError
+readonly state: InstanceState;
+get stateHandle(): string;  holdsState(): boolean;  dispose(): Promise<void>;
 ```
 
 - [ ] **Step 1: Write the failing tests**
 
 ```ts
-// src/__tests__/unit/debugger/access.test.ts
-import { DebugSessionUnavailableError, requireDebugger } from '../../../lib/debugger/access';
-import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
+// src/__tests__/unit/state/InstanceState.test.ts
+import { InstanceState, StateUnavailableError } from '../../../lib/state/InstanceState';
 
-const fakeSession = (holds: boolean) => ({ holdsState: () => holds, bind() { return this; }, describe: () => ({}), stop: async () => {} }) as any;
-const context = (inst: DebuggerInstance) => ({ connection: {} as any, debugger: () => inst });
+const part = () => {
+  let held = false; let cb: () => void = () => {};
+  return {
+    set: (v: boolean) => { held = v; cb(); },
+    p: { holdsState: () => held, dispose: async () => { held = false; }, describe: () => (held ? [{ kind: 'abap' }] : []), observe: (f: () => void) => { cb = f; } },
+  };
+};
 
-describe('requireDebugger', () => {
-  it('create mode gives the instance, whatever the arguments', () => {
-    const inst = new DebuggerInstance({ abap: fakeSession(false), amdp: fakeSession(false) });
-    expect(requireDebugger(context(inst), {}, 'create')).toBe(inst);
+describe('InstanceState', () => {
+  it('a 32-hex handle; holds what its parts hold', () => {
+    const s = new InstanceState(); const a = part(); s.attach(a.p);
+    expect(s.handle).toMatch(/^[0-9A-F]{32}$/);
+    expect(s.holdsState()).toBe(false);
+    a.set(true);
+    expect(s.holdsState()).toBe(true);
+    expect(s.describe()).toEqual({ state_handle: s.handle, states: [{ kind: 'abap' }] });
   });
-  it('use mode wants this instance handle and held state', () => {
-    const inst = new DebuggerInstance({ abap: fakeSession(true), amdp: fakeSession(false) });
-    expect(requireDebugger(context(inst), { debug_session: inst.handle }, 'use')).toBe(inst);
+  it('check: this handle and something held; otherwise not available — the same answer', () => {
+    const s = new InstanceState(); const a = part(); s.attach(a.p); a.set(true);
+    expect(() => s.check(s.handle)).not.toThrow();
+    for (const h of [undefined, 42, 'F'.repeat(32)]) expect(() => s.check(h)).toThrow(StateUnavailableError);
+    a.set(false);
+    expect(() => s.check(s.handle)).toThrow('state is not available');
   });
-  it.each([
-    ['missing', {}],
-    ['foreign', { debug_session: 'F'.repeat(32) }],
-    ['garbage', { debug_session: 42 }],
-  ])('a %s handle is not available, the same answer for all', (_n, args) => {
-    const inst = new DebuggerInstance({ abap: fakeSession(true), amdp: fakeSession(false) });
-    expect(() => requireDebugger(context(inst), args, 'use')).toThrow(DebugSessionUnavailableError);
-    expect(() => requireDebugger(context(inst), args, 'use')).toThrow('debug session is not available');
+  it('rotateIfEmpty invalidates the old handle for good', () => {
+    const s = new InstanceState(); const a = part(); s.attach(a.p);
+    const old = s.handle; s.rotateIfEmpty();
+    expect(s.handle).not.toBe(old);
+    a.set(true); expect(() => s.check(old)).toThrow(StateUnavailableError);
   });
-  it('a handle whose session holds nothing any more is not available', () => {
-    const inst = new DebuggerInstance({ abap: fakeSession(false), amdp: fakeSession(false) });
-    expect(() => requireDebugger(context(inst), { debug_session: inst.handle }, 'use')).toThrow(DebugSessionUnavailableError);
+  it('admit: refuses without an identity; refuses with the holder handle when another instance holds the kind', () => {
+    const s = new InstanceState();
+    s.host = { owner: null, reserve: () => undefined, peers: () => [] };
+    expect(() => s.admit('abap')).toThrow(/no identity/);
+    s.host = { owner: 'O', reserve: () => 'OTHERHANDLE', peers: () => [] };
+    expect(() => s.admit('abap')).toThrow(/OTHERHANDLE/);
+    s.host = { owner: 'O', reserve: () => undefined, peers: () => [] };
+    expect(() => s.admit('abap')).not.toThrow();
   });
-  it('a server instance without a debugger refuses plainly', () => {
-    expect(() => requireDebugger({ connection: {} as any }, {}, 'create')).toThrow(/debugging is not served/);
+  it('onEmpty fires when the last part stops holding', () => {
+    const s = new InstanceState(); const a = part(); s.attach(a.p);
+    const seen = jest.fn(); s.onEmpty(seen);
+    a.set(true); expect(seen).not.toHaveBeenCalled();
+    a.set(false); expect(seen).toHaveBeenCalledTimes(1);
   });
 });
 ```
 
 ```ts
-// src/__tests__/unit/debugger/answer.test.ts
-import { debugAnswer, debugStateAnswer } from '../../../lib/debugger/answer';
-import { DebugListenerError } from '../../../lib/debugger/DebugSession';
+// src/__tests__/unit/debugger/access.test.ts
+import { requireDebugger } from '../../../lib/debugger/access';
+import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
+import { InstanceState, StateUnavailableError } from '../../../lib/state/InstanceState';
 
-describe('debug answers', () => {
-  const view = { value: { a: 1, b: 2 }, raw: '<x/>' };
-  it('terse by default; full parses; raw is the document', async () => {
-    expect(JSON.parse((await debugAnswer({}, async () => view, (v) => ({ a: v.a }))).content[0].text)).toEqual({ a: 1 });
-    expect(JSON.parse((await debugAnswer({ detail: 'full' }, async () => view, () => 0)).content[0].text)).toEqual({ a: 1, b: 2 });
-    expect(JSON.parse((await debugAnswer({ detail: 'full' }, async () => view, () => 0, (v) => ({ parsed: v.b }))).content[0].text)).toEqual({ parsed: 2 });
-    expect((await debugAnswer({ detail: 'raw' }, async () => view, () => 0)).content[0].text).toBe('<x/>');
+const fake = (holds: boolean) => ({ holdsState: () => holds, bind() { return this; }, describe: () => ({ kind: 'abap' }), stop: async () => {}, observe: () => {}, ids: { terminalId: 'T', ideId: 'I' } }) as any;
+function ctx(holds: boolean) {
+  const state = new InstanceState();
+  const dbg = new DebuggerInstance({ abap: fake(holds), amdp: fake(false) });
+  state.attach(dbg);
+  return { context: { connection: {} as any, state, debugger: () => dbg }, state, dbg };
+}
+
+describe('requireDebugger', () => {
+  it('create admits the kind and gives the debugger', () => {
+    const { context, dbg } = ctx(false);
+    expect(requireDebugger(context, {}, { create: 'abap' })).toBe(dbg);
   });
-  it("a conflict is a tool error with SAP's message", async () => {
-    const r = await debugStateAnswer({}, async () => { throw new DebugListenerError('Another debugger … SY 530'); });
-    expect(r.isError).toBe(true);
-    expect(r.content[0].text).toContain('SY 530');
+  it('use wants this instance handle with state held', () => {
+    const { context, state, dbg } = ctx(true);
+    expect(requireDebugger(context, { state_handle: state.handle }, 'use')).toBe(dbg);
+    expect(() => requireDebugger(context, { state_handle: 'F'.repeat(32) }, 'use')).toThrow(StateUnavailableError);
   });
-  it('extra fields (handle, ids) join a state', async () => {
-    const r = await debugStateAnswer({}, async () => ({ state: 'listening' }), { debug_session: 'H' });
-    expect(JSON.parse(r.content[0].text)).toEqual({ state: 'listening', debug_session: 'H' });
+  it('a server instance without state or debugger refuses plainly', () => {
+    expect(() => requireDebugger({ connection: {} as any }, {}, { create: 'abap' })).toThrow(/debugging is not served/);
   });
 });
 ```
+
 
 ```ts
 // src/__tests__/unit/debugger/ports.test.ts
@@ -2451,37 +2619,136 @@ describe('the request user', () => {
 });
 ```
 
-Before you write `requestUserOf`, read `node_modules/@mcp-abap-adt/adt-clients/dist/utils/systemInfo.js`. If `getSystemInformation` throws on a 404 instead of answering `null`, map only the not-found case to `null`. An authentication or network failure must propagate (review finding 15). Keep the tests unchanged.
+```ts
+// src/__tests__/unit/debugger/answer.test.ts
+import { debugAnswer, debugStateAnswer } from '../../../lib/debugger/answer';
+import { DebugListenerError } from '../../../lib/debugger/DebugSession';
+
+describe('debug answers', () => {
+  const view = { value: { a: 1, b: 2 }, raw: '<x/>' };
+  it('terse by default; full parses; raw is the document', async () => {
+    expect(JSON.parse((await debugAnswer({}, async () => view, (v) => ({ a: v.a }))).content[0].text)).toEqual({ a: 1 });
+    expect(JSON.parse((await debugAnswer({ detail: 'full' }, async () => view, () => 0)).content[0].text)).toEqual({ a: 1, b: 2 });
+    expect(JSON.parse((await debugAnswer({ detail: 'full' }, async () => view, () => 0, (v) => ({ parsed: v.b }))).content[0].text)).toEqual({ parsed: 2 });
+    expect((await debugAnswer({ detail: 'raw' }, async () => view, () => 0)).content[0].text).toBe('<x/>');
+  });
+  it("a conflict is a tool error with SAP's message", async () => {
+    const r = await debugStateAnswer({}, async () => { throw new DebugListenerError('Another debugger … SY 530'); });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain('SY 530');
+  });
+  it('extra fields (handle, ids) join a state', async () => {
+    const r = await debugStateAnswer({}, async () => ({ state: 'listening' }), () => ({ state_handle: 'H' }));
+    expect(JSON.parse(r.content[0].text)).toEqual({ state: 'listening', state_handle: 'H' });
+  });
+});
+```
 
 ```ts
-// src/__tests__/unit/debugger/baseMcpServerDebugger.test.ts
+// src/__tests__/unit/debugger/baseMcpServerState.test.ts
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { MockAbapConnection } from '../../../embeddable/MockAbapConnection';
 
-describe('the server instance owns its debugger', () => {
-  it('two instances, two debuggers with different handles; neither holds state at first', () => {
-    const a = new EmbeddableMcpServer({ connection: new MockAbapConnection() as any, exposition: ['readonly'] } as any);
-    const b = new EmbeddableMcpServer({ connection: new MockAbapConnection() as any, exposition: ['readonly'] } as any);
+const make = () => new EmbeddableMcpServer({ connection: new MockAbapConnection() as any, exposition: ['readonly'] } as any);
+
+describe('the server instance owns its state', () => {
+  it('two instances, two handles; nothing held at first; dispose with nothing held resolves', async () => {
+    const a = make(); const b = make();
+    expect(a.stateHandle).not.toBe(b.stateHandle);
     expect(a.holdsState()).toBe(false);
-    expect(a.debugHandle).toBeUndefined();
-    const ia = (a as any).debuggerFor();
-    const ib = (b as any).debuggerFor();
-    expect(ia.handle).not.toBe(ib.handle);
-    expect(a.debugHandle).toBe(ia.handle);
-  });
-  it('dispose with nothing held resolves', async () => {
-    const a = new EmbeddableMcpServer({ connection: new MockAbapConnection() as any, exposition: ['readonly'] } as any);
     await expect(a.dispose()).resolves.toBeUndefined();
+  });
+  it('the debugger is created once, on first use, and attached to the state', () => {
+    const a = make();
+    const d1 = (a as any).debuggerFor();
+    expect((a as any).debuggerFor()).toBe(d1);
   });
 });
 ```
 
 - [ ] **Step 2: Run them and see them fail**
 
-Run: `npx jest src/__tests__/unit/debugger/access.test.ts src/__tests__/unit/debugger/answer.test.ts src/__tests__/unit/debugger/ports.test.ts src/__tests__/unit/debugger/baseMcpServerDebugger.test.ts`
+Run: `npx jest src/__tests__/unit/state/ src/__tests__/unit/debugger/access.test.ts src/__tests__/unit/debugger/answer.test.ts src/__tests__/unit/debugger/ports.test.ts src/__tests__/unit/debugger/baseMcpServerState.test.ts`
 Expected: FAIL, "Cannot find module".
 
-- [ ] **Step 3: Implement `ports.ts`**
+- [ ] **Step 3: Implement `InstanceState`**
+
+```ts
+// src/lib/state/InstanceState.ts
+/**
+ * The state an MCP server instance holds between tool calls, and its handle.
+ *
+ * Generic on purpose: the host keeps instances by this handle (MCP SEP-2567 —
+ * no protocol session; state named by an explicit handle), whatever the state
+ * is. The debugger is one part; locks will be another. Nothing expires here.
+ */
+import { randomBytes } from 'node:crypto';
+
+export interface StateDescription { kind: string; [field: string]: unknown }
+export interface StatePart { holdsState(): boolean; dispose(): Promise<void>; describe(): StateDescription[]; observe(onChange: () => void): void }
+export interface StateHost {
+  readonly owner: string | null;
+  reserve(kind: string, handle: string): string | undefined;
+  peers(): Array<{ state_handle: string; states: StateDescription[] }>;
+}
+export class StateUnavailableError extends Error {
+  constructor() { super('state is not available'); }
+}
+
+const newHandle = () => randomBytes(16).toString('hex').toUpperCase();
+
+export class InstanceState {
+  private current = newHandle();
+  private readonly parts: StatePart[] = [];
+  private readonly emptyListeners: Array<() => void> = [];
+  private wasHolding = false;
+  host?: StateHost;
+
+  get handle(): string { return this.current; }
+
+  attach(part: StatePart): void {
+    this.parts.push(part);
+    part.observe(() => this.changed());
+  }
+
+  holdsState(): boolean { return this.parts.some((p) => p.holdsState()); }
+
+  describe() { return { state_handle: this.current, states: this.parts.flatMap((p) => p.describe()) }; }
+
+  admit(kind: string): void {
+    if (!this.host) return;                            // stdio, SSE: one instance per session
+    if (this.host.owner === null) throw new Error('this request carries no identity to keep state under');
+    const holder = this.host.reserve(kind, this.current);
+    if (holder && holder !== this.current) throw new Error(`a ${kind} debug session is already open: state_handle ${holder}`);
+  }
+
+  check(handle: unknown): void {
+    if (typeof handle !== 'string' || handle !== this.current || !this.holdsState()) throw new StateUnavailableError();
+  }
+
+  rotateIfEmpty(): void {
+    if (!this.holdsState()) this.current = newHandle();
+  }
+
+  onEmpty(listener: () => void): void { this.emptyListeners.push(listener); }
+
+  private changed(): void {
+    const holding = this.holdsState();
+    if (this.wasHolding && !holding) for (const l of this.emptyListeners) l();
+    this.wasHolding = holding;
+  }
+
+  async dispose(): Promise<void> {
+    const results = await Promise.allSettled(this.parts.map((p) => p.dispose()));
+    const failures = results.flatMap((r) => (r.status === 'rejected' ? [r.reason instanceof Error ? r.reason.message : String(r.reason)] : []));
+    if (failures.length) throw new Error(failures.join('; '));
+  }
+}
+```
+
+`src/lib/state/index.ts` re-exports it. Add a `./state` export to `package.json` the same way as `./debugger`.
+
+- [ ] **Step 4: Implement the debugger side**
 
 ```ts
 // src/lib/debugger/ports.ts
@@ -2538,34 +2805,33 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
 }
 ```
 
-Check the `run({…}, {analyse})` shape against `handleRuntimeRunClass.ts:146-156` and `handleRuntimeRunProgram.ts:107-119`, and copy what those use. Check the root exports with `grep -n "AbapDebugger\|AdtExecutor\|getSystemInformation\|AmdpDebugger" node_modules/@mcp-abap-adt/adt-clients/dist/index.d.ts`. Import anything missing from `/runtime` or `/core`.
 
-- [ ] **Step 4: Implement `DebuggerInstance.ts`, `access.ts`, `answer.ts`, `schemas.ts`, `index.ts`**
+Check the `run({…}, {analyse})` shape against `handleRuntimeRunClass.ts:146-156` / `handleRuntimeRunProgram.ts:107-119`, and the root exports with `grep -n "AbapDebugger\|AdtExecutor\|getSystemInformation\|AmdpDebugger" node_modules/@mcp-abap-adt/adt-clients/dist/index.d.ts`. Import anything missing from `/runtime` or `/core`. If `getSystemInformation` throws on a 404 instead of answering `null`, map only the not-found case to `null`; let authentication and network failures through. `closeQuietly` is right here: the connector's `disconnect()` never throws by contract, so there is no close failure to report.
 
 ```ts
 // src/lib/debugger/DebuggerInstance.ts
 import type { HandlerContext } from '../../handlers/interfaces';
+import type { StateDescription, StatePart } from '../state/InstanceState';
 import { AmdpSession } from './AmdpSession';
 import { DebugCleanupError, DebugSession } from './DebugSession';
-import { type DebuggerIds, newDebuggerId, resolveDebuggerIds } from './ids';
+import { type DebuggerIds, resolveDebuggerIds } from './ids';
 import { liveAmdpPorts, liveDebugPorts } from './ports';
 
-/** One server instance's debugger: its handle, its SAP ids, both kinds. */
-export class DebuggerInstance {
-  readonly handle: string;
+/** One server instance's debugger — a part of its state: both kinds, the SAP ids. */
+export class DebuggerInstance implements StatePart {
   readonly abap: DebugSession<HandlerContext>;
   readonly amdp: AmdpSession<HandlerContext>;
-  constructor(sessions: { abap: DebugSession<HandlerContext>; amdp: AmdpSession<HandlerContext> }, handle = newDebuggerId()) {
+  constructor(sessions: { abap: DebugSession<HandlerContext>; amdp: AmdpSession<HandlerContext> }) {
     this.abap = sessions.abap;
     this.amdp = sessions.amdp;
-    this.handle = handle;
   }
   holdsState(): boolean { return this.abap.holdsState() || this.amdp.holdsState(); }
-  describe() {
-    const ids = { debug_session: this.handle, terminal_id: this.abap.ids.terminalId, ide_id: this.abap.ids.ideId };
+  observe(onChange: () => void): void { this.abap.observe(onChange); this.amdp.observe(onChange); }
+  describe(): StateDescription[] {
+    const ids = { terminal_id: this.abap.ids.terminalId, ide_id: this.abap.ids.ideId };
     return [
-      ...(this.abap.holdsState() ? [{ ...ids, ...this.abap.describe() }] : []),
-      ...(this.amdp.holdsState() ? [{ ...ids, ...this.amdp.describe() }] : []),
+      ...(this.abap.holdsState() ? [{ ...this.abap.describe(), ...ids }] : []),
+      ...(this.amdp.holdsState() ? [this.amdp.describe()] : []),
     ];
   }
   async stop(): Promise<void> {
@@ -2581,25 +2847,17 @@ export function createDebuggerInstance(ids: DebuggerIds & { stated: boolean } = 
 }
 ```
 
-`DebugSession.ids` is declared `readonly ids` in Task 4, and it is public, so `describe()` can read it.
-
 ```ts
 // src/lib/debugger/access.ts
 import type { HandlerContext } from '../../handlers/interfaces';
 import type { DebuggerInstance } from './DebuggerInstance';
 
-export class DebugSessionUnavailableError extends Error {
-  constructor() { super('debug session is not available'); }
-}
-
-/** create: the starting tools; use: every tool on an existing session — the handle must be this instance's and hold something. */
-export function requireDebugger(context: HandlerContext, args: unknown, mode: 'create' | 'use'): DebuggerInstance {
-  if (!context.debugger) throw new Error('debugging is not served by this server');
+/** create: a starting tool — the kind is admitted (identity, per-owner slot); use: the handle must be this instance's with state held. */
+export function requireDebugger(context: HandlerContext, args: unknown, mode: { create: 'abap' | 'amdp' } | 'use'): DebuggerInstance {
+  if (!context.state || !context.debugger) throw new Error('debugging is not served by this server');
+  if (mode === 'use') context.state.check((args as { state_handle?: unknown } | undefined)?.state_handle);
+  else context.state.admit(mode.create);
   const instance = context.debugger();
-  if (mode === 'use') {
-    const handle = (args as { debug_session?: unknown } | undefined)?.debug_session;
-    if (typeof handle !== 'string' || handle !== instance.handle || !instance.holdsState()) throw new DebugSessionUnavailableError();
-  }
   instance.abap.bind(context);
   instance.amdp.bind(context);
   return instance;
@@ -2630,9 +2888,11 @@ export async function debugAnswer<T>(args: unknown, work: () => Promise<DebugVie
   }
 }
 
-export async function debugStateAnswer(args: unknown, work: () => Promise<DebugState>, extra: Record<string, unknown> = {}): Promise<McpResult> {
+export async function debugStateAnswer(args: unknown, work: () => Promise<DebugState>, extraOf: () => Record<string, unknown> = () => ({})): Promise<McpResult> {
+  let extra: Record<string, unknown> = {};
   return debugAnswer(args, async () => {
     const state = await work();
+    extra = extraOf();
     const raw = state.state === 'stopped' ? [state.stop.raw.debuggee, state.stop.raw.attach, state.stop.raw.stack].join('\n') : JSON.stringify(state);
     return { value: state, raw };
   },
@@ -2640,6 +2900,7 @@ export async function debugStateAnswer(args: unknown, work: () => Promise<DebugS
   (s) => ({ ...s, ...extra }));
 }
 ```
+
 
 `schemas.ts`, complete. Every description states only the function:
 
@@ -2653,8 +2914,8 @@ import { type BreakpointTarget, lineUriOf } from './objectUri';
 export const USER_MODE_SENTENCE = 'Catches every request of the connected SAP user, not only programs run by this server.';
 export const TAKE_OVER_SENTENCE = 'Displaces another debugger listening for the same user.';
 
-export const DEBUG_SESSION_PROPERTY = {
-  debug_session: { type: 'string', description: 'The debug session the start answered.' },
+export const STATE_HANDLE_PROPERTY = {
+  state_handle: { type: 'string', description: 'Opaque handle identifying the server-held state this operation works on.' },
 } as const;
 
 export const HOLD_SECONDS_PROPERTY = {
@@ -2740,6 +3001,7 @@ export function runFromArgs(raw: unknown): RunTarget | undefined {
 }
 ```
 
+
 ```ts
 // src/lib/debugger/index.ts
 export * from './access';
@@ -2759,43 +3021,47 @@ export * from './serial';
 
 - [ ] **Step 5: Wire the server instance**
 
-In `src/handlers/interfaces.ts`, import `type DebuggerInstance` from `'../lib/debugger/DebuggerInstance'` and add `debugger?: () => DebuggerInstance` to `HandlerContext`, with the doc comment «This server instance's debugger, created on first use».
+`src/handlers/interfaces.ts`: add `state?: InstanceState` and `debugger?: () => DebuggerInstance` to `HandlerContext` (type imports from `../lib/state/InstanceState` and `../lib/debugger/DebuggerInstance`).
 
-In `src/embeddable/BaseMcpServer.ts`:
+`src/embeddable/BaseMcpServer.ts`:
 
 ```ts
+  /** What this instance holds between tool calls, and its handle (MCP SEP-2567). */
+  readonly state = new InstanceState();
   private debuggerInstance?: DebuggerInstance;
 
-  /** This instance's debugger, created on first use inside a call's scope (so stated ids are read there). */
+  /** Created on first use inside a call's scope, so stated ids are read there; attached to the state. */
   protected debuggerFor(): DebuggerInstance {
-    this.debuggerInstance ??= createDebuggerInstance();
+    if (!this.debuggerInstance) {
+      this.debuggerInstance = createDebuggerInstance();
+      this.state.attach(this.debuggerInstance);
+    }
     return this.debuggerInstance;
   }
-  get debugHandle(): string | undefined { return this.debuggerInstance?.handle; }
-  holdsState(): boolean { return this.debuggerInstance?.holdsState() ?? false; }
-  /** Stops what this instance's debugger holds; awaited by every host before it lets the instance go. */
-  async dispose(): Promise<void> {
-    const instance = this.debuggerInstance;
-    if (!instance) return;
-    await instance.dispose();
-    if (!instance.holdsState()) this.debuggerInstance = undefined;
-  }
+  get stateHandle(): string { return this.state.handle; }
+  holdsState(): boolean { return this.state.holdsState(); }
+  /** Undoes what the instance holds; awaited by every host before it lets the instance go. */
+  dispose(): Promise<void> { return this.state.dispose(); }
 ```
 
-Where the context is built (l.257-261), add `debugger: () => this.debuggerFor()`. The context is built outside `withDestinationSystemContext`, but `debuggerFor` runs when a handler calls it, inside the scope. So the destination's stated ids are seen.
+Where the context is built (l.257-261), add `state: this.state, debugger: () => this.debuggerFor()`.
 
-`package.json`: add the `./debugger` export after `./compact-shared` (`types`/`import`/`require` → `./dist/lib/debugger/index.{d.ts,js}`), and `"debugger": ["dist/lib/debugger/index.d.ts"]` under `typesVersions["*"]`.
+`package.json`: add the `./debugger` and `./state` exports after `./compact-shared` (`types`/`import`/`require` → `./dist/lib/<dir>/index.{d.ts,js}`), and both under `typesVersions["*"]`.
 
-- [ ] **Step 6: Run the folder, the type check and the build**
+Add both subpaths to the places that resolve lib's subpaths, so the server and compact packages and the tests reach them the way they reach `@mcp-abap-adt/lib/handlers`:
+- the jest `moduleNameMapper` in `package.json`: `"^@mcp-abap-adt/lib/debugger$": "<rootDir>/src/lib/debugger/index.ts"` and `"^@mcp-abap-adt/lib/state$": "<rootDir>/src/lib/state/index.ts"`;
+- `paths` in `server/tsconfig.json` and `compact/tsconfig.json`: `"@mcp-abap-adt/lib/debugger": ["../dist/lib/debugger/index.d.ts"]` and `"@mcp-abap-adt/lib/state": ["../dist/lib/state/index.d.ts"]`.
 
-Run: `npx jest src/__tests__/unit/debugger/ && npm run test:check && npm run build`
+- [ ] **Step 6: Run the folders, the type check and the build**
+
+Run: `npx jest src/__tests__/unit/state/ src/__tests__/unit/debugger/ && npm run test:check && npm run build`
 Expected: PASS, no type errors, clean build.
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/lib/debugger/ src/handlers/interfaces.ts src/embeddable/BaseMcpServer.ts package.json src/__tests__/unit/debugger/
-git commit -m "feat(debugger): the server instance owns its debugger — handle, ids, both kinds, dispose"
+git add src/lib/state/ src/lib/debugger/ src/handlers/interfaces.ts src/embeddable/BaseMcpServer.ts package.json src/__tests__/unit/
+git commit -m "feat(state): the server instance owns its state and handle; the debugger is its first part"
 ```
 
 ---
@@ -2833,9 +3099,11 @@ describe('the debug set', () => {
   it('is a handler set of its own', () => {
     expect(new DebugHandlersGroup({ connection: undefined } as any).getName()).toBe('DebugHandlers');
   });
-  it('HandlerExporter leaves it out unless asked', () => {
+  it('HandlerExporter leaves it out unless asked, and gives it when asked', () => {
     const names = (o: any) => new HandlerExporter(o).getHandlerEntries().map((e) => e.toolDefinition.name);
     expect(names({}).some((n: string) => /^(Debug|AmdpDebug|MemorySnapshot)/.test(n))).toBe(false);
+    // the group is filled in Tasks 10-12; this assertion is tightened there to the tool names
+    expect(() => names({ includeDebug: true })).not.toThrow();
   });
 });
 ```
@@ -2889,7 +3157,7 @@ Config and exporter:
   }
 ```
 
-Add this beside the `high`/`low` pushes (l.528-533). Add `statefulGroups?: (context: HandlerContext) => IHandlerGroup[]` to `LauncherOptions` for compact (Task 13), and push those groups the same way.
+Add this beside the `high`/`low` pushes (l.528-533). `DebugHandlersGroup` is imported from `@mcp-abap-adt/lib/handlers` like the other groups (l.26); export it from `src/lib/handlers/index.ts` through `groups/index.ts`. Add `statefulGroups?: (context: HandlerContext) => IHandlerGroup[]` to `LauncherOptions` for compact (Task 13), and push those groups the same way.
 
 stdio shutdown (l.613-620): `servers: [{ close: () => server.dispose() }]`, where `server` is the `StdioServer` (a `BaseMcpServer`). `installShutdown` already reports a rejected close and exits with 1.
 
@@ -2931,78 +3199,97 @@ git commit -m "feat(debugger): opt-in debug set; stdio disposes at shutdown, SSE
 
 ### Task 9: `InstancePool` — Streamable HTTP keeps the instance that holds state
 
+The pool is the host's one mechanism for continuity (spec D9). It knows `stateHandle`, `holdsState()`, `dispose()` and `InstanceState`, and nothing about debugging.
+
 **Files:**
 - Create: `server/src/InstancePool.ts`
-- Modify: `server/src/StreamableHttpServer.ts` (l.164-240: take the server from the pool; `stop()`: pool shutdown)
+- Modify: `server/src/StreamableHttpServer.ts` (l.164-240: resolve the destination and owner, then take the server from the pool; `stop()`: pool shutdown)
 - Test: `server/src/__tests__/InstancePool.test.ts`, `server/src/__tests__/streamableHttpPool.test.ts`
 
 **Interfaces:**
+- Consumes: `InstanceState`, `StateHost`, `StateDescription` (Task 7).
 - Produces:
 
 ```ts
-export interface Poolable { readonly debugHandle: string | undefined; holdsState(): boolean; dispose(): Promise<void> }
+export interface Poolable { readonly state: InstanceState; readonly stateHandle: string; holdsState(): boolean; dispose(): Promise<void> }
 export class BatchWithHandleError extends Error {}
 export class PoolClosedError extends Error {}
-/** The `debug_session` a single `tools/call` carries; a batch carrying one is refused. */
-export function handleOf(body: unknown): string | undefined;
+export function handleOf(body: unknown): string | undefined;   // single tools/call only; a batch carrying one is refused
 export class InstancePool<T extends Poolable> {
-  /**
-   * Once per request (= one stateless MCP session): the held instance the
-   * handle names when its owner matches, else a new one; `work` runs with it
-   * leased (one at a time per instance); afterwards it is kept while it holds
-   * state, and disposed otherwise.
-   */
-  serve(request: { handle?: string; owner: string }, create: () => T, work: (instance: T) => Promise<void>): Promise<void>;
+  serve(request: { handle?: string; owner: string | null }, create: () => T, work: (instance: T) => Promise<void>): Promise<void>;
   size(): number;
-  /** Stop admission, wait for the leases, dispose every held instance; resolves with what failed. */
-  shutdown(): Promise<string[]>;
+  shutdown(): Promise<string[]>;   // stop admission, drain the leases, dispose every held instance; what failed
 }
 ```
 
-**Owner** (D14, our HTTP): `dest:<destination>` for a destination request. For an `x-sap-*` request, a SHA-256 of `<x-sap-url>|<x-sap-client>|<x-sap-login or the token's user claim>`. An unknown handle and a handle of another owner both get a fresh instance, and on it the tool answers `debug session is not available`. The two cases look identical.
+**What `serve` does, once per request (one stateless MCP session):**
+1. It takes the held instance the handle names when the owner matches; otherwise it creates a new one. Both an unknown handle and another owner's handle get a new instance, and the tool on it answers `state is not available`.
+2. It lends the instance a `StateHost` for this owner, whose `owner`, `reserve` and `peers` come from the pool's owner index.
+3. It runs `work` under the instance's lease, one transport at a time. A queued request revalidates the entry when its turn comes; if the instance left the pool meanwhile, it gets a new one.
+4. Afterwards it keeps the instance under its current handle if it holds state; otherwise it disposes it and releases its reservations.
+
+An instance that stops holding state asynchronously (`onEmpty`) is evicted and disposed by the pool, without waiting for a request. A disposal failure is kept and reported by `shutdown()`.
+
+**Owner** (D9): a destination request is owned by `dest:<destination>`. An `x-sap-*` request is owned by a SHA-256 of `<x-sap-url>|<x-sap-client>|<x-sap-login, or the token's user claim>`. With neither a login nor a user claim the owner is `null`, and a state-creating call refuses (`InstanceState.admit`).
 
 - [ ] **Step 1: Write the failing pool tests**
 
 ```ts
 // server/src/__tests__/InstancePool.test.ts
+import { InstanceState } from '@mcp-abap-adt/lib/state';
 import { BatchWithHandleError, handleOf, InstancePool, PoolClosedError } from '../InstancePool';
 
+/** A poolable whose one part we drive by hand. */
 class Fake {
-  debugHandle: string | undefined;
+  readonly state = new InstanceState();
   held = false;
   disposed = 0;
-  constructor(readonly n: number) {}
-  holdsState() { return this.held; }
-  async dispose() { this.disposed++; this.held = false; }
+  failDispose = false;
+  private notify: () => void = () => {};
+  constructor(readonly n: number) {
+    this.state.attach({
+      holdsState: () => this.held,
+      dispose: async () => { this.disposed++; if (this.failDispose) throw new Error('listener still up'); this.set(false); },
+      describe: () => (this.held ? [{ kind: 'abap' }] : []),
+      observe: (f) => { this.notify = f; },
+    });
+  }
+  set(v: boolean) { this.held = v; this.notify(); }
+  get stateHandle() { return this.state.handle; }
+  holdsState() { return this.state.holdsState(); }
+  dispose() { return this.state.dispose(); }
 }
 
+let n = 0;
+const create = () => new Fake(++n);
+const gate = () => { let open!: () => void; const p = new Promise<void>((r) => { open = r; }); return { p, open }; };
+const tick = () => new Promise((r) => setImmediate(r));
+
 describe('handleOf', () => {
-  it('reads debug_session from a single tools/call only', () => {
-    expect(handleOf({ method: 'tools/call', params: { arguments: { debug_session: 'H' } } })).toBe('H');
+  it('reads state_handle from a single tools/call only; refuses a batch carrying one', () => {
+    expect(handleOf({ method: 'tools/call', params: { arguments: { state_handle: 'H' } } })).toBe('H');
     expect(handleOf({ method: 'tools/list' })).toBeUndefined();
-    expect(handleOf({ method: 'tools/call', params: { arguments: {} } })).toBeUndefined();
-  });
-  it('refuses a batch carrying a handle', () => {
-    expect(() => handleOf([{ method: 'tools/call', params: { arguments: { debug_session: 'H' } } }])).toThrow(BatchWithHandleError);
+    expect(() => handleOf([{ method: 'tools/call', params: { arguments: { state_handle: 'H' } } }])).toThrow(BatchWithHandleError);
     expect(handleOf([{ method: 'tools/list' }])).toBeUndefined();
   });
 });
 
 describe('InstancePool', () => {
-  let n = 0;
-  const create = () => new Fake(++n);
+  async function holding(pool: InstancePool<Fake>, owner = 'A') {
+    let inst!: Fake;
+    await pool.serve({ owner }, create, async (i) => { inst = i; i.set(true); });
+    return inst;
+  }
 
-  it('a request without a handle gets a new instance; kept when it holds state, under its handle', async () => {
+  it('keeps an instance that holds state under its handle; the next request with it gets the same instance', async () => {
     const pool = new InstancePool<Fake>();
-    let first!: Fake;
-    await pool.serve({ owner: 'A' }, create, async (i) => { first = i; i.debugHandle = 'H1'; i.held = true; });
-    expect(pool.size()).toBe(1);
+    const first = await holding(pool);
     let second!: Fake;
-    await pool.serve({ handle: 'H1', owner: 'A' }, create, async (i) => { second = i; });
+    await pool.serve({ handle: first.stateHandle, owner: 'A' }, create, async (i) => { second = i; });
     expect(second).toBe(first);
   });
 
-  it('an instance that holds nothing is disposed, not kept', async () => {
+  it('disposes an instance that holds nothing', async () => {
     const pool = new InstancePool<Fake>();
     let i0!: Fake;
     await pool.serve({ owner: 'A' }, create, async (i) => { i0 = i; });
@@ -3010,47 +3297,66 @@ describe('InstancePool', () => {
     expect(i0.disposed).toBe(1);
   });
 
-  it('a held instance that stops holding state leaves the pool', async () => {
+  it('another owner, or an unknown handle, gets a fresh instance', async () => {
     const pool = new InstancePool<Fake>();
-    await pool.serve({ owner: 'A' }, create, async (i) => { i.debugHandle = 'H1'; i.held = true; });
-    await pool.serve({ handle: 'H1', owner: 'A' }, create, async (i) => { i.held = false; });
-    expect(pool.size()).toBe(0);
+    const held = await holding(pool);
+    for (const req of [{ handle: held.stateHandle, owner: 'B' }, { handle: 'NOPE', owner: 'A' }]) {
+      let got!: Fake;
+      await pool.serve(req, create, async (i) => { got = i; });
+      expect(got).not.toBe(held);
+    }
   });
 
-  it('another owner with the handle gets a fresh instance, the same as an unknown handle', async () => {
+  it('serves one instance one request at a time; a queued request whose instance left the pool gets a new one', async () => {
     const pool = new InstancePool<Fake>();
-    let held!: Fake;
-    await pool.serve({ owner: 'A' }, create, async (i) => { held = i; i.debugHandle = 'H1'; i.held = true; });
-    let other!: Fake;
-    await pool.serve({ handle: 'H1', owner: 'B' }, create, async (i) => { other = i; });
-    expect(other).not.toBe(held);
-    let unknown!: Fake;
-    await pool.serve({ handle: 'NOPE', owner: 'A' }, create, async (i) => { unknown = i; });
-    expect(unknown).not.toBe(held);
-  });
-
-  it('two requests for one instance are served one after the other (one transport at a time)', async () => {
-    const pool = new InstancePool<Fake>();
-    await pool.serve({ owner: 'A' }, create, async (i) => { i.debugHandle = 'H1'; i.held = true; });
+    const held = await holding(pool);
+    const g = gate();
     const order: string[] = [];
-    let release!: () => void;
-    const gate = new Promise<void>((r) => { release = r; });
-    const a = pool.serve({ handle: 'H1', owner: 'A' }, create, async () => { order.push('a-in'); await gate; order.push('a-out'); });
-    const b = pool.serve({ handle: 'H1', owner: 'A' }, create, async () => { order.push('b-in'); });
-    await new Promise((r) => setImmediate(r));
+    let second!: Fake;
+    const a = pool.serve({ handle: held.stateHandle, owner: 'A' }, create, async (i) => { order.push('a-in'); await g.p; i.set(false); order.push('a-out'); });
+    const b = pool.serve({ handle: held.stateHandle, owner: 'A' }, create, async (i) => { order.push('b-in'); second = i; });
+    await tick();
     expect(order).toEqual(['a-in']);
-    release();
+    g.open();
     await Promise.all([a, b]);
     expect(order).toEqual(['a-in', 'a-out', 'b-in']);
+    expect(second).not.toBe(held);          // `a` emptied it: it left the pool before `b`'s turn
   });
 
-  it('shutdown stops admission, waits for leases, disposes every held instance and reports failures', async () => {
+  it('an instance that empties on its own is evicted and disposed without a request', async () => {
     const pool = new InstancePool<Fake>();
-    let held!: Fake;
-    await pool.serve({ owner: 'A' }, create, async (i) => { held = i; i.debugHandle = 'H1'; i.held = true; });
-    held.dispose = async () => { throw new Error('listener still up'); };
-    const failures = await pool.shutdown();
-    expect(failures).toEqual(['H1: listener still up']);
+    const held = await holding(pool);
+    held.set(false);
+    await tick();
+    expect(pool.size()).toBe(0);
+    expect(held.disposed).toBe(1);
+  });
+
+  it('the per-owner slot: a second start of the kind is told the holder; peers lists the owner states', async () => {
+    const pool = new InstancePool<Fake>();
+    let firstHandle = '';
+    await pool.serve({ owner: 'A' }, create, async (i) => { i.state.admit('abap'); i.set(true); firstHandle = i.stateHandle; });
+    await pool.serve({ owner: 'A' }, create, async (i) => {
+      expect(() => i.state.admit('abap')).toThrow(firstHandle);
+      expect(i.state.host!.peers().map((p) => p.state_handle)).toContain(firstHandle);
+    });
+    await pool.serve({ owner: 'B' }, create, async (i) => { expect(() => i.state.admit('abap')).not.toThrow(); });
+  });
+
+  it('shutdown stops admission, waits for an active lease, disposes held instances and reports failures', async () => {
+    const pool = new InstancePool<Fake>();
+    const held = await holding(pool);
+    held.failDispose = true;
+    const g = gate();
+    let leaseDone = false;
+    const active = pool.serve({ handle: held.stateHandle, owner: 'A' }, create, async () => { await g.p; leaseDone = true; });
+    await tick();
+    const shutting = pool.shutdown();
+    await tick();
+    expect(leaseDone).toBe(false);          // still waiting for the lease
+    g.open();
+    await active;
+    expect(await shutting).toEqual([`${held.stateHandle}: listener still up`]);
     await expect(pool.serve({ owner: 'A' }, create, async () => {})).rejects.toThrow(PoolClosedError);
   });
 });
@@ -3061,6 +3367,8 @@ describe('InstancePool', () => {
 Run: `npx jest server/src/__tests__/InstancePool.test.ts`
 Expected: FAIL, "Cannot find module".
 
+The server imports lib only through its published subpaths (`server/tsconfig.json` `rootDir` is `server/src`). The `@mcp-abap-adt/lib/state` path and jest mapping were added in Task 7. Run `npm run build` before these tests so `dist` holds the state module.
+
 - [ ] **Step 3: Implement the pool**
 
 ```ts
@@ -3069,25 +3377,22 @@ Expected: FAIL, "Cannot find module".
  * Streamable HTTP keeps the MCP instance that holds state between calls.
  *
  * The transport is stateless — every request is an MCP session of its own —
- * and the state a debugger needs lives in an instance (measured: a continuous
+ * and state lives in an instance (measured for the debugger: a continuous
  * poll, an attach within seconds, the attaching ABAP session; over RFC nothing
  * carries that session to another connection). So per request the host takes
- * an instance once: the one the request's `debug_session` names, when the
- * owner matches, or a new one. One transport at a time per instance (the SDK
- * binds one), so requests for one instance are leased in turn. An instance
- * that holds nothing is disposed; nothing expires on a clock.
+ * an instance once: the one the request's `state_handle` names, when the owner
+ * matches, or a new one. One transport at a time per instance (the SDK binds
+ * one). An instance that holds nothing is disposed; nothing expires on a clock.
  */
-export interface Poolable { readonly debugHandle: string | undefined; holdsState(): boolean; dispose(): Promise<void> }
-export class BatchWithHandleError extends Error {
-  constructor() { super('a JSON-RPC batch cannot carry debug_session'); }
-}
-export class PoolClosedError extends Error {
-  constructor() { super('the server is shutting down'); }
-}
+import type { InstanceState, StateDescription, StateHost } from '@mcp-abap-adt/lib/state';
+
+export interface Poolable { readonly state: InstanceState; readonly stateHandle: string; holdsState(): boolean; dispose(): Promise<void> }
+export class BatchWithHandleError extends Error { constructor() { super('a JSON-RPC batch cannot carry state_handle'); } }
+export class PoolClosedError extends Error { constructor() { super('the server is shutting down'); } }
 
 export function handleOf(body: unknown): string | undefined {
   const one = (m: any): string | undefined =>
-    m?.method === 'tools/call' && typeof m?.params?.arguments?.debug_session === 'string' ? m.params.arguments.debug_session : undefined;
+    m?.method === 'tools/call' && typeof m?.params?.arguments?.state_handle === 'string' ? m.params.arguments.state_handle : undefined;
   if (Array.isArray(body)) {
     if (body.some((m) => one(m) !== undefined)) throw new BatchWithHandleError();
     return undefined;
@@ -3098,58 +3403,92 @@ export function handleOf(body: unknown): string | undefined {
 interface Held<T> { instance: T; owner: string; tail: Promise<unknown> }
 
 export class InstancePool<T extends Poolable> {
-  private readonly held = new Map<string, Held<T>>();
+  private readonly held = new Map<T, Held<T>>();                // by instance
+  private readonly slots = new Map<string, T>();                // `${owner}|${kind}` → holder
   private readonly active = new Set<Promise<unknown>>();
+  private readonly disposalFailures: string[] = [];
   private admitting = true;
 
   size(): number { return this.held.size; }
 
-  async serve(request: { handle?: string; owner: string }, create: () => T, work: (instance: T) => Promise<void>): Promise<void> {
+  private byHandle(handle: string): Held<T> | undefined {
+    for (const entry of this.held.values()) if (entry.instance.stateHandle === handle) return entry;
+    return undefined;
+  }
+
+  private hostFor(owner: string | null, instance: T): StateHost {
+    return {
+      owner,
+      reserve: (kind) => {
+        if (owner === null) return undefined;
+        const key = `${owner}|${kind}`;
+        const holder = this.slots.get(key);
+        if (holder && holder !== instance && holder.holdsState()) return holder.stateHandle;
+        this.slots.set(key, instance);
+        return undefined;
+      },
+      peers: () => {
+        const mine: Array<{ state_handle: string; states: StateDescription[] }> = [];
+        for (const e of this.held.values()) if (e.owner === owner) mine.push(e.instance.state.describe());
+        if (!this.held.has(instance) && instance.holdsState()) mine.push(instance.state.describe());
+        return mine;
+      },
+    };
+  }
+
+  async serve(request: { handle?: string; owner: string | null }, create: () => T, work: (instance: T) => Promise<void>): Promise<void> {
     if (!this.admitting) throw new PoolClosedError();
-    const entry = request.handle ? this.held.get(request.handle) : undefined;
-    const run = entry && entry.owner === request.owner
-      ? this.leased(entry, work)
-      : this.fresh(request.owner, create(), work);
+    const run = this.route(request, create, work);
     this.active.add(run);
     try { await run; } finally { this.active.delete(run); }
   }
 
-  private leased(entry: Held<T>, work: (instance: T) => Promise<void>): Promise<void> {
+  private async route(request: { handle?: string; owner: string | null }, create: () => T, work: (instance: T) => Promise<void>): Promise<void> {
+    const entry = request.handle ? this.byHandle(request.handle) : undefined;
+    if (!entry || entry.owner !== request.owner) return this.fresh(request.owner, create(), work);
     const turn = entry.tail.then(async () => {
-      try { await work(entry.instance); } finally { await this.settle(entry.instance, entry.owner); }
+      // Revalidate: the instance may have left the pool while this request waited.
+      if (this.held.get(entry.instance) !== entry) return this.fresh(request.owner, create(), work);
+      entry.instance.state.host = this.hostFor(request.owner, entry.instance);
+      try { await work(entry.instance); } finally { await this.settle(entry.instance, request.owner); }
     });
     entry.tail = turn.catch(() => undefined);
     return turn;
   }
 
-  private async fresh(owner: string, instance: T, work: (instance: T) => Promise<void>): Promise<void> {
+  private async fresh(owner: string | null, instance: T, work: (instance: T) => Promise<void>): Promise<void> {
+    instance.state.host = this.hostFor(owner, instance);
     try { await work(instance); } finally { await this.settle(instance, owner); }
   }
 
-  /** After a request: keep what holds state under its handle, dispose the rest. */
-  private async settle(instance: T, owner: string): Promise<void> {
-    const handle = instance.debugHandle;
-    if (instance.holdsState() && handle) {
-      const existing = this.held.get(handle);
-      if (!existing) this.held.set(handle, { instance, owner, tail: Promise.resolve() });
+  /** After a request: keep what holds state, dispose the rest. */
+  private async settle(instance: T, owner: string | null): Promise<void> {
+    if (instance.holdsState() && owner !== null) {
+      if (!this.held.has(instance)) {
+        this.held.set(instance, { instance, owner, tail: Promise.resolve() });
+        instance.state.onEmpty(() => void this.evict(instance));
+      }
       return;
     }
-    if (handle && this.held.get(handle)?.instance === instance) this.held.delete(handle);
-    await instance.dispose().catch(() => undefined);
+    await this.evict(instance);
+  }
+
+  private async evict(instance: T): Promise<void> {
+    this.held.delete(instance);
+    for (const [key, holder] of this.slots) if (holder === instance) this.slots.delete(key);
+    await instance.dispose().catch((e) => this.disposalFailures.push(`${instance.stateHandle}: ${e instanceof Error ? e.message : String(e)}`));
   }
 
   async shutdown(): Promise<string[]> {
     this.admitting = false;
     await Promise.allSettled([...this.active]);
-    const failures: string[] = [];
-    for (const [handle, entry] of this.held) {
-      await entry.instance.dispose().catch((e) => failures.push(`${handle}: ${e instanceof Error ? e.message : String(e)}`));
-    }
-    this.held.clear();
-    return failures;
+    for (const instance of [...this.held.keys()]) await this.evict(instance);
+    return this.disposalFailures.splice(0);
   }
 }
 ```
+
+An instance with state but a `null` owner is never kept. It cannot get state anyway, because `admit` refuses.
 
 - [ ] **Step 4: Run them and see them pass**
 
@@ -3158,29 +3497,30 @@ Expected: PASS.
 
 - [ ] **Step 5: Use the pool in `StreamableHttpServer`**
 
-In the request handler (l.164-240), keep the destination and header resolution exactly as it is, but run the per-request part through the pool:
+Rework the request handler (l.164-240) in this order:
+1. Pick the destination as today (Priority 1–4). This block moves above the pool.
+2. Read the handle with `handleOf(req.body)`, answering a `BatchWithHandleError` with 400.
+3. Compute the owner with a private `ownerOf(headers, destination)`, as described above. `tokenUser` decodes the JWT payload without verifying it; it is only a key, and SAP authenticates the token.
+4. Run the rest through the pool:
 
 ```ts
-        let handle: string | undefined;
-        try { handle = handleOf(req.body); }
-        catch (error) { res.status(400).send(error instanceof Error ? error.message : String(error)); return; }
-        const owner = ownerOf(req.headers, destination);
         await this.pool.serve({ handle, owner }, () => this.createPerRequestServer(), async (server) => {
-          // (the existing setConnectionContext… / connectPublic block, on `server`)
           const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: this.enableJsonResponse });
-          const closed = new Promise<void>((resolve) => res.on('close', () => resolve()));
-          await server.connect(transport);
-          await runWithRequestContext(requestContextFromHeaders(req.headers), () => transport.handleRequest(req, res, req.body));
-          await closed;              // the lease ends when the response is done…
-          await transport.close();   // …and the instance is free for the next transport
+          const responded = new Promise<void>((resolve) => { res.once('close', () => resolve()); res.once('finish', () => resolve()); });
+          try {
+            // the existing connection-context block, on `server`: the request's own credentials, every time
+            await server.connect(transport);
+            await runWithRequestContext(requestContextFromHeaders(req.headers), () => transport.handleRequest(req, res, req.body));
+            await responded;              // the lease lasts until the response is done…
+          } finally {
+            await transport.close();      // …and the transport goes, so the next request can bind its own
+          }
         });
 ```
 
-Here:
-- `this.pool = new InstancePool<PerRequestServerLike>()`;
-- `PerRequestServer` exposes `debugHandle`, `holdsState()` and `dispose()` from `BaseMcpServer`;
-- `ownerOf(headers, destination)` is a small private function: `destination ? \`dest:${destination}\` : sha256(\`${url}|${client}|${login ?? tokenUser(jwt)}\`)`, where `tokenUser` decodes the JWT payload without verifying it. That is only a key; SAP authenticates the token itself;
-- `destination` must be resolved before `serve`, so move the destination-picking block (Priority 1–4) above the `serve` call. The connection-context calls (`setConnectionContextFromHeadersPublic`, `firstConnect.run(...)`) move inside `work`, so a pooled instance gets the request's own credentials again.
+Here `this.pool = new InstancePool<PerRequestServer>()`, and `PerRequestServer` exposes `state`, `stateHandle`, `holdsState()` and `dispose()` from `BaseMcpServer`.
+
+The SDK aborts a handler's signal when its transport closes. The background listener is not a request handler and does not consume those signals (checked: `protocol.js:252-268`), so a transport close after a response does not touch it.
 
 `stop()`:
 
@@ -3188,7 +3528,7 @@ Here:
   async stop(): Promise<void> {
     const failures = await this.pool.shutdown();
     // (the existing listener close)
-    if (failures.length) throw new Error(`debugger cleanup failed: ${failures.join('; ')}`);
+    if (failures.length) throw new Error(`state cleanup failed: ${failures.join('; ')}`);
   }
 ```
 
@@ -3198,15 +3538,18 @@ Here:
 // server/src/__tests__/streamableHttpPool.test.ts
 ```
 
-Start a `StreamableHttpServer` on port 0 with a `CompositeHandlersRegistry` that holds one test group. Its group must have two tools whose handlers use only the debugger instance (`requireDebugger(context, args, 'create'|'use')`), with no SAP call:
-- `PoolProbeStart`: answers `{ debug_session: instance.handle }`, and sets a flag on the instance so `holdsState()` is true. A test-only subclass of `DebuggerInstance` with a `held` flag is enough.
-- `PoolProbeEcho`: answers the handle it was served with.
+Start a `StreamableHttpServer` on port 0. Its `CompositeHandlersRegistry` holds a test group with tools that touch only the instance state, with no SAP call:
+- `PoolProbeHold`: creates state. It attaches a test part whose `held` it sets to true, and answers `{ state_handle }`.
+- `PoolProbeEcho(state_handle)`: `context.state.check(args.state_handle)`, then answers its handle.
+- `PoolProbeGate(state_handle)`: like Echo, but awaits a gate the test opens.
+- `PoolProbeRelease(state_handle)`: sets `held` false.
 
-Then, over real HTTP with the SDK's `StreamableHTTPClientTransport` (a new client per call, so every request is its own MCP session):
-1. Call Start, then Echo with the handle. The same handle comes back, so the request reached the pooled instance.
-2. Echo with another handle answers `debug session is not available`.
-3. Two Echo calls at once both succeed; the lease served them in turn.
-4. `server.stop()` disposes the held instance.
+Over real HTTP, open a new SDK `StreamableHTTPClientTransport` client per call, so every request is its own MCP session. Run it in both `enableJsonResponse: true` and `false`:
+1. Hold, then Echo with the handle: the same handle comes back.
+2. Echo with another handle: `state is not available`.
+3. Gate, then Echo at once: Echo answers only after the test opens the gate. This proves the lease order.
+4. Release, then Echo with the old handle: not available, and the pool size is 0.
+5. Hold, then `server.stop()`: the instance was disposed.
 
 Run: `npx jest server/src/__tests__/streamableHttpPool.test.ts`
 Expected: PASS.
@@ -3215,7 +3558,7 @@ Expected: PASS.
 
 ```bash
 git add server/src/InstancePool.ts server/src/StreamableHttpServer.ts server/src/__tests__/
-git commit -m "feat(server): Streamable HTTP keeps the MCP instance that holds state — pool, lease, owner, shutdown"
+git commit -m "feat(server): one pool keeps the MCP instance that holds state — lease, owner index, eviction, shutdown"
 ```
 
 ---
@@ -3223,82 +3566,99 @@ git commit -m "feat(server): Streamable HTTP keeps the MCP instance that holds s
 ### Task 10: Core ABAP debugger tools
 
 **Files:**
-- Create: `src/handlers/debugger/debug/handleDebug*.ts` — 20 files, one per tool in the table below.
-- Modify:
-  - `src/lib/handlers/groups/DebugHandlersGroup.ts`;
-  - `tests/fixtures/tools/surface.json`;
-  - `src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts:131-139` (`includeDebug: true`).
+- Create: `src/handlers/debugger/debug/handleDebug*.ts`, one file per tool in the table below (20 files)
+- Modify: `src/lib/handlers/groups/DebugHandlersGroup.ts`, `tests/fixtures/tools/surface.json`, `src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts:131-139` (`includeDebug: true`), `src/__tests__/unit/debugger/exposition.test.ts` (tighten the `includeDebug: true` assertion to the tool names)
 - Test: `src/__tests__/unit/debugger/handlers.test.ts`
 
 **Interfaces:**
 - Consumes:
-  - `requireDebugger`, `DebugSessionUnavailableError` (Task 7);
-  - `debugAnswer`, `debugStateAnswer` (Task 7);
-  - the `schemas.ts` constants and parsers (Task 7);
-  - `terseStop`, `placeOf`, `terseVariables` (Task 3);
-  - `readXmlDocument` (Task 6);
-  - `lineUriOf` (Task 2);
-  - `DETAIL_PROPERTY` from `src/lib/strategies/detail`.
-- Produces: the tool names of spec §2 plus `DebugListSessions`.
+  - from Task 7: `requireDebugger(context, args, {create:'abap'} | 'use')`, `debugAnswer`, `debugStateAnswer`, `STATE_HANDLE_PROPERTY` and the schema constants and parsers, `InstanceState`;
+  - from Task 3: `terseStop`, `terseVariables`;
+  - from Task 6: `readXmlDocument`;
+  - from Task 2: `lineUriOf`;
+  - `DETAIL_PROPERTY`.
+- Produces: the tool names of spec §2, and `DebugListSessions`.
 
-**Every handler has this shape.** Here is one complete file:
+**The shape of every handler.** One complete file:
 
 ```ts
 // src/handlers/debugger/debug/handleDebugGetStack.ts
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseStop } from '../../../lib/debugger/readings';
-import { DEBUG_SESSION_PROPERTY } from '../../../lib/debugger/schemas';
+import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'DebugGetStack',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[debug] Call stack of the stopped debuggee: each frame as an object address and as its technical place. Needs a stopped debuggee.',
-  inputSchema: { type: 'object', properties: { ...DEBUG_SESSION_PROPERTY, ...DETAIL_PROPERTY }, required: ['debug_session'] },
+  description: '[debug] Call stack of the stopped debuggee, each frame as an object address and as its technical place. Needs a stopped debuggee.',
+  inputSchema: { type: 'object', properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY }, required: ['state_handle'] },
 } as const;
 
-export async function handleDebugGetStack(context: HandlerContext, args: { debug_session?: string; detail?: string }) {
-  return debugAnswer(args, () => requireDebugger(context, args, 'use').abap.getStack(), (stop) => terseStop(stop.debuggee, stop.stack));
+export async function handleDebugGetStack(context: HandlerContext, args: { state_handle?: string; detail?: string }) {
+  return debugAnswer(args, async () => requireDebugger(context, args, 'use').abap.getStack(), (stop) => terseStop(stop.debuggee, stop.stack));
 }
 ```
 
-Rules for every tool in the table:
-- the description starts with `[debug] `;
-- `properties` always spread `...DETAIL_PROPERTY`;
-- `available_in: ['onprem', 'cloud'] as const`;
-- a session tool spreads `...DEBUG_SESSION_PROPERTY` and lists `'debug_session'` in `required`;
-- in the body, `D('use')` stands for `requireDebugger(context, args, 'use')` and `D('create')` for `requireDebugger(context, args, 'create')`.
+`requireDebugger` is called inside the work, so a refusal comes back as a tool error.
+
+**Rules for every tool in the table:**
+- The description starts with `[debug] ` and states the function only. It has no list of answer fields and names no other tool.
+- `available_in: ['onprem', 'cloud'] as const`.
+- `...DETAIL_PROPERTY` is spread into the properties.
+- Every tool except the two starts and `DebugListSessions` spreads `...STATE_HANDLE_PROPERTY` and lists `'state_handle'` in `required`.
+- In the Body column, `U` is `requireDebugger(context, args, 'use')`.
+
+**The two starts:**
+
+```ts
+// handleDebugStartListener.ts (DebugTakeOverListener: the same with 'takeOver' and its own description)
+export async function handleDebugStartListener(context: HandlerContext, args: any) {
+  return debugStateAnswer(args, async () => {
+    const d = requireDebugger(context, args, { create: 'abap' });
+    const started = await d.abap.start('refuse', {
+      ...(args.breakpoints ? { breakpoints: breakpointsFromArgs(args.breakpoints) } : {}),
+      run: runFromArgs(args.run),
+    });
+    return started;
+  }, () => ({ state_handle: context.state!.handle, terminal_id: context.debugger!().abap.ids.terminalId, ide_id: context.debugger!().abap.ids.ideId }));
+}
+```
+
+To make that work, change `debugStateAnswer`'s third parameter (Task 7) from a fixed object to `extra: () => Record<string, unknown> = () => ({})`, evaluated after the work. Update its test to `() => ({ state_handle: 'H' })`. `breakpoints` in the answer comes from `start`; the terse projection shows `placed` and `refused` as `DebugSetBreakpoints` does.
 
 | Tool | Properties besides detail | Description after `[debug] ` | Body |
 |---|---|---|---|
-| `DebugStartListener` | `...BREAKPOINTS_PROPERTY` (optional here), `...RUN_PROPERTY` | `Starts a debug session: arms the given breakpoints, then listens for a debuggee of the connected SAP user and attaches the first one caught. Refused while another debugger listens for that user. ${USER_MODE_SENTENCE} Answers the session, its SAP ids and its state.` | `const d = D('create'); return debugStateAnswer(args, async () => { if (args.breakpoints) await d.abap.setBreakpoints(breakpointsFromArgs(args.breakpoints)); return d.abap.start('refuse', runFromArgs(args.run)); }, { debug_session: d.handle, terminal_id: d.abap.ids.terminalId, ide_id: d.abap.ids.ideId })` |
-| `DebugTakeOverListener` | same | `Starts a debug session like the listener start, taking the user's debugging over. ${TAKE_OVER_SENTENCE} ${USER_MODE_SENTENCE} Answers the session, its SAP ids and its state.` | same with `'takeOver'` |
-| `DebugWait` | `...DEBUG_SESSION_PROPERTY`, `...HOLD_SECONDS_PROPERTY` | `State of a debug session after waiting up to hold_seconds: listening, stopped (where the debuggee stands) or ended (how it ended; a background run with its output). A debugger that took the user over is an error carrying the system's message.` | `debugStateAnswer(args, () => D('use').abap.wait(Number(args.hold_seconds ?? 10)))` |
-| `DebugSetBreakpoints` | `...DEBUG_SESSION_PROPERTY`, `...BREAKPOINTS_PROPERTY` | `Adds breakpoints to a debug session: line, exception class, ABAP statement or message, each with an optional condition. Answers which were placed and which were refused, with the reason. ${USER_MODE_SENTENCE}` | `debugAnswer(args, () => D('use').abap.setBreakpoints(breakpointsFromArgs(args.breakpoints)), (v) => ({ placed: v.placed.map((p) => ({ id: p.id, kind: p.kind, ...(p.uri ? { uri: p.uri } : {}) })), refused: v.refused }))` |
-| `DebugDeleteBreakpoint` | `...DEBUG_SESSION_PROPERTY`, `breakpoint_id: {type:'string', description:'Breakpoint id.'}` | `Removes one breakpoint of a debug session by its id.` | `debugAnswer(args, async () => { await D('use').abap.deleteBreakpoint(String(args.breakpoint_id)); return { value: { deleted: args.breakpoint_id }, raw: '' }; }, (v) => v)` |
-| `DebugListBreakpoints` | `...DEBUG_SESSION_PROPERTY` | `Breakpoints a debug session armed, with their ids.` | `debugAnswer(args, async () => { const l = D('use').abap.listBreakpoints(); return { value: l, raw: JSON.stringify(l) }; }, (v) => v)` |
+| `DebugStartListener` | `...BREAKPOINTS_PROPERTY`, `...RUN_PROPERTY` | `Opens a debug session of the connected SAP user: arms breakpoints, listens for a debuggee and attaches the first one caught; refused while another debugger listens for that user. ${USER_MODE_SENTENCE}` | (above) |
+| `DebugTakeOverListener` | same | `Opens a debug session of the connected SAP user like a listener start, taking the user's debugging over. ${TAKE_OVER_SENTENCE} ${USER_MODE_SENTENCE}` | (above, `'takeOver'`) |
+| `DebugWait` | `...STATE_HANDLE_PROPERTY`, `...HOLD_SECONDS_PROPERTY` | `State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.` | `debugStateAnswer(args, async () => U.abap.wait(Number(args.hold_seconds ?? 10)))` |
+| `DebugSetBreakpoints` | `...STATE_HANDLE_PROPERTY`, `...BREAKPOINTS_PROPERTY` | `Adds breakpoints to a debug session — line, exception class, ABAP statement or message, with an optional condition — and reports which the system refused and why. ${USER_MODE_SENTENCE}` | `debugAnswer(args, async () => U.abap.setBreakpoints(breakpointsFromArgs(args.breakpoints)), (v) => ({ placed: v.placed.map((p) => ({ id: p.id, kind: p.kind, ...(p.uri ? { uri: p.uri } : {}) })), refused: v.refused }))` |
+| `DebugDeleteBreakpoint` | `...STATE_HANDLE_PROPERTY`, `breakpoint_id: {type:'string', description:'Breakpoint id.'}` | `Removes one breakpoint of a debug session.` | `debugAnswer(args, async () => { await U.abap.deleteBreakpoint(String(args.breakpoint_id)); return { value: { deleted: args.breakpoint_id }, raw: '' }; }, (v) => v)` |
+| `DebugListBreakpoints` | `...STATE_HANDLE_PROPERTY` | `Breakpoints a debug session armed.` | `debugAnswer(args, async () => { const l = U.abap.listBreakpoints(); return { value: l, raw: JSON.stringify(l) }; }, (v) => v)` |
 | `DebugGetStack` | (above) | (above) | (above) |
-| `DebugSetStackPosition` | `...DEBUG_SESSION_PROPERTY`, `position: {type:'number', description:'Frame position.'}` | `Selects the stack frame variables are read in; what runs next does not change. Needs a stopped debuggee.` | `debugAnswer(args, () => D('use').abap.setStackPosition(Number(args.position)), (s) => terseStop(s.debuggee, s.stack))` |
-| `DebugGetVariables` | `...DEBUG_SESSION_PROPERTY`, `names: {type:'array', items:{type:'string'}, description:'Variables by name; a path reads a component or a table row.'}`, `parents: {type:'array', items:{type:'string'}, description:'Instead of names, members of these: scopes, locals, parameters, an object, a table.'}` | `Variables of the stopped debuggee, by name or as members of a parent; each with name, type and value. Needs a stopped debuggee.` | `const a = D('use').abap; return debugAnswer(args, () => (Array.isArray(args.names) && args.names.length ? a.getVariables(args.names.map(String)) : a.getChildVariables(Array.isArray(args.parents) && args.parents.length ? args.parents.map(String) : ['@ROOT'])), (v) => (v.variables.length ? terseVariables(v) : v.children.map((c) => ({ id: c.child, label: c.label }))))` |
-| `DebugSetVariable` | `...DEBUG_SESSION_PROPERTY`, `name: {type:'string'}`, `value: {type:'string', description:'New value; converted to the type by the system.'}` | `Sets a variable of the stopped debuggee. Needs a stopped debuggee.` | `debugAnswer(args, () => D('use').abap.setVariable(String(args.name), String(args.value)), terseVariables)` |
-| `DebugStep` | `...DEBUG_SESSION_PROPERTY`, `action: {type:'string', enum:['into','over','return','continue']}` | `Moves the stopped debuggee into a call, over it, out of the current one, or on to the next stop; answers where it stands or how it ended.` | see the named constant below |
-| `DebugStepToLine` | `...DEBUG_SESSION_PROPERTY`, `mode: {type:'string', enum:['run','jump'], description:'run executes up to the line; jump moves there without executing what lies between.'}`, `...LINE_TARGET_PROPERTIES` | `Runs or jumps the stopped debuggee to a line; answers where it stands or how it ended.` | `debugStateAnswer(args, () => D('use').abap.stepToLine(args.mode === 'jump' ? 'stepJumpToLine' : 'stepRunToLine', lineUriOf(args, Number(args.line))))` |
-| `DebugTerminate` | `...DEBUG_SESSION_PROPERTY` | `Ends the stopped debuggee where it stands; the program does not run on.` | `debugStateAnswer(args, () => D('use').abap.terminate())` |
-| `DebugCreateWatchpoint` | `...DEBUG_SESSION_PROPERTY`, `name: {type:'string'}`, `condition: {type:'string'}` | `Watches a variable of the stopped debuggee; it stops when the variable changes, optionally under a condition.` | `debugAnswer(args, () => D('use').abap.createWatchpoint(String(args.name), args.condition ? String(args.condition) : undefined), readXmlDocument, readXmlDocument)` |
-| `DebugListWatchpoints` | `...DEBUG_SESSION_PROPERTY` | `Watchpoints of the stopped debuggee.` | `debugAnswer(args, () => D('use').abap.listWatchpoints(), readXmlDocument, readXmlDocument)` |
-| `DebugDeleteWatchpoint` | `...DEBUG_SESSION_PROPERTY`, `watchpoint_id: {type:'string'}` | `Removes a watchpoint by its id.` | `debugAnswer(args, async () => { await D('use').abap.deleteWatchpoint(String(args.watchpoint_id)); return { value: { deleted: args.watchpoint_id }, raw: '' }; }, (v) => v)` |
-| `DebugGetMemorySizes` | `...DEBUG_SESSION_PROPERTY` | `Memory the stopped debuggee uses. Needs a stopped debuggee.` | `debugAnswer(args, () => D('use').abap.getMemorySizes(), readXmlDocument, readXmlDocument)` |
-| `DebugCreateMemorySnapshot` | `...DEBUG_SESSION_PROPERTY` | `Writes a memory snapshot of the stopped debuggee; answers the file written.` | `debugAnswer(args, () => D('use').abap.createMemorySnapshot(), readXmlDocument, readXmlDocument)` |
-| `DebugStop` | `...DEBUG_SESSION_PROPERTY` | `Ends a debug session: releases a stopped debuggee, removes its breakpoints, stops listening for both ABAP and AMDP, closes its connections. What could not be undone is reported.` | `debugAnswer(args, async () => { await D('use').stop(); return { value: { state: 'idle' }, raw: '' }; }, (v) => v)` |
-| `DebugListSessions` | none (only detail) | `Debug sessions this server holds for the caller: session, kind, state and SAP ids.` | `debugAnswer(args, async () => { const d = D('create'); const l = d.describe(); return { value: l, raw: JSON.stringify(l) }; }, (v) => v)` |
+| `DebugSetStackPosition` | `...STATE_HANDLE_PROPERTY`, `position: {type:'number', description:'Frame position.'}` | `Selects the stack frame variables are read in; what runs next does not change. Needs a stopped debuggee.` | `debugAnswer(args, async () => U.abap.setStackPosition(Number(args.position)), (s) => terseStop(s.debuggee, s.stack))` |
+| `DebugGetVariables` | `...STATE_HANDLE_PROPERTY`, `names: {type:'array', items:{type:'string'}, description:'Variables by name; a path reads a component or a table row.'}`, `parents: {type:'array', items:{type:'string'}, description:'Instead of names: members of these scopes, objects or tables.'}` | `Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.` | `debugAnswer(args, async () => { const a = U.abap; return Array.isArray(args.names) && args.names.length ? a.getVariables(args.names.map(String)) : a.getChildVariables(Array.isArray(args.parents) && args.parents.length ? args.parents.map(String) : ['@ROOT']); }, (v) => (v.variables.length ? terseVariables(v) : v.children.map((c) => ({ id: c.child, label: c.label }))))` |
+| `DebugSetVariable` | `...STATE_HANDLE_PROPERTY`, `name: {type:'string'}`, `value: {type:'string', description:'New value; converted to the type by the system.'}` | `Sets a variable of the stopped debuggee. Needs a stopped debuggee.` | `debugAnswer(args, async () => U.abap.setVariable(String(args.name), String(args.value)), terseVariables)` |
+| `DebugStep` | `...STATE_HANDLE_PROPERTY`, `action: {type:'string', enum:['into','over','return','continue']}` | `Moves the stopped debuggee into a call, over it, out of the current one, or on to the next stop.` | named constant below |
+| `DebugStepToLine` | `...STATE_HANDLE_PROPERTY`, `mode: {type:'string', enum:['run','jump'], description:'run executes up to the line; jump moves there without executing what lies between.'}`, `...LINE_TARGET_PROPERTIES` | `Runs or jumps the stopped debuggee to a line.` | `debugStateAnswer(args, async () => U.abap.stepToLine(args.mode === 'jump' ? 'stepJumpToLine' : 'stepRunToLine', lineUriOf(args, Number(args.line))))` |
+| `DebugTerminate` | `...STATE_HANDLE_PROPERTY` | `Ends the stopped debuggee where it stands; the program does not run on.` | `debugStateAnswer(args, async () => U.abap.terminate())` |
+| `DebugCreateWatchpoint` | `...STATE_HANDLE_PROPERTY`, `name: {type:'string'}`, `condition: {type:'string'}` | `Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.` | `debugAnswer(args, async () => U.abap.createWatchpoint(String(args.name), args.condition ? String(args.condition) : undefined), readXmlDocument, readXmlDocument)` |
+| `DebugListWatchpoints` | `...STATE_HANDLE_PROPERTY` | `Watchpoints of the stopped debuggee.` | `debugAnswer(args, async () => U.abap.listWatchpoints(), readXmlDocument, readXmlDocument)` |
+| `DebugDeleteWatchpoint` | `...STATE_HANDLE_PROPERTY`, `watchpoint_id: {type:'string'}` | `Removes a watchpoint.` | `debugAnswer(args, async () => { await U.abap.deleteWatchpoint(String(args.watchpoint_id)); return { value: { deleted: args.watchpoint_id }, raw: '' }; }, (v) => v)` |
+| `DebugGetMemorySizes` | `...STATE_HANDLE_PROPERTY` | `Memory the stopped debuggee uses. Needs a stopped debuggee.` | `debugAnswer(args, async () => U.abap.getMemorySizes(), readXmlDocument, readXmlDocument)` |
+| `DebugCreateMemorySnapshot` | `...STATE_HANDLE_PROPERTY` | `Writes a memory snapshot of the stopped debuggee and answers the file written.` | `debugAnswer(args, async () => U.abap.createMemorySnapshot(), readXmlDocument, readXmlDocument)` |
+| `DebugStop` | `...STATE_HANDLE_PROPERTY` | `Ends a debug session — ABAP and AMDP: releases a stopped debuggee, removes its breakpoints, stops listening, closes its connections; what could not be undone is reported and stays for another stop.` | `debugAnswer(args, async () => { await U.stop(); context.state!.rotateIfEmpty(); return { value: { state: 'idle' }, raw: '' }; }, (v) => v)` |
+| `DebugListSessions` | none | `Debug sessions this server holds for the caller, with their handles, kinds, states and SAP ids.` | `debugAnswer(args, async () => { if (!context.state) throw new Error('debugging is not served by this server'); const l = context.state.host?.peers() ?? (context.state.holdsState() ? [context.state.describe()] : []); return { value: l, raw: JSON.stringify(l) }; }, (v) => v)` |
+
+Write `U` out in each file as `requireDebugger(context, args, 'use')`, inside the work.
 
 `DebugStep`:
 
 ```ts
 const STEPS = { into: 'stepInto', over: 'stepOver', return: 'stepReturn', continue: 'stepContinue' } as const;
-export async function handleDebugStep(context: HandlerContext, args: { debug_session?: string; action?: string; detail?: string }) {
+export async function handleDebugStep(context: HandlerContext, args: { state_handle?: string; action?: string; detail?: string }) {
   return debugStateAnswer(args, async () => {
     const method = STEPS[String(args.action) as keyof typeof STEPS];
     if (!method) throw new Error('action: into, over, return or continue');
@@ -3306,10 +3666,6 @@ export async function handleDebugStep(context: HandlerContext, args: { debug_ses
   });
 }
 ```
-
-`DebugStartListener` and `DebugTakeOverListener` call `requireDebugger` **outside** the `debugStateAnswer` work. A failure there, which only happens when the server does not serve debugging, must still come back as a tool error. So wrap the whole body in `try { … } catch (e) { return return_error(e); }`.
-
-`DebugListSessions` exists for the server; within one instance it lists that instance only. Under the HTTP pool, a fresh instance answers `[]`. Listing across the pool is the pool's job and is a follow-up (spec D10).
 
 - [ ] **Step 1: Write the failing handler test**
 
@@ -3319,9 +3675,11 @@ import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { DebugSession } from '../../../lib/debugger/DebugSession';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
+import { InstanceState } from '../../../lib/state/InstanceState';
 import { handleDebugGetStack } from '../../../handlers/debugger/debug/handleDebugGetStack';
 import { handleDebugSetBreakpoints } from '../../../handlers/debugger/debug/handleDebugSetBreakpoints';
 import { handleDebugStartListener } from '../../../handlers/debugger/debug/handleDebugStartListener';
+import { handleDebugStop } from '../../../handlers/debugger/debug/handleDebugStop';
 import { handleDebugWait } from '../../../handlers/debugger/debug/handleDebugWait';
 import { okResponse } from '../../helpers/fakeClient';
 import { CONFLICT, fakeWorld, IDS, LISTEN_CATCH, LISTEN_NOTHING, until } from './fakes';
@@ -3330,9 +3688,18 @@ const json = (r: any) => JSON.parse(r.content[0].text);
 
 function install() {
   const world = fakeWorld();
-  const instance = new DebuggerInstance({ abap: new DebugSession(world.ports as any, IDS), amdp: new AmdpSession({} as any) });
-  const context = { connection: {} as any, logger: undefined, debugger: () => instance };
-  return { world, instance, context };
+  const state = new InstanceState();
+  const dbg = new DebuggerInstance({ abap: new DebugSession(world.ports as any, IDS), amdp: new AmdpSession({} as any) });
+  state.attach(dbg);
+  const context = { connection: {} as any, logger: undefined, state, debugger: () => dbg };
+  return { world, state, context };
+}
+
+async function startedListening(world: ReturnType<typeof fakeWorld>, context: any) {
+  const started = handleDebugStartListener(context, {});
+  await until(() => world.polls.length === 1);
+  world.polls[0].resolve(LISTEN_NOTHING());
+  return json(await started);
 }
 
 describe('debugger handlers', () => {
@@ -3347,79 +3714,78 @@ describe('debugger handlers', () => {
       'DebugGetMemorySizes', 'DebugCreateMemorySnapshot', 'DebugStop', 'DebugListSessions']) expect(names).toContain(n);
   });
 
-  it('start answers the session handle and the SAP ids; wait with it answers the stop, as precise', async () => {
-    const { world, instance, context } = install();
-    const started = handleDebugStartListener(context as any, {});
-    await until(() => world.polls.length === 1);
-    world.polls[0].resolve(LISTEN_NOTHING());
-    expect(json(await started)).toEqual({ state: 'listening', debug_session: instance.handle, terminal_id: IDS.terminalId, ide_id: IDS.ideId });
+  it('start answers the state handle and the SAP ids; wait with it answers the stop, as precise', async () => {
+    const { world, state, context } = install();
+    expect(await startedListening(world, context)).toEqual({ state: 'listening', state_handle: state.handle, terminal_id: IDS.terminalId, ide_id: IDS.ideId });
     await until(() => world.polls.length === 2);
     world.polls[1].resolve(LISTEN_CATCH());
     await until(() => world.calls.includes('getStack'));
-    const waited = json(await handleDebugWait(context as any, { debug_session: instance.handle, hold_seconds: 0 }));
+    const waited = json(await handleDebugWait(context as any, { state_handle: state.handle, hold_seconds: 0 }));
     expect(waited.state).toBe('stopped');
     expect(waited.at.address).toEqual({ object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 32 });
     expect(waited.at.include).toBe('ZCL_CV_DBG_MEASURE============CM002');
     expect(waited.frames).toHaveLength(5);
-    expect((await handleDebugGetStack(context as any, { debug_session: instance.handle, detail: 'raw' })).content[0].text).toContain('<dbg:stack');
+    expect((await handleDebugGetStack(context as any, { state_handle: state.handle, detail: 'raw' })).content[0].text).toContain('<dbg:stack');
   });
 
   it("a line breakpoint's URI is built from type, name and line", async () => {
-    const { world, instance, context } = install();
-    const started = handleDebugStartListener(context as any, {});
-    await until(() => world.polls.length === 1);
-    world.polls[0].resolve(LISTEN_NOTHING());
-    await started;
+    const { world, state, context } = install();
+    await startedListening(world, context);
     const seen: any[] = [];
-    const real = world.ports.abapDebugger;
-    world.ports.abapDebugger = (c, m) => Object.assign(real(c, m), { setBreakpoints: async (_i: unknown, l: any[]) => { seen.push(l); return okResponse('<dbg:breakpoints xmlns:dbg="x"/>'); } }) as any;
-    (instance.abap as any).control = undefined; // the control connection is rebuilt with the spy
-    await handleDebugSetBreakpoints(context as any, { debug_session: instance.handle, breakpoints: [{ object_type: 'CLAS', object_name: 'ZCL_A', line: 7 }] });
+    world.override.setBreakpoints = async (_i: unknown, l: any[]) => { seen.push(l); return okResponse('<dbg:breakpoints xmlns:dbg="x"/>'); };
+    await handleDebugSetBreakpoints(context as any, { state_handle: state.handle, breakpoints: [{ object_type: 'CLAS', object_name: 'ZCL_A', line: 7 }] });
     expect(seen[0]).toEqual([{ kind: 'line', uri: '/sap/bc/adt/oo/classes/zcl_a/source/main#start=7' }]);
   });
 
   it('a foreign handle is not available and nothing is sent', async () => {
     const { world, context } = install();
     const before = world.calls.length;
-    const r: any = await handleDebugGetStack(context as any, { debug_session: 'F'.repeat(32) });
+    const r: any = await handleDebugGetStack(context as any, { state_handle: 'F'.repeat(32) });
     expect(r.isError).toBe(true);
-    expect(r.content[0].text).toContain('debug session is not available');
+    expect(r.content[0].text).toContain('state is not available');
     expect(world.calls.length).toBe(before);
   });
 
-  it('a conflict at the start is a tool error', async () => {
+  it('after a complete stop the old handle is not available, for good', async () => {
+    const { world, state, context } = install();
+    const { state_handle: old } = await startedListening(world, context);
+    await handleDebugStop(context as any, { state_handle: old });
+    expect(state.handle).not.toBe(old);
+    const r: any = await handleDebugWait(context as any, { state_handle: old, hold_seconds: 0 });
+    expect(r.content[0].text).toContain('state is not available');
+  });
+
+  it('a conflict at the start is a tool error, and the breakpoints it armed are gone', async () => {
     const { world, context } = install();
-    const started = handleDebugStartListener(context as any, {});
+    const started = handleDebugStartListener(context as any, { breakpoints: [{ object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 32 }] });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT());
     const r: any = await started;
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toContain('SY 530');
+    expect(context.state.holdsState()).toBe(false);
   });
 });
 ```
-
-The `(instance.abap as any).control = undefined` line only works because `control` is `protected`. If that line feels wrong, give the fake world's `abapDebugger` a hook instead: `world.override = { setBreakpoints }`, merged into every debugger it makes. Change `fakes.ts` accordingly; it is test code.
 
 - [ ] **Step 2: Run it and see it fail**
 
 Run: `npx jest src/__tests__/unit/debugger/handlers.test.ts`
 Expected: FAIL, "Cannot find module".
 
-- [ ] **Step 3: Write the 20 handlers and register them in `DebugHandlersGroup`**
-
-Register each the way `SystemHandlersGroup` does:
+- [ ] **Step 3: Write the 20 handlers and register them in `DebugHandlersGroup`, the way `SystemHandlersGroup` does**
 
 ```ts
 { toolDefinition: DebugGetStack_Tool, handler: (args: any) => handleDebugGetStack(this.context, args) },
 ```
 
-`this.context` is read when the handler is called, so it carries `debugger`.
+`this.context` is read when the handler is called, so it carries `state` and `debugger`.
 
 - [ ] **Step 4: Ratchets**
 
-- `toolDescriptionsCarryNoLiterals.test.ts`: add `includeDebug: true` to the exporter options. `TAKES_NO_PARAMETERS` stays unchanged, because every tool has `detail`. Check by running it.
-- `tests/fixtures/tools/surface.json`: generate the `debug` rows with `npx tsx scripts/list-tools.ts` and paste them in.
+- `toolDescriptionsCarryNoLiterals.test.ts`: add `includeDebug: true` to the exporter options. `TAKES_NO_PARAMETERS` stays unchanged, because every tool has `detail`.
+- `tests/fixtures/tools/surface.json`: the `debug` rows from `npx tsx scripts/list-tools.ts`.
+- `exposition.test.ts`: `expect(names({ includeDebug: true })).toContain('DebugStartListener')`.
 
 Run: `npx jest src/__tests__/unit/debugger/ src/__tests__/unit/toolSurface.test.ts src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts`
 Expected: PASS.
@@ -3428,7 +3794,7 @@ Expected: PASS.
 
 ```bash
 git add src/handlers/debugger/ src/lib/handlers/groups/DebugHandlersGroup.ts tests/fixtures/tools/surface.json src/__tests__/unit/
-git commit -m "feat(debugger): core ABAP debugger tools behind debug_session"
+git commit -m "feat(debugger): core ABAP debugger tools behind state_handle"
 ```
 
 ---
@@ -3440,7 +3806,7 @@ git commit -m "feat(debugger): core ABAP debugger tools behind debug_session"
 - Modify: `DebugHandlersGroup.ts`, `tests/fixtures/tools/surface.json`
 - Test: `src/__tests__/unit/debugger/memoryHandlers.test.ts`
 
-Snapshots belong to the system, not to a debug session, so these tools take no `debug_session`. They use `MemorySnapshots` from adt-clients on `context.connection`.
+Snapshots belong to the system, not to a debug session, so these tools take no `state_handle`. They use `MemorySnapshots` from adt-clients on `context.connection`.
 
 ```ts
 // src/handlers/debugger/debug/handleMemorySnapshotGet.ts
@@ -3553,17 +3919,17 @@ git commit -m "feat(debugger): memory snapshot list, views and deltas"
 - Modify: `DebugHandlersGroup.ts`, `tests/fixtures/tools/surface.json`
 - Test: `src/__tests__/unit/debugger/amdpHandlers.test.ts`
 
-Rules for every tool in the table: the description starts with `[debug] `, `...DETAIL_PROPERTY` is spread, `available_in: ['onprem','cloud']`, and every tool except `AmdpDebugStart` requires `debug_session`.
+Rules for every tool in the table: the description starts with `[debug] ` and states only the function. `...DETAIL_PROPERTY` is spread, `available_in: ['onprem','cloud']`, every tool except `AmdpDebugStart` requires `state_handle`, and `requireDebugger` is called inside the work.
 
 | Tool | Properties besides detail | Description after `[debug] ` | Body |
 |---|---|---|---|
-| `AmdpDebugStart` | `stop_existing: {type:'boolean', default:false, description:'Ends an AMDP debug session of this user left behind.'}`, `...AMDP_BREAKPOINTS_PROPERTY` (required), `...RUN_PROPERTY` | `Starts an AMDP debug session of the connected SAP user with lines in SQLScript methods; the background run, when given, starts once the system confirmed the breakpoints. ${USER_MODE_SENTENCE} Answers the session and the breakpoints' states.` | `const d = D('create'); return debugAnswer(args, async () => { const r = await d.amdp.start({ stopExisting: args.stop_existing === true, breakpoints: amdpBreakpointsFromArgs(args.breakpoints), run: runFromArgs(args.run) }); return { value: { debug_session: d.handle, ...r }, raw: JSON.stringify(r) }; }, (v) => v)` |
-| `AmdpDebugSetBreakpoints` | `...DEBUG_SESSION_PROPERTY`, `...AMDP_BREAKPOINTS_PROPERTY` | `Replaces the AMDP breakpoints of a debug session; answers their states once the system confirmed them.` | `debugAnswer(args, () => D('use').amdp.setBreakpoints(amdpBreakpointsFromArgs(args.breakpoints)), (v) => ({ breakpoints: v }))` |
-| `AmdpDebugWait` | `...DEBUG_SESSION_PROPERTY`, `...HOLD_SECONDS_PROPERTY` | `Next AMDP events of a debug session after waiting up to hold_seconds: a stop with its line and variables, the end of an execution, a warning; or the end of the background run with its output.` | `debugAnswer(args, async () => { const s = await D('use').amdp.wait(Number(args.hold_seconds ?? 10)); return { value: s, raw: s.state === 'event' ? s.events.map((e) => e.body).join('\n') : JSON.stringify(s) }; }, (s) => (s.state === 'event' ? { state: 'event', events: s.events.map(terseAmdpEvent) } : s))` |
-| `AmdpDebugStep` | `...DEBUG_SESSION_PROPERTY`, `action: {type:'string', enum:['over','continue']}` | `Steps the stopped AMDP debuggee over a statement or on to the next stop.` | `debugAnswer(args, () => D('use').amdp.step(args.action === 'over' ? 'over' : 'continue'), (v) => ({ state: v }))` |
-| `AmdpDebugGetTable` | `...DEBUG_SESSION_PROPERTY`, `variable: {type:'string'}`, `query: {type:'string', description:'A SELECT over the variable.'}` | `Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.` | `debugAnswer(args, () => D('use').amdp.getTable(String(args.variable), args.query ? String(args.query) : undefined), (v) => v.rows)` |
-| `AmdpDebugCancel` | `...DEBUG_SESSION_PROPERTY` | `Cancels the stopped AMDP debuggee's execution.` | `debugAnswer(args, async () => { await D('use').amdp.cancel(); return { value: 'cancelled', raw: '' }; }, (v) => v)` |
-| `AmdpDebugStop` | `...DEBUG_SESSION_PROPERTY` | `Ends the AMDP part of a debug session; a suspended debuggee is released first. What could not be undone is reported.` | `debugAnswer(args, async () => { await D('use').amdp.stop(); return { value: { state: 'idle' }, raw: '' }; }, (v) => v)` |
+| `AmdpDebugStart` | `stop_existing: {type:'boolean', default:false, description:'Ends an AMDP debug session of this user left behind.'}`, `...AMDP_BREAKPOINTS_PROPERTY` (required), `...RUN_PROPERTY` | `Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. ${USER_MODE_SENTENCE}` | `debugAnswer(args, async () => { const d = requireDebugger(context, args, { create: 'amdp' }); const r = await d.amdp.start({ stopExisting: args.stop_existing === true, breakpoints: amdpBreakpointsFromArgs(args.breakpoints), run: runFromArgs(args.run) }); return { value: { state_handle: context.state!.handle, ...r }, raw: JSON.stringify(r) }; }, (v) => v)` |
+| `AmdpDebugSetBreakpoints` | `...STATE_HANDLE_PROPERTY`, `...AMDP_BREAKPOINTS_PROPERTY` | `Replaces the AMDP breakpoints of a debug session, as confirmed by the system. ${USER_MODE_SENTENCE}` | `debugAnswer(args, () => requireDebugger(context, args, 'use').amdp.setBreakpoints(amdpBreakpointsFromArgs(args.breakpoints)), (v) => ({ breakpoints: v }))` |
+| `AmdpDebugWait` | `...STATE_HANDLE_PROPERTY`, `...HOLD_SECONDS_PROPERTY` | `AMDP events of a debug session after waiting up to hold_seconds.` | `debugAnswer(args, async () => { const s = await requireDebugger(context, args, 'use').amdp.wait(Number(args.hold_seconds ?? 10)); return { value: s, raw: s.state === 'event' ? s.events.map((e) => e.body).join('\n') : JSON.stringify(s) }; }, (s) => (s.state === 'event' ? { state: 'event', events: s.events.map(terseAmdpEvent) } : s))` |
+| `AmdpDebugStep` | `...STATE_HANDLE_PROPERTY`, `action: {type:'string', enum:['over','continue']}` | `Steps the stopped AMDP debuggee over a statement or on to the next stop.` | `debugAnswer(args, () => requireDebugger(context, args, 'use').amdp.step(args.action === 'over' ? 'over' : 'continue'), (v) => ({ state: v }))` |
+| `AmdpDebugGetTable` | `...STATE_HANDLE_PROPERTY`, `variable: {type:'string'}`, `query: {type:'string', description:'A SELECT over the variable.'}` | `Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.` | `debugAnswer(args, () => requireDebugger(context, args, 'use').amdp.getTable(String(args.variable), args.query ? String(args.query) : undefined), (v) => v.rows)` |
+| `AmdpDebugCancel` | `...STATE_HANDLE_PROPERTY` | `Cancels the stopped AMDP debuggee's execution.` | `debugAnswer(args, async () => { await requireDebugger(context, args, 'use').amdp.cancel(); return { value: 'cancelled', raw: '' }; }, (v) => v)` |
+| `AmdpDebugStop` | `...STATE_HANDLE_PROPERTY` | `Ends the AMDP part of a debug session, releasing a suspended debuggee first; what could not be undone is reported and stays for another stop.` | `debugAnswer(args, async () => { await requireDebugger(context, args, 'use').amdp.stop(); return { value: { state: 'idle' }, raw: '' }; }, (v) => v)` |
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3572,6 +3938,7 @@ Rules for every tool in the table: the description starts with `[debug] `, `...D
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
+import { InstanceState } from '../../../lib/state/InstanceState';
 import { handleAmdpDebugStep } from '../../../handlers/debugger/debug/handleAmdpDebugStep';
 
 it('the group serves the seven AMDP tools', () => {
@@ -3580,10 +3947,12 @@ it('the group serves the seven AMDP tools', () => {
 });
 
 it('a step without a session is not available', async () => {
-  const instance = new DebuggerInstance({ abap: { holdsState: () => false, bind() { return this; } } as any, amdp: new AmdpSession({} as any) });
-  const r: any = await handleAmdpDebugStep({ connection: {}, debugger: () => instance } as any, { debug_session: instance.handle, action: 'over' });
+  const state = new InstanceState();
+  const instance = new DebuggerInstance({ abap: { holdsState: () => false, bind() { return this; }, observe() {}, describe: () => ({}), ids: {} } as any, amdp: new AmdpSession({} as any) });
+  state.attach(instance);
+  const r: any = await handleAmdpDebugStep({ connection: {}, state, debugger: () => instance } as any, { state_handle: state.handle, action: 'over' });
   expect(r.isError).toBe(true);
-  expect(r.content[0].text).toContain('debug session is not available');
+  expect(r.content[0].text).toContain('state is not available');
 });
 ```
 
@@ -3617,7 +3986,7 @@ git commit -m "feat(debugger): AMDP debugger tools"
   - `requireDebugger`;
   - `debugAnswer`, `debugStateAnswer`;
   - `breakpointsFromArgs`, `amdpBreakpointsFromArgs`, `runFromArgs`;
-  - `BREAKPOINTS_PROPERTY`, `RUN_PROPERTY`, `HOLD_SECONDS_PROPERTY`, `DEBUG_SESSION_PROPERTY`, `LINE_TARGET_PROPERTIES`;
+  - `BREAKPOINTS_PROPERTY`, `RUN_PROPERTY`, `HOLD_SECONDS_PROPERTY`, `STATE_HANDLE_PROPERTY`, `LINE_TARGET_PROPERTIES`;
   - `USER_MODE_SENTENCE`, `TAKE_OVER_SENTENCE`;
   - `terseStop`, `terseVariables`, `terseAmdpEvent`, `readXmlDocument`, `lineUriOf`, `addressOf`.
 
@@ -3632,10 +4001,10 @@ git commit -m "feat(debugger): AMDP debugger tools"
 
 | Tool | Parameters | Description | Body |
 |---|---|---|---|
-| `HandlerDebugStart` | `kind*: abap\|amdp`, `breakpoints*` (abap: `BREAKPOINTS_PROPERTY` items; amdp: `{object_name, line}`), `take_over?`, `run?`, `detail` | `Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, starts listening (abap) or an AMDP session, and optionally runs a class or report in the background. take_over: abap — ${TAKE_OVER_SENTENCE}; amdp — ends an AMDP session of this user left behind. ${USER_MODE_SENTENCE} Answers the debug session, its SAP ids and its state.` | abap: like `DebugStartListener` with `take_over ? 'takeOver' : 'refuse'`. amdp: like `AmdpDebugStart`, mapping `{object_name, line}` to `{class_name, line}`. Refused when the instance already holds the other kind. |
-| `HandlerDebugWait` | `debug_session*`, `hold_seconds?`, `detail` | `State of a debug session after waiting up to hold_seconds: listening, stopped (where it stands), ended; for AMDP the next events.` | AMDP: as `AmdpDebugWait`; else as `DebugWait`. |
-| `HandlerDebugView` | `debug_session*`, `what*: stack\|variables\|memory\|table`, `names?`, `detail` | `The stopped debuggee: stack, variables (by name, or the scopes), memory, or an AMDP table variable's rows.` | `stack` → `abap.getStack` + `terseStop`; `variables` → `getVariables(names)` or `getChildVariables(['@ROOT'])`; `memory` → `getMemorySizes` + `readXmlDocument`; `table` → `amdp.getTable(names[0])`. |
-| `HandlerDebugStep` | `debug_session*`, `action*: into\|over\|return\|continue\|run_to_line\|jump_to_line\|terminate\|stop`, `line?`, `object_type?`, `object_name?`, `include?`, `parent_name?`, `detail` | `Moves the stopped debuggee (into, over, return, continue, run or jump to a line), ends it where it stands, or ends the debug session; answers where it stands or how it ended.` | AMDP: `over`/`continue` → `amdp.step`, `terminate` → `cancel`, `stop` → `instance.stop()`. ABAP: the four steps → `step`; `run_to_line`/`jump_to_line` → `stepToLine(lineUriOf(target, line))`, where `target` is the given object or, when none is given, `addressOf(top frame uri)` — refused if that is undefined; `terminate` → `terminate`; `stop` → `instance.stop()`. |
+| `HandlerDebugStart` | `kind*: abap\|amdp`, `breakpoints*` (abap: `BREAKPOINTS_PROPERTY` items; amdp: `{object_name, line}`), `take_over?`, `run?`, `detail` | `Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. take_over: abap — ${TAKE_OVER_SENTENCE}; amdp — ends an AMDP session of this user left behind. ${USER_MODE_SENTENCE}` | abap: as the ABAP listener start with `take_over ? 'takeOver' : 'refuse'` (`requireDebugger(context, args, {create:'abap'})`). amdp: as the AMDP start, mapping `{object_name, line}` to `{class_name, line}` (`{create:'amdp'}`). Refused when the instance already holds the other kind. |
+| `HandlerDebugWait` | `state_handle*`, `hold_seconds?`, `detail` | `State of a debug session after waiting up to hold_seconds; for AMDP, its events.` | AMDP: as `AmdpDebugWait`; else as `DebugWait`. |
+| `HandlerDebugView` | `state_handle*`, `what*: stack\|variables\|memory\|table`, `names?`, `detail` | `The stopped debuggee: stack, variables (by name, or the scopes), memory, or an AMDP table variable's rows.` | `stack` → `abap.getStack` + `terseStop`; `variables` → `getVariables(names)` or `getChildVariables(['@ROOT'])`; `memory` → `getMemorySizes` + `readXmlDocument`; `table` → `amdp.getTable(names[0])`. |
+| `HandlerDebugStep` | `state_handle*`, `action*: into\|over\|return\|continue\|run_to_line\|jump_to_line\|terminate\|stop`, `line?`, `object_type?`, `object_name?`, `include?`, `parent_name?`, `detail` | `Moves the stopped debuggee (into, over, return, continue, run or jump to a line), ends it where it stands, or ends the debug session.` | AMDP: `over`/`continue` → `amdp.step`, `terminate` → `cancel`, `stop` → `instance.stop()` then `context.state.rotateIfEmpty()`. ABAP: the four steps → `step`; `run_to_line`/`jump_to_line` → `stepToLine(lineUriOf(target, line))`, where `target` is the given object or, when none is given, `addressOf(top frame uri)` — refused if that is undefined; `terminate` → `terminate`; `stop` → `instance.stop()` then `context.state.rotateIfEmpty()`. |
 
 `compact/src/launcher.ts`:
 
@@ -3684,9 +4053,9 @@ describe('compact debug', () => {
     expect(start.toolDefinition.description).toMatch(/every request of the connected SAP user/);
     expect(start.toolDefinition.description).toMatch(/Displaces another debugger/);
   });
-  it('every session verb requires debug_session', () => {
+  it('every session verb requires state_handle', () => {
     for (const e of entries.filter((x) => x.toolDefinition.name !== 'HandlerDebugStart')) {
-      expect((e.toolDefinition.inputSchema as any).required).toContain('debug_session');
+      expect((e.toolDefinition.inputSchema as any).required).toContain('state_handle');
     }
   });
 });
@@ -3739,7 +4108,7 @@ debugger_handlers:
         keep_probe: false
 ```
 
-The test follows `readOnly/system/RuntimeProfilingAndDumpsHandlers.test.ts`: `LambdaTester('debugger_handlers', 'debugger_chain', 'debugger')`. Its `beforeAll` creates and activates the probes with the high-level handlers, in the config's default package and transport. Every case builds a fresh `DebuggerInstance` (`createDebuggerInstance()`) and a context `{ connection, logger, debugger: () => instance }`, and `afterEach` calls `instance.dispose()`. Cases:
+The test follows `readOnly/system/RuntimeProfilingAndDumpsHandlers.test.ts`: `LambdaTester('debugger_handlers', 'debugger_chain', 'debugger')`. Its `beforeAll` creates and activates the probes with the high-level handlers, in the config's default package and transport. Every case builds a fresh `InstanceState` with a `createDebuggerInstance()` attached, and a context `{ connection, logger, state, debugger: () => instance }`. `afterEach` calls `state.dispose()`. Cases:
 
 1. **ABAP chain.**
    - `DebugStartListener` with the marked line as a breakpoint and `run: {kind:'class', name: probe}`.
@@ -3756,14 +4125,17 @@ The test follows `readOnly/system/RuntimeProfilingAndDumpsHandlers.test.ts`: `La
    - Record the outcome in the test output. Also record whether an IDE-like listener's breakpoints under other ids survived: arm one under other ids first.
    - Report the result to the user. Spec D12 is updated only with their word.
 5. **Memory.** At a stop: `DebugGetMemorySizes`, `DebugCreateMemorySnapshot`, then `MemorySnapshotList`, asserting `isError: false` only. Listing needs `S_MEM_SNAP`; an empty list is valid.
-6. **AMDP chain.** The AMDP probe is the class plus table function from the adt-clients AMDP test, created by the test.
+6. **Does SAP end an open AMDP event poll when the session is stopped?** `AmdpSession.stop()` relies on it to finish its cleanup (Task 6).
+   - After `AmdpDebugStop`, assert that the read loop's last turn ran (`holdsState()` false) within the case. Use the test's own `getTimeout`, which bounds the test, not the server.
+   - If it does not end, report it to the user before going on: the stop design needs another way to end the poll, such as a short hold on the event read, decided with them.
+7. **AMDP chain.** The AMDP probe is the class plus table function from the adt-clients AMDP test, created by the test.
    - `AmdpDebugStart(stop_existing: true, breakpoints, run)` answers states after `SYNC_BREAKPOINTS`.
    - `AmdpDebugWait` until `ON_BREAK`, then `AmdpDebugGetTable` on the table variable.
    - `AmdpDebugStep continue`, then `AmdpDebugWait` until `ON_EXECUTION_END`.
    - `AmdpDebugStop`.
-7. **Hard mode, once per transport,** through `tester.invokeToolOrHandler` with `integration_hard_mode.enabled: true`:
+8. **Hard mode, once per transport,** through `tester.invokeToolOrHandler` with `integration_hard_mode.enabled: true`:
    - stdio with `--exposition=readonly,high,debug`: the ABAP chain;
-   - Streamable HTTP: the ABAP chain over separate requests, carrying `debug_session`. This proves the pool on a real system. If the hard-mode harness cannot start the HTTP server, extend `src/__tests__/integration/helpers/testers/hardMode.ts` with an HTTP mode that launches `server/dist/launcher.js --transport=http` on a free port and connects with `StreamableHTTPClientTransport`.
+   - Streamable HTTP: the ABAP chain over separate requests, carrying `state_handle`. This proves the pool on a real system. If the hard-mode harness cannot start the HTTP server, extend `src/__tests__/integration/helpers/testers/hardMode.ts` with an HTTP mode that launches `server/dist/launcher.js --transport=http` on a free port and connects with `StreamableHTTPClientTransport`.
 
 - [ ] **Step 1: Ask the user (see the gate above).**
 
@@ -3793,7 +4165,38 @@ git commit -m "test(debugger): integration on premise and on the cloud, every tr
 
 ---
 
-### Task 15: Readings of the recorded AMDP and memory answers
+### Task 15: Reconciling a predecessor's breakpoints — only if Task 14 measured it possible
+
+Spec D12: a restarted process with stated ids removes a predecessor's breakpoints, but only if Task 14 case 4 showed both of these:
+- an empty breakpoint set posted under the same ids removes them;
+- breakpoints under other ids survive.
+
+If the measurement showed otherwise, this task is replaced by a documentation step. Spec D12 and `DEBUGGER.md` then say that a predecessor's breakpoints survive a restart, and how to clear them in an IDE. The user's word is needed either way, because the result changes the spec.
+
+**Files (if possible):**
+- Modify: `src/lib/debugger/DebugSession.ts` (`beforeFirstListen`)
+- Test: `src/__tests__/unit/debugger/DebugSessionLifecycle.test.ts`
+
+**Interfaces:**
+- `beforeFirstListen` additionally posts the empty set (`setBreakpoints(identity, [])`).
+- Its outcome is answered by the start in `reconciled: { listener: 'stopped' | 'none', breakpoints: 'cleared' | 'kept' }`.
+
+- [ ] **Step 1: Write the failing test.** With stated ids, the first start calls `stopListener` and then `setBreakpoints` with `[]` before its first poll. With random ids it calls neither.
+- [ ] **Step 2: Run it and see it fail; implement; run it and see it pass**
+
+Run: `npx jest src/__tests__/unit/debugger/DebugSessionLifecycle.test.ts`
+
+- [ ] **Step 3: A debuggee still held under these ids is reported, not released.** The start answers `reconciled.debuggee: <id>` when its first poll catches one at once with stated ids. Releasing it stays an explicit `DebugTerminate` or `DebugStep continue`.
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/lib/debugger/DebugSession.ts src/__tests__/unit/debugger/DebugSessionLifecycle.test.ts
+git commit -m "feat(debugger): a restart with stated ids clears what its predecessor armed"
+```
+
+---
+
+### Task 16: Readings of the recorded AMDP and memory answers
 
 **Files:**
 - Modify:
@@ -3823,7 +4226,7 @@ git commit -m "feat(debugger): readings of the recorded AMDP events (stack inclu
 
 ---
 
-### Task 16: Docs and the release preparation
+### Task 17: Docs and the release preparation
 
 **Files:**
 - Create: `docs/user-guide/DEBUGGER.md`
@@ -3881,7 +4284,7 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 
 | Decision | Task |
 |---|---|
-| D1 (state in the instance, explicit handle) | 7 |
+| D1 (state in the instance, generic `state_handle`, invalidated after a complete stop) | 7, 10 |
 | D2 (both scenarios) | 4, 5 (the run) |
 | D3 (auto-attach) | 4 |
 | D4 (no timeouts) | everywhere; only bounded waits inside a call |
@@ -3889,60 +4292,61 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | D6 (refuse / take over) | 10, 13 |
 | D7 (compact verbs) | 13 |
 | D8 (opt-in set) | 8 |
-| D9 (host pool) | 9 |
-| D10 (no TTL; list, stop, limit) | 5, 7, 10 |
+| D9 (one pool mechanism, owner index, lease) | 9 |
+| D10 (no TTL; list, stop, limit) | 7, 9, 10 |
 | D11 (measured needs) | 4, 6 |
-| D12 (stdio restores the ids; reconciliation) | 5, plus the measurement in 14 |
+| D12 (stdio restores the ids; reconciliation) | 5 (listener); 14 (measurement); 15 (breakpoints, if measured possible) |
 | D13 (HTTP carries a session, RFC does not; pool) | 9 |
 | D14 (owner, kinds, limit) | 7, 9, 13 |
 | §2 core tools | 10–12 |
-| §3 addressing and answers | 2, 3, 7, 15 |
+| §3 addressing and answers | 2, 3, 7, 16 |
 | Descriptions (function only) | 7 (schemas), 10–13, ratchet test |
-| §4 tests | 1–13 unit, 14 integration and hard mode per transport |
-| Release | 16 |
+| §4 tests | 1–13 unit; 9 real HTTP; 14 integration and hard mode per transport |
+| Release | 17 |
 
-**Codex's first review, each finding and where it went:**
+**Codex reviews, where each finding went:**
 
-| Finding | Where it is handled |
-|---|---|
-| 1 (lib import into core) | the server imports only `BaseMcpServer.dispose()` |
-| 2 (first-poll race) | a short first poll, awaited; the run starts after it |
-| 3–7 (races) | `Serial`, generation checks, captured stops |
-| 8 (terminate answers `done`) | `terminate()` releases on success; the fake returns `DONE()` |
-| 9 (run outliving stop) | the run is owned by its generation; close-once |
-| 10 (cleanup failures) | `DebugCleanupError`; failed ids stay |
-| 11–14 (AMDP) | the failed state, drain on stop, debuggee cleared, run after the sync |
-| 15 (request user) | the login, never the responsible; auth and network errors pass through |
-| 16 (shared globals) | the instance owns the state |
-| 17 (AMDP stack, compact routing) | Task 15; compact keeps one kind per instance |
-| 18 (integration) | the run in `AmdpDebugStart`; hard mode per transport |
-| 19 (refusal matching) | re-asked with `validationOnly` |
-| 20 (vacuous tests) | `until()`; both sides asserted |
-| 21 (full vs raw) | `debugAnswer(full)` |
-| 22 (names in fixtures and plans) | system ids from config; fixtures sanitised |
+| Review | Findings | Where handled |
+|---|---|---|
+| First | 1 | the server imports only published lib subpaths, Tasks 7–9 |
+| | 2 | a short first poll, awaited |
+| | 3–7 | `Serial`, generation checks, captured stops |
+| | 8 | `terminate()` |
+| | 9 | the run belongs to its generation |
+| | 10 | failures are kept and retried |
+| | 11–14 | AMDP |
+| | 15 | the login, never the responsible |
+| | 16 | the instance owns the state |
+| | 17 | Tasks 13 and 16 |
+| | 18 | Task 14 |
+| | 19 | `validationOnly` re-ask |
+| | 20 | `until()` |
+| | 21 | `debugAnswer(full)` |
+| | 22 | system values come from the config |
+| Second | lease, batch, owner, list, connections, dispose, one handle, limit, compact, restart, HTTP tests | Tasks 7, 9, 10, 13, 14 |
+| Final | 1 | no `override` |
+| | 2 | AMDP stop does not wait for the poll; the read loop finishes; measured in 14 |
+| | 3, 5, 10 | failed cleanup is kept, retried and reported |
+| | 4 | closed only after success; `disconnect()` never throws |
+| | 6 | the owner rules of D9 |
+| | 7 | owner index, slots, `peers` |
+| | 8 | a lease revalidates its entry |
+| | 9 | transport close in `finally`, after the response |
+| | 11 | `rotateIfEmpty` |
+| | 12 | a start rolls back what it armed |
+| | 13 | Task 15 |
+| | 14, 17 | the `override` proxy; reads indexed relative; gated tests |
+| | 15 | sync correlated apart; the step–break race |
+| | 16 | descriptions |
 
-**Codex's second review:**
+**Placeholders.** The only `<…>` tokens are in run commands, where local config and scratchpad values go. They are deliberately not written down: plans name no system.
 
-| Finding | Where it is handled |
-|---|---|
-| lease | the pool's tail |
-| batch | `handleOf` |
-| owner | `ownerOf` |
-| list across the pool | listed as a follow-up in Task 10 |
-| connections across transport close | the instance keeps them; the transport is per request |
-| awaited dispose and shutdown order | Tasks 8–9 |
-| one handle for both kinds | `DebuggerInstance` |
-| atomic limit | one instance holds one of each kind; a second start is refused |
-| compact schemas | Task 13 |
-| restart-breakpoint promise | measured in Task 14 before the spec says more |
-| HTTP lifecycle tests | Task 9, Step 6, and Task 14 |
-
-**Placeholders:** the only `<…>` tokens are in run commands, where the local config, scratchpad and system values go. They are deliberately not written down (CLAUDE.md: plans name no system).
-
-**Type consistency.** The following names are used the same way across tasks:
-- `DebugSession`: `start`, `wait`, `stop`, `holdsState`, `describe`, `ids`;
-- `AmdpSession`: `start({stopExisting, breakpoints, run})`, `setBreakpoints`, `startRun`;
-- `DebuggerInstance`: `handle`, `abap`, `amdp`, `stop`, `dispose`, `describe`;
-- `requireDebugger(context, args, 'create' | 'use')`;
-- `debugAnswer(args, work, terse, full?)`, `debugStateAnswer(args, work, extra?)`;
-- `InstancePool.serve({handle, owner}, create, work)`, `shutdown()`.
+**Type consistency.**
+- `InstanceState`: `handle`, `holdsState`, `describe`, `admit`, `check`, `rotateIfEmpty`, `onEmpty`, `dispose`, `host`.
+- `StateHost`: `owner`, `reserve`, `peers`.
+- `DebuggerInstance` (a `StatePart`): `abap`, `amdp`, `stop`, `dispose`, `describe`, `observe`.
+- `DebugSession`: `start(mode, {breakpoints, run})`, `wait`, `stop`, `holdsState`, `describe`, `observe`, `ids`.
+- `AmdpSession`: `start({stopExisting, breakpoints, run})`, `setBreakpoints`, `startRun`, `observe`.
+- `requireDebugger(context, args, {create} | 'use')`.
+- `debugAnswer(args, work, terse, full?)` and `debugStateAnswer(args, work, extraOf?)`.
+- `InstancePool.serve({handle, owner}, create, work)` and `shutdown()`.

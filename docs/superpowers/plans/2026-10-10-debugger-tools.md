@@ -4246,7 +4246,11 @@ describe('debugger handlers', () => {
 
   it('a start that catches at once still answers its breakpoints under terse', async () => {
     const { world, context } = install();
-    const started = handleDebugStartListener(context as any, { breakpoints: [{ object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 32 }] });
+    // The recorded answer places the line-32 breakpoint and refuses one line breakpoint: ask for both.
+    const started = handleDebugStartListener(context as any, { breakpoints: [
+      { object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 32 },
+      { object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 1 },
+    ] });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_CATCH());
     const answer = json(await started);
@@ -4456,7 +4460,7 @@ Rules for every tool in the table: the description starts with `[debug] ` and st
 | `AmdpDebugStep` | `...STATE_HANDLE_PROPERTY`, `action: {type:'string', enum:['over','continue']}` | `Steps the stopped AMDP debuggee over a statement or on to the next stop.` | `debugAnswer(args, () => requireDebugger(context, args, 'use').amdp.step(args.action === 'over' ? 'over' : 'continue'), (v) => ({ state: v }))` |
 | `AmdpDebugGetTable` | `...STATE_HANDLE_PROPERTY`, `variable: {type:'string'}`, `query: {type:'string', description:'A SELECT over the variable.'}` | `Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.` | `debugAnswer(args, () => requireDebugger(context, args, 'use').amdp.getTable(String(args.variable), args.query ? String(args.query) : undefined), (v) => v.rows)` |
 | `AmdpDebugCancel` | `...STATE_HANDLE_PROPERTY` | `Cancels the stopped AMDP debuggee's execution.` | `debugAnswer(args, async () => { await requireDebugger(context, args, 'use').amdp.cancel(); return { value: 'cancelled', raw: '' }; }, (v) => v)` |
-| `AmdpDebugStop` | `...STATE_HANDLE_PROPERTY` | `Ends the AMDP part of a debug session, releasing a suspended debuggee first; what could not be undone is reported and stays for another stop.` | `debugAnswer(args, async () => { await requireDebugger(context, args, 'use').amdp.stop(); return { value: { state: 'idle' }, raw: '' }; }, (v) => v)` |
+| `AmdpDebugStop` | `...STATE_HANDLE_PROPERTY` | `Ends the AMDP part of a debug session, releasing a suspended debuggee first; what could not be undone is reported and stays for another stop.` | `debugAnswer(args, async () => { const d = requireDebugger(context, args, 'use'); context.state!.endWhenEmpty(); await d.amdp.stop(); return { value: { state: 'stopped' }, raw: '' }; }, (v) => v)` |
 
 - [ ] **Step 1: Write the failing test**
 
@@ -4467,10 +4471,25 @@ import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { InstanceState } from '../../../lib/state/InstanceState';
 import { handleAmdpDebugStep } from '../../../handlers/debugger/debug/handleAmdpDebugStep';
+import { handleAmdpDebugStop } from '../../../handlers/debugger/debug/handleAmdpDebugStop';
 
 it('the group serves the seven AMDP tools', () => {
   const names = new DebugHandlersGroup({} as any).getHandlers().map((e) => e.toolDefinition.name);
   for (const n of ['AmdpDebugStart', 'AmdpDebugSetBreakpoints', 'AmdpDebugWait', 'AmdpDebugStep', 'AmdpDebugGetTable', 'AmdpDebugCancel', 'AmdpDebugStop']) expect(names).toContain(n);
+});
+
+it('an AMDP stop invalidates the handle once nothing else is held; with ABAP still held, the handle stays', async () => {
+  for (const abapHolds of [false, true]) {
+    const state = new InstanceState();
+    let amdpHolds = true; let tell = () => {};
+    const amdp = { holdsState: () => amdpHolds, pending: () => false, failures: () => [], bind() { return this; }, describe: () => ({ kind: 'amdp' }), observe: (f: () => void) => { tell = f; }, stop: async () => { amdpHolds = false; tell(); } } as any;
+    const abap = { holdsState: () => abapHolds, pending: () => false, failures: () => [], bind() { return this; }, describe: () => ({ kind: 'abap' }), observe() {}, ids: {} } as any;
+    const instance = new DebuggerInstance({ abap, amdp });
+    state.attach(instance);
+    const old = state.handle;
+    await handleAmdpDebugStop({ connection: {}, state, debugger: () => instance } as any, { state_handle: old });
+    expect(state.handle === old).toBe(abapHolds);
+  }
 });
 
 it('a step without a session is not available', async () => {
@@ -4900,6 +4919,9 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | Ninth (on `9a32914f`) | AMDP start leaking a connection | everything opened before the session is recorded is closed on any failure; tests for a failing second open and a thrown start |
 | | embedded SSE skipping cleanup | the drain runs at the top of `stop()`, before the early return for an external app |
 | | terse start dropping metadata after an immediate catch | the stopped projection keeps every field the start added |
+
+| Tenth (on `b47ba3f3`) | AMDP-only stop reused the handle | `AmdpDebugStop` asks `endWhenEmpty()`; the handle ends when nothing else is held, and stays while ABAP holds; tested both ways |
+| | the immediate-catch test expected a refusal it never asked for | it asks for the refused line too, as the recorded answer has it |
 
 **Placeholders.** The only `<…>` tokens are in run commands, where local config and scratchpad values go. They are deliberately not written down: plans name no system.
 

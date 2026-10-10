@@ -41,7 +41,7 @@ repositories at their release commits: auth-broker 5.0.1 (`5ec4e5f`), auth-provi
 |---|---|
 | The server is split by transport into packages, one mode each | §3; D35, D36, D37 |
 | Success: each package has only its own options and its own credentials | §3, §4, §10; D35, D38, D39 |
-| Success: failures reach the user as the chain made them | §7; D14, D15, D17, D28, D45 |
+| Success: failures reach the user as the chain made them | §7; D14, D15, D17, D28, D45, D46 |
 | Success: a connection derived from an injected one stays the consumer's | §4.3; D20–D22 |
 | Success: a request ends when its client ends it, in every mode | §3.1, §5; D4, D5, D7, D8, D10, D31, D32, D34, D40 |
 | Success: session writes are the server's stated choice | §6.2–§6.4; D12, D33 |
@@ -670,19 +670,38 @@ lib depends on no broker (D38), and auth-errors decides what a value is (H6).
   | **P1 — a refusal rethrown as a new `Error` of its message** | `handleGetIncludesList.ts:284` (the function-group list), `handleGetStructuresList.ts:248`, `src/lib/search-source/packageResolver.ts:88` |
   | **P2 — a refusal's message folded into the tool's own text or a returned string** | `handleGetWhereUsed.ts:120` (`return_error(message)`), `handleGetPackageTree.ts:112`, `handleCreateTransportTask.ts:167`, `src/lib/strategies/activationRun.ts:218`, `:239`; a log line only: `handleUpdatePackage.ts:195` |
   | **P3 — a refusal collected into a partial result answered `isError: false`** | `handleGetIncludesList.ts:143-152` (`readSource` → `unreadable`, answered at `:319-338`), `handleGetEnhancements.ts:238-241` (`unreadable`) |
-  | **P4 — the `IAdtError` passed on whole** (kept: its `refusal` travels; checked) | `handleUpdateDomain.ts:159`, `handleUpdateDataElement.ts:203`, `handleCreateTransportTask.ts:179`, `handleGetObjectVersionDiff.ts:91`, `resolveVersionedObject.ts:173`, `:185` (`thrown(…)` must keep `refusal`), `handleCreateFunctionGroup.ts:152`, `withLock.ts:46`, `:117`, `:246` (a spread keeps the own `refusal`) |
+  | **P4 — the `IAdtError` passed on whole** (kept: its `refusal` travels; checked) | `handleUpdateDomain.ts:159`, `handleUpdateDataElement.ts:203`, `handleCreateTransportTask.ts:179`, `handleGetObjectVersionDiff.ts:91`, `resolveVersionedObject.ts:173`, `:185` (`thrown(…)` must keep `refusal`), `handleCreateFunctionGroup.ts:152`, `withLock.ts:117`, `:246` (a spread keeps the own `refusal`) |
   | **P5 — a caught value normalised as `error instanceof Error ? error : new Error(String(error))`** | `handleGetIncludesList.ts:344`, `handleGetObjectVersionSource.ts:97`, `handleGetObjectVersions.ts:88`, `:119`, `handleSearchSource.ts:140`, `objectVersionTools.ts:185`, `:216`, `:281`, `:369` — an `Error` passes as itself, so `return_error` reads its `refusal`; a non-`Error` is wrapped with the value as `cause` |
   | **P6 — `answer()`'s failure payload** | `src/lib/answer.ts:103` (`failurePayload` builds `message` from the `IAdtError`): `return_answer` checks `refusal` first |
-  | **P7 — every other `catch` over an adt-clients call** | 111 `catch` blocks in `src/handlers` and `compact*/src`: the plan audits each and records it in the list as one of P1–P6 or "rethrows the original" |
+  | **P7 — every other `catch` over an adt-clients call** | 111 `catch` blocks in `src/handlers` and `compact*/src`, and 73 in the library and server paths (`src/lib` — `utils.ts` 20, `strategies/`, `search-source/`, `compact/` —, `src/embeddable`, `server/src`, then `http/src`): the plan audits each and records it as one of P1–P8 or "rethrows the original" |
+  | **P8 — library conversions of a release or a read** | `withLock.ts:33-43` (`runRelease`, a thrown release → `{ error: 'client_threw', message }`), `:46-58` (a refused release → `{ message, origin, request }`), `:136-141` (a body that succeeded + a failed release → `ok: true` with that carrier), `:169` (`messageOf`), `:181-190` (`LockNotReleased`'s message); `safeFields.ts:56` (`safeCleanup` keeps `message` only); `answer.ts:57-60` (`local()` renders the carrier); `search-source/sourceReader.ts:39-50` (`safe()`: a failed read → `null`, a debug line, a shorter result) |
 
-  That is 31 sites across P1–P6 in 20 files (P1 3, P2 6, P3 2, P4 10, P5 9, P6 1), and the
-  111 `catch` blocks of P7. At P1–P3 and P7 the
+  That is 38 sites in 23 files (P1 3, P2 6, P3 2, P4 9, P5 9, P6 1, P8 8), and the 184 `catch`
+  blocks of P7. At P1–P3 and P7 the
   helper runs first; P4–P6 are kept and pinned. **A source test keeps the list honest**: it scans
   for the patterns and fails on any occurrence not in the list (`tools/auth-failure-sites.json`,
   file, line pattern, kind), and on any listed P1–P3 / P7 site whose block does not call
   `endIfAuthFailure` before converting. Reason: the goal's *Failures reach the user as the chain
   made them* holds in every mode only if no handler turns a refusal into text or a partial
   success first; a new handler meets the test.
+- **(D46) A release that fails on the credential** (`withLock`, P8). The cleanup carrier keeps the
+  structured failure (`refusal`, rendered as `kind`, `message`, `hint` by `safeCleanup` and
+  `answer()`), and:
+  - **after a body that succeeded**: the tool call ends as that auth failure —
+    `error: authentication_failed` with `kind`, `message`, `hint`, `operation: 'succeeded'` (the
+    write landed) and `cleanup: { lock: "<object type> <name>", held: "may be held" }` — and
+    **nothing after it runs** (no activation, no check): `withLock` throws a `ToolAuthFailure`
+    carrying the body's result, so the handler's next step is never reached. A release refused by
+    SAP for any other reason keeps today's answer (success with `cleanup`,
+    `withLock.ts:120-141`);
+  - **after a body that failed**: both are reported — the body's failure as the error (an auth
+    failure as §7.3, any other as today) and the release's in `cleanup` with its `kind`, `message`,
+    `hint` and the held lock;
+  - a thrown release (`runRelease`'s `catch`) is read by `failureOf` first; only a value with no
+    refusal becomes `client_threw`.
+
+  Reason: an auth failure during the unlock means the lock may still be held and the next step
+  would run with a refused credential; the user must learn both, in the chain's words.
 
 ### 7.3 What the MCP client sees
 
@@ -927,6 +946,16 @@ with `kind` and `hint`, not a generic error); **GetEnhancements** (P3); **GetStr
 (P6, `answer()`). Each asserts `error: authentication_failed`, `kind`, `message`, `hint`.
 *Breaks:* remove `endIfAuthFailure` from `readSource` → `isError: false`; drop `cause` from a P1
 rethrow → `unknown`. The source test of §7.2 runs with them.
+
+**A release refused on the credential (D46)**, through `UpdateServiceDefinition` with
+`activate: true` against the stand-in: (a) the write is answered `200`, the unlock `401` twice —
+the result is `authentication_failed` with `kind`, `message`, `hint`, `operation: 'succeeded'` and
+the held lock naming the service definition; the stand-in's log holds no activation; (b) the update
+is refused by SAP (`400`) and the unlock `401` twice — the body's failure is the error and
+`cleanup` carries the release's `kind`, `message`, `hint` and the held lock. And a search-source
+read refused on the credential ends the search as the auth failure, not a shorter result (P8).
+*Breaks:* keep `runRelease`'s `{ message, origin, request }` carrier → no `kind`; return `ok: true`
+after an auth-failed release → the activation is sent.
 
 ### 14.3 Injected connections and fresh connections
 

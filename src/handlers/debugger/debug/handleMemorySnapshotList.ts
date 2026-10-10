@@ -36,8 +36,8 @@ export async function handleMemorySnapshotList(
     args,
     async () => {
       const answer = await snapshots.list({
-        analyse: analyseException,
         ...(args.user ? { user: args.user.toUpperCase() } : {}),
+        analyse: analyseException,
       });
       if (!answer.ok) throw new Error(answer.getError().message);
       const raw = String(answer.getResult().value ?? '');

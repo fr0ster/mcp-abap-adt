@@ -273,6 +273,7 @@ describe('provider sources (H0)', () => {
     const files = new Set(callSites().map((site) => site.where.split(':')[0]));
     expect(files).toEqual(
       new Set([
+        'server/src/connectedUser.ts',
         'src/embeddable/BaseMcpServer.ts',
         'src/lib/packageSessions.ts',
         'src/lib/utils.ts',

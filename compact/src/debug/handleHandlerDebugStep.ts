@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
           'stop',
         ],
         description:
-          'into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; terminate ends the debuggee where it stands; stop ends the debug session. An AMDP stop takes over, continue, terminate and stop.',
+          'into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.',
       },
       ...LINE_TARGET_PROPERTIES,
       ...DETAIL_PROPERTY,

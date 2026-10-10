@@ -26,6 +26,7 @@ server.
 |---|---|---|---|---|
 | **stdio** | `@mcp-abap-adt/core` (bin `mcp-abap-adt`) | one user, who owns the process | the default destination (`--mcp` / `--env` / `--env-path`), service keys included — through the broker, with its session files and an interactive (browser) login when one is needed | the server: cancellation, session writes, renewal |
 | **Streamable HTTP** | a new package with its own bin | many users | **only the credentials the user sends in the request's headers** (`x-sap-*`: a user and password, or a token), through providers built directly from auth-providers 6.0.0 — nothing else: no destination, no server-side token, no credential the server holds of any kind | the request that carries them; the server keeps none |
+| **SSE** (HTTP+SSE) | a new package with its own bin | many users | **only the credentials the user sends in the headers of the request that opens the SSE connection** (`x-sap-*`), exactly as Streamable HTTP — nothing else | that connection; the server keeps none beyond it |
 | **embedded** | `@mcp-abap-adt/lib` (`EmbeddableMcpServer`) | the consumer's application | the consumer: its injected connection, or the credentials it gives per request | the consumer: authentication, cancellation, persistence; the server keeps none |
 
 - **`@mcp-abap-adt/core`** is stdio only. It holds the default destination,
@@ -35,13 +36,24 @@ server.
 - **The HTTP package** serves Streamable HTTP only. It depends on
   `@mcp-abap-adt/lib` and auth-providers, never on auth-broker or
   auth-stores.
+- **The SSE package** serves HTTP+SSE only, by the same rules as the HTTP
+  package: credentials only from the user's headers, per connection; no
+  default destination, no broker, no stores. It depends on
+  `@mcp-abap-adt/lib` and auth-providers only. The HTTP and SSE packages do
+  not depend on each other.
 - **`@mcp-abap-adt/lib`** keeps the tools, the embeddable server, and
   building providers from header credentials.
-- **SSE is removed.** It has no advantage over Streamable HTTP and is
-  deprecated in MCP.
-- **The compact server** serves the compact tool set over both transports
-  and behaves exactly as the full server on each; only the tool set, and the
-  principle its sets are formed by, differ.
+- **SSE stays.** Some clients still speak only SSE; it keeps working, in a
+  package of its own.
+- **The compact server is one package per transport** — stdio, Streamable
+  HTTP and SSE — by the same principle: each carries only its transport's
+  options and dependencies, so compact over HTTP or SSE never pulls in the
+  broker or the stores. On each transport it behaves exactly as the full
+  server; only the tool set, and the principle its sets are formed by,
+  differ.
+- **An SSE connection's server instance is disposed when the connection
+  closes**, as the server disposes everything it owns, and SSE connections
+  take part in shutdown exactly as Streamable HTTP requests do.
 
 Some decisions the chain leaves to its consumer: how long an interactive login
 may wait, what cancels it, and what a failure looks like to the user. The
@@ -52,10 +64,12 @@ never hides one and never guesses one.
 - **Each package has only its own options and its own credentials.**
   - **No compatibility checks between modes.** Each binary accepts only the
     options of its own mode; an option of another mode is unknown to it.
-  - **The HTTP package** has no default destination, no `x-mcp-destination`,
-    no `--allow-destination-header`, no session file and no interactive
-    login. It has no dependency on auth-broker or auth-stores — checked by a
-    test reading its `package.json` and its import graph.
+  - **The HTTP and SSE packages, and compact over them,** have no default
+    destination, no `x-mcp-destination`, no `--allow-destination-header`, no
+    session file and no interactive login. None of them has a dependency on
+    auth-broker or auth-stores, and the HTTP and SSE packages none on each
+    other — checked by a test reading each `package.json` and its import
+    graph.
   - **`@mcp-abap-adt/core`** serves its default destination through the
     broker; its interactive login shows its URL where the one user can act on
     it.
@@ -131,8 +145,11 @@ never hides one and never guesses one.
   - HTTP: `x-sap-*` headers keep working, served by the HTTP package and its
     bin. The migration note says where HTTP moved, and that the default
     destination and `x-mcp-destination` are gone: pass `x-sap-*` headers.
-  - SSE: removed. The migration note says to use Streamable HTTP.
-  - Compact: over stdio as today, and over Streamable HTTP.
+  - SSE: `x-sap-*` headers keep working, served by the SSE package and its
+    bin. The migration note says where SSE moved, and that the default
+    destination and `x-mcp-destination` are gone: pass `x-sap-*` headers.
+  - Compact: over stdio as today, over Streamable HTTP and over SSE, each
+    from its own package.
   - Embedded consumers: the migration note names every change they meet.
 - **The Docker images and the release artifacts follow the split.**
   - **`docker/Dockerfile`** (today: HTTP with `--allow-destination-header`,
@@ -145,17 +162,19 @@ never hides one and never guesses one.
   - **The compose files** (`docker/docker-compose*.yml`) match the images
     they run.
   - **Build, publish and smoke** (`.github/workflows/ci.yml`,
-    `release.yml`, the bin smoke test) include the HTTP package;
-    `docs/deployment/RELEASE.md`'s table and publish order name it;
+    `release.yml`, the bin smoke test) include every new package — HTTP,
+    SSE, and compact over each; `docs/deployment/RELEASE.md`'s table and
+    publish order name them;
     `server.json`, `server-compact.json`, `glama.json` and the registry
     metadata say which package serves which transport.
-- **One release.** Every package, the new HTTP package included, is released
-  as one major, 18, from one pull request.
+- **One release.** Every package, the new ones included, is released as one
+  major, 18, from one pull request.
 - **Measured on real systems before release.** These are run against real
   systems, each recorded with its date:
   - stdio, `jwt` / `authorization_code` on the BTP trial, the browser login
     included;
   - HTTP with `x-sap-*` headers;
+  - SSE with `x-sap-*` headers;
   - basic over HTTP and RFC;
   - SNC over RFC on Windows, over stdio.
 
@@ -184,7 +203,11 @@ never hides one and never guesses one.
 - **One binary for every transport mixes their options.** A package per
   transport carries only its own options and dependencies, so no check is
   needed to keep them apart.
-- **SSE adds nothing.** Streamable HTTP covers it, and MCP deprecates it.
+- **SSE is a compatibility choice, not a technical one.** MCP deprecates
+  HTTP+SSE, but some clients still speak only SSE, and there is no data on
+  who uses it; removing it would break them for no technical need. A package
+  of its own keeps its options and dependencies apart, as for every other
+  transport.
 
 ## Holds throughout
 
@@ -210,10 +233,11 @@ never hides one and never guesses one.
      headers serve only the request that carried them.
 4. **The modes are separated by package.** The default destination, the
    broker, auth-stores, session files and interactive login exist in
-   `@mcp-abap-adt/core` (stdio) only. The HTTP package works only with the
-   credentials the user sends in the request's headers — nothing else: no
-   destination, no server-side token, no credential the server holds of any
-   kind — and depends on neither auth-broker nor auth-stores. An embedding
+   `@mcp-abap-adt/core` (stdio) only. The HTTP and SSE packages work only
+   with the credentials the user sends in the headers — per request, or per
+   SSE connection — nothing else: no destination, no server-side token, no
+   credential the server holds of any kind — and they, and compact over
+   them, depend on neither auth-broker nor auth-stores. An embedding
    consumer's credentials and connections stay the consumer's: the server
    hands them each request's signal and does not wrap them.
 5. **No built-in timeouts of the chain's making.** A wait ends with a result,
@@ -255,10 +279,15 @@ never hides one and never guesses one.
 - New grants, client certificates for the server, and passwordless HTTP
   login.
 - `mcp-auth snc`, which is the CLI's own change (3.1.0).
+- A pool of MCP server instances for the HTTP package (state that outlives
+  one request, such as a debugger session named by a handle). It follows
+  this change, once the split has landed.
 
 ## Open — for the spec
 
-1. The HTTP package: its name, its bin's name, and its options.
+1. The HTTP and SSE packages, and compact over each transport: their names,
+   their bins' names, and their options; where the helpers both HTTP
+   transports share live.
 2. What `@mcp-abap-adt/lib` exports once the destination code moves to
    `@mcp-abap-adt/core`, and what moves with it.
 3. Where the server's login bound lives (stdio):
@@ -279,4 +308,5 @@ never hides one and never guesses one.
 7. The browser choice: how today's options map to the providers' `IBrowser`
    factories, and the migration note for any option that goes.
 8. The release of every package as one major, and the migration note for
-   users of each mode, for users of SSE, and for embedding consumers.
+   users of each mode — stdio, Streamable HTTP, SSE, compact over each — and
+   for embedding consumers.

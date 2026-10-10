@@ -163,3 +163,18 @@ export function fakeWorld() {
     },
   };
 }
+
+// AMDP debugger answers, in the shapes the adt-clients AMDP integration test
+// reads them; Task 14 replaces these with recorded answers.
+export const AMDP_START = {
+  headers: {
+    location: '/sap/bc/adt/amdp/debugger/main/0123456789ABCDEF0123456789ABCDEF',
+  },
+  data: '<amdpdbg:startResponse xmlns:amdpdbg="x"><amdpdbg:property amdpdbg:key="HANA_SESSION_ID" amdpdbg:value="123"/></amdpdbg:startResponse>',
+};
+export const AMDP_SYNCED = (requestId: string) =>
+  `<amdpdbg:events xmlns:amdpdbg="x"><amdpdbg:mainResponse amdpdbg:kind="SYNC_BREAKPOINTS" amdpdbg:requestId="${requestId}"><amdpdbg:breakpoint amdpdbg:state="PENDING"/></amdpdbg:mainResponse></amdpdbg:events>`;
+export const AMDP_BREAK =
+  '<amdpdbg:events xmlns:amdpdbg="x" xmlns:adtcore="y"><amdpdbg:mainResponse amdpdbg:kind="ON_BREAK" amdpdbg:requestId="R1" amdpdbg:debuggeeId="D1"><amdpdbg:abapPosition adtcore:uri="/sap/bc/adt/oo/classes/zcl_a/source/main#start=14"/><amdpdbg:variable amdpdbg:name="LV_I">1</amdpdbg:variable><amdpdbg:variable amdpdbg:name="LV_N" amdpdbg:isNullValue="true"/></amdpdbg:mainResponse></amdpdbg:events>';
+export const AMDP_END =
+  '<amdpdbg:events xmlns:amdpdbg="x"><amdpdbg:mainResponse amdpdbg:kind="ON_EXECUTION_END" amdpdbg:requestId="R2" amdpdbg:debuggeeId="D1"/></amdpdbg:events>';

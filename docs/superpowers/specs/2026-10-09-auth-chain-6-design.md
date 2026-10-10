@@ -690,7 +690,12 @@ documented limit.
   YAML `shutdown-timeout`, **no default**), ends it early — exit `1`, naming what was pending.
   What that costs is documented with the option: a pending write is lost, and a discarded refresh
   token can come back.
-- **http**: stop listening; abort live requests; exit. Nothing is persisted, so nothing is flushed.
+- **http**: stop listening; abort every live tool request — tracked across the per-request
+  server instances, not per instance; **await their cleanup** — each aborted tool's releases
+  (D40: an unlock, sent outside the request's signal) land before exit, so a shutdown never leaves
+  a SAP lock held; then exit `0`. The same escapes as core and no others: a `SIGTERM` / `SIGINT`
+  after the start, or `--shutdown-timeout`, ends the wait early — exit `1`, naming the requests
+  still cleaning up; **no deadline by default**. Nothing is persisted, so nothing is flushed.
 
 ## 7. Failures: how they are read and what an MCP client sees
 
@@ -1139,8 +1144,12 @@ connection, which is disconnected, and no provider is constructed; without it,
 - **Shutdown**: a write held by the store lands before exit however long it takes (fake time; no
   timer pending without `--shutdown-timeout`); stdin `end` then `close` (M7) is one start and the
   held write lands; a `SIGTERM` after the start exits at once naming what was pending;
-  `--shutdown-timeout=1` ends a held flush. *Breaks:* restore the 30 s deadline; count `close` as a
-  second trigger.
+  `--shutdown-timeout=1` ends a held flush. **HTTP**, for the full and the compact tool set: a tool
+  holding a lock (the lock answered, the update held at the stand-in) when `SIGTERM` arrives — the
+  stand-in's log holds the `UNLOCK` before the process exits, exit `0`; a second `SIGTERM` while the
+  `UNLOCK` is held exits `1` at once naming the request. *Breaks:* restore the 30 s deadline; count
+  `close` as a second trigger; exit http without awaiting the aborted tools (the `UNLOCK` is
+  missing).
 - `--renewal=refresh-only`: no login; `renewal-declined` with the server's sentence.
 - **Read once per process (D3)**: the settings are read once; a failed read is not kept.
 

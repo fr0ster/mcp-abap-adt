@@ -21,7 +21,9 @@ The library already does every request (measured on premise, SAP_BASIS 758 and
 
 | # | Decision |
 |---|---|
-| D1 | **One MCP server = one user session** (one connection to the SAP system it exposes). Debugger state lives in the server instance (passed to the handlers through their context, never a module global — one process may hold several instances); no per-user registry, no session handles in tool arguments. Every session from the server to ABAP is exclusive to that server instance — the listener's and the stop's connections included; the rest is the MCP standard's. What only the consumer controls — opening parallel sessions, several servers for the same SAP user — is not ours to manage: the user's responsibility. SAP's listener conflict is caught and returned to the user as a tool error carrying SAP's message; nothing more is done about it. |
+| D1 | **One MCP server instance = one MCP session, and its debug state lives in that instance** (never a module global; one process may hold several instances). Every session from the instance to ABAP is exclusive to it. But one LLM conversation may open any number of MCP sessions (clients open one per tool call — MCP SEP-2567, which removed `Mcp-Session-Id`), so the debug state is named by an **explicit handle**: the starting tool returns `debug_session`, the instance's id, and every later debugger tool takes it (decided 2026-10-10). **The host keeps a pool of instances** and routes a call carrying a handle it holds to that instance — a pool is the server layer's, not lib's (decided 2026-10-10). What only the consumer controls — parallel sessions, several servers for one SAP user — is not ours; SAP's listener conflict reaches the model as a tool error carrying SAP's message. |
+| D9 | **The pool and its routing are the host's.** lib gives an instance an id (the host's, or random), answers it as `debug_session`, refuses a handle that is not its own with "debug session is not available", and says whether it holds state (`holdsState()`). The host — `server/src` for our HTTP transport, an embedder for its own — routes `tools/call` whose arguments carry a `debug_session` it holds to that instance after checking the caller (destination, SAP user, the host's principal), creates a fresh instance otherwise, and drops an instance from the pool once it holds nothing. Several processes: the host puts its own instance id into the id and routes itself. |
+| D10 | **No TTL.** An instance leaves the pool by `DebugStop`, the host, the backend, or shutdown. `DebugListSessions` lets the model find its open session again; one ABAP and one AMDP session per owner keeps forgotten ones from piling up. A TTL is an exception only the project owner grants. |
 | D2 | **Both scenarios**: the model starts the program, or someone else does. The listener lives in the background; the model asks whether something was caught. |
 | D3 | **Attach automatically** when the listener catches a debuggee: a debuggee is attachable only while it waits, and seconds between two model calls can lose it. |
 | D4 | **No timeouts** (decided 2026-10-10, replacing a 5-minute idle release). Nothing ends on the server's clock: a stop holds until a step, a termination, `DebugStop`, the server's shutdown, or the SAP system ends it. The user or the backend ends a session; measuring time is not the server's job. Waits inside one call (the listener's long poll, `DebugWait`'s hold) end nothing. |
@@ -80,14 +82,18 @@ handlers through their context; the handlers are thin over it.
 - **AMDP, separately** — its own pair of connections (the event session and the
   command session) and the current `mainId`; one AMDP session at a time.
 
-**Which transports carry it.** The state needs a server instance that lives as
-long as the MCP session: stdio has one per process. Over HTTP the MCP session is
-the one `Mcp-Session-Id` names; the current HTTP server builds an instance per
-request, which keeps no state between tool calls, so the `debug` set is offered
-there only once an instance lives per MCP session (the HTTP split in #287).
+**Which transports carry it.** stdio: one instance per process; the handle is
+still returned and checked, so the tools' contract is the same everywhere. HTTP:
+our transport builds an instance per request today; it gains the pool (D9) in
+`server/src`, and a call carrying `debug_session` is served by the pooled
+instance. An embedder that builds an instance per request does the same in its
+own server layer, or the debug state does not survive between its calls — its
+choice.
 
-**Shutdown** (stdin closed, signal, or `DebugStop`): breakpoints deleted, the
-listener stopped, a current debuggee released, every connection closed.
+**Shutdown** (stdin closed, signal, `DebugStop`, or the host dropping the
+instance): breakpoints deleted, the listener stopped, a current debuggee
+released, every connection closed. A cleanup that fails is reported, not
+claimed as success.
 
 **A conflict is an error; a debuggee's end is not.** A listener conflict is the
 user's to resolve (D1), so it is caught and returned as a tool error carrying
@@ -105,8 +111,7 @@ A debuggee that ended (`debuggeeEnded`, `terminateDebuggee`, read through
 
 ## 2. Core tools
 
-All act on the process's one `DebugSession`. One tool, one action; minimal
-parameters.
+The starting tools (`DebugStartListener`, `DebugTakeOverListener`, `AmdpDebugStart`, compact `HandlerDebugStart`) take their parameters at creation — breakpoints and an optional run — and return `debug_session`; every other session tool takes `debug_session` (required). One tool, one action; minimal parameters.
 
 **ABAP**
 
@@ -127,7 +132,8 @@ parameters.
 | `DebugTerminate` | Ends the debuggee where it stands. |
 | `DebugCreateWatchpoint`, `DebugListWatchpoints`, `DebugDeleteWatchpoint` | Watchpoints at the stop. |
 | `DebugGetMemorySizes`, `DebugCreateMemorySnapshot` | The debuggee's memory; a snapshot written (answers its file). |
-| `DebugStop` | Everything off: breakpoints, listener, current stop. |
+| `DebugStop` | Everything off: breakpoints, listener, current stop; the handle is released. |
+| `DebugListSessions` | The debug sessions of the caller this instance or the host's pool holds (handle, kind, state). |
 
 **Memory snapshots** (`MemorySnapshots`, no session state)
 
@@ -208,6 +214,7 @@ line, event).
 
 **Unit, no SAP**
 
+- The host pool: a call carrying `debug_session` reaches its instance; a foreign or unknown handle is "not available"; an instance holding nothing leaves the pool.
 - `DebugSession` as a state machine, with `AbapDebugger`/`AmdpDebugger` factories
   injected as fakes and fake timers:
   - listening → caught → attached, the listener standing;
@@ -247,6 +254,8 @@ An IDE debugging the same SAP user must be closed during these runs.
   and fits it, and the `debug` set survives the split.
 
 ## Out of scope
+
+- Moving the lock state (`session_id`/`session_state` in the low-level tools, `lockSessions` in `packageSessions.ts`) onto the host's pool — a task of its own.
 
 - More than one debuggee at a time (D5); adding it later adds a parameter and
   breaks no tool's contract.

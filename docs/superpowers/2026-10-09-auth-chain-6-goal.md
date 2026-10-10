@@ -39,8 +39,9 @@ server.
   building providers from header credentials.
 - **SSE is removed.** It has no advantage over Streamable HTTP and is
   deprecated in MCP.
-- **The compact packages** keep wrapping `@mcp-abap-adt/core` (stdio) as
-  today.
+- **The compact server** serves the compact tool set over both transports
+  and behaves exactly as the full server on each; only the tool set, and the
+  principle its sets are formed by, differ.
 
 Some decisions the chain leaves to its consumer: how long an interactive login
 may wait, what cancels it, and what a failure looks like to the user. The
@@ -131,7 +132,7 @@ never hides one and never guesses one.
     bin. The migration note says where HTTP moved, and that the default
     destination and `x-mcp-destination` are gone: pass `x-sap-*` headers.
   - SSE: removed. The migration note says to use Streamable HTTP.
-  - Compact: as today, over stdio.
+  - Compact: over stdio as today, and over Streamable HTTP.
   - Embedded consumers: the migration note names every change they meet.
 - **The Docker images and the release artifacts follow the split.**
   - **`docker/Dockerfile`** (today: HTTP with `--allow-destination-header`,
@@ -235,9 +236,22 @@ never hides one and never guesses one.
 
 - The proxy (`mcp-abap-adt-proxy`) and the calm server. Each migrates in its
   own change afterwards.
-- Changes to the chain's packages, beyond the per-request signal the server
-  needs from connection. A defect found there goes to its own repository, and
-  the server waits for the fix to be published.
+- Changes to the chain's packages, beyond those the server needs and waits for,
+  each released on the current line after the debugger releases
+  (interfaces-adt 13.1.0, adt-clients with the debugger):
+  - `@mcp-abap-adt/interfaces-adt-connection` 2.1.0 — a per-request signal in
+    the request options, and the code of an aborted request;
+  - `@mcp-abap-adt/interfaces-adt` 13.2.0 — the signal in the client's options,
+    and the authentication refusal kept on a failure;
+  - `@mcp-abap-adt/connection` 14.1.0 — the signal honoured at every send
+    boundary, HTTP and RFC;
+  - `@mcp-abap-adt/adt-clients` 26.1.0 — the signal on every request, releases
+    never cancelled, the refusal kept;
+  - `@mcp-abap-adt/auth-broker` 5.1.0 — a handed-over token without a binding
+    bound by the broker itself.
+
+  Any other defect found there goes to its own repository, and the server waits
+  for the fix to be published.
 - New grants, client certificates for the server, and passwordless HTTP
   login.
 - `mcp-auth snc`, which is the CLI's own change (3.1.0).
@@ -247,23 +261,22 @@ never hides one and never guesses one.
 1. The HTTP package: its name, its bin's name, and its options.
 2. What `@mcp-abap-adt/lib` exports once the destination code moves to
    `@mcp-abap-adt/core`, and what moves with it.
-3. Whether a compact server over HTTP is wanted; the default is none.
-4. Where the server's login bound lives (stdio):
+3. Where the server's login bound lives (stdio):
    - a command-line option, a configuration field or both;
    - its default: none, or a stated value.
-5. How a request's cancellation reaches the broker, the providers and the
+4. How a request's cancellation reaches the broker, the providers and the
    connection:
    - which signal each broker call gets;
    - what the connection must offer, and in which release, so that a
      cancelled request is not sent;
    - what the server's `LoginLock` becomes in stdio.
-6. Renewal, and what a failed session write means outside `--unsafe` (the
+5. Renewal, and what a failed session write means outside `--unsafe` (the
    `--env` / `--env-path` file stdio writes back):
    - the server's choice;
    - whether the user can change it, and where.
-7. What an MCP client sees for each failure `kind`: words, hint and
+6. What an MCP client sees for each failure `kind`: words, hint and
    diagnostics, and what stays out.
-8. The browser choice: how today's options map to the providers' `IBrowser`
+7. The browser choice: how today's options map to the providers' `IBrowser`
    factories, and the migration note for any option that goes.
-9. The release of every package as one major, and the migration note for
+8. The release of every package as one major, and the migration note for
    users of each mode, for users of SSE, and for embedding consumers.

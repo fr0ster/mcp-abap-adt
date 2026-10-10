@@ -39,7 +39,7 @@ repositories at their release commits: auth-broker 5.0.1 (`5ec4e5f`), auth-provi
 
 | Goal item | Answered in |
 |---|---|
-| The server is split by transport into packages, one mode each | §3; D35, D36, D37 |
+| The server is split by transport into packages, one mode each; compact on both transports | §3; D35, D36, D37 |
 | Success: each package has only its own options and its own credentials | §3, §4, §10; D35, D38, D39 |
 | Success: failures reach the user as the chain made them | §7; D14, D15, D17, D28, D45, D46 |
 | Success: a connection derived from an injected one stays the consumer's | §4.3; D20–D22 |
@@ -53,13 +53,12 @@ repositories at their release commits: auth-broker 5.0.1 (`5ec4e5f`), auth-provi
 | Success: measured on real systems before release | §15 |
 | Open 1 — the HTTP package's names and options | §3.2, §10.2; D35, D38 |
 | Open 2 — what lib exports after the move | §3.4; D36 |
-| Open 3 — compact over HTTP | §3.5; D37 |
-| Open 4 — the login bound | §5.6; D10 |
-| Open 5 — how cancellation reaches the broker, the providers and the connection; `LoginLock` | §3.1, §5; D4, D8, D31, D32 |
-| Open 6 — renewal and failed writes outside `--unsafe` | §6; D11, D12 |
-| Open 7 — what an MCP client sees per `kind` | §7.3, §7.4 |
-| Open 8 — the browser choice | §8; D9 |
-| Open 9 — the release and the migration notes | §12, §13; D29, D42 |
+| Open 3 — the login bound | §5.6; D10 |
+| Open 4 — how cancellation reaches the broker, the providers and the connection; `LoginLock` | §3.1, §5; D4, D8, D31, D32 |
+| Open 5 — renewal and failed writes outside `--unsafe` | §6; D11, D12 |
+| Open 6 — what an MCP client sees per `kind` | §7.3, §7.4 |
+| Open 7 — the browser choice | §8; D9 |
+| Open 8 — the release and the migration notes | §12, §13; D29, D42 |
 
 ## 2. What the code and the chain do today, and what was measured
 
@@ -178,20 +177,36 @@ outside the repository; each becomes a test in §14):
   entry-only check lets the cancelled request go at +505 ms; only a race and a second check stop it.
 - **M7 — a piped stdin's EOF emits both `end` and `close`** (Node 26.7.0); `installShutdown`
   listens to both (`server/src/shutdown.ts:94-97`).
+- **M8 — a `jwt` / `none` destination without `SAP_ISSUED_*` is refused** (2026-10-10): an
+  `--env`-style file (`EnvDestinationStore.forFile` + `EnvFileSessionStore`) stating
+  `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN`, no binding: `getProvider` throws
+  `DestinationConfigError` naming `issuedBy` ("the credential in the session is not bound to this
+  destination's means", auth-broker `src/destinations.ts:338-379`, `handedOverProvider`). With the
+  two lines `bindingOf(means)` answers added, the provider presents `Bearer <token>`. Nothing in the
+  chain writes them for a held token: the CLI does so for `saml` / `none` only (`--cookie`).
 
 ## 3. Packages and dependencies
 
 ### 3.1 Prerequisites in other repositories
 
 **Decided by the user: option (a)** — the per-request signal is the connection's to honour, at
-every boundary it owns; the server passes it and waits for the releases. A third release follows
-from the goal itself: the goal requires the signal in **every request's options** of a consumer's
-connection, which the server does not wrap (H4) — and the only code between the tools and a
-connection is adt-clients (§2). So the signal enters at adt-clients.
+every boundary it owns; the server passes it and waits for the releases. The signal reaches a
+consumer's connection only through adt-clients (the one code between the tools and a connection,
+§2), and adt-clients' options and failures are contracts of interfaces-adt; and the broker must
+handle a handed-over token's binding itself (D30). All of it targets **the current lines**: the
+user's debugger work moved them — `@mcp-abap-adt/interfaces-adt` 13.1.0 is published ("debugger
+contracts", tag `interfaces-adt-v13.1.0`, on `interfaces-adt-connection ^2.0.0`), and adt-clients'
+open PR #207 (`feat/debugger`, "AbapDebugger", from a fork) is still on 25.0.1 with
+`interfaces-adt ^12`. Nothing below needs the 1.x / 12.x lines, so nothing is mirrored there.
 
-1. **`@mcp-abap-adt/interfaces-adt-connection` 1.1.0** (repository `mcp-abap-adt-interfaces`; a
-   minor on the 1.x line, from `interfaces-adt-connection-v1.0.1`, since connection 14,
-   adt-clients 25 and the server are on `^1`; the same additions go into 2.1.0):
+**The debugger releases land first; the prerequisites build on them:**
+
+0. **The debugger releases (the user's, already in flight)**: interfaces-adt 13.1.0 (published);
+   adt-clients with #207 merged and released on interfaces-adt 13 — **26.0.0** (a major: moving to
+   interfaces-adt 13 / interfaces-adt-connection 2 changes the `makeAdtRequest` generic defaults
+   from `any` to `unknown`, which interfaces-adt-connection 2.0.0's notes measured as 8 errors in
+   adt-clients).
+1. **`@mcp-abap-adt/interfaces-adt-connection` 2.1.0** (`mcp-abap-adt-interfaces`; a minor):
 
    ```ts
    export interface IAbapRequestOptions {
@@ -204,8 +219,33 @@ connection is adt-clients (§2). So the signal enters at adt-clients.
      ABORTED: 'ADT_REQUEST_ABORTED',
    } as const;
    ```
-2. **`@mcp-abap-adt/connection` 14.1.0** (`mcp-abap-connection`; a minor; `interfaces-adt-connection
-   ^1.1.0`):
+2. **`@mcp-abap-adt/interfaces-adt` 13.2.0** (`mcp-abap-adt-interfaces`; a minor;
+   `interfaces-adt-connection ^2.1.0`). **(D43)** The options belong to the contract the client's
+   constructor declares — `IAdtClientOptions` and `IAdtError` live here
+   (`packages/interfaces-adt/src/adt/IAdtClientOptions.ts:18-27` at `interfaces-adt-v13.1.0`) — so
+   they are added here, not as an adt-clients-local type: a consumer type-checks its options
+   against the contract it already imports, and another implementation is held to the same fields.
+
+   ```ts
+   export interface IAdtClientOptions {
+     // … unchanged …
+     /** Read at each request: a signal, or a function answering the signal for the request being sent. */
+     signal?: AbortSignal | (() => AbortSignal | undefined) | undefined;
+   }
+   export interface IAdtError {
+     // … unchanged …
+     /**
+      * The authentication refusal the request failed with, as the connection threw it:
+      * the thrown value's own `refusal` (AuthRefusedError) or `error` (AuthProviderFailure),
+      * unchanged; read it with @mcp-abap-adt/auth-errors' classify. Never present for an
+      * answer of SAP (a 403 with an ADT message is an ADT error, not a refusal).
+      */
+     refusal?: unknown;
+   }
+   ```
+3. **`@mcp-abap-adt/connection` 14.1.0** (`mcp-abap-connection`; on `interfaces-adt-connection
+   ^2.1.0` — connection's own move to the 2.x line comes with it; its notes measured 0 new errors
+   against 2.0.0; if its exported types change, it is 15.0.0, connection's call):
    - **the request's signal is checked at every send boundary, on HTTP and RFC**: before the first
      send; after `authorize()` answers; after the logon — `establish()` and, over RFC,
      `conversation.open()` in `openOwn` / `loggedOn`, kept and throwaway conversations alike;
@@ -216,66 +256,45 @@ connection is adt-clients (§2). So the signal enters at adt-clients.
      `authorize()`, `rejected()`, the logon, `open()`; the shared work runs on for every other
      caller; a late answer to the aborted caller is handled and dropped;
    - **a request already sent is not recalled**; **without a signal**, 14.0.1's behaviour;
-   - **tests in connection**: HTTP and RFC (through its conversation seam), two callers on one
-     connection, one cancelled at each boundary in turn: no mutation of the cancelled caller
-     reaches the endpoint after its abort, it rejects `ADT_REQUEST_ABORTED` at the abort, the other
-     succeeds, no unhandled rejection; each with the check removed as the break.
-3. **`@mcp-abap-adt/interfaces-adt` 12.1.0** (`mcp-abap-adt-interfaces`; a minor on the 12.x
-   line, which adt-clients 25 and the server are on — 13.0.0 moved to interfaces-adt-connection 2;
-   the same additions go into 13.1.0). **(D43)** The option belongs to the contract the client's
-   constructor declares — `IAdtClientOptions` and `IAdtError` live here
-   (`packages/interfaces-adt/src/adt/IAdtClientOptions.ts:18-27`), not in
-   interfaces-adt-connection — so it is added there rather than as an adt-clients-local extended
-   type: a consumer type-checks its options against the contract it already imports, and another
-   implementation of the contract is held to the same field.
-
-   ```ts
-   export interface IAdtClientOptions {
-     // … unchanged …
-     /**
-      * The caller no longer needs the client's requests. Read at each request:
-      * a signal, or a function answering the signal for the request being sent
-      * (undefined: none). Every request carries it in its options, except a
-      * release (below).
-      */
-     signal?: AbortSignal | (() => AbortSignal | undefined) | undefined;
-   }
-   export interface IAdtError {
-     // … unchanged …
-     /**
-      * The authentication refusal the request failed with, as the connection
-      * threw it: the thrown value's own `refusal` (an AuthRefusedError) or
-      * `error` (an AuthProviderFailure), unchanged. Read it with
-      * @mcp-abap-adt/auth-errors' classify; never present for a refusal by SAP.
-      */
-     refusal?: unknown;
-   }
-   ```
-4. **`@mcp-abap-adt/adt-clients` 25.1.0** (`mcp-abap-adt-clients`; a minor;
-   `interfaces-adt-connection ^1.1.0`, `interfaces-adt ^12.1.0`):
-   - **the signal**: every request an `AdtClient` — and every client, facade and runtime client it
-     hands out — sends carries `signal` in its `IAbapRequestOptions`: the client's signal, or what
-     its function answers **at the moment the request is sent**; held per client, never written
-     onto the shared connection; `getSystemInformation(connection, { signal? })` and every other
-     standalone function that sends takes it too;
+   - **tests**: HTTP and RFC (through its conversation seam), two callers on one connection, one
+     cancelled at each boundary in turn: no mutation of the cancelled caller reaches the endpoint
+     after its abort, it rejects `ADT_REQUEST_ABORTED` at the abort, the other succeeds, no
+     unhandled rejection; each with the check removed as the break.
+4. **`@mcp-abap-adt/adt-clients` 26.1.0** (`mcp-abap-adt-clients`; a minor on top of the debugger
+   release 26.0.0; `interfaces-adt-connection ^2.1.0`, `interfaces-adt ^13.2.0`):
+   - **the signal**: every request an `AdtClient` — every client, facade, runtime and debugger
+     client it hands out — sends carries `signal` in its `IAbapRequestOptions`: the client's
+     signal, or what its function answers **at the moment the request is sent**; held per client,
+     never written onto the shared connection; `getSystemInformation(connection, { signal? })` and
+     every standalone function that sends takes it too;
    - **releases are never cancelled**: a request adt-clients sends to undo what an operation
-     acquired — `withLock`'s release, `LockRegistry.unlockAll`, an unlock after a failed step — is
-     sent **without** the signal, so a cancel never leaves a lock held;
-   - **the structured failure is kept**: `recogniseFailure` (`src/utils/adtResponse.js:84-96` in
-     the build) copies the thrown value's own `refusal` or `error`, unchanged, to
-     `IAdtError.refusal`, and an error adt-clients throws (`orThrow`, its own guards) carries the
-     same as an own `refusal` — the server reads it with auth-errors in every mode, whoever built
-     the connection;
+     acquired — `withLock`'s release, `LockRegistry.unlockAll`, an unlock after a failed step, a
+     debugger session's detach — is sent **without** the signal;
+   - **the structured failure is kept**: `recogniseFailure` copies the thrown value's own `refusal`
+     or `error`, unchanged, to `IAdtError.refusal`, and an error adt-clients throws (`orThrow`, its
+     own guards) carries the same as an own `refusal`; an `AdtSAPError` (SAP answered — a 403 with
+     an ADT exception included) never gets one;
    - an aborted request is the connection's `ADT_REQUEST_ABORTED`, kept as the failure's `code`;
    - **tests**: two clients over one connection with distinct signals; a function signal read per
      request; a cancel between lock and update sends the unlock and not the update; an
-     `AuthRefusedError` and an `AuthProviderFailure` thrown by a connection reach `IAdtError.refusal`
-     and a thrown error's `refusal` as the same objects.
+     `AuthRefusedError` and an `AuthProviderFailure` reach `IAdtError.refusal` as the same objects;
+     a 403 with an ADT body carries no `refusal`.
+5. **`@mcp-abap-adt/auth-broker` 5.1.0** (`mcp-abap-adt-auth-broker`; a minor) — **D30, a defect
+   for the broker** (measured, §2 M8): a `jwt` / `none` (or `saml` / `none`) destination whose
+   session holds the handed-over token or cookies **and no binding at all** (`issuedFor` and
+   `issuedBy` both absent) is bound by the broker to the destination it is read for: the provider
+   is built, and the broker writes `bindingOf(means)` beside the credential through the
+   destination's write queue (under its `onWriteFailure`). A binding that is **present and
+   different** stays refused as in 5.0.1 — that is what stops a credential copied into another
+   destination. Tests: an unbound `jwt` / `none` file is served and written with its binding; a
+   mismatched one is refused naming the field; the CLI and the token API unchanged.
 
-**Order**: interfaces-adt-connection 1.1.0 and interfaces-adt 12.1.0 (independent) → connection
-14.1.0 (on the first) and adt-clients 25.1.0 (on both) → this server's 18.0.0. Each is published
-before the next is built against it (H7). **The goal's *Out of scope* names only connection's
-signal**; §18 asks the user to amend it to name the four releases.
+**Order**: 0 (debugger releases) → 1 → 2 → 3 (on 1) and 4 (on 1, 2 and 26.0.0) → 5 (independent of
+1–4) → this server's 18.0.0. Each is published before the next is built against it (H7). **The
+server's own move to interfaces-adt 13 / interfaces-adt-connection 2 comes with it**: lib's ranges
+become `^13.2.0` / `^2.1.0`, and the one error interfaces-adt-connection 2.0.0's notes measured in
+this repository (a test helper's `makeAdtRequest` stub) is fixed in the move. The goal's *Out of
+scope* names these releases.
 
 ### 3.2 The packages
 
@@ -287,7 +306,7 @@ signal**; §18 asks the user to amend it to name the four releases.
 | `@mcp-abap-adt/core` | `server/` | `mcp-abap-adt` | **stdio only**: the default destination, service keys, `--unsafe`, the browser login | lib, auth-broker, auth-stores, auth-providers, auth-errors |
 | `@mcp-abap-adt/http` **(new)** | `http/` | `mcp-abap-adt-http` | **Streamable HTTP only**, credentials only from each request's `x-sap-*` headers | lib, auth-providers (through lib), auth-errors — **not** auth-broker, **not** auth-stores |
 | `@mcp-abap-adt/compact-readonly`, `compact-modify` | as today | — | the compact groups | lib |
-| `@mcp-abap-adt/compact` | `compact/` | `mcp-abap-adt-compact` | the compact server **over stdio** (D37) | lib, core, compact-readonly, compact-modify |
+| `@mcp-abap-adt/compact` | `compact/` | `mcp-abap-adt-compact` (stdio), `mcp-abap-adt-compact-http` (Streamable HTTP) | the compact tool set over both transports (D37) | lib, core, http, compact-readonly, compact-modify |
 
 Reasons: `@mcp-abap-adt/http` and `mcp-abap-adt-http` are free on npm (`npm view` answers `E404`,
 2026-10-10) and say what the package is beside `core`; a directory of its own mirrors `server/`.
@@ -304,13 +323,13 @@ whose graph reaches them. *Break:* import `AuthBrokerFactory` into lib → red.
 
 | Dependency | 17.1.0 (lib) | 18.0.0 | Where |
 |---|---|---|---|
-| `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.0.1` | core only |
+| `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.1.0` (prerequisite, D30) | core only |
 | `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^4.0.0` | core only |
 | `@mcp-abap-adt/auth-providers` | `^5.4.0` | `^6.0.1` | lib, core |
 | `@mcp-abap-adt/connection` | `^11.0.0` | `^14.1.0` (prerequisite) | lib |
-| `@mcp-abap-adt/adt-clients` | `~25.0.1` | `^25.1.0` (prerequisite) | lib |
-| `@mcp-abap-adt/interfaces-adt-connection` | `^1.0.1` | `^1.1.0` (prerequisite) | lib |
-| `@mcp-abap-adt/interfaces-adt` | `^12.0.1` | `^12.1.0` (prerequisite) | lib |
+| `@mcp-abap-adt/adt-clients` | `~25.0.1` | `^26.1.0` (prerequisite, on the debugger release) | lib |
+| `@mcp-abap-adt/interfaces-adt-connection` | `^1.0.1` | `^2.1.0` (prerequisite) | lib |
+| `@mcp-abap-adt/interfaces-adt` | `^12.0.1` | `^13.2.0` (prerequisite) | lib |
 | `@mcp-abap-adt/interfaces-auth` | `^3.2.0` | `^7.5.0` | lib, core |
 | `@mcp-abap-adt/auth-errors` | — | `^2.2.0` | lib, core, http |
 | `@mcp-abap-adt/interfaces-auth-broker` | `^1.2.0` | `^1.3.0` | core only |
@@ -319,10 +338,10 @@ whose graph reaches them. *Break:* import `AuthBrokerFactory` into lib → red.
 | `express` | in core | in http only (core serves no HTTP) | http |
 
 One copy of `interfaces-auth` 7 and of `auth-errors` 2 resolves (`npm ls`). The `auth` script is
-removed. Reason: each chain range is the release the goal names; the four prerequisites are
+removed. Reason: each chain range is the release the goal names; the prerequisites of §3.1 are
 published before the server. Type check for the server: `test:check` compiles a typecheck file
 that passes `{ signal: () => currentRequestSignal() }` to `AdtClient` and reads
-`IAdtError.refusal` — it fails against interfaces-adt 12.0.x.
+`IAdtError.refusal` — it fails against interfaces-adt 13.1.x.
 
 ### 3.4 What moves, and what lib exports (D36)
 
@@ -345,22 +364,39 @@ HTTP launcher. **Deleted**: `SseServer.ts`, `destinationRequest.ts` (`destinatio
 | `@mcp-abap-adt/lib/auth` | `failureOf` (§7.1), `credentialFromHeaders`, `credentialFromSapConfig`, `errorClassOf`, the server's own refusal classes used by lib | `AuthBrokerFactory`, `IAuthBrokerFactory(Config)`, `IDestinations`, `DestinationSystemContext`, `SettleReport`, `assertDestinationName`, `DestinationRefusal`, `UnsupportedAuthenticationError`, `describeAuthError`, the `DestinationConfigError` and `browserCallbackStrategy` re-exports — to core (`@mcp-abap-adt/core/auth`), or deleted |
 | `@mcp-abap-adt/lib/config` | the parameter machinery (table-driven reading of CLI, environment and YAML forms, help and template generation), the shared rows (`--exposition`, `--system-type`, `--conf`) | the destination, browser, `--unsafe` and transport rows — to core; the HTTP rows — to http |
 
-**core exports** `./launcher` (as today, for compact), `./auth` (the moved destination layer, for
-an embedder that builds a stdio server of its own). **http exports** `StreamableHttpServer` (to
-mount on a consumer's app, `app` option) and `main`.
+**lib also exports the tool-set contract** (`@mcp-abap-adt/lib/tool-set`, D37): `ToolSet` — the
+groups a server serves, given the base context and the exposition; the exposition's words, default
+and help — and `fullToolSet` (readonly, high, low, search, system: today's `launch`,
+`launcher.ts:514-563`). **core exports** `./launcher` — `main({ toolSet, program, version })`, and
+`./auth` (the moved destination layer, for an embedder that builds a stdio server of its own).
+**http exports** `main({ toolSet, program, version })` and `StreamableHttpServer` (to mount on a
+consumer's app, `app` option).
 
 Reasons: lib depends on neither broker nor stores (goal), and what it keeps is what an embedder
 and both binaries share; moving the destination layer to core puts every broker and store import
 in one package (H4).
 
-### 3.5 Compact (D37)
+### 3.5 Compact on both transports (D37)
 
-The compact packages keep wrapping core, so `mcp-abap-adt-compact` is **stdio only**: core's
-`main` with compact's groups, core's options. Reason: the goal's default; compact over HTTP today
-exists only by inheriting core's transports (the Docker image's comment offers it,
-`docker/Dockerfile:55-58`). Offering it again would be a second launcher in the HTTP package
-taking compact's groups (`LauncherOptions.extraGroups`), cheap to add later. The migration note
-says compact over HTTP is gone; §18 asks the user whether it is wanted.
+**Decided by the user: compact over HTTP is wanted**, with behaviour identical between the full and
+the compact server on both transports — only the tool set, and the principle its sets are formed
+by, differ. **The tool set is an input of each transport's launcher**: core's `main` and http's
+`main` take a `ToolSet` (§3.4) and nothing else of the tools; everything a launcher does — options,
+credentials, cancellation, failures, shutdown — is the transport's, the same for any set.
+
+- `@mcp-abap-adt/compact` exports `compactToolSet` (its groups from compact-readonly and
+  compact-modify; exposition `ro` / `rw`, default `rw` — `compact/src/launcher.ts`'s
+  `parseCompactExposition`) and has **one flag-free bin per transport**:
+  `mcp-abap-adt-compact` → core's `main({ toolSet: compactToolSet })`, `mcp-abap-adt-compact-http`
+  → http's `main({ toolSet: compactToolSet })`. The full bins are the same with `fullToolSet`.
+- Reasons: the transport's behaviour exists once (core, http), so full and compact cannot fork; a
+  bin per transport mirrors the full server's (`mcp-abap-adt` / `mcp-abap-adt-http`), so each binary
+  still has only its own options and no flag picks a transport or a set. Rejected: a
+  `--tool-set=compact` flag on core and http (they would depend on the compact packages, and a
+  binary's tools would depend on a flag); a compact HTTP launcher of its own (a second
+  implementation of the HTTP server).
+- `LauncherOptions` (`launcher.ts:215-239`: `extraGroups`, `exposition`, `program`,
+  `helpExposition`, `includeSearch`, `version`) becomes the `ToolSet` plus `program` and `version`.
 
 ## 4. Credentials, per package
 
@@ -401,6 +437,10 @@ change of the major).
   (`basic`, `snc`, `jwt/authorization_code`, `jwt/none`) is unchanged.
 - **Inspection-only mode** (stdio without a destination) is the server's own refusal before any
   connection (D17).
+- **(D30) A `jwt` / `none` destination** (a token you hold) is the broker's to bind (auth-broker
+  5.1.0, §3.1): with no binding in its session the broker binds it to this destination and writes
+  `bindingOf(means)` back; a different binding is refused naming the field. The server writes no
+  binding and the migration note asks the user to write none.
 
 ### 4.2 HTTP (`@mcp-abap-adt/http`): only the request's headers
 
@@ -441,9 +481,9 @@ interface EmbeddableMcpServerOptions {
   /**
    * A connection of its own for an operation that needs a new ABAP session:
    * RFC CreatePackage / LockPackage, DeletePackage with force_new_connection.
-   * Its authentication, cancellation and persistence are yours; honour `signal`
-   * (and the signal in each request's options). The server calls `disconnect()`
-   * on it when the operation is done. Without it those operations are refused.
+   * The connection is built by you, with its credential; honour `signal` (and the
+   * signal in each request's options). Once returned it is the server's: the server
+   * releases and closes it like its own. Without it those operations are refused.
    */
   freshConnection?: (options: { signal?: AbortSignal }) => Promise<IAbapConnection>;
 }
@@ -454,9 +494,12 @@ interface EmbeddableMcpServerOptions {
   `DeletePackage` with `force_new_connection` — gets the same three rows.
 - **(D21) `DeletePackage`'s fallback is removed**: a fresh connection that cannot be had is the
   answer, not a silent delete on the session the caller asked to avoid.
-- **(D22) Ownership**: the consumer's fresh connection is the consumer's to authenticate, cancel
-  and persist; the server closes it with `disconnect()` when the operation is done, logging a
-  failure in fixed words.
+- **(D22) Ownership passes to the server — decided by the user.** Once the consumer's factory hands
+  a fresh connection over, the server treats it exactly like a connection it built: it holds it for
+  the operation (or under a package lock's handle, `lockSessions`), its release paths run outside
+  the request's signal (D40), and it is closed with `disconnect()` when the operation or the lock
+  ends, a failure logged in fixed words. What the consumer keeps is what it built in: the
+  connection's credential and its honouring of the signal.
 - **(D19) `credentialFromSapConfig` refuses instead of guessing**: an `authType` outside `basic`,
   `jwt`, `saml`, `certificate` refused naming `authType`; `snc` "is served through a destination
   of mcp-abap-adt (stdio)"; `kerberos` refused; a missing user, password, token or cookies refused
@@ -599,6 +642,10 @@ with `mcp-auth`, or start without it."
 | a named destination without `--unsafe` (in memory) | `'continue'` | an in-memory store does not fail; stated for completeness |
 | the `--env` / `--env-path` file the server writes back | **`'fail'`** (recommended; §18 asks the user) | it is the user's own file and their production stdio setup: a write that does not land must be seen — the request fails `unknown` `persisting-tokens` and the destination is refused until a write lands — and it is what lets "a discarded refresh token does not come back" hold, since under `'continue'` its only report is a `warn` to a logger silent by default |
 
+**Where a session write happens at all**: only in stdio, and only for a **token destination** —
+`jwt` / `authorization_code` (cloud, SSO: the session secret is the token the server obtains and
+renews) and, with D30, the binding of a handed-over `jwt` / `none` token. `basic` and `snc`
+destinations obtain no session secret and are never written; HTTP and embedded write nothing.
 `--session-write-failure` does not exist. Under `'continue'` the broker's `warn` line for a failed
 write goes to stderr whatever `DEBUG_AUTH_LOG` says, so the goal's "unless a write that failed was
 reported" holds there too.
@@ -716,12 +763,36 @@ An `isError` result, JSON in the shape of the server's local failures (`src/lib/
 | Source | `error` | `kind` | `message` | `hint` |
 |---|---|---|---|---|
 | a chain failure | `authentication_failed` | its `kind` | its `reason` | its `hint` |
-| `DestinationConfigError` (core) | `destination_refused` | — (`cause_kind` when it carries an error) | `Destination "<name>" cannot be used: <fields>` | the carried hint, then one fixed hint per known field (`HINTS`, with `issuedFor` / `issuedBy` pointing at the migration note, D30) |
+| `DestinationConfigError` (core) | `destination_refused` | — (`cause_kind` when it carries an error) | `Destination "<name>" cannot be used: <fields>` | the carried hint, then one fixed hint per known field (`HINTS`; `issuedFor` / `issuedBy`: "the token in the session is bound to other means: write it again, or remove `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`") |
 | `ADT_REQUEST_ABORTED` | `request_aborted` | — | fixed words | — |
 | the server's own refusal | `destination_refused` / `fresh_connection_unavailable` / `inspection_only` / `credentials_required` (HTTP) | — | fixed words | — |
 
 Out, always: `diagnostics` (to stderr only), `facts` beyond `kind`, any thrown value's `message`, a
 token, a URL with a query, `state`. The stderr line is `logFields(error)`.
+
+### 7.3a An ADT authorization error is not a credential refusal (D47)
+
+A user who logged on but may not work with an object gets, typically, a `403` with an ADT
+exception body (`<exc:exception>` with SAP's message). That is **the system's answer, not a
+refusal of the credential**, and it reaches the client as an ADT error with its ADT text, exactly
+as today:
+
+- connection does not ask the credential about a `403` (`credentialRejection` answers only a
+  wire's refused logon or a `401`, `AbstractAbapConnection.ts:1626-1640`), so no `rejected()`, no
+  renewal, no `AuthRefusedError`; adt-clients reads the answer as `AdtSAPError` →
+  `IAdtError { origin: 'refusal', message: <SAP's text>, adtType, … }`, with **no `refusal`**
+  (§3.1, adt-clients' contract); `answer()` renders it as today (`failurePayload`, `message` and
+  `raw_body`);
+- `failureOf` reads a `refusal` only — never a status, never `origin` — so a `403` is never
+  relabelled `authentication_failed`. A `system-refused` failure (`not-authorized`, `403`) exists in
+  the chain only as a provider's verdict inside `rejected()`, which the connection does not call for
+  a `403`;
+- over RFC, only `RFC_LOGON_FAILURE` (and SNC's GSS codes) is the credential's; an authority check
+  failing inside ADT answers its ADT exception like HTTP.
+
+Test (§14.2): a `403` with an ADT exception body on a server-built and on an injected connection —
+the tool result carries SAP's text and `origin: 'refusal'`, its `error` is not
+`authentication_failed`, and no renewal was asked.
 
 ### 7.4 The server's own sentences (D28)
 
@@ -765,8 +836,9 @@ callback port keeps `--browser-auth-port` (default 61001). All of it lives in co
 - **(D26) No regular expression over untrusted input** in the touched files: `destinationName`
   (core), the parameter parsers, `errorClassOf`, `return_error`, `notStoredOf`'s removal — plain
   code, and a source test.
-- **(D27) "Server text"** means text an authorization server or identity provider sent; ADT
-  answers stay in tool results as the tools' data.
+- **(D27) "Server text" — decided by the user** — means text an authorization server or identity
+  provider sent; ADT answers, ADT's own authorization errors included (D47), stay in tool results
+  as the tools' data.
 - **stdout**: nothing is added. core is a stdio server; the HTTP package writes its lines to stderr
   as today.
 
@@ -781,16 +853,24 @@ its table**. The help, the YAML template and the validation come from it.
 |---|---|
 | `mcp-abap-adt` (core) | `--mcp`, `--env`, `--env-path` / `MCP_ENV_PATH`, `--auth-broker-path` / `AUTH_BROKER_PATH`, `--unsafe` / `MCP_UNSAFE`, `--browser` / `MCP_BROWSER`, `--browser-program`, `--browser-auth-port` / `MCP_BROWSER_AUTH_PORT`, `--connection-type` / `SAP_CONNECTION_TYPE`, `--system-type` / `SAP_SYSTEM_TYPE`, `--login-timeout`, `--renewal`, `--shutdown-timeout`, `--auth-debug` (no env), `--exposition`, `--conf`, `--help`, `--version` |
 | `mcp-abap-adt-http` | today's HTTP options, same names: `--host` / `--http-host` / `MCP_HTTP_HOST`, `--port` / `--http-port` / `MCP_HTTP_PORT`, `--path` / `--http-path`, `--http-json-response` / `MCP_HTTP_ENABLE_JSON_RESPONSE`, `--http-allowed-hosts` / `MCP_HTTP_ALLOWED_HOSTS`, `--http-allowed-origins` / `MCP_HTTP_ALLOWED_ORIGINS`, `--http-enable-dns-protection` / `MCP_HTTP_ENABLE_DNS_PROTECTION`, `--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`); `--system-type` / `SAP_SYSTEM_TYPE`, `--shutdown-timeout`, `--exposition`, `--conf`, `--help`, `--version` |
-| `mcp-abap-adt-compact` | core's table with compact's `--exposition` (`ro` / `rw`) |
+| `mcp-abap-adt-compact`, `mcp-abap-adt-compact-http` | core's, respectively http's, table with compact's `--exposition` (`ro` / `rw`) — the tool set's, nothing else |
 
 **Removed parameters stop the start, naming where they went (D39)** — the mechanism 16.0.0 used
-(`REMOVED_PARAMETERS`, `authParameters.ts:118-158`), not a cross-mode check: in core,
-`--transport` / `MCP_TRANSPORT` with any value but `stdio` ("HTTP moved to `mcp-abap-adt-http`
-(@mcp-abap-adt/http); SSE was removed: use Streamable HTTP"), `--allow-destination-header`, the
-SSE options (`--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, `MCP_SSE_*`) and the HTTP ones (`--http-*`, `--host`, `--port`, `--path`, `MCP_HTTP_*`, `MCP_TLS_*`); in http, `--mcp`, `--env`,
-`--env-path`, `--allow-destination-header`, `--unsafe`, `--browser*`, `--transport` ("destinations
-and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers"). `--transport=stdio`
-stays accepted by core so existing client configurations keep working.
+(`REMOVED_PARAMETERS`, `authParameters.ts:118-158`), not a cross-mode check:
+
+- **`--transport` / `MCP_TRANSPORT` / YAML `transport` is removed entirely — decided by the user**:
+  a binary is its transport. Passing it with any value stops the start: in core and
+  `mcp-abap-adt-compact`, "`--transport` is gone: `mcp-abap-adt` serves stdio; for Streamable HTTP
+  run `mcp-abap-adt-http` (compact: `mcp-abap-adt-compact-http`); SSE was removed"; in
+  `mcp-abap-adt-http` and `mcp-abap-adt-compact-http`, "`--transport` is gone:
+  `mcp-abap-adt-http` serves Streamable HTTP; for stdio run `mcp-abap-adt`".
+- in the stdio binaries, `--allow-destination-header`, the SSE options (`--sse-host`,
+  `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`,
+  `MCP_SSE_*`) and the HTTP ones (`--http-*`, `--host`, `--port`, `--path`, `MCP_HTTP_*`,
+  `MCP_TLS_*`);
+- in the HTTP binaries, `--mcp`, `--env`, `--env-path`, `--allow-destination-header`, `--unsafe`,
+  `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug` ("destinations and logins are
+  served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers").
 
 ### 10.2 Each current call site → its new form
 
@@ -833,7 +913,8 @@ stays accepted by core so existing client configurations keep working.
 
 - **`docker/Dockerfile`** installs `@mcp-abap-adt/http` and runs `mcp-abap-adt-http`
   (`MCP_HTTP_HOST=0.0.0.0`, `MCP_HTTP_PORT=3000`): no `AUTH_BROKER_PATH`, no `service-keys/` or
-  `sessions/`, no `--allow-destination-header`, no compact (stdio only, D37); `HEALTHCHECK` on
+  `sessions/`, no `--allow-destination-header`; it also installs `@mcp-abap-adt/compact`, whose
+  `mcp-abap-adt-compact-http` is the documented alternative command (D37); `HEALTHCHECK` on
   `/mcp/health` unconditionally. The package source is a build argument: the registry by default,
   the packed tarballs of the checkout in CI — so the image is verified before the package exists on
   npm. Verified on the built image: the health endpoint answers `200`, and a `tools/call` with only
@@ -844,13 +925,15 @@ stays accepted by core so existing client configurations keep working.
   `docker-compose.headerless.yml`, which is deleted), with no volume; `docker-compose.inspect.yml`
   unchanged.
 - **Workflows**: `ci.yml` and `release.yml` build, type-check and test `http/`, pack it beside the
-  others, install the tarballs and run `mcp-abap-adt-http --version` / `--help`, and build the
-  image from the tarballs; `scripts/publish-all.sh` publishes `./http` after `.` (lib), before
-  `./compact`; `binSmoke.test.ts` installs and starts the new bin.
+  others, install the tarballs and run `--version` / `--help` of all four bins (`mcp-abap-adt`,
+  `mcp-abap-adt-http`, `mcp-abap-adt-compact`, `mcp-abap-adt-compact-http`), and build the image
+  from the tarballs; `scripts/publish-all.sh` publishes `./http` after `.` (lib) and `./server`,
+  before `./compact`; `binSmoke.test.ts` installs and starts the four bins.
 - **Metadata**: `docs/deployment/RELEASE.md` names six packages and the order; `server.json`
   keeps core as `stdio` and its environment variables less the HTTP ones; a new registry entry
   (`server-http.json`, `io.github.fr0ster/mcp-abap-adt-http`) with transport `streamable-http`;
-  `server-compact.json` says stdio; `glama.json`'s description names the transports per package;
+  `server-compact.json` lists both compact transports (stdio, and `mcp-abap-adt-compact-http` as
+  `streamable-http`); `glama.json`'s description names the transports per package;
   `releaseMetadata.test.ts` covers the new entry.
 
 ## 12. Documentation and migration notes
@@ -862,11 +945,12 @@ stays accepted by core so existing client configurations keep working.
   `--allow-destination-header`, service-key and session mounts are gone; the Docker image changed
   accordingly.
 - **SSE users**: SSE is removed; use Streamable HTTP (`mcp-abap-adt-http`).
-- **compact over HTTP**: gone; compact is stdio.
-- **stdio users**: `--transport` other than `stdio` refused; the first start after upgrading logs in
+- **compact over HTTP**: `mcp-abap-adt-compact-http` (in `@mcp-abap-adt/compact`), identical to
+  `mcp-abap-adt-http` but for the tool set; over stdio `mcp-abap-adt-compact` as today.
+- **stdio users**: `--transport` is gone — remove it (D39); the first start after upgrading logs in
   once per `jwt` / `authorization_code` destination (broker 5 reads earlier sessions as unbound);
-  **a `jwt` / `none` destination** needs `SAP_ISSUED_FOR` / `SAP_ISSUED_BY` (the two lines given in
-  the broker's documented format, D30); editing a destination's files while the server runs is
+  a `jwt` / `none` destination keeps working — the broker binds the token on first use and writes
+  the binding back (D30); editing a destination's files while the server runs is
   unsupported — restart after any change (D3); `--browser` table, unknown names refused, `none`
   waits, `--browser-program`; no login timeout (it was 30 s) and `--login-timeout`; no shutdown
   deadline (it was 30 s), `--shutdown-timeout` and the second signal; `--renewal`; a failed write
@@ -893,7 +977,10 @@ launcher's help.
 
 - **(D29) Six packages at 18.0.0**, the new one included, from PR #287 — **decided by the user:
   one PR, one major release**.
-- **The server waits for its prerequisites** (§3.1), then releases per `RELEASE.md`: manifests and
+- **The server waits for its prerequisites** (§3.1) — the user's debugger releases first
+  (interfaces-adt 13.1.0, adt-clients 26.0.0), then interfaces-adt-connection 2.1.0,
+  interfaces-adt 13.2.0, connection 14.1.0, adt-clients 26.1.0 and auth-broker 5.1.0 — then
+  releases per `RELEASE.md`: manifests and
   sibling ranges, metadata, CHANGELOG and docs, `npm ci`, build, `test:check`, `npm test`
   (binSmoke), each package's own tests, `release:dry` ending `Published: 6  Skipped: 0`; the
   lockfile holds no `"link": true` and nothing not from the registry; after publishing, a clean
@@ -923,11 +1010,16 @@ Each package runs its own suite (`npm --prefix http test` beside `server/`).
 - **The dependency rule (D38)**: `package.json` and the import graphs of lib and http hold no
   auth-broker / auth-stores; core's does. *Break:* a lib import of `AuthBrokerFactory`.
 - **Each binary's options**: core's help lists no HTTP option, http's no destination option; each
-  removed parameter stops its binary with its words; `--transport=stdio` still starts core.
+  removed parameter stops its binary with its words; `--transport`, with any value, stops every
+  binary naming the binary to use.
 - **HTTP credentials**: a request with `x-sap-*` basic and with a token reaches the stand-in with
   that credential; none, or `x-mcp-destination`, answers `400` with its words; two concurrent
   requests with different users never see each other's credential.
-- binSmoke installs and starts all three bins; `releaseMetadata` covers the new entry.
+- **Full and compact behave alike (D37)**: one parametrised suite runs each transport test —
+  credentials, cancellation, failures, shutdown — with `fullToolSet` and with `compactToolSet`;
+  the only difference asserted is the tool list. *Break:* give compact's launcher an option of its
+  own → the parity test fails.
+- binSmoke installs and starts all four bins; `releaseMetadata` covers the new entries.
 
 ### 14.2 Failures (§7)
 
@@ -1043,7 +1135,8 @@ only. The summary prints no character of a secret. stdout stays empty under stdi
 ### 14.7 What works today
 
 The browser table (pure function); every parameter row per binary; stdio `basic` (HTTP and RFC,
-mocked transport), `snc`, `jwt` / `authorization_code`, `jwt` / `none` with and without binding;
+mocked transport), `snc`, `jwt` / `authorization_code`, `jwt` / `none` — with no binding (bound and
+written back by auth-broker 5.1.0, M8), with its own, and with another destination's (refused);
 HTTP headers; `SapConfig` refusals (D19); embedded with an injected connection. The existing suites
 are moved and updated, not deleted (`brokerFactory`, `destinationRouting` → HTTP headers,
 `packageSessions`, `credentialSources`, `connectionFactory`, `returnError`, `shutdown`,
@@ -1065,7 +1158,8 @@ browser and profile and that they are ready:
    once, a restart reuses the session (`--env-path`; a named destination with `--unsafe`), a
    refresh, `--browser=system` and `--browser=none`, and an MCP cancel during the login frees port
    61001.
-2. HTTP (`mcp-abap-adt-http`) with `x-sap-*` headers: basic on premise, and a token on the trial.
+2. HTTP (`mcp-abap-adt-http`) with `x-sap-*` headers: basic on premise, and a token on the trial;
+   the same through `mcp-abap-adt-compact-http`.
 3. basic over HTTP and over RFC (stdio).
 4. SNC over RFC on Windows, over stdio.
 
@@ -1083,7 +1177,8 @@ rebase follows renames. Footprint in shared files:
 | `src/lib/utils.ts` | `return_error`'s first lines and two regexes; one request's `signal` |
 | `src/lib/packageSessions.ts`, `handleDeletePackage.ts`, `requestSystemResolution.ts` | D20, D21, the lookup's own attempt (D44) |
 | `src/lib/handlers/interfaces.ts`, `src/lib/requestContext.ts`, handler signatures | untouched |
-| `server/src/*` | split between core and http (D42, commit 1) |
+| `server/src/*`, `compact/src/*` | split between core and http, compact's two bins (D42, commit 1) |
+| adt-clients and interfaces-adt | the debugger releases land first; this change's prerequisites build on them (§3.1) |
 | `tools/` | untouched |
 
 A debugger listener (a long request) is bounded by nothing of the server's and cancelled by its MCP
@@ -1115,22 +1210,23 @@ request like any request.
 | — | the package split (core stdio, a new HTTP package, lib without broker and stores) |
 | — | SSE removed |
 | D29 | one PR (#287), one major 18 for every package |
+| D12 (`--env` file) | `'fail'`, fixed; a session write happens only in stdio and only for token destinations |
+| D35 | `@mcp-abap-adt/http`, bin `mcp-abap-adt-http`, directory `http/` |
+| D37 | compact over HTTP wanted; behaviour identical, only the tool set differs |
+| D34 | the abort's code is the connection's own, `ADT_REQUEST_ABORTED` |
+| D30 | the broker binds a handed-over token itself — a prerequisite (auth-broker 5.1.0) |
+| D22 | ownership of a handed-over fresh connection passes to the server |
+| D27, D47 | "server text" is an authorization server's or IdP's; ADT's own authorization errors reach the client as ADT errors |
+| D39 | `--transport` removed entirely, refused naming the binary to use |
+| §3.1 | the prerequisites on the current lines, after the debugger releases; the goal's *Out of scope* names them |
 
 **Questions for the user** (the spec is written on each recommendation):
 
 | # | Question | Recommendation |
 |---|---|---|
-| 1 | The goal's *Out of scope* allows a chain change only for connection's signal; the design needs four releases (§3.1): interfaces-adt-connection 1.1.0 (`IAbapRequestOptions.signal`, `ADT_REQUEST_ABORTED`), interfaces-adt 12.1.0 (`IAdtClientOptions.signal`, `IAdtError.refusal`), connection 14.1.0 (the signal at every send boundary), adt-clients 25.1.0 (the signal on every request, releases unsignalled, the structured failure kept). Amend that line? | yes: name the four |
-| 2 | D12: what a failed write to the `--env` / `--env-path` file means | `'fail'`, fixed |
-| 3 | D35: names | `@mcp-abap-adt/http`, bin `mcp-abap-adt-http`, directory `http/` |
-| 4 | D37: compact over HTTP | none now; a second launcher in the HTTP package later if wanted |
-| 5 | D34: the abort's code | a code of the connection's own (`ADT_REQUEST_ABORTED`), not auth-errors' `interactive-login` `aborted` |
-| 6 | D30: `jwt` / `none` under broker 5 needs `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`, which no tool writes | the migration note's lines now; ask auth-broker-cli for `mcp-auth --token` |
-| 7 | D22: the server closes the consumer's fresh connection with `disconnect()` | yes |
-| 9 | D27: "server text" means an authorization server's or IdP's text; ADT answers stay | yes |
-| 10 | D39: `--transport=stdio` still accepted by core | yes, for existing client configurations |
+| 1 | D30, auth-broker 5.1.0's contract: bind a handed-over credential only when its session holds **no** binding at all; a present, different binding stays refused | yes — the one case 5.0.1 refuses that a user meets on upgrade, without opening the copy-to-another-destination hole the binding exists for |
+| 2 | §3.1: the adt-clients debugger release is assumed to be **26.0.0** (a major for the interfaces-adt 13 move) and this change's adt-clients release 26.1.0 on top; connection's move to interfaces-adt-connection 2 assumed a minor (14.1.0) | confirm the numbers with the debugger PR's release |
 
 **Possible later improvements**, each its own change in its repository: auth-stores
 `EnvDestinationStore.fromContent` / key stores `fromKey` (projections from content read once); the
-broker's `getProvider` answering the means it was built from; auth-broker-cli `--token` for
-`jwt` / `none`.
+broker's `getProvider` answering the means it was built from.

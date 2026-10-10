@@ -21,7 +21,7 @@ The library already does every request (measured on premise, SAP_BASIS 758 and
 
 | # | Decision |
 |---|---|
-| D1 | **One MCP server = one user session** (one connection to the SAP system it exposes). Debugger state lives in the server process; no per-user registry, no session handles in tool arguments. What only the consumer controls — opening parallel sessions, several servers for the same SAP user — is not ours to manage: SAP's own answer (a listener conflict) reaches the model as it is, and nothing more is done about it. |
+| D1 | **One MCP server = one user session** (one connection to the SAP system it exposes). Debugger state lives in the server process; no per-user registry, no session handles in tool arguments. Every session from the server to ABAP is exclusive to that server instance — the listener's and the stop's connections included; the rest is the MCP standard's. What only the consumer controls — opening parallel sessions, several servers for the same SAP user — is not ours to manage: SAP's own answer (a listener conflict) reaches the model as it is, and nothing more is done about it. |
 | D2 | **Both scenarios**: the model starts the program, or someone else does. The listener lives in the background; the model asks whether something was caught. |
 | D3 | **Attach automatically** when the listener catches a debuggee: a debuggee is attachable only while it waits, and seconds between two model calls can lose it. |
 | D4 | **Idle timeout 5 minutes**: an attached debuggee no tool call has touched for 5 minutes is let go (`stepContinue`), so a suspended request of someone else does not hang until its session dies. |
@@ -58,6 +58,12 @@ the handlers are thin over it.
   `Wait` to report as `ended`.
 - **AMDP, separately** — its own pair of connections (the event session and the
   command session) and the current `mainId`; one AMDP session at a time.
+
+**Which transports carry it.** The state needs a server instance that lives as
+long as the MCP session: stdio has one per process. Over HTTP the MCP session is
+the one `Mcp-Session-Id` names; the current HTTP server builds an instance per
+request, which keeps no state between tool calls, so the `debug` set is offered
+there only once an instance lives per MCP session (the HTTP split in #287).
 
 **Shutdown** (stdin closed, signal, or `DebugStop`): breakpoints deleted, the
 listener stopped, a current debuggee released, every connection closed.

@@ -76,7 +76,8 @@ http:            # or sse:
 - **SAP sessions** are held in the server process. Their cookies never leave
   it.
 - **State handles.** A tool that creates state outliving one call, such as a
-  debug session, returns a `state_handle`, and later calls send it back.
+  debug session, returns a `state_handle`, and later calls send it back. The
+  handle identifies an LLM session's state.
   - **A handle is a bearer secret.** Whoever holds it acts with the SAP
     session behind it, like a session cookie: the server does not check who
     sends it. Keeping it safe is the deployer's job.
@@ -84,9 +85,6 @@ http:            # or sse:
     transcripts and logs. Protect it like a session cookie: HTTPS for anything
     beyond `127.0.0.1`, callers isolated from one another, and no wire trace
     on a shared machine.
-  - The server's owner of a state — the destination, or a keyed hash of an
-    `x-sap-*` login and password — only scopes the listing of open states and
-    the limit of one state of a kind per owner. It authorizes nothing.
 
 ## Logs
 

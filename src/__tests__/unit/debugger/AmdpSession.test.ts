@@ -150,7 +150,8 @@ describe('AmdpSession', () => {
       return real(...(a as [any, any, any]));
     };
     await w.session.step('continue');
-    await expect(w.session.getTable('LT_ROWS')).resolves.toBeDefined(); // D3 is stopped
+    await expect(w.session.getTable('LT_ROWS')).resolves.toBeDefined();
+    expect(w.calls).toContain('preview:LT_ROWS:D3'); // D3 is the stopped debuggee
   });
 
   it('a wait does not take the sync confirmation away from the start', async () => {
@@ -381,6 +382,67 @@ describe('AmdpSession', () => {
     await until(() => v.closed.length === 3);
     expect(v.session.holdsState()).toBe(false);
     expect((await v.session.wait(0)).state).toBe('idle');
+  });
+
+  it('an event read that throws outside its answer ends the session like a failed read', async () => {
+    const w = await started();
+    w.dbg.getEvents = () => {
+      throw new Error('socket closed');
+    };
+    w.reads[1].resolve(okResponse('')); // the loop asks again, and the ask throws
+    await until(() => w.closed.length === 2);
+    expect(w.calls).toContain('stop');
+    await expect(w.session.wait(0)).rejects.toThrow(/socket closed/);
+    expect((await w.session.wait(0)).state).toBe('idle');
+    expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('two runs are fenced each by its own token: both outcomes arrive, and stop closes the one in flight', async () => {
+    const w = await started();
+    const ports = (w.session as any).ports;
+    const runs = [
+      deferred<any>(),
+      deferred<any>(),
+      deferred<any>(),
+      deferred<any>(),
+    ];
+    let n = 0;
+    ports.run = async () => runs[n++].promise;
+    w.session.startRun({ kind: 'class', name: 'ZCL_A' });
+    w.session.startRun({ kind: 'class', name: 'ZCL_A' });
+    await until(() => n === 2);
+    runs[0].resolve({ ok: true, output: 'first' });
+    await until(() => w.closed.length === 1);
+    await expect(w.session.wait(0)).resolves.toMatchObject({
+      state: 'ended',
+      run: { output: 'first' },
+    });
+    runs[1].resolve({ ok: true, output: 'second' });
+    await until(() => w.closed.length === 2);
+    await expect(w.session.wait(0)).resolves.toMatchObject({
+      state: 'ended',
+      run: { output: 'second' },
+    });
+
+    w.session.startRun({ kind: 'class', name: 'ZCL_A' });
+    w.session.startRun({ kind: 'class', name: 'ZCL_A' });
+    await until(() => n === 4);
+    runs[2].resolve({ ok: true, output: 'third' }); // the fourth run stays in flight
+    await until(() => w.closed.length === 3);
+    await w.session.stop();
+    expect(w.closed).toContainEqual({ n: 5 }); // the fourth run's connection, still tracked
+  });
+
+  it('a read failure whose cleanup fails names what it could not undo', async () => {
+    const w = await started();
+    w.dbg.stop = async () => refusedResponse('not stopped');
+    w.reads[1].resolve(refusedResponse('session gone'));
+    await until(() => w.session.describe().state === 'closing'); // retired, the stop still owed
+    expect(w.session.pending()).toBe(false);
+    await expect(w.session.wait(0)).rejects.toThrow(
+      /session gone; not undone: stop: not stopped/,
+    );
+    expect(w.session.failures()).toEqual(['stop: not stopped']);
   });
 
   it('observers hear of changes the read loop makes', async () => {

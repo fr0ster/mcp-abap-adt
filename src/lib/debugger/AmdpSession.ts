@@ -100,8 +100,8 @@ export class AmdpSession<O = unknown> {
   private notices: AmdpState[] = [];
   private failure?: string;
   private cleanupFailures: string[] = [];
-  private run?: { generation: number; connection?: IAbapConnection };
-  private generation = 0;
+  /** Runs in flight, each its own token: stop() forgets them all, so a late end changes nothing. */
+  private readonly runs = new Set<{ connection?: IAbapConnection }>();
   private readonly waiters = new Set<() => void>();
   private readonly closedConnections = new WeakSet<object>();
   /** Connections whose work is done but whose close threw: the next stop closes them. */
@@ -234,11 +234,10 @@ export class AmdpSession<O = unknown> {
       this.open = open;
       this.failure = undefined;
       this.cleanupFailures = [];
-      const generation = ++this.generation;
       void this.readLoop(open);
       try {
         const states = await this.sync(open, options.breakpoints);
-        if (options.run) this.startRunAt(options.run, generation);
+        if (options.run) this.startRun(options.run);
         return { mainId: open.mainId, breakpoints: states };
       } catch (error) {
         // A start that fails leaves no session: the same retained cleanup as a stop;
@@ -348,27 +347,44 @@ export class AmdpSession<O = unknown> {
           open.readFailed = failed;
           this.notify(); // a sync waiting in the serial hears it now, not after its bound
         }
-        await this.mutate(async () => {
-          open.readDone = true;
-          if (!open.stopping && this.open === open) {
-            // The event session failed: the AMDP session ends, through the same retained cleanup as a stop.
-            if (!open.failureReported) this.failure = open.readFailed;
-            this.retire(open);
-          }
-          // Retired: this was the last batch. It releases a break it carries and closes what is left.
-          if (this.closing === open)
-            this.cleanupFailures = await this.finishClosing(open, events);
-        });
+        await this.lastBatch(open, events);
         return;
       }
     } catch (error) {
-      // A stale loop changes nothing; one whose session is still held records the failure.
-      if (this.open === open || this.closing === open) {
-        open.readDone = true;
-        this.failure ??= `the event read failed: ${thrown(error)}`;
+      // Thrown outside an answer (the ask itself, an observer): the same end as a failed read.
+      // A stale loop changes nothing.
+      const message = `the event read failed: ${thrown(error)}`;
+      if (!open.stopping && this.open === open) open.readFailed ??= message;
+      try {
+        await this.lastBatch(open, []);
+      } catch {
+        if (this.open === open || this.closing === open) {
+          open.readDone = true;
+          this.failure ??= open.readFailed ?? message;
+        }
       }
-      this.notify();
     }
+  }
+
+  /**
+   * The read loop's last turn, in the serial. A session still running failed: it is
+   * retired through the same retained cleanup as a stop, and its failure, with what
+   * that cleanup could not undo, is what the next wait throws. A retired one: this
+   * batch is its last; it releases a break it carries and closes what is left.
+   */
+  private lastBatch(open: Open, events: AmdpEvent[]): Promise<void> {
+    return this.mutate(async () => {
+      open.readDone = true;
+      const failedHere = !open.stopping && this.open === open;
+      if (failedHere) this.retire(open);
+      const owed = this.closing === open;
+      const failures = owed ? await this.finishClosing(open, events) : [];
+      if (owed) this.cleanupFailures = failures;
+      if (failedHere && !open.failureReported)
+        this.failure = `${open.readFailed ?? 'the event read failed'}${
+          failures.length ? `; not undone: ${failures.join('; ')}` : ''
+        }`;
+    });
   }
 
   /**
@@ -523,7 +539,6 @@ export class AmdpSession<O = unknown> {
    */
   stop(): Promise<void> {
     return this.mutate(async () => {
-      this.generation++;
       const failures: string[] = [];
       try {
         for (const c of [...this.unclosed])
@@ -534,13 +549,14 @@ export class AmdpSession<O = unknown> {
       } catch (error) {
         failures.push(thrown(error));
       } finally {
-        const run = this.run;
-        this.run = undefined;
-        await this.closeOrKeep(
-          run?.connection,
-          "the run's connection",
-          failures,
-        );
+        const runs = [...this.runs];
+        this.runs.clear();
+        for (const run of runs)
+          await this.closeOrKeep(
+            run.connection,
+            "the run's connection",
+            failures,
+          );
         this.queue = [];
         this.notices = [];
         this.failure = undefined;
@@ -553,21 +569,17 @@ export class AmdpSession<O = unknown> {
   }
 
   /** Runs a target on a connection of its own; its outcome arrives through wait(). */
-  startRun(target: RunTarget): void {
-    this.startRunAt(target, this.generation);
-  }
-
   /** Never rejects: a failed run or close becomes the run's outcome or an owed close. */
-  private startRunAt(target: RunTarget, generation: number): void {
+  startRun(target: RunTarget): void {
     const origin = this.requireOrigin();
-    this.run = { generation };
+    const run: { connection?: IAbapConnection } = {};
+    this.runs.add(run);
     void (async () => {
       let connection: IAbapConnection | undefined;
       let outcome: RunOutcome;
       try {
         connection = await this.ports.openConnection(origin);
-        if (this.run?.generation === generation)
-          this.run.connection = connection;
+        if (this.runs.has(run)) run.connection = connection;
         outcome = await this.ports.run(connection, target);
       } catch (error) {
         outcome = { ok: false, message: thrown(error) };
@@ -578,8 +590,7 @@ export class AmdpSession<O = unknown> {
       } catch {
         if (connection) this.unclosed.add(connection); // the next stop closes it
       }
-      if (this.run?.generation === generation) {
-        this.run = undefined;
+      if (this.runs.delete(run)) {
         this.notices.push({
           state: 'ended',
           reason: 'run_finished',
@@ -596,7 +607,7 @@ export class AmdpSession<O = unknown> {
       !!this.closing ||
       this.queue.length > 0 ||
       this.notices.length > 0 ||
-      !!this.run ||
+      this.runs.size > 0 ||
       this.failure !== undefined ||
       this.cleanupFailures.length > 0 ||
       this.unclosed.size > 0

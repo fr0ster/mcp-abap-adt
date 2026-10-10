@@ -5,8 +5,8 @@
 export { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
 /** The browser strategy the program passes to the factory (Ruling 1). */
 export { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
+export { credentialFromHeaders } from '../credentialSources';
 export { AuthBrokerFactory } from './brokerFactory';
-export { connectedUserOf } from './connectedUser';
 export { assertDestinationName } from './destinationName';
 export {
   DestinationRefusal,

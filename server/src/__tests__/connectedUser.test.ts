@@ -5,7 +5,8 @@
 const connect = jest.fn(async () => {});
 const disconnect = jest.fn(async () => {});
 const built: Array<{ settings: unknown }> = [];
-jest.mock('../../../lib/connectionFactory', () => ({
+jest.mock('@mcp-abap-adt/lib/utils', () => ({
+  ...jest.requireActual('@mcp-abap-adt/lib/utils'),
   createAbapConnection: (settings: unknown) => {
     built.push({ settings });
     return { connect, disconnect };
@@ -16,8 +17,8 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
   getSystemInformation: (...a: unknown[]) => getSystemInformation(...a),
 }));
 
-import { connectedUserOf } from '../../../lib/auth/connectedUser';
-import { logger } from '../../../lib/logger';
+import { logger } from '@mcp-abap-adt/lib/utils';
+import { connectedUserOf } from '../connectedUser';
 
 const headers = {
   'x-sap-url': 'https://sap.invalid',

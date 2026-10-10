@@ -42,7 +42,7 @@ export const sessionContext = new AsyncLocalStorage<{
 // should import these from the SDK directly.
 export { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 export type { AxiosResponse };
-export { getTimeout, getTimeoutConfig, logger };
+export { createAbapConnection, getTimeout, getTimeoutConfig, logger };
 
 /**
  * Encodes SAP object names for use in URLs.

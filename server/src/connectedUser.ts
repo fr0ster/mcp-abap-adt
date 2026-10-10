@@ -9,10 +9,8 @@
  * against the user until the system's idle timeout.
  */
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection } from '../connectionFactory.js';
-import { credentialFromHeaders } from '../credentialSources.js';
-import { logger } from '../logger.js';
-import { errorClassOf } from './errors.js';
+import { credentialFromHeaders, errorClassOf } from '@mcp-abap-adt/lib/auth';
+import { createAbapConnection, logger } from '@mcp-abap-adt/lib/utils';
 
 /**
  * Connects with the `x-sap-*` headers' credential and answers the user SAP

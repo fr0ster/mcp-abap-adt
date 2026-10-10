@@ -1,11 +1,7 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import {
-  connectedUserOf,
-  errorClassOf,
-  type IDestinations,
-} from '@mcp-abap-adt/lib/auth';
+import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -21,6 +17,7 @@ import {
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
+import { connectedUserOf } from './connectedUser.js';
 import { CORE_VERSION } from './coreVersion.js';
 import {
   destinationFailureAnswer,

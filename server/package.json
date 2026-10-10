@@ -69,6 +69,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@mcp-abap-adt/adt-clients": "~27.0.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.1",
     "@mcp-abap-adt/lib": "^17.0.0",
     "@mcp-abap-adt/logger": "^0.4.1",

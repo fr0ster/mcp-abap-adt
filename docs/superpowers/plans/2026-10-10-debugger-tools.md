@@ -282,7 +282,7 @@ describe('the source a line names', () => {
   it('long type forms and namespaces', () => {
     expect(sourceUriOf({ object_type: 'CLAS/OC', object_name: 'ZCL_A' })).toBe('/sap/bc/adt/oo/classes/zcl_a/source/main');
     expect(sourceUriOf({ object_type: 'PROG/I', object_name: 'ZI' })).toBe('/sap/bc/adt/programs/includes/zi/source/main');
-    expect(sourceUriOf({ object_type: 'CLAS', object_name: '/NS/CL_A' })).toBe('/sap/bc/adt/oo/classes/%2fns%2fcl_a/source/main');
+    expect(sourceUriOf({ object_type: 'CLAS', object_name: '/NS/CL_A' })).toBe('/sap/bc/adt/oo/classes/%2Fns%2Fcl_a/source/main');   // encodeURIComponent writes upper-case hex
   });
   it('refuses what holds no breakpoint, and a function module without its group', () => {
     expect(() => sourceUriOf({ object_type: 'TABL', object_name: 'T' })).toThrow(/CLAS, PROG, INCL, FUNC/);
@@ -2610,6 +2610,9 @@ export class InstanceState {
   failures(): string[];                    // what the parts could not undo
   onEmpty(listener: () => void): void;     // fires once per transition from holding to empty
   onChange(listener: () => void): () => void;   // every change; answers its unsubscribe
+  settled(): Promise<void>;                // holds nothing, or nothing is finishing on its own
+  /** For a host letting the instance go: dispose, settle, once more what is left, settle; answers what is still held. */
+  shutdown(): Promise<string[]>;
   dispose(): Promise<void>;                // every part; throws an aggregate of what failed; reconciles afterwards
 }
 // handlers/interfaces.ts
@@ -2690,6 +2693,23 @@ describe('InstanceState', () => {
     s.host = { owner: 'O', reserve: () => undefined, peers: () => [] };
     expect(() => s.admit('abap')).not.toThrow();
   });
+  it('shutdown waits for a part still finishing after its disposal threw, retries once, answers what is left', async () => {
+    const s = new InstanceState();
+    let held = true; let finishing = false; let failures: string[] = []; let disposals = 0; let tell = () => {};
+    s.attach({
+      holdsState: () => held, pending: () => finishing, failures: () => failures, describe: () => [], observe: (f) => { tell = f; },
+      dispose: async () => { disposals++; if (disposals === 1) { finishing = true; throw new Error('clear refused'); } },
+    });
+    let answer: string[] | undefined;
+    const shutting = s.shutdown().then((a) => { answer = a; });
+    await new Promise((r) => setImmediate(r));
+    expect(answer).toBeUndefined();                 // waiting for the part to settle
+    finishing = false; failures = ['release debuggee D1: busy']; tell();
+    await shutting;
+    expect(disposals).toBe(2);
+    expect(answer).toEqual(['release debuggee D1: busy']);
+  });
+
   it('onEmpty fires when the last part stops holding', () => {
     const s = new InstanceState(); const a = part(); s.attach(a.p);
     const seen = jest.fn(); s.onEmpty(seen);
@@ -2908,6 +2928,30 @@ export class InstanceState {
     this.changed();
     const failures = results.flatMap((r) => (r.status === 'rejected' ? [r.reason instanceof Error ? r.reason.message : String(r.reason)] : []));
     if (failures.length) throw new Error(failures.join('; '));
+  }
+
+  settled(): Promise<void> {
+    const done = () => !this.holdsState() || !this.pending();
+    if (done()) return Promise.resolve();
+    return new Promise((resolve) => {
+      const off = this.onChange(() => { if (done()) { off(); resolve(); } });
+    });
+  }
+
+  /**
+   * What every host does before it lets an instance go (stdio at exit, SSE
+   * when a session closes, the pool at shutdown): dispose; wait until settled —
+   * a disposal that threw may still have cleanup finishing on its own; once
+   * more what is still held; settle; answer what is left. No timer: an AMDP
+   * session settles when its last event batch arrives (measured in Task 14).
+   */
+  async shutdown(): Promise<string[]> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await this.dispose().catch(() => undefined);
+      await this.settled();
+      if (!this.holdsState()) return [];
+    }
+    return [this.failures().join('; ') || 'state is still held'];
   }
 }
 ```
@@ -3227,6 +3271,8 @@ export * from './serial';
   holdsState(): boolean { return this.state.holdsState(); }
   /** Undoes what the instance holds; awaited by every host before it lets the instance go. */
   dispose(): Promise<void> { return this.state.dispose(); }
+  /** Dispose, settle, once more, settle — what a host awaits before letting the instance go; what is left. */
+  shutdownState(): Promise<string[]> { return this.state.shutdown(); }
 
   private readonly inFlight = new Set<Promise<unknown>>();
   /** Resolves when every tool handler of this instance has settled — a host releases the instance only then. */
@@ -3319,7 +3365,7 @@ Add a `--exposition=readonly,debug` case beside the existing exposition parser t
 // server/src/__tests__/sseDispose.test.ts — the SSE session's instance is disposed when the connection closes
 ```
 
-`SseServer` builds its `SessionServer` in a private method. Look at how the existing SSE tests drive it: `ls server/src/__tests__ | grep -i sse`. Using the same harness, open a GET, spy on `BaseMcpServer.prototype.dispose`, close the response, and expect `dispose` to have been called once. If no SSE harness exists, export a small `disposeOnClose(res, server)` helper from `SseServer.ts`, use it at l.388, and unit-test the helper with a fake `res` (an `EventEmitter`) and a fake server `{ dispose: jest.fn().mockResolvedValue(undefined) }`.
+`SseServer` builds its `SessionServer` in a private method. Look at how the existing SSE tests drive it: `ls server/src/__tests__ | grep -i sse`. Using the same harness, open a GET, spy on `BaseMcpServer.prototype.shutdownState` (resolve it by hand), close the response, and expect it called once. Then check that `stop()` is still pending until that promise resolves, and that a non-empty answer makes `stop()` reject with it. If no SSE harness exists, put the close handling and `stop()`'s collection in a small exported class (`SessionClosings`: `track(id, server)`, `drain(): Promise<string[]>`) used by `SseServer`, and unit-test it with fake servers whose `shutdownState` you resolve by hand.
 
 - [ ] **Step 2: Run them and see them fail**
 
@@ -3364,26 +3410,34 @@ Config and exporter:
 
 Add this beside the `high`/`low` pushes (l.528-533). `DebugHandlersGroup` is imported from `@mcp-abap-adt/lib/handlers` like the other groups (l.26); export it from `src/lib/handlers/index.ts` through `groups/index.ts`. Add `statefulGroups?: (context: HandlerContext) => IHandlerGroup[]` to `LauncherOptions` for compact (Task 13), and push those groups the same way.
 
-stdio shutdown (l.613-620): `servers: [{ close: () => server.dispose() }]`, where `server` is the `StdioServer` (a `BaseMcpServer`). `installShutdown` already reports a rejected close and exits with 1.
+stdio shutdown (l.613-620): `servers: [{ close: async () => { const left = await server.shutdownState(); if (left.length) throw new Error(`state cleanup failed: ${left.join('; ')}`); } }]`, where `server` is the `StdioServer` (a `BaseMcpServer`). `installShutdown` reports a rejected close and exits with 1. A disposal that threw while AMDP cleanup was still finishing is waited for, retried once, and only then reported (`InstanceState.shutdown`).
 
 `server/src/SseServer.ts`, where the connection closes (l.388-389):
 
 ```ts
       this.sessions.delete(sessionId);
-      void server.dispose().catch((error) =>
-        this.logger.error?.(`[SSE CLOSE] debugger cleanup for session ${sessionId} failed: ${error instanceof Error ? error.message : String(error)}`),
-      );
+      // The session's instance is owned until its state is gone: it settles on its own (an AMDP
+      // session when its last event batch arrives); stop() waits for it.
+      const closing = server.shutdownState().then((left) => {
+        if (left.length) this.logger.error?.(`[SSE CLOSE] state cleanup for session ${sessionId} left: ${left.join('; ')}`);
+        return left.map((l) => `${sessionId}: ${l}`);
+      });
+      this.closingSessions.add(closing);
+      void closing.finally(() => this.closingSessions.delete(closing));
 ```
+
+with `private readonly closingSessions = new Set<Promise<string[]>>();` on `SseServer`.
 
 `SseServer.stop()` additionally disposes every open session's server before it resolves:
 
 ```ts
-    const failures: string[] = [];
+    const pending = [...this.closingSessions];
     for (const [id, entry] of this.sessions) {
-      await entry.server.dispose().catch((e) => failures.push(`${id}: ${e instanceof Error ? e.message : String(e)}`));
+      pending.push(entry.server.shutdownState().then((left) => left.map((l) => `${id}: ${l}`)));
     }
     this.sessions.clear();
-    if (failures.length) throw new Error(`debugger cleanup failed: ${failures.join('; ')}`);
+    const failures = (await Promise.all(pending)).flat();
+    if (failures.length) throw new Error(`state cleanup failed: ${failures.join('; ')}`);
 ```
 
 Add that after the listener stops, keeping the existing body. The launcher's SSE `installShutdown` (l.643-649) already awaits `server.stop()`.
@@ -4292,7 +4346,7 @@ export async function handleMemorySnapshotGet(context: HandlerContext, args: { s
 `MemorySnapshotDelta(from_id*, to_id*, view: overview|ranking|children|references, key?, max_objects?)` uses the same switch over the `getDelta*` members, with no `header`. Description: `[debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.`
 
 `MemorySnapshotList(user?)`:
-- Description: `[debug] Memory snapshots the system lists: id, user, time, size, program. Empty without the memory snapshot authorization.`
+- Description: `[debug] Memory snapshots the system lists. Empty without the memory snapshot authorization.`
 - Body: call `list({ analyse: analyseException, ...(args.user ? { user: args.user.toUpperCase() } : {}) })`. The terse answer drops `fileName`. An empty list is answered as `{ snapshots: [], authorization: 'an empty list is also the answer without the memory snapshot authorization' }`.
 
 - [ ] **Step 1: Write the failing test**
@@ -4796,6 +4850,10 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | | (subscriptions) | `onChange` answers its unsubscribe; `settled()` unsubscribes |
 
 | Seventh (on `9218a035`) | shutdown after a disposal that threw | every owned instance settles before the retry; the failure recorded by the throw is replaced by what is left after settling and one retry |
+
+| Eighth (on `ee01ff32`) | stdio and SSE finished before AMDP cleanup settled | `InstanceState.shutdown()` — dispose, settle, once more, settle, answer what is left — used by stdio at exit, by SSE when a session closes (owned until it settles; `stop()` waits) and available to every host |
+| | `%2f` vs `%2F` | the assertion takes `encodeURIComponent`'s upper-case hex |
+| | `MemorySnapshotList` description | no answer fields |
 
 **Placeholders.** The only `<…>` tokens are in run commands, where local config and scratchpad values go. They are deliberately not written down: plans name no system.
 

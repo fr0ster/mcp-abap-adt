@@ -236,6 +236,7 @@ Published in the official MCP Registry and listed on Glama.ai.
   - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
 
 ### For Administrators
+- **[Security](SECURITY.md)** - Never more secure than its host: who may call the server, HTTPS, TLS to SAP, credentials and state handles, a deployment checklist
 - **[Deployment Docs](docs/deployment/README.md)** - MCP Registry, Docker, release notes
 - **[Server Configuration](docs/configuration/YAML_CONFIG.md)** - YAML config reference
 

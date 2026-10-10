@@ -402,6 +402,18 @@ function factoryOf(
  * `declares`. The tool's own registered name, read off its
  * `TOOL_DEFINITION` object literal, is what the caller (the test that
  * already loaded the surface rows) can check against real data instead.
+ *
+ * **The debugger's answer path.** The debug tools answer through
+ * `debugAnswer(args, …)` / `debugStateAnswer(args, …)`
+ * (`src/lib/debugger/answer.ts`), not `answer()`: the adapter itself reads
+ * `detailOf(args)` and picks terse, full or raw, so there is no context
+ * literal and no projection call to read here. What can still go wrong is the
+ * first argument: anything but the handler's own arguments (`{ detail: 'raw' }`,
+ * `{}`, a local object) fixes the level whatever the caller asked. So for
+ * these calls the check is that the first argument is a parameter of the
+ * exported handler — the tool's args reach the selection — and, the other
+ * way round, that a tool not declaring `detail` does not hand its args to an
+ * adapter that reads it.
  */
 export function detailWiring(
   handlers: string[],
@@ -427,13 +439,31 @@ export function detailWiring(
     const declares = toolName !== undefined && declaresDetail.has(toolName);
 
     const calls = answerCallsIn(source);
+    const debugCalls = debugAnswerCallsIn(source);
     // No `answer()` at all is the emptiest way to pass: the loop below never
     // runs, so it can report nothing. A tool that declares `detail` and never
-    // reaches the adapter has not wired the parameter — it has nowhere to.
-    if (declares && calls.length === 0) {
+    // reaches an adapter has not wired the parameter — it has nowhere to.
+    if (declares && calls.length === 0 && debugCalls.length === 0) {
       offenders.push(
         `${file} — tool declares detail and the handler never calls answer()`,
       );
+    }
+
+    for (const call of debugCalls) {
+      const first = call.arguments[0];
+      const fromArgs =
+        first !== undefined && isExportedHandlerParameter(first, checker);
+      const adapter = call.expression.getText();
+      if (declares && !fromArgs) {
+        offenders.push(
+          `${file}:${lineOf(source, first ?? call)} — tool declares detail, ${adapter}() is not handed the tool's arguments${first ? ` (${first.getText()})` : ''}`,
+        );
+      }
+      if (!declares && fromArgs) {
+        offenders.push(
+          `${file}:${lineOf(source, first)} — tool does not declare detail, ${adapter}() reads it from the tool's arguments anyway`,
+        );
+      }
     }
 
     for (const call of calls) {
@@ -713,6 +743,42 @@ function classifyProjection(
 }
 
 /** Calls to `answer(...)` — the only place a detail reaches a caller. */
+/** The debugger's answer adapters, which read `detail` from their first argument. */
+const DEBUG_ANSWER_ADAPTERS = new Set(['debugAnswer', 'debugStateAnswer']);
+
+function debugAnswerCallsIn(source: ts.SourceFile): ts.CallExpression[] {
+  const calls: ts.CallExpression[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      DEBUG_ANSWER_ADAPTERS.has(node.expression.getText())
+    ) {
+      calls.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return calls;
+}
+
+/**
+ * Is this expression a bare reference to a parameter of an exported function
+ * declaration — the handler's own arguments, as the caller sent them?
+ */
+function isExportedHandlerParameter(
+  expression: ts.Expression,
+  checker: ts.TypeChecker,
+): boolean {
+  if (!ts.isIdentifier(expression)) return false;
+  const declaration = checker.getSymbolAtLocation(expression)?.valueDeclaration;
+  if (declaration === undefined || !ts.isParameter(declaration)) return false;
+  const fn = declaration.parent;
+  return (
+    ts.isFunctionDeclaration(fn) &&
+    (ts.getCombinedModifierFlags(fn) & ts.ModifierFlags.Export) !== 0
+  );
+}
+
 function answerCallsIn(source: ts.SourceFile): ts.CallExpression[] {
   const calls: ts.CallExpression[] = [];
   const visit = (node: ts.Node): void => {

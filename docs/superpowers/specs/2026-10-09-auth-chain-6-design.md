@@ -41,7 +41,7 @@ repositories at their release commits: auth-broker 5.0.1 (`5ec4e5f`), auth-provi
 |---|---|
 | The server is split by transport into packages, one mode each | §3; D35, D36, D37 |
 | Success: each package has only its own options and its own credentials | §3, §4, §10; D35, D38, D39 |
-| Success: failures reach the user as the chain made them | §7; D14–D17, D28 |
+| Success: failures reach the user as the chain made them | §7; D14, D15, D17, D28, D45 |
 | Success: a connection derived from an injected one stays the consumer's | §4.3; D20–D22 |
 | Success: a request ends when its client ends it, in every mode | §3.1, §5; D4, D5, D7, D8, D10, D31, D32, D34, D40 |
 | Success: session writes are the server's stated choice | §6.2–§6.4; D12, D33 |
@@ -656,6 +656,33 @@ lib depends on no broker (D38), and auth-errors decides what a value is (H6).
   §7.3. The earlier drafts' failure observer on server-built connections and D16's "words only for
   an injected connection" are gone (H6: one place carries the failure).
 - `return_error` and `answer()` call the reader first.
+- **(D45) An auth failure ends the tool call before any conversion.** A failure that carries a
+  refusal — readable by `failureOf` — is recognised **before** a handler or wrapper turns an error
+  into text, a partial result or a new `Error`, and ends the tool call as that failure (§7.3); a
+  rethrow keeps the original as `cause` and carries its `refusal`. lib gives the sites one helper:
+  `endIfAuthFailure(errorOrAnswer)` throws a `ToolAuthFailure` holding the read failure (the
+  boundary answers it), else returns. **The audit** (`grep` over `src`, `compact*/src` for
+  `getError()`, `.message`, `new Error(`, `String(error)`, and `catch` blocks over adt-clients
+  calls), by pattern:
+
+  | Pattern | Sites |
+  |---|---|
+  | **P1 — a refusal rethrown as a new `Error` of its message** | `handleGetIncludesList.ts:284` (the function-group list), `handleGetStructuresList.ts:248`, `src/lib/search-source/packageResolver.ts:88` |
+  | **P2 — a refusal's message folded into the tool's own text or a returned string** | `handleGetWhereUsed.ts:120` (`return_error(message)`), `handleGetPackageTree.ts:112`, `handleCreateTransportTask.ts:167`, `src/lib/strategies/activationRun.ts:218`, `:239`; a log line only: `handleUpdatePackage.ts:195` |
+  | **P3 — a refusal collected into a partial result answered `isError: false`** | `handleGetIncludesList.ts:143-152` (`readSource` → `unreadable`, answered at `:319-338`), `handleGetEnhancements.ts:238-241` (`unreadable`) |
+  | **P4 — the `IAdtError` passed on whole** (kept: its `refusal` travels; checked) | `handleUpdateDomain.ts:159`, `handleUpdateDataElement.ts:203`, `handleCreateTransportTask.ts:179`, `handleGetObjectVersionDiff.ts:91`, `resolveVersionedObject.ts:173`, `:185` (`thrown(…)` must keep `refusal`), `handleCreateFunctionGroup.ts:152`, `withLock.ts:46`, `:117`, `:246` (a spread keeps the own `refusal`) |
+  | **P5 — a caught value normalised as `error instanceof Error ? error : new Error(String(error))`** | `handleGetIncludesList.ts:344`, `handleGetObjectVersionSource.ts:97`, `handleGetObjectVersions.ts:88`, `:119`, `handleSearchSource.ts:140`, `objectVersionTools.ts:185`, `:216`, `:281`, `:369` — an `Error` passes as itself, so `return_error` reads its `refusal`; a non-`Error` is wrapped with the value as `cause` |
+  | **P6 — `answer()`'s failure payload** | `src/lib/answer.ts:103` (`failurePayload` builds `message` from the `IAdtError`): `return_answer` checks `refusal` first |
+  | **P7 — every other `catch` over an adt-clients call** | 111 `catch` blocks in `src/handlers` and `compact*/src`: the plan audits each and records it in the list as one of P1–P6 or "rethrows the original" |
+
+  That is 31 sites across P1–P6 in 20 files (P1 3, P2 6, P3 2, P4 10, P5 9, P6 1), and the
+  111 `catch` blocks of P7. At P1–P3 and P7 the
+  helper runs first; P4–P6 are kept and pinned. **A source test keeps the list honest**: it scans
+  for the patterns and fails on any occurrence not in the list (`tools/auth-failure-sites.json`,
+  file, line pattern, kind), and on any listed P1–P3 / P7 site whose block does not call
+  `endIfAuthFailure` before converting. Reason: the goal's *Failures reach the user as the chain
+  made them* holds in every mode only if no handler turns a refusal into text or a partial
+  success first; a new handler meets the test.
 
 ### 7.3 What the MCP client sees
 
@@ -891,6 +918,15 @@ without binding), a failure inside a handler on a server-built **and on an injec
 `error`, `kind`, `message`, `hint` as `render` gives them and no diagnostics. Source tests: no
 `instanceof` of a chain class, no `.message` read in the auth modules, no regex in the touched
 files. Each §7.4 sentence under its condition.
+
+**Conversion sites (D45)**, each through real adt-clients against a stand-in that answers `401`
+twice (a credential refused): **GetIncludesList** — a source read (P3: answered as the auth
+failure, not `isError: false` with `unreadable`) and a function-group list (P1: the auth failure
+with `kind` and `hint`, not a generic error); **GetEnhancements** (P3); **GetStructuresList** (P1);
+**GetWhereUsed** (P2); **GetObjectVersions** (P5); **UpdateDomain** (P4); a high-level update
+(P6, `answer()`). Each asserts `error: authentication_failed`, `kind`, `message`, `hint`.
+*Breaks:* remove `endIfAuthFailure` from `readSource` → `isError: false`; drop `cause` from a P1
+rethrow → `unknown`. The source test of §7.2 runs with them.
 
 ### 14.3 Injected connections and fresh connections
 

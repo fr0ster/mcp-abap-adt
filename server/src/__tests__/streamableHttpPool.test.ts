@@ -42,9 +42,6 @@ class ProbePart implements StatePart {
     this.disposed++;
     this.set(false);
   }
-  describe() {
-    return this.held ? [{ kind: 'probe' }] : [];
-  }
   observe(f: () => void) {
     this.notify = f;
   }

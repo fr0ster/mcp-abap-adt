@@ -2100,6 +2100,23 @@ describe('AmdpSession', () => {
     expect(w.closed).toHaveLength(2);
   });
 
+  it('a start that fails before the session is recorded closes what it opened', async () => {
+    for (const failure of ['second open', 'start request'] as const) {
+      const w = world();
+      let opens = 0;
+      const realOpen = (w.session as any).ports.openConnection;
+      (w.session as any).ports.openConnection = async (o: unknown) => {
+        opens++;
+        if (failure === 'second open' && opens === 2) throw new Error('no session left');
+        return realOpen(o);
+      };
+      if (failure === 'start request') w.dbg.start = async () => { throw new Error('socket hang up'); };
+      await expect(w.session.start({ stopExisting: true, breakpoints: [{ class_name: 'ZCL_A', line: 14 }] })).rejects.toThrow();
+      expect(w.closed).toHaveLength(failure === 'second open' ? 1 : 2);
+      expect(w.session.holdsState()).toBe(false);
+    }
+  });
+
   it('a cleanup that fails is reported', async () => {
     const w = await started();
     w.dbg.stop = async () => refusedResponse('not stopped');
@@ -2301,17 +2318,26 @@ export class AmdpSession<O = unknown> {
       if (this.open || this.closing) throw new DebugStateError('an AMDP debug session is already running for this debug session');
       const origin = this.requireOrigin();
       const user = (await this.ports.requestUser(origin)).toUpperCase();
-      const events = await this.ports.openConnection(origin);
-      const commands = await this.ports.openConnection(origin);
-      const onEvents = this.ports.amdpDebugger(events);
-      const onCommands = this.ports.amdpDebugger(commands);
-      const started = await onEvents.start(user, { stopExisting: options.stopExisting });
-      if (!started.ok) {
-        await this.ports.closeConnection(events);
-        await this.ports.closeConnection(commands);
-        throw new DebugListenerError(started.getError().message);
+      // Until the session is recorded as ours, whatever was opened is closed on any failure.
+      let events: IAbapConnection | undefined;
+      let commands: IAbapConnection | undefined;
+      let onEvents: AmdpDebuggerT;
+      let onCommands: AmdpDebuggerT;
+      let mainId: string;
+      let hanaSession: string;
+      try {
+        events = await this.ports.openConnection(origin);
+        commands = await this.ports.openConnection(origin);
+        onEvents = this.ports.amdpDebugger(events);
+        onCommands = this.ports.amdpDebugger(commands);
+        const started = await onEvents.start(user, { stopExisting: options.stopExisting });
+        if (!started.ok) throw new DebugListenerError(started.getError().message);
+        ({ mainId, hanaSession } = readAmdpStart(started.getResult().value as any));
+      } catch (error) {
+        if (events) await this.ports.closeConnection(events).catch(() => undefined);
+        if (commands) await this.ports.closeConnection(commands).catch(() => undefined);
+        throw error;
       }
-      const { mainId, hanaSession } = readAmdpStart(started.getResult().value as any);
       const open: Open = { events, commands, onEvents, onCommands, mainId, hanaSession, stopping: false, released: new Set(), unreleased: new Set(), cleared: false, stopped: false, readDone: false };
       this.open = open;
       this.failure = undefined;
@@ -3123,7 +3149,12 @@ export async function debugStateAnswer(args: unknown, work: () => Promise<DebugS
       const raw = state.state === 'stopped' ? [state.stop.raw.debuggee, state.stop.raw.attach, state.stop.raw.stack].join('\n') : JSON.stringify(state);
       return { value: state, raw };
     },
-    (s) => (s.state === 'stopped' ? { state: 'stopped', ...terseStop(s.stop.debuggee, s.stop.stack), ...(s.stop.stackError ? { stack_error: s.stop.stackError } : {}) } : s),
+    (s) => {
+      if (s.state !== 'stopped') return s;
+      // Everything a start added beside the stop (breakpoints placed and refused, reconciliation) stays.
+      const { stop, ...rest } = s as DebugState & { stop: NonNullable<Extract<DebugState, { state: 'stopped' }>['stop']> } & Record<string, unknown>;
+      return { ...rest, ...terseStop(stop.debuggee, stop.stack), ...(stop.stackError ? { stack_error: stop.stackError } : {}) };
+    },
     (s) => s,
     extraOf,
   );
@@ -3440,7 +3471,7 @@ with `private readonly closingSessions = new Set<Promise<string[]>>();` on `SseS
     if (failures.length) throw new Error(`state cleanup failed: ${failures.join('; ')}`);
 ```
 
-Add that after the listener stops, keeping the existing body. The launcher's SSE `installShutdown` (l.643-649) already awaits `server.stop()`.
+Put it at the top of `stop()`, before the existing body: the existing body returns early (`if (!server) return`) when the host runs on an external app with no listener of its own, and the sessions must be drained either way. The launcher's SSE `installShutdown` (l.643-649) already awaits `server.stop()`. The SSE test covers both: an `SseServer` with its own listener, and one on an external app.
 
 - [ ] **Step 4: Run them and see them pass; run the ratchets (the group is still empty)**
 
@@ -4213,6 +4244,17 @@ describe('debugger handlers', () => {
     }
   });
 
+  it('a start that catches at once still answers its breakpoints under terse', async () => {
+    const { world, context } = install();
+    const started = handleDebugStartListener(context as any, { breakpoints: [{ object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 32 }] });
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(LISTEN_CATCH());
+    const answer = json(await started);
+    expect(answer.state).toBe('stopped');
+    expect(answer.breakpoints.placed).toHaveLength(1);
+    expect(answer.breakpoints.refused).toHaveLength(1);
+  });
+
   it("a line breakpoint's URI is built from type, name and line", async () => {
     const { world, state, context } = install();
     await startedListening(world, context);
@@ -4854,6 +4896,10 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | Eighth (on `ee01ff32`) | stdio and SSE finished before AMDP cleanup settled | `InstanceState.shutdown()` — dispose, settle, once more, settle, answer what is left — used by stdio at exit, by SSE when a session closes (owned until it settles; `stop()` waits) and available to every host |
 | | `%2f` vs `%2F` | the assertion takes `encodeURIComponent`'s upper-case hex |
 | | `MemorySnapshotList` description | no answer fields |
+
+| Ninth (on `9a32914f`) | AMDP start leaking a connection | everything opened before the session is recorded is closed on any failure; tests for a failing second open and a thrown start |
+| | embedded SSE skipping cleanup | the drain runs at the top of `stop()`, before the early return for an external app |
+| | terse start dropping metadata after an immediate catch | the stopped projection keeps every field the start added |
 
 **Placeholders.** The only `<…>` tokens are in run commands, where local config and scratchpad values go. They are deliberately not written down: plans name no system.
 

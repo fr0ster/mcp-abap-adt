@@ -19,8 +19,7 @@ describe('the debug set', () => {
         /^(Debug|AmdpDebug|MemorySnapshot)/.test(n),
       ),
     ).toBe(false);
-    // the group is filled in Tasks 10-12; this assertion is tightened there to the tool names
-    expect(() => names({ includeDebug: true })).not.toThrow();
+    expect(names({ includeDebug: true })).toContain('DebugStartListener');
   });
 
   describe('--exposition', () => {

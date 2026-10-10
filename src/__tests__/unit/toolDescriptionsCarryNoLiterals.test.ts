@@ -134,6 +134,7 @@ describe('descriptions carry no incidental literals', () => {
     includeLowLevel: true,
     includeSystem: true,
     includeSearch: true,
+    includeDebug: true,
   })
     .getHandlerEntries()
     .map((e) => e.toolDefinition);

@@ -2074,5 +2074,125 @@
     "name": "GetObjectsByType",
     "inputs": "parent_name*, parent_tech_name*, parent_type*, node_id*, format, with_short_descriptions",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugStartListener",
+    "inputs": "breakpoints, run, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugTakeOverListener",
+    "inputs": "breakpoints, run, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugWait",
+    "inputs": "state_handle*, hold_seconds, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugSetBreakpoints",
+    "inputs": "state_handle*, breakpoints, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugDeleteBreakpoint",
+    "inputs": "state_handle*, breakpoint_id*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugListBreakpoints",
+    "inputs": "state_handle*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugGetStack",
+    "inputs": "state_handle*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugSetStackPosition",
+    "inputs": "state_handle*, position*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugGetVariables",
+    "inputs": "state_handle*, names, parents, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugSetVariable",
+    "inputs": "state_handle*, name*, value*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugStep",
+    "inputs": "state_handle*, action*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugStepToLine",
+    "inputs": "state_handle*, mode*, object_type*, object_name*, line*, include, parent_name, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugTerminate",
+    "inputs": "state_handle*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugCreateWatchpoint",
+    "inputs": "state_handle*, name*, condition, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugListWatchpoints",
+    "inputs": "state_handle*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugDeleteWatchpoint",
+    "inputs": "state_handle*, watchpoint_id*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugGetMemorySizes",
+    "inputs": "state_handle*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugCreateMemorySnapshot",
+    "inputs": "state_handle*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugStop",
+    "inputs": "state_handle*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
+    "name": "DebugListSessions",
+    "inputs": "detail",
+    "available_in": "cloud, onprem"
   }
 ]

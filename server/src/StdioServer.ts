@@ -2,6 +2,7 @@ import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
+import type { StateLogger } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CORE_VERSION } from './coreVersion.js';
@@ -12,6 +13,8 @@ export interface StdioServerOptions {
   logger?: Logger;
   /** The idle bound on held state, in minutes (at least 30, default 30). */
   stateIdleMinutes?: number;
+  /** Where the state's lifecycle lines go; default stderr, always on. */
+  stateLogger?: StateLogger;
 }
 
 /**
@@ -31,6 +34,7 @@ export class StdioServer extends BaseMcpServer {
       version: opts?.version ?? CORE_VERSION,
       logger: opts?.logger ?? noopLogger,
       stateIdleMinutes: opts?.stateIdleMinutes,
+      stateLogger: opts?.stateLogger,
     });
   }
 

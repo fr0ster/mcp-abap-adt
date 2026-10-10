@@ -25,7 +25,11 @@ import {
   withDestinationSystemContext,
   withResolvedSystemContext,
 } from '../lib/requestSystemResolution.js';
-import { InstanceState } from '../lib/state/InstanceState.js';
+import {
+  InstanceState,
+  type StateLogger,
+  stderrStateLogger,
+} from '../lib/state/InstanceState.js';
 import { systemContextFromConfiguration } from '../lib/systemContext.js';
 import {
   normalizeToolContent,
@@ -91,13 +95,18 @@ export abstract class BaseMcpServer extends McpServer {
     systemContextResolver?: SystemContextResolver | null;
     /** The idle bound on held state, in minutes: at least 30, default 30. */
     stateIdleMinutes?: number;
+    /**
+     * Where the state's lifecycle lines go (the bound's end of a state, a
+     * failed cleanup, a failing observer). Default: stderr, always on — never
+     * the transport logger, which a host may silence.
+     */
+    stateLogger?: StateLogger;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
-    // The instance's own logger: the bound's end of a state reaches the host's log.
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
-      logger: this.logger,
+      logger: options.stateLogger ?? stderrStateLogger,
     });
     this.systemType = options.systemType;
     this.systemContextResolver =

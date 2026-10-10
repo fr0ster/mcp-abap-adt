@@ -118,7 +118,7 @@ A value that is not valid (a port outside 1-65535, an unknown `connection-type`,
 
 `.env` files and environment variables hold secrets and the session; YAML holds configuration only. The server **refuses a YAML key whose name looks like a secret or a session value** — a name containing `password`, `passphrase`, `secret`, `token`, `cookie`, `refresh` or `credential`, at any depth — and exits with an error that names the key (never a value). Put such values in the destination's `.env` (see [Authentication & Destinations](../user-guide/AUTHENTICATION.md)).
 
-Each parameter above also has a CLI form and, for eight of them, an environment variable; precedence is CLI, then environment, then YAML. See [CLI Options](../user-guide/CLI_OPTIONS.md).
+Each parameter above also has a CLI form and, for nine of them, an environment variable; precedence is CLI, then environment, then YAML. See [CLI Options](../user-guide/CLI_OPTIONS.md).
 
 ### HTTP Options
 

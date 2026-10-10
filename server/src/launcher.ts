@@ -25,6 +25,7 @@ import {
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '@mcp-abap-adt/lib/handlers';
+import { type StateLogger, stderrStateLogger } from '@mcp-abap-adt/lib/state';
 import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
@@ -51,6 +52,13 @@ const silentLogger: ILogger = {
 };
 const loggerForTransport =
   process.env.DEBUG_AUTH_LOG === 'true' ? stderrLogger : silentLogger;
+
+/**
+ * The state's lifecycle lines — the idle bound's end of a state, a cleanup
+ * that failed — on stderr whatever DEBUG_AUTH_LOG says: they are what an
+ * operator needs to see, and the transport logger is silent by default.
+ */
+export const stateLoggerForTransport: StateLogger = stderrStateLogger;
 
 type Transport = 'stdio' | 'sse' | 'http';
 
@@ -622,6 +630,7 @@ export async function launch(
     const server = new StdioServer(handlersRegistry, destinations, {
       version: options.version,
       stateIdleMinutes: config.stateIdleMinutes,
+      stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,
     });
     activeServer = server;
@@ -648,6 +657,7 @@ export async function launch(
     const server = new SseServer(handlersRegistry, factory, {
       version: options.version,
       stateIdleMinutes: config.stateIdleMinutes,
+      stateLogger: stateLoggerForTransport,
       host: config.host,
       port: config.port,
       ssePath: config.ssePath,
@@ -676,6 +686,7 @@ export async function launch(
   const server = new StreamableHttpServer(handlersRegistry, factory, {
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,
+    stateLogger: stateLoggerForTransport,
     host: config.host,
     port: config.port,
     enableJsonResponse: config.httpJsonResponse,

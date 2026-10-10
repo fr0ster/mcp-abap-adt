@@ -284,3 +284,87 @@ describe('InstanceState — the bound refuses a misconfiguration', () => {
     },
   );
 });
+
+describe('InstanceState — while a complete stop is disposing', () => {
+  it('a call on the handle is answered "not available" during the expiry; the handle does not serve a stopping session', async () => {
+    const s = new InstanceState({ logger: logs().logger });
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let held = true;
+    let tell = () => {};
+    s.attach({
+      holdsState: () => held,
+      pending: () => false,
+      failures: () => [],
+      observe: (f) => {
+        tell = f;
+      },
+      dispose: async () => {
+        await gate;
+        held = false;
+        tell();
+      },
+    });
+    const handle = s.handle;
+    expect(() => s.check(handle)).not.toThrow();
+    jest.advanceTimersByTime(30 * MINUTE);
+    await flush();
+    expect(s.holdsState()).toBe(true); // still disposing
+    expect(() => s.check(handle)).toThrow(StateUnavailableError);
+    release();
+    await flush();
+    expect(() => s.check(handle)).toThrow(StateUnavailableError);
+  });
+
+  it('a plain dispose (no end requested) does not refuse the handle meanwhile', async () => {
+    const s = new InstanceState({ logger: logs().logger });
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    s.attach({
+      holdsState: () => true,
+      pending: () => false,
+      failures: () => [],
+      observe: () => {},
+      dispose: () => gate,
+    });
+    const disposing = s.dispose();
+    expect(() => s.check(s.handle)).not.toThrow();
+    release();
+    await disposing;
+  });
+});
+
+describe('InstanceState — an expiry whose cleanup is still finishing', () => {
+  it('says it is ending, and says "ended" only once the state is empty', async () => {
+    const l = logs();
+    const s = new InstanceState({ logger: l.logger });
+    let held = true;
+    let finishing = false;
+    let tell = () => {};
+    s.attach({
+      holdsState: () => held,
+      pending: () => finishing,
+      failures: () => [],
+      observe: (f) => {
+        tell = f;
+      },
+      dispose: async () => {
+        finishing = true; // AMDP: the last event batch is still to come
+      },
+    });
+    jest.advanceTimersByTime(30 * MINUTE);
+    await flush();
+    expect(l.info).toHaveLength(1);
+    expect(l.info[0]).toMatch(/still finishing/);
+    expect(l.info[0]).not.toMatch(/\bended\b/);
+    finishing = false;
+    held = false;
+    tell(); // the last batch arrived
+    expect(l.info).toHaveLength(2);
+    expect(l.info[1]).toMatch(/ended after 30 minutes without a call/);
+  });
+});

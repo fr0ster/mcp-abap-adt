@@ -18,6 +18,7 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import type { SystemContextResolver } from '../lib/requestSystemResolution.js';
+import type { StateLogger } from '../lib/state/InstanceState.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
 import { setSystemContext } from '../lib/systemContext.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
@@ -130,6 +131,13 @@ export interface EmbeddableMcpServerOptions {
    * @default 30
    */
   stateIdleMinutes?: number;
+
+  /**
+   * Where the state's lifecycle lines go: the idle bound's end of a state, a
+   * cleanup that failed, an observer that threw. Never a state handle.
+   * @default stderr, always on
+   */
+  stateLogger?: StateLogger;
 }
 
 /**
@@ -167,6 +175,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       systemType: options.systemType,
       systemContextResolver: options.systemContextResolver,
       stateIdleMinutes: options.stateIdleMinutes,
+      stateLogger: options.stateLogger,
     });
 
     this.injectedConnection = options.connection;

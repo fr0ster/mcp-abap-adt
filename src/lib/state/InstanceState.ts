@@ -52,6 +52,21 @@ export interface StateLogger {
   info?(message: string): void;
 }
 
+/**
+ * The state's lifecycle lines on stderr, always on: the idle bound's end of a
+ * state, a cleanup that failed, an observer that threw. Safe under stdio
+ * (stdout is the protocol's). Hosts whose transport logger is silenced pass
+ * this one for the state.
+ */
+export const stderrStateLogger: StateLogger = {
+  info: (message: string) => {
+    process.stderr.write(`[INFO] ${message}\n`);
+  },
+  error: (message: string) => {
+    process.stderr.write(`[ERROR] ${message}\n`);
+  },
+};
+
 export interface InstanceStateOptions {
   logger?: StateLogger;
   /**
@@ -87,6 +102,8 @@ export class InstanceState {
   private disposing = 0;
   /** The host let the instance go: the bound is never armed again. */
   private closed = false;
+  /** The bound's stop is under way: "ended" is said once the state is empty. */
+  private idleEnding = false;
 
   get handle(): string {
     return this.current;
@@ -115,7 +132,9 @@ export class InstanceState {
     if (
       typeof handle !== 'string' ||
       handle !== this.current ||
-      !this.holdsState()
+      !this.holdsState() ||
+      // A complete stop is disposing: no call runs on a session being stopped.
+      (this.endRequested && this.disposing > 0)
     ) {
       throw new StateUnavailableError();
     }
@@ -195,17 +214,25 @@ export class InstanceState {
   private async expire(): Promise<void> {
     const minutes = this.idleMinutes;
     this.endWhenEmpty();
+    this.idleEnding = true; // changed() says "ended" when the state empties
+    let failed: string | undefined;
     try {
       await this.dispose();
-      this.log.info?.(
-        `instance state: held state ended after ${minutes} minutes without a call`,
-      );
     } catch (error) {
-      const failures = this.failures();
-      this.log.error(
-        `instance state: held state ended after ${minutes} minutes without a call, but its cleanup failed (kept for a retry): ${failures.length ? failures.join('; ') : messageOf(error)}`,
-      );
+      failed = messageOf(error);
     }
+    if (!this.idleEnding) return; // emptied: "ended" was said
+    if (this.holdsState() && this.pending() && failed === undefined) {
+      this.log.info?.(
+        `instance state: held state ending after ${minutes} minutes without a call; its cleanup is still finishing`,
+      );
+      return; // "ended" follows when it empties
+    }
+    this.idleEnding = false;
+    const failures = this.failures();
+    this.log.error(
+      `instance state: held state not ended after ${minutes} minutes without a call — its cleanup failed (kept for a retry): ${failures.length ? failures.join('; ') : (failed ?? 'state is still held')}`,
+    );
   }
 
   /** Every transition goes through here; state is updated before anyone is told. */
@@ -218,6 +245,12 @@ export class InstanceState {
       this.endRequested = false;
     }
     this.reviewBound();
+    if (emptied && this.idleEnding) {
+      this.idleEnding = false;
+      this.log.info?.(
+        `instance state: held state ended after ${this.idleMinutes} minutes without a call`,
+      );
+    }
     if (emptied) for (const l of [...this.emptyListeners]) this.tell(l);
     for (const l of [...this.changeListeners]) this.tell(l);
   }

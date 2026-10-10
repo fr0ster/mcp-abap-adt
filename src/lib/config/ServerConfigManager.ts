@@ -14,7 +14,7 @@
 import { ArgumentsParser } from './ArgumentsParser.js';
 import { authParametersHelp } from './authParameters.js';
 import type { HandlerSet, IServerConfig, Transport } from './IServerConfig.js';
-import { readStateIdleMinutes, stateIdleHelp } from './stateIdleMinutes.js';
+import { stateIdleHelp } from './stateIdleMinutes.js';
 import {
   applyYamlConfigToArgs,
   generateConfigTemplateIfNeeded,
@@ -162,11 +162,7 @@ export class ServerConfigManager {
       connectionTypeSource: parsed.connectionTypeSource,
       systemType: parsed.systemType,
       systemTypeSource: parsed.systemTypeSource,
-      stateIdleMinutes: readStateIdleMinutes(
-        process.argv,
-        process.env,
-        this.yamlConfig as Record<string, unknown> | null,
-      ),
+      stateIdleMinutes: parsed.stateIdleMinutes,
       tls:
         parsed.tlsCert && parsed.tlsKey
           ? {

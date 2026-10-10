@@ -14,7 +14,10 @@ import {
   requestContextFromHeaders,
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
-import { parseStateIdleMinutes } from '@mcp-abap-adt/lib/state';
+import {
+  parseStateIdleMinutes,
+  type StateLogger,
+} from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
@@ -33,6 +36,8 @@ export interface SseServerOptions {
    * after this long without a tool call. At least 30; default 30.
    */
   stateIdleMinutes?: number;
+  /** Where the state's lifecycle lines go; default stderr, always on. */
+  stateLogger?: StateLogger;
   /**
    * Host to bind to (only used when no external app is provided)
    * @default "127.0.0.1"
@@ -126,6 +131,7 @@ export class SseServer {
   private readonly allowedOrigins?: string[];
   private readonly enableDnsRebindingProtection?: boolean;
   private readonly stateIdleMinutes?: number;
+  private readonly stateLogger?: StateLogger;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -151,6 +157,7 @@ export class SseServer {
       opts?.stateIdleMinutes === undefined
         ? undefined
         : parseStateIdleMinutes(opts.stateIdleMinutes, 'stateIdleMinutes');
+    this.stateLogger = opts?.stateLogger;
   }
 
   /**
@@ -346,13 +353,13 @@ export class SseServer {
         private readonly registry: IHandlersRegistry,
         readonly loggerImpl: Logger,
         readonly ver: string,
-        stateIdleMinutes: number | undefined,
+        state: { stateIdleMinutes?: number; stateLogger?: StateLogger },
       ) {
         super({
           name: 'mcp-abap-adt-sse',
           version: ver,
           logger: loggerImpl,
-          stateIdleMinutes,
+          ...state,
         });
       }
       async init(
@@ -378,7 +385,10 @@ export class SseServer {
       this.handlersRegistry,
       this.logger,
       this.version,
-      this.stateIdleMinutes,
+      {
+        stateIdleMinutes: this.stateIdleMinutes,
+        stateLogger: this.stateLogger,
+      },
     );
     try {
       await server.init(

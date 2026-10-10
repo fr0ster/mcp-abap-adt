@@ -89,6 +89,21 @@ export class InstancePool<T extends Poolable> {
   private readonly retained = new Set<T>();
   private readonly active = new Set<Promise<unknown>>();
   private admitting = true;
+  /**
+   * What a failure is named by: an ordinal per instance. Never the handle — it
+   * is a bearer secret, and these lines reach the log at shutdown.
+   */
+  private readonly ordinals = new WeakMap<T, number>();
+  private nextOrdinal = 1;
+
+  private nameOf(instance: T): string {
+    let n = this.ordinals.get(instance);
+    if (n === undefined) {
+      n = this.nextOrdinal++;
+      this.ordinals.set(instance, n);
+    }
+    return `instance ${n}`;
+  }
 
   size(): number {
     return this.held.size;
@@ -223,7 +238,7 @@ export class InstancePool<T extends Poolable> {
           this.retained.add(instance); // still finishing: owned until it empties
         }
       } catch (e) {
-        this.failed.set(instance, `${instance.stateHandle}: ${messageOf(e)}`);
+        this.failed.set(instance, `${this.nameOf(instance)}: ${messageOf(e)}`);
         this.retained.add(instance); // fresh or held: kept for shutdown's retry
         if (!instance.holdsState()) {
           // Nothing left to route to: out of the index and the count; only
@@ -264,7 +279,7 @@ export class InstancePool<T extends Poolable> {
         const left = instance.state.failures().join('; ');
         this.failed.set(
           instance,
-          `${instance.stateHandle}: ${left || 'state is still held'}`,
+          `${this.nameOf(instance)}: ${left || 'state is still held'}`,
         );
       }
     }

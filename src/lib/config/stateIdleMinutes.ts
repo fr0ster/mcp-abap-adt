@@ -70,10 +70,10 @@ export function validateStateIdleYaml(yaml: Record<string, unknown>): string[] {
 export function stateIdleHelp(): string {
   return `HELD STATE:
   ${`${STATE_IDLE_CLI}=<minutes>`.padEnd(33)}Held state (a debug session) ends after this many minutes
-                                   without a tool call. Default and minimum: 30; a whole number
+                                   without a tool call. Default and minimum: 30; a whole number.
                                    Activity is a tool call on the instance; a call in flight
                                    (a wait on the server) pauses the bound, and a listener's own
-                                   background re-poll does not count
+                                   background re-poll does not count.
                                    env: ${STATE_IDLE_ENV}, yaml: ${STATE_IDLE_YAML}
 `;
 }

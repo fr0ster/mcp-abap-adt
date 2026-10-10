@@ -10,6 +10,17 @@ import {
   PoolClosedError,
 } from '../InstancePool';
 
+/**
+ * A failure as the pool names it: an ordinal, never the handle — the handle
+ * is a bearer secret and these strings reach the log.
+ */
+const named = (message: string) =>
+  expect.stringMatching(
+    new RegExp(
+      `^instance \\d+: ${message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+    ),
+  );
+
 /** A poolable whose one part we drive by hand. */
 class Fake {
   readonly state = new InstanceState();
@@ -212,12 +223,13 @@ describe('InstancePool', () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
     held.failDispose = true;
+    const handle = held.stateHandle;
     held.set(false);
     await tick();
     expect(pool.size()).toBe(0);
-    expect(await pool.shutdown()).toEqual([
-      `${held.stateHandle}: listener still up`,
-    ]);
+    const failures = await pool.shutdown();
+    expect(failures.join('\n')).not.toContain(handle);
+    expect(failures).toEqual([named('listener still up')]);
   });
 
   it('a fresh instance whose disposal fails is retained and retried at shutdown', async () => {
@@ -260,9 +272,7 @@ describe('InstancePool', () => {
     const shutting = pool.shutdown();
     await tick();
     held.failLate('release debuggee D1: busy'); // the last batch arrived; its release failed
-    expect(await shutting).toEqual([
-      `${held.stateHandle}: release debuggee D1: busy`,
-    ]);
+    expect(await shutting).toEqual([named('release debuggee D1: busy')]);
     expect(held.disposed).toBe(2); // retried once
   });
 
@@ -281,9 +291,7 @@ describe('InstancePool', () => {
     expect(done).toBe(false); // both still finishing
     a.set(false); // a's last batch closed everything
     b.failLate('release debuggee D1: busy'); // b's did not
-    expect(await shutting).toEqual([
-      `${b.stateHandle}: release debuggee D1: busy`,
-    ]);
+    expect(await shutting).toEqual([named('release debuggee D1: busy')]);
   });
 
   it('a request that leaves nothing behind leaves no entry in the pool', async () => {
@@ -399,9 +407,33 @@ describe('InstancePool', () => {
     expect(leaseDone).toBe(false); // still waiting for the lease
     g.open();
     await active;
-    expect(await shutting).toEqual([`${held.stateHandle}: listener still up`]);
+    expect(await shutting).toEqual([named('listener still up')]);
     await expect(pool.serve({}, create, async () => {})).rejects.toThrow(
       PoolClosedError,
     );
+  });
+});
+
+describe('the pool never names a failure by its handle', () => {
+  async function holding(pool: InstancePool<Fake>) {
+    let inst!: Fake;
+    await pool.serve({}, create, async (i) => {
+      inst = i;
+      i.set(true);
+    });
+    return inst;
+  }
+
+  it('two instances failing are told apart by an ordinal, and no handle is in any line', async () => {
+    const pool = new InstancePool<Fake>();
+    const a = await holding(pool);
+    const b = await holding(pool);
+    a.failDispose = true;
+    b.failDispose = true;
+    const handles = [a.stateHandle, b.stateHandle];
+    const failures = await pool.shutdown();
+    expect(failures).toHaveLength(2);
+    expect(new Set(failures).size).toBe(2);
+    for (const h of handles) expect(failures.join('\n')).not.toContain(h);
   });
 });

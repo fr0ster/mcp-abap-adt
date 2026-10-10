@@ -88,3 +88,39 @@ describe('ServerConfigManager carries stateIdleMinutes', () => {
     );
   });
 });
+
+describe('ArgumentsParser reads stateIdleMinutes like its neighbours', () => {
+  const ORIG_ARGV = process.argv;
+  const ORIG = process.env[ENV];
+  afterEach(() => {
+    process.argv = ORIG_ARGV;
+    if (ORIG === undefined) delete process.env[ENV];
+    else process.env[ENV] = ORIG;
+  });
+  it('CLI, env and YAML reach the parsed arguments', () => {
+    const { ArgumentsParser } = require('../../../lib/config/ArgumentsParser');
+    delete process.env[ENV];
+    process.argv = ['node', 'x', '--state-idle-minutes=50'];
+    expect(ArgumentsParser.parse().stateIdleMinutes).toBe(50);
+    process.argv = ['node', 'x'];
+    process.env[ENV] = '40';
+    expect(ArgumentsParser.parse().stateIdleMinutes).toBe(40);
+    delete process.env[ENV];
+    expect(
+      ArgumentsParser.parse({ 'state-idle-minutes': 35 } as never)
+        .stateIdleMinutes,
+    ).toBe(35);
+    expect(ArgumentsParser.parse().stateIdleMinutes).toBe(30);
+  });
+  it('the help separates its sentences', () => {
+    const help = ServerConfigManager.generateHelp();
+    const block = help.slice(help.indexOf('HELD STATE'));
+    const text = block
+      .slice(0, block.indexOf('env: MCP_STATE_IDLE_MINUTES'))
+      .replace(/\s+/g, ' ');
+    expect(text).toMatch(
+      /tool call\. Default and minimum: 30; a whole number\. /,
+    );
+    expect(text).toMatch(/does not count\. $/);
+  });
+});

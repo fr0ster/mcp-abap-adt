@@ -6,7 +6,6 @@ import { handleDebugGetMemorySizes } from '../../../handlers/debugger/debug/hand
 import { handleDebugGetStack } from '../../../handlers/debugger/debug/handleDebugGetStack';
 import { handleDebugGetVariables } from '../../../handlers/debugger/debug/handleDebugGetVariables';
 import { handleDebugListBreakpoints } from '../../../handlers/debugger/debug/handleDebugListBreakpoints';
-import { handleDebugListSessions } from '../../../handlers/debugger/debug/handleDebugListSessions';
 import { handleDebugListWatchpoints } from '../../../handlers/debugger/debug/handleDebugListWatchpoints';
 import { handleDebugSetBreakpoints } from '../../../handlers/debugger/debug/handleDebugSetBreakpoints';
 import { handleDebugSetStackPosition } from '../../../handlers/debugger/debug/handleDebugSetStackPosition';
@@ -67,7 +66,7 @@ describe('debugger handlers', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('the group serves the 20 ABAP tools', () => {
+  it('the group serves the 19 ABAP tools', () => {
     const names = new DebugHandlersGroup({} as any)
       .getHandlers()
       .map((e) => e.toolDefinition.name);
@@ -91,7 +90,6 @@ describe('debugger handlers', () => {
       'DebugGetMemorySizes',
       'DebugCreateMemorySnapshot',
       'DebugStop',
-      'DebugListSessions',
     ])
       expect(names).toContain(n);
   });
@@ -214,6 +212,39 @@ describe('debugger handlers', () => {
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toContain('SY 530');
     expect(context.state.holdsState()).toBe(false);
+  });
+
+  it('two instances with the same stated ids: the second start reaches SAP and meets its conflict; nothing of ours refuses it', async () => {
+    const world = fakeWorld();
+    const instance = () => {
+      const state = new InstanceState();
+      const dbg = new DebuggerInstance({
+        abap: new DebugSession(world.ports as any, IDS),
+        amdp: new AmdpSession({} as any),
+      });
+      state.attach(dbg);
+      // What a per-user registry would have said: another instance holds the kind.
+      (state as any).host = {
+        owner: 'O',
+        reserve: () => 'F'.repeat(32),
+        peers: () => [],
+      };
+      return { state, connection: {} as any, debugger: () => dbg };
+    };
+    const first = instance();
+    const second = instance();
+    const a = handleDebugStartListener(first as any, {});
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(LISTEN_NOTHING());
+    expect((await a).isError).toBeFalsy();
+    const b = handleDebugStartListener(second as any, {});
+    await until(() => world.polls.length === 3);
+    // SAP answers the second listener with the same ids: its conflict reaches the model as it is.
+    world.polls[2].resolve(CONFLICT());
+    const r: any = await b;
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain('SY 530');
+    expect(first.state.holdsState()).toBe(true);
   });
 
   describe('every tool reaches its port', () => {
@@ -406,24 +437,6 @@ describe('debugger handlers', () => {
         'sizes',
         'snapshot',
       ]);
-    });
-
-    it('ListSessions answers the state alone, with a host its peers, and refuses where no state is served', async () => {
-      const { world, state, context } = install();
-      expect(json(await handleDebugListSessions(context as any, {}))).toEqual(
-        [],
-      );
-      await startedListening(world, context);
-      const alone = json(await handleDebugListSessions(context as any, {}));
-      expect(alone[0].state_handle).toBe(state.handle);
-      (state as any).host = {
-        peers: () => [{ state_handle: 'P', states: [] }],
-      };
-      expect(json(await handleDebugListSessions(context as any, {}))).toEqual([
-        { state_handle: 'P', states: [] },
-      ]);
-      const none: any = await handleDebugListSessions({} as any, {});
-      expect(none.isError).toBe(true);
     });
 
     it('SetBreakpoints answers exception and statement breakpoints as the readings are', async () => {

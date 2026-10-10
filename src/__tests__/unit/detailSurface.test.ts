@@ -217,7 +217,6 @@ const JSON_ANSWERING: readonly string[] = [
   'DebugGetStack',
   'DebugGetVariables',
   'DebugListBreakpoints',
-  'DebugListSessions',
   'DebugListWatchpoints',
   'DebugSetBreakpoints',
   'DebugSetStackPosition',

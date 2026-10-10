@@ -50,32 +50,17 @@ describe('requireDebugger', () => {
   });
 });
 
-describe('requireDebugger under a host', () => {
-  it('a request with no owner creates state and takes no slot', () => {
+describe('requireDebugger', () => {
+  it('a start is not limited by anything of ours: it binds the sessions and answers the debugger', () => {
     const abap = { ...fake(false), bind: jest.fn() };
     const amdp = { ...fake(false), bind: jest.fn() };
     const state = new InstanceState();
     const dbg = new DebuggerInstance({ abap, amdp });
     state.attach(dbg);
-    const reserve = jest.fn(() => 'OTHERHANDLE');
-    state.host = { owner: null, reserve, peers: () => [] };
     const context = { connection: {} as any, state, debugger: () => dbg };
     expect(requireDebugger(context, {}, { create: 'amdp' })).toBe(dbg);
-    expect(reserve).not.toHaveBeenCalled();
-  });
-  it("an owner's slot held elsewhere refuses the start, and the debugger is not bound", () => {
-    const abap = { ...fake(false), bind: jest.fn() };
-    const amdp = { ...fake(false), bind: jest.fn() };
-    const state = new InstanceState();
-    const dbg = new DebuggerInstance({ abap, amdp });
-    state.attach(dbg);
-    state.host = { owner: 'O', reserve: () => 'OTHERHANDLE', peers: () => [] };
-    const context = { connection: {} as any, state, debugger: () => dbg };
-    expect(() => requireDebugger(context, {}, { create: 'amdp' })).toThrow(
-      /OTHERHANDLE/,
-    );
-    expect(abap.bind).not.toHaveBeenCalled();
-    expect(amdp.bind).not.toHaveBeenCalled();
+    expect(abap.bind).toHaveBeenCalledWith(context);
+    expect(amdp.bind).toHaveBeenCalledWith(context);
   });
   it("a handle that is not this instance's and an empty handle get the same answer", () => {
     const { context } = ctx(true);

@@ -84,17 +84,6 @@ describe('InstanceState', () => {
     await s.dispose();
     expect(seen).toHaveBeenCalledTimes(1);
   });
-  it('admit: without an owner admits and reserves nothing; refuses with the holder handle when another instance holds the kind', () => {
-    const s = new InstanceState();
-    const reserve = jest.fn(() => 'OTHERHANDLE');
-    s.host = { owner: null, reserve, peers: () => [] };
-    expect(() => s.admit('abap')).not.toThrow();
-    expect(reserve).not.toHaveBeenCalled();
-    s.host = { owner: 'O', reserve: () => 'OTHERHANDLE', peers: () => [] };
-    expect(() => s.admit('abap')).toThrow(/OTHERHANDLE/);
-    s.host = { owner: 'O', reserve: () => undefined, peers: () => [] };
-    expect(() => s.admit('abap')).not.toThrow();
-  });
   it('shutdown waits for a part still finishing after its disposal threw, retries once, answers what is left', async () => {
     const s = new InstanceState();
     const held = true;
@@ -168,7 +157,7 @@ describe('InstanceState — what failed is named', () => {
     });
     await expect(s.dispose()).rejects.toThrow('close: refused');
     expect(s.holdsState()).toBe(true);
-    expect(s.kindsHeld()).toEqual(['abap']);
+    expect(s.describe().states).toEqual([{ kind: 'abap' }]);
   });
   it('shutdown with nothing left answers nothing; with no failure recorded it answers the disposal error', async () => {
     const empty = new InstanceState();
@@ -199,9 +188,6 @@ describe('InstanceState — what failed is named', () => {
     off();
     a.set(false);
     expect(seen).toHaveBeenCalledTimes(1);
-  });
-  it('a host-less instance (stdio, SSE) admits without a reservation', () => {
-    expect(() => new InstanceState().admit('amdp')).not.toThrow();
   });
 });
 

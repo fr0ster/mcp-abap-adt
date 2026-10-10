@@ -1,4 +1,3 @@
-import { createHmac, randomBytes } from 'node:crypto';
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
 import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
@@ -130,8 +129,6 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly firstConnect = new FirstConnectLock();
   /** The instances that hold state between requests (spec D9). */
   private readonly pool = new InstancePool<PerRequestServerApi>();
-  /** Keys the owner scope of a basic request; per process, never stored or logged. */
-  private readonly ownerSecret = randomBytes(32);
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -231,10 +228,6 @@ export class StreamableHttpServer extends BaseMcpServer {
           throw err;
         }
 
-        // The owner scopes listing and the per-owner limit; the handle alone
-        // reaches its instance (a bearer secret).
-        const owner = this.ownerOf(req.headers, destination);
-
         const authSource = destination
           ? `destination=${destination}`
           : fromHeaders
@@ -247,7 +240,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         }
 
         await this.pool.serve(
-          { handle, owner },
+          { handle },
           () => this.createPerRequestServer(),
           async (server) => {
             // A client that left while this request waited for the lease gets nothing.
@@ -459,43 +452,6 @@ export class StreamableHttpServer extends BaseMcpServer {
     if (failures.length) {
       throw new Error(`state cleanup failed: ${failures.join('; ')}`);
     }
-  }
-
-  /**
-   * The scope of the request's state — for listing an owner's states and the
-   * per-owner limit, never an authorization: the handle is a bearer secret
-   * (spec D15). Taken only where it is known for free:
-   * - a destination request: `dest:<destination>`;
-   * - an `x-sap-*` basic request: `basic:` + HMAC-SHA256 of url, client,
-   *   login and password, keyed by a per-process secret;
-   * - otherwise (a token request, or none): null — the request may still
-   *   create state; it lists only its own instance and takes no slot.
-   * Nothing is asked of SAP, and nothing here is logged.
-   */
-  private ownerOf(
-    headers: Headers,
-    destination: string | undefined,
-  ): string | null {
-    if (destination) return `dest:${destination}`;
-    if (!this.hasSapConnectionHeaders(headers)) return null;
-    const get = (name: string): string | undefined => {
-      const value = headers[name] ?? headers[name.toUpperCase()];
-      return Array.isArray(value) ? value[0] : value;
-    };
-    if (get('x-sap-jwt-token')) return null;
-    // The fields are joined as a JSON array: a separator inside a header value
-    // cannot make two credentials one owner.
-    const mac = createHmac('sha256', this.ownerSecret)
-      .update(
-        JSON.stringify([
-          get('x-sap-url') ?? '',
-          get('x-sap-client') ?? '',
-          get('x-sap-login') ?? '',
-          get('x-sap-password') ?? '',
-        ]),
-      )
-      .digest('hex');
-    return `basic:${mac}`;
   }
 
   /**

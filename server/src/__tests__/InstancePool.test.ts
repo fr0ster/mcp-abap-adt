@@ -1,5 +1,5 @@
 /**
- * The pool keeps the instance that holds state: lease, owner index, slots,
+ * The pool keeps the instance that holds state: handle routing, lease,
  * eviction, shutdown. Driven by a fake part, no transport.
  */
 import { InstanceState } from '@mcp-abap-adt/lib/state';
@@ -102,9 +102,9 @@ describe('handleOf', () => {
 });
 
 describe('InstancePool', () => {
-  async function holding(pool: InstancePool<Fake>, owner: string | null = 'A') {
+  async function holding(pool: InstancePool<Fake>) {
     let inst!: Fake;
-    await pool.serve({ owner }, create, async (i) => {
+    await pool.serve({}, create, async (i) => {
       inst = i;
       i.set(true);
     });
@@ -115,20 +115,16 @@ describe('InstancePool', () => {
     const pool = new InstancePool<Fake>();
     const first = await holding(pool);
     let second!: Fake;
-    await pool.serve(
-      { handle: first.stateHandle, owner: 'A' },
-      create,
-      async (i) => {
-        second = i;
-      },
-    );
+    await pool.serve({ handle: first.stateHandle }, create, async (i) => {
+      second = i;
+    });
     expect(second).toBe(first);
   });
 
   it('disposes an instance that holds nothing', async () => {
     const pool = new InstancePool<Fake>();
     let i0!: Fake;
-    await pool.serve({ owner: 'A' }, create, async (i) => {
+    await pool.serve({}, create, async (i) => {
       i0 = i;
     });
     expect(pool.size()).toBe(0);
@@ -139,7 +135,7 @@ describe('InstancePool', () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
     let got!: Fake;
-    await pool.serve({ handle: 'NOPE', owner: 'A' }, create, async (i) => {
+    await pool.serve({ handle: 'NOPE' }, create, async (i) => {
       got = i;
     });
     expect(got).not.toBe(held);
@@ -151,24 +147,16 @@ describe('InstancePool', () => {
     const g = gate();
     const order: string[] = [];
     let second!: Fake;
-    const a = pool.serve(
-      { handle: held.stateHandle, owner: 'A' },
-      create,
-      async (i) => {
-        order.push('a-in');
-        await g.p;
-        i.set(false);
-        order.push('a-out');
-      },
-    );
-    const b = pool.serve(
-      { handle: held.stateHandle, owner: 'A' },
-      create,
-      async (i) => {
-        order.push('b-in');
-        second = i;
-      },
-    );
+    const a = pool.serve({ handle: held.stateHandle }, create, async (i) => {
+      order.push('a-in');
+      await g.p;
+      i.set(false);
+      order.push('a-out');
+    });
+    const b = pool.serve({ handle: held.stateHandle }, create, async (i) => {
+      order.push('b-in');
+      second = i;
+    });
     await tick();
     expect(order).toEqual(['a-in']);
     g.open();
@@ -186,72 +174,21 @@ describe('InstancePool', () => {
     expect(held.disposed).toBe(1);
   });
 
-  it('the per-owner slot: a second start of the kind is told the holder; peers lists the owner states', async () => {
-    const pool = new InstancePool<Fake>();
-    let firstHandle = '';
-    await pool.serve({ owner: 'A' }, create, async (i) => {
-      i.state.admit('abap');
-      i.set(true);
-      firstHandle = i.stateHandle;
-    });
-    await pool.serve({ owner: 'A' }, create, async (i) => {
-      expect(() => i.state.admit('abap')).toThrow(firstHandle);
-      expect(i.state.host!.peers().map((p) => p.state_handle)).toContain(
-        firstHandle,
-      );
-    });
-    await pool.serve({ owner: 'B' }, create, async (i) => {
-      expect(() => i.state.admit('abap')).not.toThrow();
-    });
-  });
-
-  it('a reservation in progress holds the slot: a concurrent start of the owner is told the holder', async () => {
-    const pool = new InstancePool<Fake>();
-    const g = gate();
-    let firstHandle = '';
-    const first = pool.serve({ owner: 'A' }, create, async (i) => {
-      i.state.admit('abap');
-      firstHandle = i.stateHandle;
-      await g.p;
-      i.set(true);
-    });
-    await tick();
-    await pool.serve({ owner: 'A' }, create, async (i) => {
-      expect(() => i.state.admit('abap')).toThrow(firstHandle);
-    });
-    g.open();
-    await first;
-  });
-
-  it('a failed start releases its slot', async () => {
-    const pool = new InstancePool<Fake>();
-    await pool.serve({ owner: 'A' }, create, async (i) => {
-      i.state.admit('abap'); /* nothing held: the start failed */
-    });
-    await pool.serve({ owner: 'A' }, create, async (i) => {
-      expect(() => i.state.admit('abap')).not.toThrow();
-    });
-  });
-
   it('an instance emptied during its own request is disposed once, after the request', async () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
     let disposedDuringWork = -1;
-    await pool.serve(
-      { handle: held.stateHandle, owner: 'A' },
-      create,
-      async (i) => {
-        i.set(false);
-        await tick();
-        disposedDuringWork = i.disposed;
-      },
-    );
+    await pool.serve({ handle: held.stateHandle }, create, async (i) => {
+      i.set(false);
+      await tick();
+      disposedDuringWork = i.disposed;
+    });
     expect(disposedDuringWork).toBe(0);
     expect(held.disposed).toBe(1);
     expect(pool.size()).toBe(0);
   });
 
-  it("a disposal that fails on an instance holding nothing: out of routing and peers, retained for shutdown's retry", async () => {
+  it("a disposal that fails on an instance holding nothing: out of routing, retained for shutdown's retry", async () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
     const handle = held.stateHandle;
@@ -263,9 +200,8 @@ describe('InstancePool', () => {
     expect((pool as any).index.size).toBe(0); // no longer routed
     expect((pool as any).retained.has(held)).toBe(true); // kept for a retry
     let got!: Fake;
-    await pool.serve({ handle, owner: 'A' }, create, async (i) => {
+    await pool.serve({ handle }, create, async (i) => {
       got = i;
-      expect(i.state.host!.peers()).toEqual([]); // not listed with empty states
     });
     expect(got).not.toBe(held);
     held.failDispose = false;
@@ -289,7 +225,7 @@ describe('InstancePool', () => {
     const pool = new InstancePool<Fake>();
     let fresh!: Fake;
     await pool.serve(
-      { owner: 'A' },
+      {},
       () => {
         fresh = create();
         fresh.failDispose = true;
@@ -334,7 +270,7 @@ describe('InstancePool', () => {
   it('a disposal that throws while its cleanup is still finishing: shutdown waits for it, then reports only what is left', async () => {
     const pool = new InstancePool<Fake>();
     const a = await holding(pool);
-    const b = await holding(pool, 'B');
+    const b = await holding(pool);
     a.throwWhileFinishing = true;
     b.throwWhileFinishing = true;
     let done = false;
@@ -353,7 +289,7 @@ describe('InstancePool', () => {
 
   it('a request that leaves nothing behind leaves no entry in the pool', async () => {
     const pool = new InstancePool<Fake>();
-    await pool.serve({ owner: 'A' }, create, async () => {});
+    await pool.serve({}, create, async () => {});
     expect((pool as any).busy.size).toBe(0);
     expect((pool as any).retained.size).toBe(0);
     expect(pool.size()).toBe(0);
@@ -367,114 +303,12 @@ describe('InstancePool', () => {
     expect(held.disposed).toBe(1);
   });
 
-  it('the handle is a bearer secret: it reaches its instance from another owner and from none; the entry keeps its owner', async () => {
-    const pool = new InstancePool<Fake>();
-    const a = await holding(pool, 'A');
-    for (const owner of ['B', null]) {
-      let got!: Fake;
-      await pool.serve({ handle: a.stateHandle, owner }, create, async (i) => {
-        got = i;
-        expect(() => i.state.check(a.stateHandle)).not.toThrow();
-      });
-      expect(got).toBe(a);
-    }
-    // Not re-keyed: A's listing still has it; B's does not.
-    await pool.serve({ owner: 'A' }, create, async (i) => {
-      expect(i.state.host!.peers().map((p) => p.state_handle)).toEqual([
-        a.stateHandle,
-      ]);
-    });
-    await pool.serve({ owner: 'B' }, create, async (i) => {
-      expect(i.state.host!.peers()).toEqual([]);
-    });
-  });
-
   it('an unknown handle gets a fresh instance whose state is not available', async () => {
     const pool = new InstancePool<Fake>();
-    await holding(pool, 'A');
-    await pool.serve({ handle: 'NOPE', owner: 'A' }, create, async (i) => {
+    await holding(pool);
+    await pool.serve({ handle: 'NOPE' }, create, async (i) => {
       expect(() => i.state.check('NOPE')).toThrow('state is not available');
     });
-  });
-
-  it('listing is scoped by owner: an owner sees its own states; no owner sees only its own instance', async () => {
-    const pool = new InstancePool<Fake>();
-    const a1 = await holding(pool, 'A');
-    const a2 = await holding(pool, 'A');
-    const b = await holding(pool, 'B');
-    const n = await holding(pool, null);
-    await pool.serve({ owner: 'A' }, create, async (i) => {
-      expect(
-        i.state
-          .host!.peers()
-          .map((p) => p.state_handle)
-          .sort(),
-      ).toEqual([a1.stateHandle, a2.stateHandle].sort());
-    });
-    await pool.serve(
-      { handle: n.stateHandle, owner: null },
-      create,
-      async (i) => {
-        expect(i.state.host!.peers().map((p) => p.state_handle)).toEqual([
-          n.stateHandle,
-        ]);
-      },
-    );
-    await pool.serve({ owner: null }, create, async (i) => {
-      expect(i.state.host!.peers()).toEqual([]);
-    });
-    expect(b.stateHandle).toBeTruthy();
-  });
-
-  it('a failed start on an instance that holds another kind releases only the failed slot', async () => {
-    const pool = new InstancePool<Fake>();
-    const held = await (async () => {
-      let inst!: Fake;
-      await pool.serve({ owner: 'A' }, create, async (i) => {
-        inst = i;
-        i.state.admit('abap');
-        i.set(true);
-      });
-      return inst;
-    })();
-    await pool.serve(
-      { handle: held.stateHandle, owner: 'A' },
-      create,
-      async (i) => {
-        i.state.admit('amdp'); /* the start failed */
-      },
-    );
-    expect((pool as any).slots.size).toBe(1);
-    await pool.serve({ owner: 'A' }, create, async (i) => {
-      expect(() => i.state.admit('amdp')).not.toThrow();
-      expect(() => i.state.admit('abap')).toThrow(held.stateHandle);
-    });
-  });
-
-  it('a request without an owner creates state, is kept, and takes no slot', async () => {
-    const pool = new InstancePool<Fake>();
-    let inst!: Fake;
-    await pool.serve({ owner: null }, create, async (i) => {
-      inst = i;
-      expect(() => i.state.admit('abap')).not.toThrow();
-      i.set(true);
-    });
-    expect(pool.size()).toBe(1);
-    expect(inst.disposed).toBe(0);
-    expect((pool as any).slots.size).toBe(0);
-    // A second one without an owner is not limited either.
-    await pool.serve({ owner: null }, create, async (i) => {
-      expect(() => i.state.admit('abap')).not.toThrow();
-    });
-    let again!: Fake;
-    await pool.serve(
-      { handle: inst.stateHandle, owner: null },
-      create,
-      async (i) => {
-        again = i;
-      },
-    );
-    expect(again).toBe(inst);
   });
 
   it('follows handle rotation: the old handle stops routing, the new one routes', async () => {
@@ -482,7 +316,7 @@ describe('InstancePool', () => {
     const held = await holding(pool);
     const old = held.stateHandle;
     // A complete stop empties the instance (the handle rotates), and new state is created under the new handle.
-    await pool.serve({ handle: old, owner: 'A' }, create, async (i) => {
+    await pool.serve({ handle: old }, create, async (i) => {
       i.state.endWhenEmpty();
       i.set(false);
       i.set(true);
@@ -492,13 +326,13 @@ describe('InstancePool', () => {
     expect(pool.size()).toBe(1);
     expect([...(pool as any).index.keys()]).toEqual([rotated]);
     let viaOld!: Fake;
-    await pool.serve({ handle: old, owner: 'A' }, create, async (i) => {
+    await pool.serve({ handle: old }, create, async (i) => {
       viaOld = i;
     });
     expect(viaOld).not.toBe(held);
     expect(() => viaOld.state.check(old)).toThrow('state is not available');
     let viaNew!: Fake;
-    await pool.serve({ handle: rotated, owner: 'A' }, create, async (i) => {
+    await pool.serve({ handle: rotated }, create, async (i) => {
       viaNew = i;
     });
     expect(viaNew).toBe(held);
@@ -516,7 +350,7 @@ describe('InstancePool', () => {
     expect(held.stateHandle).not.toBe(old);
     expect((pool as any).index.size).toBe(0);
     let got!: Fake;
-    await pool.serve({ handle: old, owner: 'A' }, create, async (i) => {
+    await pool.serve({ handle: old }, create, async (i) => {
       got = i;
     });
     expect(got).not.toBe(held);
@@ -529,14 +363,14 @@ describe('InstancePool', () => {
     const held = await holding(pool);
     const old = held.stateHandle;
     const g = gate();
-    const a = pool.serve({ handle: old, owner: 'A' }, create, async (i) => {
+    const a = pool.serve({ handle: old }, create, async (i) => {
       await g.p;
       i.state.endWhenEmpty();
       i.set(false);
       i.set(true);
     });
     let second!: Fake;
-    const b = pool.serve({ handle: old, owner: 'A' }, create, async (i) => {
+    const b = pool.serve({ handle: old }, create, async (i) => {
       second = i;
     });
     await tick();
@@ -553,7 +387,7 @@ describe('InstancePool', () => {
     const g = gate();
     let leaseDone = false;
     const active = pool.serve(
-      { handle: held.stateHandle, owner: 'A' },
+      { handle: held.stateHandle },
       create,
       async () => {
         await g.p;
@@ -567,8 +401,8 @@ describe('InstancePool', () => {
     g.open();
     await active;
     expect(await shutting).toEqual([`${held.stateHandle}: listener still up`]);
-    await expect(
-      pool.serve({ owner: 'A' }, create, async () => {}),
-    ).rejects.toThrow(PoolClosedError);
+    await expect(pool.serve({}, create, async () => {})).rejects.toThrow(
+      PoolClosedError,
+    );
   });
 });

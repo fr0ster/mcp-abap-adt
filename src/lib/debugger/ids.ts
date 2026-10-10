@@ -1,9 +1,12 @@
 /**
- * The debugger's SAP ids. Generated unless stated: two instances of one user
- * with the same ids would share one listener's catches without a conflict
- * (the same `ideId` never conflicts — measured). A user who wants otherwise
- * states them — a header, the destination, the environment; what a shared id
- * brings is theirs. Not validated: SAP judges them.
+ * The debugger's SAP ids — the consumer's to choose, and what bounds parallel
+ * debug sessions: SAP answers a second listener under the same pair with its
+ * conflict (or the take-over tools displace the first), and another pair is
+ * another listener. Nothing of ours limits them. Generated unless stated: two
+ * instances of one user with the same ids would share one listener's catches
+ * without a conflict (the same `ideId` never conflicts — measured). A user who
+ * wants otherwise states them — a header, the destination, the environment;
+ * what a shared id brings is theirs. Not validated: SAP judges them.
  */
 import { randomBytes } from 'node:crypto';
 import { getRequestContext } from '../requestContext';

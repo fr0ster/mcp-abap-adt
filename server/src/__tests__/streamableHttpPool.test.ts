@@ -103,7 +103,6 @@ const probes = new CompositeHandlersRegistry([
         'PoolProbeHold',
         { type: 'object', properties: {} },
         async (ctx, _args) => {
-          ctx.state.admit('probe');
           partOf(ctx.state).set(true);
           return text(JSON.stringify({ state_handle: ctx.state.handle }));
         },
@@ -358,7 +357,7 @@ describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secre
     }
   }
 
-  it('a token request (no owner) creates state; its handle reaches it from any credentials', async () => {
+  it('a token request creates state; its handle reaches it from any credentials', async () => {
     const held = await call(token, 'PoolProbeHold');
     if (held.isError) throw new Error(held.text);
     const handle = JSON.parse(held.text).state_handle;

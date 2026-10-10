@@ -29,21 +29,6 @@ export interface StatePart {
   observe(onChange: () => void): void;
 }
 
-/** What the host lends an instance for one request; stdio and SSE lend none. */
-export interface StateHost {
-  /**
-   * The request's owner: a scope for listing an owner's states and for the
-   * per-owner limit, never an authorization — the handle is a bearer secret.
-   * Null when the request carries no scope known for free (a token request):
-   * it may still create state, lists only its own instance and takes no slot.
-   */
-  readonly owner: string | null;
-  /** Atomically reserves the owner's slot of a kind for this handle; answers the holder's handle when another instance holds it. */
-  reserve(kind: string, handle: string): string | undefined;
-  /** Every state the owner holds in the pool, this instance's included; with no owner, this instance's alone. */
-  peers(): Array<{ state_handle: string; states: StateDescription[] }>;
-}
-
 /** An unknown handle and a handle whose state is gone get this one answer. */
 export class StateUnavailableError extends Error {
   constructor() {
@@ -82,8 +67,6 @@ export class InstanceState {
   private readonly changeListeners = new Set<() => void>();
   private wasHolding = false;
   private endRequested = false;
-  /** Set by the host per request; stdio and SSE set none. */
-  host?: StateHost;
 
   get handle(): string {
     return this.current;
@@ -107,29 +90,11 @@ export class InstanceState {
     return this.parts.flatMap((p) => p.failures());
   }
 
-  kindsHeld(): string[] {
-    return [
-      ...new Set(this.parts.flatMap((p) => p.describe().map((d) => d.kind))),
-    ];
-  }
-
   describe(): { state_handle: string; states: StateDescription[] } {
     return {
       state_handle: this.current,
       states: this.parts.flatMap((p) => p.describe()),
     };
-  }
-
-  /** For a state-creating call: reserves the owner's slot of the kind, refusing with the holder's handle. */
-  admit(kind: string): void {
-    if (!this.host) return; // stdio, SSE: one instance per session
-    if (this.host.owner === null) return; // no scope: no per-owner limit applies
-    const holder = this.host.reserve(kind, this.current);
-    if (holder && holder !== this.current) {
-      throw new Error(
-        `a ${kind} session is already open: state_handle ${holder}`,
-      );
-    }
   }
 
   /** For a call on existing state: the handle must be this one and something must be held. */

@@ -59,10 +59,6 @@ import {
   handleDebugListBreakpoints,
 } from '../../../handlers/debugger/debug/handleDebugListBreakpoints';
 import {
-  TOOL_DEFINITION as DebugListSessions_Tool,
-  handleDebugListSessions,
-} from '../../../handlers/debugger/debug/handleDebugListSessions';
-import {
   TOOL_DEFINITION as DebugListWatchpoints_Tool,
   handleDebugListWatchpoints,
 } from '../../../handlers/debugger/debug/handleDebugListWatchpoints';
@@ -153,7 +149,6 @@ export class DebugHandlersGroup extends BaseHandlerGroup {
         handleDebugCreateMemorySnapshot,
       ),
       defineTool(DebugStop_Tool, handleDebugStop),
-      defineTool(DebugListSessions_Tool, handleDebugListSessions),
       defineTool(AmdpDebugStart_Tool, handleAmdpDebugStart),
       defineTool(AmdpDebugSetBreakpoints_Tool, handleAmdpDebugSetBreakpoints),
       defineTool(AmdpDebugWait_Tool, handleAmdpDebugWait),

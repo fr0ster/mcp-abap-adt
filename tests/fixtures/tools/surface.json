@@ -2191,12 +2191,6 @@
   },
   {
     "group": "debug",
-    "name": "DebugListSessions",
-    "inputs": "detail",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "debug",
     "name": "AmdpDebugStart",
     "inputs": "stop_existing, breakpoints*, run, detail",
     "available_in": "cloud, onprem"

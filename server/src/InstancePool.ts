@@ -6,22 +6,18 @@
  * poll, an attach within seconds, the attaching ABAP session; over RFC nothing
  * carries that session to another connection). So per request the host takes
  * an instance once: the one the request's `state_handle` names, or a new one.
- * The handle is a bearer secret — whoever holds it reaches the instance, like
- * a session cookie; keeping it safe is the deployer's. The owner is a scope,
- * not an authorization: it lists an owner's states and holds the per-owner
- * limit in slots (a reservation in progress counts); a request with none
- * lists only its own instance and takes no slot. One request at a time per
- * instance (the SDK binds one transport).
+ * The handle identifies an LLM session's state and is a bearer secret:
+ * whoever holds it reaches the instance, like a session cookie; keeping it
+ * safe is the deployer's. There is no owner: parallel debug sessions are
+ * bounded by SAP on the stated terminal and IDE ids, which are the consumer's
+ * to choose. One request at a time per instance (the SDK binds one
+ * transport).
  * An instance that holds nothing is disposed once, after its work; a disposal
  * that fails keeps the instance for a retry. Nothing expires on a clock.
  *
  * The pool knows `InstanceState` and nothing of what the state is.
  */
-import type {
-  InstanceState,
-  StateDescription,
-  StateHost,
-} from '@mcp-abap-adt/lib/state';
+import type { InstanceState } from '@mcp-abap-adt/lib/state';
 
 export interface Poolable {
   readonly state: InstanceState;
@@ -68,21 +64,11 @@ export function handleOf(body: unknown): string | undefined {
 
 interface Held<T> {
   instance: T;
-  /** The scope of the request that created the state; a later bearer's does not re-key it. */
-  owner: string | null;
   /** The handle the index files this entry under; follows rotation. */
   handle: string;
   /** The lease: requests on this instance queue here. */
   tail: Promise<unknown>;
   unsubscribe: () => void;
-}
-
-interface Slot<T> {
-  instance: T;
-  owner: string;
-  kind: string;
-  /** A start in progress: the slot holds before the kind is held. */
-  pending: boolean;
 }
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -91,7 +77,6 @@ export class InstancePool<T extends Poolable> {
   private readonly held = new Map<T, Held<T>>();
   /** handle → entry, kept in step with each instance's handle (`onChange`). */
   private readonly index = new Map<string, Held<T>>();
-  private readonly slots = new Map<string, Slot<T>>();
   /** Requests working on an instance; no entry for an instance nobody works on. */
   private readonly busy = new Map<T, number>();
   private readonly subscribed = new WeakSet<object>();
@@ -107,21 +92,16 @@ export class InstancePool<T extends Poolable> {
     return this.held.size;
   }
 
-  private slotKey(owner: string, kind: string): string {
-    return JSON.stringify([owner, kind]);
-  }
-
   private byHandle(handle: string): Held<T> | undefined {
     const entry = this.index.get(handle);
     // The index follows rotation; the check keeps a stale key from ever routing.
     return entry && entry.instance.stateHandle === handle ? entry : undefined;
   }
 
-  private keep(instance: T, owner: string | null): void {
+  private keep(instance: T): void {
     if (this.held.has(instance)) return;
     const entry: Held<T> = {
       instance,
-      owner,
       handle: instance.stateHandle,
       tail: Promise.resolve(),
       unsubscribe: () => {},
@@ -148,51 +128,8 @@ export class InstancePool<T extends Poolable> {
     if (this.index.get(entry.handle) === entry) this.index.delete(entry.handle);
   }
 
-  private releaseSlots(instance: T, keepKinds?: string[]): void {
-    for (const [key, slot] of this.slots) {
-      if (slot.instance !== instance) continue;
-      if (keepKinds?.includes(slot.kind)) slot.pending = false;
-      else this.slots.delete(key);
-    }
-  }
-
-  private hostFor(owner: string | null, instance: T): StateHost {
-    return {
-      owner,
-      reserve: (kind) => {
-        if (owner === null) return undefined;
-        const key = this.slotKey(owner, kind);
-        const slot = this.slots.get(key);
-        const occupied =
-          slot &&
-          slot.instance !== instance &&
-          (slot.pending || slot.instance.state.kindsHeld().includes(kind));
-        if (occupied) return slot.instance.stateHandle;
-        this.slots.set(key, { instance, owner, kind, pending: true });
-        return undefined;
-      },
-      peers: () => {
-        const mine: Array<{
-          state_handle: string;
-          states: StateDescription[];
-        }> = [];
-        if (owner !== null) {
-          for (const e of this.held.values()) {
-            if (e.owner === owner) mine.push(e.instance.state.describe());
-          }
-        }
-        // This instance's own state, once: also when it is another scope's.
-        const own = this.held.get(instance);
-        if ((owner === null || own?.owner !== owner) && instance.holdsState()) {
-          mine.push(instance.state.describe());
-        }
-        return mine;
-      },
-    };
-  }
-
   async serve(
-    request: { handle?: string; owner: string | null },
+    request: { handle?: string },
     create: () => T,
     work: (instance: T) => Promise<void>,
   ): Promise<void> {
@@ -207,24 +144,22 @@ export class InstancePool<T extends Poolable> {
   }
 
   private route(
-    request: { handle?: string; owner: string | null },
+    request: { handle?: string },
     create: () => T,
     work: (instance: T) => Promise<void>,
   ): Promise<void> {
     const entry = request.handle ? this.byHandle(request.handle) : undefined;
     // The handle is a bearer secret: it reaches its instance whoever sends it.
     // An unknown handle gets a new instance, which answers `state is not available`.
-    if (!entry) {
-      return this.run(create(), request.owner, work);
-    }
+    if (!entry) return this.run(create(), work);
     const turn = entry.tail.then(() =>
       // Revalidate: the instance may have left the pool, be leaving it, or
       // have rotated its handle while this request waited.
       this.held.get(entry.instance) === entry &&
       !this.evicting.has(entry.instance) &&
       entry.instance.stateHandle === request.handle
-        ? this.run(entry.instance, request.owner, work)
-        : this.run(create(), request.owner, work),
+        ? this.run(entry.instance, work)
+        : this.run(create(), work),
     );
     entry.tail = turn.catch(() => undefined);
     return turn;
@@ -232,7 +167,6 @@ export class InstancePool<T extends Poolable> {
 
   private async run(
     instance: T,
-    owner: string | null,
     work: (instance: T) => Promise<void>,
   ): Promise<void> {
     if (!this.subscribed.has(instance)) {
@@ -241,7 +175,6 @@ export class InstancePool<T extends Poolable> {
         if (!this.busy.get(instance)) void this.evict(instance);
       });
     }
-    instance.state.host = this.hostFor(owner, instance);
     this.busy.set(instance, (this.busy.get(instance) ?? 0) + 1);
     try {
       await work(instance);
@@ -249,15 +182,14 @@ export class InstancePool<T extends Poolable> {
       const left = (this.busy.get(instance) ?? 1) - 1;
       if (left > 0) this.busy.set(instance, left);
       else this.busy.delete(instance);
-      await this.settle(instance, owner);
+      await this.settle(instance);
     }
   }
 
-  /** After a request: slots of kinds not held are released; what holds state is kept; the rest is disposed. */
-  private async settle(instance: T, owner: string | null): Promise<void> {
-    this.releaseSlots(instance, instance.state.kindsHeld());
+  /** After a request: what holds state is kept; the rest is disposed. */
+  private async settle(instance: T): Promise<void> {
     if (instance.holdsState()) {
-      this.keep(instance, owner);
+      this.keep(instance);
       return;
     }
     if (!this.busy.get(instance)) await this.evict(instance);
@@ -285,7 +217,6 @@ export class InstancePool<T extends Poolable> {
         if (!instance.holdsState()) {
           this.drop(instance);
           this.retained.delete(instance);
-          this.releaseSlots(instance);
         } else {
           this.retained.add(instance); // still finishing: owned until it empties
         }
@@ -293,10 +224,9 @@ export class InstancePool<T extends Poolable> {
         this.failed.set(instance, `${instance.stateHandle}: ${messageOf(e)}`);
         this.retained.add(instance); // fresh or held: kept for shutdown's retry
         if (!instance.holdsState()) {
-          // Nothing left to route to or list: out of the index, the count and
-          // the peers; only `retained` keeps it, for the retry.
+          // Nothing left to route to: out of the index and the count; only
+          // `retained` keeps it, for the retry.
           this.drop(instance);
-          this.releaseSlots(instance);
         }
       } finally {
         this.evicting.delete(instance);

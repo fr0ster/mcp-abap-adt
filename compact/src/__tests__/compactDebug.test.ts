@@ -6,6 +6,7 @@ import type { TOOL_DEFINITION as Start } from '../debug/handleHandlerDebugStart'
 import type { TOOL_DEFINITION as Step } from '../debug/handleHandlerDebugStep';
 import type { TOOL_DEFINITION as View } from '../debug/handleHandlerDebugView';
 import type { TOOL_DEFINITION as Wait } from '../debug/handleHandlerDebugWait';
+import { parseCompactDebug, parseCompactExposition } from '../launcher';
 
 /** What each verb takes: the compiler checks every call below against its schema. */
 interface VerbArgs {
@@ -14,8 +15,6 @@ interface VerbArgs {
   HandlerDebugView: ArgsOf<typeof View.inputSchema>;
   HandlerDebugStep: ArgsOf<typeof Step.inputSchema>;
 }
-
-import { parseCompactDebug, parseCompactExposition } from '../launcher';
 
 describe('compact debug', () => {
   const entries = compactDebugEntries();

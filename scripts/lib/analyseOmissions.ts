@@ -742,7 +742,6 @@ function classifyProjection(
   return 'unknown';
 }
 
-/** Calls to `answer(...)` — the only place a detail reaches a caller. */
 /** The debugger's answer adapters, which read `detail` from their first argument. */
 const DEBUG_ANSWER_ADAPTERS = new Set(['debugAnswer', 'debugStateAnswer']);
 
@@ -779,6 +778,7 @@ function isExportedHandlerParameter(
   );
 }
 
+/** Calls to `answer(...)`. */
 function answerCallsIn(source: ts.SourceFile): ts.CallExpression[] {
   const calls: ts.CallExpression[] = [];
   const visit = (node: ts.Node): void => {

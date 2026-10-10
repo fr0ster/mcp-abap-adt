@@ -256,16 +256,38 @@ describe('InstancePool', () => {
     expect(pool.size()).toBe(0);
   });
 
-  it('a disposal that fails keeps the instance; shutdown retries and reports what still failed', async () => {
+  it("a disposal that fails on an instance holding nothing: out of routing and peers, retained for shutdown's retry", async () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
+    const handle = held.stateHandle;
     held.failDispose = true;
     held.set(false); // empties: eviction runs and fails
     await tick();
-    expect(pool.size()).toBe(1); // kept for a retry
+    expect(held.disposed).toBe(1);
+    expect(pool.size()).toBe(0); // no longer counted
+    expect((pool as any).index.size).toBe(0); // no longer routed
+    expect((pool as any).retained.has(held)).toBe(true); // kept for a retry
+    let got!: Fake;
+    await pool.serve({ handle, owner: 'A' }, create, async (i) => {
+      got = i;
+      expect(i.state.host!.peers()).toEqual([]); // not listed with empty states
+    });
+    expect(got).not.toBe(held);
     held.failDispose = false;
     expect(await pool.shutdown()).toEqual([]); // the retry succeeded
+    expect(held.disposed).toBe(2);
+  });
+
+  it('a disposal that fails for good on an instance holding nothing is reported by shutdown', async () => {
+    const pool = new InstancePool<Fake>();
+    const held = await holding(pool);
+    held.failDispose = true;
+    held.set(false);
+    await tick();
     expect(pool.size()).toBe(0);
+    expect(await pool.shutdown()).toEqual([
+      `${held.stateHandle}: listener still up`,
+    ]);
   });
 
   it('a fresh instance whose disposal fails is retained and retried at shutdown', async () => {
@@ -451,17 +473,17 @@ describe('InstancePool', () => {
     expect(viaNew).toBe(held);
   });
 
-  it('a rotation outside a request, on an instance kept after a failed disposal, re-keys the index', async () => {
+  it('a rotation outside a request, on an instance whose disposal failed, routes neither handle to it', async () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
     const old = held.stateHandle;
     held.failDispose = true;
     held.state.endWhenEmpty();
-    held.set(false); // empties: rotates; eviction fails, the instance stays
+    held.set(false); // empties: rotates; eviction fails, the instance is retained only
     await tick();
-    expect(pool.size()).toBe(1);
+    expect(pool.size()).toBe(0);
     expect(held.stateHandle).not.toBe(old);
-    expect((pool as any).index.has(old)).toBe(false);
+    expect((pool as any).index.size).toBe(0);
     let got!: Fake;
     await pool.serve({ handle: old, owner: 'A' }, create, async (i) => {
       got = i;

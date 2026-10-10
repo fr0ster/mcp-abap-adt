@@ -281,7 +281,13 @@ export class InstancePool<T extends Poolable> {
         }
       } catch (e) {
         this.failed.set(instance, `${instance.stateHandle}: ${messageOf(e)}`);
-        this.retained.add(instance); // fresh or held: kept for a retry
+        this.retained.add(instance); // fresh or held: kept for shutdown's retry
+        if (!instance.holdsState()) {
+          // Nothing left to route to or list: out of the index, the count and
+          // the peers; only `retained` keeps it, for the retry.
+          this.drop(instance);
+          this.releaseSlots(instance);
+        }
       } finally {
         this.evicting.delete(instance);
         done();
@@ -306,9 +312,11 @@ export class InstancePool<T extends Poolable> {
     // cleanup finishing on its own.
     await Promise.allSettled(owned.map((i) => i.state.settled()));
     for (const instance of owned) {
+      // Clean: nothing held and no failure left (a later eviction cleared it).
+      if (!instance.holdsState() && !this.failed.has(instance)) continue;
       this.failed.delete(instance);
-      if (!instance.holdsState()) continue;
-      await this.evict(instance); // what is still held after settling: once more
+      // Still held, or a disposal that threw: once more, and what that leaves is reported.
+      await this.evict(instance);
       await instance.state.settled();
       if (instance.holdsState() && !this.failed.has(instance)) {
         const left = instance.state.failures().join('; ');

@@ -3,11 +3,12 @@
  * a connection built from those credentials — never a claim read from them.
  */
 const connect = jest.fn(async () => {});
+const disconnect = jest.fn(async () => {});
 const built: Array<{ settings: unknown }> = [];
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: (settings: unknown) => {
     built.push({ settings });
-    return { connect };
+    return { connect, disconnect };
   },
 }));
 const getSystemInformation = jest.fn();
@@ -16,6 +17,7 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 }));
 
 import { connectedUserOf } from '../../../lib/auth/connectedUser';
+import { logger } from '../../../lib/logger';
 
 const headers = {
   'x-sap-url': 'https://sap.invalid',
@@ -26,6 +28,8 @@ const headers = {
 describe('connectedUserOf', () => {
   beforeEach(() => {
     connect.mockClear();
+    disconnect.mockReset();
+    disconnect.mockResolvedValue(undefined);
     getSystemInformation.mockReset();
     built.length = 0;
   });
@@ -34,6 +38,7 @@ describe('connectedUserOf', () => {
     getSystemInformation.mockResolvedValue({ userName: 'SAPUSER01' });
     expect(await connectedUserOf(headers)).toBe('SAPUSER01');
     expect(connect).toHaveBeenCalledTimes(1);
+    expect(disconnect).toHaveBeenCalledTimes(1);
     expect(built[0].settings).toMatchObject({
       url: 'https://sap.invalid',
       client: '100',
@@ -46,11 +51,30 @@ describe('connectedUserOf', () => {
     expect(await connectedUserOf(headers)).toBeUndefined();
     getSystemInformation.mockResolvedValue({ userName: '' });
     expect(await connectedUserOf(headers)).toBeUndefined();
+    expect(disconnect).toHaveBeenCalledTimes(2);
   });
 
   it('a credential SAP refuses rejects', async () => {
     connect.mockRejectedValueOnce(new Error('401'));
     await expect(connectedUserOf(headers)).rejects.toThrow('401');
     expect(getSystemInformation).not.toHaveBeenCalled();
+    expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('a lookup that throws still closes its session, and the caller gets the lookup failure', async () => {
+    getSystemInformation.mockRejectedValue(new Error('500'));
+    await expect(connectedUserOf(headers)).rejects.toThrow('500');
+    expect(disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('a close that fails is logged by its class, never thrown over the answer', async () => {
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    disconnect.mockRejectedValue(new TypeError('SAPUSER01 secret'));
+    getSystemInformation.mockResolvedValue({ userName: 'SAPUSER01' });
+    expect(await connectedUserOf(headers)).toBe('SAPUSER01');
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(String(warn.mock.calls[0][0])).toContain('TypeError');
+    expect(String(warn.mock.calls[0][0])).not.toContain('secret');
+    warn.mockRestore();
   });
 });

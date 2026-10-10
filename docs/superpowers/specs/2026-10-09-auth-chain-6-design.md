@@ -1239,13 +1239,20 @@ request like any request.
 | D27, D47 | "server text" is an authorization server's or IdP's; ADT's own authorization errors reach the client as ADT errors |
 | D39 | `--transport` removed entirely, refused naming the binary to use |
 | §3.1 | the prerequisites on the current lines, after the debugger releases; the goal's *Out of scope* names them; connection is 15.0.0, a major, no compatibility shim |
+| D30 (contract), 2026-10-10 | auth-broker 5.1.0 binds a handed-over credential **only when its session holds no binding at all** (`issuedFor` and `issuedBy` both absent); a present, different binding stays refused, as in 5.0.1 |
+| — , 2026-10-10 | **this spec is approved**; the plan is written against it |
 
-**Questions for the user** (the spec is written on each recommendation):
+**Settled by the registry, not a decision** (2026-10-10, `npm view`): the version numbers §3.1, §3.3
+and §13 assumed for two prerequisites were taken by other releases the same day —
+`@mcp-abap-adt/interfaces-adt` 13.2.0 (the service binding's atoms), and `@mcp-abap-adt/adt-clients`
+26.0.0, 26.1.0 and 27.0.0 (the debugger line, then a major). The prerequisites keep their contracts
+and take **the next free minor on the current line** when each is released — today
+interfaces-adt 13.3.0 and adt-clients 27.1.0; interfaces-adt-connection 2.1.0 and connection 15.0.0
+are still free. Wherever this spec names interfaces-adt 13.2.0, adt-clients 25.1.0, 26.0.0 or 26.1.0
+as a prerequisite, read that release; the plan checks each number with `npm view` before it is
+used.
 
-| # | Question | Recommendation |
-|---|---|---|
-| 1 | D30, auth-broker 5.1.0's contract: bind a handed-over credential only when its session holds **no** binding at all; a present, different binding stays refused | yes — the one case 5.0.1 refuses that a user meets on upgrade, without opening the copy-to-another-destination hole the binding exists for |
-| 2 | §3.1: the adt-clients debugger release is assumed to be **26.0.0** (a major for the interfaces-adt 13 move) and this change's adt-clients release 26.1.0 on top | confirm the numbers with the debugger PR's release |
+**Questions for the user**: none open.
 
 **Possible later improvements**, each its own change in its repository: auth-stores
 `EnvDestinationStore.fromContent` / key stores `fromKey` (projections from content read once); the

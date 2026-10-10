@@ -86,9 +86,18 @@ handlers through their context; the handlers are thin over it.
 - **AMDP, separately** — its own pair of connections (the event session and the
   command session) and the current `mainId`; one AMDP session at a time.
 
-**Which transports carry it — and what this PR ships.** stdio (`@mcp-abap-adt/core`): one instance per process holds the live state; the handle is still returned and checked, so the tools' contract is the same everywhere. **This PR ships lib, stdio core and compact over stdio.** Our HTTP/SSE transports build an instance per request: there the `debug` set is refused at startup, with a message naming stdio. The pool of MCP instances (D9) goes into the HTTP package that #287 splits out (`@mcp-abap-adt/http`), after it lands — tracked on #287. An embedder that builds an instance per request keeps a pool in its own host, or the debug state does not survive between its calls — its choice.
+**Which transports carry it — and what this PR ships** (decided 2026-10-10). One instance holds the live state on every transport; what differs is who keeps the instance between tool calls:
 
-**Shutdown** (stdin closed, signal, `DebugStop`, or the host dropping the
+| Transport | Who keeps the instance | Added here |
+|---|---|---|
+| stdio (`@mcp-abap-adt/core`) | the process | dispose on shutdown |
+| SSE | the SSE session: one `BaseMcpServer` per GET connection, its POSTs routed by `sessionId` (already so) | `dispose()` when the session closes |
+| Streamable HTTP | `InstancePool` in `server/src`: per request (= per stateless MCP session) the host takes the instance once — the one a `tools/call`'s `debug_session` names, after the owner check, or a new one; after the response it keeps the instance if `holdsState()`, else disposes it. One transport at a time per instance (a lease); a batch carrying `debug_session` is refused | the pool, the lease, the shutdown order |
+| embedded (`EmbeddableMcpServer`) | the embedder's host | nothing; its choice |
+
+SSE stays (its removal in #287 is cancelled, 2026-10-10). `InstancePool` is transport-agnostic, so #287 moves it with the HTTP transport into its package.
+
+**Shutdown** (stdin closed, signal, `DebugStop`, an SSE session closed, or the host dropping the
 instance): breakpoints deleted, the listener stopped, a current debuggee
 released, every connection closed. A cleanup that fails is reported, not
 claimed as success.

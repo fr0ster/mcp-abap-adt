@@ -1,6 +1,6 @@
 # Debugger tools — design
 
-**Status:** approved in conversation 2026-10-10, awaiting review of this text.
+**Status:** approved in conversation 2026-10-10; revised the same day after review (no timeouts, state per server instance, ids in the constructor, descriptions and answers).
 **Builds on:** `@mcp-abap-adt/adt-clients` 27.0.0 (`AbapDebugger`, `AmdpDebugger`,
 `MemorySnapshots`), `@mcp-abap-adt/adt-strategies` 0.8.1 (`analyseDebuggeeEnd`),
 `@mcp-abap-adt/interfaces-adt` 13.2.0 (`IAbapDebugger`, `IAmdpDebugger`,
@@ -21,10 +21,10 @@ The library already does every request (measured on premise, SAP_BASIS 758 and
 
 | # | Decision |
 |---|---|
-| D1 | **One MCP server = one user session** (one connection to the SAP system it exposes). Debugger state lives in the server process; no per-user registry, no session handles in tool arguments. Every session from the server to ABAP is exclusive to that server instance — the listener's and the stop's connections included; the rest is the MCP standard's. What only the consumer controls — opening parallel sessions, several servers for the same SAP user — is not ours to manage: the user's responsibility. SAP's listener conflict is caught and returned to the user as a tool error carrying SAP's message; nothing more is done about it. |
+| D1 | **One MCP server = one user session** (one connection to the SAP system it exposes). Debugger state lives in the server instance (passed to the handlers through their context, never a module global — one process may hold several instances); no per-user registry, no session handles in tool arguments. Every session from the server to ABAP is exclusive to that server instance — the listener's and the stop's connections included; the rest is the MCP standard's. What only the consumer controls — opening parallel sessions, several servers for the same SAP user — is not ours to manage: the user's responsibility. SAP's listener conflict is caught and returned to the user as a tool error carrying SAP's message; nothing more is done about it. |
 | D2 | **Both scenarios**: the model starts the program, or someone else does. The listener lives in the background; the model asks whether something was caught. |
 | D3 | **Attach automatically** when the listener catches a debuggee: a debuggee is attachable only while it waits, and seconds between two model calls can lose it. |
-| D4 | **Idle timeout 5 minutes**: an attached debuggee no tool call has touched for 5 minutes is let go (`stepContinue`), so a suspended request of someone else does not hang until its session dies. |
+| D4 | **No timeouts** (decided 2026-10-10, replacing a 5-minute idle release). Nothing ends on the server's clock: a stop holds until a step, a termination, `DebugStop`, the server's shutdown, or the SAP system ends it. The user or the backend ends a session; measuring time is not the server's job. Waits inside one call (the listener's long poll, `DebugWait`'s hold) end nothing. |
 | D5 | **One debuggee at a time.** While one is attached the listener stands; it resumes when that one is released. |
 | D6 | **Refuse or take over** are two core tools, not a parameter (decided 2026-10-09); in compact a flag. |
 | D7 | **Compact: four verb tools**, `HandlerDebugStart`, `HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`, with `kind: abap|amdp`. |
@@ -32,8 +32,9 @@ The library already does every request (measured on premise, SAP_BASIS 758 and
 
 ## 1. Architecture: where the state lives
 
-A new module `src/lib/debugger/` holds one `DebugSession` per process (D1), and
-the handlers are thin over it.
+A new module `src/lib/debugger/` holds the `DebugSession` and `AmdpSession`
+classes. Each server instance constructs its own pair (D1) and hands it to the
+handlers through their context; the handlers are thin over it.
 
 `DebugSession` owns:
 
@@ -50,6 +51,9 @@ the handlers are thin over it.
   its own. The cost: breakpoints of an instance that dies without cleaning up
   stay under an identity nobody recreates, which is why shutdown cleanup is
   required, not best effort.
+
+  The ids are given to `DebugSession`'s **constructor** when the instance is
+  built — never tool arguments, never part of a tool's contract.
 
   **The user may set them.** `SAP_DEBUG_TERMINAL_ID` and `SAP_DEBUG_IDE_ID`
   (the destination's `.env` or the process environment, for stdio), or over HTTP
@@ -70,9 +74,6 @@ the handlers are thin over it.
   current stop.
 - **the current stop** (D3, D5) — on a catch: a new stateful connection, `attach`
   with the debuggee's server (`saplb`), the stack read; the listener stands.
-- **the idle timer** (D4) — reset by every tool call that touches the stop; on
-  expiry `step('stepContinue', {analyse: analyseDebuggeeEnd})`, the stop's
-  connection closed, the listener resumed.
 - **a background run** — when the starting tool names a class or a report, it is
   run on a connection of its own; its outcome (output or failure) is kept for
   `Wait` to report as `ended`.
@@ -183,17 +184,25 @@ SQLScript line.
 is the server's job. Every tool takes `detail`, as the others do:
 
 - `terse` (default):
-  - `stopped` → program, include, line, the top 5 frames;
+  - `stopped` → where it stands (object address and technical place), the top 5 frames, each just as precise;
   - variables → `{name, type, value}`; a table's rows as an array;
   - memory → the two or three numbers that matter (dynamic objects, total);
-  - an AMDP event → its kind, line, variables.
+  - an AMDP event → its kind, line, variables, and for `ON_BREAK` the stack.
 - `full` — every field, the whole stack.
 - `raw` — SAP's document as it came, for diagnosis.
 
-**Descriptions** name nothing concrete (CLAUDE.md, "What we write names nothing
-concrete"). The description of every tool that sets breakpoints or starts a
-listener says that user-mode debugging catches every request of that SAP user,
-and that taking over displaces another debugger, such as an IDE.
+**Descriptions** describe the tool's function, never its use (no other tool's
+name, no workflow), as informative and as short as possible, in the domain's
+general terms rather than a list of answer fields, and name nothing concrete
+(CLAUDE.md, "What we write names nothing concrete"). Every tool that sets
+breakpoints or starts a listener says, as a fact of its function, that user-mode
+debugging catches every request of the connected SAP user; the take-over tools
+say they displace another debugger of that user.
+
+**Answers** carry the most precise information there is: at a stop both the
+object address (type, name, unit of code, line in the object's source — the
+address a breakpoint takes) and SAP's technical place (program, include, include
+line, event).
 
 ## 4. Tests and release
 
@@ -202,7 +211,7 @@ and that taking over displaces another debugger, such as an IDE.
 - `DebugSession` as a state machine, with `AbapDebugger`/`AmdpDebugger` factories
   injected as fakes and fake timers:
   - listening → caught → attached, the listener standing;
-  - 5 minutes idle → `stepContinue` → listening again;
+  - a stop holds with no timer; only a step, termination, `DebugStop` or shutdown ends it;
   - a conflict at the start fails the start tool, a later one fails the next `Wait`; the listener is not restarted;
   - `debuggeeEnded` ends the stop, not as an error;
   - a background run ends as `ended` with its output;
@@ -233,7 +242,7 @@ An IDE debugging the same SAP user must be closed during these runs.
   registry entries, per the release checklist.
 - Compact grows from 25 to 29 tools; its tool-count and tool-list tests follow.
 - Docs: README (tool list, the `debug` set), a debugger page under `docs/` (the
-  two sessions, the idle timeout, the user-mode warning), CHANGELOG.
+  two sessions, no timeouts, the user-mode warning), CHANGELOG.
 - **#287** (auth chain 6) makes core a stdio server; the debugger lives in core
   and fits it, and the `debug` set survives the split.
 

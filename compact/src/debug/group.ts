@@ -9,7 +9,7 @@
  */
 import {
   BaseHandlerGroup,
-  type HandlerContext,
+  defineTool,
   type HandlerEntry,
 } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -29,32 +29,17 @@ import {
   handleHandlerDebugWait,
 } from './handleHandlerDebugWait';
 
-/** Built against a live context, as the other compact halves are. */
-export function compactDebugEntries(
-  getContext: () => HandlerContext,
-): HandlerEntry[] {
-  const withContext = <TArgs, TResult>(
-    handler: (context: HandlerContext, args: TArgs) => TResult,
-  ) => {
-    return (args: unknown) => handler(getContext(), args as TArgs);
-  };
+/**
+ * The four verbs, each paired with its handler by `defineTool`: the compiler
+ * checks that a handler takes what its schema declares. Every registration path
+ * hands a `(context, args)` handler the call's context.
+ */
+export function compactDebugEntries(): HandlerEntry[] {
   return [
-    {
-      toolDefinition: HandlerDebugStart_Tool,
-      handler: withContext(handleHandlerDebugStart),
-    },
-    {
-      toolDefinition: HandlerDebugWait_Tool,
-      handler: withContext(handleHandlerDebugWait),
-    },
-    {
-      toolDefinition: HandlerDebugView_Tool,
-      handler: withContext(handleHandlerDebugView),
-    },
-    {
-      toolDefinition: HandlerDebugStep_Tool,
-      handler: withContext(handleHandlerDebugStep),
-    },
+    defineTool(HandlerDebugStart_Tool, handleHandlerDebugStart),
+    defineTool(HandlerDebugWait_Tool, handleHandlerDebugWait),
+    defineTool(HandlerDebugView_Tool, handleHandlerDebugView),
+    defineTool(HandlerDebugStep_Tool, handleHandlerDebugStep),
   ];
 }
 
@@ -62,6 +47,6 @@ export class CompactDebugHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'CompactDebugHandlers';
 
   getHandlers(): HandlerEntry[] {
-    return compactDebugEntries(() => this.context);
+    return compactDebugEntries();
   }
 }

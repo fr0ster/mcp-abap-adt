@@ -48,7 +48,7 @@ describe('the compact tool surface', () => {
   const current = [
     ...compactReadOnlyEntries(context),
     ...compactModifyEntries(context),
-    ...compactDebugEntries(context),
+    ...compactDebugEntries(),
   ].map((entry) => ({
     group: 'compact',
     name: entry.toolDefinition.name,

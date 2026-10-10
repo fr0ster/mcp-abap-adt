@@ -18,7 +18,7 @@ interface VerbArgs {
 import { parseCompactDebug, parseCompactExposition } from '../launcher';
 
 describe('compact debug', () => {
-  const entries = compactDebugEntries(() => ({}) as never);
+  const entries = compactDebugEntries();
   it('four verb tools', () => {
     expect(entries.map((e) => e.toolDefinition.name).sort()).toEqual([
       'HandlerDebugStart',
@@ -225,10 +225,12 @@ function install() {
   const context = { connection: {}, state, debugger: () => instance } as any;
   const call = <K extends keyof VerbArgs>(name: K, args: VerbArgs[K]) =>
     (
-      compactDebugEntries(() => context).find(
-        (e) => e.toolDefinition.name === name,
-      )!.handler as unknown as (args: VerbArgs[K]) => Promise<any>
-    )(args);
+      compactDebugEntries().find((e) => e.toolDefinition.name === name)!
+        .handler as unknown as (
+        context: unknown,
+        args: VerbArgs[K],
+      ) => Promise<any>
+    )(context, args);
   return {
     state,
     call,

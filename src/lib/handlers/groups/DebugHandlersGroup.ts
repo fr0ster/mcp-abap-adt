@@ -119,7 +119,7 @@ import {
   TOOL_DEFINITION as MemorySnapshotList_Tool,
 } from '../../../handlers/debugger/debug/handleMemorySnapshotList';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
-import type { HandlerEntry } from '../interfaces.js';
+import { defineTool, type HandlerEntry } from '../interfaces.js';
 
 /**
  * The debugger tools — opt-in (`--exposition=…,debug`): a breakpoint catches
@@ -131,128 +131,39 @@ export class DebugHandlersGroup extends BaseHandlerGroup {
 
   getHandlers(): HandlerEntry[] {
     return [
-      {
-        toolDefinition: DebugStartListener_Tool,
-        handler: (args: any) => handleDebugStartListener(this.context, args),
-      },
-      {
-        toolDefinition: DebugTakeOverListener_Tool,
-        handler: (args: any) => handleDebugTakeOverListener(this.context, args),
-      },
-      {
-        toolDefinition: DebugWait_Tool,
-        handler: (args: any) => handleDebugWait(this.context, args),
-      },
-      {
-        toolDefinition: DebugSetBreakpoints_Tool,
-        handler: (args: any) => handleDebugSetBreakpoints(this.context, args),
-      },
-      {
-        toolDefinition: DebugDeleteBreakpoint_Tool,
-        handler: (args: any) => handleDebugDeleteBreakpoint(this.context, args),
-      },
-      {
-        toolDefinition: DebugListBreakpoints_Tool,
-        handler: (args: any) => handleDebugListBreakpoints(this.context, args),
-      },
-      {
-        toolDefinition: DebugGetStack_Tool,
-        handler: (args: any) => handleDebugGetStack(this.context, args),
-      },
-      {
-        toolDefinition: DebugSetStackPosition_Tool,
-        handler: (args: any) => handleDebugSetStackPosition(this.context, args),
-      },
-      {
-        toolDefinition: DebugGetVariables_Tool,
-        handler: (args: any) => handleDebugGetVariables(this.context, args),
-      },
-      {
-        toolDefinition: DebugSetVariable_Tool,
-        handler: (args: any) => handleDebugSetVariable(this.context, args),
-      },
-      {
-        toolDefinition: DebugStep_Tool,
-        handler: (args: any) => handleDebugStep(this.context, args),
-      },
-      {
-        toolDefinition: DebugStepToLine_Tool,
-        handler: (args: any) => handleDebugStepToLine(this.context, args),
-      },
-      {
-        toolDefinition: DebugTerminate_Tool,
-        handler: (args: any) => handleDebugTerminate(this.context, args),
-      },
-      {
-        toolDefinition: DebugCreateWatchpoint_Tool,
-        handler: (args: any) => handleDebugCreateWatchpoint(this.context, args),
-      },
-      {
-        toolDefinition: DebugListWatchpoints_Tool,
-        handler: (args: any) => handleDebugListWatchpoints(this.context, args),
-      },
-      {
-        toolDefinition: DebugDeleteWatchpoint_Tool,
-        handler: (args: any) => handleDebugDeleteWatchpoint(this.context, args),
-      },
-      {
-        toolDefinition: DebugGetMemorySizes_Tool,
-        handler: (args: any) => handleDebugGetMemorySizes(this.context, args),
-      },
-      {
-        toolDefinition: DebugCreateMemorySnapshot_Tool,
-        handler: (args: any) =>
-          handleDebugCreateMemorySnapshot(this.context, args),
-      },
-      {
-        toolDefinition: DebugStop_Tool,
-        handler: (args: any) => handleDebugStop(this.context, args),
-      },
-      {
-        toolDefinition: DebugListSessions_Tool,
-        handler: (args: any) => handleDebugListSessions(this.context, args),
-      },
-      {
-        toolDefinition: AmdpDebugStart_Tool,
-        handler: (args: any) => handleAmdpDebugStart(this.context, args),
-      },
-      {
-        toolDefinition: AmdpDebugSetBreakpoints_Tool,
-        handler: (args: any) =>
-          handleAmdpDebugSetBreakpoints(this.context, args),
-      },
-      {
-        toolDefinition: AmdpDebugWait_Tool,
-        handler: (args: any) => handleAmdpDebugWait(this.context, args),
-      },
-      {
-        toolDefinition: AmdpDebugStep_Tool,
-        handler: (args: any) => handleAmdpDebugStep(this.context, args),
-      },
-      {
-        toolDefinition: AmdpDebugGetTable_Tool,
-        handler: (args: any) => handleAmdpDebugGetTable(this.context, args),
-      },
-      {
-        toolDefinition: AmdpDebugCancel_Tool,
-        handler: (args: any) => handleAmdpDebugCancel(this.context, args),
-      },
-      {
-        toolDefinition: AmdpDebugStop_Tool,
-        handler: (args: any) => handleAmdpDebugStop(this.context, args),
-      },
-      {
-        toolDefinition: MemorySnapshotList_Tool,
-        handler: (args: any) => handleMemorySnapshotList(this.context, args),
-      },
-      {
-        toolDefinition: MemorySnapshotGet_Tool,
-        handler: (args: any) => handleMemorySnapshotGet(this.context, args),
-      },
-      {
-        toolDefinition: MemorySnapshotDelta_Tool,
-        handler: (args: any) => handleMemorySnapshotDelta(this.context, args),
-      },
+      defineTool(DebugStartListener_Tool, handleDebugStartListener),
+      defineTool(DebugTakeOverListener_Tool, handleDebugTakeOverListener),
+      defineTool(DebugWait_Tool, handleDebugWait),
+      defineTool(DebugSetBreakpoints_Tool, handleDebugSetBreakpoints),
+      defineTool(DebugDeleteBreakpoint_Tool, handleDebugDeleteBreakpoint),
+      defineTool(DebugListBreakpoints_Tool, handleDebugListBreakpoints),
+      defineTool(DebugGetStack_Tool, handleDebugGetStack),
+      defineTool(DebugSetStackPosition_Tool, handleDebugSetStackPosition),
+      defineTool(DebugGetVariables_Tool, handleDebugGetVariables),
+      defineTool(DebugSetVariable_Tool, handleDebugSetVariable),
+      defineTool(DebugStep_Tool, handleDebugStep),
+      defineTool(DebugStepToLine_Tool, handleDebugStepToLine),
+      defineTool(DebugTerminate_Tool, handleDebugTerminate),
+      defineTool(DebugCreateWatchpoint_Tool, handleDebugCreateWatchpoint),
+      defineTool(DebugListWatchpoints_Tool, handleDebugListWatchpoints),
+      defineTool(DebugDeleteWatchpoint_Tool, handleDebugDeleteWatchpoint),
+      defineTool(DebugGetMemorySizes_Tool, handleDebugGetMemorySizes),
+      defineTool(
+        DebugCreateMemorySnapshot_Tool,
+        handleDebugCreateMemorySnapshot,
+      ),
+      defineTool(DebugStop_Tool, handleDebugStop),
+      defineTool(DebugListSessions_Tool, handleDebugListSessions),
+      defineTool(AmdpDebugStart_Tool, handleAmdpDebugStart),
+      defineTool(AmdpDebugSetBreakpoints_Tool, handleAmdpDebugSetBreakpoints),
+      defineTool(AmdpDebugWait_Tool, handleAmdpDebugWait),
+      defineTool(AmdpDebugStep_Tool, handleAmdpDebugStep),
+      defineTool(AmdpDebugGetTable_Tool, handleAmdpDebugGetTable),
+      defineTool(AmdpDebugCancel_Tool, handleAmdpDebugCancel),
+      defineTool(AmdpDebugStop_Tool, handleAmdpDebugStop),
+      defineTool(MemorySnapshotList_Tool, handleMemorySnapshotList),
+      defineTool(MemorySnapshotGet_Tool, handleMemorySnapshotGet),
+      defineTool(MemorySnapshotDelta_Tool, handleMemorySnapshotDelta),
     ];
   }
 }

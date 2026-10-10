@@ -189,11 +189,14 @@ const AMDP_OUTPUT = 'total 6 steps 3 rows 3';
 // --- the record ---------------------------------------------------------------------
 
 const say = (line: string) => process.stderr.write(`${line}\n`);
+/** A state handle is a bearer secret: it never reaches a log, a test's included. */
+const withoutHandles = (text: string) =>
+  text.replace(/("state_handle"\s*:\s*")[^"]*"/g, '$1<handle>"');
 const measure = (kase: string, asked: string, answered: unknown) =>
   say(
-    `MEASURE ${kase} | ${asked} | ${
-      typeof answered === 'string' ? answered : JSON.stringify(answered)
-    }`,
+    `MEASURE ${kase} | ${asked} | ${withoutHandles(
+      typeof answered === 'string' ? answered : JSON.stringify(answered),
+    )}`,
   );
 const timing = (step: string, ms: number) =>
   say(`TIMING ${step} ${Math.round(ms)}`);

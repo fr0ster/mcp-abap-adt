@@ -6,7 +6,11 @@ import type {
 } from '@mcp-abap-adt/interfaces-auth';
 import { SettingsError } from '@mcp-abap-adt/lib/auth';
 import { UnsupportedAuthenticationError } from '../../auth/destinationFailure';
-import { type AuthHandlerContext, handlerFor } from '../../auth/handlers';
+import {
+  type AuthHandlerContext,
+  HANDLERS,
+  handlerFor,
+} from '../../auth/handlers';
 import type { LoginStrategyOptions } from '../../auth/IAuthBrokerFactoryConfig';
 
 const BROWSER: IBrowser = { open: async () => {} };
@@ -42,7 +46,6 @@ describe('handlerFor', () => {
     [{ authType: 'basic' as const }],
     [{ authType: 'snc' as const }],
     [{ authType: 'jwt' as const, grantType: 'authorization_code' as const }],
-    [{ authType: 'jwt' as const, grantType: 'none' as const }],
   ])('finds the handler for %j', (vetted) => {
     const h = handlerFor('dest', vetted);
     expect(h.authType).toBe(vetted.authType);
@@ -53,6 +56,7 @@ describe('handlerFor', () => {
     [{ authType: 'saml' as const, grantType: 'saml2_bearer' as const }],
     [{ authType: 'jwt' as const, grantType: 'passcode' as const }],
     [{ authType: 'jwt' as const, grantType: 'client_credentials' as const }],
+    [{ authType: 'jwt' as const, grantType: 'none' as const }],
   ])('refuses %j, naming destination, type and grant', (vetted) => {
     let err: unknown;
     try {
@@ -67,6 +71,16 @@ describe('handlerFor', () => {
     expect(u.grantType).toBe(vetted.grantType);
     expect(u.message).toContain('dest');
     expect(u.message).toContain(vetted.grantType);
+  });
+});
+
+describe('jwt / none (D53)', () => {
+  it('is refused like any authentication not in the table: three handlers', () => {
+    expect(HANDLERS.map((h) => `${h.authType}/${h.grantType ?? ''}`)).toEqual([
+      'basic/',
+      'snc/',
+      'jwt/authorization_code',
+    ]);
   });
 });
 
@@ -91,13 +105,12 @@ describe('certificate and kerberos', () => {
 });
 
 describe('brokerOptions', () => {
-  it.each([
-    [{ authType: 'basic' as const }],
-    [{ authType: 'snc' as const }],
-    [{ authType: 'jwt' as const, grantType: 'none' as const }],
-  ])('%j adds nothing', (vetted) => {
-    expect(handlerFor('d', vetted).brokerOptions(context().ctx)).toEqual({});
-  });
+  it.each([[{ authType: 'basic' as const }], [{ authType: 'snc' as const }]])(
+    '%j adds nothing',
+    (vetted) => {
+      expect(handlerFor('d', vetted).brokerOptions(context().ctx)).toEqual({});
+    },
+  );
 
   it('jwt / authorization_code returns exactly `authorization`: serverLogin over the context browser and port', async () => {
     const { ctx, calls, recorded, requests } = context({
@@ -186,12 +199,9 @@ describe('snc.checkSettings', () => {
       ),
     ).not.toThrow();
   });
-  it('basic, jwt / none have no checkSettings', () => {
+  it('basic has no checkSettings', () => {
     expect(
       handlerFor('d', { authType: 'basic' }).checkSettings,
-    ).toBeUndefined();
-    expect(
-      handlerFor('d', { authType: 'jwt', grantType: 'none' }).checkSettings,
     ).toBeUndefined();
   });
 });

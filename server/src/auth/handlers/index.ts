@@ -1,13 +1,16 @@
 /**
- * The authentications this server supports — exactly these four. Adding one
- * means a handler here, the docs' table and a test; nothing else.
+ * The authentications this server supports — exactly these three: `basic`,
+ * `snc` and `jwt` / `authorization_code`. Adding one means a handler here, the
+ * docs' table and a test; nothing else. `jwt` / `none` (a token you hold) is
+ * not one (D53): it is refused like any authentication not here, and the
+ * refusal says where it went — the `x-sap-jwt-token` header of
+ * `mcp-abap-adt-http` / `mcp-abap-adt-sse`.
  */
 
 import { UnsupportedAuthenticationError } from '../destinationFailure';
 import type { VettedAuthentication } from '../vocabulary';
 import { basicHandler } from './basic';
 import { jwtAuthorizationCodeHandler } from './jwtAuthorizationCode';
-import { jwtNoneHandler } from './jwtNone';
 import { sncHandler } from './snc';
 import type { AuthenticationHandler } from './types.js';
 
@@ -17,7 +20,6 @@ export const HANDLERS: readonly AuthenticationHandler[] = [
   basicHandler,
   sncHandler,
   jwtAuthorizationCodeHandler,
-  jwtNoneHandler,
 ];
 
 const keyOf = (authType: string, grantType?: string) =>

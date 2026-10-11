@@ -21,6 +21,7 @@ export {
   destinationFailureOf,
   destinationFailureWords,
   HINTS,
+  JWT_NONE_HINT,
   UnsupportedAuthenticationError,
 } from './destinationFailure';
 export type {

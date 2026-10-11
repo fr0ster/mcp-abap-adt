@@ -80,7 +80,7 @@ The server supports exactly four authentications; each is a destination stated i
 | Basic (HTTP or RFC) | `SAP_AUTH_TYPE=basic`, `SAP_USERNAME`, `SAP_PASSWORD` |
 | SNC (RFC only, passwordless) | `SAP_AUTH_TYPE=snc`, `SAP_SNC_PARTNERNAME`, optional `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` — no user, no password |
 | JWT, browser login | `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=authorization_code`, a service key (ABAP or XSUAA) or `SAP_UAA_*` |
-| JWT you hold | `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN` (or the `x-sap-jwt-token` header) |
+| JWT you hold | the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse` (stdio serves none) |
 
 A `jwt` `.env` must state `SAP_GRANT_TYPE`. The `mcp-auth` command that writes such a `.env` comes from
 `@mcp-abap-adt/auth-broker-cli`. The browser login listens on port `61001` unless `--browser-auth-port` says otherwise.
@@ -339,14 +339,9 @@ SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 ```
 
-For a JWT you already hold (SAP BTP):
-```bash
-SAP_URL=https://your-btp-system.example
-SAP_CLIENT=100
-SAP_AUTH_TYPE=jwt
-SAP_GRANT_TYPE=none
-SAP_JWT_TOKEN=your-jwt-token
-```
+A JWT you already hold is not served over stdio: send it in the `x-sap-jwt-token` header to
+`mcp-abap-adt-http` or `mcp-abap-adt-sse` (`@mcp-abap-adt/http`, `@mcp-abap-adt/sse`), or create
+the session with `mcp-auth`.
 
 For RFC connection:
 ```bash

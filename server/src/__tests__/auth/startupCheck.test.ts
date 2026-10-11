@@ -119,8 +119,8 @@ describe('the startup check', () => {
   });
 
   describe('a platform with no browser (§8): only a destination that logs in is refused', () => {
-    // basic stands for every destination that never logs in; jwt / none is
-    // refused by broker 5.0.1 for its unbound token (M8) until C1.
+    // basic stands for every destination that never logs in (jwt / none is
+    // not served over stdio, D53).
     it('basic starts on freebsd with the default --browser', async () => {
       const file = base.writeFile('conn.env', basicLines());
       const { exits, stderr } = await run(

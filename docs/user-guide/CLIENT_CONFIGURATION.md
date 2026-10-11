@@ -226,13 +226,9 @@ npx -y @mcp-abap-adt/core --transport=http --port=3000 --env-path=/path/to/<dest
 
 The connection lives in a `.env` file the server is told about (`--env-path`, `--env` or `--mcp`). Of that file only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE` and `SAP_LANGUAGE` reach the process environment; process-level settings (`NODE_EXTRA_CA_CERTS`, `SAP_SYSNR`, `PATH` for the RFC SDK on Windows) belong in the shell or the MCP client's `env` block.
 
-**For a JWT you hold:**
-```env
-SAP_URL=https://your-sap-system.example
-SAP_AUTH_TYPE=jwt
-SAP_GRANT_TYPE=none
-SAP_JWT_TOKEN=your_jwt_token_here
-```
+**A JWT you hold** is not served over stdio (18.0.0): send it in the `x-sap-jwt-token` header to
+`mcp-abap-adt-http` or `mcp-abap-adt-sse`, or create the session with `mcp-auth`. A `.env` stating
+`SAP_GRANT_TYPE=none` is refused at startup, saying so.
 
 **For JWT with browser login** (the server obtains and renews the token; no token in the file at first):
 ```env
@@ -475,7 +471,7 @@ For Server-Sent Events transport, the configuration is similar:
 
 ### Token Refresh
 
-A destination with browser login renews its token itself: with the refresh token first, then a new login if the refresh is refused. A token handed over in `x-sap-jwt-token` or `SAP_JWT_TOKEN` with `SAP_GRANT_TYPE=none` is used as it is; when SAP refuses it the request fails and you hand over a new one (a `.env` change takes effect on restart).
+A destination with browser login renews its token itself: with the refresh token first, then a new login if the refresh is refused. A token handed over in `x-sap-jwt-token` (`mcp-abap-adt-http`, `mcp-abap-adt-sse`) is used as it is; when SAP refuses it the request fails and you hand over a new one (a `.env` change takes effect on restart).
 
 ## Examples
 

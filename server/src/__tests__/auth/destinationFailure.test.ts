@@ -17,6 +17,7 @@ import {
   destinationFailureOf,
   destinationFailureWords,
   HINTS,
+  JWT_NONE_HINT,
   UnsupportedAuthenticationError,
 } from '../../auth/destinationFailure';
 import { REFRESH_ONLY_SENTENCE } from '../../auth/serverSentences';
@@ -189,7 +190,7 @@ describe('through a real --env file (broker 5.0.1)', () => {
   });
   afterEach(() => base.remove());
 
-  it('jwt / none without SAP_ISSUED_*: refused naming issuedBy, with the binding hint (M8 until C1)', async () => {
+  it('jwt / none (D53): refused as unsupported, with the hint where a token you hold goes', async () => {
     const file = base.writeFile('conn.env', [
       `SAP_URL=${SYSTEM_URL}`,
       'SAP_AUTH_TYPE=jwt',
@@ -207,15 +208,45 @@ describe('through a real --env file (broker 5.0.1)', () => {
     } catch (e) {
       thrown = e;
     }
-    const answer = payload(thrown);
-    expect(answer.error).toBe('destination_refused');
-    expect(String(answer.message)).toMatch(
-      /^Destination "default" cannot be used: .*issuedBy/,
+    expect(payload(thrown)).toEqual({
+      error: 'destination_refused',
+      message:
+        'Destination "default" uses jwt / none, which this server does not support',
+      hint: JWT_NONE_HINT,
+    });
+    expect(JSON.stringify(payload(thrown))).not.toContain(
+      'placeholder-token-value',
     );
-    expect(String(answer.hint)).toContain(ISSUED_HINT);
-    expect(JSON.stringify(answer)).not.toContain('placeholder-token-value');
-    // broker 5.0.1's unbound refusal carries no chain error (C1 changes it).
-    expect(answer).not.toHaveProperty('cause_kind');
+  });
+
+  it("jwt / authorization_code whose SAP_ISSUED_* name another destination's means: not refused — the broker does not use the stored session (measured)", async () => {
+    // The issuedFor / issuedBy refusal and its hint (HINTS, above) answer a
+    // handed-over credential, which no handler of stdio serves any more
+    // (D53). For a grant the provider obtains, broker 5.0.1 discards a
+    // session bound elsewhere and the provider obtains a new one.
+    const warnings: string[] = [];
+    const file = base.writeFile('conn.env', [
+      ...authorizationCodeLines(),
+      'SAP_JWT_TOKEN=placeholder-token-value',
+      'SAP_REFRESH_TOKEN=placeholder-refresh-value',
+      'SAP_ISSUED_FOR=https://other-system.example.test',
+      'SAP_ISSUED_BY=placeholder-record-of-other-means',
+    ]);
+    const factory = new AuthBrokerFactory(
+      factoryConfig(base, recordingLogins(), {
+        envFile: { path: file, source: '--env' },
+        logger: {
+          info: () => {},
+          debug: () => {},
+          error: () => {},
+          warn: (line: string) => warnings.push(line),
+        },
+      }),
+    );
+    await expect(factory.getProvider('default')).resolves.toBeDefined();
+    expect(warnings).toEqual([
+      "[AuthBroker] default: the stored session secret is not recorded as issued under the destination's current means; not used, the provider obtains a new one",
+    ]);
   });
 });
 

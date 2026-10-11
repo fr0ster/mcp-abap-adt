@@ -78,6 +78,13 @@ The packages, all at **18.0.0**:
 - **`mcp-abap-adt` serves stdio only** (`@mcp-abap-adt/core`). `--transport=http` or
   `--transport=sse` stops the start, naming `mcp-abap-adt-http` or `mcp-abap-adt-sse`; core no
   longer depends on `@mcp-abap-adt/http` or `@mcp-abap-adt/sse`.
+- **`jwt` / `none` is no longer served over stdio** (a token you hold: `SAP_AUTH_TYPE=jwt`,
+  `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN`). Such a destination stops the start with `Destination "X"
+  uses jwt / none, which this server does not support` and the hint *a token you hold is sent in the
+  x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the session
+  with mcp-auth*. Send the token in `x-sap-jwt-token` to `mcp-abap-adt-http` / `mcp-abap-adt-sse`,
+  or create the session with `mcp-auth` (a `jwt` / `authorization_code` destination). stdio serves
+  three authentications: `basic`, `snc`, `jwt` / `authorization_code`.
 - **The auth chain is 6.0.** The server runs on `@mcp-abap-adt/auth-broker` 5,
   `@mcp-abap-adt/auth-providers` 6 and `@mcp-abap-adt/auth-stores` 4. Your `.env` files and
   service keys keep working as they are.

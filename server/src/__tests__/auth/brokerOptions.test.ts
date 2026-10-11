@@ -123,18 +123,21 @@ describe('authDebug and authorization', () => {
     ]);
   });
 
-  it('jwt / none: no authorization', async () => {
+  it('jwt / none: refused before any broker is built (D53)', async () => {
     const file = base.writeFile('conn.env', [
       'SAP_URL=https://system.example.test',
       'SAP_AUTH_TYPE=jwt',
       'SAP_GRANT_TYPE=none',
       'SAP_JWT_TOKEN=placeholder-token',
     ]);
-    const config = await brokerConfigOf('default', {
-      envFile: { path: file, source: '--env' },
-    });
-    expect(config.authorization).toBeUndefined();
-    expect(config.authDebug).toBe(false);
+    await expect(
+      brokerConfigOf('default', {
+        envFile: { path: file, source: '--env' },
+      }),
+    ).rejects.toThrow(
+      'Destination "default" uses jwt / none, which this server does not support',
+    );
+    expect(constructed).not.toHaveBeenCalled();
   });
 
   it('jwt / authorization_code: authorization, built from the browser and the port', async () => {

@@ -34,9 +34,20 @@ export class DestinationRefusal extends ServerRefusal {
 }
 
 /**
+ * Where a token you hold went (D53, spec §7.3): the hint of a `jwt` / `none`
+ * destination's refusal.
+ */
+export const JWT_NONE_HINT =
+  'a token you hold is sent in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the session with mcp-auth';
+
+/** The hint of each refusal that has one, recorded when it is built (never read off the value). */
+const UNSUPPORTED_HINTS = new WeakMap<object, string>();
+
+/**
  * A well-formed authentication this server does not serve. `authType` and
  * `grantType` are already vetted names, so quoting them leaks nothing.
- * Answered `destination_refused`.
+ * Answered `destination_refused`; `jwt` / `none` with the hint saying where it
+ * went (`JWT_NONE_HINT`).
  */
 export class UnsupportedAuthenticationError extends ServerRefusal {
   readonly code = 'UNSUPPORTED_AUTHENTICATION' as const;
@@ -58,6 +69,9 @@ export class UnsupportedAuthenticationError extends ServerRefusal {
     this.destination = destination;
     this.authType = authType;
     if (grantType) this.grantType = grantType;
+    if (authType === 'jwt' && grantType === 'none') {
+      UNSUPPORTED_HINTS.set(this, JWT_NONE_HINT);
+    }
   }
 }
 
@@ -144,6 +158,13 @@ export function destinationFailureOf(
     const destination = destinationConfigFailure(thrown, platform);
     if (destination !== undefined) return destination;
     const read = failureOf(thrown);
+    const moved =
+      typeof thrown === 'object' && thrown !== null
+        ? UNSUPPORTED_HINTS.get(thrown)
+        : undefined;
+    if (read !== undefined && moved !== undefined) {
+      return { ...read, hint: moved };
+    }
     if (read?.authError === undefined || read.error !== 'authentication_failed')
       return read;
     const server = options.sentenceFor?.(read.authError);

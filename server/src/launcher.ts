@@ -126,11 +126,13 @@ ENVIRONMENT VARIABLES:
     DEBUG_CONNECTION_MANAGER       Enable connection manager debug logging (true|false)
     HANDLER_LOG_SILENT             Disable all handler logs (true|false)
 
-AUTHENTICATIONS (exactly four; a .env or service key stating another is refused):
+AUTHENTICATIONS (exactly three; a .env or service key stating another is refused):
     basic   SAP_AUTH_TYPE=basic            user and password, HTTP or RFC
     snc     SAP_AUTH_TYPE=snc              RFC only, no user, no password
     jwt     SAP_AUTH_TYPE=jwt, SAP_GRANT_TYPE=authorization_code   browser login
-    jwt     SAP_AUTH_TYPE=jwt, SAP_GRANT_TYPE=none                 a token you hold
+  A token you hold (SAP_GRANT_TYPE=none) is not served over stdio: send it in the
+  x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse, or create the
+  session with mcp-auth.
 
 SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
 
@@ -155,8 +157,8 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     SAP_SNC_QOP, SAP_SNC_LIB, SAP_SNC_MYNAME   Optional
 
   JWT/OAuth2 Authentication (SAP_GRANT_TYPE is required with jwt):
-    SAP_GRANT_TYPE                 authorization_code (browser login) | none (a token you hold)
-    SAP_JWT_TOKEN                  JWT token (with SAP_GRANT_TYPE=none)
+    SAP_GRANT_TYPE                 authorization_code (browser login)
+    SAP_JWT_TOKEN                  The session's token (written by mcp-auth or the server)
     SAP_REFRESH_TOKEN              Refresh token (the server stores the one it obtains)
     SAP_UAA_URL                    UAA URL for OAuth2
     SAP_UAA_CLIENT_ID              UAA Client ID

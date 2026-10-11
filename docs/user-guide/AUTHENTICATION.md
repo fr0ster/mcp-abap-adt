@@ -1,6 +1,6 @@
 # Authentication & Destinations
 
-The server supports **four authentications**. Every one of them is a *destination*: a system
+`mcp-abap-adt` (stdio) supports **three authentications**. Every one of them is a *destination*: a system
 URL plus how to log on to it, kept in a service key, a `.env` file, or both. Anything else a
 `.env` or a service key states is refused at startup: `Destination "X" uses <type> / <grant>, which this
 server does not support` (for `certificate` and `kerberos`: `... uses certificate, which this server does
@@ -11,7 +11,13 @@ not support`).
 | **Basic** | `basic` | — | HTTP or RFC | `SAP_USERNAME`, `SAP_PASSWORD` |
 | **SNC** (passwordless) | `snc` | — | **RFC only** | `SAP_SNC_PARTNERNAME`; optional `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME`. **No user, no password** |
 | **JWT, browser login** | `jwt` | `authorization_code` | HTTP | A service key (ABAP or XSUAA), or `SAP_UAA_URL`, `SAP_UAA_CLIENT_ID`, `SAP_UAA_CLIENT_SECRET`; the token is obtained and renewed by the server |
-| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (used as it is, never renewed), or the `x-sap-jwt-token` header |
+
+**A token you hold** (`jwt` / `none`) is not served over stdio: a `.env` stating it is refused at startup
+with `Destination "X" uses jwt / none, which this server does not support` and the hint *a token you hold
+is sent in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the
+session with mcp-auth*. Send it in `x-sap-jwt-token` to `mcp-abap-adt-http` / `mcp-abap-adt-sse`
+([below](#http-and-sse-credentials-from-headers-only)), or let `mcp-auth` log in and write the session
+of a `jwt` / `authorization_code` destination.
 
 A `.env` that is a destination by itself **must state `SAP_AUTH_TYPE`** (there is no default: a `.env` with a
 user and a password but no type is refused with `Destination "X" cannot be used: authType`; an ABAP service key
@@ -19,7 +25,7 @@ states `jwt` / `authorization_code` itself). A `jwt` destination **must state `S
 is refused with `Destination "X" cannot be used: grantType` and a hint to write it again with
 `mcp-auth` (see [Generate a `.env`](#generate-a-env)), or to add `SAP_GRANT_TYPE` by hand.
 
-Other grants (`client_credentials`, `passcode`, the OIDC and SAML grants) and other types
+Other grants (`none`, `client_credentials`, `passcode`, the OIDC and SAML grants) and other types
 (`saml`, `certificate`, `kerberos`) are **not supported** by this server, even though the
 libraries know some of them. A destination that states one is refused, naming it; it is never
 silently run as something else. (A `saml` destination that states no grant gets `cannot be used: grantType`,
@@ -85,9 +91,8 @@ The session — the token and its refresh token — is the server's to keep curr
   file stays as it was.
 - **A named destination's session** is written to `sessions/X.env` only with `--unsafe`.
   Without it the session is kept in memory: one browser login per process, lost on exit.
-  The session is also *read* from `sessions/X.env` only with `--unsafe`: a `jwt` / `none`
-  destination whose token (`SAP_JWT_TOKEN`) is in that file is refused without it, as
-  `Destination "X" cannot be used: authorizationToken`. Start with `--unsafe`, or serve the file with
+  The session is also *read* from `sessions/X.env` only with `--unsafe`: without it a token there
+  is not used, and the destination logs in. Start with `--unsafe`, or serve the file with
   `--env=X` or `--env-path`, which read it whatever `--unsafe` says.
 
 A destination is **read once per process**. Nothing watches the files: a change you make to a

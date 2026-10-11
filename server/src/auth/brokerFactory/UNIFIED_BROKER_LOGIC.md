@@ -75,7 +75,10 @@ the source (`--mcp`, `x-mcp-destination`, `destination`) and never quotes the na
 | `basicHandler` | `basic` | user, password | -- |
 | `sncHandler` | `snc` | `SAP_SNC_PARTNERNAME` | refuses settings whose `connection-type` is not `rfc` |
 | `jwtAuthorizationCodeHandler` | `jwt` / `authorization_code` | a service key or `SAP_UAA_*` | the browser login (`authorization`): `serverLogin(browserCallbackStrategy({ browser, port }), …)`, on the callback port (default `61001`) |
-| `jwtNoneHandler` | `jwt` / `none` | `SAP_JWT_TOKEN` | -- |
+
+`jwt` / `none` (a token you hold) has no handler (D53): it is refused like any authentication not in
+the table, with the hint that a token you hold goes in the `x-sap-jwt-token` header of
+`mcp-abap-adt-http` / `mcp-abap-adt-sse`, or that `mcp-auth` creates the session for stdio.
 
 The browser strategy is passed in by the launcher (`browserCallbackStrategy` from
 `@mcp-abap-adt/auth-providers`); the factory defaults to none. The browser is an `IBrowser`, mapped

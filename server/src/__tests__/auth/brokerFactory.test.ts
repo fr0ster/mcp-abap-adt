@@ -33,6 +33,7 @@ import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { SHUTDOWN_REFUSAL } from '../../auth/countedProvider';
 import {
   destinationFailureWords,
+  JWT_NONE_HINT,
   UnsupportedAuthenticationError,
 } from '../../auth/destinationFailure';
 import type {
@@ -273,6 +274,7 @@ describe('AuthBrokerFactory', () => {
     it.each([
       ['jwt', 'client_credentials'],
       ['jwt', 'passcode'],
+      ['jwt', 'none'],
       ['saml', 'saml2_bearer'],
     ])(
       '2. %s / %s: UnsupportedAuthenticationError, no broker, no provider',
@@ -329,7 +331,7 @@ describe('AuthBrokerFactory', () => {
       expect(await config.sessionStore.loadSession('dest')).toBeNull();
     });
 
-    it("3. jwt / none: the stores and the server's options, no handler option", async () => {
+    it('3. jwt / none (D53): a token you hold is refused at the handler table, with the hint where it went', async () => {
       const file = path.join(root, 'conn.env');
       fs.writeFileSync(
         file,
@@ -340,17 +342,16 @@ describe('AuthBrokerFactory', () => {
           'SAP_JWT_TOKEN=placeholder-token',
         ].join('\n'),
       );
-      await factory({ envFile: { path: file, source: '--env' } }).getBroker(
-        'default',
+      const err = await caught(
+        factory({ envFile: { path: file, source: '--env' } }).getBroker(
+          'default',
+        ),
       );
-      const config = constructed.mock.calls[0][0];
-      expect(Object.keys(config).sort()).toEqual([
-        'authDebug',
-        'onWriteFailure',
-        'renewal',
-        'serviceKeyStore',
-        'sessionStore',
-      ]);
+      expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
+      expect(destinationFailureWords(err, 'default')).toBe(
+        `Destination "default" uses jwt / none, which this server does not support\n${JWT_NONE_HINT}`,
+      );
+      expect(constructed).not.toHaveBeenCalled();
     });
 
     it('3. jwt / authorization_code: the stores, the options and the login strategy in serverLogin', async () => {
@@ -399,9 +400,14 @@ describe('AuthBrokerFactory', () => {
         [
           `SAP_URL=${SYSTEM_URL}`,
           'SAP_AUTH_TYPE=jwt',
-          'SAP_GRANT_TYPE=none',
+          'SAP_GRANT_TYPE=authorization_code',
+          'SAP_UAA_URL=https://uaa.example.test',
+          'SAP_UAA_CLIENT_ID=client-id',
+          'SAP_UAA_CLIENT_SECRET=client-secret',
           'SAP_JWT_TOKEN=placeholder-token',
           'SAP_REFRESH_TOKEN=placeholder-refresh',
+          `SAP_ISSUED_FOR=${SYSTEM_URL}`,
+          'SAP_ISSUED_BY=placeholder-issuer-record',
         ].join('\n'),
       );
       const settings = await factory({
@@ -560,9 +566,10 @@ describe('AuthBrokerFactory', () => {
         file,
         [
           `SAP_URL=${SYSTEM_URL}`,
-          'SAP_AUTH_TYPE=jwt',
-          'SAP_GRANT_TYPE=none',
-          'SAP_JWT_TOKEN=placeholder-token',
+          'SAP_CLIENT=100',
+          'SAP_AUTH_TYPE=basic',
+          'SAP_USERNAME=placeholder-user',
+          'SAP_PASSWORD=placeholder-password',
           'SAP_MASTER_SYSTEM=system-of-file',
         ].join('\n'),
       );
@@ -570,7 +577,10 @@ describe('AuthBrokerFactory', () => {
         factory({
           envFile: { path: file, source: '--env' },
         }).systemContextFor('default'),
-      ).resolves.toEqual({ masterSystem: 'system-of-file' });
+      ).resolves.toEqual({
+        login: 'placeholder-user',
+        masterSystem: 'system-of-file',
+      });
     });
 
     it('a destination that states neither answers nothing — the process environment is not read here', async () => {
@@ -593,7 +603,7 @@ describe('AuthBrokerFactory', () => {
   });
 
   describe('getProvider', () => {
-    it('a named jwt / none destination without --unsafe: refused naming authorizationToken, with the hint', async () => {
+    it('a named jwt / none destination: refused as unsupported, with the hint where it went, no token in the words (D53)', async () => {
       writeSession('dest', [
         `SAP_URL=${SYSTEM_URL}`,
         'SAP_AUTH_TYPE=jwt',
@@ -601,12 +611,11 @@ describe('AuthBrokerFactory', () => {
         'SAP_JWT_TOKEN=placeholder-token',
       ]);
       const err = await caught(factory({ unsafe: false }).getProvider('dest'));
-      expect(err).toBeInstanceOf(DestinationConfigError);
+      expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
       const text = destinationFailureWords(err, 'dest');
-      expect(text).toContain(
-        'Destination "dest" cannot be used: authorizationToken',
+      expect(text).toBe(
+        `Destination "dest" uses jwt / none, which this server does not support\n${JWT_NONE_HINT}`,
       );
-      expect(text).toContain('is read only with --unsafe');
       expect(text).not.toContain('placeholder-token');
     });
 

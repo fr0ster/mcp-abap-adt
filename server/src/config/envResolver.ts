@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { getPlatformPaths } from '../stores/platformPaths';
+import { getPlatformPaths } from './platformPaths';
 
 function normalizeEnvFileName(input: string): string {
   const trimmed = input.trim();

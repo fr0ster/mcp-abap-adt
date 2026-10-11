@@ -631,7 +631,7 @@ export async function handleCreateClass(
    - Created by `AuthBrokerFactory`, one per destination, on first use
    - `getProvider(destination)` gives the connector its credential; the provider renews its token and the broker stores what it obtains
    - For stdio: one destination (from CLI/YAML)
-   - For HTTP/SSE: the default destination, or the one in `x-mcp-destination` when `--allow-destination-header` is set
+   - For HTTP/SSE: none — `@mcp-abap-adt/http` and `@mcp-abap-adt/sse` take credentials from the `x-sap-*` headers; `x-mcp-destination` is answered `400`
 
 6. **Connection Setup**: 
    - For stdio: context set once via `setConnectionContext(destination, destinations)` before connecting transport

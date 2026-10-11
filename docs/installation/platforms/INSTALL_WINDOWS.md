@@ -92,24 +92,23 @@ mcp-abap-adt --help
 the same configuration. See [Installation variants](../INSTALLATION.md#installation-variants).
 
 **Available commands after installation:**
-- `mcp-abap-adt` - stdio transport (default)
-- `mcp-abap-adt --transport=stdio` - stdio transport (for MCP clients)
-- `mcp-abap-adt --transport=http` - HTTP server transport
-- `mcp-abap-adt --transport=sse` - SSE server transport
+- `mcp-abap-adt` - stdio (`@mcp-abap-adt/core`), for MCP clients
+- `mcp-abap-adt-http` - Streamable HTTP server (`npm install -g @mcp-abap-adt/http`; credentials from `x-sap-*` headers)
+- `mcp-abap-adt-sse` - SSE server (`npm install -g @mcp-abap-adt/sse`; credentials from `x-sap-*` headers)
 
 **Usage examples:**
 ```powershell
 # HTTP server on default port (3000)
-mcp-abap-adt --transport=http
+mcp-abap-adt-http
 
 # HTTP server on custom port
-mcp-abap-adt --transport=http --port=8080
+mcp-abap-adt-http --port=8080
 
 # SSE server accessible from network
-mcp-abap-adt --transport=sse --host=0.0.0.0 --port=3000
+mcp-abap-adt-sse --sse-host=0.0.0.0 --sse-port=3001
 
-# Use a custom .env file
-mcp-abap-adt --transport=http --env-path=C:\path\to\custom\.env --port=8080
+# stdio with a custom .env file
+mcp-abap-adt --env-path=/path/to/custom/.env
 ```
 
 **Troubleshooting:**
@@ -195,14 +194,14 @@ mcp-abap-adt --env-path=C:\path\to\your\your-system.env
 MCP ABAP ADT Server supports two transport protocols:
 
 1. **stdio** (default) - Standard input/output, used by Cline/Cursor (requires .env file)
-2. **http** - HTTP StreamableHTTP transport (requires `--transport=http`), works without .env file
-2. **SSE/HTTP** - Server-Sent Events over HTTP, for web interfaces
+2. **http** - Streamable HTTP, `mcp-abap-adt-http` (`@mcp-abap-adt/http`): credentials from each request's `x-sap-*` headers, no `.env`
+3. **sse** - Server-Sent Events, `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`): credentials from the opening `GET`'s `x-sap-*` headers, no `.env`
 
 ### Cline (VS Code Extension)
 
-Uses **stdio** mode (must be explicitly specified).
+Uses **stdio** mode (`mcp-abap-adt`; a binary is its transport, there is no `--transport` option).
 
-**⚠️ IMPORTANT:** After global installation (`npm install -g @mcp-abap-adt/core`), use the `mcp-abap-adt` command with `--transport=stdio` and `--env` arguments.
+**⚠️ IMPORTANT:** After global installation (`npm install -g @mcp-abap-adt/core`), use the `mcp-abap-adt` command with the `--env` (or `--env-path`, `--mcp`) argument.
 
 1. Install Cline extension in VS Code
 2. Open Cline settings (JSON): `Ctrl+Shift+P` → "Preferences: Open User Settings (JSON)"
@@ -216,7 +215,6 @@ Uses **stdio** mode (must be explicitly specified).
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
       "args": [
-        "--transport=stdio",
         "--env=C:\\path\\to\\your\\your-system.env"
       ]
     }
@@ -226,7 +224,7 @@ Uses **stdio** mode (must be explicitly specified).
 
 **Important notes for Windows:**
 - Use double backslashes `\\` or forward slashes `/` in file paths
-- `--transport=stdio` is the default; HTTP/SSE require `--transport=http`/`--transport=sse`
+- `mcp-abap-adt` serves stdio only; HTTP and SSE are `mcp-abap-adt-http` / `mcp-abap-adt-sse`, and `--transport` stops every binary at start
 - Name the env file with `--env` (or `--env-path`, or use `--mcp=<name>`): nothing is looked up in the
   working directory, so a `.env` there is read only when named (`--env-path=./.env`)
 
@@ -239,7 +237,6 @@ Uses **stdio** mode (must be explicitly specified).
       "command": "node",
       "args": [
         "C:\\Users\\YourUsername\\AppData\\Roaming\\npm\\node_modules\\@mcp-abap-adt\\core\\bin\\mcp-abap-adt.js",
-        "--transport=stdio",
         "--env=C:\\path\\to\\your\\your-system.env"
       ]
     }
@@ -249,9 +246,9 @@ Uses **stdio** mode (must be explicitly specified).
 
 ### Cursor
 
-Uses **stdio** mode (must be explicitly specified).
+Uses **stdio** mode (`mcp-abap-adt`; a binary is its transport, there is no `--transport` option).
 
-**⚠️ IMPORTANT:** After global installation, use the `mcp-abap-adt` command with `--transport=stdio` and `--env` arguments.
+**⚠️ IMPORTANT:** After global installation, use the `mcp-abap-adt` command with the `--env` (or `--env-path`, `--mcp`) argument.
 
 Add to Cursor settings:
 
@@ -261,7 +258,6 @@ Add to Cursor settings:
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
       "args": [
-        "--transport=stdio",
         "--env=C:\\path\\to\\your\\your-system.env"
       ]
     }
@@ -273,25 +269,21 @@ Add to Cursor settings:
 
 ### HTTP Mode (Streamable HTTP)
 
-**⚠️ IMPORTANT:** HTTP mode requires `--transport=http` (the default transport is stdio). No `.env` file is required for HTTP mode (connection can be configured via HTTP headers).
+**⚠️ IMPORTANT:** Streamable HTTP is its own binary, `mcp-abap-adt-http` (`npm install -g @mcp-abap-adt/http`). It reads no `.env` and serves no destination: each request carries its connection in `x-sap-*` headers.
 
 **Starting HTTP Server:**
 
 ```powershell
-# Start server in HTTP mode (requires --transport=http)
-mcp-abap-adt --transport=http
-
-# Or explicitly specify HTTP mode
-mcp-abap-adt --transport=streamable-http
+# Start the Streamable HTTP server
+mcp-abap-adt-http
 
 # Or with custom port
-mcp-abap-adt --transport=streamable-http --port=8080
+mcp-abap-adt-http --port=8080
 ```
 
 **HTTP Server Options:**
-- `--transport=streamable-http` or `--transport=http` - Use HTTP transport (stdio is the default)
 - `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
-- `--port=<port>` - Server port (default: 3000 for http)
+- `--port=<port>` (alias `--http-port`) - Server port (default: 3000)
 - `--path=<path>` (alias `--http-path=<path>`) - HTTP endpoint path (default: /mcp/stream/http)
 - `--http-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3000`)
 - `--http-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
@@ -299,7 +291,7 @@ mcp-abap-adt --transport=streamable-http --port=8080
 
 **Example with custom port:**
 ```powershell
-mcp-abap-adt --transport=streamable-http --port=8080
+mcp-abap-adt-http --port=8080
 ```
 
 Server will be available at: `http://localhost:8080/mcp/stream/http`
@@ -323,41 +315,34 @@ Server will be available at: `http://localhost:8080/mcp/stream/http`
 }
 ```
 
-**⚠️ NOTE:** For HTTP mode, you can configure SAP connection via HTTP headers (as shown above) OR use `.env` file:
-
-```powershell
-# Using .env file with HTTP mode
-mcp-abap-adt --transport=streamable-http --env=C:\\path\\to\\your\\your-system.env
-```
+**⚠️ NOTE:** Over HTTP the connection comes only from the headers; a `.env` is read only by `mcp-abap-adt` (stdio).
 
 ### SSE Mode (Server-Sent Events)
 
-**⚠️ IMPORTANT:** SSE mode requires `.env` file or HTTP headers for SAP connection configuration.
+**⚠️ IMPORTANT:** SSE is its own binary, `mcp-abap-adt-sse` (`npm install -g @mcp-abap-adt/sse`). It reads no `.env`: the `GET` that opens each SSE connection carries the connection in `x-sap-*` headers.
 
 **Starting SSE Server:**
 
 ```powershell
-# Start server in SSE mode (requires .env file)
-mcp-abap-adt --transport=sse --env=C:\\path\\to\\your\\your-system.env
+# Start the SSE server
+mcp-abap-adt-sse
 
 # Or with custom port
-mcp-abap-adt --transport=sse --port=3001 --env=C:\\path\\to\\your\\your-system.env
+mcp-abap-adt-sse --sse-port=3001
 ```
 
 **SSE Server Options:**
-- `--transport=sse` - Use SSE transport
-- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
-- `--port=<port>` - Server port (default: 3001 for sse)
+- `--sse-host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--sse-port=<port>` - Server port (default: 3001)
 - `--sse-path=<path>` - SSE connection path (default: /sse)
 - `--post-path=<path>` - SSE message post path (default: /messages)
-- `--env=PATH` - Path to `.env` file (required for SSE mode)
 - `--sse-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3001`)
 - `--sse-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
 - `--sse-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); non-allowlisted Host/Origin → HTTP 403
 
 **Example with custom port and host:**
 ```powershell
-mcp-abap-adt --transport=sse --port=4100 --host=127.0.0.1 --env=C:\\path\\to\\your\\your-system.env
+mcp-abap-adt-sse --sse-port=4100 --sse-host=127.0.0.1
 ```
 
 Server will be available at: `http://127.0.0.1:4100/sse`

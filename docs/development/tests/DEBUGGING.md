@@ -322,7 +322,7 @@ DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL
   "url": "/",
   "headers": {
     "content-type": "application/json",
-    "x-mcp-destination": "TRIAL",
+    "x-sap-url": "https://your-sap-url.example",
     "authorization": "[REDACTED]"
   },
   "remoteAddress": "::1",

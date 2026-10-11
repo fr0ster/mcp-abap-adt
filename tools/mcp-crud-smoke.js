@@ -227,7 +227,6 @@ async function createTransport(args) {
       args.stdioArgs.length > 0
         ? args.stdioArgs
         : [
-            '--transport=stdio',
             '--env-path=.env',
             '--exposition=readonly,high,low',
           ];
@@ -277,7 +276,6 @@ async function main() {
     const envPath = String(hard.env_path);
     if (envPath.trim()) {
       args.stdioArgs = [
-        '--transport=stdio',
         `--env-path=${envPath}`,
         '--exposition=readonly,high,low',
       ];

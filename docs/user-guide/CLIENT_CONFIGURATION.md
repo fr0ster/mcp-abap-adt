@@ -1,18 +1,22 @@
 # Client Configuration Guide
 
-This guide explains how to configure MCP clients to connect to the `mcp-abap-adt` server.
+This guide explains how to configure MCP clients to connect to the MCP ABAP ADT server: `mcp-abap-adt`
+(stdio), `mcp-abap-adt-http` (Streamable HTTP) or `mcp-abap-adt-sse` (HTTP+SSE).
 
 If you prefer not to edit JSON/TOML by hand, use the configurator CLI:
 `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf), docs: [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md)).
 
 ## Overview
 
-The `mcp-abap-adt` server supports multiple transport modes:
-- **stdio** - Standard input/output (default; for MCP clients like Cline, Cursor)
-- **streamable-http** - HTTP-based transport with streaming support (requires `--transport=http`)
-- **sse** - Server-Sent Events transport (requires `--transport=sse`)
+A binary is its transport (there is no `--transport` option):
+- **stdio** - `mcp-abap-adt` (`@mcp-abap-adt/core`), for MCP clients like Cline, Cursor: one destination through the auth broker
+- **streamable-http** - `mcp-abap-adt-http` (`@mcp-abap-adt/http`): each request's `x-sap-*` headers
+- **sse** - `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`): the `x-sap-*` headers of the `GET` that opens each SSE connection
 
-For HTTP-based transports (streamable-http and sse), you can configure SAP connection parameters via HTTP headers, allowing dynamic connection configuration per request.
+The HTTP binaries take SAP connection parameters **only** from HTTP headers: no destination, no
+service key, no session file, no login. A request without them is answered `400`, and so is one
+carrying `x-mcp-destination` ("destinations are served only by mcp-abap-adt (stdio); send x-sap-*
+headers").
 
 For stdio, the client starts the server itself: `mcp-abap-adt` (or `mcp-abap-adt-compact`, or `npx -y @mcp-abap-adt/core`) with `--env-path=<file>` or `--mcp=<destination>`. Configurations for the full and compact server, RFC/SNC and a company CA: [Cline configuration](../installation/CLINE_CONFIGURATION.md) and [examples](../installation/examples/README.md).
 
@@ -72,19 +76,16 @@ When using HTTP transport, a request can carry its own connection. The headers s
 | `x-sap-jwt-token` | Yes* (for a token) | A JWT access token you hold. It is used as it is: the server cannot renew it | `eyJhbGciOiJSUzI1NiIs...` |
 | `x-sap-login` | Yes* (for basic) | Username for basic authentication; on-premise also the responsible of created objects when none is stated (only on this `x-sap-url` connection, not on a destination request) | `your_username` |
 | `x-sap-password` | Yes* (for basic) | Password for basic authentication | `your_password` |
-| `x-mcp-destination` | No | A destination name; honoured **only** with `--allow-destination-header` | `TRIAL` |
-| `x-sap-master-system` | No | Master system of created objects; wins over the destination's `.env` and the environment | `<system id>` |
-| `x-sap-responsible` | No | Responsible person of created objects; wins over the destination's `.env`, the environment and the login | `<user>` |
+| `x-sap-master-system` | No | Master system of created objects; wins over the environment | `<system id>` |
+| `x-sap-responsible` | No | Responsible person of created objects; wins over the environment and the login | `<user>` |
 | `x-sap-language` | No | Master language of created objects | `EN` |
-| `x-sap-debug-terminal-id` | No | The debugger's terminal id; wins over the destination's `.env` and the environment. Random per instance when none is stated | `<terminal id>` |
+| `x-sap-debug-terminal-id` | No | The debugger's terminal id; wins over the environment (`SAP_DEBUG_TERMINAL_ID`). Random per instance when none is stated | `<terminal id>` |
 | `x-sap-debug-ide-id` | No | The debugger's IDE id; same order. The system keys its listener conflict by it: a shared IDE id means shared catches and no conflict ([Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one)) | `<IDE id>` |
 
-\* A request that carries `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password` is a direct connection. A request that carries neither a destination nor such headers is served from the default destination (`--mcp`, `--env` or `--env-path`), or answered `400` if there is none.
+\* A request (SSE: the opening `GET`) must carry `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password`; without them it is answered `400`. `x-mcp-destination` is answered `400`.
 
 **Notes:**
-- **Precedence per request:** `x-mcp-destination` (with `--allow-destination-header`), then the `x-sap-*` connection headers, then the default destination.
-- A destination name is a plain file name (letters, digits, `_`, `.`, `-`; no path, no leading dot). Anything else is refused with `400`, naming the header.
-- For a token that is renewed for you, use a destination with browser login (below), not a header.
+- For a token that is renewed for you, use a destination with browser login on `mcp-abap-adt` (stdio, below), not a header.
 - 16.0 stopped reading the earlier headers for a destination, an authentication type and a refresh token; see the [migration note](../MIGRATION-16.0.md).
 
 ## Basic Authentication
@@ -107,9 +108,9 @@ For on-premise systems using basic authentication:
 }
 ```
 
-**Note:** For basic authentication, you can pass username and password via HTTP headers (`x-sap-login` and `x-sap-password`) or configure them in the server's `.env` file (`SAP_USERNAME`, `SAP_PASSWORD`). Headers take priority over the default destination.
+**Note:** Over HTTP the user and password come only from the headers (`x-sap-login`, `x-sap-password`); a server `.env` is read only by `mcp-abap-adt` (stdio).
 
-**System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional. When present, they win over the destination's `.env`, the process environment, the login and, for a cloud system, the `systeminformation` lookup — for this request only (SSE: for the session the headers opened), whether the request names a destination or carries `x-sap-*` connection headers. Without `x-sap-responsible` (and no `SAP_RESPONSIBLE`), the responsible on-premise is the login: here `x-sap-login`; on a cloud system, the system's user. See [System context](#system-context-for-on-premise-systems).
+**System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional. When present, they win over the process environment, the login and, for a cloud system, the `systeminformation` lookup — for this request only (SSE: for the session the headers opened). Without `x-sap-responsible` (and no `SAP_RESPONSIBLE`), the responsible on-premise is the login: here `x-sap-login`; on a cloud system, the system's user. See [System context](#system-context-for-on-premise-systems).
 
 ## Destinations
 
@@ -124,20 +125,19 @@ Otherwise there is no default destination. Nothing is looked up in the working d
 
 ```bash
 # stdio: a named destination
-mcp-abap-adt --transport=stdio --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL
 
 # stdio: one env file
-mcp-abap-adt --transport=stdio --env-path=/path/to/.env
-
-# HTTP: a default destination, which a client may override per request
-mcp-abap-adt --transport=http --mcp=TRIAL --allow-destination-header
+mcp-abap-adt --env-path=/path/to/.env
 ```
 
-Both stdio and the HTTP transports take any of these. Without any of them, stdio starts in inspection-only mode (the tool list answers; a tool call needs a connection) and HTTP/SSE requests need `x-sap-*` headers.
+Destinations are served only by `mcp-abap-adt` (stdio); `mcp-abap-adt-http` and `mcp-abap-adt-sse` refuse
+`--mcp`, `--env` and `--env-path` at start, naming `mcp-abap-adt`. Without any of them, stdio starts in
+inspection-only mode (the tool list answers; a tool call needs a connection).
 
 ### How It Works
 
-1. **One destination per process by default; more with the header.** A destination named by `x-mcp-destination` is built the first time a request asks for it and kept for the life of the process.
+1. **One destination per process.** For another destination, start another process (`--mcp=<other>`).
 2. **One login at a time.** Several first requests to the same new destination share one login; destinations logging in at once take turns on the callback port.
 3. **The session is the server's to keep current.** A token obtained or renewed is stored with the secret alone (the token, its expiry and refresh token). An env file you named is written back; a named destination's session is written to `sessions/<destination>.env` only with `--unsafe`, otherwise it is kept in memory and a restart logs in again.
 4. **A destination is read once per process.** A change you make to a `.env` from outside (a new password, a token handed over again) takes effect on restart.
@@ -166,24 +166,18 @@ By default a named destination's session (JWT and refresh token) is kept **in me
 ### Example: Complete Setup
 
 1. **Create the service key** as `service-keys/TRIAL.json` (an ABAP service key).
-2. **Start the server:**
-```bash
-mcp-abap-adt --transport=http --mcp=TRIAL
-```
-3. **Configure the client** — no credentials in it:
+2. **Configure the client** — it starts the server; no credentials in it:
 ```json
 {
-  "local-mcp-http": {
-    "disabled": false,
-    "timeout": 60,
-    "type": "streamableHttp",
-    "url": "http://localhost:3000/mcp/stream/http"
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "mcp-abap-adt",
+      "args": ["--mcp=TRIAL"]
+    }
   }
 }
 ```
-4. **First tool call:** the browser opens for authentication. **Later calls** use the stored token.
-
-To let the client choose per request, start with `--allow-destination-header` and add `"headers": { "x-mcp-destination": "TRIAL" }`.
+3. **First tool call:** the browser opens for authentication. **Later calls** use the stored token.
 
 ### Custom Paths
 
@@ -206,21 +200,20 @@ The server uses `service-keys` and `sessions` subdirectories of that path (`~/pr
 | `--auth-broker-path=<path>` | Base directory of `service-keys/` and `sessions/` |
 | `--unsafe` | Write named destinations' sessions to disk |
 | `--browser`, `--browser-auth-port` | Browser and callback port (default `61001`) of a login |
-| `--allow-destination-header` | Honour `x-mcp-destination` |
 
-Every parameter, with its environment and YAML forms, is in [CLI_OPTIONS.md](CLI_OPTIONS.md). An invalid port, enum or flag value is refused at startup.
+These are `mcp-abap-adt`'s (stdio). Every parameter of each binary, with its environment and YAML forms, is in [CLI_OPTIONS.md](CLI_OPTIONS.md). An invalid port, enum or flag value is refused at startup.
 
 ## Server Configuration
 
-The server can be started in HTTP mode with:
+The Streamable HTTP server is its own package:
 
 ```bash
-mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
+mcp-abap-adt-http --port=3000
 # or without installing
-npx -y @mcp-abap-adt/core --transport=http --port=3000 --env-path=/path/to/<destination>.env
+npx -y @mcp-abap-adt/http --port=3000
 ```
 
-`mcp-abap-adt-compact` takes the same options.
+It takes no destination and no `.env`: each request carries its credential in `x-sap-*` headers.
 
 ### Environment Variables
 
@@ -389,26 +382,23 @@ In Claude Code (`claude_desktop_config.json` or `mcp.json`), name that file — 
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"]
+      "args": ["--env-path=/path/to/<destination>.env"]
     }
   }
 }
 ```
 
-With a default destination, `x-sap-*` connection headers in the client configuration are optional; a request that carries a complete set (`x-sap-url` and a credential) uses them instead of the default destination. A `.env` is read once per process: a change to it takes effect on restart.
+A `.env` is read once per process: a change to it takes effect on restart.
 
 ## Dynamic Configuration Updates
 
-The server automatically updates the connection configuration when it receives HTTP headers with SAP connection parameters. This allows:
+`mcp-abap-adt-http` builds each request's connection from its own `x-sap-*` headers (`mcp-abap-adt-sse`: each SSE connection's, from its opening `GET`). This allows:
 
 1. **Multi-tenant scenarios**: Different clients can connect to different SAP systems
 2. **Token handover**: A request may carry a different `x-sap-jwt-token`; the server does not renew it
 3. **Runtime configuration**: Configure connections without modifying server files
 
-### Configuration Priority
-
-1. `x-mcp-destination` (with `--allow-destination-header`), then complete `x-sap-*` connection headers
-2. The default destination (`--mcp`, `--env` or `--env-path`)
+Nothing is stored, shared or cached across requests (SSE: across connections).
 
 ## SSE Mode Configuration
 
@@ -510,48 +500,7 @@ A destination with browser login renews its token itself: with the refresh token
 }
 ```
 
-**Note:** For basic authentication, you can pass username and password via HTTP headers (as shown above) or configure them in the server's `.env` file. Headers take priority over the default destination:
-
-```env
-SAP_USERNAME=your_username
-SAP_PASSWORD=your_password
-SAP_CLIENT=100
-```
-
-### A destination, chosen per request
-
-Start the server with `mcp-abap-adt --transport=http --mcp=TRIAL --allow-destination-header`, then:
-
-```json
-{
-  "local-mcp-http": {
-    "disabled": false,
-    "timeout": 60,
-    "type": "streamableHttp",
-    "url": "http://localhost:3000/mcp/stream/http",
-    "headers": {
-      "x-mcp-destination": "DEV"
-    }
-  }
-}
-```
-
-The server reads `DEV` from `service-keys/DEV.json` and `sessions/DEV.env` (field by field), opens the browser for a login if there is no valid session, and stores the token (on disk with `--unsafe`, otherwise in memory).
-
-### Minimal Configuration (using .env)
-
-```json
-{
-  "local-mcp-http": {
-    "disabled": false,
-    "timeout": 60,
-    "type": "streamableHttp",
-    "url": "http://localhost:3000/mcp/stream/http"
-  }
-}
-```
-
-In this case, the server uses its default destination: `--mcp`, `--env` or `--env-path`.
+**Note:** Over HTTP and SSE the user and password come only from the headers (as shown above).
 
 ## Related Documentation
 

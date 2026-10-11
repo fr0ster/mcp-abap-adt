@@ -274,7 +274,7 @@ binary:
 
 ```
 launcher main()
-  ├── ServerConfigManager.getConfig()           // CLI args, YAML, env vars
+  ├── readStartupConfig(<binary>_PARAMETERS)    // its own table: CLI args, YAML, env vars
   ├── registryForExposition(exposition)         // ReadOnly, HighLevel, LowLevel, Debug, Search, System
   ├── core only: AuthBrokerFactory              // the destination, the startup check (D18)
   └── StdioServer | StreamableHttpServer | SseServer
@@ -527,12 +527,16 @@ An embedder that has its own connection passes it as an injected source (`Embedd
 
 ### 5.3 Custom Configuration Handling
 
-`ServerConfigManager` supports:
-- CLI arguments (`--transport`, `--host`, `--port`, `--conf`, `--mcp`, `--env`, and the authentication parameters of `src/lib/config/authParameters.ts`)
-- YAML configuration files (via `--conf <path>`) -- configuration only; a secret-looking key is refused
-- Environment variables (`MCP_TRANSPORT`, `MCP_HTTP_HOST`, `MCP_HTTP_PORT`, `MCP_BROWSER_AUTH_PORT`, ...); secrets and the session live in `.env` files
+Each binary reads its own parameter table (D38) through lib's machinery (`src/lib/config/authParameters.ts`):
+`CORE_PARAMETERS` (`server/src/config/coreParameters.ts`: the destination, browser and login rows),
+`HTTP_PARAMETERS` (`http/src/config/httpParameters.ts`) and `SSE_PARAMETERS`
+(`sse/src/config/sseParameters.ts`), each beside lib's shared rows (`--conf`, `--exposition`,
+`--system-type`, `--state-idle-minutes`; the TLS rows in http and sse). A table gives:
+- CLI arguments, environment variables and YAML keys (`--conf <path>`; configuration only, a secret-looking key is refused); CLI beats env beats YAML
+- the help text, the `--conf` template and the YAML validation
+- the refusal of every other binary's options, and of `--transport` (gone), naming the binary that serves it
 
-For deeper customization, consumers can bypass `ServerConfigManager` and construct `IServerConfig` directly.
+For deeper customization, consumers can build the config directly (`CoreConfig`, `HttpConfig`, `SseConfig`, each extending lib's `IServerConfig`), or a table of their own with `readParameters`.
 
 ### 5.4 Extending MCP Tool Behavior
 

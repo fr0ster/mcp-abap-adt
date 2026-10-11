@@ -45,12 +45,12 @@ is looked up in the working directory. The factory is built once, in the launche
 | Mode | Means (service key store) | Secret (session store) |
 |------|---------------------------|------------------------|
 | **Env file** (`--env`, `--env-path`, `MCP_ENV_PATH`) | that file | that file, **written back** with a renewed token, whatever `--unsafe` says |
-| **Named, ABAP key** (`--mcp=X`, `x-mcp-destination: X`) | `sessions/X.env` over `service-keys/X.json`, field by field | `sessions/X.env` with `--unsafe`, else in memory |
+| **Named, ABAP key** (`--mcp=X`) | `sessions/X.env` over `service-keys/X.json`, field by field | `sessions/X.env` with `--unsafe`, else in memory |
 | **Named, XSUAA key** (root `url`, `clientid`, `clientsecret`, no `uaa`) | the same, with the system's URL from `XSUAA_MCP_URL` in `sessions/X.env` only | the same |
 
 A named destination's name becomes a file name, so it is vetted first (`src/lib/auth/destinationName.ts`): only
 letters, digits, `_`, `.`, `-`; no separator, no `..`, no leading dot, not empty. A refusal names
-the source (`--mcp`, `x-mcp-destination`, `destination`) and never quotes the name.
+the source (`--mcp`, `destination`) and never quotes the name.
 
 ## Broker usage by transport
 
@@ -109,8 +109,9 @@ then exits `1` with one stderr line, never the secret.
 ### stdio with `--env-path=./my.env`
 - Default destination `default`, read from and written back to `./my.env`.
 
-### `mcp-abap-adt --transport=http` (or `sse`)
-- Refused at start, naming `mcp-abap-adt-http` (`mcp-abap-adt-sse`): core serves stdio only.
+### `mcp-abap-adt` with `--transport`, or an HTTP / SSE option
+- Refused at start, naming `mcp-abap-adt-http` (`mcp-abap-adt-sse`): core serves stdio only, and
+  reads only its own parameter table (`server/src/config/coreParameters.ts`).
 
 ### stdio without parameters and without `.env`
 - Inspection-only mode: a tool call answers `inspection_only`.

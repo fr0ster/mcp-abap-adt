@@ -71,7 +71,7 @@ function expositionValues(argv: readonly string[]): string[] | undefined {
     if (arg === '--exposition') {
       seen = true;
       const next = argv[index + 1];
-      // `--exposition --transport=stdio` gives the flag no value of its own.
+      // `--exposition --mcp=X` gives the flag no value of its own.
       value = next !== undefined && !next.startsWith('-') ? next : undefined;
     } else if (arg.startsWith('--exposition=')) {
       seen = true;

@@ -6,4 +6,7 @@
  * own application, you want `@mcp-abap-adt/lib` instead: it carries the
  * handlers and the embeddable server under Apache-2.0, and no transport.
  */
+
+// http's parameter table (D38)
+export * from './config/httpParameters.js';
 export * from './StreamableHttpServer.js';

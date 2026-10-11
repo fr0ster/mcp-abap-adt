@@ -36,17 +36,19 @@ mkdir "%USERPROFILE%\Documents\mcp-abap-adt\service-keys"
 
 ### Step 2: Start the Server with the Destination
 
-The server serves one default destination, named with `--mcp`. Over stdio the client starts the server: go to Step 3.
+`mcp-abap-adt` (stdio) serves one destination, named with `--mcp`; the client starts the server (Step 3).
+Service keys, sessions and the browser login are served only over stdio: `mcp-abap-adt-http` and
+`mcp-abap-adt-sse` take each request's `x-sap-*` headers instead.
 
 ```bash
 # Installed (npm install -g @mcp-abap-adt/core; the compact server: mcp-abap-adt-compact)
-mcp-abap-adt --transport=http --port=3000 --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL
 
 # Or without installing
-npx -y @mcp-abap-adt/core --transport=http --port=3000 --mcp=TRIAL
+npx -y @mcp-abap-adt/core --mcp=TRIAL
 
 # With custom path for service keys and sessions
-mcp-abap-adt --transport=http --port=3000 --mcp=TRIAL --auth-broker-path=/path/to/dir/
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=/path/to/dir/
 ```
 
 **What `--mcp=TRIAL` does:**
@@ -68,38 +70,7 @@ A stdio client starts the server itself — no separate server, no URL:
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--mcp=TRIAL"],
-      "disabled": false
-    }
-  }
-}
-```
-
-Over HTTP, with `--mcp=TRIAL` the client needs no headers:
-
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt-service-key": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3000/mcp/stream/http",
-      "disabled": false
-    }
-  }
-}
-```
-
-To choose the destination per request, start the server with `--allow-destination-header` and send `x-mcp-destination`:
-
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt-service-key": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3000/mcp/stream/http",
-      "headers": {
-        "x-mcp-destination": "TRIAL"
-      },
+      "args": ["--mcp=TRIAL"],
       "disabled": false
     }
   }
@@ -161,21 +132,19 @@ Create multiple service key files:
 ~/.config/mcp-abap-adt/service-keys/TRIAL.json
 ```
 
-Either run one server per destination (`--mcp=DEV`, `--mcp=PROD`, each on its own `--port`), or run one server with `--allow-destination-header` and send the destination per request. A destination is built the first time a request asks for it and kept for the life of the process:
+Run one server per destination, each started by the client:
 
 ```json
 {
   "mcpServers": {
     "mcp-abap-dev": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3000/mcp/stream/http",
-      "headers": { "x-mcp-destination": "DEV" },
+      "command": "mcp-abap-adt",
+      "args": ["--mcp=DEV"],
       "disabled": false
     },
     "mcp-abap-prod": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3000/mcp/stream/http",
-      "headers": { "x-mcp-destination": "PROD" },
+      "command": "mcp-abap-adt",
+      "args": ["--mcp=PROD"],
       "disabled": false
     }
   }

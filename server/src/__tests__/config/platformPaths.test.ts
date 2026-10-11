@@ -8,7 +8,7 @@
  * otherwise pass or fail depending on where CI happens to run.
  */
 
-import { getPlatformPaths } from '../../lib/stores/platformPaths';
+import { getPlatformPaths } from '../../config/platformPaths';
 
 describe('getPlatformPaths with AUTH_BROKER_PATH', () => {
   const realPlatform = process.platform;

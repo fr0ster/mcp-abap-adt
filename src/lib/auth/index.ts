@@ -4,8 +4,6 @@
 
 /** The browser strategy the program passes to the factory (Ruling 1). */
 export { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
-/** Where service keys and sessions live by default. */
-export { getPlatformPaths } from '../stores/platformPaths';
 export {
   answerFailure,
   answerRead,

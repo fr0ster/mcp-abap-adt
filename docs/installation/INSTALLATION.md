@@ -88,9 +88,13 @@ read for either. See [Migrating to 17.0.0](../MIGRATION-17.0.md).
 
 ## Installing
 
-After `npm install -g @mcp-abap-adt/core` you have the `mcp-abap-adt` command (default: stdio);
-`--transport=http` and `--transport=sse` serve the other MCP transports. `@mcp-abap-adt/compact` gives
-`mcp-abap-adt-compact`, which takes the same options.
+After `npm install -g @mcp-abap-adt/core` you have the `mcp-abap-adt` command: stdio, one destination
+through the auth broker. A binary is its transport: `npm install -g @mcp-abap-adt/http` gives
+`mcp-abap-adt-http` (Streamable HTTP), `npm install -g @mcp-abap-adt/sse` gives `mcp-abap-adt-sse`
+(HTTP+SSE); both take credentials only from each request's `x-sap-*` headers. There is no
+`--transport` option. `@mcp-abap-adt/compact` gives `mcp-abap-adt-compact`, which takes
+`mcp-abap-adt`'s options. Each binary reads only its own options (`<binary> --help`); another
+binary's stops the start, naming the binary that serves it.
 
 **To write a `.env` for JWT authentication**, install the CLI separately (`mcp-auth` ships in `@mcp-abap-adt/auth-broker-cli`, not in `@mcp-abap-adt/auth-broker`):
 ```bash
@@ -149,14 +153,8 @@ environment. See [RFC Setup](RFC_SETUP.md).
 
 **Run the server:**
 ```bash
-# Default stdio mode (bare command starts stdio; HTTP/SSE require --transport=http/--transport=sse)
-# Note: a named destination is chosen with `--mcp=<destination>` on every transport,
-# and per request on HTTP/SSE with the x-mcp-destination header (--allow-destination-header)
-mcp-abap-adt
-
-# stdio mode (for MCP clients, requires --env, --env-path or --mcp)
-# Example: mcp-abap-adt --transport=stdio --mcp=TRIAL
-mcp-abap-adt --transport=stdio
+# stdio (for MCP clients): name the destination with --mcp, --env or --env-path
+mcp-abap-adt --mcp=TRIAL
 
 # Or specify env destination from sessions store
 mcp-abap-adt --env=trial
@@ -165,8 +163,8 @@ mcp-abap-adt --env=trial
 mcp-abap-adt --env-path=/path/to/my.env
 mcp-abap-adt --env-path ~/configs/sap-dev.env
 
-# Start HTTP server on custom port
-mcp-abap-adt --transport=http --port=8080
+# Streamable HTTP server on a custom port (credentials from each request's x-sap-* headers)
+mcp-abap-adt-http --port=8080
 ```
 
 **Environment File Priority:**
@@ -208,7 +206,7 @@ Install in your project directory:
 ```bash
 cd /path/to/your/project
 npm install @mcp-abap-adt/core
-npx mcp-abap-adt --transport=http --port=3000
+npx mcp-abap-adt --mcp=TRIAL
 ```
 
 #### Configuration
@@ -244,17 +242,10 @@ mcp-abap-adt --mcp=TRIAL
 
 An XSUAA service key carries the UAA, not the system: state the system's URL as `XSUAA_MCP_URL` in `~/.config/mcp-abap-adt/sessions/TRIAL.env`.
 
-**Choosing the destination per request (HTTP/SSE):** start the server with `--allow-destination-header` and send
-
-```json
-{
-  "headers": {
-    "x-mcp-destination": "TRIAL"
-  }
-}
-```
-
-See [Client Configuration Guide](../user-guide/CLIENT_CONFIGURATION.md#destinations) for details.
+Destinations are served only by `mcp-abap-adt` (stdio). `mcp-abap-adt-http` and `mcp-abap-adt-sse`
+take no destination: a request carrying `x-mcp-destination` is answered `400` ("destinations are served
+only by mcp-abap-adt (stdio); send x-sap-* headers"). See
+[Client Configuration Guide](../user-guide/CLIENT_CONFIGURATION.md) for details.
 
 ##### Option 2: .env File
 
@@ -281,41 +272,38 @@ A `.env` is read once per process: a change to it takes effect on restart.
 Or use a custom environment file:
 
 ```bash
-mcp-abap-adt --transport=http --env-path /path/to/custom/.env --port=3000
+mcp-abap-adt --env-path /path/to/custom/.env
 ```
 
 #### Usage Examples
 
-**Example 1: Start HTTP server on default port (3000)**
+**Example 1: stdio with a named destination**
 ```bash
-mcp-abap-adt --transport=http
+mcp-abap-adt --mcp=TRIAL
 ```
 
-**Example 2: Start HTTP server on custom port**
+**Example 2: Streamable HTTP server on a custom port** (`@mcp-abap-adt/http`)
 ```bash
-mcp-abap-adt --transport=http --port=8080
+mcp-abap-adt-http --port=8080
 ```
 
-**Example 3: Start HTTP server accessible from network**
+**Example 3: Streamable HTTP server accessible from network**
 ```bash
-mcp-abap-adt --transport=http --host=0.0.0.0 --port=3000
+mcp-abap-adt-http --host=0.0.0.0 --port=3000
 ```
 
-**Example 4: Use custom environment file**
+**Example 4: SSE server** (`@mcp-abap-adt/sse`)
 ```bash
-mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port=8080
-```
-
-**Example 5: Start SSE server**
-```bash
-mcp-abap-adt --transport=sse --port=3000
+mcp-abap-adt-sse --sse-port=3001
 ```
 
 #### Command Line Options
 
-All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-adt --transport=sse`) support the following options:
+Each binary takes only its own options; an option of another binary, or `--transport`, stops the
+start naming the binary that serves it. Every binary takes `--help`, `--version`, `--conf`,
+`--exposition`, `--system-type` and `--state-idle-minutes`.
 
-**General Options:**
+**`mcp-abap-adt` (stdio):**
 - `--help` - Show complete help message with all available options
 - `--mcp=<destination>` - Named destination (`service-keys/<destination>.json` + `sessions/<destination>.env`)
 - `--auth-broker-path=<path>` - Base directory of the `service-keys` and `sessions` subdirectories
@@ -325,44 +313,43 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 - `--unsafe` - Write named destinations' sessions to disk (default: in memory)
 - `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login; `--browser-program=<program>` in place of `--browser`
 - `--renewal=refresh-then-login|refresh-only` - How an expired session is renewed (`refresh-only`: never a login)
-- `--allow-destination-header` - Honour `x-mcp-destination` (HTTP/SSE)
+- `--connection-type=http|rfc` - SAP connection type (default `http`)
 
 **Note:** When no `--mcp`, `--env` or `--env-path` is given, there is no default destination: nothing is looked up in the working directory (`--env-path=./.env` names a `.env` there). An invalid port, enum or flag value is refused at startup.
 
-**Transport Selection:**
-- `--transport=<type>` - Transport type: `stdio`, `http`, `streamable-http`, or `sse`
-
-**HTTP Server Options (for `mcp-abap-adt --transport=http`):**
-- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
-- `--port=<port>` - Server port (default: 3000 for http)
+**`mcp-abap-adt-http` (Streamable HTTP):**
+- `--host=<host>` / `--http-host` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--port=<port>` / `--http-port` - Server port (default: 3000)
 - `--path=<path>` / `--http-path=<path>` (alias) - HTTP endpoint path (default: /mcp/stream/http)
 - `--http-json-response` - Enable JSON response format
 - `--http-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3000`)
 - `--http-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
 - `--http-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
 
-**SSE Server Options (for `mcp-abap-adt --transport=sse`):**
-- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
-- `--port=<port>` - Server port (default: 3001 for sse)
+- `--tls-cert=<path>`, `--tls-key=<path>`, `--tls-ca=<path>` - HTTPS (cert and key together)
+
+**`mcp-abap-adt-sse` (HTTP+SSE):**
+- `--sse-host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--sse-port=<port>` - Server port (default: 3001)
 - `--sse-path=<path>` - SSE connection path (default: /sse)
 - `--post-path=<path>` - SSE message post path (default: /messages)
 - `--sse-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3001`)
 - `--sse-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
 - `--sse-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
+- `--tls-cert=<path>`, `--tls-key=<path>`, `--tls-ca=<path>` - HTTPS (cert and key together)
 
 **Environment Variables:**
 
 You can also configure the server using environment variables.
 
 *MCP Server Configuration:*
-- `MCP_ENV_PATH` - Explicit path to `.env` file (same as `--env-path`)
-- `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
-- `MCP_HTTP_PORT` - Default HTTP port
+- `MCP_ENV_PATH` - Explicit path to `.env` file (same as `--env-path`; `mcp-abap-adt`)
+- `MCP_HTTP_PORT` - Default HTTP port (`mcp-abap-adt-http`; so are the other `MCP_HTTP_*`)
 - `MCP_HTTP_HOST` - Default HTTP host (default: 127.0.0.1)
 - `MCP_HTTP_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3000`)
 - `MCP_HTTP_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
 - `MCP_HTTP_ENABLE_DNS_PROTECTION` - Enable HTTP Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
-- `MCP_SSE_PORT` - Default SSE port
+- `MCP_SSE_PORT` - Default SSE port (`mcp-abap-adt-sse`; so are the other `MCP_SSE_*`)
 - `MCP_SSE_HOST` - Default SSE host (default: 127.0.0.1)
 - `MCP_SSE_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3001`)
 - `MCP_SSE_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
@@ -406,13 +393,13 @@ For complete list see [CLI Options](../user-guide/CLI_OPTIONS.md#environment-var
 mcp-abap-adt --help
 
 # Use custom .env from different location
-mcp-abap-adt --env=~/configs/sap-production.env
+mcp-abap-adt --env-path=~/configs/sap-production.env
 
-# Start HTTP server
-mcp-abap-adt --transport=http --port=8080
+# Start a Streamable HTTP server
+mcp-abap-adt-http --port=8080
 
-# Start SSE server
-mcp-abap-adt --transport=sse --port=3001
+# Start an SSE server
+mcp-abap-adt-sse --sse-port=3001
 ```
 
 **Example 6: Use stdio transport (for MCP clients)**

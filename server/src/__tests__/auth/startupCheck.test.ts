@@ -8,8 +8,8 @@
 
 import { EventEmitter } from 'node:events';
 import type { BrokerCallOptions } from '@mcp-abap-adt/auth-broker';
-import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
+import { readCoreConfig } from '../../config/coreParameters';
 import { launch } from '../../launcher';
 import { StdioServer } from '../../StdioServer';
 import {
@@ -61,7 +61,7 @@ afterEach(() => {
 
 async function run(argv: string[], platform = 'linux') {
   process.argv = ['node', 'mcp-abap-adt', ...argv];
-  const config = await new ServerConfigManager().getConfig();
+  const config = readCoreConfig(process.argv.slice(2), process.env);
   const stderr: string[] = [];
   const exits: number[] = [];
   const processLike = Object.assign(new EventEmitter(), {
@@ -95,10 +95,7 @@ describe('the startup check', () => {
       'SAP_AUTH_TYPE=jwt',
       'SAP_GRANT_TYPE=authorization_code',
     ]);
-    const { stderr, exits } = await run([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const { stderr, exits } = await run([`--env-path=${file}`]);
     expect(exits).toEqual([1]);
     expect(stdioStart).not.toHaveBeenCalled();
     expect(stderr.join('\n')).toContain('Destination "default"');
@@ -110,7 +107,7 @@ describe('the startup check', () => {
 
   it('a destination the broker serves starts; the startup signal is aborted once the check ended', async () => {
     const file = base.writeFile('conn.env', basicLines());
-    const { exits } = await run(['--transport=stdio', `--env-path=${file}`]);
+    const { exits } = await run([`--env-path=${file}`]);
     expect(exits).toEqual([]);
     expect(stdioStart).toHaveBeenCalledTimes(1);
     const signals = startupSignals();
@@ -123,27 +120,21 @@ describe('the startup check', () => {
     // not served over stdio, D53).
     it('basic starts on freebsd with the default --browser', async () => {
       const file = base.writeFile('conn.env', basicLines());
-      const { exits, stderr } = await run(
-        ['--transport=stdio', `--env-path=${file}`],
-        'freebsd',
-      );
+      const { exits, stderr } = await run([`--env-path=${file}`], 'freebsd');
       expect(stderr.join('\n')).not.toContain('browser');
       expect(exits).toEqual([]);
       expect(stdioStart).toHaveBeenCalledTimes(1);
     });
 
     it('inspection-only starts on freebsd', async () => {
-      const { exits } = await run(['--transport=stdio'], 'freebsd');
+      const { exits } = await run([], 'freebsd');
       expect(exits).toEqual([]);
       expect(stdioStart).toHaveBeenCalledTimes(1);
     });
 
     it('jwt / authorization_code on freebsd: refused at the startup check, naming browser', async () => {
       const file = base.writeFile('conn.env', authorizationCodeLines());
-      const { exits, stderr } = await run(
-        ['--transport=stdio', `--env-path=${file}`],
-        'freebsd',
-      );
+      const { exits, stderr } = await run([`--env-path=${file}`], 'freebsd');
       expect(exits).toEqual([1]);
       expect(stdioStart).not.toHaveBeenCalled();
       const said = stderr.join('\n');
@@ -157,7 +148,7 @@ describe('the startup check', () => {
     it('jwt / authorization_code on freebsd with --browser=none: starts', async () => {
       const file = base.writeFile('conn.env', authorizationCodeLines());
       const { exits } = await run(
-        ['--transport=stdio', `--env-path=${file}`, '--browser=none'],
+        [`--env-path=${file}`, '--browser=none'],
         'freebsd',
       );
       expect(exits).toEqual([]);
@@ -167,7 +158,7 @@ describe('the startup check', () => {
     it('an unknown --browser name is refused on freebsd too, for a basic destination', async () => {
       const file = base.writeFile('conn.env', basicLines());
       const { exits, stderr } = await run(
-        ['--transport=stdio', `--env-path=${file}`, '--browser=opera'],
+        [`--env-path=${file}`, '--browser=opera'],
         'freebsd',
       );
       expect(exits).toEqual([1]);

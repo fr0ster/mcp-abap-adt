@@ -16,10 +16,39 @@ The packages, all at **18.0.0**:
 | `@mcp-abap-adt/compact-http` | `compact-http/` | `mcp-abap-adt-compact-http` | the compact tool set over Streamable HTTP |
 | `@mcp-abap-adt/compact-sse` | `compact-sse/` | `mcp-abap-adt-compact-sse` | the compact tool set over HTTP+SSE |
 
+## Every binary: `--transport` is gone, and each reads only its own parameters
+
+- **Remove `--transport`** (and `MCP_TRANSPORT`, and the YAML key `transport`) from every command
+  line, client configuration, service unit and config file: a binary is its transport. Any value —
+  `--transport=stdio` included — stops the start with the binary's sentence, e.g. "`--transport`
+  is gone: `mcp-abap-adt` serves stdio; for Streamable HTTP run `mcp-abap-adt-http`, for SSE
+  `mcp-abap-adt-sse` (compact: `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse`)". For
+  Streamable HTTP run `mcp-abap-adt-http`, for SSE `mcp-abap-adt-sse`.
+- **An option of another binary stops the start**, in any form (CLI, environment, YAML), naming the
+  binary that serves it — 17.x ignored it. Per binary:
+
+  | Binary | Refused, with the words |
+  |---|---|
+  | `mcp-abap-adt` | the SSE options (`--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, `MCP_SSE_*`, YAML `sse`): "SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)"; the Streamable HTTP ones (`--host`, `--port`, `--path`, `--http-*`, `MCP_HTTP_*`, YAML `http`): "Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)"; `--tls-*` / `MCP_TLS_*`: "TLS is an option of `mcp-abap-adt-http` and `mcp-abap-adt-sse`"; `--allow-destination-header` (gone) |
+  | `mcp-abap-adt-http` | the destination and login options (`--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_RENEWAL`, `MCP_LOGIN_TIMEOUT`, their YAML keys): "destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers"; the SSE options, with the SSE words |
+  | `mcp-abap-adt-sse` | the destination and login options, as for http; the Streamable HTTP options — `--host`, `--port` and `--path` included — with the Streamable HTTP words |
+
+  Each refusal names the form you used first: `--sse-port: SSE is served by …`.
+- **Each binary's `--help`, `--conf` template and YAML validation come from its own table.** A
+  config file written for 17.x that mixes `transport`, `mcp`, `http:` and `sse:` keys is refused by
+  every binary: keep one file per binary, or regenerate it with `--conf=<new file>` (the binary
+  writes its template there). The `http:` / `sse:` keys keep their 17.x shape (`http.port`,
+  `sse.tls.cert`, …).
+- **Values are checked in every form**: a port outside 1-65535, a flag that is not `true` /
+  `false`, is refused at start (17.x fell back to the default for `--http-port` / `--sse-port`).
+  TLS needs `--tls-cert` and `--tls-key` together (17.x served plain HTTP when one was missing).
+- `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, `--exposition` (with
+  `debug`), `--system-type` and `--conf` are in every binary's table, unchanged.
+
 ## HTTP users
 
-- **Install `@mcp-abap-adt/http` and run `mcp-abap-adt-http`.** `mcp-abap-adt --transport=http`
-  stops the start, naming it. The options keep their names: `--host` / `--http-host` /
+- **Install `@mcp-abap-adt/http` and run `mcp-abap-adt-http`**, without `--transport` (see
+  above). The options keep their names: `--host` / `--http-host` /
   `MCP_HTTP_HOST`, `--port` / `--http-port` / `MCP_HTTP_PORT`, `--path` / `--http-path`,
   `--http-json-response`, `--http-allowed-hosts`, `--http-allowed-origins`,
   `--http-enable-dns-protection` (and their `MCP_HTTP_*`), `--tls-cert` / `--tls-key` / `--tls-ca`
@@ -46,11 +75,13 @@ The packages, all at **18.0.0**:
 
 ## SSE users
 
-- **Install `@mcp-abap-adt/sse` and run `mcp-abap-adt-sse`.** `mcp-abap-adt --transport=sse` stops
-  the start, naming it. The SSE options keep their names: `--sse-host` / `MCP_SSE_HOST`,
+- **Install `@mcp-abap-adt/sse` and run `mcp-abap-adt-sse`**, without `--transport` (see above).
+  The SSE options keep their names: `--sse-host` / `MCP_SSE_HOST`,
   `--sse-port` / `MCP_SSE_PORT`, `--sse-path`, `--post-path`, `--sse-allowed-hosts`,
   `--sse-allowed-origins`, `--sse-enable-dns-protection` (and their `MCP_SSE_*`), `--tls-*`
-  (`MCP_TLS_*`), `--system-type`, `--exposition`, `--state-idle-minutes`, `--conf`.
+  (`MCP_TLS_*`), `--system-type`, `--exposition`, `--state-idle-minutes`, `--conf`. **`--host`
+  and `--port` no longer apply to SSE** (17.x: they beat the SSE ones): they are Streamable HTTP's
+  and stop the SSE start; use `--sse-host` / `--sse-port`.
 - **Credentials come only from the `x-sap-*` headers of the `GET` that opens each SSE
   connection** (`x-sap-url`, `x-sap-client`, and `x-sap-jwt-token`, or `x-sap-login` with
   `x-sap-password`); that connection's `POST`s are served with them. A `GET` without them is
@@ -75,9 +106,11 @@ The packages, all at **18.0.0**:
 
 ## stdio users
 
-- **`mcp-abap-adt` serves stdio only** (`@mcp-abap-adt/core`). `--transport=http` or
-  `--transport=sse` stops the start, naming `mcp-abap-adt-http` or `mcp-abap-adt-sse`; core no
-  longer depends on `@mcp-abap-adt/http` or `@mcp-abap-adt/sse`.
+- **`mcp-abap-adt` serves stdio only** (`@mcp-abap-adt/core`). **Remove `--transport=stdio`**
+  from your MCP client's `args`: it now stops the start (see above). The HTTP, SSE and TLS options
+  stop it too, naming `mcp-abap-adt-http` or `mcp-abap-adt-sse`; core no longer depends on
+  `@mcp-abap-adt/http` or `@mcp-abap-adt/sse`. `--allow-destination-header` is gone: the process
+  serves the one destination it is started with.
 - **`jwt` / `none` is no longer served over stdio** (a token you hold: `SAP_AUTH_TYPE=jwt`,
   `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN`). Such a destination stops the start with `Destination "X"
   uses jwt / none, which this server does not support` and the hint *a token you hold is sent in the
@@ -205,5 +238,27 @@ The packages, all at **18.0.0**:
   besides the DNS-rebinding protection and the TLS listener. `destinationFromHeader`,
   `FirstConnectLock`, `destinationFailureAnswer` and `DestinationHeaderError` are gone.
 - **`registryForExposition(exposition, { extraGroups?, includeSearch? })`**
-  (`@mcp-abap-adt/lib/handlers`) builds the tool list every binary serves;
-  `new ServerConfigManager({ transport })` reads the rows of a binary's own transport.
+  (`@mcp-abap-adt/lib/handlers`) builds the tool list every binary serves.
+- **Each binary reads its own parameter table** (`@mcp-abap-adt/lib/config` keeps the machinery
+  and the shared rows). `ServerConfigManager`, `ArgumentsParser` and `applyYamlConfigToArgs` are
+  gone: read a binary's configuration with `readCoreConfig(argv, env, yaml)` / `CORE_PARAMETERS`
+  (`@mcp-abap-adt/core`), `readHttpConfig` / `HTTP_PARAMETERS` (`@mcp-abap-adt/http`),
+  `readSseConfig` / `SSE_PARAMETERS` (`@mcp-abap-adt/sse`). lib's `readParameters(table, argv,
+  env, yaml)`, `parameterSource`, `generateHelp(table, …)`, `readStartupConfig(table, …)` and the
+  shared rows (`CONF_ROW`, `EXPOSITION_ROW`, `SYSTEM_TYPE_ROW`, `STATE_IDLE_ROW`, `tlsRows`) build
+  a table of your own; a refusal is a `ParameterRefusal` carrying its `words`.
+  `loadYamlConfig(table, path)`, `validateYamlConfig(table, config)`,
+  `generateYamlConfigTemplate(table)` and `generateConfigTemplateIfNeeded(table, path)` take the
+  table; `parseConfigArg(argv?)` reads `--conf` / `--config`.
+- **`IServerConfig` holds the shared fields only** (`exposition`, `configFile`, `systemType`,
+  `systemTypeSource`, `stateIdleMinutes`): the destination fields are core's `CoreConfig`, the
+  listener fields http's `HttpConfig` and sse's `SseConfig`. `Transport`, `IV2ServerConfig` and
+  the legacy `transport`, `transportConfig`, `defaultMcpDestination`, `defaultDestination` and
+  `logger` fields are gone.
+- **Moved to `@mcp-abap-adt/core`:** `getPlatformPaths` (was also re-exported by
+  `@mcp-abap-adt/lib/auth`), `resolveEnvFilePath`, `hydrateSystemContextFromEnvFile`,
+  `ENV_FILE_CONTEXT_KEYS`.
+- **Gone from `@mcp-abap-adt/lib/utils`:** `showHelp`, `parseTransportConfig`, `TransportConfig`
+  (and `ServerOptions.transportConfig`), `getArgValue`, `hasFlag`, `parseBoolean`,
+  `resolvePortOption`, `resolveBooleanOption`, `resolveListOption` — the 17.x help and transport
+  parsing nothing read.

@@ -1,18 +1,40 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { load } from 'js-yaml';
-import { ArgumentsParser } from '../../../lib/config/ArgumentsParser';
 import {
-  AUTH_PARAMETERS,
-  readAuthParameters,
-} from '../../../lib/config/authParameters';
-import { ServerConfigManager } from '../../../lib/config/ServerConfigManager';
-import {
-  applyYamlConfigToArgs,
   generateYamlConfigTemplate,
-  validateYamlConfig,
-} from '../../../lib/config/yamlConfig';
+  type ParameterTable,
+  readParameters,
+  SYSTEM_TYPE_ROW,
+  validateYamlConfig as validateTable,
+} from '@mcp-abap-adt/lib/config';
+import { load } from 'js-yaml';
+import {
+  CORE_PARAMETERS,
+  CORE_ROWS,
+  readCoreConfig,
+} from '../../config/coreParameters';
+import { coreHelp } from '../../launcher';
+
+/** core's own rows, and the system type it shares, read alone (no defaults of other rows). */
+const AUTH_PARAMETERS = [...CORE_ROWS, SYSTEM_TYPE_ROW] as const;
+const ROWS_ONLY: ParameterTable = {
+  program: 'mcp-abap-adt',
+  rows: AUTH_PARAMETERS,
+  removed: CORE_PARAMETERS.removed,
+};
+const readAuthParameters = (
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  yaml?: Record<string, unknown> | null,
+) => readParameters(ROWS_ONLY, argv, env, yaml) as Record<string, unknown>;
+const generateHelp = () => coreHelp();
+const template = () => generateYamlConfigTemplate(CORE_PARAMETERS);
+const validateYamlConfig = (config: Record<string, unknown>) =>
+  validateTable(CORE_PARAMETERS, config);
+/** The program's reading of `process.argv` and `process.env`. */
+const parse = (yaml?: Record<string, unknown>) =>
+  readCoreConfig(process.argv.slice(2), process.env, yaml ?? null);
 
 const sample = (p: (typeof AUTH_PARAMETERS)[number]): string => {
   if (p.kind === 'port') return '61001';
@@ -27,7 +49,7 @@ const other = (p: (typeof AUTH_PARAMETERS)[number]): string => {
 const typed = (p: (typeof AUTH_PARAMETERS)[number], v: string) =>
   p.kind === 'port' ? Number(v) : v;
 
-const NO_ENV = ['MCP_DESTINATION', 'MCP_ENV', 'MCP_ALLOW_DESTINATION_HEADER'];
+const NO_ENV = ['MCP_DESTINATION', 'MCP_ENV'];
 /** Removed in 16.0.0: its only purpose was to switch off the working directory's .env. */
 const REMOVED_ENV = 'MCP_USE_AUTH_BROKER';
 const ENV_NAMES = [
@@ -54,7 +76,7 @@ afterEach(() => {
 });
 
 describe('the table', () => {
-  it('has the twelve rows: the ten of the spec, then --browser-program and --renewal (D9, D11)', () => {
+  it('has the destination rows, then the system type it shares (§10.1)', () => {
     expect(AUTH_PARAMETERS.map((p) => p.cli)).toEqual([
       '--mcp',
       '--env',
@@ -65,7 +87,6 @@ describe('the table', () => {
       '--browser-program',
       '--renewal',
       '--browser-auth-port',
-      '--allow-destination-header',
       '--connection-type',
       '--system-type',
     ]);
@@ -82,7 +103,6 @@ describe('the table', () => {
       ['--browser-program', 'MCP_BROWSER_PROGRAM', 'browser-program'],
       ['--renewal', 'MCP_RENEWAL', 'renewal'],
       ['--browser-auth-port', 'MCP_BROWSER_AUTH_PORT', 'browser-auth-port'],
-      ['--allow-destination-header', undefined, 'allow-destination-header'],
       ['--connection-type', 'SAP_CONNECTION_TYPE', 'connection-type'],
       ['--system-type', 'SAP_SYSTEM_TYPE', 'system-type'],
     ]);
@@ -91,7 +111,7 @@ describe('the table', () => {
   describe.each(AUTH_PARAMETERS.map((p) => [p.cli, p] as const))(
     '%s',
     (_n, row) => {
-      const p = row as typeof row & { env: string };
+      const p = row as typeof row & { env: string; yaml: string };
       const hasEnv = row.env !== undefined;
       const value = p.kind === 'flag' ? true : typed(p, sample(p));
       const cliArgs = p.kind === 'flag' ? [p.cli] : [`${p.cli}=${sample(p)}`];
@@ -155,10 +175,8 @@ describe('the table', () => {
       });
 
       it('is named in the --config template and in the help', () => {
-        expect(generateYamlConfigTemplate()).toMatch(
-          new RegExp(`^${p.yaml}:`, 'm'),
-        );
-        const help = ServerConfigManager.generateHelp();
+        expect(template()).toMatch(new RegExp(`^${p.yaml}:`, 'm'));
+        const help = generateHelp();
         expect(help).toContain(p.cli);
         if (hasEnv) expect(help).toContain(p.env);
       });
@@ -170,10 +188,10 @@ describe('--auth-broker is gone in every form', () => {
   it('has no row, no help line, no template key', () => {
     expect(AUTH_PARAMETERS.map((p) => p.cli)).not.toContain('--auth-broker');
     expect(AUTH_PARAMETERS.map((p) => p.yaml)).not.toContain('auth-broker');
-    const help = ServerConfigManager.generateHelp();
+    const help = generateHelp();
     expect(help).not.toMatch(/--auth-broker(?!-path)/);
     expect(help).not.toContain(REMOVED_ENV);
-    expect(generateYamlConfigTemplate()).not.toMatch(/^auth-broker:/m);
+    expect(template()).not.toMatch(/^auth-broker:/m);
   });
 
   it.each([
@@ -192,16 +210,12 @@ describe('--auth-broker is gone in every form', () => {
     },
   );
 
-  it('the parser refuses a leftover form, so the start stops', () => {
+  it('the reader refuses a leftover form, so the start stops', () => {
     process.argv = ['node', 'server', '--auth-broker'];
-    expect(() => ArgumentsParser.parse()).toThrow(
-      '--auth-broker was removed in 16.0.0',
-    );
+    expect(() => parse()).toThrow('--auth-broker was removed in 16.0.0');
     process.argv = ['node', 'server'];
     process.env[REMOVED_ENV] = 'true';
-    expect(() => new ServerConfigManager().getConfigSync()).toThrow(
-      `${REMOVED_ENV} was removed in 16.0.0`,
-    );
+    expect(() => parse()).toThrow(`${REMOVED_ENV} was removed in 16.0.0`);
   });
 
   it('a YAML config with the removed key fails validation, naming it', () => {
@@ -221,12 +235,9 @@ describe('--auth-broker is gone in every form', () => {
 
 describe('the generated template', () => {
   it('is valid YAML config and sets nothing', () => {
-    const config = load(generateYamlConfigTemplate()) as never;
+    const config = load(template()) as never;
     expect(validateYamlConfig(config).errors).toEqual([]);
-    expect(readAuthParameters([], {}, config)).toEqual({
-      unsafe: false,
-      allowDestinationHeader: false,
-    });
+    expect(readAuthParameters([], {}, config)).toEqual({ unsafe: false });
   });
 });
 
@@ -332,31 +343,29 @@ describe('flags', () => {
 });
 
 describe('through the parser and the manager', () => {
-  it('--browser, MCP_BROWSER and YAML browser reach IServerConfig.browser', () => {
+  it('--browser, MCP_BROWSER and YAML browser reach CoreConfig.browser', () => {
     process.argv = ['node', 'server', '--browser=firefox'];
-    expect(new ServerConfigManager().getConfigSync().browser).toBe('firefox');
+    expect(parse().browser).toBe('firefox');
 
     process.argv = ['node', 'server'];
     process.env.MCP_BROWSER = 'edge';
-    expect(new ServerConfigManager().getConfigSync().browser).toBe('edge');
+    expect(parse().browser).toBe('edge');
   });
 
   it('env forms reach the config', () => {
     process.env.MCP_BROWSER_AUTH_PORT = '61005';
-    const c = new ServerConfigManager().getConfigSync();
+    const c = parse();
     expect(c.browserAuthPort).toBe(61005);
   });
 
-  it('--mcp, --env and --allow-destination-header have no env form', () => {
+  it('--mcp and --env have no env form', () => {
     process.env.MCP_DESTINATION = 'DEST';
     process.env.MCP_ENV = 'ENVDEST';
-    process.env.MCP_ALLOW_DESTINATION_HEADER = 'true';
-    const c = new ServerConfigManager().getConfigSync();
+    const c = parse();
     expect(c.mcpDestination).toBeUndefined();
     expect(c.envFile).toBeUndefined();
-    expect(c.allowDestinationHeader).toBeFalsy();
     expect(readAuthParameters([], process.env, null)).toEqual({});
-    const help = ServerConfigManager.generateHelp();
+    const help = generateHelp();
     for (const n of NO_ENV) expect(help).not.toMatch(new RegExp(`\\b${n}\\b`));
   });
 
@@ -368,9 +377,8 @@ describe('through the parser and the manager', () => {
     } as const;
     process.env.MCP_BROWSER = 'edge';
     process.argv = ['node', 'server', '--connection-type=http'];
-    applyYamlConfigToArgs({ ...yaml });
-    const parsed = ArgumentsParser.parse({ ...yaml });
-    expect(parsed.mcp).toBe('FROM_YAML');
+    const parsed = parse({ ...yaml });
+    expect(parsed.mcpDestination).toBe('FROM_YAML');
     expect(parsed.browser).toBe('edge');
     expect(parsed.connectionType).toBe('http');
   });
@@ -383,7 +391,7 @@ describe('through the parser and the manager', () => {
     delete process.env.SAP_SYSTEM_TYPE;
     process.argv = ['node', 'server', '--system-type=onprem'];
     try {
-      const parsed = ArgumentsParser.parse();
+      const parsed = parse();
       expect(parsed.systemType).toBe('onprem');
       expect(parsed.systemTypeSource).toBe('--system-type');
       expect(process.env.SAP_SYSTEM_TYPE).toBeUndefined();
@@ -414,9 +422,6 @@ describe('the env file names its source', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  const parse = (yaml?: Record<string, unknown>) =>
-    ArgumentsParser.parse(yaml as never);
-
   it.each([
     [['--env-path=./conn.env'], {}, undefined, '--env-path'],
     [['--env=./conn.env'], {}, undefined, '--env'],
@@ -434,7 +439,7 @@ describe('the env file names its source', () => {
     process.argv = ['node', 'server', ...argv];
     Object.assign(process.env, env);
     const parsed = parse(yaml);
-    expect(parsed.env).toBe(path.resolve(dir, 'conn.env'));
+    expect(parsed.envFile).toBe(path.resolve(dir, 'conn.env'));
     expect(parsed.envFileSource).toBe(source);
   });
 
@@ -448,7 +453,7 @@ describe('the env file names its source', () => {
       process.argv = ['node', 'server', ...argv];
       Object.assign(process.env, env);
       const parsed = parse(yaml);
-      expect(parsed.env).toBeUndefined();
+      expect(parsed.envFile).toBeUndefined();
       expect(parsed.envFileSource).toBeUndefined();
     },
   );
@@ -459,17 +464,15 @@ describe('the env file names its source', () => {
       'SAP_URL=https://x.example.test\n',
     );
     process.argv = ['node', 'server', '--env-path=./.env'];
-    expect(parse().env).toBe(path.resolve(dir, '.env'));
+    expect(parse().envFile).toBe(path.resolve(dir, '.env'));
   });
 
   it('no env file → no source', () => {
     expect(parse().envFileSource).toBeUndefined();
   });
 
-  it('reaches IServerConfig through the manager', () => {
+  it('reaches CoreConfig through the reader', () => {
     process.argv = ['node', 'server', '--env-path=./conn.env'];
-    expect(new ServerConfigManager().getConfigSync().envFileSource).toBe(
-      '--env-path',
-    );
+    expect(parse().envFileSource).toBe('--env-path');
   });
 });

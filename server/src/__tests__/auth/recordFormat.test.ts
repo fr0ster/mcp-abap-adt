@@ -15,7 +15,6 @@
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -25,6 +24,7 @@ import {
 } from '../../../../src/__tests__/helpers/adtStandIn';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { RECORD_FORMAT_HINT } from '../../auth/destinationFailure';
+import { readCoreConfig } from '../../config/coreParameters';
 import { launch } from '../../launcher';
 import { StdioServer } from '../../StdioServer';
 import {
@@ -157,8 +157,8 @@ function expectClean(text: string): void {
 }
 
 async function start(argv: string[]) {
-  process.argv = ['node', 'mcp-abap-adt', '--transport=stdio', ...argv];
-  const config = await new ServerConfigManager().getConfig();
+  process.argv = ['node', 'mcp-abap-adt', ...argv];
+  const config = readCoreConfig(process.argv.slice(2), process.env);
   const logins = recordingLogins();
   const stderr: string[] = [];
   const exits: number[] = [];

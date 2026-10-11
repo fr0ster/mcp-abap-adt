@@ -5,15 +5,21 @@
  */
 
 import type { EventEmitter } from 'node:events';
-import type { IServerConfig } from '@mcp-abap-adt/lib/config';
 import {
-  ServerConfigManager,
+  expositionHelp,
+  generateHelp,
+  readStartupConfig,
   validateExposition,
 } from '@mcp-abap-adt/lib/config';
 import { registryForExposition } from '@mcp-abap-adt/lib/handlers';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
+import {
+  readSseConfig,
+  SSE_PARAMETERS,
+  type SseConfig,
+} from './config/sseParameters.js';
 import { SseServer } from './SseServer.js';
 import { SSE_VERSION } from './sseVersion.js';
 
@@ -58,6 +64,18 @@ routed by its sessionId alone, and its own x-sap-* headers are not read):
   A health check answers GET /mcp/health.
 `;
 
+/** sse's help: its own table, the exposition, the headers. */
+export function sseHelp(options: SseLauncherOptions = {}): string {
+  return generateHelp(
+    { ...SSE_PARAMETERS, program: options.program ?? SSE_PARAMETERS.program },
+    {
+      description:
+        '  MCP server for SAP ABAP systems via ADT, over HTTP+SSE: credentials only from the\n  x-sap-* headers of the GET that opens each SSE connection. stdio (destinations,\n  logins) is mcp-abap-adt, Streamable HTTP mcp-abap-adt-http; a binary is its transport.',
+      sections: [expositionHelp(), HELP_SECTIONS],
+    },
+  );
+}
+
 export async function main(options: SseLauncherOptions = {}): Promise<void> {
   const version = options.version ?? SSE_VERSION;
   if (process.argv.includes('--version') || process.argv.includes('-v')) {
@@ -65,26 +83,30 @@ export async function main(options: SseLauncherOptions = {}): Promise<void> {
     process.exit(0);
   }
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.error(
-      ServerConfigManager.generateHelp(HELP_SECTIONS, {
-        program: options.program ?? 'mcp-abap-adt-sse',
-      }),
-    );
+    console.error(sseHelp(options));
     process.exit(0);
   }
-  const config = await new ServerConfigManager({
-    transport: 'sse',
-  }).getConfig();
+  const stderr = (line: string) => process.stderr.write(`${line}\n`);
+  const exit = (code: number) => process.exit(code);
+  // sse's own table: an option of another binary, or --transport, stops here.
+  const config = readStartupConfig(
+    SSE_PARAMETERS,
+    process.argv.slice(2),
+    process.env,
+    { stderr, exit },
+    readSseConfig,
+  );
+  if (config === undefined) return;
   await launch(config, options, {
-    stderr: (line) => process.stderr.write(`${line}\n`),
-    exit: (code) => process.exit(code),
+    stderr,
+    exit,
     processLike: process,
   });
 }
 
 /** Everything after the parameters are read: the tool list, the server, the shutdown. */
 export async function launch(
-  config: IServerConfig,
+  config: SseConfig,
   options: SseLauncherOptions,
   deps: SseLauncherDeps,
 ): Promise<SseServer> {

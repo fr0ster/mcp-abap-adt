@@ -63,7 +63,7 @@ node tools/mcp-crud-smoke.js --help
 Defaults not given on the command line come from `tests/test-config.yaml` →
 `environment.integration_hard_mode`. For `--transport=stdio` pass the server command with
 `--stdio-command=` and `--stdio-arg=` (repeat); the default is the installed `mcp-abap-adt`
-(`--transport=stdio --env-path=.env`).
+(`--env-path=.env`; the server has no transport option, a binary is its transport).
 
 **`mcp-crud-matrix.js`** — runs the same smoke cases over one protocol from the YAML
 (`--protocol=http|sse|stdio` to override) or, explicitly, several (`--protocols=http,sse,stdio`).

@@ -15,10 +15,10 @@ The repository holds five npm packages (not npm workspaces; each is built and pu
 
 ### Standalone server
 
-`mcp-abap-adt` (`server/src/launcher.ts`) serves three transports:
-- **StdioServer** — standard input/output for MCP clients (default)
-- **StreamableHttpServer** — `--transport=http`
-- **SseServer** — `--transport=sse`
+A binary is its transport, each reading its own parameter table:
+- **StdioServer** — `mcp-abap-adt` (`server/src/launcher.ts`, `@mcp-abap-adt/core`), standard input/output for MCP clients
+- **StreamableHttpServer** — `mcp-abap-adt-http` (`http/src/launcher.ts`, `@mcp-abap-adt/http`)
+- **SseServer** — `mcp-abap-adt-sse` (`sse/src/launcher.ts`, `@mcp-abap-adt/sse`)
 
 ### Embedding the handlers
 

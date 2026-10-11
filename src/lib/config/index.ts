@@ -1,35 +1,56 @@
 /**
- * Unified configuration system
- * Exports all configuration-related classes and types
+ * The parameter machinery and the rows every binary shares (D38). Each
+ * binary's own table lives in its package: core's destination rows, http's
+ * Streamable HTTP rows, sse's SSE rows.
  */
 
-export { ArgumentsParser, type ParsedArguments } from './ArgumentsParser.js';
 export {
-  ENV_FILE_CONTEXT_KEYS,
-  hydrateSystemContextFromEnvFile,
-} from './envFileContext.js';
-export type {
-  HandlerSet,
-  IServerConfig,
-  TlsConfig,
-  Transport,
-} from './IServerConfig.js';
-// Server configuration manager
-export { ServerConfigManager } from './ServerConfigManager.js';
-export {
-  readStateIdleMinutes,
+  CONF_ROW,
+  DESTINATION_OPTIONS_REMOVED,
+  DESTINATIONS_ELSEWHERE,
+  EXPOSITION_ROW,
+  findSecretYamlKeys,
+  generateHelp,
+  HTTP_ELSEWHERE,
+  HTTP_OPTIONS_REMOVED,
+  type Parameter,
+  type ParameterKind,
+  ParameterRefusal,
+  type ParameterTable,
+  type ParameterValue,
+  parameterSource,
+  parametersHelp,
+  parametersTemplate,
+  type RemovedParameter,
+  readParameters,
+  refuseRemovedParameters,
+  SSE_ELSEWHERE,
+  SSE_OPTIONS_REMOVED,
   STATE_IDLE_CLI,
   STATE_IDLE_ENV,
+  STATE_IDLE_ROW,
   STATE_IDLE_YAML,
-} from './stateIdleMinutes.js';
+  SYSTEM_TYPE_ROW,
+  TLS_ELSEWHERE,
+  TLS_OPTIONS_REMOVED,
+  TRANSPORT_GONE,
+  tlsConfigOf,
+  tlsRows,
+  transportRemoved,
+  validateYamlParameters,
+} from './authParameters.js';
+export { expositionHelp, toHandlerSets } from './exposition.js';
+export type { HandlerSet, IServerConfig, TlsConfig } from './IServerConfig.js';
+export { readStartupConfig, type StartupEdges } from './startup.js';
+export { readStateIdleMinutes } from './stateIdleMinutes.js';
 export { validateExposition } from './validateExposition.js';
-export type { YamlConfig } from './yamlConfig.js';
-// YAML configuration
 export {
-  applyYamlConfigToArgs,
+  type ConfigurationRead,
   generateConfigTemplateIfNeeded,
   generateYamlConfigTemplate,
   loadYamlConfig,
   parseConfigArg,
+  readConfigFile,
   validateYamlConfig,
+  type YamlConfig,
 } from './yamlConfig.js';

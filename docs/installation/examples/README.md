@@ -28,7 +28,6 @@ Nothing is read from the working directory.
 | `cline-stdio-snc-config.json` | RFC / SNC on Windows: the SDK's `lib` directory on `PATH` |
 | `cline-stdio-ca-config.json` | A system whose certificate a company CA issued: `NODE_EXTRA_CA_CERTS` |
 | `cline-http-config.json` | Client of `mcp-abap-adt-http`, its credentials in `x-sap-*` headers |
-| `cline-http-service-key-config.json` | The same, choosing the destination per request (`x-mcp-destination`) |
 | `cline-sse-config.json` | Client of `mcp-abap-adt-sse`, its credentials in the opening request's `x-sap-*` headers |
 
 ## 1. Full server over HTTP (stdio)
@@ -40,7 +39,7 @@ With one `.env` file:
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env"],
       "disabled": false
     }
   }
@@ -75,7 +74,7 @@ The same arguments and `.env`, the command `mcp-abap-adt-compact`:
   "mcpServers": {
     "mcp-abap-adt-compact": {
       "command": "mcp-abap-adt-compact",
-      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env"],
       "disabled": false
     }
   }
@@ -94,7 +93,7 @@ them from the `.env`. On Windows the SDK's `lib` directory must be on `PATH` whe
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--env-path=C:/path/to/<destination>.env"],
+      "args": ["--env-path=C:/path/to/<destination>.env"],
       "env": {
         "PATH": "C:\\nwrfcsdk\\nwrfcsdk\\lib;<the rest of your PATH>"
       },
@@ -132,7 +131,7 @@ trusts that CA. Name the PEM file in the client's `env` block:
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env"],
       "env": {
         "NODE_EXTRA_CA_CERTS": "/path/to/company-ca.pem"
       },
@@ -150,24 +149,19 @@ The server runs on its own; the client only connects. Start it in a terminal (pr
 such as `NODE_EXTRA_CA_CERTS` belong in that terminal's environment):
 
 ```bash
-# Streamable HTTP: http://localhost:3000/mcp/stream/http
-mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
+# Streamable HTTP (@mcp-abap-adt/http): http://localhost:3000/mcp/stream/http
+mcp-abap-adt-http --port=3000
 
-# A named destination instead of a .env
-mcp-abap-adt --transport=http --port=3000 --mcp=<destination>
-
-# SSE: http://localhost:3001/sse
-mcp-abap-adt --transport=sse --port=3001 --env-path=/path/to/<destination>.env
+# SSE (@mcp-abap-adt/sse): http://localhost:3001/sse
+mcp-abap-adt-sse --sse-port=3001
 ```
 
-`mcp-abap-adt-compact` and `npx -y @mcp-abap-adt/core` take the same arguments. Then use
-`cline-http-config.json` or `cline-sse-config.json`.
+Neither takes a destination: each request (Streamable HTTP), or the `GET` that opens each SSE
+connection, carries its credential in `x-sap-*` headers. Then use `cline-http-config.json` or
+`cline-sse-config.json`. A request carrying `x-mcp-destination` is answered `400`: destinations, service
+keys and the browser login are served only by `mcp-abap-adt` (stdio).
 
-To choose the destination per request, start the server with `--allow-destination-header` and send
-`x-mcp-destination` (`cline-http-service-key-config.json`). Without `--mcp`, `--env` or `--env-path` there
-is no default destination, and a request must name one or carry `x-sap-url` with a credential.
-
-**First-time authentication** of a service-key destination: the browser opens for the login (callback
+**First-time authentication** of a service-key destination (`mcp-abap-adt --mcp=<destination>`, stdio): the browser opens for the login (callback
 port `61001`). The token is kept in memory, or saved to `sessions/<destination>.env` with `--unsafe`.
 
 ## More Info

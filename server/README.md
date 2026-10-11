@@ -13,8 +13,8 @@ mcp-abap-adt --env-path=./mcp.env        # a .env written by mcp-auth
 Streamable HTTP and HTTP+SSE are packages of their own, serving credentials from each request's
 `x-sap-*` headers: [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)
 (`mcp-abap-adt-http`) and [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)
-(`mcp-abap-adt-sse`). `--transport=http` or `--transport=sse` stops this binary naming the one to
-run. Only this package depends on `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores`.
+(`mcp-abap-adt-sse`). There is no `--transport` option: it, and any option of those binaries, stops
+this one naming the binary to run. Only this package depends on `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores`.
 
 It connects to the ABAP system over **HTTP** (basic or JWT), **RFC** (basic) or **SNC**
 (passwordless, over RFC). HTTP needs nothing more. **RFC and SNC need the SAP NW RFC SDK, a C++

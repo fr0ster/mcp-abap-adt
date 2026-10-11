@@ -5,15 +5,21 @@
  */
 
 import type { EventEmitter } from 'node:events';
-import type { IServerConfig } from '@mcp-abap-adt/lib/config';
 import {
-  ServerConfigManager,
+  expositionHelp,
+  generateHelp,
+  readStartupConfig,
   validateExposition,
 } from '@mcp-abap-adt/lib/config';
 import { registryForExposition } from '@mcp-abap-adt/lib/handlers';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
+import {
+  HTTP_PARAMETERS,
+  type HttpConfig,
+  readHttpConfig,
+} from './config/httpParameters.js';
 import { HTTP_VERSION } from './httpVersion.js';
 import { StreamableHttpServer } from './StreamableHttpServer.js';
 
@@ -56,6 +62,18 @@ CREDENTIALS (each request's headers; nothing is stored, shared or cached):
   A health check answers GET /mcp/health.
 `;
 
+/** http's help: its own table, the exposition, the headers. */
+export function httpHelp(options: HttpLauncherOptions = {}): string {
+  return generateHelp(
+    { ...HTTP_PARAMETERS, program: options.program ?? HTTP_PARAMETERS.program },
+    {
+      description:
+        "  MCP server for SAP ABAP systems via ADT, over Streamable HTTP: credentials only from\n  each request's x-sap-* headers. stdio (destinations, logins) is mcp-abap-adt, SSE\n  mcp-abap-adt-sse; a binary is its transport.",
+      sections: [expositionHelp(), HELP_SECTIONS],
+    },
+  );
+}
+
 export async function main(options: HttpLauncherOptions = {}): Promise<void> {
   const version = options.version ?? HTTP_VERSION;
   if (process.argv.includes('--version') || process.argv.includes('-v')) {
@@ -63,26 +81,30 @@ export async function main(options: HttpLauncherOptions = {}): Promise<void> {
     process.exit(0);
   }
   if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.error(
-      ServerConfigManager.generateHelp(HELP_SECTIONS, {
-        program: options.program ?? 'mcp-abap-adt-http',
-      }),
-    );
+    console.error(httpHelp(options));
     process.exit(0);
   }
-  const config = await new ServerConfigManager({
-    transport: 'http',
-  }).getConfig();
+  const stderr = (line: string) => process.stderr.write(`${line}\n`);
+  const exit = (code: number) => process.exit(code);
+  // http's own table: an option of another binary, or --transport, stops here.
+  const config = readStartupConfig(
+    HTTP_PARAMETERS,
+    process.argv.slice(2),
+    process.env,
+    { stderr, exit },
+    readHttpConfig,
+  );
+  if (config === undefined) return;
   await launch(config, options, {
-    stderr: (line) => process.stderr.write(`${line}\n`),
-    exit: (code) => process.exit(code),
+    stderr,
+    exit,
     processLike: process,
   });
 }
 
 /** Everything after the parameters are read: the tool list, the server, the shutdown. */
 export async function launch(
-  config: IServerConfig,
+  config: HttpConfig,
   options: HttpLauncherOptions,
   deps: HttpLauncherDeps,
 ): Promise<StreamableHttpServer> {
@@ -98,7 +120,7 @@ export async function launch(
     stateLogger: stderrStateLogger,
     host: config.host,
     port: config.port,
-    enableJsonResponse: config.httpJsonResponse,
+    enableJsonResponse: config.httpJsonResponse || undefined,
     path: config.httpPath,
     logger: noopLogger,
     tls: config.tls,

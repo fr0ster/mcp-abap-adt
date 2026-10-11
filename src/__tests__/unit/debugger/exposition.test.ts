@@ -1,4 +1,4 @@
-import { ServerConfigManager } from '../../../lib/config/ServerConfigManager';
+import { expositionHelp, toHandlerSets } from '../../../lib/config/exposition';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 
@@ -23,21 +23,15 @@ describe('the debug set', () => {
   });
 
   describe('--exposition', () => {
-    const saved = process.argv;
-    afterEach(() => {
-      process.argv = saved;
-    });
-
     it('accepts debug beside readonly', () => {
-      process.argv = [...saved.slice(0, 2), '--exposition=readonly,debug'];
-      const manager = Object.create(ServerConfigManager.prototype) as any;
-      expect(manager.parseExposition()).toEqual(['readonly', 'debug']);
+      expect(toHandlerSets(['readonly', 'debug'])).toEqual([
+        'readonly',
+        'debug',
+      ]);
     });
 
     it('lists debug in the help text', () => {
-      expect(ServerConfigManager.getHandlerSetsDescription()).toMatch(
-        /debug:\s+the debugger tools; opt-in/,
-      );
+      expect(expositionHelp()).toMatch(/debug:\s+the debugger tools; opt-in/);
     });
   });
 });

@@ -50,7 +50,7 @@ npm install -g @mcp-abap-adt/configurator
 mcp-conf --client cline --name abap --mcp TRIAL
 
 # HTTP (streamable HTTP)
-mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http --mcp trial
+mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http
 ```
 
 Full configurator usage (separate repo): [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md).
@@ -66,7 +66,7 @@ See [docs/user-guide/TERMINOLOGY.md](docs/user-guide/TERMINOLOGY.md) for the ful
 Destination-based auth is the default. Drop service keys into the standard platform folder and use the filename as your destination:
 
 ```bash
-mcp-abap-adt --transport=stdio --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL
 ```
 
 Standard service key paths:
@@ -107,7 +107,9 @@ the obligations of a server that service never runs.
 | Package | Licence | What it is |
 |---|---|---|
 | [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib) | Apache-2.0 | The ADT tool handlers and the embeddable MCP server. No transport: the host supplies one. |
-| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | AGPL-3.0-only | The standalone server — stdio, SSE and streamable HTTP, the launcher and the `mcp-abap-adt` CLI. Depends on the library. |
+| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | AGPL-3.0-only | The standalone stdio server, `mcp-abap-adt`: one destination through the auth broker. Depends on the library. |
+| [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http) | AGPL-3.0-only | The Streamable HTTP server, `mcp-abap-adt-http`: credentials from each request's `x-sap-*` headers. |
+| [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse) | AGPL-3.0-only | The HTTP+SSE server, `mcp-abap-adt-sse`: credentials from the `x-sap-*` headers of each SSE connection's `GET`. |
 | [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | AGPL-3.0-only | The compact standalone server, `mcp-abap-adt-compact`: one tool per operation, the object type in the arguments. Same launcher and configuration as `core`. |
 | [`@mcp-abap-adt/compact-readonly`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes. |
 
@@ -115,11 +117,11 @@ Install `@mcp-abap-adt/core` (or `@mcp-abap-adt/compact`) to run a server. Insta
 embed the tools in your own application.
 
 ### 1. Standalone MCP Server (Default)
-Run as a standalone MCP server with stdio, HTTP, or SSE transport:
+Run as a standalone MCP server; a binary is its transport (there is no `--transport` option):
 ```bash
-mcp-abap-adt                           # stdio (default)
-mcp-abap-adt --transport=http          # HTTP mode
-mcp-abap-adt --transport=sse           # SSE mode
+mcp-abap-adt --mcp=TRIAL               # stdio (@mcp-abap-adt/core): one destination
+mcp-abap-adt-http                      # Streamable HTTP (@mcp-abap-adt/http): x-sap-* headers per request
+mcp-abap-adt-sse                       # SSE (@mcp-abap-adt/sse): x-sap-* headers per SSE connection
 ```
 
 ### 2. Embeddable Server (For Integration)
@@ -281,14 +283,11 @@ mcp-abap-adt --help
 # Default stdio mode (for MCP clients; requires .env file or --mcp parameter)
 mcp-abap-adt
 
-# stdio mode (explicit; default when --transport is omitted)
-mcp-abap-adt --transport=stdio
-
-# HTTP mode on custom port (HTTP requires --transport=http)
-mcp-abap-adt --transport=http --port=8080
+# Streamable HTTP on a custom port (@mcp-abap-adt/http; credentials from x-sap-* headers)
+mcp-abap-adt-http --port=8080
 
 # Use stdio mode with auth-broker (--mcp parameter)
-mcp-abap-adt --transport=stdio --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL
 
 # Use env destination from platform sessions store
 mcp-abap-adt --env=trial
@@ -296,11 +295,8 @@ mcp-abap-adt --env=trial
 # Use explicit .env file path
 mcp-abap-adt --env-path=/path/to/my.env
 
-# SSE mode (requires .env file or --mcp parameter)
-mcp-abap-adt --transport=sse --port=3001
-
-# SSE mode with auth-broker (--mcp parameter)
-mcp-abap-adt --transport=sse --mcp=TRIAL
+# SSE (@mcp-abap-adt/sse; credentials from the opening GET's x-sap-* headers)
+mcp-abap-adt-sse --sse-port=3001
 
 # The compact server takes the same options (npm install -g @mcp-abap-adt/compact)
 mcp-abap-adt-compact --env-path=/path/to/my.env
@@ -396,7 +392,6 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--browser-program=<program>` - The program that opens the login URL instead (excludes `--browser`)
 - `--renewal=<mode>` - `refresh-then-login` (default) or `refresh-only` (never a login)
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
-- `--allow-destination-header` - Honour the `x-mcp-destination` header (HTTP/SSE only, off by default)
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`
 - `--unsafe` - Write named destinations' sessions to disk. By default they are kept in memory (one login per process). A `.env` you name is written back either way
 

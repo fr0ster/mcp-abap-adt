@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import {
   ENV_FILE_CONTEXT_KEYS,
   hydrateSystemContextFromEnvFile,
-} from '../../lib/config/envFileContext';
+} from '../../config/envFileContext';
 
 function envFile(content: string): string {
   const path = join(mkdtempSync(join(tmpdir(), 'env-ctx-')), 'session.env');

@@ -1,0 +1,172 @@
+/**
+ * `mcp-abap-adt-sse`'s parameter table (D38, D48, spec §10.1): every SSE
+ * option of today under its name, beside lib's shared rows and the TLS rows
+ * (D50). No destination, login or Streamable HTTP option is here; any form of
+ * one — or of `--transport`, which is gone — stops the start naming the
+ * binary that serves it (D39).
+ */
+
+import {
+  CONF_ROW,
+  DESTINATION_OPTIONS_REMOVED,
+  EXPOSITION_ROW,
+  HTTP_OPTIONS_REMOVED,
+  type IServerConfig,
+  type Parameter,
+  type ParameterTable,
+  type ParameterValue,
+  parameterSource,
+  readParameters,
+  STATE_IDLE_ROW,
+  SYSTEM_TYPE_ROW,
+  type TlsConfig,
+  tlsConfigOf,
+  tlsRows,
+  toHandlerSets,
+  transportRemoved,
+  type YamlConfig,
+} from '@mcp-abap-adt/lib/config';
+
+const SSE = 'SSE';
+
+/** The SSE rows: today's names (§10.1). */
+export const SSE_ROWS: readonly Parameter[] = [
+  {
+    key: 'host',
+    cli: '--sse-host',
+    env: 'MCP_SSE_HOST',
+    yaml: 'sse.host',
+    kind: 'string',
+    default: '127.0.0.1',
+    valueHint: '=<host>',
+    section: SSE,
+    help: 'Host to listen on (default 127.0.0.1, this machine only; 0.0.0.0 for every interface)',
+  },
+  {
+    key: 'port',
+    cli: '--sse-port',
+    env: 'MCP_SSE_PORT',
+    yaml: 'sse.port',
+    kind: 'port',
+    default: 3001,
+    section: SSE,
+    help: 'Port to listen on, 1-65535 (default 3001)',
+  },
+  {
+    key: 'ssePath',
+    cli: '--sse-path',
+    kind: 'string',
+    valueHint: '=<path>',
+    section: SSE,
+    help: 'The path of the GET that opens an SSE connection (default /sse)',
+  },
+  {
+    key: 'postPath',
+    cli: '--post-path',
+    kind: 'string',
+    valueHint: '=<path>',
+    section: SSE,
+    help: "The path of a connection's POST messages (default /messages)",
+  },
+  {
+    key: 'allowedHosts',
+    cli: '--sse-allowed-hosts',
+    env: 'MCP_SSE_ALLOWED_HOSTS',
+    yaml: 'sse.allowed-hosts',
+    kind: 'list',
+    section: SSE,
+    help: 'Host header values accepted with DNS-rebinding protection (exact, with the port), comma-separated',
+  },
+  {
+    key: 'allowedOrigins',
+    cli: '--sse-allowed-origins',
+    env: 'MCP_SSE_ALLOWED_ORIGINS',
+    yaml: 'sse.allowed-origins',
+    kind: 'list',
+    section: SSE,
+    help: 'Origin header values accepted with DNS-rebinding protection (exact, with the scheme), comma-separated',
+  },
+  {
+    key: 'enableDnsRebindingProtection',
+    cli: '--sse-enable-dns-protection',
+    env: 'MCP_SSE_ENABLE_DNS_PROTECTION',
+    yaml: 'sse.enable-dns-protection',
+    kind: 'flag',
+    section: SSE,
+    help: 'Enable DNS-rebinding protection (with --sse-allowed-hosts and/or --sse-allowed-origins)',
+  },
+];
+
+/** `mcp-abap-adt-sse`'s table: its rows, the shared rows, and what it refuses. */
+export const SSE_PARAMETERS: ParameterTable = {
+  program: 'mcp-abap-adt-sse',
+  rows: [
+    CONF_ROW,
+    EXPOSITION_ROW,
+    SYSTEM_TYPE_ROW,
+    ...SSE_ROWS,
+    ...tlsRows('sse'),
+    STATE_IDLE_ROW,
+  ],
+  removed: [
+    transportRemoved('sse'),
+    DESTINATION_OPTIONS_REMOVED,
+    HTTP_OPTIONS_REMOVED,
+  ],
+};
+
+/** What `mcp-abap-adt-sse` reads. */
+export interface SseConfig extends IServerConfig {
+  host?: string;
+  port?: number;
+  /** The path of the GET that opens an SSE connection */
+  ssePath?: string;
+  /** The path of a connection's POST messages */
+  postPath?: string;
+  /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
+  allowedHosts?: string[];
+  /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
+  allowedOrigins?: string[];
+  /** Enable DNS-rebinding protection */
+  enableDnsRebindingProtection?: boolean;
+  /** TLS: cert and key start HTTPS */
+  tls?: TlsConfig;
+}
+
+const list = (v: ParameterValue | undefined): string[] | undefined =>
+  Array.isArray(v) ? [...v] : undefined;
+
+/**
+ * `mcp-abap-adt-sse`'s configuration from the arguments, the environment and
+ * the loaded config file. A removed parameter, or an invalid value, throws a
+ * `ParameterRefusal` in its words.
+ */
+export function readSseConfig(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  yaml: YamlConfig | null = null,
+): SseConfig {
+  const values = readParameters(SSE_PARAMETERS, argv, env, yaml);
+  return {
+    exposition: toHandlerSets(values.exposition as readonly string[]),
+    configFile: values.configFile as string | undefined,
+    systemType: values.systemType as SseConfig['systemType'],
+    systemTypeSource: parameterSource(
+      SSE_PARAMETERS,
+      'systemType',
+      argv,
+      env,
+      yaml,
+    ),
+    stateIdleMinutes: values.stateIdleMinutes as number,
+    host: values.host as string,
+    port: values.port as number,
+    ssePath: values.ssePath as string | undefined,
+    postPath: values.postPath as string | undefined,
+    allowedHosts: list(values.allowedHosts),
+    allowedOrigins: list(values.allowedOrigins),
+    enableDnsRebindingProtection:
+      (values.enableDnsRebindingProtection as boolean | undefined) ?? false,
+    tls: tlsConfigOf(values),
+  };
+}

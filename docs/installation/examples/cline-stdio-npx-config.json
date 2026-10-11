@@ -5,7 +5,6 @@
       "args": [
         "-y",
         "@mcp-abap-adt/core",
-        "--transport=stdio",
         "--env-path=/path/to/<destination>.env"
       ],
       "disabled": false

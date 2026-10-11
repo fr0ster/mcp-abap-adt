@@ -5,10 +5,11 @@ import {
   assertDestinationName,
   browserCallbackStrategy,
 } from '@mcp-abap-adt/lib/auth';
-import type { HandlerSet, IServerConfig } from '@mcp-abap-adt/lib/config';
 import {
-  hydrateSystemContextFromEnvFile,
-  ServerConfigManager,
+  expositionHelp,
+  generateHelp,
+  type HandlerSet,
+  readStartupConfig,
   validateExposition,
 } from '@mcp-abap-adt/lib/config';
 import {
@@ -30,6 +31,12 @@ import {
   type IAuthBrokerFactoryConfig,
   promptLogger,
 } from './auth';
+import {
+  CORE_PARAMETERS,
+  type CoreConfig,
+  readCoreConfig,
+} from './config/coreParameters';
+import { hydrateSystemContextFromEnvFile } from './config/envFileContext';
 import { CORE_VERSION } from './coreVersion.js';
 import { StdioServer } from './StdioServer.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
@@ -60,16 +67,6 @@ export const stateLoggerForTransport: StateLogger = stderrStateLogger;
 
 // Keep strong reference to running server instance to avoid premature GC/exit
 let activeServer: StdioServer | undefined;
-
-/**
- * core serves stdio only (D35): the other transports are packages of their
- * own, and a start that asks for one stops naming the binary that serves it
- * (§10.1's words).
- */
-const TRANSPORT_ELSEWHERE: Readonly<Record<'http' | 'sse', string>> = {
-  http: 'Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)',
-  sse: 'SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)',
-};
 
 function hasArg(name: string): boolean {
   return process.argv.includes(name);
@@ -176,26 +173,24 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     compiled by npm install: SAPNWRFC_HOME and a C++ toolchain must be there before it;
     npm ls -g @mcp-abap-adt/sap-rfc-lite shows (empty) when it was left out)
 
-  System Context (per request, first found wins; reads are unaffected):
+  System Context (first found wins; reads are unaffected):
     SAP_RESPONSIBLE                Responsible person of created objects, always sent. First
-                                   found: the tool's argument; x-sap-responsible; SAP_RESPONSIBLE
-                                   in the destination's own .env (--env / --env-path file, or
+                                   found: the tool's argument; SAP_RESPONSIBLE in the
+                                   destination's own .env (--env / --env-path file, or
                                    sessions/<destination>.env), then in the environment. Else
                                    the login: on-premise the destination's SAP_USERNAME, the
-                                   x-sap-login of an x-sap-url connection, the environment's
-                                   SAP_USERNAME; on a cloud system only the system's user. A create
-                                   that finds none is refused (SNC, a token), a message class
-                                   included.
+                                   environment's SAP_USERNAME; on a cloud system only the
+                                   system's user. A create that finds none is refused (SNC, a
+                                   token), a message class included.
     SAP_MASTER_SYSTEM              Master system of created objects (no tool takes it as an
-                                   argument). First found: x-sap-master-system; the destination's
-                                   .env; the environment; on a cloud system, the system id.
+                                   argument). First found: the destination's .env; the
+                                   environment; on a cloud system, the system id.
                                    Otherwise left out of the request, never refused
                                    The environment is read once: later changes are not picked up
     SAP_DEBUG_TERMINAL_ID          The debugger's terminal id and IDE id (with --exposition=...,debug),
-    SAP_DEBUG_IDE_ID               each on its own. First found: x-sap-debug-terminal-id /
-                                   x-sap-debug-ide-id; the destination's .env; the environment.
-                                   Else random per instance. A shared IDE id shares the user's
-                                   catches without the system's listener conflict
+    SAP_DEBUG_IDE_ID               each on its own. First found: the destination's .env; the
+                                   environment. Else random per instance. A shared IDE id shares
+                                   the user's catches without the system's listener conflict
 
   Streamable HTTP and SSE are served by mcp-abap-adt-http (@mcp-abap-adt/http) and
   mcp-abap-adt-sse (@mcp-abap-adt/sse), with credentials from each request's x-sap-* headers.
@@ -207,14 +202,57 @@ GENERATING A .ENV:
   A jwt .env must state SAP_GRANT_TYPE.
 `;
 
-function showHelp(options: LauncherOptions = {}): void {
-  console.error(
-    ServerConfigManager.generateHelp(V2_HELP_SECTIONS, {
-      program: options.program,
-      // A sibling command documents its OWN exposition vocabulary, not this one's.
-      expositionSection: options.helpExposition,
-    }),
+/** The examples of core's help: stdio only. */
+const EXAMPLES = `
+EXAMPLES:
+  # A named destination (for MCP clients)
+  mcp-abap-adt --mcp=TRIAL
+
+  # An env file by destination name, from the sessions store
+  mcp-abap-adt --env=trial
+
+  # An explicit env file (a .env in the working directory is read only when named)
+  mcp-abap-adt --env-path=./.env
+
+  # RFC connection (any system with SAP NW RFC SDK)
+  # (or SAP_CONNECTION_TYPE=rfc in the .env file)
+  mcp-abap-adt --env-path=my-system.env --connection-type=rfc
+
+  # Explicit system type (tools default to cloud; the connector to cloud for a jwt, else onprem)
+  mcp-abap-adt --env-path=<system>.env --system-type=onprem
+
+  # Readonly operations only
+  mcp-abap-adt --mcp=TRIAL --exposition=readonly
+
+  # A YAML config file (a template is written when it does not exist)
+  mcp-abap-adt --conf=my-config.yaml
+`;
+
+/**
+ * core's help: its own table (no HTTP or SSE option), the exposition, the
+ * environment. `program` and `helpExposition` exist for a sibling command:
+ * `mcp-abap-adt-compact` shares this launcher, but must not print
+ * `mcp-abap-adt` in USAGE, and its exposition is another vocabulary.
+ */
+export function coreHelp(options: LauncherOptions = {}): string {
+  return generateHelp(
+    { ...CORE_PARAMETERS, program: options.program ?? CORE_PARAMETERS.program },
+    {
+      description:
+        '  MCP server for SAP ABAP systems via ADT (ABAP Development Tools), over stdio:\n' +
+        '  one destination through the auth broker. Streamable HTTP is mcp-abap-adt-http,\n' +
+        '  SSE mcp-abap-adt-sse; a binary is its transport.',
+      sections: [
+        options.helpExposition ?? expositionHelp(),
+        V2_HELP_SECTIONS,
+        EXAMPLES,
+      ],
+    },
   );
+}
+
+function showHelp(options: LauncherOptions = {}): void {
+  console.error(coreHelp(options));
 }
 
 /**
@@ -266,13 +304,21 @@ export async function main(options: LauncherOptions = {}) {
     process.exit(0);
   }
 
-  // Use ServerConfigManager for all config parsing
-  const configManager = new ServerConfigManager();
-  const config = await configManager.getConfig();
+  const stderr = (line: string) => process.stderr.write(`${line}\n`);
+  const exit = (code: number) => process.exit(code);
+  // core's own table: an option of another binary, or --transport, stops here.
+  const config = readStartupConfig(
+    CORE_PARAMETERS,
+    process.argv.slice(2),
+    process.env,
+    { stderr, exit },
+    readCoreConfig,
+  );
+  if (config === undefined) return;
   await launch(config, options, {
     browserStrategy: browserCallbackStrategy,
-    stderr: (line) => process.stderr.write(`${line}\n`),
-    exit: (code) => process.exit(code),
+    stderr,
+    exit,
     processLike: process,
   });
 }
@@ -292,11 +338,11 @@ export interface LauncherDeps {
 
 /**
  * The env file and the parameter it came from. `envFilePath` is
- * `IServerConfig`'s alias of `envFile`; ServerConfigManager sets both and
+ * `CoreConfig`'s alias of `envFile`; `readCoreConfig` sets both and
  * states the source. A config made by hand names the field it set.
  */
 function envFileOf(
-  config: IServerConfig,
+  config: CoreConfig,
 ): Pick<IAuthBrokerFactoryConfig, 'envFile'> {
   const field = config.envFile
     ? 'envFile'
@@ -307,7 +353,7 @@ function envFileOf(
   return {
     envFile: {
       path: config[field] as string,
-      source: config.envFileSource ?? `IServerConfig.${field}`,
+      source: config.envFileSource ?? `CoreConfig.${field}`,
     },
   };
 }
@@ -358,9 +404,9 @@ function effectiveFromEnvironment<T extends string>(
 
 /** The connection type: see {@link effectiveFromEnvironment}. */
 export function effectiveConnectionType(
-  config: IServerConfig,
+  config: CoreConfig,
   env: NodeJS.ProcessEnv,
-): IServerConfig['connectionType'] {
+): CoreConfig['connectionType'] {
   return effectiveFromEnvironment(
     config.connectionType,
     config.connectionTypeSource,
@@ -376,9 +422,9 @@ export function effectiveConnectionType(
  * was read and so beat the file's SAP_SYSTEM_TYPE even from YAML.
  */
 export function effectiveSystemType(
-  config: IServerConfig,
+  config: CoreConfig,
   env: NodeJS.ProcessEnv,
-): IServerConfig['systemType'] {
+): CoreConfig['systemType'] {
   return effectiveFromEnvironment(
     config.systemType,
     config.systemTypeSource,
@@ -395,7 +441,7 @@ export function effectiveSystemType(
  * from, as the user gave it.
  */
 export function factoryConfigFrom(
-  config: IServerConfig,
+  config: CoreConfig,
   collaborators: Pick<
     IAuthBrokerFactoryConfig,
     'browserStrategy' | 'logger' | 'promptLogger'
@@ -454,7 +500,7 @@ function startupWords(
 async function checkAndSummarise(
   factory: AuthBrokerFactory,
   destination: string,
-  config: IServerConfig,
+  config: CoreConfig,
   stderr: (line: string) => void,
   platform: string,
 ): Promise<void> {
@@ -506,21 +552,16 @@ async function checkAndSummarise(
  * any transport does.
  */
 export async function launch(
-  config: IServerConfig,
+  config: CoreConfig,
   options: LauncherOptions,
   deps: LauncherDeps,
 ): Promise<void> {
-  if (config.transport === 'http' || config.transport === 'sse') {
-    deps.stderr(`[MCP] ${TRANSPORT_ELSEWHERE[config.transport]}`);
-    deps.exit(1);
-    return;
-  }
   // The env file's context joins the process environment first — never over
   // a value already there — so its SAP_CONNECTION_TYPE and SAP_SYSTEM_TYPE
   // count (as in 15.x).
   hydrateSystemContextFromEnvFile(config.envFile ?? config.envFilePath);
-  let connectionType: IServerConfig['connectionType'];
-  let systemType: IServerConfig['systemType'];
+  let connectionType: CoreConfig['connectionType'];
+  let systemType: CoreConfig['systemType'];
   try {
     connectionType = effectiveConnectionType(config, process.env);
     systemType = effectiveSystemType(config, process.env);

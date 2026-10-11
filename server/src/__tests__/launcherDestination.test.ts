@@ -42,8 +42,9 @@ import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
-import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
+import { readConfigFile } from '@mcp-abap-adt/lib/config';
 import { AuthBrokerFactory, type LoginStrategyOptions } from '../auth';
+import { CORE_PARAMETERS, readCoreConfig } from '../config/coreParameters';
 import { factoryConfigFrom, launch } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
 
@@ -128,7 +129,14 @@ async function run(
   platform = 'linux',
 ) {
   process.argv = ['node', 'mcp-abap-adt', ...argv];
-  const config = await new ServerConfigManager().getConfig();
+  // As the program reads it: the --conf / --config file, then core's table.
+  const args = process.argv.slice(2);
+  const file = readConfigFile(CORE_PARAMETERS, args);
+  const config = readCoreConfig(
+    args,
+    process.env,
+    file.template ? null : file.yaml,
+  );
   const strategy = recordingStrategy();
   const stderr: string[] = [];
   const exits: number[] = [];
@@ -205,7 +213,7 @@ async function browserOfTheLogin(
 }
 
 describe('the browser reaches the login strategy, mapped for the platform', () => {
-  const stdio = ['--transport=stdio', '--mcp=dest'];
+  const stdio = ['--mcp=dest'];
 
   it('--browser', async () => {
     writeKey('dest', abapKey);
@@ -296,7 +304,6 @@ describe('a browser that cannot be served stops the start', () => {
   ])('%j: its words on stderr, exit 1, nothing read', async (args, words) => {
     writeKey('dest', abapKey);
     const { stderr, exits } = await run([
-      '--transport=stdio',
       '--mcp=dest',
       `--auth-broker-path=${root}`,
       ...args,
@@ -333,7 +340,6 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
       const port = await freePort();
       const { stderr } = await run(
         [
-          '--transport=stdio',
           '--mcp=dest',
           `--auth-broker-path=${root}`,
           `--browser=${browser}`,
@@ -404,11 +410,7 @@ describe('one destination per process', () => {
     // .env and a destination named default.
     fs.writeFileSync(path.join(root, '.env'), basicLines().join('\n'));
     writeSession('default', basicLines());
-    const { exits } = await run([
-      '--transport=stdio',
-      '--mcp=dest',
-      `--auth-broker-path=${root}`,
-    ]);
+    const { exits } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
     expect(exits).toEqual([]);
     expect(constructed).toHaveBeenCalledTimes(1);
     expect(stdioStart).toHaveBeenCalledTimes(1);
@@ -418,10 +420,7 @@ describe('one destination per process', () => {
   it('an --env-path file → the destination default, one broker', async () => {
     const file = path.join(root, 'conn.env');
     fs.writeFileSync(file, `${basicLines().join('\n')}\n`);
-    const { exits, stderr } = await run([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const { exits, stderr } = await run([`--env-path=${file}`]);
     expect(exits).toEqual([]);
     expect(constructed).toHaveBeenCalledTimes(1);
     expect(stdioStart).toHaveBeenCalledWith('default');
@@ -429,35 +428,11 @@ describe('one destination per process', () => {
   });
 
   it('neither: inspection-only, no broker', async () => {
-    const { stderr } = await run(['--transport=stdio']);
+    const { stderr } = await run([]);
     expect(constructed).not.toHaveBeenCalled();
     expect(stdioStart).toHaveBeenCalledWith(undefined);
     expect(stderr[0]).toContain('inspection-only mode');
   });
-});
-
-describe('core serves stdio only (D35)', () => {
-  it.each([
-    [
-      'http',
-      'Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)',
-    ],
-    ['sse', 'SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)'],
-  ] as const)(
-    '--transport=%s stops the start naming the binary, before anything is read',
-    async (transport, words) => {
-      writeSession('dest', basicLines());
-      const { stderr, exits } = await run([
-        `--transport=${transport}`,
-        '--mcp=dest',
-        `--auth-broker-path=${root}`,
-      ]);
-      expect(exits).toEqual([1]);
-      expect(stderr).toEqual([`[MCP] ${words}`]);
-      expect(constructed).not.toHaveBeenCalled();
-      expect(stdioStart).not.toHaveBeenCalled();
-    },
-  );
 });
 
 describe('a destination that cannot be served stops the start', () => {
@@ -469,7 +444,6 @@ describe('a destination that cannot be served stops the start', () => {
       `SAP_PASSWORD=${PASSWORD}`,
     ]);
     const { stderr, exits } = await run([
-      '--transport=stdio',
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
@@ -487,7 +461,6 @@ describe('a destination that cannot be served stops the start', () => {
       '{"uaa":{"clientsecret":PLACEHOLDERSECRET}}',
     );
     const { stderr, exits } = await run([
-      '--transport=stdio',
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
@@ -505,10 +478,7 @@ describe('a destination that cannot be served stops the start', () => {
 
   it('an --env-path file that does not exist: the parameter and the path', async () => {
     const missing = path.join(root, 'nope.env');
-    const { stderr, exits } = await run([
-      '--transport=stdio',
-      `--env-path=${missing}`,
-    ]);
+    const { stderr, exits } = await run([`--env-path=${missing}`]);
     expect(exits).toEqual([1]);
     expect(stderr).toEqual([
       `[MCP] --env-path: the file does not exist: ${missing}`,
@@ -518,7 +488,6 @@ describe('a destination that cannot be served stops the start', () => {
 
   it('--mcp that is a path: refused naming --mcp, nothing read', async () => {
     const { stderr, exits } = await run([
-      '--transport=stdio',
       '--mcp=../outside',
       `--auth-broker-path=${root}`,
     ]);
@@ -532,11 +501,7 @@ describe('a destination that cannot be served stops the start', () => {
 describe('the startup summary', () => {
   it('a basic destination: the password masked exactly as before', async () => {
     writeSession('dest', basicLines());
-    const { stderr } = await run([
-      '--transport=stdio',
-      '--mcp=dest',
-      `--auth-broker-path=${root}`,
-    ]);
+    const { stderr } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
     const summary = stderr.join('\n');
     expect(summary).toContain(
       `║  Source:        ${'service-key: dest'.padEnd(45)}║`,
@@ -557,7 +522,6 @@ describe('the shutdown is installed', () => {
   it('stdio: SIGTERM settles and exits 0', async () => {
     writeSession('dest', basicLines());
     const { processLike, exits } = await run([
-      '--transport=stdio',
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
@@ -573,13 +537,13 @@ describe('the shutdown is installed', () => {
 describe('factoryConfigFrom: the env file', () => {
   const browserStrategy = recordingStrategy().browserStrategy;
 
-  it("envFilePath, IServerConfig's alias, is read too, naming the field", () => {
+  it("envFilePath, CoreConfig's alias, is read too, naming the field", () => {
     expect(
       factoryConfigFrom(
         { envFilePath: '/x/conn.env' },
         { browserStrategy, promptLogger: silent },
       ).envFile,
-    ).toEqual({ path: '/x/conn.env', source: 'IServerConfig.envFilePath' });
+    ).toEqual({ path: '/x/conn.env', source: 'CoreConfig.envFilePath' });
   });
 
   it('envFile by hand: named by its field', () => {
@@ -588,7 +552,7 @@ describe('factoryConfigFrom: the env file', () => {
         { envFile: '/x/conn.env' },
         { browserStrategy, promptLogger: silent },
       ).envFile,
-    ).toEqual({ path: '/x/conn.env', source: 'IServerConfig.envFile' });
+    ).toEqual({ path: '/x/conn.env', source: 'CoreConfig.envFile' });
   });
 
   it('the source the parser stated wins', () => {
@@ -609,7 +573,7 @@ describe('factoryConfigFrom: the env file', () => {
     fs.writeFileSync(file, `${basicLines().join('\n')}\n`);
     const exits: number[] = [];
     await launch(
-      { transport: 'stdio', envFilePath: file },
+      { envFilePath: file },
       { exposition: ['readonly'], includeSearch: false },
       {
         browserStrategy,
@@ -646,10 +610,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
 
   it('basic + rfc in the file: rfc', async () => {
     const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
-    const settings = await settingsOf([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.connectionType).toBe('rfc');
   });
 
@@ -660,10 +621,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
       'SAP_SNC_PARTNERNAME=p:placeholder',
       'SAP_CONNECTION_TYPE=rfc',
     ]);
-    const settings = await settingsOf([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.authType).toBe('snc');
     expect(settings.connectionType).toBe('rfc');
   });
@@ -671,7 +629,6 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   it('--connection-type=http beats the file', async () => {
     const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
     const settings = await settingsOf([
-      '--transport=stdio',
       `--env-path=${file}`,
       '--connection-type=http',
     ]);
@@ -683,7 +640,6 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
     const yamlFile = path.join(root, 'config.yaml');
     fs.writeFileSync(yamlFile, 'connection-type: http\n');
     const settings = await settingsOf([
-      '--transport=stdio',
       `--env-path=${file}`,
       `--config=${yamlFile}`,
     ]);
@@ -693,10 +649,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   it('the process environment beats the file', async () => {
     const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
     process.env.SAP_CONNECTION_TYPE = 'http';
-    const settings = await settingsOf([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.connectionType).toBe('http');
   });
 
@@ -705,10 +658,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
       ...basicLines(),
       'SAP_CONNECTION_TYPE=carrier-pigeon',
     ]);
-    const { exits, stderr } = await run([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const { exits, stderr } = await run([`--env-path=${file}`]);
     expect(exits).toEqual([1]);
     expect(stderr.join('\n')).toContain('SAP_CONNECTION_TYPE');
     expect(stderr.join('\n')).not.toContain('carrier-pigeon');
@@ -724,7 +674,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
 describe('the working directory .env is never the destination', () => {
   it('with no --env / --env-path / --mcp: no destination, inspection-only under stdio', async () => {
     fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
-    const { exits } = await run(['--transport=stdio']);
+    const { exits } = await run([]);
     expect(exits).toEqual([]);
     expect(constructed).not.toHaveBeenCalled();
     expect(stdioStart).toHaveBeenCalledWith(undefined);
@@ -732,7 +682,7 @@ describe('the working directory .env is never the destination', () => {
 
   it('named with --env-path=./.env, it is the destination default', async () => {
     fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
-    await run(['--transport=stdio', '--env-path=./.env']);
+    await run(['--env-path=./.env']);
     expect(stdioStart).toHaveBeenCalledWith('default');
   });
 });
@@ -755,7 +705,7 @@ describe('SAP_SYSTEM_TYPE inside the env file', () => {
     return file;
   };
   async function systemTypeOf(argv: string[]) {
-    const result = await run(['--transport=stdio', ...argv]);
+    const result = await run([...argv]);
     expect(result.exits).toEqual([]);
     return process.env.SAP_SYSTEM_TYPE;
   }
@@ -795,10 +745,7 @@ describe('SAP_SYSTEM_TYPE inside the env file', () => {
 
   it('a word that is not a system type: refused naming the key, not quoting it', async () => {
     const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=mainframe']);
-    const { exits, stderr } = await run([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const { exits, stderr } = await run([`--env-path=${file}`]);
     expect(exits).toEqual([1]);
     expect(stderr).toEqual([
       '[MCP] SAP_SYSTEM_TYPE (environment or env file) must be onprem, cloud or legacy',

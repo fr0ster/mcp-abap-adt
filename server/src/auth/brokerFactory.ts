@@ -34,9 +34,9 @@ import type {
 import {
   assertDestinationName,
   type DestinationSystemContext,
-  getPlatformPaths,
   SettingsError,
 } from '@mcp-abap-adt/lib/auth';
+import { getPlatformPaths } from '../config/platformPaths';
 import { countedProvider, ProviderGate } from './countedProvider';
 import {
   type DestinationMode,

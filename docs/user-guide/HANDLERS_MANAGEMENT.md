@@ -102,19 +102,19 @@ V2 server supports flexible handler set configuration through the `--exposition`
 
 ```bash
 # Default: readonly + high (+ search always; + system because readonly is present)
-node bin/mcp-abap-adt.js --transport=stdio --env-path=.env
+mcp-abap-adt --env-path=.env
 
 # Only read-only operations (safest)
-node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly
+mcp-abap-adt --env-path=.env --exposition=readonly
 
 # Read-only + high-level writes (recommended)
-node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly,high
+mcp-abap-adt --env-path=.env --exposition=readonly,high
 
 # Low-level writes (use instead of `high`, not together)
-node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly,low
+mcp-abap-adt --env-path=.env --exposition=readonly,low
 
 # The debugger beside the default sets (opt-in)
-node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly,high,debug
+mcp-abap-adt --env-path=.env --exposition=readonly,high,debug
 ```
 
 #### Validation rules
@@ -153,12 +153,15 @@ exposition:
 
 ### Environment Variable
 
-Set `MCP_EXPOSITION`:
+`--exposition` has no environment form; a config file states it (`--conf`, YAML `exposition`):
 
 ```bash
-export MCP_EXPOSITION=readonly,high
-node bin/mcp-abap-adt.js --transport=stdio --env-path=.env
+printf 'exposition: readonly,high\n' > config.yaml
+mcp-abap-adt --env-path=.env --conf=config.yaml
 ```
+
+Every binary takes `--exposition`: `mcp-abap-adt-http --exposition=readonly,debug`,
+`mcp-abap-adt-sse --exposition=readonly`.
 
 ## Generating Handler Documentation
 

@@ -28,7 +28,6 @@ async function connect(destination: string, exposition: string) {
       command: process.execPath,
       args: [
         path.resolve(process.cwd(), 'dist/server/launcher.js'),
-        '--transport=stdio',
         `--exposition=${exposition}`,
         '--unsafe',
         `--mcp=${destination}`,

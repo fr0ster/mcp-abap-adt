@@ -37,8 +37,8 @@ EOF
 # stdio (for MCP clients)
 mcp-abap-adt --env-path=/path/to/<destination>.env
 
-# HTTP server
-mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
+# Streamable HTTP server (@mcp-abap-adt/http): no destination, each request sends x-sap-* headers
+mcp-abap-adt-http --port=3000
 ```
 
 ---
@@ -52,7 +52,7 @@ mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
 - **Compact facade tools** — moved to `@mcp-abap-adt/compact` and documented there (`compact/docs/AVAILABLE_TOOLS.md`) (auto-generated)
 - **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Full combined tools reference (auto-generated)
 - **[AUTHENTICATION.md](AUTHENTICATION.md)** - The four supported authentications, destinations, service key locations, and header-based auth
-- **[CLI_OPTIONS.md](CLI_OPTIONS.md)** - Every command-line option with its environment and YAML forms
+- **[CLI_OPTIONS.md](CLI_OPTIONS.md)** - Each binary's command-line options with their environment and YAML forms
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups and exposure
 - **[DEBUGGER.md](DEBUGGER.md)** - The opt-in debugger: debug sessions, the SAP ids, transports, what ends a session
@@ -81,39 +81,41 @@ objects for each package. Each object includes:
 
 ## Command Reference
 
-After installing, these commands are available (`mcp-abap-adt-compact` takes the same options):
+A binary is its transport; there is no `--transport` option. Each binary reads only its own options
+(`<binary> --help`); an option of another binary stops the start, naming the binary that serves it.
 
-### `mcp-abap-adt` - Default stdio transport
+### `mcp-abap-adt` - stdio (`@mcp-abap-adt/core`)
 ```bash
-mcp-abap-adt [--env <destination>] [--env-path /path/to/.env]
+mcp-abap-adt [--mcp <destination>] [--env <destination>] [--env-path /path/to/.env]
 ```
-Use with MCP clients like Claude Desktop, VSCode extensions.
+Use with MCP clients like Claude Desktop, VSCode extensions. `mcp-abap-adt-compact` takes the same
+options with the compact tool set.
 
-### `mcp-abap-adt --transport=http` - HTTP server
+### `mcp-abap-adt-http` - Streamable HTTP (`@mcp-abap-adt/http`)
 ```bash
-mcp-abap-adt --transport=http [--port 3000] [--host localhost] [--env <destination>] [--env-path /path/to/.env]
+mcp-abap-adt-http [--port 3000] [--host 127.0.0.1]
 ```
-Starts HTTP server with StreamableHTTP transport.
+Credentials come only from each request's `x-sap-*` headers.
 
-### `mcp-abap-adt --transport=sse` - SSE server
+### `mcp-abap-adt-sse` - HTTP+SSE (`@mcp-abap-adt/sse`)
 ```bash
-mcp-abap-adt --transport=sse [--port 3001] [--host localhost] [--env <destination>] [--env-path /path/to/.env]
+mcp-abap-adt-sse [--sse-port 3001] [--sse-host 127.0.0.1]
 ```
-Starts HTTP server with Server-Sent Events transport.
+Credentials come only from the `x-sap-*` headers of the `GET` that opens each SSE connection.
 
 ## Examples
 
-### Example 1: HTTP Server on Port 8080
+### Example 1: Streamable HTTP Server on Port 8080
 ```bash
-mcp-abap-adt --transport=http --port=8080
+mcp-abap-adt-http --port=8080
 ```
 
 ### Example 2: SSE Server Accessible from Network
 ```bash
-mcp-abap-adt --transport=sse --host=0.0.0.0 --port=3001
+mcp-abap-adt-sse --sse-host=0.0.0.0 --sse-port=3001
 ```
 
-### Example 3: Custom Environment File
+### Example 3: Custom Environment File (stdio)
 ```bash
-mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port=8080
+mcp-abap-adt --env-path /opt/config/.env.production
 ```

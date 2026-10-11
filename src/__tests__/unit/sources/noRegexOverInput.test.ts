@@ -1,7 +1,8 @@
 /**
  * D26: no regular expression over untrusted input in the touched files —
  * `errorClassOf` (errors.ts), `return_error` (utils.ts), the destination name
- * (destinationName.ts) and the parameter parsers (authParameters.ts) are
+ * (destinationName.ts) and the parameter parsers (authParameters.ts, the
+ * config file reader, and each binary's table) are
  * plain code. A scan with the TypeScript parser: no regex literal, no
  * `RegExp` in each file, or — for utils.ts — in `return_error` and the
  * helpers it calls.
@@ -18,6 +19,12 @@ const SCANNED: ReadonlyArray<[string, readonly string[] | undefined]> = [
   ['src/lib/auth/errors.ts', undefined],
   ['src/lib/auth/destinationName.ts', undefined],
   ['src/lib/config/authParameters.ts', undefined],
+  ['src/lib/config/yamlConfig.ts', undefined],
+  ['src/lib/config/exposition.ts', undefined],
+  ['src/lib/config/startup.ts', undefined],
+  ['server/src/config/coreParameters.ts', undefined],
+  ['http/src/config/httpParameters.ts', undefined],
+  ['sse/src/config/sseParameters.ts', undefined],
   [
     'src/lib/utils.ts',
     [

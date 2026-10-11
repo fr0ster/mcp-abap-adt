@@ -8,5 +8,11 @@
  * own application, you want `@mcp-abap-adt/lib` instead: it carries the
  * handlers and the embeddable server under Apache-2.0, and no transport.
  */
+
+// core's parameter table and the destination's env file (D38, §3.4)
+export * from './config/coreParameters.js';
+export * from './config/envFileContext.js';
+export * from './config/envResolver.js';
+export * from './config/platformPaths.js';
 export * from './destinationSource.js';
 export * from './StdioServer.js';

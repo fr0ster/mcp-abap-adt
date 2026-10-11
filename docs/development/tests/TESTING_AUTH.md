@@ -48,25 +48,16 @@ With an installed server (a checkout is not runnable by itself — see
 [Installation — from source](../../installation/INSTALLATION.md#from-source-development)):
 
 ```bash
-npx @modelcontextprotocol/inspector mcp-abap-adt --mcp=<destination>   # stdio, in the MCP Inspector
-# or
-mcp-abap-adt --transport=http --allow-destination-header
-# or
-mcp-abap-adt --transport=sse --allow-destination-header
+npx @modelcontextprotocol/inspector mcp-abap-adt --mcp=TRIAL   # stdio, in the MCP Inspector
 ```
+
+Destinations, service keys and the browser login are served only by `mcp-abap-adt` (stdio);
+`mcp-abap-adt-http` / `mcp-abap-adt-sse` take credentials from `x-sap-*` headers and answer a
+request carrying `x-mcp-destination` with `400`.
 
 ### 3. Test via MCP Inspector or client:
 
-Send a request with header:
-```
-x-mcp-destination: TRIAL
-x-sap-url: https://your-sap-url.com
-```
-
-Or:
-```
-x-mcp-destination: TRIAL
-```
+Call any tool: the first call connects, opening the browser login when there is no valid session.
 
 ### 4. Verify that .env file was created:
 
@@ -105,7 +96,7 @@ mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
 To enable debug logs for auth-broker:
 
 ```bash
-DEBUG_AUTH_LOG=true mcp-abap-adt --transport=http --allow-destination-header
+DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL
 ```
 
 ## Test Logging Switches

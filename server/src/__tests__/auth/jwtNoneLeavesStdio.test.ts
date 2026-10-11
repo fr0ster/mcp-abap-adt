@@ -24,7 +24,6 @@ jest.mock('@mcp-abap-adt/auth-broker', () => {
 });
 
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -34,6 +33,7 @@ import {
   destinationFailureOf,
   JWT_NONE_HINT,
 } from '../../auth/destinationFailure';
+import { readCoreConfig } from '../../config/coreParameters';
 import { launch } from '../../launcher';
 import { StdioServer } from '../../StdioServer';
 import {
@@ -99,13 +99,8 @@ it('a jwt / none --env file stops the start: destination_refused, its words and 
     `SAP_ISSUED_FOR=${standIn.url}?sap-client=100`,
     'SAP_ISSUED_BY=placeholder-issuer-record',
   ]);
-  process.argv = [
-    'node',
-    'mcp-abap-adt',
-    '--transport=stdio',
-    `--env-path=${file}`,
-  ];
-  const config = await new ServerConfigManager().getConfig();
+  process.argv = ['node', 'mcp-abap-adt', `--env-path=${file}`];
+  const config = readCoreConfig(process.argv.slice(2), process.env);
   const stderr: string[] = [];
   const exits: number[] = [];
   const stdout = jest.spyOn(process.stdout, 'write');

@@ -1,9 +1,12 @@
 /**
- * Unified server configuration interface
- * Shared by both v1 and v2 servers
+ * What every binary's configuration holds: the values of lib's shared rows
+ * (`--exposition`, `--system-type`, `--conf`, `--state-idle-minutes`).
+ *
+ * The transport, HTTP, SSE and destination fields are not here (D38): each
+ * belongs to the package that reads it — core's `CoreConfig` (the
+ * destination, the browser, the login), http's `HttpConfig` (the Streamable
+ * HTTP listener), sse's `SseConfig` (the SSE listener).
  */
-
-import type { TransportConfig } from '../utils.js';
 
 /** TLS configuration for HTTPS server */
 export interface TlsConfig {
@@ -15,10 +18,6 @@ export interface TlsConfig {
   ca?: string;
 }
 
-/** Transport type (simple string for v2) */
-export type Transport = 'stdio' | 'sse' | 'http';
-
-/** Handler set for exposition control */
 /**
  * The handler sets a configuration may name.
  *
@@ -30,102 +29,11 @@ export type Transport = 'stdio' | 'sse' | 'http';
 export type HandlerSet = 'readonly' | 'high' | 'low' | 'compact' | 'debug';
 
 export interface IServerConfig {
-  // ============================================================================
-  // COMMON FIELDS (used by both v1 and v2)
-  // ============================================================================
-
-  /** Path to .env file */
-  envFilePath?: string;
-  /** `--env` / `env` as the user gave it: a destination name or a path */
-  envDestination?: string;
-  /** `--env-path` / `MCP_ENV_PATH` / `env-path` as the user gave it */
-  envPath?: string;
-  /**
-   * The parameter `envFile` came from, as the user gave it: `--env`,
-   * `--env-path`, `MCP_ENV_PATH`, `env (config file)`,
-   * or `env-path (config file)`.
-   */
-  envFileSource?: string;
-  /** Alias for envFilePath (v2 compatibility) */
-  envFile?: string;
-  /** Custom path for auth broker storage */
-  authBrokerPath?: string;
-  /** Default MCP destination from --mcp parameter */
-  mcpDestination?: string;
-  /** Use unsafe mode (file-based session store) */
-  unsafe?: boolean;
-  /**
-   * The browser of a login (`--browser`): system (default), auto, chrome,
-   * edge, firefox, none, headless — mapped by the platform to one of
-   * auth-providers' browsers; `none` and `headless` open nothing: the URL is
-   * shown on stderr and the login waits for the callback.
-   */
-  browser?: string;
-  /** The program that opens the login URL (`--browser-program`); excludes `browser`. */
-  browserProgram?: string;
-  /** How an expired session is renewed (`--renewal`); default `refresh-then-login`. */
-  renewal?: 'refresh-then-login' | 'refresh-only';
-  /** Port for browser auth callback server */
-  browserAuthPort?: number;
-  /** Allow x-mcp-destination header to override default destination (--allow-destination-header) */
-  allowDestinationHeader?: boolean;
-
-  // ============================================================================
-  // TRANSPORT CONFIGURATION
-  // ============================================================================
-
-  /** Transport type (simple string) */
-  transport?: Transport;
-  /** Full transport configuration (v1 style, complex object) */
-  transportConfig?: TransportConfig;
-  /** Server host */
-  host?: string;
-  /** Server port */
-  port?: number;
-  /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
-  allowedHosts?: string[];
-  /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
-  allowedOrigins?: string[];
-  /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
-  enableDnsRebindingProtection?: boolean;
-
-  // ============================================================================
-  // HTTP/SSE SPECIFIC
-  // ============================================================================
-
-  /** Enable JSON response format for HTTP */
-  httpJsonResponse?: boolean;
-  /** HTTP endpoint path */
-  httpPath?: string;
-  /** SSE connection path */
-  ssePath?: string;
-  /** SSE message post path */
-  postPath?: string;
-  /** TLS configuration for HTTPS (cert + key enables HTTPS automatically) */
-  tls?: TlsConfig;
-
-  // ============================================================================
-  // HANDLER EXPOSITION (v2)
-  // ============================================================================
-
-  /** Handler sets to expose */
+  /** Handler sets to expose (`--exposition`); default readonly,high. */
   exposition?: HandlerSet[];
 
-  // ============================================================================
-  // CONFIG FILE
-  // ============================================================================
-
-  /** Path to YAML config file */
+  /** Path to YAML config file (`--conf`). */
   configFile?: string;
-
-  /** SAP connection type: http (default) or rfc */
-  connectionType?: 'http' | 'rfc';
-  /**
-   * The form `connectionType` came from: `--connection-type`,
-   * `SAP_CONNECTION_TYPE`, or `connection-type (config file)`. Only the CLI
-   * form beats an `SAP_CONNECTION_TYPE` the env file brings (as in 15.x).
-   */
-  connectionTypeSource?: string;
 
   /**
    * SAP system type: onprem | cloud | legacy (`--system-type`, `SAP_SYSTEM_TYPE`).
@@ -137,7 +45,7 @@ export interface IServerConfig {
   /**
    * The form `systemType` came from: `--system-type`, `SAP_SYSTEM_TYPE`, or
    * `system-type (config file)`. Only the CLI form beats an `SAP_SYSTEM_TYPE`
-   * the env file brings, as for the connection type.
+   * a destination's env file brings (core).
    */
   systemTypeSource?: string;
 
@@ -147,15 +55,4 @@ export interface IServerConfig {
    * `state-idle-minutes`). A whole number, at least 30; default 30.
    */
   stateIdleMinutes?: number;
-
-  // ============================================================================
-  // LEGACY FIELDS (for v1 backward compatibility)
-  // ============================================================================
-
-  /** @deprecated Use mcpDestination instead */
-  defaultMcpDestination?: string;
-  /** @deprecated Use mcpDestination or envFilePath instead */
-  defaultDestination?: string;
-  /** Logger instance (v1 only) */
-  logger?: any;
 }

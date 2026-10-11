@@ -248,6 +248,7 @@ describe('debugger handlers', () => {
 
   it('a refused start that could not undo everything answers the handle with its error, so the model can stop it', async () => {
     const { world, context } = install();
+    world.override.stopListener = async () => CONFLICT();
     world.override.deleteBreakpoint = async () => CONFLICT();
     const started = handleDebugStartListener(context as any, {
       breakpoints: [
@@ -262,6 +263,7 @@ describe('debugger handlers', () => {
     expect(context.state.holdsState()).toBe(true);
     const all = r.content.map((c: any) => c.text).join('\n');
     expect(all).toContain(context.state.handle);
+    delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
     const stopped: any = await handleDebugStop(context as any, {
       state_handle: context.state.handle,

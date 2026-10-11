@@ -42,7 +42,7 @@ describe('DebugSession lifecycle', () => {
     });
   });
 
-  it('stop releases the debuggee, deletes breakpoints, stops the listener, closes every connection once', async () => {
+  it("stop releases the debuggee, stops the listener (which deletes the key's breakpoints), closes every connection once", async () => {
     const { session, world } = await started();
     await session.setBreakpoints([
       {
@@ -54,7 +54,10 @@ describe('DebugSession lifecycle', () => {
     await until(() => world.calls.includes('getStack'));
     await session.stop();
     expect(world.calls).toContain('step:stepContinue:analysed');
-    expect(world.calls.some((c) => c === 'deleteBreakpoint:ID1')).toBe(true);
+    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(
+      false,
+    );
+    expect(session.listBreakpoints()).toEqual([]);
     expect(world.calls).toContain('stopListener');
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
     expect(world.closed.length).toBe(world.opened.length);
@@ -200,11 +203,13 @@ describe('DebugSession lifecycle', () => {
         uri: '/sap/bc/adt/oo/classes/zcl_cv_dbg_measure/source/main#start=32',
       },
     ]);
+    world.override.stopListener = async () => refusedResponse('listener busy');
     world.override.deleteBreakpoint = async () =>
       refusedResponse('not authorised');
     await expect(session.stop()).rejects.toThrow(DebugCleanupError);
     expect(session.listBreakpoints()).toHaveLength(1);
     expect(session.holdsState()).toBe(true);
+    delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
     await expect(session.stop()).resolves.toBeUndefined(); // the retry undoes what was left
     expect(session.holdsState()).toBe(false);

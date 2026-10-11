@@ -87,7 +87,10 @@ describe('DebugSession', () => {
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT());
     await expect(started).rejects.toThrow(DebugListenerError);
-    expect(world.calls.some((c) => c === 'deleteBreakpoint:ID1')).toBe(true);
+    expect(world.calls).toContain('stopListener');
+    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(
+      false,
+    );
     expect(session.listBreakpoints()).toEqual([]);
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
   });
@@ -134,9 +137,7 @@ describe('DebugSession', () => {
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT());
     await expect(started).rejects.toThrow(DebugListenerError);
-    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(
-      true,
-    );
+    expect(world.calls).toContain('stopListener');
   });
 
   it('a debuggee caught on the first poll is attached at once', async () => {
@@ -551,6 +552,8 @@ describe('DebugSession', () => {
 
     it('a refused start reports the breakpoint it could not delete, and keeps it armed', async () => {
       const world = fakeWorld();
+      world.override.stopListener = async () =>
+        refusedResponse('listener busy');
       world.override.deleteBreakpoint = async () =>
         refusedResponse('Breakpoint is locked');
       const session = new DebugSession(world.ports, IDS).bind('origin');
@@ -568,7 +571,7 @@ describe('DebugSession', () => {
       expect(error).toBeInstanceOf(DebugListenerError);
       expect((error as Error).message).toMatch(/SY 530/);
       expect((error as Error).message).toMatch(
-        /not undone: .*Breakpoint is locked/,
+        /not undone: listener: listener busy; breakpoint .*: Breakpoint is locked/,
       );
       expect(session.listBreakpoints()).toHaveLength(1);
     });

@@ -457,6 +457,15 @@ export class DebugSession<O = unknown> {
         throw new DebugStateError(
           'a listener is already running for this debug session',
         );
+      // Anything kept for a later stop — an identity, an owed stopListener, armed
+      // breakpoints, a failure the cleanup named, a connection not closed, a release
+      // owed, a control connection that served the identity — refuses a new start:
+      // it would switch the identity over that state, and the next stop would address
+      // the old key's breakpoints under the new one.
+      if (this.keepsCleanup())
+        throw new DebugStateError(
+          'the cleanup of this debug session is not complete: DebugStop it, then start again',
+        );
       // Refusals before the wire: nothing is opened, nothing is sent.
       refuseConditionOffLine(options.breakpoints ?? []);
       const identity = await this.identityFor(options);
@@ -464,9 +473,10 @@ export class DebugSession<O = unknown> {
       this.failure = undefined;
       this.fixed = identity;
       this.preferences = { ...(options.settings ?? {}) };
-      const before = new Set(this.armed.keys());
-      const placedHere = () =>
-        [...this.armed.values()].filter((b) => !before.has(b.id!));
+      // The guard above leaves no control connection kept from an earlier run: one
+      // there now was opened by this start. Checked all the same, so a refusal before
+      // any change can never close one that served another identity.
+      const ownControl = this.control === undefined;
       let armed: DebugView<BreakpointsAnswer> | undefined;
       try {
         // 1. the preflight; 2. the reconciliation (stopListener deletes the key's
@@ -512,17 +522,14 @@ export class DebugSession<O = unknown> {
           // Refused before any change — a preflight 409, a failure of the preflight
           // itself, a first listen refused 409 with nothing armed or reconciled. No
           // stopListener and no deletion: only the connections this start opened close.
+          // A close that fails is kept like any other cleanup failure: the identity
+          // stays, a new start is refused, DebugStop finishes it.
           const failures = [
             ...(await this.dropListener()),
-            ...(await this.closeControl()),
+            ...(ownControl ? await this.closeControl() : []),
           ];
-          // The identity and the settings go only with a complete cleanup (Task 4
-          // replaces this branch by `settle(failures)`).
-          if (failures.length === 0) {
-            this.fixed = undefined;
-            this.preferences = {};
-            throw error;
-          }
+          this.settle(failures);
+          if (failures.length === 0) throw error;
           const notClosed = `not closed: ${failures.join('; ')}`;
           if (error instanceof Error) {
             error.message = `${error.message}; ${notClosed}`;
@@ -530,19 +537,13 @@ export class DebugSession<O = unknown> {
           }
           throw new DebugListenerError(`${thrown(error)}; ${notClosed}`);
         }
-        // A refused or failed start leaves nothing it armed. Each undo runs whatever the other did,
-        // and what could not be undone is named in the error the start fails with.
-        const failures: string[] = [];
-        failures.push(...(await this.releaseLocked()));
-        const run = this.run;
-        this.run = undefined;
-        const runKept = await this.closeOrRecord(
-          run?.connection,
-          "the run's connection",
-        );
-        if (runKept) failures.push(runKept);
-        failures.push(...(await this.dropListener()));
-        failures.push(...(await this.undoArmed(identity, placedHere())));
+        // A start that failed after a change runs the stop's cleanup. It no longer
+        // deletes the ids "placed here": after a replacement they do not say what this
+        // start added.
+        const failures = await this.cleanupLocked();
+        this.failure = undefined;
+        this.notices.length = 0;
+        this.settle(failures);
         if (failures.length === 0) throw error;
         const notUndone = `not undone: ${failures.join('; ')}`;
         if (error instanceof Error) {
@@ -552,59 +553,6 @@ export class DebugSession<O = unknown> {
         throw new DebugListenerError(`${thrown(error)}; ${notUndone}`);
       }
     });
-  }
-
-  /**
-   * Inside the serial, for a failed start: a stop it attached is released. One that
-   * cannot be released stays for DebugStop. Never throws: it answers what it could not undo.
-   */
-  private async releaseLocked(): Promise<string[]> {
-    const stop = this.current;
-    if (!stop) return [];
-    const released = await stop.debugger
-      .step('stepContinue', { analyse: analyseDebuggeeEnd })
-      .catch(asFailure);
-    if (!released.ok)
-      return [`the debuggee was not released: ${messageOf(released)}`];
-    this.current = undefined;
-    const kept = await this.closeOrRecord(
-      stop.connection,
-      "the debuggee's connection",
-    );
-    return kept ? [kept] : [];
-  }
-
-  /**
-   * A refused start leaves nothing armed: what it placed is deleted; what cannot be
-   * stays armed for DebugStop. Never throws: it answers what it could not undo.
-   */
-  private async undoArmed(
-    identity: IDebuggerIdentity,
-    placed: BreakpointReading[],
-  ): Promise<string[]> {
-    const failures: string[] = [];
-    const control = this.control?.debugger;
-    for (const p of placed) {
-      const deleted = control
-        ? await control.deleteBreakpoint(identity, p.id!).catch(asFailure)
-        : undefined;
-      if (deleted?.ok) this.forget(p.id!);
-      else
-        failures.push(
-          `breakpoint ${p.id} is still armed: ${deleted ? messageOf(deleted) : 'no connection to delete it on'}`,
-        );
-    }
-    if (this.armed.size === 0 && this.control) {
-      const control = this.control;
-      this.control = undefined;
-      // A close that throws keeps the connection for the next stop.
-      const kept = await this.closeOrRecord(
-        control.connection,
-        "the breakpoints' connection",
-      );
-      if (kept) failures.push(kept);
-    }
-    return failures;
   }
 
   private poll(
@@ -1087,52 +1035,97 @@ export class DebugSession<O = unknown> {
     })().catch(() => this.notify());
   }
 
+  /** The settings the caller set, kept until a complete cleanup. */
+  preferredSettings(): DebugSettings {
+    return { ...this.preferences };
+  }
+
   /**
-   * Everything off — DebugStop, dispose, shutdown. Required, not best effort.
-   * A stopped listener counts as off once the system answered its open poll.
-   * Never throws anything but DebugCleanupError, and whatever failed stays for the next stop.
+   * Inside the serial: everything off — DebugStop, a start that failed after a
+   * change, dispose, shutdown. stopListener deletes the key's breakpoints
+   * (measured on premise (2026-10-11), BASIS 816), so it is the authoritative
+   * cleanup: only when it fails are the breakpoints deleted by id. Never
+   * throws; answers what it could not undo, which stays for the next stop.
    */
-  stop(): Promise<void> {
-    return this.mutate(async () => {
-      this.generation++;
-      const failures: string[] = [];
-      try {
-        for (const connection of [...this.unclosed])
-          await this.closeOrKeep(connection, 'a connection', failures);
-        for (const owed of [...this.owed]) {
-          const notReleased = await this.release(owed.debugger);
-          if (notReleased) {
-            failures.push(`${owed.what}: ${notReleased}`); // kept: a later stop retries
-            continue;
-          }
+  private async cleanupLocked(): Promise<string[]> {
+    this.generation++;
+    const failures: string[] = [];
+    try {
+      for (const connection of [...this.unclosed])
+        await this.closeOrKeep(connection, 'a connection', failures);
+      for (const owed of [...this.owed]) {
+        const notReleased = await this.release(owed.debugger);
+        if (notReleased) {
+          failures.push(`${owed.what}: ${notReleased}`); // kept: a later stop retries
+          continue;
+        }
+        // Released: only its connection may be left, and a retry must not release twice.
+        this.owed.delete(owed);
+        await this.closeOrKeep(
+          owed.connection,
+          `${owed.what}'s connection`,
+          failures,
+        );
+      }
+      // 1. A held stop is released.
+      const stop = this.current;
+      if (stop) {
+        const released = await stop.debugger
+          .step('stepContinue', { analyse: analyseDebuggeeEnd })
+          .catch(asFailure);
+        if (released.ok) {
           // Released: only its connection may be left, and a retry must not release twice.
-          this.owed.delete(owed);
+          this.current = undefined;
           await this.closeOrKeep(
-            owed.connection,
-            `${owed.what}'s connection`,
+            stop.connection,
+            "the debuggee's connection",
             failures,
           );
+        } else {
+          failures.push(`release the debuggee: ${messageOf(released)}`); // kept: a later stop retries
         }
-        const stop = this.current;
-        if (stop) {
-          const released = await stop.debugger
-            .step('stepContinue', { analyse: analyseDebuggeeEnd })
-            .catch(asFailure);
-          if (released.ok) {
-            // Released: only its connection may be left, and a retry must not release twice.
-            this.current = undefined;
+      }
+      // 2. The listener is stopped, and the key's breakpoints with it.
+      if (this.changed) {
+        const identity = this.requireIdentity();
+        const control = await this.controlDebugger();
+        const listener = this.listener;
+        const open = listener?.open; // taken before the stop: its answer may come at once
+        const stopped = await control.stopListener(identity).catch(asFailure);
+        if (stopped.ok) {
+          // 3. Nothing is left to delete by id, and no per-id failure of an earlier stop
+          // stands: settle() replaces the failures with this cleanup's. The tag counter
+          // stays: a tag is never reused in this instance. `changed` stays until settle()
+          // finds the cleanup complete, so a stop that keeps anything owes the stopListener again.
+          this.armed.clear();
+          this.requested = [];
+          this.pairedWith.clear();
+          this.listener = undefined;
+          if (listener) {
+            // Accepted is not done: SAP lets go of the user's listener when it answers the
+            // open poll (130–570 ms after the stop, at most the poll's hold, measured on
+            // premise 2026-10-11). Until then a start of another ideId meets 409
+            // conflictDetected, so the stop returns only after that answer.
+            if (open) {
+              const last = await open;
+              listener.open = undefined;
+              if (!last.ok)
+                failures.push(`the listener's last poll: ${messageOf(last)}`);
+              else {
+                // A catch in it — during the stop, or just before and not yet handled.
+                const caught = readDebuggee(bodyOf(last));
+                if (caught) await this.releaseCaught(caught, failures);
+              }
+            }
             await this.closeOrKeep(
-              stop.connection,
-              "the debuggee's connection",
+              listener.connection,
+              "the listener's connection",
               failures,
             );
-          } else {
-            failures.push(`release the debuggee: ${messageOf(released)}`); // kept: a later stop retries
           }
-        }
-        if (this.armed.size > 0 || this.listener) {
-          const identity = this.requireIdentity();
-          const control = await this.controlDebugger();
+        } else {
+          // 4. Deleted by id, as before; what fails stays for the next stop.
+          failures.push(`listener: ${messageOf(stopped)}`);
           for (const id of [...this.armed.keys()]) {
             const deleted = await control
               .deleteBreakpoint(identity, id)
@@ -1140,63 +1133,76 @@ export class DebugSession<O = unknown> {
             if (deleted.ok) this.forget(id);
             else failures.push(`breakpoint ${id}: ${messageOf(deleted)}`);
           }
-          if (this.listener) {
-            const open = this.listener.open; // taken before the stop: its answer may come at once
-            const stopped = await control
-              .stopListener(identity)
-              .catch(asFailure);
-            if (stopped.ok) {
-              const listener = this.listener;
-              this.listener = undefined;
-              // Accepted is not done: SAP lets go of the user's listener when it answers the
-              // open poll (130–570 ms after the stop, at most the poll's hold, measured on
-              // premise 2026-10-11). Until then a start of another ideId meets 409
-              // conflictDetected, so the stop returns only after that answer.
-              if (open) {
-                const last = await open;
-                listener.open = undefined;
-                if (!last.ok)
-                  failures.push(`the listener's last poll: ${messageOf(last)}`);
-                else {
-                  // A catch in it — during the stop, or just before and not yet handled.
-                  const caught = readDebuggee(bodyOf(last));
-                  if (caught) await this.releaseCaught(caught, failures);
-                }
-              }
-              await this.closeOrKeep(
-                listener.connection,
-                "the listener's connection",
-                failures,
-              );
-            } else {
-              failures.push(`listener: ${messageOf(stopped)}`); // kept: a later stop retries
-            }
-          }
         }
-        if (!failures.length && this.control) {
-          const control = this.control;
-          this.control = undefined;
-          await this.closeOrKeep(
-            control.connection,
-            "the breakpoints' connection",
-            failures,
-          );
-        }
-      } catch (error) {
-        failures.push(thrown(error));
-      } finally {
-        const run = this.run;
-        this.run = undefined;
+      } else if (this.listener) {
+        // Nothing was sent that changes the system: a listener here only closes.
+        const listener = this.listener;
+        this.listener = undefined;
         await this.closeOrKeep(
-          run?.connection,
-          "the run's connection",
+          listener.connection,
+          "the listener's connection",
           failures,
         );
-        this.failure = undefined;
-        this.notices.length = 0;
-        this.cleanupFailures = failures;
-        this.notify(); // also tells the instance state (observe) that this part may hold nothing now
       }
+      if (!failures.length && this.control) {
+        const control = this.control;
+        this.control = undefined;
+        await this.closeOrKeep(
+          control.connection,
+          "the breakpoints' connection",
+          failures,
+        );
+      }
+    } catch (error) {
+      failures.push(thrown(error));
+    } finally {
+      const run = this.run;
+      this.run = undefined;
+      await this.closeOrKeep(run?.connection, "the run's connection", failures);
+    }
+    return failures;
+  }
+
+  /**
+   * What the cleanup could not undo stays named for the next stop. The
+   * identity — the request user, the mode — the owed stopListener and the
+   * settings go only with a complete cleanup: while anything is kept, a retry
+   * addresses the same key.
+   */
+  private settle(failures: string[]): void {
+    this.cleanupFailures = failures;
+    if (failures.length > 0) return;
+    this.fixed = undefined;
+    this.changed = false;
+    this.preferences = {};
+  }
+
+  /** Anything a later stop still has to undo — what refuses a new start. */
+  private keepsCleanup(): boolean {
+    return (
+      this.fixed !== undefined ||
+      this.changed ||
+      this.armed.size > 0 ||
+      this.control !== undefined ||
+      !!this.run ||
+      this.cleanupFailures.length > 0 ||
+      this.unclosed.size > 0 ||
+      this.owed.size > 0
+    );
+  }
+
+  /**
+   * Everything off — DebugStop, dispose, shutdown. Required, not best effort.
+   * A stopped listener counts as off once the system answered its open poll.
+   * Never throws anything but DebugCleanupError, and whatever failed stays for the next stop.
+   */
+  stop(): Promise<void> {
+    return this.mutate(async () => {
+      const failures = await this.cleanupLocked();
+      this.failure = undefined;
+      this.notices.length = 0;
+      this.settle(failures);
+      this.notify(); // also tells the instance state (observe) that this part may hold nothing now
       if (failures.length) throw new DebugCleanupError(failures.join('; '));
     });
   }
@@ -1206,6 +1212,9 @@ export class DebugSession<O = unknown> {
       !!this.listener ||
       !!this.current ||
       this.armed.size > 0 ||
+      // An identity is held, or a stopListener is owed: only a cleanup ends them.
+      this.changed ||
+      this.fixed !== undefined ||
       this.notices.length > 0 ||
       !!this.run ||
       this.failure !== undefined ||

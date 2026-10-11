@@ -234,5 +234,6 @@ describe('the start', () => {
     expect(world.calls).not.toContain('stopListener');
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
     expect(session.holdsState()).toBe(false);
+    expect(session.currentIdentity()).toBeUndefined();
   });
 });

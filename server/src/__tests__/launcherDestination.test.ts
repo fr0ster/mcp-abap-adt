@@ -38,13 +38,11 @@ jest.mock('@mcp-abap-adt/auth-broker', () => {
 });
 
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
-import { StreamableHttpServer } from '@mcp-abap-adt/http';
 import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
 import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
-import { SseServer } from '@mcp-abap-adt/sse';
 import { AuthBrokerFactory, type LoginStrategyOptions } from '../auth';
 import { factoryConfigFrom, launch } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
@@ -65,8 +63,6 @@ let root: string;
 let keysDir: string;
 let sessionsDir: string;
 let stdioStart: jest.SpyInstance;
-let httpStart: jest.SpyInstance;
-let sseStart: jest.SpyInstance;
 
 beforeEach(() => {
   // Real path: on macOS the temp dir is under /var, a link to /private/var.
@@ -97,10 +93,6 @@ beforeEach(() => {
   stdioStart = jest
     .spyOn(StdioServer.prototype, 'start')
     .mockResolvedValue(undefined);
-  httpStart = jest
-    .spyOn(StreamableHttpServer.prototype, 'start')
-    .mockResolvedValue(undefined);
-  sseStart = jest.spyOn(SseServer.prototype, 'start').mockResolvedValue();
 });
 
 afterEach(() => {
@@ -444,33 +436,50 @@ describe('one destination per process', () => {
   });
 });
 
-describe('a destination that cannot be served stops the start', () => {
+describe('core serves stdio only (D35)', () => {
   it.each([
-    ['stdio', () => stdioStart],
-    ['http', () => httpStart],
-    ['sse', () => sseStart],
+    [
+      'http',
+      'Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)',
+    ],
+    ['sse', 'SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)'],
   ] as const)(
-    '%s: its words on stderr, exit 1, no transport started',
-    async (transport, started) => {
-      // Malformed: no system URL.
-      writeSession('dest', [
-        'SAP_AUTH_TYPE=basic',
-        'SAP_USERNAME=placeholder-user',
-        `SAP_PASSWORD=${PASSWORD}`,
-      ]);
+    '--transport=%s stops the start naming the binary, before anything is read',
+    async (transport, words) => {
+      writeSession('dest', basicLines());
       const { stderr, exits } = await run([
         `--transport=${transport}`,
         '--mcp=dest',
         `--auth-broker-path=${root}`,
       ]);
       expect(exits).toEqual([1]);
-      expect(stderr.join('\n')).toContain(
-        'Destination "dest" cannot be used: SAP_URL',
-      );
-      expect(stderr.join('\n')).not.toContain(PASSWORD);
-      expect(started()).not.toHaveBeenCalled();
+      expect(stderr).toEqual([`[MCP] ${words}`]);
+      expect(constructed).not.toHaveBeenCalled();
+      expect(stdioStart).not.toHaveBeenCalled();
     },
   );
+});
+
+describe('a destination that cannot be served stops the start', () => {
+  it('its words on stderr, exit 1, no transport started', async () => {
+    // Malformed: no system URL.
+    writeSession('dest', [
+      'SAP_AUTH_TYPE=basic',
+      'SAP_USERNAME=placeholder-user',
+      `SAP_PASSWORD=${PASSWORD}`,
+    ]);
+    const { stderr, exits } = await run([
+      '--transport=stdio',
+      '--mcp=dest',
+      `--auth-broker-path=${root}`,
+    ]);
+    expect(exits).toEqual([1]);
+    expect(stderr.join('\n')).toContain(
+      'Destination "dest" cannot be used: SAP_URL',
+    );
+    expect(stderr.join('\n')).not.toContain(PASSWORD);
+    expect(stdioStart).not.toHaveBeenCalled();
+  });
 
   it('a key that does not parse: its class, never a slice of the file (H4)', async () => {
     fs.writeFileSync(
@@ -544,21 +553,17 @@ describe('the startup summary', () => {
   });
 });
 
-describe('the shutdown is installed for every transport', () => {
-  it.each([
-    ['stdio', true],
-    ['http', false],
-    ['sse', false],
-  ] as const)('%s: SIGTERM settles and exits 0', async (transport, stdin) => {
+describe('the shutdown is installed', () => {
+  it('stdio: SIGTERM settles and exits 0', async () => {
     writeSession('dest', basicLines());
     const { processLike, exits } = await run([
-      `--transport=${transport}`,
+      '--transport=stdio',
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
     expect(processLike.listenerCount('SIGTERM')).toBe(1);
     expect(processLike.listenerCount('SIGINT')).toBe(1);
-    expect(processLike.stdin.listenerCount('end')).toBe(stdin ? 1 : 0);
+    expect(processLike.stdin.listenerCount('end')).toBe(1);
     processLike.emit('SIGTERM');
     await new Promise((r) => setTimeout(r, 20));
     expect(exits).toEqual([0]);

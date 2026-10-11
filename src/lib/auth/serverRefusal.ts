@@ -28,6 +28,10 @@ export const FRESH_CONNECTION_UNAVAILABLE_WORDS =
 export const CREDENTIALS_REQUIRED_WORDS =
   "this server takes credentials only from the request's headers: send x-sap-url with x-sap-jwt-token, or with x-sap-login and x-sap-password";
 
+/** HTTP and SSE: a request carrying `x-mcp-destination` (D39), refused as `destination_refused`. */
+export const DESTINATIONS_ONLY_STDIO_WORDS =
+  'destinations are served only by mcp-abap-adt (stdio); send x-sap-* headers';
+
 /** The refusals whose words are fixed. */
 type FixedCode = Exclude<ServerRefusalCode, 'destination_refused'>;
 

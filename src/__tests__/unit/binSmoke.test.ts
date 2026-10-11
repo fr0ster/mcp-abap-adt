@@ -131,6 +131,18 @@ describe('the published bins start from an installed package', () => {
       version('compact/package.json'),
     );
 
+    // The two HTTP binaries answer their own packages' versions.
+    for (const [pkg, binName] of [
+      ['http', 'mcp-abap-adt-http.js'],
+      ['sse', 'mcp-abap-adt-sse.js'],
+    ] as const) {
+      const transportBin = installedFile(workdir, pkg, 'bin', binName);
+      expect(existsSync(transportBin)).toBe(true);
+      expect(runNode([transportBin, '--version'], workdir).trim()).toBe(
+        version(`${pkg}/package.json`),
+      );
+    }
+
     expect(printed).toBe(version('server/package.json'));
     // And not the library's, which is what two levels up answered in a checkout
     // — the same number today, so this only bites when they diverge.

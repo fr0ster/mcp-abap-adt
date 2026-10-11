@@ -1,31 +1,56 @@
-import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
 
 /**
- * Connection context for MCP server: what a connection is built from.
- * The settings and the credential are separate facts from separate sources.
+ * What a connection source answers for one request: the connector's settings
+ * and the credential it presents — separate facts from separate sources.
  */
-export interface ConnectionContext {
+export interface ResolvedConnection {
   /**
    * The connector's settings (URL, client, auth type, connection type).
    * They hold no secret: the credential holds it.
    */
-  connectionParams: SapConfig;
-
+  settings: SapConfig;
   /**
-   * The credential the connector presents: a destination's provider
-   * (`IDestinations.getProvider`) or the one the request headers carry
+   * The credential the connector presents: a destination's provider (core:
+   * the broker's `getProvider`) or the one a request's headers carry
    * (`credentialFromHeaders`).
    */
   credential: IAuthProvider;
-
   /**
-   * Session ID for this connection context
+   * Who creates objects and on which system, as the source states it: the
+   * destination's own `.env`, or an `x-sap-*` basic connection's login.
+   * Entered into each call's scope below the request's headers.
    */
-  sessionId: string;
-
-  /**
-   * Optional metadata for additional context information
-   */
-  metadata?: Record<string, any>;
+  systemContext?: DestinationSystemContext;
 }
+
+/**
+ * Where an instance's connections come from, filled by the package that
+ * serves it (spec §4): core a destination through the broker, http and sse
+ * the request's headers (`headerSource`).
+ */
+export interface ConnectionSource {
+  /** The settings and the credential for one request; the request's signal bounds the waits. */
+  resolve(signal: AbortSignal): Promise<ResolvedConnection>;
+}
+
+/**
+ * How an instance gets its connection: built from a source, or injected by
+ * an embedder and used as given (no `resolve`, no `connect()`, no wrap).
+ */
+export type Source =
+  | { kind: 'built'; source: ConnectionSource }
+  | { kind: 'injected'; connection: AbapConnection };
+
+/**
+ * Connection context for an MCP server instance: its source, and what
+ * identifies it.
+ */
+export type ConnectionContext = Source & {
+  /** Session ID for this connection context. */
+  sessionId: string;
+  /** Optional metadata for additional context information. */
+  metadata?: Record<string, unknown>;
+};

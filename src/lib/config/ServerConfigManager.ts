@@ -36,6 +36,13 @@ export class ServerConfigManager {
   private config: IServerConfig | null = null;
   private yamlConfig: YamlConfig | null = null;
 
+  /**
+   * `transport`: the binary's own transport (`mcp-abap-adt-http`,
+   * `mcp-abap-adt-sse`), which decides the host, port and DNS-protection
+   * rows it reads; without it, `--transport` / `MCP_TRANSPORT` as before.
+   */
+  constructor(private readonly options: { transport?: Transport } = {}) {}
+
   // --------------------------------------------------------------------------
   // PUBLIC API - Configuration Access
   // --------------------------------------------------------------------------
@@ -111,7 +118,7 @@ export class ServerConfigManager {
     // Use unified ArgumentsParser for CLI args
     const parsed = ArgumentsParser.parse(this.yamlConfig);
 
-    const transport = this.parseTransport();
+    const transport = this.options.transport ?? this.parseTransport();
     const exposition = this.parseExposition();
 
     // Resolve final host/port in a transport-aware way: SSE must fall back to

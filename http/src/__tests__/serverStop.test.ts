@@ -4,14 +4,8 @@
  */
 
 import * as net from 'node:net';
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
-
-const stubDestinations: IDestinations = {
-  settingsFor: jest.fn(),
-  getProvider: jest.fn(),
-};
 
 function connects(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -35,11 +29,10 @@ describe.each([
   [
     'StreamableHttpServer',
     () =>
-      new StreamableHttpServer(
-        new CompositeHandlersRegistry([]),
-        stubDestinations,
-        { host: '127.0.0.1', port: 0 },
-      ),
+      new StreamableHttpServer(new CompositeHandlersRegistry([]), {
+        host: '127.0.0.1',
+        port: 0,
+      }),
   ],
 ] as const)('%s.stop()', (_name, make) => {
   let errorSpy: jest.SpyInstance;

@@ -4,6 +4,7 @@
  * of a login and the server's login wrapper.
  */
 
+export { destinationSource } from '../destinationSource';
 export { AuthBrokerFactory } from './brokerFactory';
 export {
   BROWSER_NAMES,
@@ -22,6 +23,11 @@ export {
   HINTS,
   UnsupportedAuthenticationError,
 } from './destinationFailure';
+export type {
+  IAuthBrokerFactory,
+  IDestinations,
+  SettleReport,
+} from './IAuthBrokerFactory.js';
 export type {
   IAuthBrokerFactoryConfig,
   LoginStrategyOptions,

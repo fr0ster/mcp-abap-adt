@@ -1,5 +1,4 @@
 import { classify, logFields } from '@mcp-abap-adt/auth-errors';
-import { StreamableHttpServer } from '@mcp-abap-adt/http';
 import type { IBrowser } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
@@ -12,29 +11,21 @@ import {
   ServerConfigManager,
   validateExposition,
 } from '@mcp-abap-adt/lib/config';
-import type { HandlerContext, IHandlerGroup } from '@mcp-abap-adt/lib/handlers';
 import {
-  CompositeHandlersRegistry,
-  DebugHandlersGroup,
-  HighLevelHandlersGroup,
-  LowLevelHandlersGroup,
-  ReadOnlyHandlersGroup,
-  ReadVsGetDedupStrategy,
-  SearchHandlersGroup,
-  SystemHandlersGroup,
+  type HandlerContext,
+  type IHandlerGroup,
+  registryForExposition,
 } from '@mcp-abap-adt/lib/handlers';
 import { type StateLogger, stderrStateLogger } from '@mcp-abap-adt/lib/state';
 import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
-import { SseServer } from '@mcp-abap-adt/sse';
 import {
   AuthBrokerFactory,
   BrowserChoiceError,
   browserFor,
   browserOf,
-  destinationFailureOf,
   destinationFailureWords,
   type IAuthBrokerFactoryConfig,
   promptLogger,
@@ -67,10 +58,18 @@ const loggerForTransport =
  */
 export const stateLoggerForTransport: StateLogger = stderrStateLogger;
 
-type Transport = 'stdio' | 'sse' | 'http';
-
 // Keep strong reference to running server instance to avoid premature GC/exit
-let activeServer: StdioServer | SseServer | StreamableHttpServer | undefined;
+let activeServer: StdioServer | undefined;
+
+/**
+ * core serves stdio only (D35): the other transports are packages of their
+ * own, and a start that asks for one stops naming the binary that serves it
+ * (§10.1's words).
+ */
+const TRANSPORT_ELSEWHERE: Readonly<Record<'http' | 'sse', string>> = {
+  http: 'Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)',
+  sse: 'SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)',
+};
 
 function hasArg(name: string): boolean {
   return process.argv.includes(name);
@@ -107,11 +106,6 @@ const V2_HELP_SECTIONS = `
 ENVIRONMENT VARIABLES:
 
   MCP Server Configuration:
-    MCP_TRANSPORT                  Transport type: stdio|http|sse (default: stdio)
-    MCP_HTTP_HOST                  HTTP server host (default: 127.0.0.1)
-    MCP_HTTP_PORT                  HTTP server port (default: 3000)
-    MCP_SSE_HOST                   SSE server host (default: 127.0.0.1)
-    MCP_SSE_PORT                   SSE server port (default: 3001)
     MCP_ENV_PATH                   Explicit .env file path (same as --env-path)
     MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
     MCP_BROWSER                    Browser for a login: system|auto|chrome|edge|firefox|none|headless
@@ -120,9 +114,6 @@ ENVIRONMENT VARIABLES:
     MCP_BROWSER_AUTH_PORT          Login callback port, 1-65535 (default: 61001)
     MCP_STATE_IDLE_MINUTES         Held state (a debug session) ends after this many minutes
                                    without a tool call: at least 30 (default: 30)
-    MCP_TLS_CERT                   Path to TLS certificate file (PEM)
-    MCP_TLS_KEY                    Path to TLS private key file (PEM)
-    MCP_TLS_CA                     Path to TLS CA certificate file (PEM, optional)
 
   Auth-Broker:
     DEBUG_AUTH_LOG                 Enable debug logging for auth-broker (true|false)
@@ -204,14 +195,8 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    Else random per instance. A shared IDE id shares the user's
                                    catches without the system's listener conflict
 
-  HTTP/SSE Headers (System Context; SSE: the session's opening request):
-    x-sap-master-system            Master system for this request (wins over the .env and env)
-    x-sap-responsible              Responsible for this request (wins over the .env and env)
-    x-sap-login                    With x-sap-url (on-premise): the login, the responsible when
-                                   none is stated; on a destination request it is not read
-    x-sap-language                 Master/original language for created objects (overrides SAP_LANGUAGE)
-    x-sap-debug-terminal-id        The debugger's terminal id (wins over the .env and env)
-    x-sap-debug-ide-id             The debugger's IDE id (wins over the .env and env)
+  Streamable HTTP and SSE are served by mcp-abap-adt-http (@mcp-abap-adt/http) and
+  mcp-abap-adt-sse (@mcp-abap-adt/sse), with credentials from each request's x-sap-* headers.
 
 GENERATING A .ENV:
   Install the CLI: npm install -g @mcp-abap-adt/auth-broker-cli
@@ -523,6 +508,11 @@ export async function launch(
   options: LauncherOptions,
   deps: LauncherDeps,
 ): Promise<void> {
+  if (config.transport === 'http' || config.transport === 'sse') {
+    deps.stderr(`[MCP] ${TRANSPORT_ELSEWHERE[config.transport]}`);
+    deps.exit(1);
+    return;
+  }
   // The env file's context joins the process environment first — never over
   // a value already there — so its SAP_CONNECTION_TYPE and SAP_SYSTEM_TYPE
   // count (as in 15.x).
@@ -544,58 +534,14 @@ export async function launch(
   if (systemType) process.env.SAP_SYSTEM_TYPE = systemType;
   config = { ...config, connectionType, systemType };
 
-  const baseContext = {
-    connection: undefined as any,
-    logger: undefined,
-  } satisfies HandlerContext;
-
   // Build handlers based on exposition config (default to readonly,high)
   const exposition = options.exposition ??
     config.exposition ?? ['readonly', 'high'];
   validateExposition(exposition);
-
-  // Non-readonly groups are built first so that their tool names can be fed
-  // into ReadOnlyHandlersGroup for duplicate suppression (e.g. hide
-  // ReadFunctionModule when GetFunctionModule is also exposed).
-  const overridingGroups: IHandlerGroup[] = [];
-  if (exposition.includes('high')) {
-    overridingGroups.push(new HighLevelHandlersGroup(baseContext));
-  }
-  if (exposition.includes('low')) {
-    overridingGroups.push(new LowLevelHandlersGroup(baseContext));
-  }
-  if (exposition.includes('debug')) {
-    overridingGroups.push(new DebugHandlersGroup(baseContext));
-  }
-  for (const group of options.extraGroups?.(baseContext) ?? []) {
-    overridingGroups.push(group);
-  }
-
-  const overridingToolNames = new Set<string>();
-  for (const g of overridingGroups) {
-    for (const e of g.getHandlers()) {
-      overridingToolNames.add(e.toolDefinition.name);
-    }
-  }
-
-  const handlerGroups: IHandlerGroup[] = [];
-  if (exposition.includes('readonly')) {
-    handlerGroups.push(
-      new ReadOnlyHandlersGroup(
-        baseContext,
-        overridingToolNames,
-        new ReadVsGetDedupStrategy(),
-      ),
-    );
-    handlerGroups.push(new SystemHandlersGroup(baseContext));
-  }
-  handlerGroups.push(...overridingGroups);
-  // Search joins every list but a fixed one — see LauncherOptions.includeSearch.
-  if (options.includeSearch !== false) {
-    handlerGroups.push(new SearchHandlersGroup(baseContext));
-  }
-
-  const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
+  const handlersRegistry = registryForExposition(exposition, {
+    extraGroups: options.extraGroups,
+    includeSearch: options.includeSearch,
+  });
 
   // The browser of a login, mapped by the platform (D9); a choice that
   // cannot be served stops the start before anything is read.
@@ -655,111 +601,44 @@ export async function launch(
     }
   }
 
-  if (config.transport === 'stdio') {
-    if (!destination) {
-      // Inspection-only mode: no connection parameters provided
-      deps.stderr(
-        '[MCP] Starting in inspection-only mode (no connection parameters).',
-      );
-      deps.stderr(
-        '[MCP] To connect to SAP system, use --mcp=<destination> or --env-path=<path>',
-      );
-    }
-
-    const server = new StdioServer(
-      handlersRegistry,
-      destination ? factory : undefined,
-      {
-        version: options.version,
-        stateIdleMinutes: config.stateIdleMinutes,
-        stateLogger: stateLoggerForTransport,
-        logger: loggerForTransport,
-        sentenceFor: (error) => factory.sentenceFor(error),
-      },
+  if (!destination) {
+    // Inspection-only mode: no connection parameters provided
+    deps.stderr(
+      '[MCP] Starting in inspection-only mode (no connection parameters).',
     );
-    activeServer = server;
-    // Under stdio a signal is not the end of input: the factory's gate holds.
-    installShutdown({
-      factory,
-      servers: [
-        {
-          // The instance owns what it holds (a listener, a session) until it is
-          // gone; the close waits for that and reports what was left.
-          close: () => closeInstanceState(server),
-        },
-      ],
-      onStdinEnd: true,
-      exit: deps.exit,
-      stderr: deps.stderr,
-      processLike: deps.processLike,
-    });
-    await server.start(destination);
-    return;
+    deps.stderr(
+      '[MCP] To connect to SAP system, use --mcp=<destination> or --env-path=<path>',
+    );
   }
 
-  if (config.transport === 'sse') {
-    const server = new SseServer(handlersRegistry, factory, {
-      version: options.version ?? CORE_VERSION,
+  const server = new StdioServer(
+    handlersRegistry,
+    destination ? factory : undefined,
+    {
+      version: options.version,
       stateIdleMinutes: config.stateIdleMinutes,
       stateLogger: stateLoggerForTransport,
-      host: config.host,
-      port: config.port,
-      ssePath: config.ssePath,
-      postPath: config.postPath,
-      defaultDestination: destination,
       logger: loggerForTransport,
-      tls: config.tls,
-      allowDestinationHeader: config.allowDestinationHeader,
-      allowedHosts: config.allowedHosts,
-      allowedOrigins: config.allowedOrigins,
-      enableDnsRebindingProtection: config.enableDnsRebindingProtection,
-      readFailure: (thrown) =>
-        destinationFailureOf(thrown, {
-          sentenceFor: (error) => factory.sentenceFor(error),
-        }),
-    });
-    activeServer = server;
-    installShutdown({
-      factory,
-      servers: [{ close: () => server.stop() }],
-      exit: deps.exit,
-      stderr: deps.stderr,
-      processLike: deps.processLike,
-    });
-    await server.start();
-    return;
-  }
-
-  // http
-  const server = new StreamableHttpServer(handlersRegistry, factory, {
-    version: options.version ?? CORE_VERSION,
-    stateIdleMinutes: config.stateIdleMinutes,
-    stateLogger: stateLoggerForTransport,
-    host: config.host,
-    port: config.port,
-    enableJsonResponse: config.httpJsonResponse,
-    path: config.httpPath,
-    defaultDestination: destination,
-    logger: loggerForTransport,
-    tls: config.tls,
-    allowDestinationHeader: config.allowDestinationHeader,
-    allowedHosts: config.allowedHosts,
-    allowedOrigins: config.allowedOrigins,
-    enableDnsRebindingProtection: config.enableDnsRebindingProtection,
-    readFailure: (thrown) =>
-      destinationFailureOf(thrown, {
-        sentenceFor: (error) => factory.sentenceFor(error),
-      }),
-  });
+      sentenceFor: (error) => factory.sentenceFor(error),
+    },
+  );
   activeServer = server;
+  // Under stdio a signal is not the end of input: the factory's gate holds.
   installShutdown({
     factory,
-    servers: [{ close: () => server.stop() }],
+    servers: [
+      {
+        // The instance owns what it holds (a listener, a session) until it is
+        // gone; the close waits for that and reports what was left.
+        close: () => closeInstanceState(server),
+      },
+    ],
+    onStdinEnd: true,
     exit: deps.exit,
     stderr: deps.stderr,
     processLike: deps.processLike,
   });
-  await server.start();
+  await server.start(destination);
 }
 
 /**

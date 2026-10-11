@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the six packages of this repository to npm, in dependency order.
+# Publish the seven packages of this repository to npm, in dependency order.
 #
 # Usage: npm run release:publish            (add --dry-run to rehearse)
 #
@@ -23,17 +23,17 @@ for arg in "$@"; do
   [ "$arg" = "--dry-run" ] && DRY="--dry-run"
 done
 
-# Order matters and is not cosmetic: server/tsconfig.json resolves
-# @mcp-abap-adt/lib through paths into ../dist, @mcp-abap-adt/http into
-# ../http/dist and @mcp-abap-adt/sse into ../sse/dist, so the server cannot
-# build until all three have.
+# Order matters and is not cosmetic: dependency order. core (./server), http
+# and sse each resolve @mcp-abap-adt/lib through paths into ../dist, so none
+# can build until the library has; compact depends on core. core, http and
+# sse do not depend on one another.
 PACKAGES=(
   "."
   "./compact-readonly"
   "./compact-modify"
+  "./server"
   "./http"
   "./sse"
-  "./server"
   "./compact"
 )
 

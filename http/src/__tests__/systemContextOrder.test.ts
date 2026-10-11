@@ -1,11 +1,10 @@
 /**
  * Who creates objects (responsible) and on which system (master system), per
  * request, over Streamable HTTP. Each its own variable first: the request's
- * `x-sap-responsible` / `x-sap-master-system` headers; the destination's own
- * `.env` (`IDestinations.systemContextFor`); the process environment. Then,
- * for the responsible only, the login: the destination's `SAP_USERNAME`, the
- * request's `x-sap-login`, the process `SAP_USERNAME`. Each request sees its
- * own values — two concurrent requests never see each other's.
+ * `x-sap-responsible` / `x-sap-master-system` headers; the process
+ * environment. Then, for the responsible only, the login: the request's
+ * `x-sap-login`, the process `SAP_USERNAME`. Each request sees its own
+ * values — two concurrent requests never see each other's.
  */
 
 import type { Server } from 'node:http';
@@ -17,11 +16,6 @@ jest.mock('../../../src/lib/connectionFactory', () => ({
   createAbapConnection: () => ({ connect: async () => {} }),
 }));
 
-import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-import type {
-  DestinationSystemContext,
-  IDestinations,
-} from '@mcp-abap-adt/lib/auth';
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import {
   CompositeHandlersRegistry,
@@ -68,36 +62,6 @@ const whoAmI: IHandlerGroup = {
   ],
 };
 const registry = new CompositeHandlersRegistry([whoAmI]);
-
-const DESTINATION_CONTEXT: Record<string, DestinationSystemContext> = {
-  alpha: { responsible: 'ALPHA_USER', masterSystem: 'ALPHA_SYS' },
-  beta: { responsible: 'BETA_USER', masterSystem: 'BETA_SYS' },
-  // A basic destination stating no SAP_RESPONSIBLE: its login.
-  gamma: { login: 'GAMMA_LOGIN' },
-  bare: {},
-};
-
-function provider(): IAuthProvider {
-  return {
-    kind: 'test',
-    prepare: async () => ({ ok: true }),
-    establish: async () => ({ ok: true }),
-    authorize: async () => ({ ok: true }),
-    rejected: async () => ({ ok: true }),
-  };
-}
-
-function destinations(): IDestinations {
-  return {
-    settingsFor: async () => ({
-      url: 'https://system.example.invalid',
-      authType: 'basic' as const,
-    }),
-    getProvider: async () => provider(),
-    systemContextFor: async (destination) =>
-      DESTINATION_CONTEXT[destination] ?? {},
-  };
-}
 
 async function listen(
   register: (app: IHttpApplication) => void,
@@ -157,15 +121,20 @@ afterEach(async () => {
   }
 });
 
+/** A token connection: the credential every request must carry, stating no login. */
+const TOKEN = {
+  'x-sap-url': 'https://system.example.invalid',
+  'x-sap-jwt-token': 'token-placeholder',
+};
+
 describe('StreamableHttpServer: responsible and master system per request', () => {
   let server: Server;
   let baseUrl: string;
 
   beforeEach(async () => {
-    const mcp = new StreamableHttpServer(registry, destinations(), {
-      allowDestinationHeader: true,
-      defaultDestination: 'bare',
-    });
+    // A token connection is cloud by default: onprem, so nothing is looked up.
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    const mcp = new StreamableHttpServer(registry, {});
     ({ server, baseUrl } = await listen((app) => mcp.registerRoutes(app)));
   });
   afterEach(() => close(server));
@@ -190,73 +159,44 @@ describe('StreamableHttpServer: responsible and master system per request', () =
     return JSON.parse(body.result.content[0].text);
   }
 
-  it('the headers win over the destination .env', async () => {
+  it('the headers win over the process environment', async () => {
     await expect(
-      ask({
-        'x-mcp-destination': 'alpha',
-        'x-sap-responsible': 'HEADER_USER',
-      }),
+      ask({ ...TOKEN, 'x-sap-responsible': 'HEADER_USER' }),
     ).resolves.toEqual({
       responsible: 'HEADER_USER',
-      masterSystem: 'ALPHA_SYS',
+      masterSystem: 'PROCESS_SYS',
     });
     await expect(
-      ask({
-        'x-mcp-destination': 'alpha',
-        'x-sap-master-system': 'HEADER_SYS',
-      }),
+      ask({ ...TOKEN, 'x-sap-master-system': 'HEADER_SYS' }),
     ).resolves.toEqual({
-      responsible: 'ALPHA_USER',
+      responsible: 'PROCESS_USER',
       masterSystem: 'HEADER_SYS',
     });
-  });
-
-  it('the destination .env wins over the process environment', async () => {
-    await expect(ask({ 'x-mcp-destination': 'alpha' })).resolves.toEqual({
-      responsible: 'ALPHA_USER',
-      masterSystem: 'ALPHA_SYS',
-    });
-    // A destination that states neither: the process environment.
-    await expect(ask({ 'x-mcp-destination': 'bare' })).resolves.toEqual({
+    await expect(ask(TOKEN)).resolves.toEqual({
       responsible: 'PROCESS_USER',
       masterSystem: 'PROCESS_SYS',
     });
-  });
-
-  it('two concurrent requests to different destinations each see their own', async () => {
-    const [a, b] = await Promise.all([
-      ask({ 'x-mcp-destination': 'alpha' }, 1, 60),
-      ask({ 'x-mcp-destination': 'beta' }, 2, 0),
-    ]);
-    expect(a).toEqual({ responsible: 'ALPHA_USER', masterSystem: 'ALPHA_SYS' });
-    expect(b).toEqual({ responsible: 'BETA_USER', masterSystem: 'BETA_SYS' });
   });
 
   it('two concurrent requests with different headers each see their own', async () => {
     const [a, b] = await Promise.all([
-      ask({ 'x-sap-responsible': 'FIRST', 'x-sap-master-system': 'S1' }, 1, 60),
-      ask({ 'x-sap-responsible': 'SECOND', 'x-sap-master-system': 'S2' }, 2, 0),
+      ask(
+        { ...TOKEN, 'x-sap-responsible': 'FIRST', 'x-sap-master-system': 'S1' },
+        1,
+        60,
+      ),
+      ask(
+        {
+          ...TOKEN,
+          'x-sap-responsible': 'SECOND',
+          'x-sap-master-system': 'S2',
+        },
+        2,
+        0,
+      ),
     ]);
     expect(a).toEqual({ responsible: 'FIRST', masterSystem: 'S1' });
     expect(b).toEqual({ responsible: 'SECOND', masterSystem: 'S2' });
-  });
-
-  it('x-sap-* credential headers: the headers, else the process environment', async () => {
-    const direct = {
-      'x-sap-url': 'https://system.example.invalid',
-      'x-sap-login': 'placeholder-user',
-      'x-sap-password': 'placeholder-password',
-    };
-    await expect(
-      ask({ ...direct, 'x-sap-responsible': 'HEADER_USER' }),
-    ).resolves.toEqual({
-      responsible: 'HEADER_USER',
-      masterSystem: 'PROCESS_SYS',
-    });
-    await expect(ask(direct)).resolves.toEqual({
-      responsible: 'PROCESS_USER',
-      masterSystem: 'PROCESS_SYS',
-    });
   });
 
   describe('the login, when no SAP_RESPONSIBLE / x-sap-responsible is stated', () => {
@@ -265,43 +205,6 @@ describe('StreamableHttpServer: responsible and master system per request', () =
       'x-sap-login': 'HEADER_LOGIN',
       'x-sap-password': 'placeholder-password',
     };
-
-    it("the process SAP_RESPONSIBLE beats the destination's login", async () => {
-      await expect(ask({ 'x-mcp-destination': 'gamma' })).resolves.toEqual({
-        responsible: 'PROCESS_USER',
-        masterSystem: 'PROCESS_SYS',
-      });
-    });
-
-    it("the destination's SAP_USERNAME beats the process SAP_USERNAME", async () => {
-      delete process.env.SAP_RESPONSIBLE;
-      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-      await expect(ask({ 'x-mcp-destination': 'gamma' })).resolves.toEqual({
-        responsible: 'GAMMA_LOGIN',
-        masterSystem: 'PROCESS_SYS',
-      });
-      // A destination stating no login: the process SAP_USERNAME.
-      await expect(ask({ 'x-mcp-destination': 'bare' })).resolves.toEqual({
-        responsible: 'PROCESS_LOGIN',
-        masterSystem: 'PROCESS_SYS',
-      });
-    });
-
-    it('x-sap-login on a destination request is not the login: only an x-sap-url connection logs on with it', async () => {
-      delete process.env.SAP_RESPONSIBLE;
-      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-      await expect(
-        ask({ 'x-mcp-destination': 'bare', 'x-sap-login': 'HEADER_LOGIN' }),
-      ).resolves.toEqual({
-        responsible: 'PROCESS_LOGIN',
-        masterSystem: 'PROCESS_SYS',
-      });
-      // The default destination, with a stray x-sap-login and no x-sap-url.
-      await expect(ask({ 'x-sap-login': 'HEADER_LOGIN' })).resolves.toEqual({
-        responsible: 'PROCESS_LOGIN',
-        masterSystem: 'PROCESS_SYS',
-      });
-    });
 
     it('x-sap-login beats the process SAP_USERNAME; SAP_RESPONSIBLE beats x-sap-login', async () => {
       process.env.SAP_USERNAME = 'PROCESS_LOGIN';
@@ -315,6 +218,17 @@ describe('StreamableHttpServer: responsible and master system per request', () =
       await expect(ask(direct)).resolves.toEqual({
         responsible: 'HEADER_LOGIN',
         masterSystem: null,
+      });
+    });
+
+    it('a token connection states no login: the process SAP_USERNAME', async () => {
+      delete process.env.SAP_RESPONSIBLE;
+      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+      await expect(
+        ask({ ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' }),
+      ).resolves.toEqual({
+        responsible: 'PROCESS_LOGIN',
+        masterSystem: 'PROCESS_SYS',
       });
     });
   });

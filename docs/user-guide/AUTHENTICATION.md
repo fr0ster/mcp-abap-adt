@@ -55,8 +55,9 @@ A process serves **one default destination**, chosen in this order:
 2. **`--env-path=<path|file>`** (or `MCP_ENV_PATH`), **`--env=<name>`** (resolved to
    `sessions/<name>.env`) — one `.env` file, used as it is.
 
-Without those there is no default destination (stdio runs inspection-only; HTTP/SSE serve
-`x-sap-*` headers and, with `--allow-destination-header`, `x-mcp-destination`). **Nothing is looked
+Without those there is no default destination: stdio runs inspection-only. Destinations are served
+only by `mcp-abap-adt` (`@mcp-abap-adt/core`, stdio); `mcp-abap-adt-http` and `mcp-abap-adt-sse`
+take credentials only from `x-sap-*` headers (below). **Nothing is looked
 up in the working directory**: a server started inside someone else's project must not take their
 settings. A `.env` there is read only when you name it: `--env-path=./.env`.
 
@@ -161,7 +162,7 @@ destination, the first tool call logs in once; the token is then renewed as `--r
   destination the broker refuses stops the start, exit `1`, with the error's own words.
 
 ```bash
-mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=61005
+mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
 ```
 
 ## Generate a `.env`
@@ -196,22 +197,21 @@ system only when one is known. For each request the server takes each from the f
 |-------|-------------|---------------|
 | 1 | the tool's own argument, where the tool has one (`CreateTransport`'s `owner`) | the tool's own argument, where a tool has one (none does today) |
 | 2 | the request's `x-sap-responsible` header | the request's `x-sap-master-system` header |
-| 3 | `SAP_RESPONSIBLE` in the destination's own `.env` | `SAP_MASTER_SYSTEM` in the destination's own `.env` |
+| 3 | `SAP_RESPONSIBLE` in the destination's own `.env` (stdio) | `SAP_MASTER_SYSTEM` in the destination's own `.env` (stdio) |
 | 4 | `SAP_RESPONSIBLE` in the process environment | `SAP_MASTER_SYSTEM` in the process environment |
-| 5 | on-premise, the login: the destination's own `SAP_USERNAME` | on a cloud system, the system id (`systeminformation`) |
-| 6 | on-premise, the login: `x-sap-login` of an `x-sap-url` connection | — left out of the request |
+| 5 | on-premise, the login: the destination's own `SAP_USERNAME` (stdio) | on a cloud system, the system id (`systeminformation`) |
+| 6 | on-premise, the login: `x-sap-login` of an `x-sap-url` basic connection (HTTP, SSE) | — left out of the request |
 | 7 | on-premise, the login: the process `SAP_USERNAME` | |
 | 8 | on a cloud system, the login is the system's user (`systeminformation`) alone | |
 
-The headers are read per request over HTTP and from the session's opening request over SSE, for a
-destination request and an `x-sap-*` connection request alike. The destination's own `.env` is the
-`--env` / `--env-path` file, or `sessions/<destination>.env` for a named destination (`--mcp`,
-`x-mcp-destination`) — read per destination, so one destination never gets another's. A cloud system is
+The headers are read per request over HTTP and from the connection's opening request over SSE. The
+destination's own `.env` (stdio) is the `--env` / `--env-path` file, or `sessions/<destination>.env`
+for a named destination (`--mcp`). A cloud system is
 asked once per connection, on the connected connection, and only for what is not stated; on-premise
 nothing is asked of the system. Which kind a system is follows the rule above, never its URL. On a cloud
 system steps 5–7 do not count: `SAP_USERNAME` and `x-sap-login` are not its login. `x-sap-login` is the
-login only of an `x-sap-url` basic connection, which logs on with it; on a destination request it is not
-read. The process environment (`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_USERNAME`) is read once: a
+login only of an `x-sap-url` basic connection, which logs on with it; a token connection states no
+login. The process environment (`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_USERNAME`) is read once: a
 change made to it while the server runs is not picked up.
 
 A create (or a transport without an `owner`) that finds no responsible person — on-premise over SNC or
@@ -230,17 +230,24 @@ sends the responsible like every other create (adt-clients 25.0.1), and is refus
 none is found — and so is a program's test include (`CreateProgramUnitTest`), whose include create
 now receives the same context.
 
-## HTTP/SSE headers
+## HTTP and SSE: credentials from headers only
 
-For HTTP and SSE transports a request may carry its own connection:
+`mcp-abap-adt-http` (`@mcp-abap-adt/http`) takes credentials **only** from each request's headers,
+and `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) only from the headers of the `GET` that opens each SSE
+connection:
 
-- A destination: `x-mcp-destination`, **only with `--allow-destination-header`** (off by
-  default). A value that is not a plain destination name is refused naming the header.
-- A token you hold: `x-sap-url`, `x-sap-client`, `x-sap-jwt-token`
-- Basic: `x-sap-url`, `x-sap-client`, `x-sap-login`, `x-sap-password`
+- A token you hold: `x-sap-url`, `x-sap-client`, `x-sap-jwt-token` — presented as a Bearer token,
+  never renewed.
+- Basic: `x-sap-url`, `x-sap-client`, `x-sap-login`, `x-sap-password`.
 
-Precedence: `x-mcp-destination` (when allowed), then `x-sap-*` headers, then the default
-destination. A request with none of them is answered `400`.
+There is no destination, no service key, no session file and no login in either: a request (HTTP)
+or an opening `GET` (SSE) without credentials is answered `400` — *this server takes credentials
+only from the request's headers: send x-sap-url with x-sap-jwt-token, or with x-sap-login and
+x-sap-password* — and one carrying `x-mcp-destination` (SSE: a `GET` or a `POST`) is answered `400`
+— *destinations are served only by mcp-abap-adt (stdio); send x-sap-* headers*. `ping` answers
+without credentials. Each request (HTTP) or connection (SSE) builds its own credential; nothing is
+stored, shared or cached across them. Over SSE a `POST` is routed by its `sessionId` alone: its own
+`x-sap-*` headers are not read.
 
 ## Errors you may meet at startup
 

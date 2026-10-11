@@ -17,7 +17,8 @@
  */
 
 import type { EventEmitter } from 'node:events';
-import { errorClassOf, type SettleReport } from '@mcp-abap-adt/lib/auth';
+import { errorClassOf } from '@mcp-abap-adt/lib/auth';
+import type { SettleReport } from './auth/IAuthBrokerFactory.js';
 
 /** The callback strategy's login timeout: a login waiting on a browser ends by then. */
 export const SHUTDOWN_DEADLINE_MS = 30_000;

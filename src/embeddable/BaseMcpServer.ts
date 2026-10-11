@@ -1,19 +1,16 @@
-import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
 import { answerRead } from '../lib/auth/answerFailure.js';
+import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
 import {
   failureOf,
   type ReadFailure,
   readGuarded,
 } from '../lib/auth/failures.js';
-import type {
-  DestinationSystemContext,
-  IDestinations,
-} from '../lib/auth/IAuthBrokerFactory.js';
 import { createAbapConnection } from '../lib/connectionFactory.js';
-import { credentialFromHeaders } from '../lib/credentialSources.js';
 import {
   createDebuggerInstance,
   type DebuggerInstance,
@@ -45,6 +42,12 @@ import { return_error } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
 /**
+ * The signal a tool call's connection is acquired with until the request's own
+ * reaches here (A8 supplies it): never aborted.
+ */
+const NO_REQUEST_SIGNAL: AbortSignal = new AbortController().signal;
+
+/**
  * Base MCP Server class that extends SDK McpServer
  * Manages connection context and provides connection injection for handlers
  */
@@ -55,14 +58,27 @@ export abstract class BaseMcpServer extends McpServer {
   protected readonly logger: Logger;
 
   /**
-   * Connection context (set per request for SSE/HTTP, once for stdio)
+   * Connection context: the instance's one source (spec §4) — set once for
+   * stdio, per request for Streamable HTTP (also on a pooled instance), once
+   * per SSE connection, at construction for an embedder's injected connection.
    */
   protected connectionContext: ConnectionContext | null = null;
 
   /**
-   * Cached connection for stdio mode (created once, reused for all requests)
+   * The connection built from the source, kept while the source answers the
+   * same credential object (D13): stdio's provider, an SSE connection's
+   * headers. A new credential — the broker built a new provider, a new HTTP
+   * request — builds a new connection.
    */
-  private cachedConnection: AbapConnection | null = null;
+  private built:
+    | { credential: IAuthProvider; connection: Promise<AbapConnection> }
+    | undefined;
+
+  /** What each built connection's source stated about who creates objects. */
+  private readonly systemContexts = new WeakMap<
+    AbapConnection,
+    DestinationSystemContext | undefined
+  >();
 
   /**
    * Per-instance SAP system type. Overrides process.env.SAP_SYSTEM_TYPE
@@ -75,15 +91,6 @@ export abstract class BaseMcpServer extends McpServer {
    * `null` disables. See src/lib/requestSystemResolution.ts.
    */
   protected readonly systemContextResolver: SystemContextResolver | null;
-
-  /**
-   * The responsible, login and master system the destination's own `.env`
-   * states (`IDestinations.systemContextFor`) — or, for an `x-sap-*` basic
-   * connection, its `x-sap-login` as the login — entered into each call's
-   * request scope below the request's headers. Per server instance: HTTP builds one
-   * per request, SSE one per session.
-   */
-  private destinationSystemContext: DestinationSystemContext | undefined;
 
   /** What this instance holds between tool calls, and its handle (MCP SEP-2567). */
   readonly state: InstanceState;
@@ -161,90 +168,15 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Sets the connection context of a destination: its settings
-   * (`settingsFor`) and its provider (`getProvider`, the counted one). No
-   * token is read here and no auth type is branched on: the credential is
-   * the destination's, and it renews itself.
-   * For stdio: called once on startup. For SSE/HTTP: per request or session.
+   * Sets the instance's source (spec §4): a `ConnectionSource` to build from
+   * (core: the destination; http and sse: the request's headers), or an
+   * injected connection used as given. Nothing is read or sent here; the
+   * process configuration joins the process context (the fallback after the
+   * request's headers and the source's own statement).
    */
-  protected async setConnectionContext(
-    destination: string,
-    destinations: IDestinations,
-  ): Promise<void> {
-    this.logger.debug(
-      `[BaseMcpServer] Getting connection settings for destination: ${destination}`,
-    );
-
-    const settings = await destinations.settingsFor(destination);
-    const credential = await destinations.getProvider(destination);
-    const connectionParams: SapConfig = { ...settings };
-
-    // No setup-time lookup and no connection. Per call, in this order: the
-    // tool's arguments, the request's headers, the destination's own .env
-    // (read here, nothing sent), the process configuration (read here into
-    // the process context); for the responsible then the login (the
-    // destination's SAP_USERNAME, x-sap-login, the process SAP_USERNAME);
-    // and — in the cloud only — the connected
-    // connection (withResolvedSystemContext). A cloud destination without
-    // SAP_CLIENT uses the system's default client.
-    this.destinationSystemContext =
-      await destinations.systemContextFor?.(destination);
+  protected setConnectionContext(context: ConnectionContext): void {
     systemContextFromConfiguration();
-    this.connectionContext = {
-      sessionId: destination,
-      connectionParams,
-      credential,
-      metadata: {
-        destination,
-      },
-    };
-  }
-
-  /**
-   * Sets connection context from HTTP headers (direct SAP connection, no broker)
-   * Used when x-sap-url + auth headers are provided: the settings and the
-   * credential are what `credentialFromHeaders` answers.
-   */
-  protected setConnectionContextFromHeaders(
-    headers: Record<string, string | string[] | undefined>,
-  ): void {
-    const getHeader = (name: string): string | undefined => {
-      const value = headers[name] ?? headers[name.toUpperCase()];
-      return Array.isArray(value) ? value[0] : value;
-    };
-
-    const { settings, credential } = credentialFromHeaders(headers);
-    // No destination: the headers (the request scope), then the process
-    // configuration, then — in the cloud only — the connected connection.
-    // A basic connection logs on as x-sap-login: that is this connection's
-    // login, the responsible when none is stated. Only here — on a
-    // destination request x-sap-login logs nobody on (Ruling 19).
-    const login =
-      settings.authType === 'basic' ? getHeader('x-sap-login') : undefined;
-    this.destinationSystemContext = login ? { login } : undefined;
-    systemContextFromConfiguration();
-    const masterSystem = getHeader('x-sap-master-system');
-    const responsible = getHeader('x-sap-responsible');
-    const masterLanguage = getHeader('x-sap-language');
-
-    const metadata: Record<string, string> = {};
-    if (masterSystem) metadata.masterSystem = masterSystem;
-    if (responsible) metadata.responsible = responsible;
-    if (masterLanguage) metadata.masterLanguage = masterLanguage;
-
-    // Per-request master/original language (x-sap-language) is carried in the
-    // per-request connection metadata above and, for HTTP/SSE, in the
-    // request-scoped context the transport establishes around dispatch (see
-    // runWithRequestContext in StreamableHttpServer/SseServer). It is NOT
-    // written to the process-global system-context cache, which would leak the
-    // value across requests, sessions, and connection modes (#110).
-
-    this.connectionContext = {
-      sessionId: settings.authType === 'jwt' ? 'direct-jwt' : 'direct-basic',
-      connectionParams: settings,
-      credential,
-      metadata,
-    };
+    this.connectionContext = context;
   }
 
   /**
@@ -264,49 +196,48 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Gets ABAP connection from connection context: the connector built from
-   * the context's settings and credential, then connected. The credential
-   * renews itself (a 401 reaches its `rejected()`), so nothing is looked up
-   * here for refreshing.
-   * For stdio mode: caches connection and reuses it for all requests (like v1)
-   * For SSE/HTTP: creates new connection per request
+   * The connection a tool call works on. Injected: the connection as given —
+   * no `resolve`, no `connect()`, no wrap. Built: the source resolves the
+   * settings and the credential with `signal` (the request's, from A8), and
+   * the connection is built and connected once per credential object — kept
+   * while the source answers the same one (D13). The credential renews
+   * itself (a 401 reaches its `rejected()`), so nothing is looked up here for
+   * refreshing.
    */
-  protected async getConnection(): Promise<AbapConnection> {
-    if (!this.connectionContext?.connectionParams) {
+  protected async getConnection(signal: AbortSignal): Promise<AbapConnection> {
+    const context = this.connectionContext;
+    if (!context) {
       throw new Error(
         'Connection context not set. Call setConnectionContext() first.',
       );
     }
+    if (context.kind === 'injected') return context.connection;
 
-    const destination = this.connectionContext.metadata?.destination as
-      | string
-      | undefined;
-    const sessionId = this.connectionContext.sessionId;
-
-    // For stdio mode: cache connection and reuse it (like v1)
-    // This prevents creating new connection on each request, which would trigger browser auth
-    // Check if we have cached connection with same sessionId (stdio uses destination as sessionId)
-    if (destination && this.cachedConnection && sessionId === destination) {
-      // Reuse cached connection for stdio mode
-      return this.cachedConnection;
+    const resolved = await context.source.resolve(signal);
+    let held = this.built;
+    if (!held || held.credential !== resolved.credential) {
+      const connecting = (async () => {
+        const connection = createAbapConnection(
+          resolved.settings,
+          resolved.credential,
+        );
+        // Establish session (CSRF token + cookies) before first request.
+        // RFC needs this for the stateful session; HTTP needs it because some
+        // SAP systems reject the very first request (403) when no session
+        // cookie is present.
+        await connection.connect();
+        return connection;
+      })();
+      const entry = { credential: resolved.credential, connection: connecting };
+      held = entry;
+      this.built = entry;
+      // A failed connect is not kept: the next call connects again.
+      connecting.catch(() => {
+        if (this.built === entry) this.built = undefined;
+      });
     }
-
-    const connection = createAbapConnection(
-      this.connectionContext.connectionParams,
-      this.connectionContext.credential,
-    );
-
-    // Establish session (CSRF token + cookies) before first request.
-    // RFC needs this for the stateful session; HTTP needs it because some SAP systems
-    // reject the very first request (403) when no session cookie is present.
-    await connection.connect();
-
-    // Cache connection for stdio mode (when sessionId === destination, it's stdio)
-    // SSE/HTTP modes use different sessionId per request, so caching won't interfere
-    if (destination && sessionId === destination) {
-      this.cachedConnection = connection;
-    }
-
+    const connection = await held.connection;
+    this.systemContexts.set(connection, resolved.systemContext);
     return connection;
   }
 
@@ -340,7 +271,7 @@ export abstract class BaseMcpServer extends McpServer {
               // Get connection from context (this.connectionContext)
               // Token will be automatically refreshed via AuthBroker if needed
               const context: HandlerContext = {
-                connection: await this.getConnection(),
+                connection: await this.getConnection(NO_REQUEST_SIGNAL),
                 logger: this.logger,
                 state: this.state,
                 debugger: () => this.debuggerFor(),
@@ -357,7 +288,7 @@ export abstract class BaseMcpServer extends McpServer {
               // states.
               const resolved = <T>(fn: () => Promise<T>) =>
                 withDestinationSystemContext(
-                  this.destinationSystemContext,
+                  this.systemContexts.get(context.connection),
                   () =>
                     withResolvedSystemContext(
                       context.connection,

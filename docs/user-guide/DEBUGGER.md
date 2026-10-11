@@ -65,9 +65,11 @@ The system knows a debugger by the SAP user and two ids, a **terminal id** and a
 instance (32 upper-case hex characters). Either can be stated instead, each on its
 own; the first found wins:
 
-1. the request headers `x-sap-debug-terminal-id` and `x-sap-debug-ide-id` (HTTP;
-   SSE: the session's opening request);
-2. `SAP_DEBUG_TERMINAL_ID` and `SAP_DEBUG_IDE_ID` in the destination's own `.env`;
+1. the request headers `x-sap-debug-terminal-id` and `x-sap-debug-ide-id`
+   (`@mcp-abap-adt/http`: each request; `@mcp-abap-adt/sse`: the connection's
+   opening request);
+2. `SAP_DEBUG_TERMINAL_ID` and `SAP_DEBUG_IDE_ID` in the destination's own `.env`
+   — `@mcp-abap-adt/core` (stdio) only: HTTP and SSE serve no destination;
 3. the same variables in the process environment.
 
 The ids are read when the instance's debugger is first used — the first debug
@@ -109,9 +111,9 @@ keep the instance:
 
 | Transport | Who keeps the instance |
 |---|---|
-| stdio | the process: one per client session, holding the session until it exits |
-| SSE | the SSE session: one instance per connection; when the connection closes, the debug session is stopped |
-| Streamable HTTP | the server's pool of instances: each request takes the instance its `tools/call`'s `state_handle` names, or a new one; an instance that still holds state after the response stays in the pool, one that holds nothing is disposed. One request at a time per instance; a JSON-RPC batch carrying a `state_handle` is refused |
+| stdio (`@mcp-abap-adt/core`, `mcp-abap-adt`) | the process: one per client session, holding the session until it exits |
+| SSE (`@mcp-abap-adt/sse`, `mcp-abap-adt-sse`) | the SSE connection: one instance per connection, its credential from the opening `GET`'s headers; when the connection closes, the debug session is stopped |
+| Streamable HTTP (`@mcp-abap-adt/http`, `mcp-abap-adt-http`) | the server's pool of instances: each request takes the instance its `tools/call`'s `state_handle` names, or a new one, and its own `x-sap-*` headers give its credential; an instance that still holds state after the response stays in the pool, one that holds nothing is disposed. One request at a time per instance; a JSON-RPC batch carrying a `state_handle` is refused. The debug session keeps the connections it opened with the creating request's credential until it ends |
 | embedded (`EmbeddableMcpServer`) | the embedding host |
 
 Why a pool and not a session carried by the client: over HTTP the system's stop

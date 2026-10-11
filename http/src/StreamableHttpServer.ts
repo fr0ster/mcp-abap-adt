@@ -1,12 +1,9 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import {
-  errorClassOf,
-  type IDestinations,
-  type ReadFailure,
-} from '@mcp-abap-adt/lib/auth';
+import { errorClassOf } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
+  ConnectionContext,
   IHttpApplication,
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
@@ -14,11 +11,10 @@ import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
-  destinationFailureAnswer,
-  destinationFromHeader,
-  type FailureReader,
-  FirstConnectLock,
   getProtocol,
+  headerContext,
+  refuseDestinationHeader,
+  requestFailureAnswer,
   withDnsRebindingProtection,
 } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
@@ -65,10 +61,6 @@ export interface StreamableHttpServerOptions {
    */
   enableJsonResponse?: boolean;
   /**
-   * Default SAP destination to use if not specified in headers
-   */
-  defaultDestination?: string;
-  /**
    * Path for the MCP endpoint
    * @default "/mcp/stream/http"
    */
@@ -91,43 +83,30 @@ export interface StreamableHttpServerOptions {
    * TLS configuration for HTTPS support
    */
   tls?: TlsConfig;
-  /**
-   * Allow x-mcp-destination header to override default destination
-   * @default false
-   */
-  allowDestinationHeader?: boolean;
   /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
   allowedHosts?: string[];
   /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
   allowedOrigins?: string[];
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
-  /**
-   * What reads a failure as the client's answer (§7.1); default lib's
-   * `failureOf`. core passes its destination reader while it still serves
-   * destinations over this transport.
-   */
-  readFailure?: FailureReader;
 }
-
-type Headers = Record<string, string | string[] | undefined>;
 
 /** What the pool keeps of a per-request server, and what the request handler drives on it. */
 interface PerRequestServerApi extends Poolable {
   connect: BaseMcpServer['connect'];
   idle(): Promise<void>;
-  setConnectionContextPublic: (
-    destination: string,
-    destinations: IDestinations,
-  ) => Promise<void>;
-  setConnectionContextFromHeadersPublic: (headers: Headers) => void;
-  connectPublic: () => Promise<unknown>;
+  /** The request's own source (its `x-sap-*` headers), set on every request. */
+  useConnectionContext(context: ConnectionContext): void;
 }
 
 /**
- * Minimal Streamable HTTP server implementation.
- * Creates new transport for each HTTP POST and forwards request to the MCP server.
- * Destination is taken from x-mcp-destination header or defaultDestination.
+ * The Streamable HTTP server. Each HTTP POST is an MCP session of its own, on
+ * a new server instance or the pooled one its `state_handle` names.
+ * Credentials come only from each request's `x-sap-*` headers (D39), through
+ * lib's `headerSource`: nothing is stored, shared or cached across requests,
+ * except the connections held state opened (§3.8). A request without them is
+ * answered `400` (`ping` excepted), and so is one carrying
+ * `x-mcp-destination` — destinations are core's (stdio).
  *
  * Supports two modes:
  * 1. Standalone mode: Creates its own Express server (when no app option provided)
@@ -137,28 +116,21 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly host: string;
   private readonly port: number;
   private readonly enableJsonResponse: boolean;
-  private readonly defaultDestination?: string;
   private readonly path: string;
   private readonly externalApp?: IHttpApplication;
   private readonly version: string;
   private standaloneServer?: HttpServer | HttpsServer;
   private readonly tls?: TlsConfig;
-  private readonly allowDestinationHeader: boolean;
   private readonly allowedHosts?: string[];
   private readonly allowedOrigins?: string[];
   private readonly enableDnsRebindingProtection?: boolean;
-  /** Per-destination lock around the first connect: it serialises the first login. */
-  private readonly firstConnect = new FirstConnectLock();
   /** The instances that hold state between requests (spec D9). */
   private readonly pool = new InstancePool<PerRequestServerApi>();
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
-  private readonly failureReader: FailureReader | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
-    /** The destinations: settings and the counted provider, nothing else. */
-    private readonly destinations: IDestinations,
     opts?: StreamableHttpServerOptions,
   ) {
     super({
@@ -176,15 +148,12 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
     this.enableJsonResponse = opts?.enableJsonResponse ?? true;
-    this.defaultDestination = opts?.defaultDestination;
     this.path = opts?.path ?? '/mcp/stream/http';
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
-    this.allowDestinationHeader = opts?.allowDestinationHeader ?? false;
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
-    this.failureReader = opts?.readFailure;
     // Register handlers once for shared MCP server
     this.registerHandlers(this.handlersRegistry);
   }
@@ -216,38 +185,11 @@ export class StreamableHttpServer extends BaseMcpServer {
       }
 
       try {
-        let destination: string | undefined;
-        let fromHeaders = false;
-
-        // Priority 1: x-mcp-destination (only with --allow-destination-header),
-        // refused when it is not a destination name
-        const destinationHeader = destinationFromHeader(
-          req.headers,
-          this.allowDestinationHeader,
-        );
-
-        if (destinationHeader !== undefined) {
-          destination = destinationHeader;
-        }
-        // Priority 2: Check SAP connection headers (x-sap-url + auth params)
-        // The settings and the credential come from the headers, no destination
-        else if (this.hasSapConnectionHeaders(req.headers)) {
-          destination = undefined;
-          fromHeaders = true;
-        }
-        // Priority 3: Use default destination
-        else if (this.defaultDestination) {
-          destination = this.defaultDestination;
-        }
-        // Priority 4: No auth params at all -> reject request
-        else {
-          res
-            .status(400)
-            .send(
-              'Missing SAP connection context. Provide x-mcp-destination header, configure default destination (--mcp/--env-path), or pass x-sap-* headers.',
-            );
-          return;
-        }
+        // A header this server no longer serves is refused, never ignored.
+        refuseDestinationHeader(req.headers);
+        // The request's own source, from its x-sap-* headers alone; `ping`
+        // is a protocol-level check and answers without them.
+        const context = isPing ? undefined : headerContext(req.headers);
 
         let handle: string | undefined;
         try {
@@ -260,14 +202,9 @@ export class StreamableHttpServer extends BaseMcpServer {
           throw err;
         }
 
-        const authSource = destination
-          ? `destination=${destination}`
-          : fromHeaders
-            ? 'x-sap-* headers'
-            : 'none';
         if (!isPing) {
           console.error(
-            `[StreamableHttpServer] ${methodInfo} | auth: ${authSource}`,
+            `[StreamableHttpServer] ${methodInfo} | auth: x-sap-* headers`,
           );
         }
 
@@ -293,24 +230,9 @@ export class StreamableHttpServer extends BaseMcpServer {
               }),
             );
             try {
-              // The request's own credentials, every time — also on a kept instance.
-              if (!isPing && fromHeaders) {
-                server.setConnectionContextFromHeadersPublic(req.headers);
-              } else if (!isPing && destination) {
-                // Skip SAP connection setup for ping — it's a protocol-level check.
-                // The first request of a destination connects inside the lock:
-                // two first logins must not race for the same callback port
-                const chosen = destination;
-                await this.firstConnect.run(
-                  chosen,
-                  () =>
-                    server.setConnectionContextPublic(
-                      chosen,
-                      this.destinations,
-                    ),
-                  () => server.connectPublic(),
-                );
-              }
+              // The request's own credentials, every time — also on a kept
+              // instance: its tool calls build their connections from them.
+              if (context) server.useConnectionContext(context);
 
               await server.connect(transport);
               // Scope what the request states — x-sap-language, x-sap-responsible,
@@ -350,9 +272,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           if (!res.headersSent) res.status(503).send(POOL_CLOSED_WORDS);
           return;
         }
-        const answer = this.failureReader
-          ? destinationFailureAnswer(err, this.failureReader)
-          : destinationFailureAnswer(err);
+        const answer = requestFailureAnswer(err);
         if (answer.logLine !== undefined) console.error(answer.logLine);
         if (!answer.known) {
           // No words for it: its class only — a message may quote a file (H4).
@@ -369,13 +289,6 @@ export class StreamableHttpServer extends BaseMcpServer {
         }
       }
     };
-  }
-
-  /** The host's failure reader when it gave one, else lib's (§7.1). */
-  protected override readFailure(thrown: unknown): ReadFailure | undefined {
-    return this.failureReader
-      ? this.failureReader(thrown)
-      : super.readFailure(thrown);
   }
 
   /**
@@ -424,11 +337,6 @@ export class StreamableHttpServer extends BaseMcpServer {
     console.error(
       `[StreamableHttpServer] JSON response mode: ${this.enableJsonResponse}`,
     );
-    if (this.defaultDestination) {
-      console.error(
-        `[StreamableHttpServer] Default destination: ${this.defaultDestination}`,
-      );
-    }
   }
 
   /**
@@ -496,21 +404,6 @@ export class StreamableHttpServer extends BaseMcpServer {
     }
   }
 
-  /**
-   * Check if request has SAP connection headers
-   */
-  private hasSapConnectionHeaders(
-    headers: Record<string, string | string[] | undefined>,
-  ): boolean {
-    const hasUrl = headers['x-sap-url'] || headers['X-SAP-URL'];
-    const hasJwtAuth = headers['x-sap-jwt-token'] || headers['X-SAP-JWT-Token'];
-    const hasBasicAuth =
-      (headers['x-sap-login'] || headers['X-SAP-Login']) &&
-      (headers['x-sap-password'] || headers['X-SAP-Password']);
-
-    return !!(hasUrl && (hasJwtAuth || hasBasicAuth));
-  }
-
   private createPerRequestServer(): PerRequestServerApi {
     class PerRequestServer extends BaseMcpServer {
       constructor(
@@ -518,34 +411,13 @@ export class StreamableHttpServer extends BaseMcpServer {
         version: string,
         logger: Logger,
         state: { stateIdleMinutes?: number; stateLogger?: StateLogger },
-        private readonly failureReader: FailureReader | undefined,
       ) {
         super({ name: 'mcp-abap-adt', version, logger, ...state });
         this.registerHandlers(this.registry);
       }
 
-      protected override readFailure(thrown: unknown): ReadFailure | undefined {
-        return this.failureReader
-          ? this.failureReader(thrown)
-          : super.readFailure(thrown);
-      }
-
-      public setConnectionContextPublic(
-        destination: string,
-        destinations: IDestinations,
-      ): Promise<void> {
-        return this.setConnectionContext(destination, destinations);
-      }
-
-      /** The context's connection, connected (cached for this request). */
-      public connectPublic(): Promise<unknown> {
-        return this.getConnection();
-      }
-
-      public setConnectionContextFromHeadersPublic(
-        headers: Record<string, string | string[] | undefined>,
-      ): void {
-        this.setConnectionContextFromHeaders(headers);
+      public useConnectionContext(context: ConnectionContext): void {
+        this.setConnectionContext(context);
       }
     }
     return new PerRequestServer(
@@ -556,7 +428,6 @@ export class StreamableHttpServer extends BaseMcpServer {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
       },
-      this.failureReader,
     );
   }
 }

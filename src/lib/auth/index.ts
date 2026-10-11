@@ -15,6 +15,7 @@ export {
   failurePayload,
 } from './answerFailure';
 export { assertDestinationName } from './destinationName';
+export type { DestinationSystemContext } from './destinationSystemContext';
 export { errorClassOf, SettingsError } from './errors';
 export {
   ADT_REQUEST_ABORTED,
@@ -27,14 +28,9 @@ export {
   readGuarded,
   readOwn,
 } from './failures';
-export type {
-  DestinationSystemContext,
-  IAuthBrokerFactory,
-  IDestinations,
-  SettleReport,
-} from './IAuthBrokerFactory.js';
 export {
   CREDENTIALS_REQUIRED_WORDS,
+  DESTINATIONS_ONLY_STDIO_WORDS,
   FRESH_CONNECTION_UNAVAILABLE_WORDS,
   INSPECTION_ONLY_WORDS,
   ServerRefusal,

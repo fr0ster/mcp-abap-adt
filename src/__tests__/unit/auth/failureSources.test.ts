@@ -14,11 +14,18 @@ import {
   ClientCredentialsProvider,
   refreshThenLogin,
 } from '@mcp-abap-adt/auth-providers';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
-import type { IDestinations } from '../../../lib/auth';
+
+/** What the source answers: the settings and the provider, as a destination's. */
+interface IDestinations {
+  settingsFor(): Promise<SapConfig>;
+  getProvider(): Promise<IAuthProvider>;
+}
+
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 
@@ -53,12 +60,21 @@ class TestServer extends BaseMcpServer {
   constructor(private readonly beforeConnect?: () => Promise<void>) {
     super({ name: 'test-server', version: '1.0.0', logger: silent });
   }
-  protected override async getConnection() {
+  protected override async getConnection(signal: AbortSignal) {
     await this.beforeConnect?.();
-    return super.getConnection();
+    return super.getConnection(signal);
   }
   async serve(destinations: IDestinations, group: StubGroup): Promise<Client> {
-    await this.setConnectionContext('dest', destinations);
+    this.setConnectionContext({
+      kind: 'built',
+      source: {
+        resolve: async () => ({
+          settings: await destinations.settingsFor(),
+          credential: await destinations.getProvider(),
+        }),
+      },
+      sessionId: 'dest',
+    });
     this.registerHandlers(new CompositeHandlersRegistry([group as never]));
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: 'test', version: '1.0.0' });

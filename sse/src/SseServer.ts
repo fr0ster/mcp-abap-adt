@@ -1,12 +1,9 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import {
-  errorClassOf,
-  type IDestinations,
-  type ReadFailure,
-} from '@mcp-abap-adt/lib/auth';
+import { errorClassOf } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
+  ConnectionContext,
   IHttpApplication,
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
@@ -14,11 +11,10 @@ import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
-  destinationFailureAnswer,
-  destinationFromHeader,
-  type FailureReader,
-  FirstConnectLock,
   getProtocol,
+  headerContext,
+  refuseDestinationHeader,
+  requestFailureAnswer,
   withDnsRebindingProtection,
 } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
@@ -66,10 +62,6 @@ export interface SseServerOptions {
    */
   postPath?: string;
   /**
-   * Default SAP destination to use if not specified in headers
-   */
-  defaultDestination?: string;
-  /**
    * Logger instance
    */
   logger?: Logger;
@@ -87,23 +79,12 @@ export interface SseServerOptions {
    * TLS configuration for HTTPS support
    */
   tls?: TlsConfig;
-  /**
-   * Allow x-mcp-destination header to override default destination
-   * @default false
-   */
-  allowDestinationHeader?: boolean;
   /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
   allowedHosts?: string[];
   /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
   allowedOrigins?: string[];
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
-  /**
-   * What reads a failure as the client's answer (§7.1); default lib's
-   * `failureOf`. core passes its destination reader while it still serves
-   * destinations over this transport.
-   */
-  readFailure?: FailureReader;
 }
 
 type SessionEntry = {
@@ -117,7 +98,12 @@ type SessionEntry = {
 };
 
 /**
- * Minimal SSE server: creates a new BaseMcpServer per GET connection, routes POST by sessionId.
+ * The SSE server (D48): a `GET` opens a connection and builds one
+ * `BaseMcpServer` for it, whose source is that `GET`'s `x-sap-*` headers
+ * (lib's `headerSource`) — one per connection, shared with no other and
+ * outliving none. A `POST` is routed by its `sessionId` alone: its own
+ * `x-sap-*` headers are not read. A `GET` without credentials, and a `GET` or
+ * a `POST` carrying `x-mcp-destination`, are answered `400`.
  *
  * Supports two modes:
  * 1. Standalone mode: Creates its own Express server (when no app option provided)
@@ -128,45 +114,35 @@ export class SseServer {
   private readonly port: number;
   private readonly ssePath: string;
   private readonly postPath: string;
-  private readonly defaultDestination?: string;
   private readonly sessions = new Map<string, SessionEntry>();
   /** Disposals of closed sessions still running; stop() waits for them. */
   private readonly closingSessions = new Set<Promise<string[]>>();
-  /** Per-destination lock around the first connect: it serialises the first login. */
-  private readonly firstConnect = new FirstConnectLock();
   private readonly logger: Logger;
   private readonly version: string;
   private readonly externalApp?: IHttpApplication;
   private standaloneServer?: HttpServer | HttpsServer;
   private readonly tls?: TlsConfig;
-  private readonly allowDestinationHeader: boolean;
   private readonly allowedHosts?: string[];
   private readonly allowedOrigins?: string[];
   private readonly enableDnsRebindingProtection?: boolean;
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
-  private readonly failureReader: FailureReader | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
-    /** The destinations: settings and the counted provider, nothing else. */
-    private readonly destinations: IDestinations,
     opts?: SseServerOptions,
   ) {
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3001;
     this.ssePath = opts?.ssePath ?? '/sse';
     this.postPath = opts?.postPath ?? '/messages';
-    this.defaultDestination = opts?.defaultDestination;
     this.logger = opts?.logger ?? noopLogger;
     this.version = opts?.version ?? SSE_VERSION;
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
-    this.allowDestinationHeader = opts?.allowDestinationHeader ?? false;
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
-    this.failureReader = opts?.readFailure;
     // Refused here, at startup, rather than at a session's first request.
     this.stateIdleMinutes =
       opts?.stateIdleMinutes === undefined
@@ -228,11 +204,6 @@ export class SseServer {
     console.error(`[SseServer] Routes registered on external app`);
     console.error(`[SseServer] SSE endpoint: ${this.ssePath}`);
     console.error(`[SseServer] POST endpoint: ${this.postPath}`);
-    if (this.defaultDestination) {
-      console.error(
-        `[SseServer] Default destination: ${this.defaultDestination}`,
-      );
-    }
   }
 
   /**
@@ -324,45 +295,17 @@ export class SseServer {
   }
 
   private async handleGet(req: any, res: any): Promise<void> {
-    let destination: string | undefined;
-    let fromHeaders = false;
-
+    // The connection's source, from this GET's x-sap-* headers alone; a
+    // header this server no longer serves is refused, never ignored.
+    let context: ConnectionContext;
     try {
-      // Priority 1: x-mcp-destination (only with --allow-destination-header),
-      // refused when it is not a destination name
-      const destinationHeader = destinationFromHeader(
-        req.headers,
-        this.allowDestinationHeader,
-      );
-
-      if (destinationHeader !== undefined) {
-        destination = destinationHeader;
-      }
-      // Priority 2: Check SAP connection headers (x-sap-url + auth params)
-      // The settings and the credential come from the headers, no destination
-      else if (this.hasSapConnectionHeaders(req.headers)) {
-        destination = undefined;
-        fromHeaders = true;
-      }
-      // Priority 3: Use default destination
-      else if (this.defaultDestination) {
-        destination = this.defaultDestination;
-      }
-      // Priority 4: No auth params at all -> reject request
-      else {
-        res
-          .status(400)
-          .send(
-            'Missing SAP connection context. Provide x-mcp-destination header, configure default destination (--mcp/--env-path), or pass x-sap-* headers.',
-          );
-        return;
-      }
+      context = headerContext(req.headers);
     } catch (error) {
       this.answerFailure(res, error);
       return;
     }
 
-    this.logger.debug(`SSE GET: destination=${destination ?? 'none'}`);
+    this.logger.debug('SSE GET: credentials from x-sap-* headers');
 
     class SessionServer extends BaseMcpServer {
       constructor(
@@ -370,7 +313,6 @@ export class SseServer {
         readonly loggerImpl: Logger,
         readonly ver: string,
         state: { stateIdleMinutes?: number; stateLogger?: StateLogger },
-        private readonly failureReader: FailureReader | undefined,
       ) {
         super({
           name: 'mcp-abap-adt-sse',
@@ -380,26 +322,8 @@ export class SseServer {
         });
       }
 
-      protected override readFailure(thrown: unknown): ReadFailure | undefined {
-        return this.failureReader
-          ? this.failureReader(thrown)
-          : super.readFailure(thrown);
-      }
-      async init(
-        dest: string | undefined,
-        destinations: IDestinations,
-        firstConnect: FirstConnectLock,
-        hdrs?: any,
-      ) {
-        if (dest) {
-          await firstConnect.run(
-            dest,
-            () => this.setConnectionContext(dest, destinations),
-            () => this.getConnection(),
-          );
-        } else if (hdrs) {
-          this.setConnectionContextFromHeaders(hdrs);
-        }
+      init(connectionContext: ConnectionContext) {
+        this.setConnectionContext(connectionContext);
         this.registerHandlers(this.registry);
       }
     }
@@ -412,26 +336,13 @@ export class SseServer {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
       },
-      this.failureReader,
     );
-    try {
-      await server.init(
-        destination,
-        this.destinations,
-        this.firstConnect,
-        fromHeaders ? req.headers : undefined,
-      );
-    } catch (error) {
-      this.answerFailure(res, error);
-      return;
-    }
+    server.init(context);
 
     const transport = new SSEServerTransport(this.postPath, res);
     const sessionId = transport.sessionId;
 
-    console.error(
-      `[SSE GET] Created session ${sessionId} for destination ${destination}`,
-    );
+    console.error(`[SSE GET] Created session ${sessionId}`);
     // Capture what the session states (x-sap-language, x-sap-responsible,
     // x-sap-master-system) once at connection time; it is scoped around each
     // POST dispatch below so it never leaks into other sessions via a
@@ -484,6 +395,15 @@ export class SseServer {
   }
 
   private async handlePost(req: any, res: any, url?: URL): Promise<void> {
+    // A header this server no longer serves is refused on a POST too; the
+    // POST's own x-sap-* headers are not read (the connection's are its GET's).
+    try {
+      refuseDestinationHeader(req.headers);
+    } catch (error) {
+      this.answerFailure(res, error);
+      return;
+    }
+
     const sessionId = (url?.searchParams.get('sessionId') ||
       req.headers['x-session-id'] ||
       '') as string;
@@ -539,41 +459,22 @@ export class SseServer {
    * reader knows, else its class only — a message may quote a file (H4).
    */
   private failureWords(error: unknown): string {
-    const answer = this.destinationAnswer(error);
+    const answer = requestFailureAnswer(error);
     return answer.logLine ?? errorClassOf(error);
   }
 
-  private destinationAnswer(error: unknown) {
-    return this.failureReader
-      ? destinationFailureAnswer(error, this.failureReader)
-      : destinationFailureAnswer(error);
-  }
-
-  /** A session whose destination failed: the error's words, or as before. */
+  /** A request refused or failed: the refusal's words (400), the reader's, or as before. */
   private answerFailure(res: any, error: unknown): void {
-    const answer = this.destinationAnswer(error);
+    const answer = requestFailureAnswer(error);
     if (answer.logLine !== undefined) console.error(answer.logLine);
     if (answer.known) {
-      console.error(`[SSE GET] FAILED: ${answer.text}`);
+      console.error(`[SSE] FAILED: ${answer.text}`);
     } else {
       // No words for it: its class only — a message may quote a file (H4).
-      console.error(`[SSE GET] FAILED: ${errorClassOf(error)}`);
+      console.error(`[SSE] FAILED: ${errorClassOf(error)}`);
     }
     if (!res.headersSent) {
       res.status(answer.status).send(answer.text);
     }
-  }
-
-  /**
-   * Check if request has SAP connection headers
-   */
-  private hasSapConnectionHeaders(headers: any): boolean {
-    const hasUrl = headers['x-sap-url'] || headers['X-SAP-URL'];
-    const hasJwtAuth = headers['x-sap-jwt-token'] || headers['X-SAP-JWT-Token'];
-    const hasBasicAuth =
-      (headers['x-sap-login'] || headers['X-SAP-Login']) &&
-      (headers['x-sap-password'] || headers['X-SAP-Password']);
-
-    return !!(hasUrl && (hasJwtAuth || hasBasicAuth));
   }
 }

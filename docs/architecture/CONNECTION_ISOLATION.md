@@ -18,22 +18,25 @@ In previous versions, the server used a global connection cache that could be ov
 
 A connection belongs to the `BaseMcpServer` instance that built it, and that instance belongs to one session or one request:
 
-- **stdio**: one instance for the life of the process; its connection is built on the first tool call and kept.
-- **SSE**: one instance per session.
-- **HTTP (streamable)**: one instance per request, so a request never sees another request's connection.
+- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built on the first tool call and kept while the destination's provider is the same one (D13).
+- **SSE** (`@mcp-abap-adt/sse`): one instance per SSE connection, its credential from the `GET` that opened it.
+- **HTTP (streamable)** (`@mcp-abap-adt/http`): one instance per request, or the pooled one its `state_handle` names; either way the request's own headers give its credential, so a request never sees another request's.
 
-What a connection is built from is its `ConnectionContext`: the **settings** (`connectionParams`: URL, client, authentication type, connection type -- no secret) and the **credential** (an `IAuthProvider`). The two come from separate sources:
+Each instance has one **connection source** (`ConnectionSource`, `src/embeddable/ConnectionContext.ts`), filled by its package; per call it answers the **settings** (URL, client, authentication type, connection type -- no secret) and the **credential** (an `IAuthProvider`):
 
-| Request carries | Settings | Credential |
-|:---|:---|:---|
-| `x-mcp-destination` (with `--allow-destination-header`) or the default destination | `IDestinations.settingsFor(destination)` | `IDestinations.getProvider(destination)` |
-| `x-sap-url` + `x-sap-jwt-token`, or + `x-sap-login` and `x-sap-password` | from the headers | built from the headers, owned by that request |
+| Package | Source | Settings | Credential |
+|:---|:---|:---|:---|
+| core (stdio) | `destinationSource` | `IDestinations.settingsFor(destination)` | `IDestinations.getProvider(destination, { signal })` |
+| http, sse | `headerSource` (`@mcp-abap-adt/lib/http-transport`) | `x-sap-url`, `x-sap-client` | built from `x-sap-jwt-token`, or `x-sap-login` and `x-sap-password`, owned by that request (http) or connection (sse) |
+| an embedder | `{ kind: 'injected', connection }` | — | the consumer's connection, used as given |
+
+A request to http or sse without credentials is answered `400`, and so is one carrying `x-mcp-destination`: destinations are served only by core, over stdio.
 
 ### Implementation Details
 
 #### 1. A credential per destination, shared; a credential per header request, not
 
-`AuthBrokerFactory` builds one broker, and one provider, per destination, on first use, and hands the provider out counted (so that shutdown can wait for what is in flight). Two sessions on the same destination share the provider: one token, one refresh token, one renewal in flight. Each is still its own connection (cookie jar, CSRF token, session). A connection built from headers has a credential of its own, built from those headers, and shares nothing.
+`AuthBrokerFactory` (core) builds one broker, and one provider, for the process's destination, and hands the provider out counted (so that shutdown can wait for what is in flight). A connection built from headers has a credential of its own, built from those headers, and shares nothing: nothing is stored, shared or cached across requests (http) or connections (sse). The one exception is held state (a debug session): the connections it opened stay with it until it ends.
 
 #### 2. Request-scoped values
 
@@ -41,33 +44,33 @@ Values that belong to one request, such as the master language of created object
 
 #### 3. Connection construction
 
-`BaseMcpServer.getConnection()` builds the connector once, in one place (`src/lib/connectionFactory.ts`), from the context's settings and credential, and calls `connect()`. The credential is the one the caller hands in; the factory builds none from `settings.authType`.
+`BaseMcpServer.getConnection(signal)` resolves the source, then builds the connector in one place (`src/lib/connectionFactory.ts`) from the settings and credential, and calls `connect()` — once per credential object: kept while the source answers the same one, built anew for a new one. The factory builds no credential from `settings.authType`.
 
 ### Session Lifecycle
 
-1. **Session Creation**: a new client connects (SSE), or a request arrives (HTTP): a server instance is created
-2. **Context**: the destination's settings and provider, or the headers' settings and credential, become the instance's `ConnectionContext`
-3. **Connection Creation**: the first tool call builds and connects the connector
-4. **Renewal**: a `401` is put to the credential (`rejected`); a renewed token gets the request one more attempt
-5. **Shutdown**: on `SIGTERM`/`SIGINT` the transports stop accepting, the factory waits up to 30 s for provider calls in flight, and every broker is flushed
+1. **Session Creation**: stdio starts, a client opens an SSE connection, or an HTTP request arrives: a server instance is created (or, for HTTP, the pooled one a `state_handle` names is taken)
+2. **Source**: the destination (stdio) or the headers (http, sse) become the instance's `ConnectionSource`
+3. **Connection Creation**: the first tool call resolves the source and builds and connects the connector
+4. **Renewal**: a `401` is put to the credential (`rejected`); a renewed token gets the request one more attempt. A header credential is fixed: nothing renews it
+5. **Shutdown**: on `SIGTERM`/`SIGINT` the transport stops accepting; core's factory waits for provider calls in flight and flushes its broker
 
 ### Benefits
 
 1. **Security**: no data leakage between clients: nothing about a connection is global
-2. **Multi-Tenancy**: clients may connect to different SAP systems at once (by header, or by destination with `--allow-destination-header`)
-3. **One login**: a destination's logins are serialised and its token is shared by the sessions that use it
+2. **Multi-Tenancy**: over http and sse, clients may connect to different SAP systems at once, each with its own headers
+3. **One login**: stdio's destination logs in through its one provider, whose logins are serialised
 
 ## Example Flow
 
 ```
-Client A (destination A, via x-mcp-destination):
-  Request 1 → server instance → settingsFor(A) + getProvider(A) → connection A
-Client B (destination B, via x-mcp-destination):
-  Request 1 → server instance → settingsFor(B) + getProvider(B) → connection B
-Client C (x-sap-* headers):
-  Request 1 → server instance → settings + credential from the headers → connection C
+mcp-abap-adt-http, Client A (x-sap-* headers, user A):
+  Request 1 → server instance → headerSource → credential A → connection A
+mcp-abap-adt-http, Client B (x-sap-* headers, user B), at the same time:
+  Request 1 → server instance → headerSource → credential B → connection B
+mcp-abap-adt (stdio), destination D:
+  Tool call → destinationSource → settingsFor(D) + getProvider(D) → connection D, kept
 
-Each connection has its own session; A and B each have their own provider and token.
+No two of them share a credential or a connection.
 ```
 
 ## Related Documentation

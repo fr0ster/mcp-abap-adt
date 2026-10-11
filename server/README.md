@@ -1,14 +1,20 @@
 # @mcp-abap-adt/core
 
-The standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP
-transports, the launcher, TLS, the DNS-rebinding guard and the `mcp-abap-adt`
-CLI.
+The standalone MCP server for SAP ABAP ADT over **stdio**: the `mcp-abap-adt` CLI, one
+destination per process through the auth broker — a service key, a session, an `--env` file, the
+browser login — and the launcher.
 
 ```bash
 npm install -g @mcp-abap-adt/core
-mcp-abap-adt                    # stdio (default)
-mcp-abap-adt --transport=http
+mcp-abap-adt --mcp=TRIAL                 # a destination from the service-keys folder
+mcp-abap-adt --env-path=./mcp.env        # a .env written by mcp-auth
 ```
+
+Streamable HTTP and HTTP+SSE are packages of their own, serving credentials from each request's
+`x-sap-*` headers: [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)
+(`mcp-abap-adt-http`) and [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)
+(`mcp-abap-adt-sse`). `--transport=http` or `--transport=sse` stops this binary naming the one to
+run. Only this package depends on `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores`.
 
 It connects to the ABAP system over **HTTP** (basic or JWT), **RFC** (basic) or **SNC**
 (passwordless, over RFC). HTTP needs nothing more. **RFC and SNC need the SAP NW RFC SDK, a C++

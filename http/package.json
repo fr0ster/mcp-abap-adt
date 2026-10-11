@@ -31,10 +31,26 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js"
+    },
+    "./launcher": {
+      "types": "./dist/launcher.d.ts",
+      "import": "./dist/launcher.js",
+      "require": "./dist/launcher.js"
     }
+  },
+  "typesVersions": {
+    "*": {
+      "launcher": [
+        "dist/launcher.d.ts"
+      ]
+    }
+  },
+  "bin": {
+    "mcp-abap-adt-http": "./bin/mcp-abap-adt-http.js"
   },
   "files": [
     "dist/",
+    "bin/",
     "README.md",
     "LICENSE"
   ],

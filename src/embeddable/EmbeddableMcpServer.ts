@@ -165,8 +165,6 @@ export interface EmbeddableMcpServerOptions {
  * ```
  */
 export class EmbeddableMcpServer extends BaseMcpServer {
-  private readonly injectedConnection: AbapConnection;
-
   constructor(options: EmbeddableMcpServerOptions) {
     super({
       name: 'mcp-abap-adt',
@@ -178,7 +176,12 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       stateLogger: options.stateLogger,
     });
 
-    this.injectedConnection = options.connection;
+    // Used as given (spec §4.3): no credential built, no wrap, no connect().
+    this.setConnectionContext({
+      kind: 'injected',
+      connection: options.connection,
+      sessionId: 'embedded',
+    });
 
     if (options.systemContext) {
       setSystemContext(options.systemContext);
@@ -194,14 +197,6 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       );
 
     this.registerHandlers(registry);
-  }
-
-  /**
-   * Returns the injected connection
-   * Called by BaseMcpServer.registerHandlers() wrapper lambdas
-   */
-  protected async getConnection(): Promise<AbapConnection> {
-    return this.injectedConnection;
   }
 
   /**

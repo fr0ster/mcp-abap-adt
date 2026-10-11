@@ -5,7 +5,7 @@
  */
 
 import { EventEmitter } from 'node:events';
-import type { SettleReport } from '@mcp-abap-adt/lib/auth';
+import type { SettleReport } from '../auth/IAuthBrokerFactory.js';
 import { installShutdown, SHUTDOWN_DEADLINE_MS } from '../shutdown.js';
 
 function deferred<T>() {

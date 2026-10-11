@@ -48,12 +48,6 @@
       "@mcp-abap-adt/lib/request-context": [
         "../dist/lib/requestContext.d.ts"
       ],
-      "@mcp-abap-adt/http": [
-        "../http/dist/index.d.ts"
-      ],
-      "@mcp-abap-adt/sse": [
-        "../sse/dist/index.d.ts"
-      ],
       "@mcp-abap-adt/lib/debugger": [
         "../dist/lib/debugger/index.d.ts"
       ],

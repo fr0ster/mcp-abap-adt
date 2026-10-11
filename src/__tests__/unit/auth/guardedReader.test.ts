@@ -1,6 +1,6 @@
 /**
- * A reader the answer site does not own — a `BaseMcpServer` override, a
- * host's `readFailure` — may throw. The call is then answered in auth-errors'
+ * A reader the answer site does not own — a `BaseMcpServer` override — may
+ * throw. The call is then answered in auth-errors'
  * fixed `unknown` words; nothing of the reader's throw reaches the client.
  */
 
@@ -10,7 +10,6 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { ReadFailure } from '../../../lib/auth/failures';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
-import { destinationFailureAnswer } from '../../../lib/httpTransport/destinationRequest';
 
 const READER_SECRET = 'READER-SECRET-7';
 const FIXED = authError.unknown({ operation: 'unfamiliar-error' });
@@ -76,15 +75,4 @@ it("the tool wrapper: a reader's throw answers the fixed unknown words", async (
   } finally {
     await client.close();
   }
-});
-
-it("the destination answer: a host reader's throw answers the fixed words", () => {
-  const answer = destinationFailureAnswer(new Error('x'), () => {
-    throw new Error(READER_SECRET);
-  });
-  expect(answer.text).toBe(
-    [FIXED.reason, FIXED.hint].filter(Boolean).join('\n'),
-  );
-  expect(answer.text).not.toContain(READER_SECRET);
-  expect(answer.logLine ?? '').not.toContain(READER_SECRET);
 });

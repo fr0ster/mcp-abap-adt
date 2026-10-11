@@ -57,21 +57,16 @@ the source (`--mcp`, `x-mcp-destination`, `destination`) and never quotes the na
   reads the settings and builds the provider — `getProvider(destination, { signal })` with the
   start's own signal, aborted once the check ends; building sends nothing — so a destination
   the broker refuses stops the start, exit 1, with the error's own vetted words.
-- One server instance for the process; its connection is built on the first tool call and kept.
+- One server instance for the process; its source is the destination (`destinationSource`). Its
+  connection is built on the first tool call and kept while `getProvider` answers the same
+  provider; a new provider builds a new connection (D13).
 - With no default destination the server starts in inspection-only mode: the tool list answers, and
   a tool call answers the server's own `inspection_only` refusal before any connection is built.
 
 ### Streamable HTTP and SSE
-- Per request (HTTP) or per session (SSE), the destination is chosen in this order:
-  1. `x-mcp-destination`, **only with `--allow-destination-header`**; a value that is not a plain
-     destination name is refused (`400`), naming the header;
-  2. `x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`: a direct
-     connection with a credential built from the headers; no broker;
-  3. the default destination;
-  4. otherwise `400`.
-- The first connect of a destination runs inside a per-destination lock. (Until the HTTP and SSE
-  packages stop serving destinations, two destinations logging in at once in one HTTP process
-  compete for the callback port: the second login answers `port-in-use`.)
+- Not served here. `@mcp-abap-adt/http` and `@mcp-abap-adt/sse` take credentials only from the
+  request's `x-sap-*` headers (lib's `headerSource`) and use no broker, no store and no
+  destination; a request carrying `x-mcp-destination` is answered `400`.
 
 ## Handlers (`server/src/auth/handlers/`)
 
@@ -109,14 +104,8 @@ then exits `1` with one stderr line, never the secret.
 ### stdio with `--env-path=./my.env`
 - Default destination `default`, read from and written back to `./my.env`.
 
-### HTTP with `--mcp=trial`, client sends no destination
-- Served from `trial`.
-
-### HTTP with `--mcp=trial --allow-destination-header`, client sends `x-mcp-destination: production`
-- `production` is built on first use, beside `trial`; the request is served from it.
-
-### HTTP without `--mcp` and without `.env`, client sends `x-sap-url` and a credential
-- No broker: the connection is built from the headers.
+### `mcp-abap-adt --transport=http` (or `sse`)
+- Refused at start, naming `mcp-abap-adt-http` (`mcp-abap-adt-sse`): core serves stdio only.
 
 ### stdio without parameters and without `.env`
 - Inspection-only mode: a tool call answers `inspection_only`.

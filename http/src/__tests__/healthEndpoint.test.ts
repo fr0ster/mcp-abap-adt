@@ -1,6 +1,5 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
@@ -8,12 +7,6 @@ import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 // Empty registry — health endpoint doesn't need any handlers
 const emptyRegistry = new CompositeHandlersRegistry([]);
-
-// The health endpoint never reaches a destination.
-const stubDestinations: IDestinations = {
-  settingsFor: jest.fn(),
-  getProvider: jest.fn(),
-};
 
 async function startApp(
   register: (app: IHttpApplication) => void,
@@ -34,11 +27,9 @@ describe('Health endpoint — StreamableHttpServer', () => {
   let baseUrl: string;
 
   beforeAll(async () => {
-    const mcpServer = new StreamableHttpServer(
-      emptyRegistry,
-      stubDestinations,
-      { version: '1.2.3' },
-    );
+    const mcpServer = new StreamableHttpServer(emptyRegistry, {
+      version: '1.2.3',
+    });
     const result = await startApp((app) => mcpServer.registerRoutes(app));
     httpServer = result.server;
     baseUrl = result.baseUrl;

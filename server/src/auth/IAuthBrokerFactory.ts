@@ -1,32 +1,13 @@
 /**
- * What a session's server needs from the destinations, and the factory's
- * whole surface.
+ * What core's stdio server needs from the destinations, and the factory's
+ * whole surface. `DestinationSystemContext` stays lib's: the sources fill it,
+ * and lib's server reads it for each call's scope.
  */
 
 import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-
-/**
- * Who creates objects and on which system, as a destination states it in its
- * own `.env`. A key the destination does not state is absent.
- */
-export interface DestinationSystemContext {
-  /** `SAP_RESPONSIBLE`. */
-  responsible?: string;
-  /**
-   * The destination's own `SAP_USERNAME` — the login, which is the
-   * responsible only when no `SAP_RESPONSIBLE` is stated anywhere (the
-   * request, the destination, the process).
-   */
-  login?: string;
-  /** `SAP_MASTER_SYSTEM`. */
-  masterSystem?: string;
-  /** `SAP_DEBUG_TERMINAL_ID`. */
-  debugTerminalId?: string;
-  /** `SAP_DEBUG_IDE_ID`. */
-  debugIdeId?: string;
-}
+import type { DestinationSystemContext } from '@mcp-abap-adt/lib/auth';
 
 export interface IDestinations {
   /** The connector's settings: URL, client, auth type, connection type — no secret. */

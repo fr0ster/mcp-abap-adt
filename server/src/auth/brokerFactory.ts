@@ -35,9 +35,7 @@ import {
   assertDestinationName,
   type DestinationSystemContext,
   getPlatformPaths,
-  type IAuthBrokerFactory,
   SettingsError,
-  type SettleReport,
 } from '@mcp-abap-adt/lib/auth';
 import { countedProvider, ProviderGate } from './countedProvider';
 import {
@@ -51,6 +49,7 @@ import {
   type AuthHandlerContext,
   handlerFor,
 } from './handlers';
+import type { IAuthBrokerFactory, SettleReport } from './IAuthBrokerFactory.js';
 import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
 import { type RenewalMode, serverSentence } from './serverSentences';
 import { type VettedAuthentication, vetMeans } from './vocabulary';

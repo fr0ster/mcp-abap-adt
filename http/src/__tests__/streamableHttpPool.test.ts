@@ -7,7 +7,6 @@
  */
 
 import type { AddressInfo } from 'node:net';
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import {
   CompositeHandlersRegistry,
@@ -19,9 +18,11 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
-const stubDestinations: IDestinations = {
-  settingsFor: jest.fn(),
-  getProvider: jest.fn(),
+/** Every request carries its own credentials: the server takes them from nowhere else (D39). */
+const CREDENTIALS = {
+  'x-sap-url': 'https://sap.invalid',
+  'x-sap-client': '100',
+  'x-sap-jwt-token': 'header.payload.signature',
 };
 
 /** A part the probe tools drive: held while `held`. */
@@ -142,19 +143,15 @@ describe.each([
     beforeEach(async () => {
       jest.spyOn(console, 'error').mockImplementation(() => {});
       jest
-        .spyOn(BaseMcpServer.prototype as never, 'setConnectionContext')
-        .mockResolvedValue(undefined as never);
-      jest
         .spyOn(BaseMcpServer.prototype as never, 'getConnection')
         .mockResolvedValue({} as never);
       previousType = process.env.SAP_SYSTEM_TYPE;
       process.env.SAP_SYSTEM_TYPE = 'onprem'; // no system lookup on the stub connection
       currentGate = gate();
       gateEntered = gate();
-      server = new StreamableHttpServer(probes, stubDestinations, {
+      server = new StreamableHttpServer(probes, {
         host: '127.0.0.1',
         port: 0,
-        defaultDestination: 'DEST01',
         enableJsonResponse,
       });
       await server.start();
@@ -178,6 +175,7 @@ describe.each([
     /** One call, its own client and its own MCP session. */
     async function call(name: string, args: Args = {}, signal?: AbortSignal) {
       const transport = new StreamableHTTPClientTransport(url, {
+        requestInit: { headers: CREDENTIALS },
         fetch: (input, init) =>
           fetch(input, { ...init, signal: signal ?? init?.signal }),
       });
@@ -303,7 +301,7 @@ describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secre
       .mockResolvedValue({} as never);
     previousType = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = 'onprem';
-    server = new StreamableHttpServer(probes, stubDestinations, {
+    server = new StreamableHttpServer(probes, {
       host: '127.0.0.1',
       port: 0,
     });

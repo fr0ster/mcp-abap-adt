@@ -3,6 +3,10 @@
  * three sources — a destination (`getProvider`), the request headers
  * (`credentialFromHeaders`), or a caller's `SapConfig`
  * (`credentialFromSapConfig`) — and nothing else in the server builds one.
+ * A `ConnectionSource`'s answer (`(await source.resolve(signal)).credential`,
+ * spec §4) counts as a source because each source's own `credential`
+ * binding is checked here like every other: core's `destinationSource`
+ * (`getProvider`), lib's `headerSource` (`credentialFromHeaders`).
  *
  * Read from the source tree with the TypeScript parser: every call of
  * `createAbapConnection` outside `connectionFactory.ts` is checked for where
@@ -84,9 +88,45 @@ function strip(expr: ts.Expression): ts.Expression {
   return current;
 }
 
-/** A credential straight from one of the three sources. */
-function isSource(raw: ts.Expression): boolean {
+/** The names bound to `await <source>.resolve(...)` in a file: a connection source's answer. */
+function resolvedAnswers(file: ts.SourceFile): Set<string> {
+  const names = new Set<string>();
+  walk(file, (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer
+    ) {
+      const init = strip(node.initializer);
+      if (!ts.isAwaitExpression(init)) return;
+      const call = strip(init.expression);
+      if (
+        ts.isCallExpression(call) &&
+        ts.isPropertyAccessExpression(call.expression) &&
+        call.expression.name.text === 'resolve'
+      ) {
+        names.add(node.name.text);
+      }
+    }
+  });
+  return names;
+}
+
+/** A credential straight from one of the three sources, or a connection source's answer. */
+function isSource(
+  raw: ts.Expression,
+  resolved: ReadonlySet<string> = new Set(),
+): boolean {
   const expr = strip(raw);
+  // 4. a connection source's answer: <resolved>.credential
+  if (
+    ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === 'credential' &&
+    ts.isIdentifier(expr.expression) &&
+    resolved.has(expr.expression.text)
+  ) {
+    return true;
+  }
   // 1. a destination: await <destinations>.getProvider(destination)
   if (ts.isAwaitExpression(expr)) {
     const inner = strip(expr.expression);
@@ -142,6 +182,7 @@ function credentialBindingOffences(
   requireBinding = true,
 ): string[] {
   const offences: string[] = [];
+  const resolved = resolvedAnswers(file);
   let bindings = 0;
   const where = (node: ts.Node) =>
     `${rel(file.fileName)}:${
@@ -155,7 +196,7 @@ function credentialBindingOffences(
       node.name.text === 'credential'
     ) {
       bindings += 1;
-      if (!node.initializer || !isSource(node.initializer)) {
+      if (!node.initializer || !isSource(node.initializer, resolved)) {
         offences.push(
           `${where(node)} credential = ${node.initializer?.getText()}`,
         );
@@ -187,7 +228,7 @@ function credentialBindingOffences(
       ts.isObjectLiteralExpression(node.parent)
     ) {
       bindings += 1;
-      if (!isSource(node.initializer)) {
+      if (!isSource(node.initializer, resolved)) {
         offences.push(
           `${where(node)} credential: ${node.initializer.getText()}`,
         );
@@ -209,7 +250,7 @@ function judge(
 ): string | undefined {
   if (!arg) return 'no credential argument';
   const expr = strip(arg);
-  if (isSource(expr)) return undefined;
+  if (isSource(expr, resolvedAnswers(file))) return undefined;
 
   // A sibling of a connection the factory built: that connection's own
   // credential, else the SapConfig source.

@@ -18,7 +18,52 @@ The packages, all at **18.0.0**:
 
 ## HTTP users
 
+- **Install `@mcp-abap-adt/http` and run `mcp-abap-adt-http`.** `mcp-abap-adt --transport=http`
+  stops the start, naming it. The options keep their names: `--host` / `--http-host` /
+  `MCP_HTTP_HOST`, `--port` / `--http-port` / `MCP_HTTP_PORT`, `--path` / `--http-path`,
+  `--http-json-response`, `--http-allowed-hosts`, `--http-allowed-origins`,
+  `--http-enable-dns-protection` (and their `MCP_HTTP_*`), `--tls-cert` / `--tls-key` / `--tls-ca`
+  (`MCP_TLS_*`), `--system-type`, `--exposition`, `--state-idle-minutes`, `--conf`. `GET
+  /mcp/health` answers as before.
+- **Credentials come only from each request's headers**: `x-sap-url`, `x-sap-client`, and
+  `x-sap-jwt-token`, or `x-sap-login` with `x-sap-password`. A request without them is answered
+  `400` — *this server takes credentials only from the request's headers: send x-sap-url with
+  x-sap-jwt-token, or with x-sap-login and x-sap-password* (`ping` answers without them). Nothing is
+  stored, shared or cached across requests.
+- **No destination is served over HTTP.** The default destination (`--mcp`, `--env`,
+  `--env-path`), `x-mcp-destination` and `--allow-destination-header` are gone from HTTP: a request
+  carrying `x-mcp-destination` is answered `400` — *destinations are served only by mcp-abap-adt
+  (stdio); send x-sap-* headers*. There is no broker, no store, no session file and no login, so
+  the `service-keys` / `sessions` mounts (`AUTH_BROKER_PATH`) of a container or service running
+  HTTP are no longer read: send the credential in the headers instead. A token you hold goes in
+  `x-sap-jwt-token`.
+- **The debugger works as in 17.2**: `--exposition=...,debug`, the `state_handle` routes a call back
+  to the pooled instance that holds the state, the idle bound is `--state-idle-minutes`. Each
+  request's own headers give its credential, also on a pooled instance. The debugger's ids come from
+  `x-sap-debug-terminal-id` / `x-sap-debug-ide-id`, then `SAP_DEBUG_TERMINAL_ID` /
+  `SAP_DEBUG_IDE_ID` of the environment; a destination's `.env` (and its `SAP_DEBUG_*`) is read only
+  by `mcp-abap-adt` (stdio).
+
 ## SSE users
+
+- **Install `@mcp-abap-adt/sse` and run `mcp-abap-adt-sse`.** `mcp-abap-adt --transport=sse` stops
+  the start, naming it. The SSE options keep their names: `--sse-host` / `MCP_SSE_HOST`,
+  `--sse-port` / `MCP_SSE_PORT`, `--sse-path`, `--post-path`, `--sse-allowed-hosts`,
+  `--sse-allowed-origins`, `--sse-enable-dns-protection` (and their `MCP_SSE_*`), `--tls-*`
+  (`MCP_TLS_*`), `--system-type`, `--exposition`, `--state-idle-minutes`, `--conf`.
+- **Credentials come only from the `x-sap-*` headers of the `GET` that opens each SSE
+  connection** (`x-sap-url`, `x-sap-client`, and `x-sap-jwt-token`, or `x-sap-login` with
+  `x-sap-password`); that connection's `POST`s are served with them. A `GET` without them is
+  answered `400` with the sentence above. A `POST` is routed by its `sessionId` alone: its own
+  `x-sap-*` headers are not read. Nothing is shared with another connection, and nothing outlives
+  one.
+- **No destination is served over SSE**: the default destination, `x-mcp-destination` (a `GET` or a
+  `POST` carrying it is answered `400`), `--allow-destination-header` and the `service-keys` /
+  `sessions` mounts are gone, as for HTTP.
+- **The debugger works as in 17.2**: the debug session lives in the connection's instance until the
+  connection closes, its stop tool runs or the idle bound ends it. Its ids come from the opening
+  `GET`'s `x-sap-debug-*` headers, then `SAP_DEBUG_*` of the environment; a destination's `.env` is
+  read only by `mcp-abap-adt` (stdio).
 
 ## compact users
 
@@ -30,6 +75,9 @@ The packages, all at **18.0.0**:
 
 ## stdio users
 
+- **`mcp-abap-adt` serves stdio only** (`@mcp-abap-adt/core`). `--transport=http` or
+  `--transport=sse` stops the start, naming `mcp-abap-adt-http` or `mcp-abap-adt-sse`; core no
+  longer depends on `@mcp-abap-adt/http` or `@mcp-abap-adt/sse`.
 - **The auth chain is 6.0.** The server runs on `@mcp-abap-adt/auth-broker` 5,
   `@mcp-abap-adt/auth-providers` 6 and `@mcp-abap-adt/auth-stores` 4. Your `.env` files and
   service keys keep working as they are.
@@ -119,5 +167,27 @@ The packages, all at **18.0.0**:
   throws `ServerRefusal('destination_refused', …)`. `ServerRefusal` takes
   `destination_refused` with its words, and `fresh_connection_unavailable` /
   `credentials_required` with fixed ones.
-- **`StreamableHttpServer` and `SseServer` take `readFailure?`**, the reader they answer a failed
-  destination and a failed tool call with (default `failureOf`).
+- **`ConnectionContext` is the instance's source** (`@mcp-abap-adt/lib/embeddable`):
+  `{ kind: 'built', source: ConnectionSource } | { kind: 'injected', connection }`, plus
+  `sessionId` and `metadata?`. A `ConnectionSource` answers `resolve(signal)` with `{ settings,
+  credential, systemContext? }`. `BaseMcpServer.setConnectionContext(context)` takes it (17.x:
+  `(destination, destinations)`); `setConnectionContextFromHeaders` is gone — pass
+  `headerContext(headers)` from `@mcp-abap-adt/lib/http-transport`; `getConnection(signal)` takes
+  the request's signal. A built connection is kept while the source answers the same credential
+  object. `EmbeddableMcpServer`'s `connection` is an injected source, used as given.
+- **`IDestinations`, `IAuthBrokerFactory` and `SettleReport` left `@mcp-abap-adt/lib/auth`** for
+  `@mcp-abap-adt/core/auth`, beside core's `destinationSource(destination, destinations)`.
+  `DestinationSystemContext` stays in `@mcp-abap-adt/lib/auth`.
+- **`StreamableHttpServer` and `SseServer` moved** to `@mcp-abap-adt/http` and `@mcp-abap-adt/sse`
+  (core no longer re-exports them) and lost their destinations argument:
+  `new StreamableHttpServer(handlersRegistry, options)`, `new SseServer(handlersRegistry,
+  options)`. Their `defaultDestination`, `allowDestinationHeader` and `readFailure` options are
+  gone; a failed tool call is answered by `BaseMcpServer`'s `readFailure`.
+- **`@mcp-abap-adt/lib/http-transport`** holds what both transports share: `headerSource`,
+  `headerContext`, `refuseDestinationHeader`, `hasHeaderCredentials`, `requestFailureAnswer`,
+  `installTransportShutdown`, `CREDENTIALS_REQUIRED_WORDS`, `DESTINATIONS_ONLY_STDIO_WORDS`,
+  besides the DNS-rebinding protection and the TLS listener. `destinationFromHeader`,
+  `FirstConnectLock`, `destinationFailureAnswer` and `DestinationHeaderError` are gone.
+- **`registryForExposition(exposition, { extraGroups?, includeSearch? })`**
+  (`@mcp-abap-adt/lib/handlers`) builds the tool list every binary serves;
+  `new ServerConfigManager({ transport })` reads the rows of a binary's own transport.

@@ -4,14 +4,8 @@
  */
 
 import * as net from 'node:net';
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { SseServer } from '../SseServer.js';
-
-const stubDestinations: IDestinations = {
-  settingsFor: jest.fn(),
-  getProvider: jest.fn(),
-};
 
 function connects(port: number): Promise<boolean> {
   return new Promise((resolve) => {
@@ -35,7 +29,7 @@ describe.each([
   [
     'SseServer',
     () =>
-      new SseServer(new CompositeHandlersRegistry([]), stubDestinations, {
+      new SseServer(new CompositeHandlersRegistry([]), {
         host: '127.0.0.1',
         port: 0,
       }),

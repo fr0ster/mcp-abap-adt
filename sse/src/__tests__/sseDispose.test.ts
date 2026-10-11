@@ -6,14 +6,14 @@
 import { EventEmitter } from 'node:events';
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { SseServer } from '../SseServer.js';
 
-const stubDestinations: IDestinations = {
-  settingsFor: jest.fn(),
-  getProvider: jest.fn(),
+/** The opening GET carries the connection's credentials (D48). */
+const CREDENTIALS = {
+  'x-sap-url': 'https://sap.invalid',
+  'x-sap-jwt-token': 'header.payload.signature',
 };
 
 function deferred<T>() {
@@ -27,10 +27,9 @@ function deferred<T>() {
 const tick = () => new Promise((r) => setImmediate(r));
 
 function make(opts: object = {}) {
-  return new SseServer(new CompositeHandlersRegistry([]), stubDestinations, {
+  return new SseServer(new CompositeHandlersRegistry([]), {
     host: '127.0.0.1',
     port: 0,
-    defaultDestination: 'D',
     ...opts,
   });
 }
@@ -53,9 +52,6 @@ describe('SseServer disposes the instance of a session', () => {
   beforeEach(() => {
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     jest
-      .spyOn(BaseMcpServer.prototype as any, 'setConnectionContext')
-      .mockResolvedValue(undefined);
-    jest
       .spyOn(BaseMcpServer.prototype as any, 'getConnection')
       .mockResolvedValue({});
     shutdown = jest.spyOn(BaseMcpServer.prototype, 'shutdownState');
@@ -73,7 +69,12 @@ describe('SseServer disposes the instance of a session', () => {
     await sse.start();
     const port = (sse as any).standaloneServer.address() as AddressInfo;
 
-    const req = http.get({ host: '127.0.0.1', port: port.port, path: '/sse' });
+    const req = http.get({
+      host: '127.0.0.1',
+      port: port.port,
+      path: '/sse',
+      headers: CREDENTIALS,
+    });
     req.on('error', () => {});
     await new Promise<void>((resolve) => req.once('response', () => resolve()));
     req.destroy();
@@ -104,7 +105,7 @@ describe('SseServer disposes the instance of a session', () => {
     const sse = make({ app });
     sse.registerRoutes(app);
     const res = fakeRes();
-    await routes['/sse']({ headers: {}, query: {} }, res);
+    await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
     expect(shutdown).not.toHaveBeenCalled();
 
     await expect(sse.stop()).rejects.toThrow(
@@ -126,7 +127,7 @@ describe('SseServer disposes the instance of a session', () => {
     const sse = make({ app });
     sse.registerRoutes(app);
     const res = fakeRes();
-    await routes['/sse']({ headers: {}, query: {} }, res);
+    await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
     const stopping = sse.stop();
     await tick();
     res.emit('close');
@@ -158,7 +159,7 @@ describe('SseServer disposes the instance of a session', () => {
     const sse = make({ app, logger });
     sse.registerRoutes(app);
     const res = fakeRes();
-    await routes['/sse']({ headers: {}, query: {} }, res);
+    await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
     res.emit('close');
     await expect(sse.stop()).rejects.toThrow(/a session was left/);
     expect(logger.error).toHaveBeenCalledWith(
@@ -185,7 +186,7 @@ describe('SseServer disposes the instance of a session', () => {
     const sse = make({ app });
     sse.registerRoutes(app);
     const res = fakeRes();
-    await routes['/sse']({ headers: {}, query: {} }, res);
+    await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
     res.emit('close');
     await expect(sse.stop()).rejects.toThrow(/a debuggee was left/);
     stderr.mockRestore();
@@ -215,7 +216,7 @@ describe('SseServer disposes the instance of a session', () => {
     });
     sse.registerRoutes(app);
     const res = fakeRes();
-    await routes['/sse']({ headers: {}, query: {} }, res);
+    await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
     res.emit('close');
     await expect(sse.stop()).rejects.toThrow(/a listener was left/);
     expect(lines.join('')).toContain('a listener was left');

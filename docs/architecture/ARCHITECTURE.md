@@ -105,20 +105,19 @@ This allows `IAdtObject<TConfig, TState>` to provide a uniform CRUD interface ac
 
 | Attribute | Value |
 |:---|:---|
-| **Responsibility** | Turns the connection headers of a request into settings and a credential, or names the destination the request asks for |
-| **Where** | `src/lib/credentialSources.ts` (`credentialFromHeaders`), `src/lib/httpTransport/destinationRequest.ts` (`destinationFromHeader`) |
-| **Runtime role** | Used by the HTTP and SSE transport servers; stdio has no request headers |
+| **Responsibility** | Turns the connection headers of a request into a `ConnectionSource`: settings and a credential |
+| **Where** | `src/lib/credentialSources.ts` (`credentialFromHeaders`), `src/lib/httpTransport/headerSource.ts` (`headerSource`, `headerContext`, the two `400` sentences) — `@mcp-abap-adt/lib/http-transport` |
+| **Runtime role** | The only credential `@mcp-abap-adt/http` (per request) and `@mcp-abap-adt/sse` (per SSE connection, from its opening `GET`) take; stdio has no request headers |
 
-Per request, in this order:
+| Method | Headers |
+|:---|:---|
+| A token you hold | `x-sap-url` + `x-sap-jwt-token` |
+| Basic | `x-sap-url` + `x-sap-login` + `x-sap-password` |
 
-| Priority | Method | Headers |
-|:---|:---|:---|
-| 3 (highest) | A named destination, only with `--allow-destination-header` | `x-mcp-destination` (a plain name; anything else is refused with `400`, naming the header) |
-| 2 | A token you hold | `x-sap-url` + `x-sap-jwt-token` |
-| 1 | Basic | `x-sap-url` + `x-sap-login` + `x-sap-password` |
-| 0 | The default destination (`--mcp`, `--env`, `--env-path`) | none; with no default, `400` |
-
-A header connection gets a fixed credential (`TokenAuthProvider.fixed`, `BasicAuthProvider`); nothing renews it.
+A request without them is answered `400` (`ping` excepted); a request carrying `x-mcp-destination`
+is answered `400` too — destinations are core's, over stdio. A header connection gets a fixed
+credential (`TokenAuthProvider.fixed`, `BasicAuthProvider`); nothing renews it, and nothing is
+stored, shared or cached across requests.
 
 ---
 
@@ -240,21 +239,46 @@ Each step accumulates results in `TState`, providing full audit trail of the ope
 | Attribute | Value |
 |:---|:---|
 | **Responsibility** | MCP protocol adapter -- translates MCP tool calls into ADT client operations |
-| **Runtime role** | Primary application entry point; composition root |
-| **Transport modes** | `stdio`, `streamable-http`, `sse` |
-| **Dependencies** | All packages above + `@modelcontextprotocol/sdk`, `zod` |
+| **Runtime role** | Primary application entry point; one composition root per binary |
+| **Packages** | `@mcp-abap-adt/core` (`server/`, `mcp-abap-adt`: stdio), `@mcp-abap-adt/http` (`http/`, `mcp-abap-adt-http`: Streamable HTTP), `@mcp-abap-adt/sse` (`sse/`, `mcp-abap-adt-sse`: HTTP+SSE), each on `@mcp-abap-adt/lib` |
+| **Dependencies** | All packages above + `@modelcontextprotocol/sdk`, `zod`; only core depends on `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores` |
 
-#### Composition Root
+#### The three packages and their connection sources
 
-`src/server/launcher.ts` is the composition root where all dependencies are wired:
+`BaseMcpServer` (lib) holds one **connection source** per instance — the contract each package
+fills (`src/embeddable/ConnectionContext.ts`):
+
+```ts
+interface ConnectionSource {
+  resolve(signal: AbortSignal): Promise<{ settings: SapConfig; credential: IAuthProvider; systemContext? }>;
+}
+type Source =
+  | { kind: 'built'; source: ConnectionSource }        // core: a destination; http, sse: the headers
+  | { kind: 'injected'; connection: AbapConnection };  // embedded: the consumer's, used as given
+```
+
+| Package | Source | Connection |
+|:---|:---|:---|
+| core (stdio) | `destinationSource(destination, factory)`: `settingsFor`, `getProvider(destination, { signal })`, `systemContextFor` | kept while `getProvider` answers the same provider; a new one for a new provider |
+| http | `headerSource(req.headers)` per request, on a new instance or the pooled one its `state_handle` names | one per request |
+| sse | `headerSource` of the `GET` that opened the connection | one per SSE connection |
+| embedder | `{ kind: 'injected', connection }` (`EmbeddableMcpServer`) | the consumer's, never connected or wrapped |
+
+The dependency rule is a test (`src/__tests__/unit/packages/dependencyRule.test.ts`): the published
+lib, http and sse declare and reach no broker, stores or `interfaces-auth-broker`; http and sse
+never reach each other.
+
+#### Composition Roots
+
+`server/src/launcher.ts` (core), `http/src/launcher.ts` and `sse/src/launcher.ts` wire each
+binary:
 
 ```
-launcher.ts main()
-  ├── ServerConfigManager.getConfig()         // CLI args, YAML, env vars
-  ├── Create handler groups (by exposition)   // ReadOnly, HighLevel, LowLevel, Search, System
-  ├── CompositeHandlersRegistry(groups)       // Aggregate registry
-  ├── AuthBrokerFactory                       // Per-destination auth broker management
-  └── Transport server (Stdio|Http|Sse)       // Start appropriate transport
+launcher main()
+  ├── ServerConfigManager.getConfig()           // CLI args, YAML, env vars
+  ├── registryForExposition(exposition)         // ReadOnly, HighLevel, LowLevel, Debug, Search, System
+  ├── core only: AuthBrokerFactory              // the destination, the startup check (D18)
+  └── StdioServer | StreamableHttpServer | SseServer
 ```
 
 #### Handler Architecture
@@ -307,11 +331,11 @@ export async function handleGetProgram(context: HandlerContext, args: GetProgram
 
 #### Transport Servers
 
-| Transport | Class | Connection Model | Session Management |
-|:---|:---|:---|:---|
-| stdio | `StdioServer` | Cached (one per server lifetime) | Single persistent session |
-| HTTP | `StreamableHttpServer` | Per-request (new server instance) | Stateless |
-| SSE | `SseServer` | Per-connection | Map by session ID |
+| Transport | Package | Class | Connection Model | Session Management |
+|:---|:---|:---|:---|:---|
+| stdio | core | `StdioServer` | Kept while the destination's provider is the same | Single persistent session |
+| HTTP | http | `StreamableHttpServer` | Per request, from its headers | Stateless; held state in pooled instances by `state_handle` |
+| SSE | sse | `SseServer` | Per connection, from its opening `GET` | Map by session ID |
 
 All transports extend `BaseMcpServer` which handles handler registration, connection context management, and per-request context injection.
 
@@ -421,10 +445,10 @@ graph TD
 2. Per-request server creation
    └── new BaseMcpServer() instance per request
 
-3. Connection context resolution
-   ├── From x-mcp-destination header (--allow-destination-header) → IDestinations: settingsFor + getProvider(destination)
-   ├── From x-sap-url + auth headers → settings and a fixed credential from the headers
-   └── From default destination (startup config) → the same IDestinations path
+3. Connection source
+   ├── x-mcp-destination → 400 (destinations are core's, over stdio)
+   ├── no x-sap-url with a token or a user and password → 400 (ping excepted)
+   └── headerSource(req.headers) → the instance's source: settings and a fixed credential
 
 4. Handler invocation
    ├── BaseMcpServer resolves tool name → handler function
@@ -447,21 +471,23 @@ The system has three distinct IoC boundaries:
 
 | Boundary | What is Inverted | Composition Point |
 |:---|:---|:---|
-| **Auth** | The credential a connector presents | `ConnectionContext.credential` (an `IAuthProvider`) is built by `AuthBrokerFactory.getProvider` or from headers; the connector never builds one |
+| **Auth** | The credential a connector presents | the instance's `ConnectionSource` answers it (an `IAuthProvider`): `AuthBrokerFactory.getProvider` (core) or the headers (http, sse); the connector never builds one |
 | **Transport** | HTTP communication with SAP | `AdtClient` constructor receives `IAbapConnection` |
 | **Handlers** | Tool behavior per transport/mode | `CompositeHandlersRegistry` receives `IHandlerGroup[]` |
 
 ### 4.4 Composition Root Location
 
-`mcp-abap-adt/src/server/launcher.ts` is the single composition root for the main server. It:
+`server/src/launcher.ts` is core's composition root (stdio). It:
 
 1. Reads configuration (CLI, YAML, env)
 2. Chooses the stores of a destination (`server/src/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
 3. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
-4. Assembles one `AuthBroker` per destination via `AuthBrokerFactory`, on first use
-5. Creates handler groups with `HandlerContext`
-6. Assembles `CompositeHandlersRegistry`
-7. Starts the appropriate transport server
+4. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`, on first use
+5. Assembles the registry (`registryForExposition`)
+6. Starts `StdioServer` with `destinationSource`
+
+`http/src/launcher.ts` and `sse/src/launcher.ts` read their configuration, assemble the same
+registry and start their server; neither has a broker, a store or a login.
 
 No other file in the system creates concrete cross-package dependencies.
 
@@ -496,7 +522,7 @@ To add an authentication the server serves:
 2. **Add an `AuthenticationHandler`** in `server/src/auth/handlers/` that tells the broker what the destination needs, and register it in `HANDLERS`
 3. Add its row to the table in section 2.6 and a test; the rest of the system remains unchanged -- the connector presents whatever `IAuthProvider` it is given
 
-An embedder that has its own credential passes it as `ConnectionContext.credential` and the server builds nothing from settings.
+An embedder that has its own connection passes it as an injected source (`EmbeddableMcpServer`'s `connection`); one that has its own credential gives a `ConnectionSource` whose `resolve` answers it, and the server builds nothing from settings.
 
 ---
 
@@ -637,7 +663,7 @@ For troubleshooting:
 
 | Risk | Mitigation |
 |:---|:---|
-| Two destinations logging in at once would race for the callback port | One login at a time per process; the first connect of a destination runs inside its lock |
+| A login racing another for the callback port | stdio serves one destination per process, whose provider serializes its own logins; http and sse log nobody in |
 | Large handler count (~150 tools) may overwhelm AI model context | `exposition` config limits visible tools per deployment |
 | XML parsing of ADT responses is fragile across SAP versions | `fast-xml-parser` with per-object-type parsers; integration tests validate against real systems |
 | Service key files stored on filesystem | Configurable directory; `unsafe` flag controls file vs. in-memory storage |

@@ -1,5 +1,5 @@
 /**
- * Setting a destination's context up builds no connection: there is no
+ * Setting a source's context up builds no connection: there is no
  * setup-time master-system lookup (the master system and responsible are
  * resolved per call, on the connected connection). A request whose credential
  * refuses presents it once, when the request connects, answers the refusal in
@@ -11,7 +11,7 @@ import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
-import type { IDestinations } from '../../../lib/auth';
+import type { ConnectionSource } from '../../../embeddable/ConnectionContext';
 import { failureOf } from '../../../lib/auth/failures';
 import * as connectionFactory from '../../../lib/connectionFactory';
 import {
@@ -25,11 +25,11 @@ class TestServer extends BaseMcpServer {
   constructor() {
     super({ name: 'test-server', version: '1.0.0', logger: silent });
   }
-  fromDestination(destination: string, destinations: IDestinations) {
-    return this.setConnectionContext(destination, destinations);
+  fromSource(source: ConnectionSource) {
+    this.setConnectionContext({ kind: 'built', source, sessionId: 'dest' });
   }
   connection() {
-    return this.getConnection();
+    return this.getConnection(new AbortController().signal);
   }
 }
 
@@ -57,18 +57,17 @@ const SETTINGS: SapConfig = {
   authType: 'jwt',
 };
 
-function destinationsOf(provider: IAuthProvider): IDestinations {
+function sourceOf(provider: IAuthProvider): ConnectionSource {
   return {
-    settingsFor: async () => ({ ...SETTINGS }),
-    getProvider: async () => provider,
+    resolve: async () => ({ settings: { ...SETTINGS }, credential: provider }),
   };
 }
 
 /** One request as a transport runs it: set the context up, then connect. */
-async function request(destinations: IDestinations): Promise<unknown> {
+async function request(source: ConnectionSource): Promise<unknown> {
   const server = new TestServer();
   try {
-    await server.fromDestination('dest', destinations);
+    server.fromSource(source);
     await server.connection();
   } catch (error) {
     return error;
@@ -103,7 +102,7 @@ describe('setting the context up', () => {
     try {
       const { provider, prepare } = refusingProvider();
       const server = new TestServer();
-      await server.fromDestination('dest', destinationsOf(provider));
+      server.fromSource(sourceOf(provider));
       expect(build).not.toHaveBeenCalled();
       expect(prepare).not.toHaveBeenCalled();
     } finally {
@@ -115,14 +114,14 @@ describe('setting the context up', () => {
 describe('a refused credential', () => {
   it('one prepare per request, the refusal answered, no context cached', async () => {
     const { provider, prepare } = refusingProvider();
-    const destinations = destinationsOf(provider);
+    const source = sourceOf(provider);
 
-    const first = await request(destinations);
+    const first = await request(source);
     expect(first).toBeInstanceOf(AuthRefusedError);
     expect(prepare).toHaveBeenCalledTimes(1);
     expect(getSystemContext()).toStrictEqual({});
 
-    const second = await request(destinations);
+    const second = await request(source);
     expect(second).toBeInstanceOf(AuthRefusedError);
     expect(prepare).toHaveBeenCalledTimes(2);
     expect(getSystemContext()).toStrictEqual({});
@@ -130,7 +129,7 @@ describe('a refused credential', () => {
 
   it('is answered in its own fixed words', async () => {
     const { provider } = refusingProvider();
-    const error = await request(destinationsOf(provider));
+    const error = await request(sourceOf(provider));
     // The refusal's own words, as auth-errors rendered them: reason, then hint.
     const read = failureOf(error);
     expect(read?.error).toBe('authentication_failed');

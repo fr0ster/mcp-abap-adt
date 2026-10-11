@@ -1,11 +1,10 @@
 /**
  * Who creates objects (responsible) and on which system (master system), per
- * session, over SSE. Each its own variable first: the request's
- * `x-sap-responsible` / `x-sap-master-system` headers; the destination's own
- * `.env` (`IDestinations.systemContextFor`); the process environment. Then,
- * for the responsible only, the login: the destination's `SAP_USERNAME`, the
- * request's `x-sap-login`, the process `SAP_USERNAME`. Each request sees its
- * own values — two concurrent requests never see each other's.
+ * session, over SSE. Each its own variable first: the opening request's
+ * `x-sap-responsible` / `x-sap-master-system` headers; the process
+ * environment. Then, for the responsible only, the login: the opening
+ * request's `x-sap-login`, the process `SAP_USERNAME`. Each session sees its
+ * own values — two concurrent sessions never see each other's.
  */
 
 import type { Server } from 'node:http';
@@ -17,11 +16,6 @@ jest.mock('../../../src/lib/connectionFactory', () => ({
   createAbapConnection: () => ({ connect: async () => {} }),
 }));
 
-import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-import type {
-  DestinationSystemContext,
-  IDestinations,
-} from '@mcp-abap-adt/lib/auth';
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import {
   CompositeHandlersRegistry,
@@ -69,35 +63,11 @@ const whoAmI: IHandlerGroup = {
 };
 const registry = new CompositeHandlersRegistry([whoAmI]);
 
-const DESTINATION_CONTEXT: Record<string, DestinationSystemContext> = {
-  alpha: { responsible: 'ALPHA_USER', masterSystem: 'ALPHA_SYS' },
-  beta: { responsible: 'BETA_USER', masterSystem: 'BETA_SYS' },
-  // A basic destination stating no SAP_RESPONSIBLE: its login.
-  gamma: { login: 'GAMMA_LOGIN' },
-  bare: {},
+/** A token connection: the credential every session must open with, stating no login. */
+const TOKEN = {
+  'x-sap-url': 'https://system.example.invalid',
+  'x-sap-jwt-token': 'token-placeholder',
 };
-
-function provider(): IAuthProvider {
-  return {
-    kind: 'test',
-    prepare: async () => ({ ok: true }),
-    establish: async () => ({ ok: true }),
-    authorize: async () => ({ ok: true }),
-    rejected: async () => ({ ok: true }),
-  };
-}
-
-function destinations(): IDestinations {
-  return {
-    settingsFor: async () => ({
-      url: 'https://system.example.invalid',
-      authType: 'basic' as const,
-    }),
-    getProvider: async () => provider(),
-    systemContextFor: async (destination) =>
-      DESTINATION_CONTEXT[destination] ?? {},
-  };
-}
 
 async function listen(
   register: (app: IHttpApplication) => void,
@@ -163,10 +133,9 @@ describe('SseServer: responsible and master system per session', () => {
   const controllers: AbortController[] = [];
 
   beforeEach(async () => {
-    const sse = new SseServer(registry, destinations(), {
-      allowDestinationHeader: true,
-      defaultDestination: 'bare',
-    });
+    // A token connection is cloud by default: onprem, so nothing is looked up.
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    const sse = new SseServer(registry, {});
     ({ server, baseUrl } = await listen((app) => sse.registerRoutes(app)));
   });
   afterEach(async () => {
@@ -212,30 +181,22 @@ describe('SseServer: responsible and master system per session', () => {
     return JSON.parse(message.result.content[0].text);
   }
 
-  it('the headers win over the destination .env, which wins over the process', async () => {
+  it('the opening headers win over the process environment', async () => {
     await expect(
-      ask({ 'x-mcp-destination': 'alpha', 'x-sap-responsible': 'HEADER_USER' }),
+      ask({ ...TOKEN, 'x-sap-responsible': 'HEADER_USER' }),
     ).resolves.toEqual({
       responsible: 'HEADER_USER',
-      masterSystem: 'ALPHA_SYS',
+      masterSystem: 'PROCESS_SYS',
     });
-    await expect(ask({ 'x-mcp-destination': 'alpha' })).resolves.toEqual({
-      responsible: 'ALPHA_USER',
-      masterSystem: 'ALPHA_SYS',
-    });
-    await expect(ask({})).resolves.toEqual({
+    await expect(ask(TOKEN)).resolves.toEqual({
       responsible: 'PROCESS_USER',
       masterSystem: 'PROCESS_SYS',
     });
   });
 
-  it("the login: the destination's SAP_USERNAME, x-sap-login, the process SAP_USERNAME", async () => {
+  it('the login: x-sap-login of a basic connection, else the process SAP_USERNAME', async () => {
     delete process.env.SAP_RESPONSIBLE;
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-    await expect(ask({ 'x-mcp-destination': 'gamma' })).resolves.toEqual({
-      responsible: 'GAMMA_LOGIN',
-      masterSystem: 'PROCESS_SYS',
-    });
     await expect(
       ask({
         'x-sap-url': 'https://system.example.invalid',
@@ -246,29 +207,20 @@ describe('SseServer: responsible and master system per session', () => {
       responsible: 'HEADER_LOGIN',
       masterSystem: 'PROCESS_SYS',
     });
-    await expect(ask({})).resolves.toEqual({
-      responsible: 'PROCESS_LOGIN',
-      masterSystem: 'PROCESS_SYS',
-    });
-  });
-
-  it('x-sap-login on a destination session is not the login', async () => {
-    delete process.env.SAP_RESPONSIBLE;
-    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     await expect(
-      ask({ 'x-mcp-destination': 'bare', 'x-sap-login': 'HEADER_LOGIN' }),
+      ask({ ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' }),
     ).resolves.toEqual({
       responsible: 'PROCESS_LOGIN',
       masterSystem: 'PROCESS_SYS',
     });
   });
 
-  it('two concurrent sessions to different destinations each see their own', async () => {
+  it('two concurrent sessions each see their own', async () => {
     const [a, b] = await Promise.all([
-      ask({ 'x-mcp-destination': 'alpha' }, 60),
-      ask({ 'x-mcp-destination': 'beta', 'x-sap-master-system': 'HDR' }, 0),
+      ask({ ...TOKEN, 'x-sap-responsible': 'FIRST' }, 60),
+      ask({ ...TOKEN, 'x-sap-master-system': 'HDR' }, 0),
     ]);
-    expect(a).toEqual({ responsible: 'ALPHA_USER', masterSystem: 'ALPHA_SYS' });
-    expect(b).toEqual({ responsible: 'BETA_USER', masterSystem: 'HDR' });
+    expect(a).toEqual({ responsible: 'FIRST', masterSystem: 'PROCESS_SYS' });
+    expect(b).toEqual({ responsible: 'PROCESS_USER', masterSystem: 'HDR' });
   });
 });

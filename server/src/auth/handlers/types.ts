@@ -5,9 +5,9 @@ import type {
   IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import type { DestinationGrant } from '@mcp-abap-adt/interfaces-auth-broker';
-import type { AuthType } from '@mcp-abap-adt/lib/auth';
 import type { LoginStrategyOptions } from '../IAuthBrokerFactoryConfig.js';
 import type { ServerLoginContext } from '../serverLogin.js';
+import type { AuthType } from '../vocabulary';
 
 /**
  * What a handler may use to build its broker options. (Not `HandlerContext`:

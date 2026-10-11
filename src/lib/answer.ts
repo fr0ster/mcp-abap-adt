@@ -9,6 +9,8 @@
  * See docs/superpowers/specs/2026-09-08-result-error-strategies-design.md.
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { answerFailure } from './auth/answerFailure';
+import { failureOf } from './auth/failures';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
 import {
@@ -165,6 +167,10 @@ export function return_answer<T>(
 ): McpResult {
   if (!answer.ok) {
     const error = answer.getError() as IAdtError & MessageCarrier;
+    // A failure that carries a refusal (§7.2, P6): answered as the chain
+    // made it (§7.3), never rebuilt from the error's message.
+    const read = failureOf(error);
+    if (read !== undefined) return answerFailure(read);
     // Refused here, before any request: not a claim about the server.
     if (isSystemContextRefusal(error.message)) {
       return local('system_context_missing', ctx, error.message);
@@ -231,6 +237,9 @@ export async function answer<T>(
   try {
     response = await call();
   } catch (thrown) {
+    // The failure reader first (§7.2): a thrown refusal is the chain's.
+    const read = failureOf(thrown);
+    if (read !== undefined) return answerFailure(read);
     // Refused here, before any request: not a claim about the server.
     if (thrown instanceof SystemContextMissingError) {
       return local('system_context_missing', ctx, thrown.message);

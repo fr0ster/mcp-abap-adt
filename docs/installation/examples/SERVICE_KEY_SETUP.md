@@ -123,7 +123,7 @@ When you make the first request:
 
 ## Troubleshooting
 
-### Error: `Destination "TRIAL" lacks: <fields>`
+### Error: `Destination "TRIAL" cannot be used: <fields>`
 
 **Cause**: The destination states less than its authentication needs. The message names the fields and, where the server knows the remedy, one hint.
 

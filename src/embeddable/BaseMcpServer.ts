@@ -2,6 +2,8 @@ import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import { answerFailure, failureLogLine } from '../lib/auth/answerFailure.js';
+import { failureOf, type ReadFailure } from '../lib/auth/failures.js';
 import type {
   DestinationSystemContext,
   IDestinations,
@@ -249,6 +251,15 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
+   * What a thrown value is, as the client's answer (spec §7.1): lib's
+   * `failureOf`. A server that knows more failures (core: the destination
+   * layer's) reads those first, then this.
+   */
+  protected readFailure(thrown: unknown): ReadFailure | undefined {
+    return failureOf(thrown);
+  }
+
+  /**
    * Gets ABAP connection from connection context: the connector built from
    * the context's settings and credential, then connected. The credential
    * renews itself (a 401 reaches its `rejected()`), so nothing is looked up
@@ -388,6 +399,14 @@ export abstract class BaseMcpServer extends McpServer {
 
               return { content };
             } catch (error) {
+              // The failure reader first (§7.2): a chain failure, an aborted
+              // request or the server's own refusal is answered as §7.3, its
+              // diagnostics on stderr only.
+              const read = this.readFailure(error);
+              if (read !== undefined) {
+                process.stderr.write(`${failureLogLine('MCP', read)}\n`);
+                return answerFailure(read);
+              }
               // An uncaught throw (connection setup, handler, transport) becomes a
               // structured result. return_error extracts the ADT response body,
               // which the SDK's own error.message would discard.

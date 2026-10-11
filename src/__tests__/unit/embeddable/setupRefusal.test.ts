@@ -12,7 +12,7 @@ import { AuthRefusedError, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { IDestinations } from '../../../lib/auth';
-import { describeAuthError } from '../../../lib/auth/errors';
+import { failureOf } from '../../../lib/auth/failures';
 import * as connectionFactory from '../../../lib/connectionFactory';
 import {
   getSystemContext,
@@ -132,8 +132,9 @@ describe('a refused credential', () => {
     const { provider } = refusingProvider();
     const error = await request(destinationsOf(provider));
     // The refusal's own words, as auth-errors rendered them: reason, then hint.
-    const words = describeAuthError(error);
-    expect(words).toContain(REASON);
-    expect(words).toContain(REFUSAL.hint as string);
+    const read = failureOf(error);
+    expect(read?.error).toBe('authentication_failed');
+    expect(read?.message).toBe(REASON);
+    expect(read?.hint).toBe(REFUSAL.hint);
   });
 });

@@ -8,6 +8,8 @@ import {
 } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AxiosError, type AxiosResponse } from 'axios';
+import { answerFailure } from './auth/answerFailure';
+import { failureOf } from './auth/failures';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
 import {
@@ -226,7 +228,74 @@ export function extractAdtErrorMessage(
   return fallback;
 }
 
+/** Whether `c` is a whitespace code unit (space, tab, line feed, CR, VT, FF). */
+function isSpace(c: number): boolean {
+  return c === 32 || (c >= 9 && c <= 13);
+}
+
+/**
+ * The host after the first `ENOTFOUND` followed by whitespace, up to the
+ * next whitespace; `undefined` without one. Plain code (D26).
+ */
+function hostAfterNotFound(text: string): string | undefined {
+  const marker = 'ENOTFOUND';
+  for (
+    let at = text.indexOf(marker);
+    at >= 0;
+    at = text.indexOf(marker, at + 1)
+  ) {
+    const afterMarker = at + marker.length;
+    let start = afterMarker;
+    while (start < text.length && isSpace(text.charCodeAt(start))) start += 1;
+    if (start === afterMarker || start === text.length) continue;
+    let end = start;
+    while (end < text.length && !isSpace(text.charCodeAt(end))) end += 1;
+    return text.slice(start, end);
+  }
+  return undefined;
+}
+
+/** `MCP error -<n>: ` at `at`: its length, else 0. */
+function mcpErrorPrefixAt(text: string, at: number): number {
+  const head = 'MCP error ';
+  if (!text.startsWith(head, at)) return 0;
+  let i = at + head.length;
+  if (text[i] === '-') i += 1;
+  const digits = i;
+  while (
+    i < text.length &&
+    text.charCodeAt(i) >= 48 &&
+    text.charCodeAt(i) <= 57
+  )
+    i += 1;
+  if (i === digits || !text.startsWith(': ', i)) return 0;
+  return i + 2 - at;
+}
+
+/**
+ * `text` without the SDK's leading `McpError: ` / `MCP error -<n>: `
+ * prefixes, however many are stacked. Plain code (D26).
+ */
+function withoutMcpErrorPrefixes(text: string): string {
+  let at = 0;
+  for (;;) {
+    if (text.startsWith('McpError: ', at)) {
+      at += 'McpError: '.length;
+      continue;
+    }
+    const length = mcpErrorPrefixAt(text, at);
+    if (length === 0) break;
+    at += length;
+  }
+  return text.slice(at);
+}
+
 export function return_error(error: any) {
+  // The failure reader first (§7.2): a chain failure, an aborted request or
+  // the server's own refusal is answered as §7.3 — never its message.
+  const read = failureOf(error);
+  if (read !== undefined) return answerFailure(read);
+
   // Safely extract error message to avoid circular reference issues
   // Always extract only safe properties, never serialize the entire error object
   let errorText: string;
@@ -245,10 +314,7 @@ export function return_error(error: any) {
         errorCode === 'ENOTFOUND' ||
         errorMessage.includes('getaddrinfo ENOTFOUND')
       ) {
-        const hostnameMatch =
-          errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
-          errorMessage.match(/getaddrinfo ENOTFOUND\s+([^\s]+)/);
-        const hostname = hostnameMatch ? hostnameMatch[1] : 'unknown host';
+        const hostname = hostAfterNotFound(errorMessage) ?? 'unknown host';
 
         errorText =
           `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
@@ -316,10 +382,7 @@ export function return_error(error: any) {
         errorMessage.includes('getaddrinfo ENOTFOUND') ||
         errorMessage.includes('ENOTFOUND')
       ) {
-        const hostnameMatch =
-          errorMessage.match(/ENOTFOUND\s+([^\s]+)/) ||
-          errorMessage.match(/getaddrinfo ENOTFOUND\s+([^\s]+)/);
-        const hostname = hostnameMatch ? hostnameMatch[1] : 'unknown host';
+        const hostname = hostAfterNotFound(errorMessage) ?? 'unknown host';
 
         errorText =
           `DNS resolution failed: Cannot resolve hostname "${hostname}". ` +
@@ -370,7 +433,7 @@ export function return_error(error: any) {
   // registration paths route any thrown error through here. Schema-validation
   // errors are unaffected: the SDK raises those before our code runs and never
   // reaches return_error.
-  errorText = errorText.replace(/^(?:McpError: |MCP error -?\d+: )+/, '');
+  errorText = withoutMcpErrorPrefixes(errorText);
 
   return {
     isError: true,

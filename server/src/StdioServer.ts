@@ -1,5 +1,10 @@
 import type { AbapConnection } from '@mcp-abap-adt/connection';
-import { type IDestinations, ServerRefusal } from '@mcp-abap-adt/lib/auth';
+import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
+import {
+  type IDestinations,
+  type ReadFailure,
+  ServerRefusal,
+} from '@mcp-abap-adt/lib/auth';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
@@ -7,6 +12,7 @@ import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { destinationFailureOf } from './auth/destinationFailure';
 import { CORE_VERSION } from './coreVersion.js';
 
 export interface StdioServerOptions {
@@ -17,6 +23,8 @@ export interface StdioServerOptions {
   stateIdleMinutes?: number;
   /** Where the state's lifecycle lines go; default stderr, always on. */
   stateLogger?: StateLogger;
+  /** The server's own sentence beside a chain failure (§7.4): the factory's `sentenceFor`. */
+  sentenceFor?: (error: IAuthProviderError) => string | undefined;
 }
 
 /**
@@ -28,6 +36,10 @@ export interface StdioServerOptions {
  * `inspection_only` refusal before any connection is built (D17).
  */
 export class StdioServer extends BaseMcpServer {
+  private readonly sentenceFor:
+    | ((error: IAuthProviderError) => string | undefined)
+    | undefined;
+
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
     private readonly destinations: IDestinations | undefined,
@@ -41,6 +53,12 @@ export class StdioServer extends BaseMcpServer {
       // From the options as given: the silent default above is never the state's.
       stateLogger: stateLoggerOf(opts ?? {}),
     });
+    this.sentenceFor = opts?.sentenceFor;
+  }
+
+  /** The destination layer's failures first, then lib's reader (§7.1). */
+  protected override readFailure(thrown: unknown): ReadFailure | undefined {
+    return destinationFailureOf(thrown, { sentenceFor: this.sentenceFor });
   }
 
   /**

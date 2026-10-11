@@ -21,11 +21,13 @@ jest.mock('../../../src/lib/connectionFactory', () => ({
 }));
 
 import type { AddressInfo } from 'node:net';
+import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import {
-  DestinationConfigError,
+  failureOf,
   type IDestinations,
-  UnsupportedAuthenticationError,
+  type ReadFailure,
+  ServerRefusal,
 } from '@mcp-abap-adt/lib/auth';
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
@@ -57,9 +59,24 @@ function fakeProvider(): IAuthProvider {
   };
 }
 
+/** What the host's reader (core's destination layer) knows; nothing else does. */
+class MisconfiguredDestination extends Error {}
+
+/** A host's failure reader: its own failure first, then lib's. */
+function hostReader(thrown: unknown): ReadFailure | undefined {
+  if (thrown instanceof MisconfiguredDestination) {
+    return {
+      error: 'destination_refused',
+      message: 'Destination "misconfigured" cannot be used: grantType',
+    };
+  }
+  return failureOf(thrown);
+}
+
 /**
- * `good` and `other` are served; `unsupported` is a well-formed
- * authentication no handler serves; `misconfigured` lacks a field.
+ * `good` and `other` are served; `unsupported` is refused in the server's
+ * own words; `misconfigured` is known to the host's reader only; `refused`
+ * fails with a chain failure.
  * Nothing but the two methods of IDestinations.
  */
 function stubDestinations() {
@@ -68,10 +85,9 @@ function stubDestinations() {
     provider,
     settingsFor: jest.fn(async (destination: string) => {
       if (destination === 'unsupported') {
-        throw new UnsupportedAuthenticationError(
-          'unsupported',
-          'saml',
-          'saml2_bearer',
+        throw new ServerRefusal(
+          'destination_refused',
+          'Destination "unsupported" uses saml / saml2_bearer, which this server does not support',
         );
       }
       if (destination === 'leaky') {
@@ -81,10 +97,11 @@ function stubDestinations() {
         );
       }
       if (destination === 'misconfigured') {
-        throw new DestinationConfigError(
-          'misconfigured',
-          ['grantType'],
-          'the destination states no grant',
+        throw new MisconfiguredDestination(`grantType: ${LEAKED}`);
+      }
+      if (destination === 'refused') {
+        throw new AuthProviderFailure(
+          authError['credential-refused']({ credential: 'token' }),
         );
       }
       return {
@@ -157,6 +174,7 @@ describe('StreamableHttpServer: destinations', () => {
   async function start(opts: {
     allowDestinationHeader?: boolean;
     defaultDestination?: string;
+    readFailure?: (thrown: unknown) => ReadFailure | undefined;
   }) {
     destinations = stubDestinations();
     const mcp = new StreamableHttpServer(emptyRegistry, destinations, opts);
@@ -192,16 +210,35 @@ describe('StreamableHttpServer: destinations', () => {
     expect(destinations.getProvider).toHaveBeenCalledWith('good');
   });
 
-  it('a DestinationConfigError is answered with its fields', async () => {
-    await start({ defaultDestination: 'misconfigured' });
-
+  it("a failure the host's reader knows is answered in the reader's words", async () => {
+    await start({
+      defaultDestination: 'misconfigured',
+      readFailure: hostReader,
+    });
     const refused = await post();
     const text = await refused.text();
     expect(refused.status).toBeGreaterThanOrEqual(400);
-    expect(text).toContain('misconfigured');
-    expect(text).toContain('grantType');
-    expect(text).not.toContain('Auth broker not initialized');
-    expect(text).not.toContain('Internal Server Error');
+    expect(text).toBe('Destination "misconfigured" cannot be used: grantType');
+    expect(text).not.toContain(LEAKED);
+  });
+
+  it("without the host's reader, a failure lib does not know is answered generically", async () => {
+    await start({ defaultDestination: 'misconfigured' });
+    const refused = await post();
+    expect(await refused.text()).toBe('Internal Server Error');
+    expect(logged(errorSpy)).not.toContain(LEAKED);
+  });
+
+  it('a chain failure is answered in its reason and hint, logFields on stderr', async () => {
+    await start({ defaultDestination: 'refused' });
+    const refused = await post();
+    const text = await refused.text();
+    const expected = authError['credential-refused']({ credential: 'token' });
+    expect(refused.status).toBeGreaterThanOrEqual(400);
+    expect(text).toBe(
+      [expected.reason, expected.hint].filter(Boolean).join('\n'),
+    );
+    expect(logged(errorSpy)).toContain('"kind":"credential-refused"');
   });
 
   it('an error the server has no words for: answered generically, logged by class only', async () => {

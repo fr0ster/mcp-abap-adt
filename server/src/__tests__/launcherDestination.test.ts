@@ -464,7 +464,9 @@ describe('a destination that cannot be served stops the start', () => {
         `--auth-broker-path=${root}`,
       ]);
       expect(exits).toEqual([1]);
-      expect(stderr.join('\n')).toContain('Destination "dest" lacks: SAP_URL');
+      expect(stderr.join('\n')).toContain(
+        'Destination "dest" cannot be used: SAP_URL',
+      );
       expect(stderr.join('\n')).not.toContain(PASSWORD);
       expect(started()).not.toHaveBeenCalled();
     },

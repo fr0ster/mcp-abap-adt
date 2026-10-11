@@ -14,15 +14,15 @@ not support`).
 | **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (used as it is, never renewed), or the `x-sap-jwt-token` header |
 
 A `.env` that is a destination by itself **must state `SAP_AUTH_TYPE`** (there is no default: a `.env` with a
-user and a password but no type is refused with `Destination "X" lacks: authType`; an ABAP service key
+user and a password but no type is refused with `Destination "X" cannot be used: authType`; an ABAP service key
 states `jwt` / `authorization_code` itself). A `jwt` destination **must state `SAP_GRANT_TYPE`** too. A `.env` that states `jwt` without a grant
-is refused with `Destination "X" lacks: grantType` and a hint to write it again with
+is refused with `Destination "X" cannot be used: grantType` and a hint to write it again with
 `mcp-auth` (see [Generate a `.env`](#generate-a-env)), or to add `SAP_GRANT_TYPE` by hand.
 
 Other grants (`client_credentials`, `passcode`, the OIDC and SAML grants) and other types
 (`saml`, `certificate`, `kerberos`) are **not supported** by this server, even though the
 libraries know some of them. A destination that states one is refused, naming it; it is never
-silently run as something else. (A `saml` destination that states no grant gets `lacks: grantType`,
+silently run as something else. (A `saml` destination that states no grant gets `cannot be used: grantType`,
 like a `jwt` one.)
 
 ### SNC
@@ -86,7 +86,7 @@ The session — the token and its refresh token — is the server's to keep curr
   Without it the session is kept in memory: one browser login per process, lost on exit.
   The session is also *read* from `sessions/X.env` only with `--unsafe`: a `jwt` / `none`
   destination whose token (`SAP_JWT_TOKEN`) is in that file is refused without it, as
-  `Destination "X" lacks: authorizationToken`. Start with `--unsafe`, or serve the file with
+  `Destination "X" cannot be used: authorizationToken`. Start with `--unsafe`, or serve the file with
   `--env=X` or `--env-path`, which read it whatever `--unsafe` says.
 
 A destination is **read once per process**. Nothing watches the files: a change you make to a
@@ -244,9 +244,16 @@ destination. A request with none of them is answered `400`.
 
 ## Errors you may meet at startup
 
-- `Destination "X" lacks: <fields>` — the destination states less than its authentication
-  needs, followed by one hint where the server knows the remedy (`grantType`, `SAP_URL`,
-  `XSUAA_MCP_URL`, `connection-type`).
+- `Destination "X" cannot be used: <fields>` — the destination states less than its
+  authentication needs, or a session it cannot use, followed by one hint where the server knows
+  the remedy (`grantType`, `SAP_URL`, `XSUAA_MCP_URL`, `connection-type`, `authorizationToken`,
+  `issuedFor` / `issuedBy`). A token in the session bound to other means (`issuedFor` /
+  `issuedBy`) gets: "the token in the session is bound to other means: write it again, or
+  remove `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`".
+- `Destination "X" logs in through a browser, and none is known on this platform (<platform>)`
+  — a `jwt` / `authorization_code` destination on a platform outside the browser table, with
+  the hint "Start with --browser=none and open the URL the login prints on stderr, or give
+  --browser-program=<program>."
 - `Destination "X" uses <type> / <grant>, which this server does not support` — an
   authentication outside the four above (`certificate` and `kerberos` have no grant: `uses certificate`).
 - `--env-path: the file does not exist: <path>` — an env file you named is missing; the server
@@ -254,8 +261,38 @@ destination. A request with none of them is answered `400`.
 - `--auth-broker was removed in 16.0.0 — remove it from the configuration` (likewise
   `MCP_USE_AUTH_BROKER` and `auth-broker (config file)`) — a parameter 16.0.0 removed is still
   set; the start stops, naming the form you used.
+- A refusal of the credential itself (a token endpoint or the system said no) is printed in the
+  words of the authentication chain: its reason, then its hint.
 
 The server names fields and the words above only; it never prints a value read from a file.
+
+## What an MCP client sees when a tool call fails on authentication
+
+A tool call that fails on the credential, on the destination or on one of the server's own
+refusals is answered with `isError: true` and a JSON text:
+
+```json
+{ "error": "authentication_failed", "kind": "credential-refused",
+  "message": "the token was refused", "hint": "obtain a new token",
+  "server": "…the server's own sentence, when it has one…" }
+```
+
+| Source | `error` | `kind` | `message` | `hint` |
+|---|---|---|---|---|
+| a failure of the authentication chain (a provider, the connection's refusal) | `authentication_failed` | its `kind` | its reason | its hint |
+| a destination the server cannot use | `destination_refused` | — (`cause_kind` when a chain error caused it) | `Destination "<name>" cannot be used: <fields>` | the chain error's hint, then one fixed hint per known field |
+| a request that was cancelled | `request_aborted` | — | fixed words | — |
+| the server's own refusal | `destination_refused`, `fresh_connection_unavailable`, `inspection_only`, `credentials_required` | — | fixed words | — |
+
+`server` is added when the server has its own sentence for the failure — for example under
+`--renewal=refresh-only`, when a renewal would need a login. Never in the answer: the chain
+error's diagnostics and facts beyond its `kind`, an error's message, a token, a URL with a
+query, the login's `state`. The diagnostics go to stderr only, as one line per failure:
+`[MCP] <error>: <logFields>` (auth-errors' `logFields`: `error`, `kind`, `status`,
+`diagnostics`).
+
+A tool failure that is not one of these — an ADT error, a `403` with SAP's text included — is
+answered as before.
 
 ## Shutdown
 

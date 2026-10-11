@@ -29,13 +29,12 @@ import type {
   IAuthRejection,
   IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
-import {
-  describeAuthError,
-  UnsupportedAuthenticationError,
-  vetMeans,
-} from '@mcp-abap-adt/lib/auth';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { SHUTDOWN_REFUSAL } from '../../auth/countedProvider';
+import {
+  destinationFailureWords,
+  UnsupportedAuthenticationError,
+} from '../../auth/destinationFailure';
 import type {
   IAuthBrokerFactoryConfig,
   LoginStrategyOptions,
@@ -594,7 +593,7 @@ describe('AuthBrokerFactory', () => {
   });
 
   describe('getProvider', () => {
-    it('a named jwt / none destination without --unsafe: lacks authorizationToken, with the hint', async () => {
+    it('a named jwt / none destination without --unsafe: refused naming authorizationToken, with the hint', async () => {
       writeSession('dest', [
         `SAP_URL=${SYSTEM_URL}`,
         'SAP_AUTH_TYPE=jwt',
@@ -603,8 +602,10 @@ describe('AuthBrokerFactory', () => {
       ]);
       const err = await caught(factory({ unsafe: false }).getProvider('dest'));
       expect(err).toBeInstanceOf(DestinationConfigError);
-      const text = describeAuthError(err);
-      expect(text).toContain('Destination "dest" lacks: authorizationToken');
+      const text = destinationFailureWords(err, 'dest');
+      expect(text).toContain(
+        'Destination "dest" cannot be used: authorizationToken',
+      );
       expect(text).toContain('is read only with --unsafe');
       expect(text).not.toContain('placeholder-token');
     });
@@ -930,87 +931,5 @@ describe('AuthBrokerFactory', () => {
       expect(tokenRequests).toEqual(['authorization_code', 'refresh_token']);
       expect(fs.readFileSync(envFile, 'utf8')).toBe(afterFlush);
     });
-  });
-});
-
-describe('describeAuthError', () => {
-  const HINTS = {
-    grantType:
-      'Write the destination again with `mcp-auth --destination <name> --type abap|xsuaa` or `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (from @mcp-abap-adt/auth-broker-cli), or add SAP_GRANT_TYPE to its .env.',
-    SAP_URL: "Set SAP_URL to the system's URL.",
-    XSUAA_MCP_URL:
-      "Set XSUAA_MCP_URL in the destination's sessions/<destination>.env to the system's URL.",
-    'connection-type': 'SNC logs on over RFC: set --connection-type=rfc.',
-    authorizationToken:
-      'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
-  } as const;
-
-  it.each(Object.keys(HINTS) as Array<keyof typeof HINTS>)(
-    'names %s with its own hint and no other',
-    (field) => {
-      const text = describeAuthError(
-        new DestinationConfigError('dest', [field], 'fixed reason'),
-      );
-      expect(text).toBe(`Destination "dest" lacks: ${field}\n${HINTS[field]}`);
-      for (const [other, hint] of Object.entries(HINTS)) {
-        if (other !== field) expect(text).not.toContain(hint);
-      }
-    },
-  );
-
-  it('a field without a known remedy gets the bare lacks line', () => {
-    expect(
-      describeAuthError(
-        new DestinationConfigError('dest', ['uaaClientId'], 'fixed reason'),
-      ),
-    ).toBe('Destination "dest" lacks: uaaClientId');
-  });
-
-  it('several fields: one line naming them, then a hint per known field', () => {
-    expect(
-      describeAuthError(
-        new DestinationConfigError(
-          'dest',
-          ['uaaUrl', 'grantType'],
-          'fixed reason',
-        ),
-      ),
-    ).toBe(`Destination "dest" lacks: uaaUrl, grantType\n${HINTS.grantType}`);
-  });
-
-  it('carries no value read from a store', () => {
-    let err: unknown;
-    try {
-      vetMeans('dest', {
-        authType: 'jwt',
-        grantType: 'made-up-grant-z9' as never,
-      });
-    } catch (e) {
-      err = e;
-    }
-    const text = describeAuthError(err);
-    expect(text).toContain('Destination "dest" lacks: grantType');
-    expect(text).not.toContain('made-up-grant-z9');
-    try {
-      vetMeans('dest', { authType: 'made-up-type-z9' as never });
-    } catch (e) {
-      err = e;
-    }
-    expect(describeAuthError(err)).toBe('Destination "dest" lacks: authType');
-  });
-
-  it('an unsupported authentication', () => {
-    expect(
-      describeAuthError(
-        new UnsupportedAuthenticationError('dest', 'jwt', 'client_credentials'),
-      ),
-    ).toBe(
-      'Destination "dest" uses jwt / client_credentials, which this server does not support',
-    );
-  });
-
-  it('anything else: undefined', () => {
-    expect(describeAuthError(new Error('x'))).toBeUndefined();
-    expect(describeAuthError('x')).toBeUndefined();
   });
 });

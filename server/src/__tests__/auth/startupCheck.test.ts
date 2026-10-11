@@ -147,9 +147,11 @@ describe('the startup check', () => {
       expect(exits).toEqual([1]);
       expect(stdioStart).not.toHaveBeenCalled();
       const said = stderr.join('\n');
-      expect(said).toContain('Destination "default"');
-      expect(said).toContain('browser');
-      expect(said).toContain('--browser=none');
+      expect(said).toContain(
+        '[MCP] Destination "default" logs in through a browser, and none is known on this platform (freebsd)\nStart with --browser=none and open the URL the login prints on stderr, or give --browser-program=<program>.',
+      );
+      // "lacks" is the form for a missing destination field: not this.
+      expect(said).not.toContain('lacks');
     });
 
     it('jwt / authorization_code on freebsd with --browser=none: starts', async () => {

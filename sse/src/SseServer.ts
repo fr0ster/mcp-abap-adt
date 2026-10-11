@@ -1,6 +1,10 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
+import {
+  errorClassOf,
+  type IDestinations,
+  type ReadFailure,
+} from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -12,6 +16,7 @@ import {
   createServerListener,
   destinationFailureAnswer,
   destinationFromHeader,
+  type FailureReader,
   FirstConnectLock,
   getProtocol,
   withDnsRebindingProtection,
@@ -93,6 +98,12 @@ export interface SseServerOptions {
   allowedOrigins?: string[];
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
+  /**
+   * What reads a failure as the client's answer (§7.1); default lib's
+   * `failureOf`. core passes its destination reader while it still serves
+   * destinations over this transport.
+   */
+  readFailure?: FailureReader;
 }
 
 type SessionEntry = {
@@ -134,6 +145,7 @@ export class SseServer {
   private readonly enableDnsRebindingProtection?: boolean;
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
+  private readonly failureReader: FailureReader | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -154,6 +166,7 @@ export class SseServer {
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
+    this.failureReader = opts?.readFailure;
     // Refused here, at startup, rather than at a session's first request.
     this.stateIdleMinutes =
       opts?.stateIdleMinutes === undefined
@@ -357,6 +370,7 @@ export class SseServer {
         readonly loggerImpl: Logger,
         readonly ver: string,
         state: { stateIdleMinutes?: number; stateLogger?: StateLogger },
+        private readonly failureReader: FailureReader | undefined,
       ) {
         super({
           name: 'mcp-abap-adt-sse',
@@ -364,6 +378,12 @@ export class SseServer {
           logger: loggerImpl,
           ...state,
         });
+      }
+
+      protected override readFailure(thrown: unknown): ReadFailure | undefined {
+        return this.failureReader
+          ? this.failureReader(thrown)
+          : super.readFailure(thrown);
       }
       async init(
         dest: string | undefined,
@@ -392,6 +412,7 @@ export class SseServer {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
       },
+      this.failureReader,
     );
     try {
       await server.init(
@@ -428,7 +449,7 @@ export class SseServer {
       this.logger.debug(`SSE GET: server connected for session ${sessionId}`);
     } catch (error) {
       this.logger.error(
-        `SSE GET: failed to connect for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
+        `SSE GET: failed to connect for session ${sessionId}: ${this.failureWords(error)}`,
       );
       this.sessions.delete(sessionId);
       if (!res.headersSent) {
@@ -503,19 +524,35 @@ export class SseServer {
         );
       }
     } catch (error) {
+      // Fixed words and what the reader makes of it — never its message (§9).
       console.error(
-        `[SSE POST] FAILED for session ${sessionId}: ${error instanceof Error ? error.message : String(error)}`,
+        `[SSE POST] FAILED for session ${sessionId}: ${this.failureWords(error)}`,
       );
-      console.error(`[SSE POST] Error stack:`, error);
       if (!res.headersSent) {
         res.writeHead(500).end('Internal Server Error');
       }
     }
   }
 
+  /**
+   * What a log line says of a thrown value: `logFields` of the failure the
+   * reader knows, else its class only — a message may quote a file (H4).
+   */
+  private failureWords(error: unknown): string {
+    const answer = this.destinationAnswer(error);
+    return answer.logLine ?? errorClassOf(error);
+  }
+
+  private destinationAnswer(error: unknown) {
+    return this.failureReader
+      ? destinationFailureAnswer(error, this.failureReader)
+      : destinationFailureAnswer(error);
+  }
+
   /** A session whose destination failed: the error's words, or as before. */
   private answerFailure(res: any, error: unknown): void {
-    const answer = destinationFailureAnswer(error);
+    const answer = this.destinationAnswer(error);
+    if (answer.logLine !== undefined) console.error(answer.logLine);
     if (answer.known) {
       console.error(`[SSE GET] FAILED: ${answer.text}`);
     } else {

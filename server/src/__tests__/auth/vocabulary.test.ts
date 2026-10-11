@@ -1,6 +1,6 @@
 import { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
 import type { DestinationGrant } from '@mcp-abap-adt/interfaces-auth-broker';
-import { GRANTS, vetMeans } from '../../../lib/auth/vocabulary';
+import { GRANTS, vetMeans } from '../../auth/vocabulary';
 
 const MADE_UP = 'zz-made-up-value';
 

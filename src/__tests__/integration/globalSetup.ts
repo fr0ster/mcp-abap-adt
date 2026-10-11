@@ -21,9 +21,9 @@ import {
   AuthBrokerFactory,
   browserFor,
   browserOf,
+  destinationFailureWords,
   promptLogger,
 } from '@mcp-abap-adt/core/auth';
-import { describeAuthError } from '../../lib/auth/errors';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { restoreResolution } from './helpers/packageSources';
 import { testConfigPathFromEnv } from './helpers/testConfigPath';
@@ -127,10 +127,7 @@ async function setUp(): Promise<void> {
     await (connection as { disconnect?: () => Promise<void> }).disconnect?.();
   } catch (error: unknown) {
     console.log(
-      `[globalSetup] Auth failed: ${
-        describeAuthError(error) ??
-        (error instanceof Error ? error.constructor.name : typeof error)
-      }`,
+      `[globalSetup] Auth failed: ${destinationFailureWords(error, destination)}`,
     );
     // Don't throw — let tests handle missing auth gracefully (skip)
   } finally {

@@ -4,8 +4,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
   browserCallbackStrategy,
-  describeAuthError,
-  errorClassOf,
 } from '@mcp-abap-adt/lib/auth';
 import type { HandlerSet, IServerConfig } from '@mcp-abap-adt/lib/config';
 import {
@@ -35,6 +33,8 @@ import {
   BrowserChoiceError,
   browserFor,
   browserOf,
+  destinationFailureOf,
+  destinationFailureWords,
   type IAuthBrokerFactoryConfig,
   promptLogger,
 } from './auth';
@@ -426,15 +426,21 @@ export function factoryConfigFrom(
 }
 
 /**
- * The words a startup failure is reported in: the error's own vetted words
- * when the server knows them, else the destination and the error's class —
- * never its message, which may quote a file it could not parse (H4).
+ * The words a startup failure is reported in: what the failure reader makes
+ * of it (`destinationFailureWords`: the §7.3 message, its hint, the server's
+ * sentence), else the destination and the error's class — never its
+ * message, which may quote a file it could not parse (H4).
  */
-function startupWords(error: unknown, destination: string): string {
-  return (
-    describeAuthError(error) ??
-    `Destination "${destination}" cannot be read: ${errorClassOf(error)}`
-  );
+function startupWords(
+  error: unknown,
+  destination: string,
+  factory: AuthBrokerFactory,
+  platform: string,
+): string {
+  return destinationFailureWords(error, destination, {
+    platform,
+    sentenceFor: (e) => factory.sentenceFor(e),
+  });
 }
 
 /**
@@ -449,6 +455,7 @@ async function checkAndSummarise(
   destination: string,
   config: IServerConfig,
   stderr: (line: string) => void,
+  platform: string,
 ): Promise<void> {
   const settings = await factory.settingsFor(destination);
   const startup = new AbortController();
@@ -486,7 +493,7 @@ async function checkAndSummarise(
   } catch (error) {
     // The summary is information: it never stops a start the settings allowed.
     stderr(
-      `[MCP] Warning: Could not display auth config: ${startupWords(error, destination)}`,
+      `[MCP] Warning: Could not display auth config: ${startupWords(error, destination, factory, platform)}`,
     );
   }
 }
@@ -618,9 +625,17 @@ export async function launch(
       if (config.mcpDestination) {
         assertDestinationName(config.mcpDestination, '--mcp');
       }
-      await checkAndSummarise(factory, destination, config, deps.stderr);
+      await checkAndSummarise(
+        factory,
+        destination,
+        config,
+        deps.stderr,
+        deps.platform ?? process.platform,
+      );
     } catch (error) {
-      deps.stderr(`[MCP] ${startupWords(error, destination)}`);
+      deps.stderr(
+        `[MCP] ${startupWords(error, destination, factory, deps.platform ?? process.platform)}`,
+      );
       deps.exit(1);
       return;
     }
@@ -645,6 +660,7 @@ export async function launch(
         stateIdleMinutes: config.stateIdleMinutes,
         stateLogger: stateLoggerForTransport,
         logger: loggerForTransport,
+        sentenceFor: (error) => factory.sentenceFor(error),
       },
     );
     activeServer = server;
@@ -683,6 +699,10 @@ export async function launch(
       allowedHosts: config.allowedHosts,
       allowedOrigins: config.allowedOrigins,
       enableDnsRebindingProtection: config.enableDnsRebindingProtection,
+      readFailure: (thrown) =>
+        destinationFailureOf(thrown, {
+          sentenceFor: (error) => factory.sentenceFor(error),
+        }),
     });
     activeServer = server;
     installShutdown({
@@ -712,6 +732,10 @@ export async function launch(
     allowedHosts: config.allowedHosts,
     allowedOrigins: config.allowedOrigins,
     enableDnsRebindingProtection: config.enableDnsRebindingProtection,
+    readFailure: (thrown) =>
+      destinationFailureOf(thrown, {
+        sentenceFor: (error) => factory.sentenceFor(error),
+      }),
   });
   activeServer = server;
   installShutdown({

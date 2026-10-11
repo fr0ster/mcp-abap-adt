@@ -1,6 +1,10 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
+import {
+  errorClassOf,
+  type IDestinations,
+  type ReadFailure,
+} from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -12,6 +16,7 @@ import {
   createServerListener,
   destinationFailureAnswer,
   destinationFromHeader,
+  type FailureReader,
   FirstConnectLock,
   getProtocol,
   withDnsRebindingProtection,
@@ -27,9 +32,11 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import express, { type Request, type Response } from 'express';
 import { HTTP_VERSION } from './httpVersion.js';
 import {
+  BATCH_WITH_HANDLE_WORDS,
   BatchWithHandleError,
   handleOf,
   InstancePool,
+  POOL_CLOSED_WORDS,
   type Poolable,
   PoolClosedError,
 } from './InstancePool.js';
@@ -95,6 +102,12 @@ export interface StreamableHttpServerOptions {
   allowedOrigins?: string[];
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
+  /**
+   * What reads a failure as the client's answer (§7.1); default lib's
+   * `failureOf`. core passes its destination reader while it still serves
+   * destinations over this transport.
+   */
+  readFailure?: FailureReader;
 }
 
 type Headers = Record<string, string | string[] | undefined>;
@@ -140,6 +153,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly pool = new InstancePool<PerRequestServerApi>();
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
+  private readonly failureReader: FailureReader | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -170,6 +184,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
+    this.failureReader = opts?.readFailure;
     // Register handlers once for shared MCP server
     this.registerHandlers(this.handlersRegistry);
   }
@@ -239,7 +254,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           handle = handleOf(req.body);
         } catch (err) {
           if (err instanceof BatchWithHandleError) {
-            res.status(400).send(err.message);
+            res.status(400).send(BATCH_WITH_HANDLE_WORDS);
             return;
           }
           throw err;
@@ -332,10 +347,13 @@ export class StreamableHttpServer extends BaseMcpServer {
         }
       } catch (err) {
         if (err instanceof PoolClosedError) {
-          if (!res.headersSent) res.status(503).send(err.message);
+          if (!res.headersSent) res.status(503).send(POOL_CLOSED_WORDS);
           return;
         }
-        const answer = destinationFailureAnswer(err);
+        const answer = this.failureReader
+          ? destinationFailureAnswer(err, this.failureReader)
+          : destinationFailureAnswer(err);
+        if (answer.logLine !== undefined) console.error(answer.logLine);
         if (!answer.known) {
           // No words for it: its class only — a message may quote a file (H4).
           console.error(
@@ -351,6 +369,13 @@ export class StreamableHttpServer extends BaseMcpServer {
         }
       }
     };
+  }
+
+  /** The host's failure reader when it gave one, else lib's (§7.1). */
+  protected override readFailure(thrown: unknown): ReadFailure | undefined {
+    return this.failureReader
+      ? this.failureReader(thrown)
+      : super.readFailure(thrown);
   }
 
   /**
@@ -493,9 +518,16 @@ export class StreamableHttpServer extends BaseMcpServer {
         version: string,
         logger: Logger,
         state: { stateIdleMinutes?: number; stateLogger?: StateLogger },
+        private readonly failureReader: FailureReader | undefined,
       ) {
         super({ name: 'mcp-abap-adt', version, logger, ...state });
         this.registerHandlers(this.registry);
+      }
+
+      protected override readFailure(thrown: unknown): ReadFailure | undefined {
+        return this.failureReader
+          ? this.failureReader(thrown)
+          : super.readFailure(thrown);
       }
 
       public setConnectionContextPublic(
@@ -524,6 +556,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
       },
+      this.failureReader,
     );
   }
 }

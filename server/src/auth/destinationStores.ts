@@ -24,10 +24,10 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
-  DestinationRefusal,
   type DestinationSystemContext,
 } from '@mcp-abap-adt/lib/auth';
 import * as dotenv from 'dotenv';
+import { DestinationRefusal } from './destinationFailure';
 
 export type DestinationMode =
   | {

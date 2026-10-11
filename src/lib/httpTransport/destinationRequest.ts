@@ -3,14 +3,20 @@
  * reading `x-mcp-destination`, and answering a destination that fails.
  */
 
+import { failureLogLine } from '../auth/answerFailure';
 import { assertDestinationName } from '../auth/destinationName';
-import { describeAuthError } from '../auth/errors';
+import { failureOf, type ReadFailure } from '../auth/failures';
+import { serverRefusalOf } from '../auth/serverRefusal';
 
-/** `x-mcp-destination` is not a destination name. Its message names the header, never the value. */
+/** `x-mcp-destination` is not a destination name. Its words name the header, never the value. */
 export class DestinationHeaderError extends Error {
-  constructor(message: string) {
-    super(message);
+  /** The refusal's vetted words (the header's label, never its value). */
+  readonly words: string;
+
+  constructor(words: string) {
+    super(words);
     this.name = 'DestinationHeaderError';
+    this.words = words;
   }
 }
 
@@ -31,29 +37,47 @@ export function destinationFromHeader(
     assertDestinationName(value, 'x-mcp-destination');
   } catch (error) {
     throw new DestinationHeaderError(
-      error instanceof Error ? error.message : 'x-mcp-destination: refused.',
+      serverRefusalOf(error)?.words ?? 'x-mcp-destination: refused.',
     );
   }
   return value;
 }
 
+/** What reads a thrown value as an answer: lib's `failureOf`, or the host's (core's destination layer first). */
+export type FailureReader = (thrown: unknown) => ReadFailure | undefined;
+
 /**
  * How a request whose destination failed is answered: a refused header is
- * the client's (400); an authentication error the server knows is answered
- * in its own words (`describeAuthError`: field names and vetted vocabulary
- * only); anything else as before, without its message.
+ * the client's (400); a failure the reader knows is answered in its words
+ * (its §7.3 message and hint), with `logLine` for stderr (`logFields`);
+ * anything else as before, without its message.
  */
-export function destinationFailureAnswer(error: unknown): {
+export function destinationFailureAnswer(
+  error: unknown,
+  read: FailureReader = failureOf,
+): {
   status: number;
   text: string;
-  /** Whether the text is the error's own vetted words. */
+  /** Whether the text is the failure's own vetted words. */
   known: boolean;
+  /** What stderr gets of a read failure. */
+  logLine?: string;
 } {
   if (error instanceof DestinationHeaderError) {
-    return { status: 400, text: error.message, known: true };
+    return { status: 400, text: error.words, known: true };
   }
-  const words = describeAuthError(error);
-  if (words !== undefined) return { status: 500, text: words, known: true };
+  const answer = read(error);
+  if (answer !== undefined) {
+    const text = [answer.message, answer.hint, answer.server]
+      .filter((line): line is string => line !== undefined)
+      .join('\n');
+    return {
+      status: 500,
+      text,
+      known: true,
+      logLine: failureLogLine('destination', answer),
+    };
+  }
   return { status: 500, text: 'Internal Server Error', known: false };
 }
 

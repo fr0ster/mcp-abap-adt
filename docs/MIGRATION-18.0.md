@@ -72,6 +72,17 @@ The packages, all at **18.0.0**:
   new values until the next start. Restart after any change.
 - **Inspection-only mode** (stdio without a destination) answers a tool call with the server's own
   `inspection_only` refusal, before any connection.
+- **A tool call that fails on authentication answers JSON** (`isError: true`): `{ error, kind?,
+  message, hint?, cause_kind?, server? }`. `error` is `authentication_failed` for a failure of the
+  auth chain (`kind`, `message` and `hint` are the chain's), `destination_refused` for a destination
+  the server cannot use, `request_aborted` for a cancelled request, or one of the server's own
+  refusals (`inspection_only`, `fresh_connection_unavailable`, `credentials_required`). The words are
+  no longer a plain line of text, and no error's message, diagnostics or facts beyond `kind` are in
+  them; the diagnostics go to stderr as auth-errors' `logFields`. See
+  [What an MCP client sees](user-guide/AUTHENTICATION.md#what-an-mcp-client-sees-when-a-tool-call-fails-on-authentication).
+- **A destination refused for its fields reads `Destination "X" cannot be used: <fields>`**
+  (17.x: `lacks: <fields>`); a browser login on a platform with no known browser reads
+  `Destination "X" logs in through a browser, and none is known on this platform (<platform>)`.
 
 ## Embedders
 
@@ -90,3 +101,21 @@ The packages, all at **18.0.0**:
   (`@mcp-abap-adt/lib/auth`).
 - **The closed provider gate answers auth-errors' `interactive-login` `aborted`**, minted, in place
   of `{ reason: 'the server is shutting down' }`.
+- **`describeAuthError` is gone; read a failure with `failureOf(thrown)`** from
+  `@mcp-abap-adt/lib/auth`: structural (no `instanceof`, no `message`, no `name`), total, it answers
+  a `ReadFailure` (`error`, `kind?`, `message`, `hint?`, …) for a chain failure
+  (`AuthProviderFailure`, connection's `AuthRefusedError`, an `IAdtError` carrying a `refusal`), an
+  aborted request (`code: 'ADT_REQUEST_ABORTED'`) or a `ServerRefusal`, else `undefined`.
+  `answerFailure(read)` renders the §7.3 JSON, `failureLogLine(where, read)` the stderr line. The
+  destination layer's reader, `DestinationConfigError` first, is core's `destinationFailureOf(thrown,
+  { platform?, sentenceFor? })` (`@mcp-abap-adt/core/auth`); a `BaseMcpServer` subclass overrides
+  `protected readFailure(thrown)` to read more.
+- **Moved to `@mcp-abap-adt/core/auth`:** `UnsupportedAuthenticationError`, `DestinationRefusal`
+  (both now a `ServerRefusal` answered `destination_refused`), `vetMeans`, `AuthType`,
+  `VettedAuthentication`. `@mcp-abap-adt/lib/auth` no longer re-exports auth-broker's
+  `DestinationConfigError`: import it from `@mcp-abap-adt/auth-broker`. `assertDestinationName`
+  throws `ServerRefusal('destination_refused', …)`. `ServerRefusal` takes
+  `destination_refused` with its words, and `fresh_connection_unavailable` /
+  `credentials_required` with fixed ones.
+- **`StreamableHttpServer` and `SseServer` take `readFailure?`**, the reader they answer a failed
+  destination and a failed tool call with (default `failureOf`).

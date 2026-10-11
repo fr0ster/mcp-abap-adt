@@ -28,16 +28,23 @@ export interface Poolable {
   dispose(): Promise<void>;
 }
 
+/** The `400` words of a batch carrying `state_handle`. */
+export const BATCH_WITH_HANDLE_WORDS =
+  'a JSON-RPC batch cannot carry state_handle';
+
+/** The `503` words of a request after the shutdown began. */
+export const POOL_CLOSED_WORDS = 'the server is shutting down';
+
 export class BatchWithHandleError extends Error {
   constructor() {
-    super('a JSON-RPC batch cannot carry state_handle');
+    super(BATCH_WITH_HANDLE_WORDS);
     this.name = 'BatchWithHandleError';
   }
 }
 
 export class PoolClosedError extends Error {
   constructor() {
-    super('the server is shutting down');
+    super(POOL_CLOSED_WORDS);
     this.name = 'PoolClosedError';
   }
 }

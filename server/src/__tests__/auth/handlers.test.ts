@@ -4,10 +4,8 @@ import type {
   IAuthorizationStrategy,
   IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
-import {
-  SettingsError,
-  UnsupportedAuthenticationError,
-} from '@mcp-abap-adt/lib/auth';
+import { SettingsError } from '@mcp-abap-adt/lib/auth';
+import { UnsupportedAuthenticationError } from '../../auth/destinationFailure';
 import { type AuthHandlerContext, handlerFor } from '../../auth/handlers';
 import type { LoginStrategyOptions } from '../../auth/IAuthBrokerFactoryConfig';
 
@@ -86,7 +84,7 @@ describe('certificate and kerberos', () => {
       const u = err as UnsupportedAuthenticationError;
       expect(u.authType).toBe(authType);
       expect(u.message).toBe(
-        `Destination 'dest' uses the authentication '${authType}', which this server does not support.`,
+        `Destination "dest" uses ${authType}, which this server does not support`,
       );
     },
   );

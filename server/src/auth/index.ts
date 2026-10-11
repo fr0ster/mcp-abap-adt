@@ -14,6 +14,14 @@ export {
   browserFor,
   browserOf,
 } from './browser';
+export {
+  type DestinationFailureOptions,
+  DestinationRefusal,
+  destinationFailureOf,
+  destinationFailureWords,
+  HINTS,
+  UnsupportedAuthenticationError,
+} from './destinationFailure';
 export type {
   IAuthBrokerFactoryConfig,
   LoginStrategyOptions,
@@ -31,3 +39,10 @@ export {
   SHUTDOWN_SENTENCE,
   serverSentence,
 } from './serverSentences';
+export {
+  AUTH_TYPES,
+  type AuthType,
+  GRANTS,
+  type VettedAuthentication,
+  vetMeans,
+} from './vocabulary';

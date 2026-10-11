@@ -13,6 +13,16 @@
 
 import type { IServerConfig } from './IServerConfig.js';
 
+/** Whether `text` is one or more ASCII digits. Plain code (D26). */
+function isDigits(text: string): boolean {
+  if (text.length === 0) return false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    if (c < 48 || c > 57) return false;
+  }
+  return true;
+}
+
 export type AuthParameterKind = 'string' | 'flag' | 'port' | 'enum';
 
 /** A parameter's resolved key in `IServerConfig`, or the raw form of the env-file pair. */
@@ -209,7 +219,7 @@ function convert(
   if (text === '') return undefined;
 
   if (p.kind === 'port') {
-    const port = /^\d+$/.test(text) ? Number.parseInt(text, 10) : Number.NaN;
+    const port = isDigits(text) ? Number.parseInt(text, 10) : Number.NaN;
     if (!Number.isInteger(port) || port < 1 || port > 65535) {
       throw new Error(
         `Invalid ${name}: "${text}". Must be a port between 1 and 65535`,

@@ -2,19 +2,28 @@
  * Authentication module exports
  */
 
-export { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
 /** The browser strategy the program passes to the factory (Ruling 1). */
 export { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 /** Where service keys and sessions live by default. */
 export { getPlatformPaths } from '../stores/platformPaths';
-export { assertDestinationName } from './destinationName';
 export {
-  DestinationRefusal,
-  describeAuthError,
-  errorClassOf,
-  SettingsError,
-  UnsupportedAuthenticationError,
-} from './errors';
+  answerFailure,
+  type FailureAnswer,
+  failureLogFields,
+  failureLogLine,
+  failurePayload,
+} from './answerFailure';
+export { assertDestinationName } from './destinationName';
+export { errorClassOf, SettingsError } from './errors';
+export {
+  ADT_REQUEST_ABORTED,
+  authenticationFailed,
+  type FailureCode,
+  failureOf,
+  REQUEST_ABORTED_WORDS,
+  type ReadFailure,
+  readOwn,
+} from './failures';
 export type {
   DestinationSystemContext,
   IAuthBrokerFactory,
@@ -22,12 +31,10 @@ export type {
   SettleReport,
 } from './IAuthBrokerFactory.js';
 export {
+  CREDENTIALS_REQUIRED_WORDS,
+  FRESH_CONNECTION_UNAVAILABLE_WORDS,
   INSPECTION_ONLY_WORDS,
   ServerRefusal,
   type ServerRefusalCode,
+  serverRefusalOf,
 } from './serverRefusal';
-export {
-  type AuthType,
-  type VettedAuthentication,
-  vetMeans,
-} from './vocabulary';

@@ -38,8 +38,6 @@ import {
   type IAuthBrokerFactory,
   SettingsError,
   type SettleReport,
-  type VettedAuthentication,
-  vetMeans,
 } from '@mcp-abap-adt/lib/auth';
 import { countedProvider, ProviderGate } from './countedProvider';
 import {
@@ -55,6 +53,7 @@ import {
 } from './handlers';
 import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
 import { type RenewalMode, serverSentence } from './serverSentences';
+import { type VettedAuthentication, vetMeans } from './vocabulary';
 
 /** The destination an `--env` file is served as. */
 const ENV_FILE_DESTINATION = 'default';

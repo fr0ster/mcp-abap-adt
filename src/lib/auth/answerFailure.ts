@@ -41,6 +41,16 @@ export function answerFailure(read: ReadFailure): FailureAnswer {
   };
 }
 
+/**
+ * The answer for `read`, with its stderr line written: what every answer site
+ * (the tool wrapper, `return_error`, `return_answer`, `answer()`) does with a
+ * read failure.
+ */
+export function answerRead(read: ReadFailure, where = 'MCP'): FailureAnswer {
+  process.stderr.write(`${failureLogLine(where, read)}\n`);
+  return answerFailure(read);
+}
+
 /** What a log line may carry of `read`: `logFields` of its chain error, else nothing. */
 export function failureLogFields(read: ReadFailure): LogFields | undefined {
   return read.authError === undefined ? undefined : logFields(read.authError);

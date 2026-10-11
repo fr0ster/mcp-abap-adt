@@ -6,11 +6,7 @@
  */
 
 import { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
-import {
-  AuthProviderFailure,
-  authError,
-  readFailure,
-} from '@mcp-abap-adt/auth-errors';
+import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import { answerFailure } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -218,13 +214,8 @@ describe('through a real --env file (broker 5.0.1)', () => {
     );
     expect(String(answer.hint)).toContain(ISSUED_HINT);
     expect(JSON.stringify(answer)).not.toContain('placeholder-token-value');
-    // The chain error a refusal carries is read the same way, never by its words.
-    if (answer.cause_kind !== undefined) {
-      expect(answer.cause_kind).toBe(
-        readFailure((thrown as { error?: unknown }).error, 'unfamiliar-error')
-          .kind,
-      );
-    }
+    // broker 5.0.1's unbound refusal carries no chain error (C1 changes it).
+    expect(answer).not.toHaveProperty('cause_kind');
   });
 });
 

@@ -2,8 +2,12 @@ import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
-import { answerFailure, failureLogLine } from '../lib/auth/answerFailure.js';
-import { failureOf, type ReadFailure } from '../lib/auth/failures.js';
+import { answerRead } from '../lib/auth/answerFailure.js';
+import {
+  failureOf,
+  type ReadFailure,
+  readGuarded,
+} from '../lib/auth/failures.js';
 import type {
   DestinationSystemContext,
   IDestinations,
@@ -402,11 +406,10 @@ export abstract class BaseMcpServer extends McpServer {
               // The failure reader first (§7.2): a chain failure, an aborted
               // request or the server's own refusal is answered as §7.3, its
               // diagnostics on stderr only.
-              const read = this.readFailure(error);
-              if (read !== undefined) {
-                process.stderr.write(`${failureLogLine('MCP', read)}\n`);
-                return answerFailure(read);
-              }
+              // The reader may be an override or a host's: guarded, so its
+              // own throw answers fixed words, never itself.
+              const read = readGuarded((t) => this.readFailure(t), error);
+              if (read !== undefined) return answerRead(read);
               // An uncaught throw (connection setup, handler, transport) becomes a
               // structured result. return_error extracts the ADT response body,
               // which the SDK's own error.message would discard.

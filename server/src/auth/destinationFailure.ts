@@ -104,7 +104,16 @@ function destinationConfigFailure(
   platform: string,
 ): ReadFailure | undefined {
   if (!isDestinationConfigError(thrown)) return undefined;
-  const fields = thrown.missingFields;
+  // Each read once, as own data, and only the copies rendered: a value that
+  // answers differently on a second read cannot change what was checked.
+  const destination = readOwn(thrown, 'destination');
+  const listed = readOwn(thrown, 'missingFields');
+  if (typeof destination !== 'string' || !Array.isArray(listed)) {
+    return undefined;
+  }
+  const copied: unknown[] = Array.from(listed as unknown[]);
+  if (!copied.every((field) => typeof field === 'string')) return undefined;
+  const fields = copied as string[];
   const carried = readOwn(thrown, 'error');
   const cause =
     carried === undefined ? undefined : classify(carried, 'unfamiliar-error');
@@ -116,7 +125,7 @@ function destinationConfigFailure(
   }
   return {
     error: 'destination_refused',
-    message: headline(thrown.destination, fields, platform),
+    message: headline(destination, fields, platform),
     ...(hints.length > 0 ? { hint: hints.join('\n') } : {}),
     ...(cause !== undefined ? { causeKind: cause.kind, authError: cause } : {}),
   };

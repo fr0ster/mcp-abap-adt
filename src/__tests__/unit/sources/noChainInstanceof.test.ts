@@ -1,251 +1,140 @@
 /**
- * D14: a failure is read by structure through auth-errors — never by
- * `instanceof` of a chain class, never by a thrown value's `message` or
- * `name`. A scan, with the TypeScript parser, of the auth and transport
- * sources (tests excluded):
+ * D14 / §9: a failure is read by structure through auth-errors — never by
+ * `instanceof` of a chain class, never through a thrown value's `message`,
+ * `stack`, `cause` or `name`, and a thrown value never goes whole into a log
+ * line or a string. The scan (`helpers/failureScan.ts`) runs on the
+ * TypeScript program with its type checker: what a name resolves to, never
+ * what it is called.
  *
- * - no `instanceof X` where `X` is imported from a chain package
- *   (`@mcp-abap-adt/auth-*`, `connection`, `adt-clients`, `interfaces-*`);
- * - no read of `.message` or `.name` (nor `['message']` / `['name']`) on a
- *   value that holds a thrown value: a `catch` binding, or an identifier
- *   named as one (`error`, `err`, `e`, `thrown`, `cause`, `failure`,
- *   `refusal`). A write (`this.name = …`) is not a read; a class's own name
- *   (`error.constructor.name`) is not the error's.
+ * - `instanceof` of a chain class: every package's `src` (lib, core, http,
+ *   sse).
+ * - a thrown value's use: core, http and sse whole, and lib's auth, HTTP
+ *   transport and embeddable server. lib's handlers and their libraries carry
+ *   ADT errors, whose text is the tool's data (D27); how they convert a
+ *   refusal is the D45 audit's (C7), with its own list.
  *
- * The one exception is listed with its reason; a finding is fixed in the
- * code, never by widening the list.
+ * The scan's own rules are load-bearing: each fixture under
+ * `__fixtures__/failureScan/refused` is one way past a name-based scan and
+ * must be reported; each under `clean` must not.
  */
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as ts from 'typescript';
+import {
+  createProgram,
+  type Finding,
+  REPO,
+  rel,
+  scanProgram,
+  tsFiles,
+} from './helpers/failureScan';
 
-const REPO = path.resolve(__dirname, '../../../..');
-const SCANNED = [
+const PACKAGES = ['src', 'server/src', 'http/src', 'sse/src'];
+const THROWN_SCOPE = [
   'src/lib/auth',
   'src/lib/httpTransport',
-  'server/src/auth',
+  'src/embeddable',
+  'server/src',
   'http/src',
   'sse/src',
 ];
 
 /**
- * `file: the enclosing function` → why it may read a message. Main's
- * instance pool, carried as it is (ruling 16): its disposal report quotes
- * the held state's own undo words; A10 owns that report.
+ * The exact findings allowed, each with its reason. Main's instance pool,
+ * carried as it is (ruling 16), quotes the held state's undo words in its
+ * shutdown report; A10 removes both (the report reads `failureOf(e)?.message
+ * ?? errorClassOf(e)`), and this list is then empty.
  */
-const ALLOWED_MESSAGE_READS: Readonly<Record<string, string>> = {
-  'http/src/InstancePool.ts: messageOf':
-    "the held state's own undo words, in the pool's shutdown report (A10)",
-};
-
-const CHAIN_MODULE_PREFIXES = [
-  '@mcp-abap-adt/auth-',
-  '@mcp-abap-adt/connection',
-  '@mcp-abap-adt/adt-clients',
-  '@mcp-abap-adt/interfaces-',
+const ALLOWED: ReadonlyArray<{ where: string; text: string; why: string }> = [
+  {
+    where: 'http/src/InstancePool.ts',
+    text: 'e.message',
+    why: "the held state's undo words in the pool's shutdown report (A10)",
+  },
+  {
+    where: 'http/src/InstancePool.ts',
+    text: 'String(e)',
+    why: "the held state's undo words in the pool's shutdown report (A10)",
+  },
 ];
 
-const THROWN_NAMES = new Set([
-  'error',
-  'err',
-  'e',
-  'thrown',
-  'cause',
-  'failure',
-  'refusal',
-]);
-
-function rel(file: string): string {
-  return path.relative(REPO, file).split(path.sep).join('/');
-}
-
-function tsFiles(dir: string, out: string[] = []): string[] {
-  if (!fs.existsSync(dir)) return out;
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) tsFiles(full, out);
-    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) {
-      out.push(full);
-    }
-  }
-  return out;
-}
-
-function parse(file: string): ts.SourceFile {
-  return ts.createSourceFile(
-    file,
-    fs.readFileSync(file, 'utf8'),
-    ts.ScriptTarget.ES2022,
-    true,
+const isAllowed = (finding: Finding) =>
+  ALLOWED.some(
+    (allowed) =>
+      finding.where.startsWith(`${allowed.where}:`) &&
+      finding.text === allowed.text,
   );
-}
 
-function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
-  visit(node);
-  node.forEachChild((child) => walk(child, visit));
-}
-
-/** Local names bound to an import from a chain package. */
-function chainImports(source: ts.SourceFile): Set<string> {
-  const names = new Set<string>();
-  for (const statement of source.statements) {
-    if (!ts.isImportDeclaration(statement)) continue;
-    const from = (statement.moduleSpecifier as ts.StringLiteral).text;
-    if (!CHAIN_MODULE_PREFIXES.some((prefix) => from.startsWith(prefix))) {
-      continue;
-    }
-    const clause = statement.importClause;
-    if (!clause) continue;
-    if (clause.name) names.add(clause.name.text);
-    const bindings = clause.namedBindings;
-    if (bindings && ts.isNamedImports(bindings)) {
-      for (const element of bindings.elements) names.add(element.name.text);
-    }
-    if (bindings && ts.isNamespaceImport(bindings)) {
-      names.add(bindings.name.text);
-    }
-  }
-  return names;
-}
-
-/** The name of the function, method or variable holding the function around `node`. */
-function enclosingFunction(node: ts.Node): string {
-  let current: ts.Node | undefined = node.parent;
-  while (current) {
-    if (
-      (ts.isFunctionDeclaration(current) || ts.isMethodDeclaration(current)) &&
-      current.name
-    ) {
-      return current.name.getText();
-    }
-    if (
-      (ts.isArrowFunction(current) || ts.isFunctionExpression(current)) &&
-      ts.isVariableDeclaration(current.parent)
-    ) {
-      return current.parent.name.getText();
-    }
-    current = current.parent;
-  }
-  return '<top>';
-}
-
-/** Catch bindings in scope of `node`. */
-function catchBindings(node: ts.Node): Set<string> {
-  const names = new Set<string>();
-  let current: ts.Node | undefined = node.parent;
-  while (current) {
-    if (
-      ts.isCatchClause(current) &&
-      current.variableDeclaration &&
-      ts.isIdentifier(current.variableDeclaration.name)
-    ) {
-      names.add(current.variableDeclaration.name.text);
-    }
-    current = current.parent;
-  }
-  return names;
-}
-
-/** Whether `node` is the target of an assignment (`x.name = …`). */
-function isWritten(node: ts.Node): boolean {
-  const parent = node.parent;
-  return (
-    ts.isBinaryExpression(parent) &&
-    parent.left === node &&
-    parent.operatorToken.kind === ts.SyntaxKind.EqualsToken
-  );
-}
-
-/** The receiver's identifier when it names a thrown value. */
-function thrownReceiver(receiver: ts.Expression, node: ts.Node): boolean {
-  let target = receiver;
-  while (
-    ts.isParenthesizedExpression(target) ||
-    ts.isAsExpression(target) ||
-    ts.isNonNullExpression(target)
-  ) {
-    target = target.expression;
-  }
-  if (!ts.isIdentifier(target)) return false;
-  return THROWN_NAMES.has(target.text) || catchBindings(node).has(target.text);
-}
-
-interface Finding {
-  where: string;
-  what: string;
-}
-
-function scan(): { findings: Finding[]; allowedSeen: Set<string> } {
-  const findings: Finding[] = [];
-  const allowedSeen = new Set<string>();
-  for (const root of SCANNED) {
-    for (const file of tsFiles(path.join(REPO, root))) {
-      const source = parse(file);
-      const chain = chainImports(source);
-      walk(source, (node) => {
-        const line =
-          source.getLineAndCharacterOfPosition(node.getStart()).line + 1;
-        const where = `${rel(file)}:${line}`;
-        if (
-          ts.isBinaryExpression(node) &&
-          node.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword &&
-          ts.isIdentifier(node.right) &&
-          chain.has(node.right.text)
-        ) {
-          findings.push({ where, what: `instanceof ${node.right.text}` });
-        }
-        let property: string | undefined;
-        let receiver: ts.Expression | undefined;
-        if (ts.isPropertyAccessExpression(node)) {
-          property = node.name.text;
-          receiver = node.expression;
-        } else if (
-          ts.isElementAccessExpression(node) &&
-          ts.isStringLiteralLike(node.argumentExpression)
-        ) {
-          property = node.argumentExpression.text;
-          receiver = node.expression;
-        }
-        if (
-          receiver !== undefined &&
-          (property === 'message' || property === 'name') &&
-          !isWritten(node) &&
-          thrownReceiver(receiver, node)
-        ) {
-          const key = `${rel(file)}: ${enclosingFunction(node)}`;
-          if (property === 'message' && key in ALLOWED_MESSAGE_READS) {
-            allowedSeen.add(key);
-            return;
-          }
-          findings.push({
-            where,
-            what: `${node.getText()} (a ${property} read)`,
-          });
-        }
-      });
-    }
-  }
-  return { findings, allowedSeen };
-}
-
-describe('no chain instanceof, no message or name read (D14)', () => {
-  const { findings, allowedSeen } = scan();
-
-  it('the scanned directories exist and hold sources', () => {
-    for (const root of SCANNED) {
-      expect(tsFiles(path.join(REPO, root)).length).toBeGreaterThan(0);
-    }
-  });
-
-  it('finds nothing', () => {
-    expect(findings).toEqual([]);
-  });
-
-  it('every listed exception still exists (a stale entry is removed)', () => {
-    expect([...allowedSeen].sort()).toEqual(
-      Object.keys(ALLOWED_MESSAGE_READS).sort(),
+describe('the sources (D14, §9)', () => {
+  const files = PACKAGES.flatMap((dir) => tsFiles(path.join(REPO, dir)));
+  const inScope = (scope: readonly string[]) =>
+    new Set(
+      files.filter((file) =>
+        scope.some((dir) => rel(file).startsWith(`${dir}/`)),
+      ),
     );
+  const all = new Set(files);
+  const findings = scanProgram(createProgram(files), all, {
+    instanceof: all,
+    thrown: inScope(THROWN_SCOPE),
   });
+
+  it('scans every package, the launcher included', () => {
+    for (const dir of PACKAGES) {
+      expect(files.some((f) => rel(f).startsWith(`${dir}/`))).toBe(true);
+    }
+    expect(files.map(rel)).toContain('server/src/launcher.ts');
+  });
+
+  it('finds nothing but the listed exceptions', () => {
+    expect(findings.filter((f) => !isAllowed(f))).toEqual([]);
+  });
+
+  it('every listed exception is still found (a stale entry fails)', () => {
+    for (const allowed of ALLOWED) {
+      expect(
+        findings.some(
+          (f) =>
+            f.where.startsWith(`${allowed.where}:`) && f.text === allowed.text,
+        ),
+      ).toBe(true);
+    }
+  });
+});
+
+describe('the scan refuses every way past it, and only those', () => {
+  const root = path.join(__dirname, '__fixtures__/failureScan');
+  const refused = fs
+    .readdirSync(path.join(root, 'refused'))
+    .map((name) => path.join(root, 'refused', name));
+  const clean = fs
+    .readdirSync(path.join(root, 'clean'))
+    .map((name) => path.join(root, 'clean', name));
+  const fixtures = new Set([...refused, ...clean]);
+  const findings = scanProgram(createProgram([...fixtures]), fixtures, {
+    instanceof: fixtures,
+    thrown: fixtures,
+  });
+  const of = (file: string) =>
+    findings.filter((f) => f.where.startsWith(`${rel(file)}:`));
+
+  it('has fixtures of both kinds', () => {
+    expect(refused.length).toBeGreaterThanOrEqual(20);
+    expect(clean.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it.each(refused.map((file) => [path.basename(file, '.ts'), file]))(
+    'refuses %s',
+    (name, file) => {
+      const rule = name.startsWith('instanceof') ? 'instanceof' : 'thrown';
+      expect(of(file).map((f) => f.rule)).toContain(rule);
+    },
+  );
+
+  it.each(clean.map((file) => [path.basename(file, '.ts'), file]))(
+    'accepts %s',
+    (_name, file) => {
+      expect(of(file)).toEqual([]);
+    },
+  );
 });

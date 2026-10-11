@@ -150,8 +150,8 @@ describe('the startup check', () => {
       expect(said).toContain(
         '[MCP] Destination "default" logs in through a browser, and none is known on this platform (freebsd)\nStart with --browser=none and open the URL the login prints on stderr, or give --browser-program=<program>.',
       );
-      // "lacks" is the form for a missing destination field: not this.
-      expect(said).not.toContain('lacks');
+      // The browser headline replaces the generic one; no second line has it.
+      expect(said).not.toContain('cannot be used');
     });
 
     it('jwt / authorization_code on freebsd with --browser=none: starts', async () => {

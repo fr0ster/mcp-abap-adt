@@ -106,7 +106,9 @@ The packages, all at **18.0.0**:
   a `ReadFailure` (`error`, `kind?`, `message`, `hint?`, …) for a chain failure
   (`AuthProviderFailure`, connection's `AuthRefusedError`, an `IAdtError` carrying a `refusal`), an
   aborted request (`code: 'ADT_REQUEST_ABORTED'`) or a `ServerRefusal`, else `undefined`.
-  `answerFailure(read)` renders the §7.3 JSON, `failureLogLine(where, read)` the stderr line. The
+  `answerFailure(read)` renders the §7.3 JSON, `failureLogLine(where, read)` the stderr line,
+  `answerRead(read)` both; `readGuarded(reader, thrown)` answers auth-errors' fixed `unknown`
+  words when a reader you do not own throws. The
   destination layer's reader, `DestinationConfigError` first, is core's `destinationFailureOf(thrown,
   { platform?, sentenceFor? })` (`@mcp-abap-adt/core/auth`); a `BaseMcpServer` subclass overrides
   `protected readFailure(thrown)` to read more.

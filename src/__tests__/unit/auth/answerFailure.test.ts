@@ -10,6 +10,9 @@ import {
   renderDiagnostics,
 } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { answer, return_answer } from '../../../lib/answer';
 import {
   answerFailure,
@@ -28,6 +31,8 @@ import {
   INSPECTION_ONLY_WORDS,
   ServerRefusal,
 } from '../../../lib/auth/serverRefusal';
+import { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
+import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { return_error } from '../../../lib/utils';
 
 const ALLOWED_KEYS = [
@@ -197,12 +202,27 @@ describe('the answer sites read the failure first (§7.2)', () => {
     ...(error.hint !== undefined ? { hint: error.hint } : {}),
   };
   const ctx = { tool: 'GetThing', detail: 'terse' as const };
+  /** The one stderr line every site writes: fixed words + logFields. */
+  const LINE = `[MCP] authentication_failed: ${JSON.stringify(logFields(error))}\n`;
+  let written: string[];
+  let stderr: jest.SpyInstance;
+  beforeEach(() => {
+    written = [];
+    stderr = jest
+      .spyOn(process.stderr, 'write')
+      .mockImplementation((chunk: unknown) => {
+        written.push(String(chunk));
+        return true;
+      });
+  });
+  afterEach(() => stderr.mockRestore());
 
   it('return_error: a thrown chain failure, not its message', () => {
     const thrown = { refusal: error, message: 'server text SECRET-3' };
     const result = return_error(thrown);
     expect(result.isError).toBe(true);
     expect(JSON.parse(result.content[0].text)).toEqual(expected);
+    expect(written).toEqual([LINE]);
   });
 
   it("return_answer: an IAdtError carrying a refusal (P6), not failurePayload's message", () => {
@@ -219,6 +239,7 @@ describe('the answer sites read the failure first (§7.2)', () => {
     } as unknown as IAdtResponse<never, IAdtError>;
     const result = return_answer(failed, (v) => v, ctx);
     expect(JSON.parse(result.content[0].text)).toEqual(expected);
+    expect(written).toEqual([LINE]);
   });
 
   it('answer(): a thrown refusal, not client_threw with its message', async () => {
@@ -231,5 +252,44 @@ describe('the answer sites read the failure first (§7.2)', () => {
     );
     expect(result.isError).toBe(true);
     expect(JSON.parse(result.content[0].text)).toEqual(expected);
+    expect(written).toEqual([LINE]);
+  });
+
+  it("BaseHandlerGroup's registration path: the same answer and the same line", async () => {
+    class Group extends BaseHandlerGroup {
+      protected groupName = 'stub-group';
+      getHandlers() {
+        return [
+          {
+            toolDefinition: {
+              name: 'StubThrowsRefusal',
+              description: 'a tool whose call is refused',
+              inputSchema: { type: 'object', properties: {} },
+            },
+            handler: async () => {
+              throw new AuthProviderFailure(error);
+            },
+          },
+        ] as never;
+      }
+    }
+    const server = new McpServer({ name: 'group-test', version: '1.0.0' });
+    new CompositeHandlersRegistry([
+      new Group({ connection: {} as never, logger: undefined as never }),
+    ]).registerAllTools(server);
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'test', version: '1.0.0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    try {
+      const result = (await client.callTool({
+        name: 'StubThrowsRefusal',
+        arguments: {},
+      })) as { isError?: boolean; content: Array<{ text: string }> };
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text)).toEqual(expected);
+      expect(written).toEqual([LINE]);
+    } finally {
+      await client.close();
+    }
   });
 });

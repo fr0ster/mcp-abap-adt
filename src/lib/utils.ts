@@ -8,7 +8,7 @@ import {
 } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AxiosError, type AxiosResponse } from 'axios';
-import { answerFailure } from './auth/answerFailure';
+import { answerRead } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
@@ -294,7 +294,7 @@ export function return_error(error: any) {
   // The failure reader first (§7.2): a chain failure, an aborted request or
   // the server's own refusal is answered as §7.3 — never its message.
   const read = failureOf(error);
-  if (read !== undefined) return answerFailure(read);
+  if (read !== undefined) return answerRead(read);
 
   // Safely extract error message to avoid circular reference issues
   // Always extract only safe properties, never serialize the entire error object

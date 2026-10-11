@@ -1,3 +1,4 @@
+import { classify, logFields } from '@mcp-abap-adt/auth-errors';
 import { StreamableHttpServer } from '@mcp-abap-adt/http';
 import type { IBrowser } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -324,6 +325,17 @@ function envFileOf(
   };
 }
 
+/** A start the launcher refuses, in words that name parameters only. */
+class LauncherRefusal extends Error {
+  readonly words: string;
+
+  constructor(words: string) {
+    super(words);
+    this.name = 'LauncherRefusal';
+    this.words = words;
+  }
+}
+
 /**
  * A parameter the env file may state: the CLI, then the process environment
  * — which by now holds what the env file states, never over a value set
@@ -350,7 +362,9 @@ function effectiveFromEnvironment<T extends string>(
       values.length === 2
         ? values.join(' or ')
         : `${values.slice(0, -1).join(', ')} or ${values[values.length - 1]}`;
-    throw new Error(`${key} (environment or env file) must be ${words}`);
+    throw new LauncherRefusal(
+      `${key} (environment or env file) must be ${words}`,
+    );
   }
   return raw as T;
 }
@@ -520,7 +534,7 @@ export async function launch(
     systemType = effectiveSystemType(config, process.env);
   } catch (error) {
     deps.stderr(
-      `[MCP] ${error instanceof Error ? error.message : 'SAP_CONNECTION_TYPE or SAP_SYSTEM_TYPE: refused'}`,
+      `[MCP] ${error instanceof LauncherRefusal ? error.words : 'SAP_CONNECTION_TYPE or SAP_SYSTEM_TYPE: refused'}`,
     );
     deps.exit(1);
     return;
@@ -601,7 +615,7 @@ export async function launch(
     }
   } catch (error) {
     if (!(error instanceof BrowserChoiceError)) throw error;
-    deps.stderr(`[MCP] ${error.message}`);
+    deps.stderr(`[MCP] ${error.words}`);
     deps.exit(1);
     return;
   }
@@ -748,15 +762,20 @@ export async function launch(
   await server.start();
 }
 
+/**
+ * The launcher's last line when `main()` rejects: fixed words and auth-errors'
+ * `logFields` of what the value classifies as — never its message (§9).
+ */
+export function launcherFailedLine(thrown: unknown): string {
+  return `[MCP] launcher failed: ${JSON.stringify(logFields(classify(thrown, 'unfamiliar-error')))}`;
+}
+
 // Run only when this module is the program. The bin calls `main()` itself, and a
 // sibling command imports it — neither wants a server started by an import.
 if (require.main === module) {
   void main().catch((err) => {
     // eslint-disable-next-line no-console
-    console.error(
-      '[MCP] launcher failed:',
-      err instanceof Error ? err.message : String(err),
-    );
+    console.error(launcherFailedLine(err));
     process.exit(1);
   });
 }

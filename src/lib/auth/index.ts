@@ -8,6 +8,7 @@ export { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 export { getPlatformPaths } from '../stores/platformPaths';
 export {
   answerFailure,
+  answerRead,
   type FailureAnswer,
   failureLogFields,
   failureLogLine,
@@ -22,6 +23,8 @@ export {
   failureOf,
   REQUEST_ABORTED_WORDS,
   type ReadFailure,
+  readerFailed,
+  readGuarded,
   readOwn,
 } from './failures';
 export type {

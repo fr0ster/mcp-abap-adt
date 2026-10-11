@@ -5,7 +5,7 @@
 
 import { failureLogLine } from '../auth/answerFailure';
 import { assertDestinationName } from '../auth/destinationName';
-import { failureOf, type ReadFailure } from '../auth/failures';
+import { failureOf, type ReadFailure, readGuarded } from '../auth/failures';
 import { serverRefusalOf } from '../auth/serverRefusal';
 
 /** `x-mcp-destination` is not a destination name. Its words name the header, never the value. */
@@ -66,7 +66,7 @@ export function destinationFailureAnswer(
   if (error instanceof DestinationHeaderError) {
     return { status: 400, text: error.words, known: true };
   }
-  const answer = read(error);
+  const answer = readGuarded(read, error);
   if (answer !== undefined) {
     const text = [answer.message, answer.hint, answer.server]
       .filter((line): line is string => line !== undefined)

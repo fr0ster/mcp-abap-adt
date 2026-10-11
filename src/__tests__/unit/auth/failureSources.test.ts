@@ -219,8 +219,16 @@ describe("a provider's failure from a token endpoint stand-in", () => {
         getProvider: async () => provider,
       };
       const { payload, group } = await callTool(destinations);
-      expect(payload.error).toBe('authentication_failed');
-      expect(payload.kind).toBe('request-failed');
+      // The provider's own error against the same stand-in: the words the
+      // answer must carry are auth-errors' render of its kind and facts.
+      const own = await clientCredentials(tokenEndpoint.url)
+        .getTokens()
+        .then(
+          () => undefined,
+          (e: { error: { kind: string; facts: object } }) => e.error,
+        );
+      expect(own?.kind).toBe('request-failed');
+      expectRendered(payload, 'request-failed', own?.facts ?? {});
       expect(group.reached).not.toHaveBeenCalled();
       expect(tokenEndpoint.requests.length).toBeGreaterThan(0);
       expect(adt.requests).toEqual([]);

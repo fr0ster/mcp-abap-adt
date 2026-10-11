@@ -11,6 +11,7 @@
  */
 
 import {
+  authError,
   classify,
   isAuthProviderErrorKind,
   isAuthProviderFailure,
@@ -73,6 +74,31 @@ export function readOwn(value: unknown, key: string): unknown {
     return descriptor.value;
   } catch {
     return undefined;
+  }
+}
+
+/**
+ * What a reader that threw is answered as: auth-errors' fixed `unknown`
+ * words — nothing of the reader's throw.
+ */
+export function readerFailed(): ReadFailure {
+  return authenticationFailed(
+    authError.unknown({ operation: 'unfamiliar-error' }),
+  );
+}
+
+/**
+ * `read(thrown)`, guarded: a reader the caller does not own (an override, a
+ * host's) that throws answers `readerFailed()`.
+ */
+export function readGuarded(
+  read: (thrown: unknown) => ReadFailure | undefined,
+  thrown: unknown,
+): ReadFailure | undefined {
+  try {
+    return read(thrown);
+  } catch {
+    return readerFailed();
   }
 }
 

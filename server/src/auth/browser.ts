@@ -65,9 +65,13 @@ export type BrowserMapping =
 
 /** A choice that cannot be served; its words name parameters only. */
 export class BrowserChoiceError extends Error {
-  constructor(message: string) {
-    super(message);
+  /** The refusal's words: parameter names only, safe to print. */
+  readonly words: string;
+
+  constructor(words: string) {
+    super(words);
     this.name = 'BrowserChoiceError';
+    this.words = words;
   }
 }
 

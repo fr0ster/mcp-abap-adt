@@ -585,7 +585,8 @@ only what its own rules require:
   latch; the instance latch is the SSE close's and shutdown's (D51).
 - **The idle bound** stays the project owner's stated exception (H5): an option of every binary that
   serves tools (§10.1), from lib's shared row, unchanged.
-- **Not changed here**: the handle's bearer semantics and the absence of a limit (§18, question 1),
+- **Not changed here**: the handle's bearer semantics and the absence of a limit (the project
+  owner's exception, §18, question 1),
   the debugger's tools.
 
 Reasons: the pool is shipped behaviour users rely on (`docs/user-guide/DEBUGGER.md`); redesigning
@@ -1649,13 +1650,12 @@ used.
 
 **Questions for the user**:
 
-1. **The `state_handle` is a bearer secret (main's pool).** Whoever presents it reaches the instance
-   and its held state, which keeps the connections it opened with the credential of the request that
-   opened them (§3.8); there is no check of the caller and no limit per owner. The earlier D52
-   follow-up planned "a check of the caller". This change carries the pool as it is; whether a
-   pooled instance should be served only to the caller it was created for (for example the same
-   `x-sap-url` and user), and whether a limit is wanted, is the user's decision — in this PR or in
-   a change of its own.
+1. ~~The `state_handle` is a bearer secret~~ — **decided by the user: it stays a bearer secret.**
+   The handle is the secret that names an LLM session, like a login and password sent with a
+   request; no check of the caller and no limit per owner are added. Whoever needs more security
+   runs the server in Docker or connects to it over HTTPS. This is the project owner's exception to
+   the "possession of a handle is not authorization" rule, as the idle bound is to "no timeouts"
+   (H5).
 
 **Possible later improvements**, each its own change in its repository: auth-stores
 `EnvDestinationStore.fromContent` / key stores `fromKey` (projections from content read once); the

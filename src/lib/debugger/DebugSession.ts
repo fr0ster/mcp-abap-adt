@@ -694,6 +694,8 @@ export class DebugSession<O = unknown> {
           },
         },
       };
+      // A new attach: the previous one's settings are not this stop's.
+      this.effective = undefined;
       // The preferences after each attach; a failure leaves the stop standing and is named.
       if (Object.keys(this.preferences).length > 0) {
         const stop = this.current;
@@ -1127,15 +1129,19 @@ export class DebugSession<O = unknown> {
    * Sends the preferences at a stop. The first call after an attach ignores
    * systemDebugging=false (server source, BASIS 816, read 2026-10-11), and its
    * answer cannot show it, so then they are sent a second time; what is
-   * reported is the last answer.
+   * reported is the last answer. A failed call does not count as the first.
    */
   private async applySettings(stop: Stop): Promise<DebugView<SettingsReading>> {
     const first = !stop.settingsSent;
-    stop.settingsSent = true;
     let answer = await stop.debugger.setDebuggerSettings(this.preferences);
-    if (answer.ok && first && this.preferences.systemDebugging === false)
-      answer = await stop.debugger.setDebuggerSettings(this.preferences);
     if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+    // Only a call that succeeded counts as the first: after a failed one the
+    // second send stays owed (an extra request is harmless, a missed one is not).
+    stop.settingsSent = true;
+    if (first && this.preferences.systemDebugging === false) {
+      answer = await stop.debugger.setDebuggerSettings(this.preferences);
+      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+    }
     const raw = bodyOf(answer);
     this.effective = readSettings(raw);
     stop.view = {

@@ -140,4 +140,34 @@ describe('the debugger settings', () => {
       'Settings not allowed',
     );
   });
+
+  it('a failed first call after an attach does not count: a later system_debugging false is still sent twice', async () => {
+    const world = fakeWorld();
+    world.settingsAnswers.push(() => refusedResponse('Settings not allowed'));
+    const { session } = await caught({ systemDebugging: true }, world);
+    expect(sent(world)).toHaveLength(1);
+    await session.setSettings({ systemDebugging: false });
+    expect(sent(world)).toEqual([
+      'settings:{"systemDebugging":true}',
+      'settings:{"systemDebugging":false}',
+      'settings:{"systemDebugging":false}',
+    ]);
+  });
+
+  it("a re-attach whose settings fail reports no settings, not the previous attach's", async () => {
+    const { session, world } = await caught({ updateDebugging: true });
+    expect(session.settingsInForce()).toMatchObject({ updateDebugging: true });
+    await session.detach();
+    await until(() => world.polls.length === 3);
+    world.settingsAnswers.push(() => refusedResponse('Settings not allowed'));
+    world.polls[2].resolve(LISTEN_CATCH());
+    await until(() => sent(world).length === 2);
+    const state = await session.wait(0);
+    expect(state.state).toBe('stopped');
+    expect(session.settingsInForce()).toBeUndefined();
+    expect(state.state === 'stopped' && state.stop.settings).toBeUndefined();
+    expect(state.state === 'stopped' && state.stop.settingsError).toBe(
+      'Settings not allowed',
+    );
+  });
 });

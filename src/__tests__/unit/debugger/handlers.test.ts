@@ -30,6 +30,7 @@ import {
   IDS,
   LISTEN_CATCH,
   LISTEN_NOTHING,
+  rowsXml,
   until,
 } from './fakes';
 
@@ -145,11 +146,28 @@ describe('debugger handlers', () => {
 
   it('a start that catches at once still answers its breakpoints under terse', async () => {
     const { world, context } = install();
-    // The recorded answer places the line-32 breakpoint and refuses one line breakpoint: ask for both.
+    // As the system answers (on premise (2026-10-11), BASIS 816): the refused row first, each row with its tag.
+    world.breakpointAnswers.push(() =>
+      okResponse(
+        rowsXml([
+          {
+            kind: 'line',
+            clientId: 'bp2',
+            error: 'Cannot create a breakpoint at this position',
+          },
+          {
+            kind: 'line',
+            id: 'L32',
+            clientId: 'bp1',
+            uri: '/sap/bc/adt/oo/classes/class_a/source/main#start=32',
+          },
+        ]),
+      ),
+    );
     const started = handleDebugStartListener(context as any, {
       breakpoints: [
-        { object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 32 },
-        { object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 1 },
+        { object_type: 'CLAS', object_name: 'class_a', line: 32 },
+        { object_type: 'CLAS', object_name: 'class_a', line: 1 },
       ],
     });
     await until(() => world.polls.length === 1);
@@ -157,7 +175,16 @@ describe('debugger handlers', () => {
     const answer = json(await started);
     expect(answer.state).toBe('stopped');
     expect(answer.breakpoints.placed).toHaveLength(1);
-    expect(answer.breakpoints.refused).toHaveLength(1);
+    expect(answer.breakpoints.refused).toEqual([
+      {
+        requested: {
+          kind: 'line',
+          uri: '/sap/bc/adt/oo/classes/class_a/source/main#start=1',
+        },
+        error: 'Cannot create a breakpoint at this position',
+      },
+    ]);
+    expect(answer.breakpoints.unexpected).toEqual([]);
   });
 
   it("a line breakpoint's URI is built from type, name and line", async () => {
@@ -173,7 +200,11 @@ describe('debugger handlers', () => {
       breakpoints: [{ object_type: 'CLAS', object_name: 'ZCL_A', line: 7 }],
     });
     expect(seen[0]).toEqual([
-      { kind: 'line', uri: '/sap/bc/adt/oo/classes/zcl_a/source/main#start=7' },
+      {
+        kind: 'line',
+        uri: '/sap/bc/adt/oo/classes/zcl_a/source/main#start=7',
+        clientId: 'bp1',
+      },
     ]);
   });
 

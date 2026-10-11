@@ -50,6 +50,40 @@ export interface WireCall {
   args: unknown[];
 }
 
+/** A breakpoints answer with these rows, in this order; `uri` and `error` are written the way the system names them. */
+export const rowsXml = (rows: Array<Record<string, string>>) =>
+  `<?xml version="1.0" encoding="utf-8"?><dbg:breakpoints xmlns:dbg="http://www.sap.com/adt/debugger" xmlns:adtcore="http://www.sap.com/adt/core">${rows
+    .map(
+      (r) =>
+        `<breakpoint ${Object.entries(r)
+          .map(
+            ([k, v]) =>
+              `${k === 'uri' ? 'adtcore:uri' : k === 'error' ? 'errorMessage' : k}="${v}"`,
+          )
+          .join(' ')}/>`,
+    )
+    .join('')}</dbg:breakpoints>`;
+
+/** A conforming answer: every row sent is placed, its tag echoed, its id the fake's own. */
+export const placeAll = (list: Array<Record<string, any>>) =>
+  rowsXml(
+    list.map((b, i) => {
+      const row: Record<string, string> = { kind: b.kind, id: `ID${i + 1}` };
+      for (const k of [
+        'clientId',
+        'uri',
+        'exceptionClass',
+        'statement',
+        'msgId',
+        'msgNo',
+        'msgTy',
+        'condition',
+      ])
+        if (b[k] !== undefined) row[k] = String(b[k]);
+      return row;
+    }),
+  );
+
 export function fakeWorld() {
   const log: WireCall[] = [];
   const polls: Array<ReturnType<typeof deferred<any>> & { hold?: number }> = [];
@@ -63,6 +97,10 @@ export function fakeWorld() {
   /** What the next checkListener answers, in order; free (`done`) when none is left. */
   const checkAnswers: Array<() => any> = [];
   let validationAnswers: Array<() => any> = [];
+  /** Every list setBreakpoints was sent, in order. */
+  const sent: any[][] = [];
+  /** What the next setBreakpoints answers, in order; every row placed (`placeAll`) when none is left. */
+  const breakpointAnswers: Array<(sent: any[]) => any> = [];
   /** Members put here replace the fake's on every debugger, cached ones included. */
   const override: Record<string, any> = {};
   const make = (connection: IAbapConnection): Debugger => {
@@ -131,9 +169,10 @@ export function fakeWorld() {
           return (validationAnswers.shift() ?? (() => okResponse('')))();
         }
         calls.push(`setBreakpoints:${list.length}`);
-        return okResponse(
-          corpusBody('debugger-conversation--01-breakpoints-set'),
-        );
+        sent.push(list);
+        return (
+          breakpointAnswers.shift() ?? ((l: any[]) => okResponse(placeAll(l)))
+        )(list);
       },
       deleteBreakpoint: async (_i: unknown, id: string) => {
         calls.push(`deleteBreakpoint:${id}`);
@@ -202,6 +241,8 @@ export function fakeWorld() {
     stepAnswers,
     attachAnswers,
     checkAnswers,
+    sent,
+    breakpointAnswers,
     override,
     setValidationAnswers: (a: Array<() => any>) => {
       validationAnswers = a;

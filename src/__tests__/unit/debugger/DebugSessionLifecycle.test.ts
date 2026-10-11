@@ -54,9 +54,7 @@ describe('DebugSession lifecycle', () => {
     await until(() => world.calls.includes('getStack'));
     await session.stop();
     expect(world.calls).toContain('step:stepContinue:analysed');
-    expect(
-      world.calls.some((c) => c.startsWith('deleteBreakpoint:KIND=0.')),
-    ).toBe(true);
+    expect(world.calls.some((c) => c === 'deleteBreakpoint:ID1')).toBe(true);
     expect(world.calls).toContain('stopListener');
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
     expect(world.closed.length).toBe(world.opened.length);

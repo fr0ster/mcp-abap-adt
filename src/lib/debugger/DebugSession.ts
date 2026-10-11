@@ -26,11 +26,18 @@ import type {
   IDebuggerStepToLineMethod,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  type BreakpointNotPlaced,
+  mergeDefinitions,
+  pairRows,
+  type RequestedBreakpoint,
+  type UnexpectedRow,
+  wireOf,
+} from './arming';
 import type { BreakpointConflict, DebuggerIds } from './ids';
 import {
   type AttachReading,
   type BreakpointReading,
-  breakpointKey,
   type DebuggeeReading,
   failureText,
   readAttach,
@@ -89,8 +96,14 @@ export interface DebugView<T> {
   raw: string;
 }
 export interface BreakpointsAnswer {
+  /** The full resulting set, the surviving earlier breakpoints included. */
   placed: BreakpointReading[];
-  refused: Array<{ requested: IDebuggerBreakpoint; error: string }>;
+  /** This call's definitions the system did not place, each with the reason its row gave. */
+  refused: BreakpointNotPlaced[];
+  /** Earlier definitions no longer placed. */
+  lost: BreakpointNotPlaced[];
+  /** Answer rows that pair with no definition sent; a conforming system answers none. */
+  unexpected: UnexpectedRow[];
 }
 export type DebuggingMode = 'user' | 'terminal';
 /** What a caller may set; `showDataAging` is left out, so it stays off, the system's default. */
@@ -183,6 +196,12 @@ export class DebugSession<O = unknown> {
   protected mode: IDebuggerListenerConflict = 'refuse';
   protected control?: Listener;
   protected readonly armed = new Map<string, BreakpointReading>();
+  /** The breakpoint definitions as the callers gave them, deduplicated and tagged: what every change sends again. */
+  protected requested: RequestedBreakpoint[] = [];
+  /** A paired placed row's id → its definition's tag. */
+  protected readonly pairedWith = new Map<string, string>();
+  /** The last tag handed out. Never reset — not by a stop, not by a new start — so a tag is never reused. */
+  private tags = 0;
   protected listener?: Listener;
   protected current?: Stop;
   protected failure?: string;
@@ -349,58 +368,79 @@ export class DebugSession<O = unknown> {
     });
   }
 
-  /** Inside the serial. */
-  private async armLocked(
-    list: IDebuggerBreakpoint[],
-  ): Promise<DebugView<BreakpointsAnswer>> {
-    {
-      const identity = this.requireIdentity();
-      const dbg = await this.controlDebugger();
-      this.changed = true;
-      const answer = await dbg.setBreakpoints(identity, list);
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
-      const raw = bodyOf(answer);
-      const rows = readBreakpoints(raw);
-      const placed = rows.filter((r) => r.id);
-      for (const p of placed) this.armed.set(p.id!, p); // recorded at once: whatever happens next, they can be undone
-      const placedKeys = new Set(placed.map(breakpointKey));
-      const unmatched = list.filter((b) => !placedKeys.has(breakpointKey(b)));
-      const errors = rows.filter((r) => r.error);
-      const refused: BreakpointsAnswer['refused'] = [];
-      for (const kind of new Set(unmatched.map((b) => b.kind))) {
-        const asked = unmatched.filter((b) => b.kind === kind);
-        const said = errors.filter((e) => e.kind === kind);
-        if (asked.length === 1 && said.length === 1) {
-          refused.push({ requested: asked[0], error: said[0].error! });
-          continue;
-        }
-        for (const requested of asked) {
-          // ambiguous within the kind: ask each on its own
-          const one = await dbg
-            .setBreakpoints(identity, [requested], { validationOnly: true })
-            .catch(asFailure);
-          const error = one.ok
-            ? readBreakpoints(bodyOf(one)).find((r) => r.error)?.error
-            : `the reason could not be read: ${messageOf(one)}`;
-          refused.push({
-            requested,
-            error: error ?? 'refused without a reason',
-          });
-        }
-      }
-      return { value: { placed, refused }, raw };
-    }
+  /** `bp` and the next count: short, `[a-z0-9]` only, unique within the instance. */
+  private nextTag(): string {
+    this.tags += 1;
+    return `bp${this.tags}`;
   }
 
+  /**
+   * Inside the serial: the kept definitions and the new ones, sent as one set
+   * (it replaces the key's set), each with its tag. No validationOnly request
+   * is ever made: it replaces the set as well. A failed replacement keeps both
+   * lists, and the next change sends them again.
+   */
+  private async armLocked(
+    added: readonly IDebuggerBreakpoint[],
+  ): Promise<DebugView<BreakpointsAnswer>> {
+    const identity = this.requireIdentity();
+    const dbg = await this.controlDebugger();
+    const earlier = new Set(this.requested.map((r) => r.clientId));
+    const sent = mergeDefinitions(this.requested, added, () => this.nextTag());
+    this.changed = true;
+    const answer = await dbg.setBreakpoints(identity, sent.map(wireOf));
+    if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+    const raw = bodyOf(answer);
+    const pairing = pairRows(sent, earlier, readBreakpoints(raw));
+    this.armed.clear();
+    for (const row of pairing.placed) this.armed.set(row.id!, row);
+    this.requested = pairing.requested;
+    this.pairedWith.clear();
+    for (const [id, tag] of pairing.paired) this.pairedWith.set(id, tag);
+    return {
+      value: {
+        placed: pairing.placed,
+        refused: pairing.refused,
+        lost: pairing.lost,
+        unexpected: pairing.unexpected,
+      },
+      raw,
+    };
+  }
+
+  /**
+   * By id: the breakpoint leaves both lists, and nothing else is sent. Refused
+   * before the wire for an id this session does not hold: sent, it would change
+   * nothing in `requested`, and the next change would arm it again.
+   */
   deleteBreakpoint(id: string): Promise<void> {
     return this.mutate(async () => {
+      const identity = this.requireIdentity(); // before a start: not started, not "not armed"
+      if (!this.armed.has(id))
+        throw new DebugRefusedError(
+          `no breakpoint ${id} is armed in this debug session`,
+        );
       const answer = await (await this.controlDebugger()).deleteBreakpoint(
-        this.requireIdentity(),
+        identity,
         id,
       );
       if (!answer.ok) throw new DebugRequestError(messageOf(answer));
-      this.armed.delete(id);
+      this.forget(id);
     });
+  }
+
+  /** The row leaves `armed`, and the definition its tag pairs it with leaves `requested`. */
+  private forget(id: string): void {
+    this.armed.delete(id);
+    const tag = this.pairedWith.get(id);
+    this.pairedWith.delete(id);
+    if (tag !== undefined)
+      this.requested = this.requested.filter((r) => r.clientId !== tag);
+  }
+
+  /** The definitions every change sends again, as the callers gave them. */
+  requestedBreakpoints(): IDebuggerBreakpoint[] {
+    return this.requested.map((r) => r.definition);
   }
 
   listBreakpoints(): BreakpointReading[] {
@@ -548,7 +588,7 @@ export class DebugSession<O = unknown> {
       const deleted = control
         ? await control.deleteBreakpoint(identity, p.id!).catch(asFailure)
         : undefined;
-      if (deleted?.ok) this.armed.delete(p.id!);
+      if (deleted?.ok) this.forget(p.id!);
       else
         failures.push(
           `breakpoint ${p.id} is still armed: ${deleted ? messageOf(deleted) : 'no connection to delete it on'}`,
@@ -1097,7 +1137,7 @@ export class DebugSession<O = unknown> {
             const deleted = await control
               .deleteBreakpoint(identity, id)
               .catch(asFailure);
-            if (deleted.ok) this.armed.delete(id);
+            if (deleted.ok) this.forget(id);
             else failures.push(`breakpoint ${id}: ${messageOf(deleted)}`);
           }
           if (this.listener) {

@@ -116,6 +116,8 @@ export interface BreakpointReading {
   msgNo?: string;
   msgTy?: string;
   condition?: string;
+  /** The caller's tag, echoed by the system on a placed and on a refused row alike. */
+  clientId?: string;
   error?: string;
 }
 export type DebuggeeEnd = 'debuggeeEnded' | 'terminateDebuggee';
@@ -228,6 +230,7 @@ export function readBreakpoints(xml: string): BreakpointReading[] {
       'msgNo',
       'msgTy',
       'condition',
+      'clientId',
     ] as const) {
       const v = text(b[k]);
       if (v) r[k] = v;

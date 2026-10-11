@@ -13,8 +13,11 @@ export const USER_MODE_SENTENCE =
   'In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server.';
 export const TAKE_OVER_SENTENCE =
   'Displaces another debugger listening for the same user.';
-export const SHARED_SET_SENTENCE =
-  'Its breakpoints are one set, shared by every IDE of the same SAP user debugging the same request user (or terminal id), and each change replaces that set as a whole.';
+const SHARED_SET_PREDICATE =
+  'are one set, shared by every IDE of the same SAP user debugging the same request user (or terminal id), and each change replaces that set as a whole.';
+/** The shared set as a fragment, lower case, for a text that scopes it (compact: `abap: …`). */
+export const SHARED_SET_FACT = `the breakpoints ${SHARED_SET_PREDICATE}`;
+export const SHARED_SET_SENTENCE = `Its breakpoints ${SHARED_SET_PREDICATE}`;
 /** Both ABAP starts: refused without one breakpoint, before anything is sent. */
 export const START_NEEDS_BREAKPOINTS_SENTENCE =
   'Needs at least one breakpoint.';

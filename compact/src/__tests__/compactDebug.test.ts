@@ -82,6 +82,19 @@ describe('compact debug', () => {
     expect(start.toolDefinition.description).toMatch(
       /replaces that set as a whole/,
     );
+    // The shared set is the ABAP listener's key; the AMDP session has none.
+    expect(start.toolDefinition.description).toMatch(
+      /abap: the breakpoints are one set/,
+    );
+    expect(start.toolDefinition.description).not.toMatch(/Its breakpoints/);
+    expect(start.toolDefinition.description).toMatch(
+      /abap is refused before anything is placed while another debugger listens/,
+    );
+    const takeOver = (start.toolDefinition.inputSchema as any).properties
+      .take_over.description as string;
+    expect(takeOver).toMatch(
+      /^abap: takes over .* are replaced\. amdp: ends an AMDP session/,
+    );
     expect(start.toolDefinition.description).not.toMatch(/[.;,][.;,]/);
   });
   it('every session verb requires state_handle', () => {
@@ -314,6 +327,51 @@ describe('compact debug verbs on the fake sessions', () => {
         settings: { systemDebugging: true },
       },
     ]);
+  });
+
+  it.each([
+    ['a blank request_user', { request_user: '  ' }, 'request_user is empty'],
+    [
+      'request_user with terminal mode',
+      { request_user: 'sapuser02', debugging_mode: 'terminal' as const },
+      'request_user does not apply to terminal mode',
+    ],
+  ])(
+    'start abap with %s is refused before the wire',
+    async (_, extra, text) => {
+      const t = install();
+      const r = await t.call('HandlerDebugStart', {
+        kind: 'abap',
+        breakpoints: [{ exception_class: 'cx_a' }],
+        ...extra,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain(text);
+      expect(t.abap).toEqual([]);
+    },
+  );
+
+  it('start abap answers the identity in force: debugging_mode and request_user', async () => {
+    const t = install();
+    const abap = (t.state as any).parts[0].abap;
+    abap.currentIdentity = () => ({
+      debuggingMode: 'user',
+      requestUser: 'SAPUSER02',
+      terminalId: 'T',
+    });
+    const r = await t.call('HandlerDebugStart', {
+      kind: 'abap',
+      breakpoints: [{ exception_class: 'cx_a' }],
+      request_user: 'sapuser02',
+    });
+    expect(json(r)).toEqual({
+      state: 'listening',
+      state_handle: t.state.handle,
+      terminal_id: 'T',
+      ide_id: 'I',
+      debugging_mode: 'user',
+      request_user: 'SAPUSER02',
+    });
   });
 
   it.each([

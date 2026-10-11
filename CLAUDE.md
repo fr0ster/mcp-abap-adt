@@ -302,10 +302,15 @@ user mode, refuse, the first IDE armed and listening):
   listening, the run stopped at the newcomer's line, not the first one's;
 - a stopListener under another ideId of the same user ends the other IDE's
   listener: after it the first IDE's poll returned at once with an empty answer,
-  and listening again caught nothing — its set was gone too (so was it after a
-  deletion of the newcomer's own breakpoint: the arming had already replaced it);
+  and listening again caught nothing — its set was gone too;
+- deleting only the newcomer's own breakpoint by id instead left the first
+  IDE's listener running, but it caught nothing: the arming had already
+  replaced its set;
 - a `checkListener` before anything else answered `409` and left the first IDE
-  untouched.
+  untouched;
+- a `checkListener` under the identity of a listener of our own that is running
+  answered `200` and left it listening, in user and terminal mode alike — so
+  the check does not refuse a session's own later arming.
 
 So under listener mode refuse a start checks the listener on the control
 connection before it reconciles or arms, whatever the breakpoint conflict says,

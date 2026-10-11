@@ -41,6 +41,26 @@ export const CONFLICT_409 = () =>
       data: corpusBody('debugger-conflict--01-listen-refused'),
     },
   } as unknown as Partial<IAdtError>);
+/**
+ * The system's refusal of a request user: `403 notAuthorized` or `404
+ * invalidUser`, in the `exc:exception` shape every ADT refusal takes. Built
+ * from the shape measured on premise (2026-10-11), BASIS 816, for a request
+ * user that does not exist; the user is the placeholder `SAPUSER03`.
+ */
+export const USER_REFUSED = (
+  status: 403 | 404,
+  subType: string,
+  text = 'User SAPUSER03 does not exist',
+) =>
+  refusedResponse('An exception was raised', {
+    response: {
+      status,
+      headers: { 'content-type': 'application/xml' },
+      data: `<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="AdiFailed"/><message lang="EN">${text}</message><localizedMessage lang="EN">${text}</localizedMessage><properties><entry key="com.sap.adt.communicationFramework.subType">${subType}</entry></properties></exc:exception>`,
+    },
+  } as unknown as Partial<IAdtError>);
+export const NOT_AUTHORIZED = () => USER_REFUSED(403, 'notAuthorized');
+export const INVALID_USER = () => USER_REFUSED(404, 'invalidUser');
 /** The default strategies' shapes: `done` answers nothing (adt-clients `nothing`). */
 export const DONE = () => okResponse(undefined);
 

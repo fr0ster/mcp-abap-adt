@@ -19,6 +19,7 @@ import {
 import {
   analyseDebuggeeEnd,
   analyseDebuggerFreed,
+  readExceptionSubType,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
@@ -141,8 +142,19 @@ export class DebugListenerError extends Error {}
 export class DebugStateError extends Error {}
 export class DebugRequestError extends Error {}
 export class DebugCleanupError extends Error {}
-/** Refused before anything was sent. */
-export class DebugRefusedError extends Error {}
+/**
+ * Refused before anything was sent, or refused by the system before anything
+ * of ours was left to undo. `placed`: breakpoints the system keeps, when a
+ * start was refused after its arming placed them.
+ */
+export class DebugRefusedError extends Error {
+  constructor(
+    message: string,
+    readonly placed?: BreakpointReading[],
+  ) {
+    super(message);
+  }
+}
 /** Another debugger holds the user's debugging (409), as `readListenerConflict` reads it. */
 export class DebugConflictError extends DebugListenerError {
   constructor(
@@ -196,6 +208,39 @@ export function refuseConditionOffLine(
         `breakpoints[${i}] (${b.kind}): a condition applies to a line breakpoint only`,
       );
   });
+}
+
+/**
+ * The system refused the request user: `403 notAuthorized` or `404
+ * invalidUser`, read from the subtype of the answer's `exc:exception`. Measured
+ * on premise (2026-10-11), BASIS 816, for a request user that does not exist:
+ * `setBreakpoints` answers `403 notAuthorized` and places nothing,
+ * `stopListener` answers `404 invalidUser`. From the server source (server
+ * source, BASIS 816, read 2026-10-11): `setBreakpoints` checks the connected
+ * user's debug authorisation as well, so a missing authorisation and a request
+ * user that does not exist are both refused there, before anything is placed.
+ * A listen or a stopListener refused the same way after a successful arming is
+ * a safety net a conforming server does not reach. Any other failure is not
+ * read as this.
+ */
+function refusesUser(answer: IAdtResponse<unknown>): boolean {
+  if (answer.ok) return false;
+  const response = answer.getError().response;
+  const subType = readExceptionSubType(response?.data);
+  return (
+    (response?.status === 403 && subType === 'notAuthorized') ||
+    (response?.status === 404 && subType === 'invalidUser')
+  );
+}
+
+/** A placed breakpoint as the model reads it: its id, its kind and what it is on. */
+function describePlaced(b: BreakpointReading): string {
+  const on =
+    b.uri ??
+    b.exceptionClass ??
+    b.statement ??
+    ([b.msgId, b.msgNo].filter(Boolean).join(' ') || undefined);
+  return `${b.id ?? '?'} (${b.kind}${on ? ` ${on}` : ''})`;
 }
 
 /** A failed listener answer: the holder named when it is the system's conflict. */
@@ -405,9 +450,22 @@ export class DebugSession<O = unknown> {
     const dbg = await this.controlDebugger();
     const earlier = new Set(this.requested.map((r) => r.clientId));
     const sent = mergeDefinitions(this.requested, added, () => this.nextTag());
+    const changedBefore = this.changed;
     this.changed = true;
     const answer = await dbg.setBreakpoints(identity, sent.map(wireOf));
-    if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+    if (!answer.ok) {
+      // Our choice on an explicit reading (refusesUser): 403 notAuthorized (measured
+      // for a request user that does not exist; from the server source, also a
+      // connected user without debug authorisation) or 404 invalidUser placed
+      // nothing, so this arming changed nothing — a start takes the before-change
+      // branch, a replacement keeps both lists — and SAP's message reaches the
+      // model as it is. Any other failure leaves the state unknown.
+      if (refusesUser(answer)) {
+        this.changed = changedBefore;
+        throw new DebugRefusedError(messageOf(answer));
+      }
+      throw new DebugRequestError(messageOf(answer));
+    }
     const raw = bodyOf(answer);
     const pairing = pairRows(sent, earlier, readBreakpoints(raw));
     this.armed.clear();
@@ -456,6 +514,46 @@ export class DebugSession<O = unknown> {
       this.requested = this.requested.filter((r) => r.clientId !== tag);
   }
 
+  /** Both lists empty: nothing of ours is left armed under the key. */
+  private forgetAll(): void {
+    this.armed.clear();
+    this.requested = [];
+    this.pairedWith.clear();
+  }
+
+  /**
+   * Inside the cleanup, once nothing of ours is armed under the key: the
+   * listener is let go. Its open poll is awaited — SAP lets go of the user's
+   * listener when it answers it (130–570 ms after a stop, at most the poll's
+   * hold, measured on premise 2026-10-11); until then a start of another ideId
+   * meets 409 conflictDetected — a catch in it is released, and its
+   * connection closes.
+   */
+  private async retireListener(
+    listener: Listener | undefined,
+    open: Promise<IAdtResponse<string>> | undefined,
+    failures: string[],
+  ): Promise<void> {
+    this.listener = undefined;
+    if (!listener) return;
+    if (open) {
+      const last = await open;
+      listener.open = undefined;
+      if (!last.ok)
+        failures.push(`the listener's last poll: ${messageOf(last)}`);
+      else {
+        // A catch in it — during the stop, or just before and not yet handled.
+        const caught = readDebuggee(bodyOf(last));
+        if (caught) await this.releaseCaught(caught, failures);
+      }
+    }
+    await this.closeOrKeep(
+      listener.connection,
+      "the listener's connection",
+      failures,
+    );
+  }
+
   /** The definitions every change sends again, as the callers gave them. */
   requestedBreakpoints(): IDebuggerBreakpoint[] {
     return this.requested.map((r) => r.definition);
@@ -466,6 +564,11 @@ export class DebugSession<O = unknown> {
   }
 
   // --- listener -----------------------------------------------------------------
+  /**
+   * Starts the debug session. The connected user needs debug authorisation
+   * (`S_DEVELOP` DEBUG); SAP's refusal of it, or of the request user, reaches
+   * the model as SAP says it, and breakpoints are never removed for it.
+   */
   start(
     conflict: IDebuggerListenerConflict,
     options: DebugStartOptions = {},
@@ -517,6 +620,25 @@ export class DebugSession<O = unknown> {
           FIRST_POLL_HOLD_SECONDS,
         );
         listener.open = undefined; // handled here
+        if (!first.ok && refusesUser(first)) {
+          // Our choice on an explicit reading (refusesUser), a safety net: after an
+          // arming the system accepted, a conforming server does not refuse the listen
+          // for the user (setBreakpoints checks the same authorisation). If it does,
+          // the start is refused with SAP's message and nothing is rolled back: the
+          // breakpoints are not ours to remove for a lack of rights — whoever has the
+          // rights debugs them — so no stopListener and no deletion. They stay on the
+          // system, the answer names them, and the session lets go of them: the
+          // before-change branch below closes what this start opened and ends it.
+          const placed = this.listBreakpoints();
+          this.forgetAll();
+          this.changed = false;
+          throw new DebugRefusedError(
+            placed.length
+              ? `${messageOf(first)}; the breakpoints placed stay on the system: ${placed.map(describePlaced).join(', ')}`
+              : messageOf(first),
+            placed,
+          );
+        }
         if (!first.ok) {
           const error = listenerError(first);
           // A refused listener (409) changed nothing; any other failure leaves its state unknown.
@@ -538,7 +660,9 @@ export class DebugSession<O = unknown> {
       } catch (error) {
         if (!this.changed) {
           // Refused before any change — a preflight 409, a failure of the preflight
-          // itself, a first listen refused 409 with nothing armed or reconciled. No
+          // itself, an arming refused for the user, a first listen refused 409 with
+          // nothing armed or reconciled, or refused for the user (its breakpoints are
+          // left to the system, see above). No
           // stopListener and no deletion: only the connections this start opened close.
           // A close that fails is kept like any other cleanup failure: the identity
           // stays, a new start is refused, DebugStop finishes it.
@@ -1158,6 +1282,8 @@ export class DebugSession<O = unknown> {
    * (measured on premise (2026-10-11), BASIS 816), so it is the authoritative
    * cleanup: only when it fails are the breakpoints deleted by id. Never
    * throws; answers what it could not undo, which stays for the next stop.
+   * It needs the connected user's debug authorisation (`S_DEVELOP` DEBUG) as
+   * the start does; SAP's refusal reaches the model as SAP says it.
    */
   private async cleanupLocked(): Promise<string[]> {
     this.generation++;
@@ -1209,32 +1335,18 @@ export class DebugSession<O = unknown> {
           // stands: settle() replaces the failures with this cleanup's. The tag counter
           // stays: a tag is never reused in this instance. `changed` stays until settle()
           // finds the cleanup complete, so a stop that keeps anything owes the stopListener again.
-          this.armed.clear();
-          this.requested = [];
-          this.pairedWith.clear();
-          this.listener = undefined;
-          if (listener) {
-            // Accepted is not done: SAP lets go of the user's listener when it answers the
-            // open poll (130–570 ms after the stop, at most the poll's hold, measured on
-            // premise 2026-10-11). Until then a start of another ideId meets 409
-            // conflictDetected, so the stop returns only after that answer.
-            if (open) {
-              const last = await open;
-              listener.open = undefined;
-              if (!last.ok)
-                failures.push(`the listener's last poll: ${messageOf(last)}`);
-              else {
-                // A catch in it — during the stop, or just before and not yet handled.
-                const caught = readDebuggee(bodyOf(last));
-                if (caught) await this.releaseCaught(caught, failures);
-              }
-            }
-            await this.closeOrKeep(
-              listener.connection,
-              "the listener's connection",
-              failures,
-            );
-          }
+          this.forgetAll();
+          await this.retireListener(listener, open, failures);
+        } else if (refusesUser(stopped)) {
+          // Our choice on an explicit reading (refusesUser), a safety net: 404
+          // invalidUser (measured for a request user that does not exist) or 403
+          // notAuthorized is final. After an arming the system accepted, a conforming
+          // server does not answer it (setBreakpoints checks the same authorisation).
+          // No per-id deletes: breakpoints are not ours to remove for a lack of
+          // rights — whoever has the rights debugs them. The session lets go of them
+          // (the system keeps them), no failure is recorded, and the session ends.
+          this.forgetAll();
+          await this.retireListener(listener, open, failures);
         } else {
           // 4. Deleted by id, as before; what fails stays for the next stop.
           failures.push(`listener: ${messageOf(stopped)}`);

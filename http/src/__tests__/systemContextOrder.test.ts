@@ -1,6 +1,6 @@
 /**
  * Who creates objects (responsible) and on which system (master system), per
- * request, over HTTP and SSE. Each its own variable first: the request's
+ * request, over Streamable HTTP. Each its own variable first: the request's
  * `x-sap-responsible` / `x-sap-master-system` headers; the destination's own
  * `.env` (`IDestinations.systemContextFor`); the process environment. Then,
  * for the responsible only, the login: the destination's `SAP_USERNAME`, the
@@ -33,7 +33,6 @@ import {
   getEffectiveSystemContext,
   resetSystemContextCache,
 } from '../../../src/lib/systemContext';
-import { SseServer } from '../SseServer.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 /** One tool: waits `delayMs`, then answers the context its call sees. */
@@ -318,121 +317,5 @@ describe('StreamableHttpServer: responsible and master system per request', () =
         masterSystem: null,
       });
     });
-  });
-});
-
-describe('SseServer: responsible and master system per session', () => {
-  let server: Server;
-  let baseUrl: string;
-  const controllers: AbortController[] = [];
-
-  beforeEach(async () => {
-    const sse = new SseServer(registry, destinations(), {
-      allowDestinationHeader: true,
-      defaultDestination: 'bare',
-    });
-    ({ server, baseUrl } = await listen((app) => sse.registerRoutes(app)));
-  });
-  afterEach(async () => {
-    for (const c of controllers.splice(0)) c.abort();
-    await close(server);
-  });
-
-  /** Opens a session with these headers, calls the tool once on it. */
-  async function ask(
-    headers: Record<string, string>,
-    delayMs = 0,
-  ): Promise<Seen> {
-    const controller = new AbortController();
-    controllers.push(controller);
-    const res = await fetch(`${baseUrl}/sse`, {
-      headers,
-      signal: controller.signal,
-    });
-    const reader = (res.body as ReadableStream<Uint8Array>).getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    const nextData = async (event: string): Promise<string> => {
-      for (;;) {
-        const match = buffer.match(
-          new RegExp(`event: ${event}\\r?\\ndata: (.*)\\r?\\n\\r?\\n`),
-        );
-        if (match) {
-          buffer = buffer.slice((match.index ?? 0) + match[0].length);
-          return match[1];
-        }
-        const { value, done } = await reader.read();
-        if (done) throw new Error('stream ended');
-        buffer += decoder.decode(value, { stream: true });
-      }
-    };
-    const endpoint = await nextData('endpoint');
-    await fetch(new URL(endpoint, baseUrl), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(call(1, delayMs)),
-    });
-    const message = JSON.parse(await nextData('message'));
-    return JSON.parse(message.result.content[0].text);
-  }
-
-  it('the headers win over the destination .env, which wins over the process', async () => {
-    await expect(
-      ask({ 'x-mcp-destination': 'alpha', 'x-sap-responsible': 'HEADER_USER' }),
-    ).resolves.toEqual({
-      responsible: 'HEADER_USER',
-      masterSystem: 'ALPHA_SYS',
-    });
-    await expect(ask({ 'x-mcp-destination': 'alpha' })).resolves.toEqual({
-      responsible: 'ALPHA_USER',
-      masterSystem: 'ALPHA_SYS',
-    });
-    await expect(ask({})).resolves.toEqual({
-      responsible: 'PROCESS_USER',
-      masterSystem: 'PROCESS_SYS',
-    });
-  });
-
-  it("the login: the destination's SAP_USERNAME, x-sap-login, the process SAP_USERNAME", async () => {
-    delete process.env.SAP_RESPONSIBLE;
-    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-    await expect(ask({ 'x-mcp-destination': 'gamma' })).resolves.toEqual({
-      responsible: 'GAMMA_LOGIN',
-      masterSystem: 'PROCESS_SYS',
-    });
-    await expect(
-      ask({
-        'x-sap-url': 'https://system.example.invalid',
-        'x-sap-login': 'HEADER_LOGIN',
-        'x-sap-password': 'placeholder-password',
-      }),
-    ).resolves.toEqual({
-      responsible: 'HEADER_LOGIN',
-      masterSystem: 'PROCESS_SYS',
-    });
-    await expect(ask({})).resolves.toEqual({
-      responsible: 'PROCESS_LOGIN',
-      masterSystem: 'PROCESS_SYS',
-    });
-  });
-
-  it('x-sap-login on a destination session is not the login', async () => {
-    delete process.env.SAP_RESPONSIBLE;
-    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-    await expect(
-      ask({ 'x-mcp-destination': 'bare', 'x-sap-login': 'HEADER_LOGIN' }),
-    ).resolves.toEqual({
-      responsible: 'PROCESS_LOGIN',
-      masterSystem: 'PROCESS_SYS',
-    });
-  });
-
-  it('two concurrent sessions to different destinations each see their own', async () => {
-    const [a, b] = await Promise.all([
-      ask({ 'x-mcp-destination': 'alpha' }, 60),
-      ask({ 'x-mcp-destination': 'beta', 'x-sap-master-system': 'HDR' }, 0),
-    ]);
-    expect(a).toEqual({ responsible: 'ALPHA_USER', masterSystem: 'ALPHA_SYS' });
-    expect(b).toEqual({ responsible: 'BETA_USER', masterSystem: 'HDR' });
   });
 });

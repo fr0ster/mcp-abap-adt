@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as http from 'node:http';
 import * as https from 'node:https';
-import type { TlsConfig } from '@mcp-abap-adt/lib/config';
+import type { TlsConfig } from '../config/IServerConfig';
 
 /**
  * Create HTTP or HTTPS server based on TLS configuration.

@@ -58,6 +58,11 @@
       "types": "./dist/lib/compact/index.d.ts",
       "import": "./dist/lib/compact/index.js",
       "require": "./dist/lib/compact/index.js"
+    },
+    "./http-transport": {
+      "types": "./dist/lib/httpTransport/index.d.ts",
+      "import": "./dist/lib/httpTransport/index.js",
+      "require": "./dist/lib/httpTransport/index.js"
     }
   },
   "typesVersions": {
@@ -91,6 +96,9 @@
       ],
       "compact-shared": [
         "dist/lib/compact/index.d.ts"
+      ],
+      "http-transport": [
+        "dist/lib/httpTransport/index.d.ts"
       ]
     }
   },
@@ -109,8 +117,8 @@
     "lint": "npx biome check --write src",
     "lint:check": "npx biome check src",
     "format": "npx biome format --write src",
-    "prebuild": "node -e \"const fs=require('node:fs');for(const d of ['dist','http/dist','server/dist','compact-readonly/dist','compact-modify/dist','compact/dist'])fs.rmSync(d,{recursive:true,force:true})\"",
-    "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json && npx tsc -p http/tsconfig.json && npx tsc -p server/tsconfig.json && npx tsc -p compact-readonly/tsconfig.json && npx tsc -p compact-modify/tsconfig.json && npx tsc -p compact/tsconfig.json",
+    "prebuild": "node -e \"const fs=require('node:fs');for(const d of ['dist','http/dist','sse/dist','server/dist','compact-readonly/dist','compact-modify/dist','compact/dist'])fs.rmSync(d,{recursive:true,force:true})\"",
+    "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json && npx tsc -p http/tsconfig.json && npx tsc -p sse/tsconfig.json && npx tsc -p server/tsconfig.json && npx tsc -p compact-readonly/tsconfig.json && npx tsc -p compact-modify/tsconfig.json && npx tsc -p compact/tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "check-todos": "node tools/check-todos.js",
     "auth": "npx sap-abap-auth auth",
@@ -255,11 +263,13 @@
       "^@mcp-abap-adt/lib/utils$": "<rootDir>/src/lib/utils.ts",
       "^@mcp-abap-adt/lib/config$": "<rootDir>/src/lib/config/index.ts",
       "^@mcp-abap-adt/lib/auth$": "<rootDir>/src/lib/auth/index.ts",
+      "^@mcp-abap-adt/lib/http-transport$": "<rootDir>/src/lib/httpTransport/index.ts",
       "^@mcp-abap-adt/compact-readonly$": "<rootDir>/compact-readonly/src/index.ts",
       "^@mcp-abap-adt/compact-modify$": "<rootDir>/compact-modify/src/index.ts",
       "^@mcp-abap-adt/core/launcher$": "<rootDir>/server/src/launcher.ts",
       "^@mcp-abap-adt/core/auth$": "<rootDir>/server/src/auth/index.ts",
       "^@mcp-abap-adt/http$": "<rootDir>/http/src/index.ts",
+      "^@mcp-abap-adt/sse$": "<rootDir>/sse/src/index.ts",
       "^@mcp-abap-adt/compact-readonly/routes$": "<rootDir>/compact-readonly/src/handlers/compactReadRoutes.ts",
       "^@mcp-abap-adt/compact-modify/routes$": "<rootDir>/compact-modify/src/handlers/compactWriteRoutes.ts",
       "^(\\.{1,2}/.*)\\.js$": "$1"

@@ -1,5 +1,5 @@
 /**
- * How the HTTP and SSE transports reach a destination: through
+ * How the Streamable HTTP transport reaches a destination: through
  * `IDestinations` alone (`settingsFor`, the counted `getProvider`), with a
  * failure answered in the error's own words, and `x-mcp-destination`
  * honoured only when allowed and only when it is a name, not a path.
@@ -31,7 +31,6 @@ import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
 import { inspectionOnlyDestinations } from '../../../server/src/StdioServer.js';
-import { SseServer } from '../SseServer.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 const emptyRegistry = new CompositeHandlersRegistry([]);
@@ -249,91 +248,6 @@ describe('StreamableHttpServer: destinations', () => {
   );
 });
 
-describe('SseServer: destinations, per session', () => {
-  let server: Server;
-  let baseUrl: string;
-  let destinations: ReturnType<typeof stubDestinations>;
-  const open: AbortController[] = [];
-
-  async function start(opts: {
-    allowDestinationHeader?: boolean;
-    defaultDestination?: string;
-  }) {
-    destinations = stubDestinations();
-    const sse = new SseServer(emptyRegistry, destinations, opts);
-    ({ server, baseUrl } = await listen((app) => sse.registerRoutes(app)));
-  }
-
-  afterEach(async () => {
-    for (const controller of open.splice(0)) controller.abort();
-    await close(server);
-  });
-
-  function get(headers: Record<string, string> = {}) {
-    const controller = new AbortController();
-    open.push(controller);
-    return fetch(`${baseUrl}/sse`, { headers, signal: controller.signal });
-  }
-
-  it('an unsupported destination fails in its words; the next session, supported, opens', async () => {
-    await start({ allowDestinationHeader: true });
-
-    const refused = await get({ 'x-mcp-destination': 'unsupported' });
-    const text = await refused.text();
-    expect(refused.status).toBeGreaterThanOrEqual(400);
-    expect(text).toContain('unsupported');
-    expect(text).toContain('saml / saml2_bearer');
-
-    const served = await get({ 'x-mcp-destination': 'good' });
-    expect(served.status).toBe(200);
-    expect(served.headers.get('content-type')).toContain('text/event-stream');
-    expect(destinations.getProvider).toHaveBeenCalledWith('good');
-  });
-
-  it('an error the server has no words for: answered generically, logged by class only', async () => {
-    await start({ defaultDestination: 'leaky' });
-    const refused = await get();
-    const text = await refused.text();
-    expect(refused.status).toBe(500);
-    expect(text).toBe('Internal Server Error');
-    expect(logged(errorSpy)).toContain('SyntaxError');
-    expect(logged(errorSpy)).not.toContain(LEAKED);
-    expect(logged(errorSpy)).not.toContain('ntsecret');
-  });
-
-  it('a DestinationConfigError is answered with its fields', async () => {
-    await start({ defaultDestination: 'misconfigured' });
-    const refused = await get();
-    const text = await refused.text();
-    expect(refused.status).toBeGreaterThanOrEqual(400);
-    expect(text).toContain('misconfigured');
-    expect(text).toContain('grantType');
-    expect(text).not.toContain('Auth broker not initialized');
-  });
-
-  it('x-mcp-destination is ignored without allowDestinationHeader', async () => {
-    await start({ defaultDestination: 'good' });
-    const served = await get({ 'x-mcp-destination': 'other' });
-    expect(served.status).toBe(200);
-    expect(destinations.getProvider).not.toHaveBeenCalledWith('other');
-    expect(destinations.getProvider).toHaveBeenCalledWith('good');
-  });
-
-  it.each(PATH_LIKE)(
-    'a path-like x-mcp-destination %p is refused naming the header, before any lookup',
-    async (value) => {
-      await start({ allowDestinationHeader: true, defaultDestination: 'good' });
-      const refused = await get({ 'x-mcp-destination': value });
-      const text = await refused.text();
-      expect(refused.status).toBe(400);
-      expect(text).toContain('x-mcp-destination');
-      if (value) expect(text).not.toContain(value);
-      expect(destinations.settingsFor).not.toHaveBeenCalled();
-      expect(destinations.getProvider).not.toHaveBeenCalled();
-    },
-  );
-});
-
 describe('stdio inspection-only mode: the stand-in destinations', () => {
   it('has only the two methods of IDestinations, and no getToken', async () => {
     const destinations = inspectionOnlyDestinations();
@@ -437,36 +351,6 @@ describe('the first login to a destination is serialised', () => {
     await until(() => prepared() === 1);
     const second = post();
     // The first login is held open: the second has not started.
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(events).toEqual(['settingsFor 1', 'prepare 1 start']);
-
-    release();
-    expect((await first).status).toBe(200);
-    expect((await second).status).toBe(200);
-    expect(events.slice(0, 3)).toEqual([
-      'settingsFor 1',
-      'prepare 1 start',
-      'prepare 1 end',
-    ]);
-    expect(events).toContain('settingsFor 2');
-  });
-
-  it('SSE: the second first session starts only after the first connect settles', async () => {
-    const { destinations, events, release, prepared } = heldDestinations();
-    const sse = new SseServer(emptyRegistry, destinations, {
-      defaultDestination: 'good',
-    });
-    let baseUrl: string;
-    ({ server, baseUrl } = await listen((app) => sse.registerRoutes(app)));
-    const get = () => {
-      const controller = new AbortController();
-      open.push(controller);
-      return fetch(`${baseUrl}/sse`, { signal: controller.signal });
-    };
-
-    const first = get();
-    await until(() => prepared() === 1);
-    const second = get();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(events).toEqual(['settingsFor 1', 'prepare 1 start']);
 

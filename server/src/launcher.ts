@@ -1,4 +1,4 @@
-import { SseServer, StreamableHttpServer } from '@mcp-abap-adt/http';
+import { StreamableHttpServer } from '@mcp-abap-adt/http';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
@@ -27,6 +27,7 @@ import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
+import { SseServer } from '@mcp-abap-adt/sse';
 import { AuthBrokerFactory, type IAuthBrokerFactoryConfig } from './auth';
 import { CORE_VERSION } from './coreVersion.js';
 import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';

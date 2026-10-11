@@ -1,0 +1,93 @@
+{
+  "name": "@mcp-abap-adt/sse",
+  "version": "17.1.0",
+  "description": "The HTTP+SSE transport of the MCP ABAP ADT server: an Express app serving the ADT tools of @mcp-abap-adt/lib over the MCP HTTP+SSE transport, with DNS rebinding protection and TLS.",
+  "license": "AGPL-3.0-only",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
+  },
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "sse"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=9.0.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npx tsc -p tsconfig.json",
+    "test": "jest --passWithNoTests",
+    "test:check": "npx tsc --noEmit -p tsconfig.test.json",
+    "lint:check": "npx biome check src",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/lib": "^17.0.0",
+    "@mcp-abap-adt/logger": "^0.4.1",
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "express": "^5.2.1"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/src"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.test.json"
+        }
+      ]
+    },
+    "moduleNameMapper": {
+      "^@mcp-abap-adt/lib$": "<rootDir>/../src/index.ts",
+      "^@mcp-abap-adt/lib/handlers$": "<rootDir>/../src/lib/handlers/index.ts",
+      "^@mcp-abap-adt/lib/http-transport$": "<rootDir>/../src/lib/httpTransport/index.ts",
+      "^@mcp-abap-adt/lib/utils$": "<rootDir>/../src/lib/utils.ts",
+      "^@mcp-abap-adt/lib/embeddable$": "<rootDir>/../src/embeddable/index.ts",
+      "^@mcp-abap-adt/lib/config$": "<rootDir>/../src/lib/config/index.ts",
+      "^@mcp-abap-adt/lib/auth$": "<rootDir>/../src/lib/auth/index.ts",
+      "^@mcp-abap-adt/lib/logger$": "<rootDir>/../src/lib/handlerLogger.ts",
+      "^@mcp-abap-adt/lib/request-context$": "<rootDir>/../src/lib/requestContext.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    }
+  },
+  "devDependencies": {
+    "@types/express": "*",
+    "@types/jest": "*",
+    "@types/node": "*",
+    "jest": "*",
+    "ts-jest": "*",
+    "typescript": "*"
+  }
+}

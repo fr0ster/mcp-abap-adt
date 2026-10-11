@@ -19,6 +19,7 @@ const ROOTS = [
   'src',
   'server/src',
   'http/src',
+  'sse/src',
   'compact/src',
   'compact-readonly/src',
   'compact-modify/src',

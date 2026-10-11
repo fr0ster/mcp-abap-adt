@@ -4,7 +4,6 @@ import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
-import { SseServer } from '../SseServer.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 // Empty registry — health endpoint doesn't need any handlers
@@ -66,38 +65,5 @@ describe('Health endpoint — StreamableHttpServer', () => {
   it('does not require special headers', async () => {
     const res = await fetch(`${baseUrl}/mcp/health`);
     expect(res.status).toBe(200);
-  });
-});
-
-describe('Health endpoint — SseServer', () => {
-  let httpServer: Server;
-  let baseUrl: string;
-
-  beforeAll(async () => {
-    const sseServer = new SseServer(emptyRegistry, stubDestinations, {
-      version: '1.2.3',
-    });
-    const result = await startApp((app) => sseServer.registerRoutes(app));
-    httpServer = result.server;
-    baseUrl = result.baseUrl;
-  });
-
-  afterAll(
-    () =>
-      new Promise<void>((resolve) => {
-        httpServer.close(() => resolve());
-      }),
-  );
-
-  it('returns 200 with status ok and activeSessions', async () => {
-    const res = await fetch(`${baseUrl}/mcp/health`);
-    expect(res.status).toBe(200);
-
-    const body = (await res.json()) as any;
-    expect(body.status).toBe('ok');
-    expect(body.transport).toBe('sse');
-    expect(body.version).toBe('1.2.3');
-    expect(typeof body.uptime).toBe('number');
-    expect(body.activeSessions).toBe(0);
   });
 });

@@ -28,6 +28,9 @@
       "@mcp-abap-adt/lib/handlers": [
         "../src/lib/handlers/index.ts"
       ],
+      "@mcp-abap-adt/lib/http-transport": [
+        "../src/lib/httpTransport/index.ts"
+      ],
       "@mcp-abap-adt/lib/utils": [
         "../src/lib/utils.ts"
       ],
@@ -48,6 +51,9 @@
       ],
       "@mcp-abap-adt/http": [
         "../http/src/index.ts"
+      ],
+      "@mcp-abap-adt/sse": [
+        "../sse/src/index.ts"
       ]
     },
     "noEmit": true

@@ -106,7 +106,7 @@ This allows `IAdtObject<TConfig, TState>` to provide a uniform CRUD interface ac
 | Attribute | Value |
 |:---|:---|
 | **Responsibility** | Turns the connection headers of a request into settings and a credential, or names the destination the request asks for |
-| **Where** | `src/lib/credentialSources.ts` (`credentialFromHeaders`), `http/src/destinationRequest.ts` (`destinationFromHeader`) |
+| **Where** | `src/lib/credentialSources.ts` (`credentialFromHeaders`), `src/lib/httpTransport/destinationRequest.ts` (`destinationFromHeader`) |
 | **Runtime role** | Used by the HTTP and SSE transport servers; stdio has no request headers |
 
 Per request, in this order:

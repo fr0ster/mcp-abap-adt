@@ -8,6 +8,14 @@ import type {
 } from '@mcp-abap-adt/lib/embeddable';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import {
+  createServerListener,
+  destinationFailureAnswer,
+  destinationFromHeader,
+  FirstConnectLock,
+  getProtocol,
+  withDnsRebindingProtection,
+} from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import {
   type RequestContext,
@@ -17,14 +25,7 @@ import {
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
-import {
-  destinationFailureAnswer,
-  destinationFromHeader,
-  FirstConnectLock,
-} from './destinationRequest.js';
-import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
-import { HTTP_VERSION } from './httpVersion.js';
-import { createServerListener, getProtocol } from './tlsUtils.js';
+import { SSE_VERSION } from './sseVersion.js';
 
 export interface SseServerOptions {
   /**
@@ -130,7 +131,7 @@ export class SseServer {
     this.postPath = opts?.postPath ?? '/messages';
     this.defaultDestination = opts?.defaultDestination;
     this.logger = opts?.logger ?? noopLogger;
-    this.version = opts?.version ?? HTTP_VERSION;
+    this.version = opts?.version ?? SSE_VERSION;
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
     this.allowDestinationHeader = opts?.allowDestinationHeader ?? false;

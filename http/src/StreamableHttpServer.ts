@@ -8,6 +8,14 @@ import type {
 } from '@mcp-abap-adt/lib/embeddable';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import {
+  createServerListener,
+  destinationFailureAnswer,
+  destinationFromHeader,
+  FirstConnectLock,
+  getProtocol,
+  withDnsRebindingProtection,
+} from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import {
   requestContextFromHeaders,
@@ -16,14 +24,7 @@ import {
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
-import {
-  destinationFailureAnswer,
-  destinationFromHeader,
-  FirstConnectLock,
-} from './destinationRequest.js';
-import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { HTTP_VERSION } from './httpVersion.js';
-import { createServerListener, getProtocol } from './tlsUtils.js';
 
 export interface StreamableHttpServerOptions {
   /**

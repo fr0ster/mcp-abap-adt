@@ -22,13 +22,14 @@ jest.mock('@mcp-abap-adt/auth-broker', () => {
   };
 });
 
-import { SseServer, StreamableHttpServer } from '@mcp-abap-adt/http';
+import { StreamableHttpServer } from '@mcp-abap-adt/http';
 import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
 import { browserCallbackStrategy } from '@mcp-abap-adt/lib/auth';
 import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
+import { SseServer } from '@mcp-abap-adt/sse';
 import { AuthBrokerFactory } from '../auth';
 import { factoryConfigFrom, launch } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';

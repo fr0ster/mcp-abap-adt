@@ -1,0 +1,59 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": [
+      "es2022"
+    ],
+    "module": "node16",
+    "moduleResolution": "node16",
+    "isolatedModules": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": [
+      "node",
+      "jest"
+    ],
+    "rootDir": "..",
+    "outDir": "./dist",
+    "noImplicitAny": false,
+    "paths": {
+      "@mcp-abap-adt/lib": [
+        "../src/index.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers": [
+        "../src/lib/handlers/index.ts"
+      ],
+      "@mcp-abap-adt/lib/http-transport": [
+        "../src/lib/httpTransport/index.ts"
+      ],
+      "@mcp-abap-adt/lib/utils": [
+        "../src/lib/utils.ts"
+      ],
+      "@mcp-abap-adt/lib/embeddable": [
+        "../src/embeddable/index.ts"
+      ],
+      "@mcp-abap-adt/lib/config": [
+        "../src/lib/config/index.ts"
+      ],
+      "@mcp-abap-adt/lib/auth": [
+        "../src/lib/auth/index.ts"
+      ],
+      "@mcp-abap-adt/lib/logger": [
+        "../src/lib/handlerLogger.ts"
+      ],
+      "@mcp-abap-adt/lib/request-context": [
+        "../src/lib/requestContext.ts"
+      ]
+    },
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": []
+}

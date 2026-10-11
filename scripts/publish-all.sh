@@ -24,13 +24,15 @@ for arg in "$@"; do
 done
 
 # Order matters and is not cosmetic: server/tsconfig.json resolves
-# @mcp-abap-adt/lib through paths into ../dist, and @mcp-abap-adt/http into
-# ../http/dist, so the server cannot build until both have.
+# @mcp-abap-adt/lib through paths into ../dist, @mcp-abap-adt/http into
+# ../http/dist and @mcp-abap-adt/sse into ../sse/dist, so the server cannot
+# build until all three have.
 PACKAGES=(
   "."
   "./compact-readonly"
   "./compact-modify"
   "./http"
+  "./sse"
   "./server"
   "./compact"
 )

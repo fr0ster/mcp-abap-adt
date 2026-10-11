@@ -1,12 +1,11 @@
 /**
- * Shutdown step 1: an HTTP or SSE server stops taking connections. Asserted
+ * Shutdown step 1: a Streamable HTTP server stops taking connections. Asserted
  * on the port — a new connection is refused — never on a log line.
  */
 
 import * as net from 'node:net';
 import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
-import { SseServer } from '../SseServer.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 const stubDestinations: IDestinations = {
@@ -41,14 +40,6 @@ describe.each([
         stubDestinations,
         { host: '127.0.0.1', port: 0 },
       ),
-  ],
-  [
-    'SseServer',
-    () =>
-      new SseServer(new CompositeHandlersRegistry([]), stubDestinations, {
-        host: '127.0.0.1',
-        port: 0,
-      }),
   ],
 ] as const)('%s.stop()', (_name, make) => {
   let errorSpy: jest.SpyInstance;

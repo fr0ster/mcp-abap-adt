@@ -86,6 +86,7 @@
     "@mcp-abap-adt/interfaces-utils": "^1.1.1",
     "@mcp-abap-adt/lib": "^17.0.0",
     "@mcp-abap-adt/logger": "^0.4.1",
+    "@mcp-abap-adt/sse": "^17.1.0",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "dotenv": "^18.0.5",
     "express": "^5.2.1"
@@ -110,6 +111,7 @@
     "moduleNameMapper": {
       "^@mcp-abap-adt/lib$": "<rootDir>/../src/index.ts",
       "^@mcp-abap-adt/lib/handlers$": "<rootDir>/../src/lib/handlers/index.ts",
+      "^@mcp-abap-adt/lib/http-transport$": "<rootDir>/../src/lib/httpTransport/index.ts",
       "^@mcp-abap-adt/lib/utils$": "<rootDir>/../src/lib/utils.ts",
       "^@mcp-abap-adt/lib/embeddable$": "<rootDir>/../src/embeddable/index.ts",
       "^@mcp-abap-adt/lib/config$": "<rootDir>/../src/lib/config/index.ts",
@@ -117,6 +119,7 @@
       "^@mcp-abap-adt/lib/logger$": "<rootDir>/../src/lib/handlerLogger.ts",
       "^@mcp-abap-adt/lib/request-context$": "<rootDir>/../src/lib/requestContext.ts",
       "^@mcp-abap-adt/http$": "<rootDir>/../http/src/index.ts",
+      "^@mcp-abap-adt/sse$": "<rootDir>/../sse/src/index.ts",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     }
   },

@@ -27,6 +27,9 @@
       "@mcp-abap-adt/lib/handlers": [
         "../dist/lib/handlers/index.d.ts"
       ],
+      "@mcp-abap-adt/lib/http-transport": [
+        "../dist/lib/httpTransport/index.d.ts"
+      ],
       "@mcp-abap-adt/lib/utils": [
         "../dist/lib/utils.d.ts"
       ],

@@ -6,4 +6,14 @@
  * handlers and the embeddable server under Apache-2.0, and no transport.
  */
 export * from '@mcp-abap-adt/http';
+// What `@mcp-abap-adt/http` exported before the shared helpers moved to lib
+// (D50): core's own surface stays as it was.
+export {
+  checkDnsRebinding,
+  createServerListener,
+  type DnsRebindingOptions,
+  getProtocol,
+  withDnsRebindingProtection,
+} from '@mcp-abap-adt/lib/http-transport';
+export * from '@mcp-abap-adt/sse';
 export * from './StdioServer.js';

@@ -2,7 +2,10 @@ import * as fs from 'node:fs';
 import * as https from 'node:https';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
-import { createServerListener, getProtocol } from '../tlsUtils.js';
+import {
+  createServerListener,
+  getProtocol,
+} from '../../../lib/httpTransport/tlsUtils';
 import { createSelfSignedCert } from './helpers/selfSignedCert';
 
 let certDir: string;

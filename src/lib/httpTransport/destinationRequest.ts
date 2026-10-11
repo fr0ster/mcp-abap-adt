@@ -3,10 +3,8 @@
  * reading `x-mcp-destination`, and answering a destination that fails.
  */
 
-import {
-  assertDestinationName,
-  describeAuthError,
-} from '@mcp-abap-adt/lib/auth';
+import { assertDestinationName } from '../auth/destinationName';
+import { describeAuthError } from '../auth/errors';
 
 /** `x-mcp-destination` is not a destination name. Its message names the header, never the value. */
 export class DestinationHeaderError extends Error {

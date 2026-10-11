@@ -41,12 +41,15 @@ jobs:
       - name: Run Biome lint
         run: npx biome check src --diagnostic-level=error
 
-      # The root step covers `src` only; core and http lint their own sources.
+      # The root step covers `src` only; core, http and sse lint their own sources.
       - name: Run Biome lint (server)
         run: npm --prefix server run lint:check
 
       - name: Run Biome lint (http)
         run: npm --prefix http run lint:check
+
+      - name: Run Biome lint (sse)
+        run: npm --prefix sse run lint:check
 
       - name: Build project
         run: npm run build
@@ -115,24 +118,32 @@ jobs:
       - name: Run http tests
         run: npm --prefix http test
 
+      # The SSE package's own tests, beside http's.
+      - name: Type-check sse tests
+        run: npm --prefix sse run test:check
+
+      - name: Run sse tests
+        run: npm --prefix sse test
+
       - name: Security audit (production deps, high+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high
 
-      # All six packages. 10.0.0 split them: the repository root is
+      # All seven packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
       # one carrying the `mcp-abap-adt` binary. `npm pack` at the root produces
       # `mcp-abap-adt-lib-*.tgz`, so the install step below looked for a file
       # this job had never created and failed on every run since the split.
       # 14.0.0 added `compact`, `compact-readonly` and `compact-modify`, which
       # this step did not pack — a compact package that could not be created
-      # or installed reached the release unseen. `http` is `core`'s dependency,
-      # so without its tarball the install would ask the registry for it.
+      # or installed reached the release unseen. `http` and `sse` are `core`'s
+      # dependencies, so without their tarballs the install would ask the
+      # registry for them.
       - name: Verify the packages can be created
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
           npm pack
-          npm pack ./compact-readonly ./compact-modify ./http ./server ./compact
+          npm pack ./compact-readonly ./compact-modify ./http ./sse ./server ./compact
 
       # **Both tarballs in one install, or this step cannot pass a release.**
       # `core` depends on `lib` by range, so installing the core tarball alone
@@ -175,7 +186,7 @@ jobs:
           node -e "const {readFileSync,existsSync}=require('node:fs');
             const nm='node_modules/@mcp-abap-adt/';
             const pkg=n=>JSON.parse(readFileSync(nm+n+'/package.json','utf8'));
-            const ours=['lib','http','core','compact','compact-readonly','compact-modify'];
+            const ours=['lib','http','sse','core','compact','compact-readonly','compact-modify'];
             let bad=0;
             for (const p of ours) for (const d of Object.keys(pkg(p).dependencies||{})) {
               const n=d.replace('@mcp-abap-adt/','');

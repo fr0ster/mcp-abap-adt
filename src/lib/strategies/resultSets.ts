@@ -260,6 +260,11 @@ export const READING_BY_SLOT = {
   rankingList: structured,
   children: structured,
   references: structured,
+
+  // Arrived with adt-clients 29.0.0, on `setDebuggerSettings`: the settings'
+  // confirmation, a document like its neighbour `memory`. The debugger tools
+  // read through their own.
+  settings: structured,
 } satisfies Record<string, IResultStrategy<unknown>>;
 
 /**

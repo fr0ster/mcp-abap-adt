@@ -1,3 +1,4 @@
+import { compactDebugEntries } from '../../../../compact/src/debug/group';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 
 /** A tool's own text and every parameter description, at any depth. */
@@ -32,7 +33,17 @@ const START_TOOLS = ['DebugStartListener', 'DebugTakeOverListener'];
 
 describe('the debugger descriptions', () => {
   it('no breakpoint description says every kind takes a condition', () => {
-    for (const tool of coreDebugTools())
+    for (const tool of [
+      ...coreDebugTools(),
+      ...compactDebugEntries().map(
+        (e) =>
+          e.toolDefinition as {
+            name: string;
+            description: string;
+            inputSchema: unknown;
+          },
+      ),
+    ])
       for (const text of textsOf(tool))
         expect({ tool: tool.name, text }).not.toEqual({
           tool: tool.name,

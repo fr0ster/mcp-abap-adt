@@ -16,7 +16,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerDebugStep',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Moves the stopped debuggee (into, over, return, continue, run or jump to a line), ends it where it stands, or ends the debug session.',
+    'Moves the stopped debuggee (into, over, return, continue, run or jump to a line), leaves it running (detach, release_debugger), ends it where it stands, or ends the debug session.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,11 +30,13 @@ export const TOOL_DEFINITION = {
           'continue',
           'run_to_line',
           'jump_to_line',
+          'detach',
+          'release_debugger',
           'terminate',
           'stop',
         ],
         description:
-          'into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.',
+          'into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; detach lets the program run on, where an armed breakpoint can catch it again; release_debugger frees the debugger and the program runs on; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.',
       },
       ...LINE_TARGET_PROPERTIES,
       ...DETAIL_PROPERTY,
@@ -142,6 +144,10 @@ export async function handleHandlerDebugStep(
             );
           });
         }
+        if (action === 'detach')
+          return debugStateAnswer(args, async () => d.abap.detach());
+        if (action === 'release_debugger')
+          return debugStateAnswer(args, async () => d.abap.releaseDebugger());
         if (action === 'terminate') {
           return debugStateAnswer(args, async () => d.abap.terminate());
         }

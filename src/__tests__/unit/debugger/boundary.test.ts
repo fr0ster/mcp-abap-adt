@@ -5,6 +5,7 @@
  */
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { TOOL_DEFINITION as CompactStart } from '../../../../compact/src/debug/handleHandlerDebugStart';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { TOOL_DEFINITION as AmdpSetBreakpoints } from '../../../handlers/debugger/debug/handleAmdpDebugSetBreakpoints';
 import { TOOL_DEFINITION as SetBreakpoints } from '../../../handlers/debugger/debug/handleDebugSetBreakpoints';
@@ -35,6 +36,7 @@ class BoundaryServer extends BaseMcpServer {
       SetSettings,
       SnapshotGet,
       VirtualFolders,
+      CompactStart,
     ].map((toolDefinition) => ({ toolDefinition, handler: this.handler }));
     this.registerHandlers(
       new CompositeHandlersRegistry([
@@ -161,6 +163,24 @@ describe('the MCP boundary validates debug tool arguments', () => {
     const result = await client.callTool({
       name: StartListener.name,
       arguments: { breakpoints: [{ statement: 'WRITE' }] },
+    });
+    expect(result.isError).toBeFalsy();
+    const received = server.handler.mock.calls[0][1] as Record<string, unknown>;
+    expect(received).not.toHaveProperty('request_user');
+    expect(received).not.toHaveProperty('debugging_mode');
+    expect(received).not.toHaveProperty('settings');
+    await client.close();
+  });
+
+  it('a compact AMDP start reaches the handler without request_user, debugging_mode or settings: no default fills them in', async () => {
+    const server = new BoundaryServer();
+    const client = await connected(server);
+    const result = await client.callTool({
+      name: CompactStart.name,
+      arguments: {
+        kind: 'amdp',
+        breakpoints: [{ object_name: 'class_a', line: 14 }],
+      },
     });
     expect(result.isError).toBeFalsy();
     const received = server.handler.mock.calls[0][1] as Record<string, unknown>;

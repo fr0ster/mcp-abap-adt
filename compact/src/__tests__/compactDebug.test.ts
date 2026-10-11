@@ -79,6 +79,9 @@ describe('compact debug', () => {
     expect(start.toolDefinition.description).toMatch(
       /Displaces another debugger/,
     );
+    expect(start.toolDefinition.description).toMatch(
+      /replaces that set as a whole/,
+    );
     expect(start.toolDefinition.description).not.toMatch(/[.;,][.;,]/);
   });
   it('every session verb requires state_handle', () => {
@@ -141,6 +144,15 @@ function fakeAbap(held: { on: boolean }) {
     },
     observe() {},
     ids: { terminalId: 'T', ideId: 'I' },
+    currentIdentity: () => undefined,
+    detach: async () => {
+      calls.push(['detach']);
+      return { state: 'listening' };
+    },
+    releaseDebugger: async () => {
+      calls.push(['releaseDebugger']);
+      return { state: 'listening' };
+    },
     start: async (mode: unknown, o: unknown) => {
       calls.push(['start', mode, o]);
       held.on = true;
@@ -282,6 +294,79 @@ function install() {
 }
 
 describe('compact debug verbs on the fake sessions', () => {
+  it('start abap passes request_user, debugging_mode and settings to the session', async () => {
+    const t = install();
+    await t.call('HandlerDebugStart', {
+      kind: 'abap',
+      breakpoints: [{ exception_class: 'cx_a' }],
+      request_user: 'sapuser02',
+      debugging_mode: 'user',
+      settings: { system_debugging: true },
+    });
+    expect(t.abap[0]).toEqual([
+      'start',
+      'refuse',
+      {
+        breakpoints: [{ kind: 'exception', exceptionClass: 'CX_A' }],
+        run: undefined,
+        requestUser: 'sapuser02',
+        debuggingMode: 'user',
+        settings: { systemDebugging: true },
+      },
+    ]);
+  });
+
+  it.each([
+    ['request_user', { request_user: 'sapuser02' }],
+    ['debugging_mode', { debugging_mode: 'terminal' as const }],
+    ['settings', { settings: { system_debugging: true } }],
+  ])('start amdp with %s is refused before the wire', async (_, extra) => {
+    const t = install();
+    const r = await t.call('HandlerDebugStart', {
+      kind: 'amdp',
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
+      ...extra,
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain(
+      'request_user, debugging_mode and settings apply to kind abap only',
+    );
+    expect(t.amdp).toEqual([]);
+  });
+
+  it('step on ABAP: detach and release_debugger reach the session', async () => {
+    const t = install();
+    await t.call('HandlerDebugStart', {
+      kind: 'abap',
+      breakpoints: [{ exception_class: 'cx_a' }],
+    });
+    const h = { state_handle: t.state.handle };
+    await t.call('HandlerDebugStep', { ...h, action: 'detach' });
+    await t.call('HandlerDebugStep', { ...h, action: 'release_debugger' });
+    expect(t.abap.map((c) => c[0])).toEqual([
+      'start',
+      'detach',
+      'releaseDebugger',
+    ]);
+  });
+
+  it('step on AMDP: detach and release_debugger are refused', async () => {
+    const t = install();
+    await t.call('HandlerDebugStart', {
+      kind: 'amdp',
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
+    });
+    const h = { state_handle: t.state.handle };
+    for (const action of ['detach', 'release_debugger'] as const) {
+      const r = await t.call('HandlerDebugStep', { ...h, action });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain(
+        `action: ${action} does not apply to an amdp debug session`,
+      );
+    }
+    expect(t.amdp.map((c) => c[0])).toEqual(['start']);
+  });
+
   it('start abap: refuse by default, takeOver on take_over; the answer carries handle and ids', async () => {
     const t = install();
     const r = await t.call('HandlerDebugStart', {

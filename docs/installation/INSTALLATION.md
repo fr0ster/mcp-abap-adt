@@ -385,7 +385,7 @@ You can also configure the server using environment variables.
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
 - `SAP_AUTH_TYPE` - Authentication type: basic|snc|jwt (required)
-- `SAP_GRANT_TYPE` - `authorization_code` or `none`; required with jwt
+- `SAP_GRANT_TYPE` - `authorization_code`; required with jwt
 - `SAP_SNC_PARTNERNAME`, `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` - SNC (RFC only; no user, no password)
 - `SAP_SYSTEM_TYPE` - System type: `cloud` (default), `onprem`, or `legacy`. Controls tool availability (e.g. Programs require `onprem`)
 - `SAP_USERNAME` - SAP username (for basic auth)

@@ -1181,7 +1181,7 @@ SAP CONNECTION (.env file):
                                    Example: 100
   SAP_AUTH_TYPE                    Authentication type: basic|snc|jwt (required)
                                    saml, certificate and kerberos are not supported
-  SAP_GRANT_TYPE                   With jwt (required): authorization_code|none
+  SAP_GRANT_TYPE                   With jwt (required): authorization_code
   SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)
                                    Precedence: --connection-type, then the environment
                                    (the .env joins it, never over a value set), then YAML

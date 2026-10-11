@@ -73,7 +73,9 @@ Compact keeps its four debugger tools.
   - `user`: `{ debuggingMode: 'user', requestUser, terminalId, ideId }`;
   - `terminal`: `{ debuggingMode: 'terminal', terminalId, ideId }`.
 - The identity is fixed for the life of the state handle. Another identity means another start, with another handle.
-- `stop()` clears the identity: the request user, the mode and the settings.
+- **Clearing the identity on stop.** It is cleared, with the request user, the mode and the settings, only when the stop's cleanup succeeded completely.
+  - While anything is kept for a later stop (a listener not stopped, breakpoints not deleted, a connection not closed), the identity is kept, so the retry addresses the same key.
+  - A new start is refused until that cleanup is done.
 - `reconciled` stays true for the life of the instance. The predecessor of stated ids is reconciled once per process, as today.
 - The listener and each attach already run on connections of their own. This stays, and a test pins that a listener for another request user never reuses a connection that served another identity.
 
@@ -98,6 +100,11 @@ Compact keeps its four debugger tools.
   1. When the answer has one row per sent definition and the kinds agree position by position, rows pair by position. The integration test measures whether the server keeps the order; if it does not, this rule is dropped and the next one applies.
   2. Otherwise, within one kind, a single sent definition pairs with a single row.
   3. A refused row that pairs with nothing is reported as `unmatched: [{ error }]`, a new field of the answer, without guessing.
+  4. **Placed rows that cannot be paired** (positional pairing unavailable and several definitions of one kind): nothing is silently discarded.
+     - Every sent definition of that kind stays in `requested`.
+     - `armed` holds the placed rows.
+     - The answer reports `ambiguous: [kind]`, and for that kind `lost` is not reported.
+     - A later change re-sends those definitions. One the server refuses again is reported again, which costs a row and loses nothing.
 
   The server may rewrite a line URI in a placed row, so placed rows are matched by position or kind, never by URI equality.
 - **After the answer:**
@@ -116,7 +123,8 @@ Compact keeps its four debugger tools.
   2. Stop the listener.
   3. If `stopListener` succeeded, clear `armed` and `requested`, and drop any per-id deletion failure: the listener's deletion covered them.
   4. If it failed, delete by id as today. What fails stays for the next stop.
-- **A failed start.** It runs the same cleanup as a stop. It no longer deletes by the ids "placed here", because after a replacement those ids no longer say what this start added.
+- **A start refused before any change.** No mutation was sent: a preflight `409`, a refusal before the wire such as `terminal` without a terminal id or a condition on a non-line breakpoint, or a failure of the preflight itself. Such a start closes only the connections it opened, and sends no `stopListener` and no deletion.
+- **A start that failed after a change.** That is from the reconciliation or the arming on. It runs the same cleanup as a stop. It no longer deletes by the ids "placed here", because after a replacement those ids no longer say what this start added.
 
 **Detach and release.**
 
@@ -171,20 +179,24 @@ Compact keeps its four debugger tools.
   - Our own same-`ideId` listener does not block an update.
 - **The arming contract.**
   - A second change sends `requested ∪ new`.
+  - Ambiguous placed rows of one kind keep every definition and report `ambiguous`.
   - No `validationOnly` request is made.
   - Fixtures cover reordered rows, a rewritten line URI in a placed row, a refusal that pairs and one that does not (`unmatched`), and a partial refusal where an old breakpoint comes back refused (`lost`).
   - `armed` and `requested` match the rules.
 - **Stop and a failed start.**
   - After a successful `stopListener`, `armed` and `requested` are empty and per-id deletion failures are gone.
   - After a failed `stopListener`, the per-id deletes run and their failures remain.
-  - A failed start runs the same cleanup.
+  - A failed start after a change runs the same cleanup.
+  - A start refused by the preflight `409`, or before the wire, sends no `stopListener` and no deletion.
+  - A failed stop keeps the identity, a new start is refused, and the retry addresses the same key.
+  - The identity and settings are cleared only after a complete cleanup.
 - **Detach and release.**
   - Each ends in the listening state with the listener, `requested` and `armed` kept.
   - `release_debugger` drops the freed connection without a further request.
   - Its freed `500` (`text/plain` or empty) is no failure. An ADT document `500`, an HTML `500` and a `400` stay failures, with the attachment kept.
   - Both are refused for AMDP.
 - **Settings.**
-  - The preferences are applied after attach.
+  - The preferences are applied after attach, and again after a re-attach (a catch after `detach` or `release_debugger`).
   - `system_debugging: false` is sent twice after an attach.
   - `DebugSetSettings` merges, and the reported settings are the last answer's.
 - **Compact.** It gets the same parameters and actions, and they are refused for `kind: amdp`.

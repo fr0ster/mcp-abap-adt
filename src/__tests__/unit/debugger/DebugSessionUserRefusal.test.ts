@@ -186,8 +186,14 @@ describe("the system's refusal of a request user", () => {
         const stopped = session.stop();
         await until(() => world.calls.includes('stopListener'));
         world.polls[1].resolve(LISTEN_NOTHING()); // the open poll answers at its hold
-        await stopped;
+        const notes = await stopped;
         expect(world.calls).toEqual(['stopListener']);
+        // SAP's answer reaches the model as a note that is no debt, naming what stays.
+        expect(notes).toHaveLength(1);
+        expect(notes[0]).toMatch(SAID);
+        expect(notes[0]).toMatch(
+          /the breakpoints placed stay on the system: L10 \(line .*\), E1 \(exception CX_A\)/,
+        );
         expect(new Set(world.closed)).toEqual(new Set(world.opened));
         expect(session.currentIdentity()).toBeUndefined();
         expect(session.listBreakpoints()).toEqual([]);
@@ -205,7 +211,9 @@ describe("the system's refusal of a request user", () => {
       const { session, started } = armedStart(world);
       await until(() => world.polls.length === 1);
       world.polls[0].resolve(refusedResponse('listener broke'));
-      await expect(started).rejects.toThrow(/listener broke/);
+      await expect(started).rejects.toThrow(
+        /listener broke; listener: .*User SAPUSER03 does not exist.*; the breakpoints placed stay on the system: L10 \(line .*\), E1 \(exception CX_A\)/,
+      );
       await expect(started).rejects.not.toThrow(/not undone/);
       expect(world.calls).toEqual([
         'setBreakpoints:2',
@@ -234,6 +242,94 @@ describe("the system's refusal of a request user", () => {
       ]);
       expect(session.listBreakpoints()).toEqual([]);
       expect(session.currentIdentity()).toBeDefined();
+      expect(session.holdsState()).toBe(true);
+    });
+  });
+
+  describe('with stated ids (a reconciliation before the arming)', () => {
+    const STATED = { ...IDS, stated: true };
+
+    it('a refused arming: the reconciliation, the arming, the cleanup stopListener — and the session ends', async () => {
+      const world = fakeWorld();
+      world.breakpointAnswers.push(NOT_AUTHORIZED);
+      const session = new DebugSession(world.ports, STATED).bind('origin');
+      const started = session.start('refuse', {
+        breakpoints: [A],
+        requestUser: 'SAPUSER03',
+      });
+      await expect(started).rejects.toThrow(DebugRefusedError);
+      await expect(started).rejects.toThrow(SAID);
+      await expect(started).rejects.not.toThrow(/not undone/);
+      expect(world.calls).toEqual([
+        'stopListener',
+        'setBreakpoints:1',
+        'stopListener',
+      ]);
+      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      expect(session.currentIdentity()).toBeUndefined();
+      expect(session.failures()).toEqual([]);
+      expect(session.holdsState()).toBe(false);
+      await startsAgain(session, world);
+    });
+
+    it('as measured for a user that does not exist (stopListener 404): the note is told, nothing is kept', async () => {
+      const world = fakeWorld();
+      world.breakpointAnswers.push(NOT_AUTHORIZED);
+      refuseStop(world, INVALID_USER);
+      const session = new DebugSession(world.ports, STATED).bind('origin');
+      const started = session.start('refuse', {
+        breakpoints: [A],
+        requestUser: 'SAPUSER03',
+      });
+      await expect(started).rejects.toThrow(
+        /User SAPUSER03 does not exist.*; listener: .*User SAPUSER03 does not exist/,
+      );
+      await expect(started).rejects.not.toThrow(/not undone/);
+      expect(world.calls).toEqual([
+        'stopListener',
+        'setBreakpoints:1',
+        'stopListener',
+      ]);
+      expect(session.holdsState()).toBe(false);
+    });
+  });
+
+  describe('a 403 without an exception document is not read as a refusal of the user', () => {
+    const CSRF = () =>
+      refusedResponse('Forbidden', {
+        response: {
+          status: 403,
+          headers: { 'content-type': 'text/html' },
+          data: '<html><body>CSRF token validation failed</body></html>',
+        },
+      } as any);
+
+    it('at the arming: a request failure after a change', async () => {
+      const world = fakeWorld();
+      world.breakpointAnswers.push(CSRF);
+      const session = new DebugSession(world.ports, IDS).bind('origin');
+      await expect(
+        session.start('refuse', { breakpoints: [A] }),
+      ).rejects.toThrow(DebugRequestError);
+      expect(world.calls).toEqual(['setBreakpoints:1', 'stopListener']);
+    });
+
+    it('at the stopListener: the per-id deletes run and the debt stays', async () => {
+      const world = fakeWorld();
+      world.breakpointAnswers.push(ROWS);
+      const session = new DebugSession(world.ports, IDS).bind('origin');
+      const s = session.start('refuse', { breakpoints: [A, EXC] });
+      await until(() => world.polls.length === 1);
+      world.polls[0].resolve(LISTEN_NOTHING());
+      await s;
+      refuseStop(world, CSRF);
+      world.calls.length = 0;
+      await expect(session.stop()).rejects.toThrow(/listener: Forbidden/);
+      expect(world.calls).toEqual([
+        'stopListener',
+        'deleteBreakpoint:L10',
+        'deleteBreakpoint:E1',
+      ]);
       expect(session.holdsState()).toBe(true);
     });
   });

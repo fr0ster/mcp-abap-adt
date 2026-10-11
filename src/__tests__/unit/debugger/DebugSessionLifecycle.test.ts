@@ -158,7 +158,7 @@ describe('DebugSession lifecycle', () => {
     expect(world.closed).not.toContain(attaching); // only the attaching session can release it
     expect(session.holdsState()).toBe(true);
     delete world.override.stopListener;
-    await expect(session.stop()).resolves.toBeUndefined();
+    await expect(session.stop()).resolves.toEqual([]);
     expect(releases()).toBe(2); // retried on the session that attached it
     expect(world.closed).toContain(attaching);
     expect(world.calls.filter((c) => c.startsWith('attach:'))).toHaveLength(1);
@@ -180,7 +180,7 @@ describe('DebugSession lifecycle', () => {
     );
     expect(session.holdsState()).toBe(true);
     delete world.override.step;
-    await expect(session.stop()).resolves.toBeUndefined();
+    await expect(session.stop()).resolves.toEqual([]);
     expect(session.holdsState()).toBe(false);
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
   });
@@ -211,7 +211,7 @@ describe('DebugSession lifecycle', () => {
     expect(session.holdsState()).toBe(true);
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
-    await expect(session.stop()).resolves.toBeUndefined(); // the retry undoes what was left
+    await expect(session.stop()).resolves.toEqual([]); // the retry undoes what was left
     expect(session.holdsState()).toBe(false);
   });
 
@@ -259,7 +259,7 @@ describe('DebugSession lifecycle', () => {
       await expect(failed).rejects.toThrow(/close refused/);
       expect(session.holdsState()).toBe(true);
       expect(session.failures().join()).toMatch(/close refused/);
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
     });
@@ -272,7 +272,7 @@ describe('DebugSession lifecycle', () => {
       closeFailsOnce(world);
       await expect(session.stop()).rejects.toThrow(DebugCleanupError);
       expect(session.holdsState()).toBe(true);
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(
         world.calls.filter((c) => c === 'step:stepContinue:analysed'),
       ).toHaveLength(1);
@@ -302,7 +302,7 @@ describe('DebugSession lifecycle', () => {
       world.run.resolve({ ok: true, output: 'late' });
       await jest.advanceTimersByTimeAsync(0);
       expect((await session.wait(0)).state).toBe('idle');
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
     });
@@ -351,7 +351,7 @@ describe('DebugSession lifecycle', () => {
         );
         expect(session.holdsState()).toBe(true);
         gate.refuse = false;
-        await expect(session.stop()).resolves.toBeUndefined();
+        await expect(session.stop()).resolves.toEqual([]);
         expect(session.holdsState()).toBe(false);
         expect(new Set(world.closed)).toEqual(new Set(world.opened));
       } finally {
@@ -371,7 +371,7 @@ describe('DebugSession lifecycle', () => {
       );
       expect(session.holdsState()).toBe(true);
       gate.refuse = false;
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
     });
@@ -391,7 +391,7 @@ describe('DebugSession lifecycle', () => {
         /the debuggee's connection was not closed: close refused/,
       );
       gate.refuse = false;
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
     });
@@ -415,7 +415,7 @@ describe('DebugSession lifecycle', () => {
       const attaching = world.opened[world.opened.length - 1];
       expect(world.closed).not.toContain(attaching); // kept: only it can release the debuggee
       delete world.override.step;
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(world.calls).toContain('step:stepContinue:analysed'); // the retried release
       expect(world.closed).toContain(attaching);
       expect(session.holdsState()).toBe(false);

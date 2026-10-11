@@ -28,6 +28,7 @@ import {
   CONFLICT,
   fakeWorld,
   IDS,
+  INVALID_USER,
   LISTEN_CATCH,
   LISTEN_NOTHING,
   rowsXml,
@@ -269,6 +270,23 @@ describe('debugger handlers', () => {
       state_handle: context.state.handle,
     });
     expect(stopped.isError).toBeFalsy();
+    expect(context.state.holdsState()).toBe(false);
+  });
+
+  it("DebugStop: a stopListener refused for the user is no debt, and SAP's answer reaches the model as a note", async () => {
+    const { world, context } = install();
+    await startedListening(world, context);
+    await until(() => world.polls.length === 2);
+    world.override.stopListener = async () => INVALID_USER();
+    const stopping = handleDebugStop(context as any, {
+      state_handle: context.state.handle,
+    });
+    await until(() => world.log.some((c) => c.call === 'stopListener'));
+    world.polls[1].resolve(LISTEN_NOTHING());
+    const r: any = await stopping;
+    expect(r.isError).toBeFalsy();
+    expect(r.content[0].text).toMatch(/User SAPUSER03 does not exist/);
+    expect(world.log.some((c) => c.call === 'deleteBreakpoint')).toBe(false);
     expect(context.state.holdsState()).toBe(false);
   });
 

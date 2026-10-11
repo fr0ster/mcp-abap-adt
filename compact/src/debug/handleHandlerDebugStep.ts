@@ -64,8 +64,12 @@ export async function handleHandlerDebugStep(
       args,
       async () => {
         context.state!.endWhenEmpty();
-        await d.stop();
-        return { value: { state: 'stopped' }, raw: '' };
+        // A note is no debt: SAP's final refusal, reaching the model as it is.
+        const notes = await d.stop();
+        return {
+          value: { state: 'stopped', ...(notes.length ? { notes } : {}) },
+          raw: notes.join('\n'),
+        };
       },
       (v) => v,
     );

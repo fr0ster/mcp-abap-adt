@@ -620,6 +620,7 @@ export class DebugSession<O = unknown> {
           FIRST_POLL_HOLD_SECONDS,
         );
         listener.open = undefined; // handled here
+        // A 404 invalidUser on a listen was never measured; it is read like the 403.
         if (!first.ok && refusesUser(first)) {
           // Our choice on an explicit reading (refusesUser), a safety net: after an
           // arming the system accepted, a conforming server does not refuse the listen
@@ -682,17 +683,22 @@ export class DebugSession<O = unknown> {
         // A start that failed after a change runs the stop's cleanup. It no longer
         // deletes the ids "placed here": after a replacement they do not say what this
         // start added.
+        this.cleanupNotes = [];
         const failures = await this.cleanupLocked();
+        const notes = this.cleanupNotes.splice(0);
         this.failure = undefined;
         this.notices.length = 0;
         this.settle(failures);
-        if (failures.length === 0) throw error;
-        const notUndone = `not undone: ${failures.join('; ')}`;
+        const told = [
+          ...notes,
+          ...(failures.length ? [`not undone: ${failures.join('; ')}`] : []),
+        ];
+        if (told.length === 0) throw error;
         if (error instanceof Error) {
-          error.message = `${error.message}; ${notUndone}`;
+          error.message = `${error.message}; ${told.join('; ')}`;
           throw error;
         }
-        throw new DebugListenerError(`${thrown(error)}; ${notUndone}`);
+        throw new DebugListenerError(`${thrown(error)}; ${told.join('; ')}`);
       }
     });
   }
@@ -1153,6 +1159,8 @@ export class DebugSession<O = unknown> {
   private run?: { generation: number; connection?: IAbapConnection };
   private reconciled = false;
   private cleanupFailures: string[] = [];
+  /** What the current cleanup has to tell that is no debt: SAP's final refusal of the stopListener. */
+  private cleanupNotes: string[] = [];
   /** Connections whose work is done but whose close threw: the next stop closes them. */
   private readonly unclosed = new Set<IAbapConnection>();
   /** Attached debuggees whose release failed, each with its connection: the next stop retries. */
@@ -1345,7 +1353,18 @@ export class DebugSession<O = unknown> {
           // No per-id deletes: breakpoints are not ours to remove for a lack of
           // rights — whoever has the rights debugs them. The session lets go of them
           // (the system keeps them), no failure is recorded, and the session ends.
+          // SAP's answer still reaches the model, as a note that is no debt, naming
+          // the breakpoints that stay on the system.
+          const placed = this.listBreakpoints();
+          this.cleanupNotes.push(
+            placed.length
+              ? `listener: ${messageOf(stopped)}; the breakpoints placed stay on the system: ${placed.map(describePlaced).join(', ')}`
+              : `listener: ${messageOf(stopped)}`,
+          );
           this.forgetAll();
+          // Unlike after a stopListener that succeeded, the system's listener was not
+          // stopped, so nothing wakes an open poll: the wait for its answer can last
+          // the poll's full hold — the system's clock, not ours.
           await this.retireListener(listener, open, failures);
         } else {
           // 4. Deleted by id, as before; what fails stays for the next stop.
@@ -1420,15 +1439,20 @@ export class DebugSession<O = unknown> {
    * Everything off — DebugStop, dispose, shutdown. Required, not best effort.
    * A stopped listener counts as off once the system answered its open poll.
    * Never throws anything but DebugCleanupError, and whatever failed stays for the next stop.
+   * Answers the notes that are no debt: SAP's final refusal of the stopListener.
    */
-  stop(): Promise<void> {
+  stop(): Promise<string[]> {
     return this.mutate(async () => {
+      this.cleanupNotes = [];
       const failures = await this.cleanupLocked();
+      const notes = this.cleanupNotes.splice(0);
       this.failure = undefined;
       this.notices.length = 0;
       this.settle(failures);
       this.notify(); // also tells the instance state (observe) that this part may hold nothing now
-      if (failures.length) throw new DebugCleanupError(failures.join('; '));
+      if (failures.length)
+        throw new DebugCleanupError([...failures, ...notes].join('; '));
+      return notes;
     });
   }
 

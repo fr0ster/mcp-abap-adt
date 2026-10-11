@@ -43,8 +43,11 @@ export class DebuggerInstance implements StatePart {
     this.amdp.observe(onChange);
   }
 
-  /** Stops both; what either could not undo is reported, named, and stays for another stop. */
-  async stop(): Promise<void> {
+  /**
+   * Stops both; what either could not undo is reported, named, and stays for
+   * another stop. Answers the notes that are no debt.
+   */
+  async stop(): Promise<string[]> {
     const results = await Promise.allSettled([
       this.abap.stop(),
       this.amdp.stop(),
@@ -53,10 +56,13 @@ export class DebuggerInstance implements StatePart {
       r.status === 'rejected' ? [messageOf(r.reason)] : [],
     );
     if (failures.length) throw new DebugCleanupError(failures.join('; '));
+    return results.flatMap((r) =>
+      r.status === 'fulfilled' && Array.isArray(r.value) ? r.value : [],
+    );
   }
 
-  dispose(): Promise<void> {
-    return this.stop();
+  async dispose(): Promise<void> {
+    await this.stop();
   }
 }
 

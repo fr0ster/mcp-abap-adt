@@ -1315,8 +1315,10 @@ its table**. The help, the YAML template and the validation come from it.
   (`@mcp-abap-adt/compact-http`); over SSE `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`);
   each identical to its full transport's bin but for the tool set; `debug` beside `ro` / `rw` on
   each.
-- **stdio users**: `--transport` is gone — remove it (D39); the first start after upgrading logs in
-  once per `jwt` / `authorization_code` destination (broker 5 reads earlier sessions as unbound);
+- **stdio users**: `--transport` is gone — remove it (D39); a destination with **no** session record
+  logs in on first use, as before, but an **existing** record of an older format is not read as
+  unbound and no login starts — the start stops with the refusal below (an absent session permits
+  a login, an invalid one stops);
   **a token you hold (`jwt` / `none`, `SAP_JWT_TOKEN` in an `--env` file) is no longer served
   over stdio** — send it in `x-sap-jwt-token` to `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or
   create a stdio session with `mcp-auth` (D53); **only session records written by `mcp-auth` or

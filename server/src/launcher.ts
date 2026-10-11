@@ -1,11 +1,11 @@
 import { StreamableHttpServer } from '@mcp-abap-adt/http';
+import type { IBrowser } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
   browserCallbackStrategy,
   describeAuthError,
   errorClassOf,
-  type IDestinations,
 } from '@mcp-abap-adt/lib/auth';
 import type { HandlerSet, IServerConfig } from '@mcp-abap-adt/lib/config';
 import {
@@ -30,9 +30,16 @@ import {
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
 import { SseServer } from '@mcp-abap-adt/sse';
-import { AuthBrokerFactory, type IAuthBrokerFactoryConfig } from './auth';
+import {
+  AuthBrokerFactory,
+  BrowserChoiceError,
+  browserFor,
+  browserOf,
+  type IAuthBrokerFactoryConfig,
+  promptLogger,
+} from './auth';
 import { CORE_VERSION } from './coreVersion.js';
-import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';
+import { StdioServer } from './StdioServer.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
 import { closeInstanceState } from './stateClose.js';
 
@@ -106,7 +113,9 @@ ENVIRONMENT VARIABLES:
     MCP_SSE_PORT                   SSE server port (default: 3001)
     MCP_ENV_PATH                   Explicit .env file path (same as --env-path)
     MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
-    MCP_BROWSER                    Browser for a login: chrome|edge|firefox|system|headless|none
+    MCP_BROWSER                    Browser for a login: system|auto|chrome|edge|firefox|none|headless
+    MCP_BROWSER_PROGRAM            The program that opens the login URL (excludes MCP_BROWSER)
+    MCP_RENEWAL                    refresh-then-login (default) | refresh-only (never a login)
     MCP_BROWSER_AUTH_PORT          Login callback port, 1-65535 (default: 61001)
     MCP_STATE_IDLE_MINUTES         Held state (a debug session) ends after this many minutes
                                    without a tool call: at least 30 (default: 30)
@@ -288,6 +297,8 @@ export interface LauncherDeps {
   exit: (code: number) => void;
   /** Where the shutdown listens: `process` in the program. */
   processLike: ShutdownProcess;
+  /** The platform `--browser` is mapped for; `process.platform` when absent. */
+  platform?: string;
 }
 
 /**
@@ -376,64 +387,33 @@ export function effectiveSystemType(
 }
 
 /**
- * The login strategy, with prompts that reach the user. auth-providers'
- * strategy speaks to the user through the request's logger — the URL to open
- * under `--browser=none`/`headless`, or `auto` when it could not open one — and
- * that logger is the broker's, silent unless DEBUG_AUTH_LOG is set. A prompt
- * the user cannot see makes the login impassable: it times out.
- *
- * So the strategy gets its own logger: `info`, the level the strategy prompts
- * at, is a line on stderr always; `warn`, `error` and `debug` stay the
- * broker's — diagnostics, gated, and they may quote an error's message (H4).
- * Not "no logger" (auth-providers then writes prompts to stderr itself): that
- * would also drop those diagnostics under DEBUG_AUTH_LOG. Never stdout (H3).
- */
-export function promptsOnStderr(
-  browserStrategy: IAuthBrokerFactoryConfig['browserStrategy'],
-  stderr: (line: string) => void,
-  diagnostics: ILogger,
-): IAuthBrokerFactoryConfig['browserStrategy'] {
-  const logger: ILogger = {
-    info: (message: string) => stderr(message),
-    warn: (message, meta) => diagnostics.warn(message, meta),
-    error: (message, meta) => diagnostics.error(message, meta),
-    debug: (message, meta) => diagnostics.debug(message, meta),
-  };
-  return (options) => {
-    const strategy = browserStrategy(options);
-    const prompting: ReturnType<typeof browserStrategy> = {
-      authorize: (request) => strategy.authorize({ ...request, logger }),
-    };
-    if (strategy.dispose) {
-      prompting.dispose = () => strategy.dispose?.() ?? Promise.resolve();
-    }
-    return prompting;
-  };
-}
-
-/** The browser of a login when none is given. */
-const DEFAULT_BROWSER = 'system';
-
-/**
- * The factory's configuration, read from the parameters alone. The callback
- * port is left to the strategy (61001) when none is given; the env file
- * carries the parameter it came from, as the user gave it.
+ * The factory's configuration, read from the parameters and the browser the
+ * launcher mapped (`browserFor`). The callback port is left to the strategy
+ * (61001) when none is given; the env file carries the parameter it came
+ * from, as the user gave it.
  */
 export function factoryConfigFrom(
   config: IServerConfig,
-  collaborators: Pick<IAuthBrokerFactoryConfig, 'browserStrategy' | 'logger'>,
+  collaborators: Pick<
+    IAuthBrokerFactoryConfig,
+    'browserStrategy' | 'logger' | 'promptLogger'
+  > & { browser?: IBrowser | undefined },
 ): IAuthBrokerFactoryConfig {
   return {
     ...envFileOf(config),
     ...(config.mcpDestination && { mcpDestination: config.mcpDestination }),
     ...(config.authBrokerPath && { authBrokerPath: config.authBrokerPath }),
     unsafe: config.unsafe ?? false,
-    browser: config.browser ?? DEFAULT_BROWSER,
+    ...(collaborators.browser !== undefined && {
+      browser: collaborators.browser,
+    }),
     ...(config.browserAuthPort !== undefined && {
       browserAuthPort: config.browserAuthPort,
     }),
     ...(config.connectionType && { connectionType: config.connectionType }),
+    ...(config.renewal && { renewal: config.renewal }),
     browserStrategy: collaborators.browserStrategy,
+    promptLogger: collaborators.promptLogger,
     ...(collaborators.logger && { logger: collaborators.logger }),
   };
 }
@@ -451,10 +431,11 @@ function startupWords(error: unknown, destination: string): string {
 }
 
 /**
- * The startup summary: the destination's settings, then what its stores
- * hold, masked as before (H4's one exception). The settings are read first
- * and their failure is the caller's: a destination that cannot be served
- * stops the start.
+ * The startup check (D18), then the summary. The destination's settings are
+ * read and its provider is built — `getProvider(destination, { signal })`
+ * with the start's own signal, aborted once the check ends — so a
+ * destination the broker refuses stops the start; building sends nothing.
+ * Then what its stores hold, masked as before (H4's one exception).
  */
 async function checkAndSummarise(
   factory: AuthBrokerFactory,
@@ -463,6 +444,12 @@ async function checkAndSummarise(
   stderr: (line: string) => void,
 ): Promise<void> {
   const settings = await factory.settingsFor(destination);
+  const startup = new AbortController();
+  try {
+    await factory.getProvider(destination, { signal: startup.signal });
+  } finally {
+    startup.abort();
+  }
   try {
     const broker = await factory.getBroker(destination);
     const connConfig = await broker.getConnectionConfig(destination);
@@ -582,13 +569,30 @@ export async function launch(
 
   const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
 
+  // The browser of a login, mapped by the platform (D9); a choice that
+  // cannot be served stops the start before anything is read.
+  let browser: IBrowser | undefined;
+  try {
+    browser = browserOf(
+      browserFor(
+        { browser: config.browser, program: config.browserProgram },
+        deps.platform ?? process.platform,
+      ),
+    );
+  } catch (error) {
+    if (!(error instanceof BrowserChoiceError)) throw error;
+    deps.stderr(`[MCP] ${error.message}`);
+    deps.exit(1);
+    return;
+  }
+
   const factory = new AuthBrokerFactory(
     factoryConfigFrom(config, {
-      browserStrategy: promptsOnStderr(
-        deps.browserStrategy,
-        deps.stderr,
-        loggerForTransport,
-      ),
+      browserStrategy: deps.browserStrategy,
+      browser,
+      // A login prompts on stderr whatever DEBUG_AUTH_LOG says; the broker's
+      // diagnostics stay gated (§9).
+      promptLogger: promptLogger(deps.stderr, loggerForTransport),
       logger: loggerForTransport,
     }),
   );
@@ -609,15 +613,8 @@ export async function launch(
   }
 
   if (config.transport === 'stdio') {
-    let destinations: IDestinations = factory;
-    let served: string;
-
-    if (destination) {
-      served = destination;
-    } else {
+    if (!destination) {
       // Inspection-only mode: no connection parameters provided
-      destinations = inspectionOnlyDestinations();
-      served = 'mock';
       deps.stderr(
         '[MCP] Starting in inspection-only mode (no connection parameters).',
       );
@@ -626,12 +623,16 @@ export async function launch(
       );
     }
 
-    const server = new StdioServer(handlersRegistry, destinations, {
-      version: options.version,
-      stateIdleMinutes: config.stateIdleMinutes,
-      stateLogger: stateLoggerForTransport,
-      logger: loggerForTransport,
-    });
+    const server = new StdioServer(
+      handlersRegistry,
+      destination ? factory : undefined,
+      {
+        version: options.version,
+        stateIdleMinutes: config.stateIdleMinutes,
+        stateLogger: stateLoggerForTransport,
+        logger: loggerForTransport,
+      },
+    );
     activeServer = server;
     // Under stdio a signal is not the end of input: the factory's gate holds.
     installShutdown({
@@ -648,7 +649,7 @@ export async function launch(
       stderr: deps.stderr,
       processLike: deps.processLike,
     });
-    await server.start(served);
+    await server.start(destination);
     return;
   }
 

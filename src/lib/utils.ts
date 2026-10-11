@@ -1036,8 +1036,10 @@ ENVIRONMENT FILE:
                                    --allow-destination-header
   --allow-destination-header       Honour the x-mcp-destination header (HTTP/SSE, off by default)
   --unsafe                         Write named destinations' sessions to disk (default: in memory)
-  --browser=<name>                 Browser for a login: chrome|edge|firefox|system|headless|none
+  --browser=<name>                 Browser for a login: system|auto|chrome|edge|firefox|none|headless
+  --browser-program=<program>      The program that opens the login URL (excludes --browser)
   --browser-auth-port=<port>       Login callback port, 1-65535 (default: 61001)
+  --renewal=<mode>                 refresh-then-login (default) | refresh-only (never a login)
 
 TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
@@ -1064,6 +1066,8 @@ ENVIRONMENT VARIABLES:
   MCP_ENV_PATH                     Explicit .env file path (same as --env-path)
   MCP_UNSAFE                       Same as --unsafe (true|false)
   MCP_BROWSER                      Same as --browser
+  MCP_BROWSER_PROGRAM              Same as --browser-program
+  MCP_RENEWAL                      Same as --renewal
   MCP_BROWSER_AUTH_PORT            Same as --browser-auth-port (default: 61001)
   MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
   MCP_TRANSPORT                    Transport type (stdio|http|sse)

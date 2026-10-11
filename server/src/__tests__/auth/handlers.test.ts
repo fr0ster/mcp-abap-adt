@@ -2,31 +2,42 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
+  IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import {
   SettingsError,
   UnsupportedAuthenticationError,
 } from '@mcp-abap-adt/lib/auth';
 import { type AuthHandlerContext, handlerFor } from '../../auth/handlers';
-import { LoginLock } from '../../auth/loginLock';
+import type { LoginStrategyOptions } from '../../auth/IAuthBrokerFactoryConfig';
+
+const BROWSER: IBrowser = { open: async () => {} };
+const silent = { info() {}, warn() {}, error() {}, debug() {} };
 
 function context(over: Partial<AuthHandlerContext> = {}) {
-  const calls: { browser: string; port?: number }[] = [];
+  const calls: LoginStrategyOptions[] = [];
+  const recorded: IAuthorizationStrategy<string>[] = [];
+  const requests: AuthorizationRequest[] = [];
   const ctx: AuthHandlerContext = {
-    browser: 'headless',
-    loginLock: new LoginLock(),
+    browser: BROWSER,
     browserStrategy: (options) => {
       calls.push(options);
       return {
-        authorize: async () => ({ payload: 'code', redirectUri: 'r' }),
+        authorize: async (request) => {
+          requests.push(request);
+          return { payload: 'code', redirectUri: 'r' };
+        },
       };
     },
+    login: { logger: silent, record: (s) => recorded.push(s) },
     ...over,
   };
-  return { ctx, calls };
+  return { ctx, calls, recorded, requests };
 }
 
-const request = {} as AuthorizationRequest;
+const request = {
+  buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
+} as AuthorizationRequest;
 
 describe('handlerFor', () => {
   it.each([
@@ -90,44 +101,32 @@ describe('brokerOptions', () => {
     expect(handlerFor('d', vetted).brokerOptions(context().ctx)).toEqual({});
   });
 
-  it('jwt / authorization_code returns exactly `authorization`, locked, with the context browser and port', async () => {
-    const { ctx, calls } = context({ browserAuthPort: 4242 });
+  it('jwt / authorization_code returns exactly `authorization`: serverLogin over the context browser and port', async () => {
+    const { ctx, calls, recorded, requests } = context({
+      browserAuthPort: 4242,
+    });
     const options = handlerFor('d', {
       authType: 'jwt',
       grantType: 'authorization_code',
     }).brokerOptions(ctx);
     expect(Object.keys(options)).toEqual(['authorization']);
     const strategy = options.authorization?.('d', 'authorization_code');
-    expect(calls).toEqual([{ browser: 'headless', port: 4242 }]);
-
-    // Observed through the lock: while the lock is held, authorize waits.
-    let release!: () => void;
-    const held = ctx.loginLock.run(
-      () => new Promise<void>((r) => (release = r)),
-    );
-    let done = false;
-    const login = (strategy as IAuthorizationStrategy<string>)
-      .authorize(request)
-      .then(() => {
-        done = true;
-      });
-    await new Promise((r) => setTimeout(r, 20));
-    expect(done).toBe(false);
-    release();
-    await held;
-    await login;
-    expect(done).toBe(true);
+    expect(calls).toEqual([{ browser: BROWSER, port: 4242 }]);
+    // The serverLogin wrapper: recorded for disposal, the prompt logger in.
+    expect(recorded).toEqual([strategy]);
+    await (strategy as IAuthorizationStrategy<string>).authorize(request);
+    expect(requests[0].logger).toBe(silent);
   });
 
-  it('leaves the port out when the context has none', () => {
-    const { ctx, calls } = context();
+  it('leaves the browser and the port out when the context has none', () => {
+    const { ctx, calls } = context({ browser: undefined });
     handlerFor('d', {
       authType: 'jwt',
       grantType: 'authorization_code',
     })
       .brokerOptions(ctx)
       .authorization?.('d', 'authorization_code');
-    expect(calls).toEqual([{ browser: 'headless' }]);
+    expect(calls).toEqual([{}]);
   });
 });
 

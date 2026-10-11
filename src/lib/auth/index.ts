@@ -22,6 +22,11 @@ export type {
   SettleReport,
 } from './IAuthBrokerFactory.js';
 export {
+  INSPECTION_ONLY_WORDS,
+  ServerRefusal,
+  type ServerRefusalCode,
+} from './serverRefusal';
+export {
   type AuthType,
   type VettedAuthentication,
   vetMeans,

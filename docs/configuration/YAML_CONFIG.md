@@ -60,8 +60,11 @@ unsafe: false
 # Base directory of service-keys/ and sessions/
 auth-broker-path: ~/custom/path
 
-# Browser for a login: chrome | edge | firefox | system (default) | headless | none
+# Browser for a login: system (default) | auto | chrome | edge | firefox | none | headless
 browser: system
+
+# How an expired session is renewed: refresh-then-login (default) | refresh-only
+renewal: refresh-then-login
 
 # Login callback port, 1-65535 (default 61001)
 browser-auth-port: 61001
@@ -107,7 +110,9 @@ sse:
 | `system-type` | string | tools: `cloud`; connector: `cloud` for a `jwt`, else `onprem` | `onprem`, `cloud` or `legacy`; never guessed from the URL |
 | `unsafe` | boolean | `false` | Write named destinations' sessions to disk instead of keeping them in memory |
 | `auth-broker-path` | string | - | Base directory of `service-keys/` and `sessions/` |
-| `browser` | string | `system` | Browser for a login: `chrome`, `edge`, `firefox`, `system`, `headless`, `none` |
+| `browser` | string | `system` | Browser for a login: `system`, `auto`, `chrome`, `edge`, `firefox`, `none`, `headless` (mapped by the platform; excludes `browser-program`) |
+| `browser-program` | string | — | The program that opens the login URL (excludes `browser`) |
+| `renewal` | string | `refresh-then-login` | `refresh-then-login` or `refresh-only` (never a login) |
 | `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |
 | `allow-destination-header` | boolean | `false` | Honour the `x-mcp-destination` header (HTTP/SSE only) |
 | `state-idle-minutes` | number | `30` | Held state (a debug session) ends after this many minutes without a tool call; a whole number, at least 30 and at most 35791 (the longest a timer can hold). A call in flight pauses it; a listener's own background re-poll does not count |

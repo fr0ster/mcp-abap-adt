@@ -47,6 +47,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@mcp-abap-adt/auth-errors": "^2.2.0",
     "@mcp-abap-adt/lib": "^17.2.2",
     "@mcp-abap-adt/logger": "^0.4.1",
     "@modelcontextprotocol/sdk": "^1.32.0",

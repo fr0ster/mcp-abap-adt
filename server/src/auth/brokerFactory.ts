@@ -4,20 +4,36 @@
  * Building a destination's broker decides three things, each before anything
  * is built: is what the destination states well formed (`vetMeans`), is
  * there a handler for it (`handlerFor`), and then the broker with exactly the
- * destination's stores and that handler's options. A failure reaches the
- * caller as the error it is.
+ * destination's stores, the options the server states for every destination
+ * (`renewal`, `onWriteFailure` by store, `authDebug`) and that handler's
+ * options. A failure reaches the caller as the error it is.
  *
  * Its providers are handed out counted, behind one gate: `settle` closes the
- * gate, waits for the calls already running, then flushes every broker.
+ * gate, disposes the logins it composed, waits for the calls already
+ * running, then flushes every broker.
+ *
+ * The settings are read once per process (D3); the provider is asked of the
+ * broker on every call, with the caller's signal — the factory keeps no
+ * provider cache, the broker does.
  */
 
-import { AuthBroker, DestinationConfigError } from '@mcp-abap-adt/auth-broker';
+import {
+  AuthBroker,
+  type BrokerCallOptions,
+  DestinationConfigError,
+} from '@mcp-abap-adt/auth-broker';
+import { classify } from '@mcp-abap-adt/auth-errors';
+import { refreshOnly, refreshThenLogin } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import type {
+  IAuthorizationStrategy,
+  IAuthProvider,
+  IAuthProviderError,
+  IRenewalStrategy,
+} from '@mcp-abap-adt/interfaces-auth';
 import {
   assertDestinationName,
   type DestinationSystemContext,
-  errorClassOf,
   getPlatformPaths,
   type IAuthBrokerFactory,
   SettingsError,
@@ -38,7 +54,7 @@ import {
   handlerFor,
 } from './handlers';
 import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
-import { LoginLock } from './loginLock';
+import { type RenewalMode, serverSentence } from './serverSentences';
 
 /** The destination an `--env` file is served as. */
 const ENV_FILE_DESTINATION = 'default';
@@ -50,24 +66,42 @@ interface Built {
   stores: DestinationStores;
 }
 
-const ENTRY = /^"[^"\n]*": [A-Za-z_$][\w$]*$/;
+/** An own data property of a foreign value, never a getter; `undefined` otherwise. */
+function ownValue(value: unknown, key: string): unknown {
+  if (value === null || typeof value !== 'object') return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 /**
- * A rejecting `flush()` as `"<destination>": <ErrorClass>` lines: the
- * broker's `AggregateError` entries when they have that shape, else the
- * destination and the class of what was thrown.
+ * A rejecting `flush()` as `"<destination>": <reason>` lines. The broker
+ * rejects with an `AggregateError` of `SessionWriteFailure`s, each carrying
+ * its destination and its store error classified; every entry — and anything
+ * else a flush rejects with — is read with auth-errors'
+ * `classify(entry, 'persisting-tokens')`, never by its message or class.
  */
-function notStoredOf(destination: string, error: unknown): string[] {
-  if (error instanceof AggregateError) {
-    const lines = error.errors.map((entry: unknown) =>
-      entry instanceof Error && ENTRY.test(entry.message)
-        ? entry.message
-        : `"${destination}": ${errorClassOf(entry)}`,
-    );
-    if (lines.length > 0) return lines;
-  }
-  return [`"${destination}": ${errorClassOf(error)}`];
+function unstoredLines(destination: string, error: unknown): string[] {
+  const entries = ownValue(error, 'errors');
+  const lines = Array.isArray(entries)
+    ? entries.map((entry: unknown) => {
+        const named = ownValue(entry, 'destination');
+        const where = typeof named === 'string' ? named : destination;
+        return `"${where}": ${classify(entry, 'persisting-tokens').reason}`;
+      })
+    : [];
+  return lines.length > 0
+    ? lines
+    : [`"${destination}": ${classify(error, 'persisting-tokens').reason}`];
 }
+
+const RENEWALS: Readonly<Record<RenewalMode, () => IRenewalStrategy>> = {
+  'refresh-then-login': refreshThenLogin,
+  'refresh-only': refreshOnly,
+};
 
 export class AuthBrokerFactory implements IAuthBrokerFactory {
   readonly defaultDestination: string | undefined;
@@ -75,9 +109,13 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   private readonly config: IAuthBrokerFactoryConfig;
   private readonly context: AuthHandlerContext;
   private readonly gate = new ProviderGate();
+  private readonly renewal: RenewalMode;
   /** The build of each destination, set before its first await. */
   private readonly built = new Map<string, Promise<Built>>();
-  private readonly providers = new Map<string, Promise<IAuthProvider>>();
+  /** One counted wrapper per inner provider the brokers answered. */
+  private readonly counted = new WeakMap<IAuthProvider, IAuthProvider>();
+  /** Every login strategy composed, disposed at shutdown. */
+  private readonly logins = new Set<IAuthorizationStrategy<string>>();
   private readonly settings = new Map<string, Promise<SapConfig>>();
   private readonly systemContexts = new Map<
     string,
@@ -89,14 +127,32 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     this.defaultDestination =
       config.mcpDestination ??
       (config.envFile ? ENV_FILE_DESTINATION : undefined);
+    this.renewal = config.renewal ?? 'refresh-then-login';
     this.context = {
-      browser: config.browser,
+      ...(config.browser !== undefined && { browser: config.browser }),
       ...(config.browserAuthPort !== undefined && {
         browserAuthPort: config.browserAuthPort,
       }),
-      loginLock: new LoginLock(),
       browserStrategy: config.browserStrategy,
+      login: {
+        logger: config.promptLogger,
+        record: (strategy) => {
+          this.logins.add(strategy);
+        },
+      },
     };
+  }
+
+  /**
+   * The server's own sentence for a chain failure (§7.4), keyed on its
+   * `kind` and this factory's state: the renewal it was started with, and
+   * whether the shutdown closed its gate.
+   */
+  sentenceFor(error: IAuthProviderError): string | undefined {
+    return serverSentence(error, {
+      renewal: this.renewal,
+      shuttingDown: this.gate.closed,
+    });
   }
 
   /**
@@ -183,26 +239,39 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return context;
   }
 
-  getProvider(destination: string): Promise<IAuthProvider> {
-    const cached = this.providers.get(destination);
-    if (cached) return cached;
-    const provider = (async () => {
-      const broker = await this.getBroker(destination);
-      return countedProvider(await broker.getProvider(destination), this.gate);
-    })();
-    this.providers.set(destination, provider);
-    provider.catch(() => {
-      if (this.providers.get(destination) === provider) {
-        this.providers.delete(destination);
-      }
+  /**
+   * The destination's provider, asked of its broker on every call with the
+   * caller's `signal` (the broker answers its cached provider while the
+   * destination is unchanged), handed out counted: one wrapper per inner
+   * provider, so the same inner answers the same wrapper.
+   */
+  async getProvider(
+    destination: string,
+    options: BrokerCallOptions = {},
+  ): Promise<IAuthProvider> {
+    const broker = await this.getBroker(destination);
+    const inner = await broker.getProvider(destination, {
+      signal: options.signal,
     });
-    return provider;
+    const known = this.counted.get(inner);
+    if (known) return known;
+    const wrapper = countedProvider(inner, this.gate);
+    this.counted.set(inner, wrapper);
+    return wrapper;
   }
 
-  async settle(deadlineMs: number): Promise<SettleReport> {
+  async settle(
+    deadlineMs: number,
+    options: BrokerCallOptions = {},
+  ): Promise<SettleReport> {
     // Closed first, before any await: a 401 answered from here on gets the
     // shutdown refusal instead of a renewal that would land after the flush.
     this.gate.close();
+    // Every login composed ends (`disposed`): its listener is released, and
+    // a call waiting on it answers.
+    await Promise.allSettled(
+      [...this.logins].map((login) => login.dispose?.()),
+    );
     const abandoned = await this.gate.drained(deadlineMs);
     const builds = await Promise.allSettled(
       [...this.built.entries()].map(async ([destination, build]) => ({
@@ -216,9 +285,9 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         if (outcome.status !== 'fulfilled') return;
         const { destination, built } = outcome.value;
         try {
-          await built.broker.flush();
+          await built.broker.flush({ signal: options.signal });
         } catch (error) {
-          notStored.push(...notStoredOf(destination, error));
+          notStored.push(...unstoredLines(destination, error));
         }
       }),
     );
@@ -246,14 +315,23 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   }
 
   private async build(destination: string): Promise<Built> {
-    const stores = storesFor(this.modeOf(destination), this.config.logger);
+    const mode = this.modeOf(destination);
+    const stores = storesFor(mode, this.config.logger);
     const means = await stores.serviceKeyStore.getConnectionConfig(destination);
     const vetted = vetMeans(destination, means);
     const handler = handlerFor(destination, vetted);
+    const renewal = RENEWALS[this.renewal];
     const broker = new AuthBroker(
       {
         serviceKeyStore: stores.serviceKeyStore,
         sessionStore: stores.sessionStore,
+        // D11: every token row renews this way; basic, snc and none ignore it.
+        renewal: () => renewal(),
+        // D12: the user's own --env file must see a write that did not land;
+        // a named destination (in memory, or sessions/ under --unsafe) goes on.
+        onWriteFailure: mode.kind === 'envFile' ? 'fail' : 'continue',
+        // D24 (A11) turns this on from --auth-debug only.
+        authDebug: false,
         ...handler.brokerOptions(this.context),
       },
       this.config.logger,

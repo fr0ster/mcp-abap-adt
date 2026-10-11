@@ -31,8 +31,15 @@ export interface DestinationSystemContext {
 export interface IDestinations {
   /** The connector's settings: URL, client, auth type, connection type — no secret. */
   settingsFor(destination: string): Promise<SapConfig>;
-  /** The destination's provider, counted while it works. */
-  getProvider(destination: string): Promise<IAuthProvider>;
+  /**
+   * The destination's provider, counted while it works. Asked per request,
+   * with the request's `signal`: the broker answers its cached provider while
+   * the destination is unchanged, and the signal releases this caller alone.
+   */
+  getProvider(
+    destination: string,
+    options?: { readonly signal?: AbortSignal | undefined },
+  ): Promise<IAuthProvider>;
   /**
    * The responsible and master system the destination's own `.env` states
    * (the `--env` file, or `sessions/<destination>.env`). Optional: a server
@@ -46,7 +53,10 @@ export interface IDestinations {
 export interface SettleReport {
   /** Provider calls still running at the deadline: their result is lost. */
   abandoned: number;
-  /** `"<destination>": <ErrorClass>` for each session secret not stored. */
+  /**
+   * `"<destination>": <reason>` for each session secret not stored, the
+   * reason auth-errors' `classify(entry, 'persisting-tokens')`.
+   */
   notStored: string[];
 }
 
@@ -60,8 +70,12 @@ export interface IAuthBrokerFactory extends IDestinations {
    */
   getBroker(destination: string): Promise<AuthBroker>;
   /**
-   * Closes the gate on provider calls, waits for the ones in progress up to
-   * `deadlineMs`, then flush()es every broker built.
+   * Closes the gate on provider calls, disposes the login strategies it
+   * composed, waits for the calls in progress up to `deadlineMs`, then
+   * `flush({ signal })`es every broker built.
    */
-  settle(deadlineMs: number): Promise<SettleReport>;
+  settle(
+    deadlineMs: number,
+    options?: { readonly signal?: AbortSignal | undefined },
+  ): Promise<SettleReport>;
 }

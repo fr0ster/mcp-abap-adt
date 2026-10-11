@@ -1,3 +1,4 @@
+import { authError } from '@mcp-abap-adt/auth-errors';
 import type {
   AuthOutcome,
   IAuthProvider,
@@ -14,7 +15,7 @@ import {
 const OK: AuthOutcome = { ok: true };
 const OOPS: AuthOutcome = {
   ok: false,
-  refusal: { reason: 'refused by the inner provider', hint: 'a hint' },
+  refusal: authError['credential-refused']({ credential: 'token' }),
 };
 
 function deferred<T>() {
@@ -136,7 +137,7 @@ describe('countedProvider', () => {
       const outcome = await call(p, m);
       expect(outcome).toEqual({
         ok: false,
-        refusal: { reason: 'the server is shutting down' },
+        refusal: authError['interactive-login']({ outcome: 'aborted' }),
       });
       expect(outcome).toEqual(SHUTDOWN_REFUSAL);
       expect(calls).toHaveLength(0);

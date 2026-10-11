@@ -155,6 +155,8 @@ export class ServerConfigManager {
       browserAuthPort: parsed.browserAuthPort,
       allowDestinationHeader: parsed.allowDestinationHeader,
       browser: parsed.browser,
+      browserProgram: parsed.browserProgram,
+      renewal: parsed.renewal,
       envDestination: parsed.envDestination,
       envPath: parsed.envPath,
       envFileSource: parsed.envFileSource,

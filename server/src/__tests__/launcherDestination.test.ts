@@ -10,6 +10,21 @@ import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
+// The shipped browsers are stand-ins tagged with what they were built for:
+// the launcher's mapping is observed, and nothing is ever launched.
+jest.mock('@mcp-abap-adt/auth-providers', () => {
+  const actual = jest.requireActual('@mcp-abap-adt/auth-providers');
+  const tagged = (factory: string) => (argument?: string) => ({
+    open: async () => {},
+    built: argument === undefined ? factory : `${factory}(${argument})`,
+  });
+  return {
+    ...actual,
+    linuxDefaultBrowser: tagged('linuxDefaultBrowser'),
+    linuxBrowser: tagged('linuxBrowser'),
+  };
+});
+
 // Every broker the factory builds is counted; nothing else changes.
 jest.mock('@mcp-abap-adt/auth-broker', () => {
   const actual = jest.requireActual('@mcp-abap-adt/auth-broker');
@@ -22,15 +37,15 @@ jest.mock('@mcp-abap-adt/auth-broker', () => {
   };
 });
 
+import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import { StreamableHttpServer } from '@mcp-abap-adt/http';
 import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
-import { browserCallbackStrategy } from '@mcp-abap-adt/lib/auth';
 import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
 import { SseServer } from '@mcp-abap-adt/sse';
-import { AuthBrokerFactory } from '../auth';
+import { AuthBrokerFactory, type LoginStrategyOptions } from '../auth';
 import { factoryConfigFrom, launch } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
 
@@ -66,6 +81,8 @@ beforeEach(() => {
   process.chdir(root);
   for (const name of [
     'MCP_BROWSER',
+    'MCP_BROWSER_PROGRAM',
+    'MCP_RENEWAL',
     'MCP_BROWSER_AUTH_PORT',
     'MCP_ENV_PATH',
     'MCP_UNSAFE',
@@ -94,12 +111,13 @@ afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+const silent = { info() {}, warn() {}, error() {}, debug() {} };
+
 function recordingStrategy() {
-  const calls: Array<{ browser: string; port?: number }> = [];
-  const browserStrategy = (options: {
-    browser: string;
-    port?: number;
-  }): IAuthorizationStrategy<string> => {
+  const calls: LoginStrategyOptions[] = [];
+  const browserStrategy = (
+    options: LoginStrategyOptions,
+  ): IAuthorizationStrategy<string> => {
     calls.push(options);
     return {
       authorize: async (request: AuthorizationRequest) => {
@@ -134,6 +152,7 @@ async function run(
         stderr: (line) => stderr.push(line),
         exit: (code) => exits.push(code),
         processLike,
+        platform: 'linux',
       },
     );
   } finally {
@@ -168,7 +187,7 @@ const writeSession = (name: string, lines: string[]) =>
     `${lines.join('\n')}\n`,
   );
 
-/** Runs the login the factory's only broker was given; answers the browser the strategy got. */
+/** Runs the login the factory's only broker was given; answers what the strategy was built with. */
 async function browserOfTheLogin(
   strategy: ReturnType<typeof recordingStrategy>,
 ) {
@@ -178,11 +197,21 @@ async function browserOfTheLogin(
   await login.authorize({
     buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
   });
-  expect(strategy.calls).toHaveLength(1);
-  return strategy.calls[0];
+  // The broker composes a strategy per build of the provider — the startup
+  // check's build among them — and each is built with the same options.
+  expect(strategy.calls.length).toBeGreaterThanOrEqual(1);
+  const last = strategy.calls[strategy.calls.length - 1];
+  expect(strategy.calls.every((c) => c.browser === last.browser)).toBe(true);
+  const { browser, ...rest } = last;
+  return {
+    ...rest,
+    ...(browser !== undefined && {
+      browser: (browser as unknown as { built: string }).built,
+    }),
+  };
 }
 
-describe('the browser reaches the login strategy', () => {
+describe('the browser reaches the login strategy, mapped for the platform', () => {
   const stdio = ['--transport=stdio', '--mcp=dest'];
 
   it('--browser', async () => {
@@ -192,14 +221,18 @@ describe('the browser reaches the login strategy', () => {
       `--auth-broker-path=${root}`,
       '--browser=firefox',
     ]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe('firefox');
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(firefox)',
+    );
   });
 
   it('MCP_BROWSER', async () => {
     writeKey('dest', abapKey);
     process.env.MCP_BROWSER = 'edge';
     const { strategy } = await run([...stdio, `--auth-broker-path=${root}`]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe('edge');
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(microsoft-edge)',
+    );
   });
 
   it('YAML browser', async () => {
@@ -210,16 +243,32 @@ describe('the browser reaches the login strategy', () => {
       `browser: chrome\nauth-broker-path: ${JSON.stringify(root)}\n`,
     );
     const { strategy } = await run([...stdio, `--config=${yamlFile}`]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe('chrome');
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(google-chrome)',
+    );
   });
 
-  it('none given: system, and no port — the strategy keeps its own 61001', async () => {
+  it('--browser-program: the named browser with that program', async () => {
+    writeKey('dest', abapKey);
+    const { strategy } = await run([
+      ...stdio,
+      `--auth-broker-path=${root}`,
+      '--browser-program=my-browser',
+    ]);
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(my-browser)',
+    );
+  });
+
+  it('none given: the system browser, and no port — the strategy keeps its own 61001', async () => {
     writeKey('dest', abapKey);
     const { strategy } = await run([...stdio, `--auth-broker-path=${root}`]);
-    expect(await browserOfTheLogin(strategy)).toEqual({ browser: 'system' });
+    expect(await browserOfTheLogin(strategy)).toEqual({
+      browser: 'linuxDefaultBrowser',
+    });
   });
 
-  it('--browser-auth-port reaches it beside the browser', async () => {
+  it('--browser=none: no browser; --browser-auth-port reaches the strategy', async () => {
     writeKey('dest', abapKey);
     const { strategy } = await run([
       ...stdio,
@@ -227,10 +276,29 @@ describe('the browser reaches the login strategy', () => {
       '--browser=none',
       '--browser-auth-port=61005',
     ]);
-    expect(await browserOfTheLogin(strategy)).toEqual({
-      browser: 'none',
-      port: 61005,
-    });
+    expect(await browserOfTheLogin(strategy)).toEqual({ port: 61005 });
+  });
+});
+
+describe('a browser that cannot be served stops the start', () => {
+  it.each([
+    [['--browser=opera'], '--browser=none'],
+    [
+      ['--browser=firefox', '--browser-program=x'],
+      '--browser-program excludes --browser',
+    ],
+  ])('%j: its words on stderr, exit 1, nothing read', async (args, words) => {
+    writeKey('dest', abapKey);
+    const { stderr, exits } = await run([
+      '--transport=stdio',
+      '--mcp=dest',
+      `--auth-broker-path=${root}`,
+      ...args,
+    ]);
+    expect(exits).toEqual([1]);
+    expect(stderr.join('\n')).toContain(words);
+    expect(constructed).not.toHaveBeenCalled();
+    expect(stdioStart).not.toHaveBeenCalled();
   });
 });
 
@@ -267,27 +335,55 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
         ],
         browserCallbackStrategy,
       );
+      // auth-providers 6 writes the authorization URL to stderr itself, never
+      // through a logger (it carries `state`); the prompt logger carries the
+      // rest — the "waiting on" line among it.
+      const written: string[] = [];
+      const direct = jest
+        .spyOn(process.stderr, 'write')
+        .mockImplementation((chunk: unknown) => {
+          written.push(String(chunk));
+          return true;
+        });
       const stdout = jest.spyOn(process.stdout, 'write');
       const broker = constructed.mock.results[0].value;
       const login = broker.getToken('dest');
       const failed = expect(login).rejects.toThrow();
       const redirect = `http://localhost:${port}/callback`;
-      const url =
-        'https://uaa.example.test/oauth/authorize?client_id=client-id' +
-        `&redirect_uri=${encodeURIComponent(redirect)}&response_type=code`;
-      for (let i = 0; i < 100 && !stderr.join('\n').includes(url); i++) {
+      const said = () => [...written, ...stderr].join('\n');
+      for (
+        let i = 0;
+        i < 100 && !said().includes(encodeURIComponent(redirect));
+        i++
+      ) {
         await new Promise((r) => setTimeout(r, 20));
       }
       try {
-        const said = stderr.join('\n');
-        expect(said).toContain('Open this URL in your browser to authenticate');
-        expect(said).toContain(url);
-        expect(said).toContain(`Waiting for callback on ${redirect}`);
-        expect(said).not.toContain('client-secret');
+        const text = said();
+        expect(text).toContain(
+          'https://uaa.example.test/oauth/authorize?client_id=client-id',
+        );
+        expect(text).toContain(`redirect_uri=${encodeURIComponent(redirect)}`);
+        expect(stderr.join('\n')).toContain(
+          `Waiting for callback on ${redirect}`,
+        );
+        expect(text).not.toContain('client-secret');
       } finally {
-        // End the login: the identity provider says no.
-        await fetch(`${redirect}?error=access_denied`).catch(() => undefined);
+        // End the login: the identity provider says no — with this attempt's
+        // state, so the callback is not ignored.
+        const shown = said();
+        const from = shown.indexOf('https://uaa.example.test/oauth/authorize?');
+        let to = from;
+        while (to >= 0 && to < shown.length && shown[to].trim() !== '') to++;
+        const state =
+          from < 0
+            ? ''
+            : (new URL(shown.slice(from, to)).searchParams.get('state') ?? '');
+        await fetch(`${redirect}?error=access_denied&state=${state}`).catch(
+          () => undefined,
+        );
         await failed;
+        direct.mockRestore();
         expect(stdout).not.toHaveBeenCalled();
         stdout.mockRestore();
       }
@@ -329,7 +425,7 @@ describe('one destination per process', () => {
   it('neither: inspection-only, no broker', async () => {
     const { stderr } = await run(['--transport=stdio']);
     expect(constructed).not.toHaveBeenCalled();
-    expect(stdioStart).toHaveBeenCalledWith('mock');
+    expect(stdioStart).toHaveBeenCalledWith(undefined);
     expect(stderr[0]).toContain('inspection-only mode');
   });
 });
@@ -458,15 +554,19 @@ describe('factoryConfigFrom: the env file', () => {
 
   it("envFilePath, IServerConfig's alias, is read too, naming the field", () => {
     expect(
-      factoryConfigFrom({ envFilePath: '/x/conn.env' }, { browserStrategy })
-        .envFile,
+      factoryConfigFrom(
+        { envFilePath: '/x/conn.env' },
+        { browserStrategy, promptLogger: silent },
+      ).envFile,
     ).toEqual({ path: '/x/conn.env', source: 'IServerConfig.envFilePath' });
   });
 
   it('envFile by hand: named by its field', () => {
     expect(
-      factoryConfigFrom({ envFile: '/x/conn.env' }, { browserStrategy })
-        .envFile,
+      factoryConfigFrom(
+        { envFile: '/x/conn.env' },
+        { browserStrategy, promptLogger: silent },
+      ).envFile,
     ).toEqual({ path: '/x/conn.env', source: 'IServerConfig.envFile' });
   });
 
@@ -478,7 +578,7 @@ describe('factoryConfigFrom: the env file', () => {
           envFilePath: '/x/conn.env',
           envFileSource: 'MCP_ENV_PATH',
         },
-        { browserStrategy },
+        { browserStrategy, promptLogger: silent },
       ).envFile,
     ).toEqual({ path: '/x/conn.env', source: 'MCP_ENV_PATH' });
   });
@@ -606,7 +706,7 @@ describe('the working directory .env is never the destination', () => {
     const { exits } = await run(['--transport=stdio']);
     expect(exits).toEqual([]);
     expect(constructed).not.toHaveBeenCalled();
-    expect(stdioStart).toHaveBeenCalledWith('mock');
+    expect(stdioStart).toHaveBeenCalledWith(undefined);
   });
 
   it('named with --env-path=./.env, it is the destination default', async () => {

@@ -17,7 +17,12 @@
 import './helpers/packageSources';
 import * as path from 'node:path';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
-import { AuthBrokerFactory } from '@mcp-abap-adt/core/auth';
+import {
+  AuthBrokerFactory,
+  browserFor,
+  browserOf,
+  promptLogger,
+} from '@mcp-abap-adt/core/auth';
 import { describeAuthError } from '../../lib/auth/errors';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { restoreResolution } from './helpers/packageSources';
@@ -89,18 +94,27 @@ async function setUp(): Promise<void> {
     mcpDestination: destination,
     authBrokerPath: basePath,
     unsafe: useUnsafe,
-    browser: config?.auth_broker?.browser ?? 'system',
+    // The test config's browser word, mapped as the server maps --browser.
+    browser: browserOf(
+      browserFor(
+        { browser: config?.auth_broker?.browser ?? 'system' },
+        process.platform,
+      ),
+    ),
     ...(config?.auth_broker?.browser_auth_port !== undefined && {
       browserAuthPort: Number(config.auth_broker.browser_auth_port),
     }),
     ...(process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc' && {
       connectionType: 'rfc' as const,
     }),
-    browserStrategy: ({ browser, port }) =>
-      browserCallbackStrategy({
-        browser,
-        ...(port !== undefined && { port }),
-      }),
+    browserStrategy: browserCallbackStrategy,
+    // A login's prompts reach the person running the tests, on stderr.
+    promptLogger: promptLogger((line) => process.stderr.write(`${line}\n`), {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+      debug: () => {},
+    }),
   });
 
   try {

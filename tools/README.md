@@ -94,8 +94,8 @@ Run it after adding, removing or redescribing tools. The compact tool list is ge
 - `bulk-update-interface-handlers.sh` — a one-time migration script, kept for history.
 - `sample-service-key.json` — the shape of a service key, with placeholder values.
 
-## Service keys and the `sap-abap-auth` CLI
+## Service keys and the `mcp-auth` CLI
 
-`npx sap-abap-auth` (from `@mcp-abap-adt/connection`; `npm run auth`) logs in through a browser and
-writes a `.env` from a service key. How a destination states its authentication — `basic`, `snc`, or `jwt` with
+`mcp-auth` (from `@mcp-abap-adt/auth-broker-cli`: `npm install -g @mcp-abap-adt/auth-broker-cli`)
+logs in through a browser and writes a `.env` from a service key; `npm run auth` is gone. How a destination states its authentication — `basic`, `snc`, or `jwt` with
 `SAP_GRANT_TYPE` — is in [Authentication](../docs/user-guide/AUTHENTICATION.md).

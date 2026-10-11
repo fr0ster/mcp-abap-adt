@@ -7,12 +7,13 @@
  * (broker 4), so once the count is zero every renewal has reached the
  * broker's writer and `flush()` covers it.
  *
- * Behind a closed gate no call starts: each answers the shutdown refusal at
- * once, without reaching the inner provider — Oops, never a throw. A call
+ * Behind a closed gate no call starts: each answers the shutdown refusal
+ * (`interactive-login` `aborted`, minted) at once, without reaching the inner provider — Oops, never a throw. A call
  * admitted before the gate closed runs to its answer and is waited for.
  * Nothing opens the gate again.
  */
 
+import { authError } from '@mcp-abap-adt/auth-errors';
 import type {
   AuthOutcome,
   IAuthProvider,
@@ -21,9 +22,14 @@ import type {
   IRequestTarget,
 } from '@mcp-abap-adt/interfaces-auth';
 
+/**
+ * The closed gate's answer (D17): auth-errors' `interactive-login` `aborted`,
+ * minted — the server's shutdown sentence goes beside it (`serverSentence`),
+ * never into the refusal.
+ */
 export const SHUTDOWN_REFUSAL: AuthOutcome = Object.freeze({
   ok: false,
-  refusal: Object.freeze({ reason: 'the server is shutting down' }),
+  refusal: authError['interactive-login']({ outcome: 'aborted' }),
 });
 
 export class ProviderGate {

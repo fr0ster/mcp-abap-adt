@@ -396,7 +396,9 @@ Inline comments are not parsed, so keep comments on separate lines.
 **Authentication:**
 - `--mcp=<destination>` - Named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, field by field
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
-- `--browser=<name>` - Browser for a login: `chrome`, `edge`, `firefox`, `system` (default), `headless`, `none`
+- `--browser=<name>` - Browser for a login: `system` (default), `auto`, `chrome`, `edge`, `firefox`, `none`, `headless` — mapped by the platform; `none` / `headless`: the URL on stderr ([Authentication](docs/user-guide/AUTHENTICATION.md))
+- `--browser-program=<program>` - The program that opens the login URL instead (excludes `--browser`)
+- `--renewal=<mode>` - `refresh-then-login` (default) or `refresh-only` (never a login)
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
 - `--allow-destination-header` - Honour the `x-mcp-destination` header (HTTP/SSE only, off by default)
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`

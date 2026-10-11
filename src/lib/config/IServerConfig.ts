@@ -55,12 +55,16 @@ export interface IServerConfig {
   /** Use unsafe mode (file-based session store) */
   unsafe?: boolean;
   /**
-   * Browser type for authentication (chrome, edge, firefox, system, headless, none)
-   * - 'system' (default): Opens system default browser
-   * - 'headless': Logs URL and waits for manual callback (SSH/remote sessions)
-   * - 'none': Logs URL and rejects immediately (automated tests)
+   * The browser of a login (`--browser`): system (default), auto, chrome,
+   * edge, firefox, none, headless — mapped by the platform to one of
+   * auth-providers' browsers; `none` and `headless` open nothing: the URL is
+   * shown on stderr and the login waits for the callback.
    */
   browser?: string;
+  /** The program that opens the login URL (`--browser-program`); excludes `browser`. */
+  browserProgram?: string;
+  /** How an expired session is renewed (`--renewal`); default `refresh-then-login`. */
+  renewal?: 'refresh-then-login' | 'refresh-only';
   /** Port for browser auth callback server */
   browserAuthPort?: number;
   /** Allow x-mcp-destination header to override default destination (--allow-destination-header) */

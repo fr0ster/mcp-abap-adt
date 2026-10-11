@@ -54,7 +54,7 @@ afterEach(() => {
 });
 
 describe('the table', () => {
-  it('has the ten rows of the spec', () => {
+  it('has the twelve rows: the ten of the spec, then --browser-program and --renewal (D9, D11)', () => {
     expect(AUTH_PARAMETERS.map((p) => p.cli)).toEqual([
       '--mcp',
       '--env',
@@ -62,6 +62,8 @@ describe('the table', () => {
       '--auth-broker-path',
       '--unsafe',
       '--browser',
+      '--browser-program',
+      '--renewal',
       '--browser-auth-port',
       '--allow-destination-header',
       '--connection-type',
@@ -77,6 +79,8 @@ describe('the table', () => {
       ['--auth-broker-path', 'AUTH_BROKER_PATH', 'auth-broker-path'],
       ['--unsafe', 'MCP_UNSAFE', 'unsafe'],
       ['--browser', 'MCP_BROWSER', 'browser'],
+      ['--browser-program', 'MCP_BROWSER_PROGRAM', 'browser-program'],
+      ['--renewal', 'MCP_RENEWAL', 'renewal'],
       ['--browser-auth-port', 'MCP_BROWSER_AUTH_PORT', 'browser-auth-port'],
       ['--allow-destination-header', undefined, 'allow-destination-header'],
       ['--connection-type', 'SAP_CONNECTION_TYPE', 'connection-type'],

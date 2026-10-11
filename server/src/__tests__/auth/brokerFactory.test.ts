@@ -20,12 +20,14 @@ import {
   AuthBroker as AuthBrokerCtor,
   DestinationConfigError,
 } from '@mcp-abap-adt/auth-broker';
+import { classify } from '@mcp-abap-adt/auth-errors';
 import type {
   AuthOutcome,
   AuthorizationRequest,
   IAuthorizationStrategy,
   IAuthProvider,
   IAuthRejection,
+  IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import {
   describeAuthError,
@@ -34,7 +36,10 @@ import {
 } from '@mcp-abap-adt/lib/auth';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { SHUTDOWN_REFUSAL } from '../../auth/countedProvider';
-import type { IAuthBrokerFactoryConfig } from '../../auth/IAuthBrokerFactoryConfig';
+import type {
+  IAuthBrokerFactoryConfig,
+  LoginStrategyOptions,
+} from '../../auth/IAuthBrokerFactoryConfig';
 
 const constructed = AuthBrokerCtor as unknown as jest.Mock;
 /** The fs module itself: `import * as` yields a copy whose getters cannot be spied. */
@@ -60,12 +65,14 @@ function deferred<T>() {
 
 const tick = () => new Promise((r) => setImmediate(r));
 
+const BROWSER: IBrowser = { open: async () => {} };
+const silent = { info() {}, warn() {}, error() {}, debug() {} };
+
 function strategyFactory() {
-  const calls: Array<{ browser: string; port?: number }> = [];
-  const browserStrategy = (options: {
-    browser: string;
-    port?: number;
-  }): IAuthorizationStrategy<string> => {
+  const calls: LoginStrategyOptions[] = [];
+  const browserStrategy = (
+    options: LoginStrategyOptions,
+  ): IAuthorizationStrategy<string> => {
     calls.push(options);
     return {
       authorize: async (request: AuthorizationRequest) => {
@@ -127,9 +134,9 @@ describe('AuthBrokerFactory', () => {
     new AuthBrokerFactory({
       authBrokerPath: root,
       unsafe: false,
-      browser: 'none',
       connectionType: 'http',
       browserStrategy: strategies.browserStrategy,
+      promptLogger: silent,
       ...over,
     });
 
@@ -304,12 +311,15 @@ describe('AuthBrokerFactory', () => {
       },
     );
 
-    it('3. basic: the broker gets exactly the stores, no option', async () => {
+    it("3. basic: the broker gets the stores and the server's options, no handler option", async () => {
       basic('dest');
       await factory().getBroker('dest');
       expect(constructed).toHaveBeenCalledTimes(1);
       const config = constructed.mock.calls[0][0];
       expect(Object.keys(config).sort()).toEqual([
+        'authDebug',
+        'onWriteFailure',
+        'renewal',
         'serviceKeyStore',
         'sessionStore',
       ]);
@@ -320,7 +330,7 @@ describe('AuthBrokerFactory', () => {
       expect(await config.sessionStore.loadSession('dest')).toBeNull();
     });
 
-    it('3. jwt / none: the broker gets exactly the stores, no option', async () => {
+    it("3. jwt / none: the stores and the server's options, no handler option", async () => {
       const file = path.join(root, 'conn.env');
       fs.writeFileSync(
         file,
@@ -336,19 +346,25 @@ describe('AuthBrokerFactory', () => {
       );
       const config = constructed.mock.calls[0][0];
       expect(Object.keys(config).sort()).toEqual([
+        'authDebug',
+        'onWriteFailure',
+        'renewal',
         'serviceKeyStore',
         'sessionStore',
       ]);
     });
 
-    it('3. jwt / authorization_code: the stores and the browser strategy under the login lock', async () => {
+    it('3. jwt / authorization_code: the stores, the options and the login strategy in serverLogin', async () => {
       writeKey('dest', abapKey);
-      await factory({ browser: 'firefox', browserAuthPort: 61005 }).getBroker(
+      await factory({ browser: BROWSER, browserAuthPort: 61005 }).getBroker(
         'dest',
       );
       const config = constructed.mock.calls[0][0];
       expect(Object.keys(config).sort()).toEqual([
+        'authDebug',
         'authorization',
+        'onWriteFailure',
+        'renewal',
         'serviceKeyStore',
         'sessionStore',
       ]);
@@ -357,7 +373,7 @@ describe('AuthBrokerFactory', () => {
         buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
       });
       expect(outcome.payload).toBe('code-1');
-      expect(strategies.calls).toEqual([{ browser: 'firefox', port: 61005 }]);
+      expect(strategies.calls).toEqual([{ browser: BROWSER, port: 61005 }]);
       expect(
         (await config.serviceKeyStore.getConnectionConfig('dest'))?.grantType,
       ).toBe('authorization_code');
@@ -593,7 +609,7 @@ describe('AuthBrokerFactory', () => {
       expect(text).not.toContain('placeholder-token');
     });
 
-    it('the same counted object for every call on a destination', async () => {
+    it('the same counted object for every call on a destination (the broker answers one provider)', async () => {
       basic('dest');
       const f = factory();
       const [a, b] = await Promise.all([
@@ -683,31 +699,32 @@ describe('AuthBrokerFactory', () => {
       await running;
     });
 
-    it('reports a rejecting flush() as destination and class only', async () => {
+    it('reports a rejecting flush() as destination and classified reason only', async () => {
       basic('dest');
       basic('other');
       const f = factory();
       const a = await f.getBroker('dest');
       const b = await f.getBroker('other');
+      const storeError = new Error('"dest": StorageError placeholder-secret');
       jest
         .spyOn(a, 'flush')
         .mockRejectedValue(
           new AggregateError(
-            [new Error('"dest": StorageError')],
+            [storeError],
             'Session writes still failing for "dest" placeholder-secret',
           ),
         );
       class OddStoreFailure extends Error {}
-      jest
-        .spyOn(b, 'flush')
-        .mockRejectedValue(new OddStoreFailure('placeholder-secret'));
+      const odd = new OddStoreFailure('placeholder-secret');
+      jest.spyOn(b, 'flush').mockRejectedValue(odd);
       const report = await f.settle(1_000);
       expect(report.abandoned).toBe(0);
       expect(report.notStored.sort()).toEqual([
-        '"dest": StorageError',
-        '"other": OddStoreFailure',
+        `"dest": ${classify(storeError, 'persisting-tokens').reason}`,
+        `"other": ${classify(odd, 'persisting-tokens').reason}`,
       ]);
       expect(JSON.stringify(report)).not.toContain('placeholder-secret');
+      expect(JSON.stringify(report)).not.toContain('OddStoreFailure');
     });
   });
 

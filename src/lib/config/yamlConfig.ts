@@ -17,6 +17,8 @@ export interface YamlConfig {
   unsafe?: boolean;
   'auth-broker-path'?: string;
   browser?: string;
+  'browser-program'?: string;
+  renewal?: string;
   'browser-auth-port'?: number | string;
   'allow-destination-header'?: boolean;
   'connection-type'?: string;

@@ -146,7 +146,7 @@ The same option can be set with `SAP_CONNECTION_TYPE=rfc` in the process environ
 
 ## Authentication and Connection Parameters
 
-Every parameter below has a CLI form, a YAML key and — for seven of them — an environment
+Every parameter below has a CLI form, a YAML key and — for nine of them — an environment
 variable. **CLI wins over the environment, which wins over YAML.** `.env` files and environment
 variables hold secrets and the session; YAML holds configuration only. An invalid port, enum
 value or flag value is **refused at startup**, naming the parameter in the form you used
@@ -160,7 +160,9 @@ ignored.
 | `--env-path=<path>` | `MCP_ENV_PATH` | `env-path` | path | One env file by path or file name (relative to the working directory) |
 | `--auth-broker-path=<dir>` | `AUTH_BROKER_PATH` | `auth-broker-path` | path | Base directory of `service-keys/` and `sessions/` (default: the platform paths) |
 | `--unsafe` | `MCP_UNSAFE` | `unsafe` | flag | Write named destinations' sessions to disk instead of keeping them in memory |
-| `--browser=<name>` | `MCP_BROWSER` | `browser` | `chrome`, `edge`, `firefox`, `system`, `headless`, `none` | Browser for a login (default `system`) |
+| `--browser=<name>` | `MCP_BROWSER` | `browser` | `system`, `auto`, `chrome`, `edge`, `firefox`, `none`, `headless` | Browser for a login (default `system`), mapped by the platform; excludes `--browser-program` |
+| `--browser-program=<program>` | `MCP_BROWSER_PROGRAM` | `browser-program` | a program | The program that opens the login URL; excludes `--browser` |
+| `--renewal=<mode>` | `MCP_RENEWAL` | `renewal` | `refresh-then-login`, `refresh-only` | How an expired session is renewed (default `refresh-then-login`); `refresh-only` never logs in |
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
 | `--allow-destination-header` | — | `allow-destination-header` | flag | Honour `x-mcp-destination` (HTTP/SSE, off by default) |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
@@ -188,6 +190,34 @@ mcp-abap-adt --transport=http --mcp=TRIAL
   not the system).
 - Without `--unsafe` the session is kept in memory: one browser login per process.
 - With no default destination, an HTTP/SSE request without `x-sap-*` headers is answered `400`.
+
+**--browser=\<name\>**, **--browser-program=\<program\>**
+
+The browser of a login (JWT / `authorization_code`), mapped by the platform:
+
+| `--browser` | Linux | macOS | Windows | another platform |
+|---|---|---|---|---|
+| `system` (default), `auto` | `xdg-open` | `open` | the default browser | refused at start: use `--browser=none` |
+| `chrome` | `google-chrome` | `Google Chrome` | `chrome` | refused |
+| `edge` | `microsoft-edge` | `Microsoft Edge` | `msedge` | refused |
+| `firefox` | `firefox` | `Firefox` | `firefox` | refused |
+| `none`, `headless` | no browser: the URL on stderr; the login waits | the same | the same | the same |
+
+A name outside the table is refused at start. `--browser-program` runs the program you name (an
+executable on Linux, an application on macOS, a program on Windows); it excludes `--browser`.
+
+```bash
+mcp-abap-adt --mcp=TRIAL --browser=firefox
+mcp-abap-adt --mcp=TRIAL --browser-program=/opt/browsers/my-browser
+mcp-abap-adt --mcp=TRIAL --browser=none        # open the URL from stderr yourself
+```
+
+**--renewal=\<mode\>**
+
+How the provider renews an expired or refused token: `refresh-then-login` (the default) refreshes,
+then logs in when there is no refresh token or the refresh is refused; `refresh-only` never logs
+in — a destination that would need a login answers `renewal-declined` with "Logins are off
+(`--renewal=refresh-only`): log in with `mcp-auth`, or start without it."
 
 **--browser-auth-port=\<port\>**
 
@@ -420,7 +450,9 @@ Alternative to command line arguments. Environment variables can be set in shell
 - `MCP_SKIP_AUTO_START` - Skip automatic server start (true|false, for testing)
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
 - `MCP_UNSAFE` - Write named destinations' sessions to disk (true|false)
-- `MCP_BROWSER` - Browser for a login: chrome, edge, firefox, system, headless, none
+- `MCP_BROWSER` - Browser for a login: system, auto, chrome, edge, firefox, none, headless
+- `MCP_BROWSER_PROGRAM` - The program that opens the login URL (excludes `MCP_BROWSER`)
+- `MCP_RENEWAL` - refresh-then-login (default) or refresh-only
 - `MCP_BROWSER_AUTH_PORT` - Login callback port (default 61001)
 - `MCP_STATE_IDLE_MINUTES` - The idle bound on held state (a debug session), in minutes: at least 30, default 30 (see [Held State](#held-state))
 

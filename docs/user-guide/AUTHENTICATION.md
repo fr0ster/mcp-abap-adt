@@ -91,6 +91,34 @@ The session — the token and its refresh token — is the server's to keep curr
 
 A destination is **read once per process**. Nothing watches the files: a change you make to a
 `.env` from outside (a new password, a token handed over again) takes effect on **restart**.
+**Editing a destination's files while the server runs is not supported and may combine old and
+new values until the next start — restart after any change.** (The settings are read once; the
+credential is asked of the broker on every request, and the broker rebuilds it when what it was
+built from changed, so the two may disagree until the restart.)
+
+### Renewal (`--renewal`)
+
+An expired or refused token is renewed by the provider, the way `--renewal` says (or
+`MCP_RENEWAL`, YAML `renewal`):
+
+- `refresh-then-login` (the default): refresh with the refresh token; when there is none, or the
+  refresh is refused, log in again in the browser.
+- `refresh-only`: refresh only, never a login. A destination that would need a login is refused
+  with `renewal-declined` and the server's sentence "Logins are off (`--renewal=refresh-only`):
+  log in with `mcp-auth`, or start without it." Use it where nobody can answer a browser login:
+  log in once with `mcp-auth` (from `@mcp-abap-adt/auth-broker-cli`), then serve the file.
+
+### A session write that did not land
+
+Where the renewed session is written decides what a failed write means (no option):
+
+| Store | A failed write |
+|---|---|
+| the `--env` / `--env-path` file | **fails the request** (`unknown`, `persisting-tokens`), and the destination is refused until a write lands: it is your own file, and a write that did not land must be seen |
+| a named destination, with `--unsafe` (`sessions/X.env`) or without (in memory) | is logged on stderr, and the request goes on |
+
+At shutdown a write still pending is reported on stderr as `"<destination>": <reason>` and the
+exit is `1`; the reason is the classified failure, never the store's own message.
 
 ### Secrets live in `.env`, configuration in YAML
 
@@ -101,16 +129,33 @@ key, never the value). See [YAML Configuration](../configuration/YAML_CONFIG.md)
 ## Browser login (JWT / `authorization_code`)
 
 When there is no valid token, the server opens the system's login page and waits for the
-redirect on a local callback port.
+redirect on a local callback port. On the first start of a `jwt` / `authorization_code`
+destination, the first tool call logs in once; the token is then renewed as `--renewal` says.
 
-- `--browser=<name>` (or `MCP_BROWSER`, YAML `browser`): `chrome`, `edge`, `firefox`,
-  `system` (the default), `headless`, `none`. With `none` or `headless` the URL to open is printed
-  on stderr (never stdout), whatever `DEBUG_AUTH_LOG` says.
+- `--browser=<name>` (or `MCP_BROWSER`, YAML `browser`) picks the browser, mapped by the
+  platform to one of `@mcp-abap-adt/auth-providers`' browsers:
+
+  | `--browser` | Linux | macOS | Windows | another platform |
+  |---|---|---|---|---|
+  | `system` (default), `auto` | `xdg-open` | `open` | the default browser | refused at start: use `--browser=none` |
+  | `chrome` | `google-chrome` | `Google Chrome` | `chrome` | refused |
+  | `edge` | `microsoft-edge` | `Microsoft Edge` | `msedge` | refused |
+  | `firefox` | `firefox` | `Firefox` | `firefox` | refused |
+  | `none`, `headless` | no browser: the URL is printed on stderr; the login waits | the same | the same | the same |
+
+  A name outside the table is refused at start. The URL goes to stderr (never stdout) whatever
+  `DEBUG_AUTH_LOG` says, also when a browser could not be started.
+- `--browser-program=<program>` (or `MCP_BROWSER_PROGRAM`, YAML `browser-program`) runs the
+  program you name instead: an executable on Linux, an application on macOS, a program on
+  Windows. It excludes `--browser`: giving both is refused at start.
 - `--browser-auth-port=<port>` (or `MCP_BROWSER_AUTH_PORT`, YAML `browser-auth-port`):
   the callback port, **default `61001`** for every transport. A value that is not an integer
   from 1 to 65535 is refused at startup.
-- The login waits up to 30 s. Several destinations logging in at once take turns: one login
-  at a time per process.
+- The login waits until the browser answers, the identity provider refuses, or the request is
+  cancelled: there is no built-in timeout. The callback port is free again as soon as a login
+  ends, cancelled or not.
+- At startup the server reads the destination and builds its credential (nothing is sent): a
+  destination the broker refuses stops the start, exit `1`, with the error's own words.
 
 ```bash
 mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=61005

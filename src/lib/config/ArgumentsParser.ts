@@ -58,6 +58,10 @@ export interface ParsedArguments {
   allowDestinationHeader?: boolean;
   /** Browser for a login */
   browser?: string;
+  /** The program that opens the login URL */
+  browserProgram?: string;
+  /** How an expired session is renewed */
+  renewal?: 'refresh-then-login' | 'refresh-only';
   /** --env as the user gave it: a destination name or a path */
   envDestination?: string;
   /** --env-path as the user gave it */
@@ -174,6 +178,8 @@ export class ArgumentsParser {
     );
     result.allowDestinationHeader = auth.allowDestinationHeader ?? false;
     result.browser = auth.browser;
+    result.browserProgram = auth.browserProgram;
+    result.renewal = auth.renewal;
     result.envDestination = auth.envDestination;
     result.envPath = auth.envPath;
     result.unsafe = auth.unsafe ?? false;

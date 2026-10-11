@@ -1,10 +1,12 @@
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
+import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { type IDestinations, ServerRefusal } from '@mcp-abap-adt/lib/auth';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { CORE_VERSION } from './coreVersion.js';
 
 export interface StdioServerOptions {
@@ -21,12 +23,14 @@ export interface StdioServerOptions {
  * Minimal stdio server implementation based on BaseMcpServer.
  * Sets connection context once at startup and connects stdio transport.
  * The destination's settings and provider come from `IDestinations` — the
- * factory, or the inspection-only stand-in.
+ * factory. Without destinations the server is in inspection-only mode: the
+ * tools are listed, and a tool call answers the server's own
+ * `inspection_only` refusal before any connection is built (D17).
  */
 export class StdioServer extends BaseMcpServer {
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
-    private readonly destinations: IDestinations,
+    private readonly destinations: IDestinations | undefined,
     opts?: StdioServerOptions,
   ) {
     super({
@@ -39,37 +43,24 @@ export class StdioServer extends BaseMcpServer {
     });
   }
 
-  async start(destination: string): Promise<void> {
-    await this.setConnectionContext(destination, this.destinations);
+  /**
+   * Serves `destination` (none: inspection-only mode) over `transport` —
+   * stdio unless a host passes its own.
+   */
+  async start(
+    destination: string | undefined,
+    transport: Transport = new StdioServerTransport(),
+  ): Promise<void> {
+    if (destination !== undefined && this.destinations) {
+      await this.setConnectionContext(destination, this.destinations);
+    }
     this.registerHandlers(this.handlersRegistry);
-
-    const transport = new StdioServerTransport();
     await this.connect(transport);
   }
-}
 
-const INSPECTION_ONLY =
-  'inspection-only mode: no connection parameters. To connect to an SAP system, use --mcp=<destination> or --env-path=<path>.';
-
-/**
- * The destinations of inspection-only mode (stdio with neither `--mcp` nor an
- * `--env` file): the tools can be listed, and a tool call answers with the
- * refusal of a provider that has no credential, instead of dialling anywhere.
- */
-export function inspectionOnlyDestinations(): IDestinations {
-  const refused = async () => ({
-    ok: false as const,
-    refusal: { reason: INSPECTION_ONLY },
-  });
-  const provider: Awaited<ReturnType<IDestinations['getProvider']>> = {
-    kind: 'inspection-only',
-    prepare: refused,
-    establish: refused,
-    authorize: refused,
-    rejected: refused,
-  };
-  return {
-    settingsFor: async () => ({ url: 'http://mock', authType: 'basic' }),
-    getProvider: async () => provider,
-  };
+  /** Inspection-only mode refuses here, before any connection is built. */
+  protected override async getConnection(): Promise<AbapConnection> {
+    if (!this.destinations) throw new ServerRefusal('inspection_only');
+    return super.getConnection();
+  }
 }

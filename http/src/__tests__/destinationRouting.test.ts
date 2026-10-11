@@ -30,7 +30,6 @@ import {
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
-import { inspectionOnlyDestinations } from '../../../server/src/StdioServer.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 const emptyRegistry = new CompositeHandlersRegistry([]);
@@ -246,37 +245,6 @@ describe('StreamableHttpServer: destinations', () => {
       expect(destinations.getProvider).not.toHaveBeenCalled();
     },
   );
-});
-
-describe('stdio inspection-only mode: the stand-in destinations', () => {
-  it('has only the two methods of IDestinations, and no getToken', async () => {
-    const destinations = inspectionOnlyDestinations();
-    expect(Object.keys(destinations).sort()).toEqual([
-      'getProvider',
-      'settingsFor',
-    ]);
-    expect(destinations).not.toHaveProperty('getToken');
-    const settings = await destinations.settingsFor('mock');
-    expect(settings.url).toBe('http://mock');
-    expect(settings).not.toHaveProperty('password');
-  });
-
-  it('its provider refuses every moment, naming how to connect', async () => {
-    const provider = await inspectionOnlyDestinations().getProvider('mock');
-    const outcomes = [
-      await provider.prepare(),
-      await provider.establish({} as any),
-      await provider.authorize({} as any),
-      await provider.rejected({} as any),
-    ];
-    for (const outcome of outcomes) {
-      expect(outcome.ok).toBe(false);
-      if (!outcome.ok) {
-        expect(outcome.refusal.reason).toContain('--mcp');
-        expect(outcome.refusal.reason).toContain('--env-path');
-      }
-    }
-  });
 });
 
 /**

@@ -322,7 +322,8 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 - `--env=<destination>` - Destination env file from sessions store (`<destination>.env`)
 - `--env-path=<path|file>` - Explicit path to a `.env` file
 - `--unsafe` - Write named destinations' sessions to disk (default: in memory)
-- `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login
+- `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login; `--browser-program=<program>` in place of `--browser`
+- `--renewal=refresh-then-login|refresh-only` - How an expired session is renewed (`refresh-only`: never a login)
 - `--allow-destination-header` - Honour `x-mcp-destination` (HTTP/SSE)
 
 **Note:** When no `--mcp`, `--env` or `--env-path` is given, there is no default destination: nothing is looked up in the working directory (`--env-path=./.env` names a `.env` there). An invalid port, enum or flag value is refused at startup.

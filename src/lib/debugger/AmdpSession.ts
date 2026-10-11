@@ -73,7 +73,9 @@ interface Open {
   unreleased: Set<string>; // debuggees still owed a deletion
   cleared: boolean; // the empty breakpoint sync was answered ok
   stopped: boolean; // the stop request was answered ok
-  readDone: boolean; // the read loop's last batch was handled
+  readDone: boolean; // the read loop's last batch arrived (its cleanup may still run)
+  /** What the last batch could not undo, set once its cleanup finished and was recorded. */
+  lastBatchFailures?: string[];
   readFailed?: string; // the event read failed: a sync waiting for confirmation hears it at once
   failureReported: boolean; // that failure was already thrown by a sync
 }
@@ -370,6 +372,7 @@ export class AmdpSession<O = unknown> {
           open.readDone = true;
           this.failure ??= open.readFailed ?? message;
         }
+        open.lastBatchFailures ??= []; // the failure is the next wait's
         this.notify(); // a stop waiting for this read's end hears it
       }
     }
@@ -393,6 +396,8 @@ export class AmdpSession<O = unknown> {
         this.failure = `${open.readFailed ?? 'the event read failed'}${
           failures.length ? `; not undone: ${failures.join('; ')}` : ''
         }`;
+      // Last: a stop waiting for this batch returns only now, with what it could not undo.
+      open.lastBatchFailures = failures;
     });
   }
 
@@ -587,20 +592,25 @@ export class AmdpSession<O = unknown> {
       if (failures.length) throw new DebugCleanupError(failures.join('; '));
     });
     // Outside the serial: the read's last batch, and what it could not undo is this
-    // stop's failure too.
+    // stop's failure too — its own, not whatever a later call left in cleanupFailures.
     if (ending) {
-      await this.lastBatchHandled(ending);
-      if (this.cleanupFailures.length)
-        throw new DebugCleanupError(this.cleanupFailures.join('; '));
+      const failures = await this.lastBatchHandled(ending);
+      if (failures.length) throw new DebugCleanupError(failures.join('; '));
     }
   }
 
-  private lastBatchHandled(open: Open): Promise<void> {
+  /**
+   * The read arriving is not enough: its last batch's release and close must have
+   * finished and been recorded. Anything else that wakes the waiters meanwhile (a
+   * run ending, a wait) changes nothing.
+   */
+  private lastBatchHandled(open: Open): Promise<string[]> {
     return new Promise((resolve) => {
       const check = () => {
-        if (!open.readDone) return;
+        const failures = open.lastBatchFailures;
+        if (!failures) return;
         this.waiters.delete(check);
-        resolve();
+        resolve(failures);
       };
       this.waiters.add(check);
       check();
@@ -653,9 +663,9 @@ export class AmdpSession<O = unknown> {
     );
   }
 
-  /** Still finishing on its own: retired, the last event batch not yet arrived. */
+  /** Still finishing on its own: retired, the last event batch not yet arrived or its cleanup not yet done. */
   pending(): boolean {
-    return !!this.closing && !this.closing.readDone;
+    return !!this.closing && this.closing.lastBatchFailures === undefined;
   }
 
   /** What the last cleanup could not undo. */

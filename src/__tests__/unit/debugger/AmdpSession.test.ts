@@ -331,6 +331,51 @@ describe('AmdpSession', () => {
     expect(w.closed).toHaveLength(2);
   });
 
+  it('a stop returns only after the last batch released its break and recorded the outcome, whatever else wakes it meanwhile', async () => {
+    const w = await started(world(), true);
+    await until(() => w.calls.includes('run'));
+    w.sim.stopAnswersRead = false;
+    let settled = false;
+    const stopping = w.session.stop().finally(() => {
+      settled = true;
+    });
+    stopping.catch(() => undefined);
+    await until(() => w.calls.includes('stop'));
+    const release = deferred<any>();
+    w.dbg.deleteDebuggee = async (_m: string, d: string) => {
+      w.calls.push(`delete:${d}`);
+      return release.promise;
+    };
+    w.reads[1].resolve(okResponse(BREAK)); // the last batch carries a break
+    await until(() => w.calls.includes('delete:D1'));
+    w.run.resolve({ ok: true, output: 'late' }); // a run ending now wakes the waiters
+    await jest.advanceTimersByTimeAsync(0);
+    await jest.advanceTimersByTimeAsync(0);
+    expect(settled).toBe(false); // the release is still unanswered
+    release.resolve(refusedResponse('release failed'));
+    await expect(stopping).rejects.toThrow(
+      /release debuggee D1: release failed/,
+    );
+    expect(w.session.failures()).toEqual([
+      'release debuggee D1: release failed',
+    ]);
+    expect(w.session.holdsState()).toBe(true);
+  });
+
+  it('a second stop while the first waits does not erase what the last batch could not undo', async () => {
+    const w = await started();
+    w.sim.stopAnswersRead = false;
+    const first = w.session.stop();
+    first.catch(() => undefined);
+    await until(() => w.calls.includes('stop'));
+    await expect(w.session.stop()).resolves.toBeUndefined(); // nothing failed yet
+    w.dbg.deleteDebuggee = async () => refusedResponse('busy');
+    w.reads[1].resolve(okResponse(BREAK));
+    await expect(first).rejects.toThrow(/release debuggee D1: busy/);
+    expect(w.session.failures()).toEqual(['release debuggee D1: busy']);
+    expect(w.session.holdsState()).toBe(true);
+  });
+
   it('a start that fails before the session is recorded closes what it opened', async () => {
     for (const failure of ['second open', 'start request'] as const) {
       const w = world();

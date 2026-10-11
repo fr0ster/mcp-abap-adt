@@ -211,6 +211,23 @@ mcp-abap-adt --transport=http --mcp=TRIAL --allow-destination-header
 
 See [Authentication & Destinations](AUTHENTICATION.md) for the four supported authentications.
 
+## Handler Exposition
+
+**--exposition=\<sets\>** (YAML `exposition`)
+
+A comma list of the tool sets to serve: `readonly`, `high`, `low`, `debug`. Default
+`readonly,high`. `high` and `low` are mutually exclusive; `compact` is refused (the
+compact facade is its own command, `mcp-abap-adt-compact`). The search tools are always
+served, the system tools with `readonly`.
+
+`debug` is the debugger — opt-in, never part of the default, because a breakpoint or a
+listener catches every request of the connected SAP user. It goes beside any other set,
+or alone. See [Debugger](DEBUGGER.md) and [Handlers Management](HANDLERS_MANAGEMENT.md).
+
+```bash
+mcp-abap-adt --exposition=readonly,high,debug
+```
+
 ## Held State
 
 **--state-idle-minutes=\<minutes\>** (env `MCP_STATE_IDLE_MINUTES`, YAML `state-idle-minutes`)
@@ -405,6 +422,7 @@ Alternative to command line arguments. Environment variables can be set in shell
 - `MCP_UNSAFE` - Write named destinations' sessions to disk (true|false)
 - `MCP_BROWSER` - Browser for a login: chrome, edge, firefox, system, headless, none
 - `MCP_BROWSER_AUTH_PORT` - Login callback port (default 61001)
+- `MCP_STATE_IDLE_MINUTES` - The idle bound on held state (a debug session), in minutes: at least 30, default 30 (see [Held State](#held-state))
 
 ### HTTP Transport
 
@@ -438,6 +456,8 @@ These are typically set in `.env` file:
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
 - `SAP_MASTER_SYSTEM` - Master system of created objects (the system id), optional; no tool takes it as an argument. In the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<destination>.env`) or the process environment; the `x-sap-master-system` header wins over both, the destination's `.env` over the environment. On a cloud system the system is asked when none is stated; otherwise the attribute is left out of the request and the system applies itself. Never refused
 - `SAP_RESPONSIBLE` - Responsible person of created objects, optional. Same order, with the `x-sap-responsible` header; when none is stated, the login (on-premise: `SAP_USERNAME` of the destination, `x-sap-login` of an `x-sap-url` connection, `SAP_USERNAME` of the environment; on a cloud system only the system's user). A create that finds none (SNC, a token you hold) is refused naming `SAP_RESPONSIBLE`, nothing sent. A message class is created with the system's own default responsible (the one exception)
+
+- `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID` - The debugger's terminal id and IDE id, optional, each on its own. In the destination's own `.env` or the process environment; the `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` headers win over both, the destination's `.env` over the environment. Read when an instance's debugger is first used; when none is stated, each is random per instance. The system keys its listener conflict by the IDE id: a shared one means shared catches and no conflict — your choice, see [Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one). Not validated by the server
 
 **SNC (RFC only, no user, no password):**
 - `SAP_AUTH_TYPE=snc`; start with `--connection-type=rfc`

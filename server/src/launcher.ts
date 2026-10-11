@@ -109,6 +109,8 @@ ENVIRONMENT VARIABLES:
     MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
     MCP_BROWSER                    Browser for a login: chrome|edge|firefox|system|headless|none
     MCP_BROWSER_AUTH_PORT          Login callback port, 1-65535 (default: 61001)
+    MCP_STATE_IDLE_MINUTES         Held state (a debug session) ends after this many minutes
+                                   without a tool call: at least 30 (default: 30)
     MCP_TLS_CERT                   Path to TLS certificate file (PEM)
     MCP_TLS_KEY                    Path to TLS private key file (PEM)
     MCP_TLS_CA                     Path to TLS CA certificate file (PEM, optional)
@@ -187,6 +189,11 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    .env; the environment; on a cloud system, the system id.
                                    Otherwise left out of the request, never refused
                                    The environment is read once: later changes are not picked up
+    SAP_DEBUG_TERMINAL_ID          The debugger's terminal id and IDE id (with --exposition=...,debug),
+    SAP_DEBUG_IDE_ID               each on its own. First found: x-sap-debug-terminal-id /
+                                   x-sap-debug-ide-id; the destination's .env; the environment.
+                                   Else random per instance. A shared IDE id shares the user's
+                                   catches without the system's listener conflict
 
   HTTP/SSE Headers (System Context; SSE: the session's opening request):
     x-sap-master-system            Master system for this request (wins over the .env and env)
@@ -194,6 +201,8 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     x-sap-login                    With x-sap-url (on-premise): the login, the responsible when
                                    none is stated; on a destination request it is not read
     x-sap-language                 Master/original language for created objects (overrides SAP_LANGUAGE)
+    x-sap-debug-terminal-id        The debugger's terminal id (wins over the .env and env)
+    x-sap-debug-ide-id             The debugger's IDE id (wins over the .env and env)
 
 GENERATING A .ENV:
   Install the CLI: npm install -g @mcp-abap-adt/auth-broker-cli

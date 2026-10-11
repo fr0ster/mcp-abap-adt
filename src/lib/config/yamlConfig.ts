@@ -251,7 +251,7 @@ ${authParametersTemplate()}
 # Also: --state-idle-minutes, MCP_STATE_IDLE_MINUTES
 state-idle-minutes: 30
 
-# Handler sets to expose: readonly, high, low
+# Handler sets to expose: readonly, high, low, debug (the debugger, opt-in)
 # (compact moved to the @mcp-abap-adt/compact command and is refused here)
 # Default: readonly,high
 # Use comma-separated list or YAML array

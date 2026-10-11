@@ -214,6 +214,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🌐 Service Binding Preview**: `GetServiceBindingPreviewUrl` - The browser URL that opens a published service binding's Fiori preview, beside its OData service and `$metadata` URLs. Composed from the binding, its service definition and the exposed root view — no document carries it. OData V2 and V4; a Web API binding has no preview and says so. On SAP BTP the preview URL carries the browser host (`abap-web`), where the BTP logon answers, while the service URLs keep the ADT host
 - **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
 - **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader (dumps — filtered by user, runtime error, exception, object, package or component, and read past SAP's 100 entries per request — system messages, gateway errors), SM02 system messages, Gateway error log
+- **🐞 Debugger** (opt-in, `--exposition=…,debug`): ABAP and AMDP — breakpoints (line, exception, statement, message, with a condition), a background run of a class or report caught at them, stack, variables, watchpoints, steps, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. A breakpoint catches every request of the connected SAP user, so the set is never on by default. See [Debugger](docs/user-guide/DEBUGGER.md)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
@@ -228,6 +229,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[RFC Setup](docs/installation/RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC SDK and a C++ toolchain before the install
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
+- **[Debugger](docs/user-guide/DEBUGGER.md)** - The opt-in `debug` set: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups
 - **Configurator**: `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)) provides the `mcp-conf` CLI to auto-configure clients
 - **Tools by level**

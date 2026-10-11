@@ -27,6 +27,7 @@ import { InstanceState } from '../../../lib/state/InstanceState';
 import { okResponse } from '../../helpers/fakeClient';
 import {
   CONFLICT,
+  CONFLICT_409,
   fakeWorld,
   IDS,
   INVALID_USER,
@@ -401,6 +402,19 @@ describe('debugger handlers', () => {
       expect(world.opened).toEqual([]);
     },
   );
+
+  it('a start the listener check refuses is a tool error naming another debugger, before any change', async () => {
+    const { world, context } = install();
+    world.checkAnswers.push(CONFLICT_409);
+    const r: any = await handleDebugStartListener(context as any, {
+      breakpoints: BP,
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain(
+      'another debugger holds this debugging',
+    );
+    expect(world.calls).toEqual(['checkListener']);
+  });
 
   it('terminal mode needs no configured terminal id: the start is accepted under the session ids', async () => {
     const { world, context } = install();

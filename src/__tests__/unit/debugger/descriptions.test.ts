@@ -64,7 +64,7 @@ describe('the debugger descriptions', () => {
     for (const name of ['DebugSetBreakpoints', ...START_TOOLS]) {
       const tool = coreDebugTools().find((t) => t.name === name)!;
       expect(tool.description).toMatch(
-        /shared by every IDE of the same SAP user in either debugging mode/,
+        /shared by every IDE of the same SAP user \(in user mode, debugging the same request user; in terminal mode, whatever its ids\)/,
       );
       expect(tool.description).toMatch(/replaces that set as a whole/);
     }

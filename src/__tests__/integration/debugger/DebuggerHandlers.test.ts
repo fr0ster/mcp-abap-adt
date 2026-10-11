@@ -809,7 +809,7 @@ describe('Debugger handlers (integration)', () => {
   // --- 2. the listener conflict ----------------------------------------------------------
 
   it(
-    'conflict, refuse: a second instance is refused with the system message; nothing of it stays',
+    'conflict, refuse: a second instance is refused before any change, named as another debugger; nothing of it stays',
     async () => {
       await tester.run(async () => {
         softOnly('the conflict needs two instances');
@@ -829,7 +829,9 @@ describe('Debugger handlers (integration)', () => {
           ms: Math.round(second.ms),
         });
         expect(second.isError).toBe(true);
-        expect(second.text).toContain('conflictDetected');
+        // The refusal comes from the listener check before any change; the
+        // contract is the handler's own wording, not the system's sentence.
+        expect(second.text).toContain('another debugger holds this debugging');
         expect(b.state?.holdsState()).toBe(false);
         const stillA = await call(a, 'DebugWait', {
           state_handle: handleA,

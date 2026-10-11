@@ -64,7 +64,7 @@ async function closeOwn(connection: IAbapConnection): Promise<void> {
  * ids, so the terminal-mode listener under them catches it; without them only
  * a user-mode listener does.
  */
-export async function run(
+async function run(
   connection: IAbapConnection,
   target: RunTarget,
   debuggee?: IDebuggeeIds,

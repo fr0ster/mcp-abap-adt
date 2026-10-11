@@ -180,6 +180,9 @@ export class DebugConflictError extends DebugListenerError {
   }
 }
 
+/** The polls the system has answered: whether an open poll has settled, read without waiting. */
+const settledPolls = new WeakSet<Promise<IAdtResponse<string>>>();
+
 interface Listener {
   connection: IAbapConnection;
   debugger: Debugger;
@@ -295,7 +298,7 @@ export class DebugSession<O = unknown> {
 
   constructor(
     protected readonly ports: DebugSessionPorts<O>,
-    readonly ids: DebuggerIds & { stated?: boolean },
+    readonly ids: DebuggerIds & { stated?: boolean; terminalStated?: boolean },
     options: DebugSessionOptions = {},
   ) {
     this.breakpointConflict = options.breakpointConflict ?? 'replace';
@@ -740,9 +743,11 @@ export class DebugSession<O = unknown> {
     identity: IDebuggerIdentity,
     holdSeconds: number,
   ): Promise<IAdtResponse<string>> {
-    const answer = listener.debugger
-      .listen(identity, { holdSeconds })
-      .catch(asFailure);
+    const sent = listener.debugger.listen(identity, { holdSeconds });
+    const answer = sent.catch(asFailure);
+    // Marked on the answer itself, the first tick after it comes.
+    const settle = () => settledPolls.add(answer);
+    sent.then(settle, settle);
     listener.open = answer; // cleared once its answer is handled (onPoll, start)
     return answer;
   }
@@ -1231,7 +1236,13 @@ export class DebugSession<O = unknown> {
   protected async beforeFirstListen(
     identity: IDebuggerIdentity,
   ): Promise<void> {
-    if (!this.ids.stated || this.reconciled) return;
+    // Only a stated id can have a predecessor; in terminal mode the terminal id
+    // itself must be stated, since the listener there is keyed by it.
+    const stated =
+      identity.debuggingMode === 'terminal'
+        ? this.ids.terminalStated
+        : this.ids.stated;
+    if (!stated || this.reconciled) return;
     // A predecessor under these ids may have left a listener (D12); its absence is no failure.
     // It counts as done only once the request was sent: a start that failed before it retries.
     // stopListener deletes the key's breakpoints too, which the arming then replaces.
@@ -1389,6 +1400,15 @@ export class DebugSession<O = unknown> {
           // stays: a tag is never reused in this instance. `changed` stays until settle()
           // finds the cleanup complete, so a stop that keeps anything owes the stopListener again.
           this.forgetAll();
+          // Measured on premise (2026-10-12): a poll sent just before the stop (the loop
+          // polls again at once after a run ends) can reach the system after the
+          // stopListener; nothing then wakes it, and it holds its full hold. So while
+          // that poll has not settled, the listener is stopped once more, on the same
+          // identity. No timer: only whether the answer has come. Its failure is no
+          // debt — the first stop succeeded and deleted the key's breakpoints; at worst
+          // the poll holds until the system answers it.
+          if (open && !settledPolls.has(open))
+            await control.stopListener(identity).catch(() => undefined);
           await this.retireListener(listener, open, failures);
         } else if (refusesUser(stopped)) {
           // Our choice on an explicit reading (refusesUser), a safety net: 404

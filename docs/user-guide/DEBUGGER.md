@@ -86,7 +86,8 @@ What the system does with them, measured on premise and on the cloud
   requests that carry its terminal id and IDE id, and the runs this server
   starts for the debug session carry them (measured on premise, 2026-10-12), so
   terminal mode needs neither id configured: a stated id only replaces the random
-  one. A request started elsewhere carries no such ids and is not caught.
+  one. Any other request is caught only if it carries the same ids, so a
+  terminal start without a run catches only those.
 - **Breakpoints belong to the SAP user, not to an id**: whichever listener of that
   user is active catches them.
 

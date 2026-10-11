@@ -64,10 +64,6 @@ describe('DebugSession lifecycle', () => {
         debuggee: { terminalId: identity.terminalId, ideId: identity.ideId },
       },
     ]);
-    expect(world.runs[0].debuggee).toEqual({
-      terminalId: IDS.terminalId,
-      ideId: IDS.ideId,
-    });
   });
 
   it('a run under user mode carries no ids', async () => {
@@ -271,6 +267,83 @@ describe('DebugSession lifecycle', () => {
     expect(world.calls.indexOf('stopListener')).toBeLessThan(
       world.calls.findIndex((c) => c.startsWith('listen:')),
     );
+  });
+
+  it.each([
+    ['user mode, the IDE id alone stated', {}, { stated: true }, true],
+    [
+      'terminal mode, the IDE id alone stated',
+      { debuggingMode: 'terminal' as const },
+      { stated: true },
+      false,
+    ],
+    [
+      'terminal mode, the terminal id stated',
+      { debuggingMode: 'terminal' as const },
+      { stated: true, terminalStated: true },
+      true,
+    ],
+    [
+      'terminal mode, nothing stated',
+      { debuggingMode: 'terminal' as const },
+      {},
+      false,
+    ],
+  ])(
+    'the first start reconciles a predecessor only under ids that can have one: %s',
+    async (_, mode, stated, reconciles) => {
+      const world = fakeWorld();
+      await started(undefined, { ...IDS, ...stated }, world, mode);
+      expect(world.calls.includes('stopListener')).toBe(reconciles);
+    },
+  );
+
+  // Measured on premise (2026-10-12): a poll sent just before the stop can reach
+  // the system after the stopListener and then holds its full hold.
+  it('a stop whose first stopListener left the open poll unanswered stops the listener once more, before awaiting the poll', async () => {
+    const { session, world } = await started();
+    const open = world.polls[1];
+    let answered = false;
+    let stops = 0;
+    const unansweredAtSecond: boolean[] = [];
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      stops++;
+      if (stops === 2) {
+        unansweredAtSecond.push(!answered);
+        answered = true;
+        open.resolve(LISTEN_NOTHING());
+      }
+      return okResponse(undefined);
+    };
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(world.calls.filter((c) => c === 'stopListener')).toHaveLength(2);
+    expect(unansweredAtSecond).toEqual([true]);
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
+  it('a stop whose stopListener answered the open poll stops the listener once', async () => {
+    const { session, world } = await started();
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(world.calls.filter((c) => c === 'stopListener')).toHaveLength(1);
+    expect(session.holdsState()).toBe(false);
+  });
+
+  it('a second stopListener that fails is no failure of the stop: the first one succeeded', async () => {
+    const { session, world } = await started();
+    const open = world.polls[1];
+    let stops = 0;
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      stops++;
+      if (stops === 1) return okResponse(undefined);
+      open.resolve(LISTEN_NOTHING()); // the system answers the poll at last
+      return refusedResponse('listener already stopped');
+    };
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(stops).toBe(2);
+    expect(session.holdsState()).toBe(false);
   });
 
   describe('a close that throws during stop', () => {

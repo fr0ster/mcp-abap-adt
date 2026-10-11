@@ -342,8 +342,8 @@ Terminal mode works for the runs this server starts, measured on premise
   (in user mode it ended it).
 
 So under terminal mode our own run carries the session's ids, and in user mode
-none. A request started elsewhere does not carry our ids, so terminal mode does
-not catch it.
+none. Any other request is caught in terminal mode only if it carries the same
+ids, so a terminal start without a run catches only such requests.
 
 This holds for this repository (stated by the user 2026-10-10); a handle in
 another project may mean something else, and the global MCP rules still apply

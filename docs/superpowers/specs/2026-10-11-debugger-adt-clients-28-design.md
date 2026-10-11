@@ -105,6 +105,9 @@ Compact keeps its four debugger tools.
      - `armed` holds the placed rows.
      - The answer reports `ambiguous: [kind]`, and for that kind `lost` is not reported.
      - A later change re-sends those definitions. One the server refuses again is reported again, which costs a row and loses nothing.
+     - **The one exception to "a delete by id removes the breakpoint from both lists".** In a kind marked ambiguous, an id cannot be tied to one definition. So `DebugDeleteBreakpoint` for a breakpoint of that kind is refused before the wire: "this kind's breakpoints cannot be told apart; `DebugStop` clears them". This avoids both deleting the wrong definition and re-arming the deleted one on the next change.
+     - The kind stops being ambiguous as soon as a later answer pairs by position.
+     - This path exists only if the integration test finds that the server does not keep the order of the rows.
 
   The server may rewrite a line URI in a placed row, so placed rows are matched by position or kind, never by URI equality.
 - **After the answer:**
@@ -180,6 +183,7 @@ Compact keeps its four debugger tools.
 - **The arming contract.**
   - A second change sends `requested ∪ new`.
   - Ambiguous placed rows of one kind keep every definition and report `ambiguous`.
+  - A delete by id in an ambiguous kind is refused before the wire.
   - No `validationOnly` request is made.
   - Fixtures cover reordered rows, a rewritten line URI in a placed row, a refusal that pairs and one that does not (`unmatched`), and a partial refusal where an old breakpoint comes back refused (`lost`).
   - `armed` and `requested` match the rules.

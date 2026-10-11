@@ -4,6 +4,7 @@
  * debuggee, a stop, a data preview).
  */
 import { XMLParser } from 'fast-xml-parser';
+import { addressOf, type ObjectAddress } from './objectUri';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -13,7 +14,14 @@ const parser = new XMLParser({
   parseAttributeValue: false,
   trimValues: false,
   isArray: (n) =>
-    ['mainResponse', 'variable', 'columns', 'data', 'breakpoint'].includes(n),
+    [
+      'mainResponse',
+      'variable',
+      'columns',
+      'data',
+      'breakpoint',
+      'callstackEntry',
+    ].includes(n),
 });
 const text = (v: unknown): string =>
   v === undefined || v === null
@@ -30,6 +38,26 @@ export interface AmdpBreakpointState {
   errorMessage?: string;
 }
 
+/**
+ * One frame of an AMDP stop's call stack: the procedure, where it stands in
+ * the ABAP source, and where in the database procedure.
+ */
+export interface AmdpFrame {
+  index: number;
+  procedure: string;
+  language: string;
+  type: string;
+  isDebugCompiled: boolean;
+  /** The ABAP source position, its line in `#start=`. */
+  uri: string;
+  /** The object as the system types it, the subtype included. */
+  objectType: string;
+  objectName: string;
+  line?: number;
+  schema: string;
+  nativeLine?: number;
+}
+
 export interface AmdpEvent {
   kind: string;
   requestId: string;
@@ -37,6 +65,8 @@ export interface AmdpEvent {
   line?: number;
   variables: Array<{ name: string; value: string }>;
   breakpoints: AmdpBreakpointState[];
+  /** The call stack an ON_BREAK carries, in the order the system sends it. */
+  stack?: AmdpFrame[];
   body: string;
 }
 
@@ -54,6 +84,26 @@ function breakpointState(b: any): AmdpBreakpointState {
     ...(line !== undefined ? { line } : {}),
     state: text(b.state),
     ...(errorMessage ? { errorMessage } : {}),
+  };
+}
+
+function frameOf(f: any): AmdpFrame {
+  const abap = f.abapPosition ?? {};
+  const native = f.nativePosition ?? {};
+  const line = lineOf(abap.uri);
+  const nativeLine = text(native.line).trim();
+  return {
+    index: Number(text(f.index).trim() || 0),
+    procedure: text(abap.procedureName) || text(native.procedureName),
+    language: text(f.language),
+    type: text(f.type),
+    isDebugCompiled: text(f.isDebugCompiled) === 'true',
+    uri: text(abap.uri),
+    objectType: text(abap.type),
+    objectName: text(abap.name),
+    ...(line !== undefined ? { line } : {}),
+    schema: text(native.schemaName),
+    ...(nativeLine ? { nativeLine: Number(nativeLine) } : {}),
   };
 }
 
@@ -89,6 +139,7 @@ export function readAmdpEvents(xml: string): AmdpEvent[] {
   const bodies = [...xml.matchAll(MAIN_RESPONSE)].map((m) => m[0]);
   return rows.map((r, i) => {
     const line = lineOf(deep(r, 'abapPosition')[0]?.uri);
+    const frames = deep(r, 'callstackEntry');
     return {
       kind: text(r.kind),
       requestId: text(r.requestId),
@@ -99,6 +150,7 @@ export function readAmdpEvents(xml: string): AmdpEvent[] {
         value: text(v.isNullValue) === 'true' ? 'NULL' : text(v),
       })),
       breakpoints: deep(r, 'breakpoint').map(breakpointState),
+      ...(frames.length ? { stack: frames.map(frameOf) } : {}),
       body: bodies[i] ?? '',
     };
   });
@@ -148,6 +200,37 @@ export function readAmdpPreview(xml: string): {
   return { columns: names, rows };
 }
 
+/**
+ * A frame as a model acts on it: the procedure, the ABAP address a breakpoint
+ * or a read takes, and the line in the database procedure. Language, frame
+ * type and index are left out; a frame not compiled for debugging is named,
+ * since it cannot be stepped in.
+ */
+export interface TerseAmdpFrame {
+  procedure: string;
+  address?: ObjectAddress;
+  native_line?: number;
+  not_debug_compiled?: true;
+}
+
+export function terseAmdpFrame(f: AmdpFrame): TerseAmdpFrame {
+  const address =
+    addressOf(f.uri) ??
+    (f.objectName
+      ? {
+          object_type: f.objectType,
+          object_name: f.objectName,
+          ...(f.line !== undefined ? { line: f.line } : {}),
+        }
+      : undefined);
+  return {
+    procedure: f.procedure,
+    ...(address ? { address } : {}),
+    ...(f.nativeLine !== undefined ? { native_line: f.nativeLine } : {}),
+    ...(f.isDebugCompiled ? {} : { not_debug_compiled: true as const }),
+  };
+}
+
 /** Shortens by count, never by precision: the ids that tell events apart stay. */
 export function terseAmdpEvent(e: AmdpEvent): {
   kind: string;
@@ -156,6 +239,7 @@ export function terseAmdpEvent(e: AmdpEvent): {
   line?: number;
   variables: Array<{ name: string; value: string }>;
   breakpoints?: AmdpBreakpointState[];
+  stack?: TerseAmdpFrame[];
 } {
   return {
     kind: e.kind,
@@ -165,5 +249,9 @@ export function terseAmdpEvent(e: AmdpEvent): {
     variables: e.variables,
     // An INVALID breakpoint and the system's reason reach the model.
     ...(e.breakpoints.length ? { breakpoints: e.breakpoints } : {}),
+    // The top frames, as the ABAP stop keeps them (terseStop).
+    ...(e.stack?.length
+      ? { stack: e.stack.slice(0, 5).map(terseAmdpFrame) }
+      : {}),
   };
 }

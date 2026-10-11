@@ -1,7 +1,9 @@
 import { corpusBody } from '../../../lib/adtCorpus';
 import {
+  readMemorySizes,
   readSnapshotList,
   readXmlDocument,
+  terseMemorySizes,
 } from '../../../lib/debugger/memoryReadings';
 
 it('lists the recorded snapshots of a user; none for a user with none', () => {
@@ -47,4 +49,35 @@ it('the memory sizes and a created snapshot, as recorded, read as their document
       data: expect.stringContaining('abDbgMemory_'),
     }),
   });
+});
+
+it('the recorded memory sizes read as numbers, named after their elements', () => {
+  const sizes = readMemorySizes(corpusBody('debugger-memory--01-memory-sizes'));
+  expect(sizes).toEqual({
+    abap: {
+      staticVariables: 272952,
+      stackUsed: 41840,
+      stackAllocated: 205864,
+      dynamicMemoryObjectsUsed: 236362,
+      dynamicMemoryObjectsAllocated: 292100,
+    },
+    internal: { used: 4271832, allocated: 7698616, peakUsed: 5526872 },
+    external: {
+      used: 4271832,
+      allocated: 4938492,
+      peakUsed: 5526872,
+      numberOfInternalSessions: 1,
+    },
+  });
+  expect(terseMemorySizes(sizes)).toEqual({
+    abap_objects_used: 236362,
+    internal_used: 4271832,
+    internal_peak_used: 5526872,
+  });
+});
+it('memory sizes of an empty or partial document read as zero', () => {
+  expect(readMemorySizes('').internal.used).toBe(0);
+  expect(
+    readMemorySizes('<dbg:memorySizes xmlns:dbg="u"/>').abap.stackUsed,
+  ).toBe(0);
 });

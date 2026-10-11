@@ -1,7 +1,11 @@
 // src/handlers/debugger/debug/handleDebugGetMemorySizes.ts
 import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
-import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
+import {
+  readMemorySizes,
+  readXmlDocument,
+  terseMemorySizes,
+} from '../../../lib/debugger/memoryReadings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
@@ -26,7 +30,7 @@ export async function handleDebugGetMemorySizes(
   return debugAnswer(
     args,
     async () => requireDebugger(context, args, 'use').abap.getMemorySizes(),
-    readXmlDocument,
+    (xml) => terseMemorySizes(readMemorySizes(xml)),
     readXmlDocument,
   );
 }

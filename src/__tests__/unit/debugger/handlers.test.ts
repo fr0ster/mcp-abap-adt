@@ -468,6 +468,21 @@ describe('debugger handlers', () => {
       ]);
     });
 
+    it('memory sizes: terse is three sizes of the recorded answer, full the document', async () => {
+      const { call } = await stopped();
+      expect(json(await call(handleDebugGetMemorySizes))).toEqual({
+        abap_objects_used: 236362,
+        internal_used: 4271832,
+        internal_peak_used: 5526872,
+      });
+      const full = json(
+        await call(handleDebugGetMemorySizes, { detail: 'full' }),
+      );
+      expect(full.memorySizes.external.numberOfInternalSessions).toBe('1');
+      const raw: any = await call(handleDebugGetMemorySizes, { detail: 'raw' });
+      expect(raw.content[0].text).toContain('<dbg:memorySizes');
+    });
+
     it('SetBreakpoints answers exception and statement breakpoints as the readings are', async () => {
       const { world, state, context } = install();
       await startedListening(world, context);

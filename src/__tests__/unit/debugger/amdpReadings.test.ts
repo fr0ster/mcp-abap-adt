@@ -57,7 +57,76 @@ describe('AMDP readings', () => {
       debuggeeId: 'D1',
       line: AMDP_BREAK_LINE,
       variables: e.variables,
+      stack: [
+        {
+          procedure: 'ZMCP_DBG_AMDP=>SUM_TO',
+          address: {
+            object_type: 'CLAS',
+            object_name: 'ZMCP_DBG_AMDP',
+            line: AMDP_BREAK_LINE,
+          },
+          native_line: 14,
+        },
+      ],
     });
+  });
+  it('an ON_BREAK carries its call stack: the procedure, the ABAP position, the native line', () => {
+    const [e] = readAmdpEvents(corpusBody('amdp-debugger--05-events-on-break'));
+    expect(e.stack).toEqual([
+      {
+        index: 1,
+        procedure: 'ZMCP_DBG_AMDP=>SUM_TO',
+        language: 'sql',
+        type: 'line',
+        isDebugCompiled: true,
+        uri: '/sap/bc/adt/oo/classes/zmcp_dbg_amdp/source/main#start=27',
+        objectType: 'CLAS/OC',
+        objectName: 'ZMCP_DBG_AMDP',
+        line: 27,
+        schema: 'SAPHANADB',
+        nativeLine: 14,
+      },
+    ]);
+  });
+  it('the table function stop carries its own frame; terse keeps the address and the native line', () => {
+    const [e] = readAmdpEvents(
+      corpusBody('amdp-debugger--07-events-on-break-table-function'),
+    );
+    expect(e.stack).toMatchObject([
+      { index: 0, procedure: 'ZMCP_DBG_AMDP=>TF', line: 37, nativeLine: 16 },
+    ]);
+    expect(terseAmdpEvent(e).stack).toEqual([
+      {
+        procedure: 'ZMCP_DBG_AMDP=>TF',
+        address: {
+          object_type: 'CLAS',
+          object_name: 'ZMCP_DBG_AMDP',
+          line: 37,
+        },
+        native_line: 16,
+      },
+    ]);
+  });
+  it('terse names a frame not compiled for debugging and keeps the top five', () => {
+    const recorded = corpusBody('amdp-debugger--05-events-on-break');
+    const entry =
+      /<amdpdbg:callstackEntry\b[\s\S]*?<\/amdpdbg:callstackEntry>/.exec(
+        recorded,
+      )![0];
+    const cold = entry.replace(
+      'amdpdbg:isDebugCompiled="true"',
+      'amdpdbg:isDebugCompiled="false"',
+    );
+    expect(cold).not.toBe(entry);
+    const xml = recorded.replace(entry, cold + entry.repeat(6));
+    const terse = terseAmdpEvent(readAmdpEvents(xml)[0]);
+    expect(terse.stack).toHaveLength(5);
+    expect(terse.stack?.[0].not_debug_compiled).toBe(true);
+    expect(terse.stack?.[1].not_debug_compiled).toBeUndefined();
+  });
+  it('an event without a call stack has none', () => {
+    expect(readAmdpEvents(END)[0].stack).toBeUndefined();
+    expect(terseAmdpEvent(readAmdpEvents(END)[0]).stack).toBeUndefined();
   });
   it('a variable the system marks null reads NULL', () => {
     const xml = BREAK.replace(

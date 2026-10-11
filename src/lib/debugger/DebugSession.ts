@@ -124,8 +124,8 @@ export type DebuggingMode = 'user' | 'terminal';
 /** What a caller may set; `showDataAging` is left out, so it stays off, the system's default. */
 export type DebugSettings = Omit<IDebuggerSettings, 'showDataAging'>;
 export interface DebugStartOptions {
-  /** At least one: a start without a breakpoint is refused before the wire. */
-  breakpoints?: IDebuggerBreakpoint[];
+  /** At least one: a start with an empty list is refused before the wire. */
+  breakpoints: IDebuggerBreakpoint[];
   run?: RunTarget;
   /** User mode: whose requests are caught; the connected user when omitted. */
   requestUser?: string;
@@ -572,7 +572,7 @@ export class DebugSession<O = unknown> {
    */
   start(
     conflict: IDebuggerListenerConflict,
-    options: DebugStartOptions = {},
+    options: DebugStartOptions,
   ): Promise<DebugState & { breakpoints?: BreakpointsAnswer }> {
     return this.mutate(async () => {
       if (this.listener || this.current)
@@ -592,6 +592,8 @@ export class DebugSession<O = unknown> {
       // A start arms at least one breakpoint (the user's decision, 2026-10-11): a
       // caller that forgot them learns it here, not from a listener that can catch
       // nothing it asked for.
+      // Typed as required; `?? []` gives an untyped caller of the library the same
+      // refusal instead of a TypeError.
       const breakpoints = options.breakpoints ?? [];
       if (!breakpoints.length)
         throw new DebugRefusedError('a start needs at least one breakpoint');
@@ -645,12 +647,9 @@ export class DebugSession<O = unknown> {
             placed,
           );
         }
-        if (!first.ok) {
-          const error = listenerError(first);
-          // A refused listener (409) changed nothing; any other failure leaves its state unknown.
-          if (!(error instanceof DebugConflictError)) this.changed = true;
-          throw error;
-        }
+        // The arming changed the system already, so any other failed listen
+        // takes the cleanup after a change.
+        if (!first.ok) throw listenerError(first);
         this.changed = true;
         const caught = readDebuggee(bodyOf(first));
         if (caught) await this.attachTo(caught, bodyOf(first), generation);
@@ -666,9 +665,8 @@ export class DebugSession<O = unknown> {
       } catch (error) {
         if (!this.changed) {
           // Refused before any change — a preflight 409, a failure of the preflight
-          // itself, an arming refused for the user, a first listen refused 409 with
-          // nothing armed or reconciled, or refused for the user (its breakpoints are
-          // left to the system, see above). No
+          // itself, an arming refused for the user, or a first listen refused for the
+          // user (its breakpoints are left to the system, see above). No
           // stopListener and no deletion: only the connections this start opened close.
           // A close that fails is kept like any other cleanup failure: the identity
           // stays, a new start is refused, DebugStop finishes it.

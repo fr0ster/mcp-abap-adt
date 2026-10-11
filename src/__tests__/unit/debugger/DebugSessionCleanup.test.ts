@@ -37,12 +37,11 @@ describe('the cleanup', () => {
 
   async function armed(
     world = fakeWorld(),
-    start: Parameters<DebugSession['start']>[1] = {},
+    start: Partial<Parameters<DebugSession['start']>[1]> = {},
   ) {
     world.breakpointAnswers.push(ROWS);
     const session = new DebugSession(world.ports, IDS).bind('origin');
     const s = session.start('refuse', {
-      ...START,
       breakpoints: [A, EXC],
       ...start,
     });
@@ -98,7 +97,7 @@ describe('the cleanup', () => {
     const world = fakeWorld();
     world.breakpointAnswers.push(ROWS);
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const s = session.start('refuse', { ...START, breakpoints: [A, EXC] });
+    const s = session.start('refuse', { breakpoints: [A, EXC] });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT());
     await expect(s).rejects.toThrow(/SY 530/);
@@ -119,9 +118,9 @@ describe('the cleanup', () => {
       { ...IDS, stated: true },
       { breakpointConflict: 'refuse-if-held' },
     ).bind('origin');
-    await expect(
-      held.start('refuse', { ...START, breakpoints: [A] }),
-    ).rejects.toThrow(/global debugging scope/);
+    await expect(held.start('refuse', { breakpoints: [A] })).rejects.toThrow(
+      /global debugging scope/,
+    );
     const terminal = new DebugSession(world.ports, IDS).bind('origin');
     await expect(
       terminal.start('refuse', { ...START, debuggingMode: 'terminal' }),
@@ -161,16 +160,16 @@ describe('the cleanup', () => {
     });
     expect(session.preferredSettings()).toEqual({ systemDebugging: true });
     expect(session.holdsState()).toBe(true);
-    await expect(
-      session.start('refuse', { ...START, breakpoints: [A] }),
-    ).rejects.toThrow(NOT_COMPLETE);
+    await expect(session.start('refuse', { breakpoints: [A] })).rejects.toThrow(
+      NOT_COMPLETE,
+    );
     await session.stop();
     expect(session.currentIdentity()).toBeUndefined();
     expect(session.preferredSettings()).toEqual({});
     expect(session.holdsState()).toBe(false);
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
     world.breakpointAnswers.push(ROWS);
-    const again = session.start('refuse', { ...START, breakpoints: [A, EXC] });
+    const again = session.start('refuse', { breakpoints: [A, EXC] });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await expect(again).resolves.toBeDefined();
@@ -327,13 +326,13 @@ describe('the cleanup', () => {
   it('a tag is never reused: the cleanup empties the lists, not the counter', async () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const first = session.start('refuse', { ...START, breakpoints: [A] });
+    const first = session.start('refuse', { breakpoints: [A] });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await first;
     await session.stop();
     expect(session.requestedBreakpoints()).toEqual([]);
-    const second = session.start('refuse', { ...START, breakpoints: [A] });
+    const second = session.start('refuse', { breakpoints: [A] });
     await until(() => world.polls.length === 3);
     world.polls[2].resolve(LISTEN_NOTHING());
     await second;

@@ -79,7 +79,6 @@ describe('DebugSession', () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
     const started = session.start('refuse', {
-      ...START,
       breakpoints: [
         {
           kind: 'line',
@@ -105,7 +104,6 @@ describe('DebugSession', () => {
     });
     const session = new DebugSession(world.ports, IDS).bind('origin');
     const started = session.start('refuse', {
-      ...START,
       breakpoints: [
         {
           kind: 'line',
@@ -131,7 +129,6 @@ describe('DebugSession', () => {
       return realClose(c);
     };
     const started = session.start('refuse', {
-      ...START,
       breakpoints: [
         {
           kind: 'line',
@@ -600,7 +597,6 @@ describe('DebugSession', () => {
         refusedResponse('Breakpoint is locked');
       const session = new DebugSession(world.ports, IDS).bind('origin');
       const started = session.start('refuse', {
-        ...START,
         breakpoints: [
           {
             kind: 'line',

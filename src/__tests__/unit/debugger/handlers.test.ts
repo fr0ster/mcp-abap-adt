@@ -459,12 +459,12 @@ describe('debugger handlers', () => {
       expect(world.modes).toEqual(['refuse', 'refuse']);
     });
 
-    it('a start without a breakpoint is a tool error before the wire, with no handle', async () => {
+    it('an empty breakpoint list at a start is a tool error before the wire, with no handle (a missing one the boundary refuses)', async () => {
       for (const start of [
         handleDebugStartListener,
         handleDebugTakeOverListener,
       ])
-        for (const args of [{}, { breakpoints: [] }]) {
+        for (const args of [{ breakpoints: [] }]) {
           const { world, context } = install();
           const r: any = await start(context as any, args as any);
           expect(r.isError).toBe(true);

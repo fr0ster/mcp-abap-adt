@@ -66,7 +66,6 @@ describe("the system's refusal of a request user", () => {
         world.breakpointAnswers.push(refusal);
         const session = new DebugSession(world.ports, IDS).bind('origin');
         const started = session.start('refuse', {
-          ...START,
           breakpoints: [A],
           requestUser: 'SAPUSER03',
         });
@@ -91,7 +90,6 @@ describe("the system's refusal of a request user", () => {
       }).bind('origin');
       await expect(
         session.start('refuse', {
-          ...START,
           breakpoints: [A],
           requestUser: 'SAPUSER03',
         }),
@@ -105,7 +103,7 @@ describe("the system's refusal of a request user", () => {
       world.breakpointAnswers.push(() => USER_REFUSED(403, 'otherSubType'));
       const session = new DebugSession(world.ports, IDS).bind('origin');
       await expect(
-        session.start('refuse', { ...START, breakpoints: [A] }),
+        session.start('refuse', { breakpoints: [A] }),
       ).rejects.toThrow(DebugRequestError);
       expect(world.calls).toEqual(['setBreakpoints:1', 'stopListener']);
     });
@@ -116,7 +114,7 @@ describe("the system's refusal of a request user", () => {
       const world = fakeWorld();
       world.breakpointAnswers.push(ROWS);
       const session = new DebugSession(world.ports, IDS).bind('origin');
-      const s = session.start('refuse', { ...START, breakpoints: [A, EXC] });
+      const s = session.start('refuse', { breakpoints: [A, EXC] });
       await until(() => world.polls.length === 1);
       world.polls[0].resolve(LISTEN_NOTHING());
       await s;
@@ -140,7 +138,6 @@ describe("the system's refusal of a request user", () => {
       world.breakpointAnswers.push(ROWS);
       const session = new DebugSession(world.ports, IDS).bind('origin');
       const started = session.start('refuse', {
-        ...START,
         breakpoints: [A, EXC],
         requestUser: 'SAPUSER03',
       });
@@ -183,7 +180,7 @@ describe("the system's refusal of a request user", () => {
         const world = fakeWorld();
         world.breakpointAnswers.push(ROWS);
         const session = new DebugSession(world.ports, IDS).bind('origin');
-        const s = session.start('refuse', { ...START, breakpoints: [A, EXC] });
+        const s = session.start('refuse', { breakpoints: [A, EXC] });
         await until(() => world.polls.length === 1);
         world.polls[0].resolve(LISTEN_NOTHING());
         await s;
@@ -261,7 +258,6 @@ describe("the system's refusal of a request user", () => {
       world.breakpointAnswers.push(NOT_AUTHORIZED);
       const session = new DebugSession(world.ports, STATED).bind('origin');
       const started = session.start('refuse', {
-        ...START,
         breakpoints: [A],
         requestUser: 'SAPUSER03',
       });
@@ -286,7 +282,6 @@ describe("the system's refusal of a request user", () => {
       refuseStop(world, INVALID_USER);
       const session = new DebugSession(world.ports, STATED).bind('origin');
       const started = session.start('refuse', {
-        ...START,
         breakpoints: [A],
         requestUser: 'SAPUSER03',
       });
@@ -318,7 +313,7 @@ describe("the system's refusal of a request user", () => {
       world.breakpointAnswers.push(CSRF);
       const session = new DebugSession(world.ports, IDS).bind('origin');
       await expect(
-        session.start('refuse', { ...START, breakpoints: [A] }),
+        session.start('refuse', { breakpoints: [A] }),
       ).rejects.toThrow(DebugRequestError);
       expect(world.calls).toEqual(['setBreakpoints:1', 'stopListener']);
     });
@@ -327,7 +322,7 @@ describe("the system's refusal of a request user", () => {
       const world = fakeWorld();
       world.breakpointAnswers.push(ROWS);
       const session = new DebugSession(world.ports, IDS).bind('origin');
-      const s = session.start('refuse', { ...START, breakpoints: [A, EXC] });
+      const s = session.start('refuse', { breakpoints: [A, EXC] });
       await until(() => world.polls.length === 1);
       world.polls[0].resolve(LISTEN_NOTHING());
       await s;

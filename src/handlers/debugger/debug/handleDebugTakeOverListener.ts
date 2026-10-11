@@ -45,10 +45,10 @@ export async function handleDebugTakeOverListener(
     args,
     async () => {
       const d = requireDebugger(context, args, { create: 'abap' });
-      // The boundary refuses a missing or empty list; a direct caller reaches the
-      // session, which refuses it before the wire.
+      // The boundary refuses a missing or empty list; the session refuses an empty
+      // one before the wire too.
       return d.abap.start('takeOver', {
-        breakpoints: breakpointsFromArgs(args.breakpoints ?? []),
+        breakpoints: breakpointsFromArgs(args.breakpoints),
         run: runFromArgs(args.run),
         ...startOptionsFromArgs(args),
       });

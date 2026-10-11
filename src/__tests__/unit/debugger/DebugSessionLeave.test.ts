@@ -31,7 +31,7 @@ describe('leaving a debuggee running', () => {
       ),
     );
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const s = session.start('refuse', { ...START, breakpoints: [A] });
+    const s = session.start('refuse', { breakpoints: [A] });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;

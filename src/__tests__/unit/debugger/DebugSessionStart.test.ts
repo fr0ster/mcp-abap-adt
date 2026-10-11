@@ -4,6 +4,7 @@ import {
   DebugRefusedError,
   DebugRequestError,
   DebugSession,
+  type DebugStartOptions,
   FIRST_POLL_HOLD_SECONDS,
 } from '../../../lib/debugger/DebugSession';
 import { refusedResponse } from '../../helpers/fakeClient';
@@ -30,10 +31,10 @@ describe('the start', () => {
     world = fakeWorld(),
     ids: ConstructorParameters<typeof DebugSession>[1] = IDS,
     options: ConstructorParameters<typeof DebugSession>[2] = {},
-    start: Parameters<DebugSession['start']>[1] = {},
+    start: Partial<Parameters<DebugSession['start']>[1]> = {},
   ) {
     const session = new DebugSession(world.ports, ids, options).bind('origin');
-    const started = session.start('refuse', { ...START, ...START, ...start });
+    const started = session.start('refuse', { ...START, ...start });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await started;
@@ -52,7 +53,10 @@ describe('the start', () => {
       for (const conflict of ['refuse', 'takeOver'] as const) {
         const world = fakeWorld();
         const session = new DebugSession(world.ports, IDS).bind('origin');
-        await expect(session.start(conflict, start)).rejects.toThrow(
+        // The type requires the list; an untyped caller can still leave it out.
+        await expect(
+          session.start(conflict, start as DebugStartOptions),
+        ).rejects.toThrow(
           new DebugRefusedError('a start needs at least one breakpoint'),
         );
         expect(world.log).toEqual([]);
@@ -153,7 +157,6 @@ describe('the start', () => {
       const session = new DebugSession(world.ports, IDS).bind('origin');
       await expect(
         session.start('refuse', {
-          ...START,
           breakpoints: [
             LINE,
             {
@@ -180,7 +183,7 @@ describe('the start', () => {
         HELD,
       ).bind('origin');
       const error = await session
-        .start('refuse', { ...START, breakpoints: [LINE] })
+        .start('refuse', { breakpoints: [LINE] })
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(DebugConflictError);
       expect((error as DebugConflictError).conflictText).toMatch(
@@ -198,7 +201,7 @@ describe('the start', () => {
       world.checkAnswers.push(() => refusedResponse('No authorization'));
       const session = new DebugSession(world.ports, IDS, HELD).bind('origin');
       await expect(
-        session.start('refuse', { ...START, breakpoints: [LINE] }),
+        session.start('refuse', { breakpoints: [LINE] }),
       ).rejects.toThrow(new DebugRequestError('No authorization'));
       expect(world.calls).toEqual(['checkListener']);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));

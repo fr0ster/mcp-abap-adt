@@ -5,6 +5,7 @@
  */
 import { XMLParser } from 'fast-xml-parser';
 import { addressOf, type ObjectAddress } from './objectUri';
+import { terseFrames } from './readings';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -244,6 +245,17 @@ export function terseAmdpFrame(f: AmdpFrame): TerseAmdpFrame {
   };
 }
 
+function terseStack(stack: AmdpFrame[]): {
+  stack: TerseAmdpFrame[];
+  stack_depth?: number;
+} {
+  const kept = terseFrames(stack, terseAmdpFrame);
+  return {
+    stack: kept.frames,
+    ...(kept.depth ? { stack_depth: kept.depth } : {}),
+  };
+}
+
 /** Shortens by count, never by precision: the ids that tell events apart stay. */
 export function terseAmdpEvent(e: AmdpEvent): {
   kind: string;
@@ -253,6 +265,7 @@ export function terseAmdpEvent(e: AmdpEvent): {
   variables: Array<{ name: string; value: string }>;
   breakpoints?: AmdpBreakpointState[];
   stack?: TerseAmdpFrame[];
+  stack_depth?: number;
 } {
   return {
     kind: e.kind,
@@ -264,8 +277,6 @@ export function terseAmdpEvent(e: AmdpEvent): {
     ...(e.breakpoints.length ? { breakpoints: e.breakpoints } : {}),
     // The top frames, as the ABAP stop keeps them (terseStop): the system sends the
     // innermost first, its index counting from 1 at the outermost (measured on premise, 2026-10-11).
-    ...(e.stack?.length
-      ? { stack: e.stack.slice(0, 5).map(terseAmdpFrame) }
-      : {}),
+    ...(e.stack?.length ? terseStack(e.stack) : {}),
   };
 }

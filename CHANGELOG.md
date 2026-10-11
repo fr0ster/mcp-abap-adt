@@ -9,9 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A terse stop keeps up to 50 frames, not 5** — the ABAP stop (`DebugWait`,
+  the step answers, compact's `HandlerDebugWait`) and an AMDP break alike. Real
+  stacks run to some 20–25 frames, and five cut most of an ordinary one. A
+  deeper stack is cut at 50 from the top, and `stack_depth` then gives the full
+  depth, so a model knows to ask for `detail: full`.
 - **The AMDP stack under `terse` keeps no lines for a caller not compiled for
   debugging.** Measured on premise with nested procedures: the system sends the
-  innermost frame first (so the five kept are the top five), and for a caller
+  innermost frame first (so the frames kept are the top ones), and for a caller
   not compiled for debugging it answers the method's first line and native line
   `0` rather than where the call stands. Such a frame now answers its procedure
   and object with `not_debug_compiled`, without `line` or `native_line`. `full`

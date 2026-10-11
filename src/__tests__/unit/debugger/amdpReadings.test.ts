@@ -6,6 +6,7 @@ import {
   readAmdpStart,
   terseAmdpEvent,
 } from '../../../lib/debugger/amdpReadings';
+import { TERSE_STACK_FRAMES } from '../../../lib/debugger/readings';
 import {
   AMDP_BREAK_LINE,
   AMDP_MAIN_ID,
@@ -107,7 +108,7 @@ describe('AMDP readings', () => {
       },
     ]);
   });
-  it('terse names a frame not compiled for debugging and keeps the top five', () => {
+  it('terse names a frame not compiled for debugging; a deep stack keeps its top frames and its depth', () => {
     const recorded = corpusBody('amdp-debugger--05-events-on-break');
     const entry =
       /<amdpdbg:callstackEntry\b[\s\S]*?<\/amdpdbg:callstackEntry>/.exec(
@@ -118,9 +119,13 @@ describe('AMDP readings', () => {
       'amdpdbg:isDebugCompiled="false"',
     );
     expect(cold).not.toBe(entry);
-    const xml = recorded.replace(entry, cold + entry.repeat(6));
+    const xml = recorded.replace(
+      entry,
+      cold + entry.repeat(TERSE_STACK_FRAMES + 2),
+    );
     const terse = terseAmdpEvent(readAmdpEvents(xml)[0]);
-    expect(terse.stack).toHaveLength(5);
+    expect(terse.stack).toHaveLength(TERSE_STACK_FRAMES);
+    expect(terse.stack_depth).toBe(TERSE_STACK_FRAMES + 3);
     expect(terse.stack?.[0].not_debug_compiled).toBe(true);
     expect(terse.stack?.[1].not_debug_compiled).toBeUndefined();
   });

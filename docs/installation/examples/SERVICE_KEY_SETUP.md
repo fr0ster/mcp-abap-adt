@@ -128,7 +128,7 @@ When you make the first request:
 **Cause**: The destination states less than its authentication needs. The message names the fields and, where the server knows the remedy, one hint.
 
 **Solution**:
-- `grantType`: the `.env` is a `jwt` one without `SAP_GRANT_TYPE`. Add it, or regenerate with `mcp-auth generate-env --grant <grant>` (`@mcp-abap-adt/auth-broker-cli`)
+- `grantType`: the `.env` is a `jwt` one without `SAP_GRANT_TYPE`. Add it, or write the `.env` again with `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (`@mcp-abap-adt/auth-broker-cli`)
 - `XSUAA_MCP_URL`: an XSUAA key needs the system's URL in `sessions/TRIAL.env`
 - `SAP_URL`: state the system's URL
 

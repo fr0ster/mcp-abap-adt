@@ -1133,7 +1133,8 @@ GENERATING A .ENV (JWT Authentication):
   The mcp-auth command ships in @mcp-abap-adt/auth-broker-cli:
 
     npm install -g @mcp-abap-adt/auth-broker-cli
-    mcp-auth generate-env --grant authorization_code
+    mcp-auth --service-key <key.json> --output <file.env> --type abap|xsuaa
+    mcp-auth --destination <name> --type abap|xsuaa
 
   mcp-auth --help lists the other flags. A jwt .env must state SAP_GRANT_TYPE.
 
@@ -1206,7 +1207,7 @@ AUTHENTICATION:
   Four authentications: basic, snc (RFC only), jwt/authorization_code (browser login),
   jwt/none (a token you hold). A jwt .env must state SAP_GRANT_TYPE.
   To write a .env: npm install -g @mcp-abap-adt/auth-broker-cli, then
-  mcp-auth generate-env --grant authorization_code
+  mcp-auth --service-key <key.json> --output <file.env> --type abap|xsuaa
 
 SERVICE KEYS (Destination-Based Authentication):
   The server supports destination-based authentication using service keys stored locally.

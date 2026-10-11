@@ -197,14 +197,17 @@ The browser of a login (JWT / `authorization_code`), mapped by the platform:
 
 | `--browser` | Linux | macOS | Windows | another platform |
 |---|---|---|---|---|
-| `system` (default), `auto` | `xdg-open` | `open` | the default browser | refused at start: use `--browser=none` |
-| `chrome` | `google-chrome` | `Google Chrome` | `chrome` | refused |
-| `edge` | `microsoft-edge` | `Microsoft Edge` | `msedge` | refused |
-| `firefox` | `firefox` | `Firefox` | `firefox` | refused |
+| `system` (default), `auto` | `xdg-open` | `open` | the default browser | none: a `jwt` / `authorization_code` destination is refused at start (use `--browser=none` or `--browser-program`); other destinations start |
+| `chrome` | `google-chrome` | `Google Chrome` | `chrome` | none (as above) |
+| `edge` | `microsoft-edge` | `Microsoft Edge` | `msedge` | none (as above) |
+| `firefox` | `firefox` | `Firefox` | `firefox` | none (as above) |
 | `none`, `headless` | no browser: the URL on stderr; the login waits | the same | the same | the same |
 
-A name outside the table is refused at start. `--browser-program` runs the program you name (an
-executable on Linux, an application on macOS, a program on Windows); it excludes `--browser`.
+A name outside the table is refused at start on every platform. On another platform only a
+destination that logs in (`jwt` / `authorization_code`) is refused for the missing browser, at the
+startup check; the others start. `--browser-program` runs the program you name (an executable on
+Linux, an application on macOS, a program on Windows; elsewhere run as on Linux); it excludes
+`--browser`.
 
 ```bash
 mcp-abap-adt --mcp=TRIAL --browser=firefox

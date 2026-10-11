@@ -471,7 +471,7 @@ For Server-Sent Events transport, the configuration is similar:
 
 - Ensure JWT token is not expired
 - A destination refused at startup names the fields it lacks (`Destination "X" lacks: <fields>`) and one hint
-- A `jwt` `.env` must state `SAP_GRANT_TYPE`; regenerate it with `mcp-auth generate-env --grant <grant>` (`@mcp-abap-adt/auth-broker-cli`)
+- A `jwt` `.env` must state `SAP_GRANT_TYPE`; write it again with `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` or `mcp-auth --destination <name> --type abap|xsuaa` (`@mcp-abap-adt/auth-broker-cli`)
 
 ### Token Refresh
 

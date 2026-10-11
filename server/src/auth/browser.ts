@@ -4,8 +4,11 @@
  *
  * `browserFor` is a pure function: it answers which factory and which
  * argument, and constructs nothing — so the table is tested cell by cell
- * without a browser. `browserOf` builds the one it answered. A choice that
- * cannot be served is refused at start, before anything is read.
+ * without a browser. `browserOf` builds the one it answered. A word outside
+ * the table, or `--browser-program` beside `--browser`, is refused at start on
+ * every platform. A browser on a platform with none is *unavailable*: only a
+ * destination that logs in (`jwt` / `authorization_code`) is refused for it,
+ * at the startup check (D18).
  */
 
 import {
@@ -39,15 +42,26 @@ export interface BrowserChoice {
 
 /**
  * Which shipped factory and its argument. No factory: no browser — the URL
- * is shown on stderr and the login waits for the callback.
+ * is shown on stderr and the login waits for the callback. `unavailable`:
+ * the browser named has none on this platform; the words say what to do.
  */
 export type BrowserMapping =
-  | { readonly factory: () => IBrowser; readonly argument?: undefined }
+  | {
+      readonly factory: () => IBrowser;
+      readonly argument?: undefined;
+      readonly unavailable?: undefined;
+    }
   | {
       readonly factory: (argument: string) => IBrowser;
       readonly argument: string;
+      readonly unavailable?: undefined;
     }
-  | { readonly factory?: undefined; readonly argument?: undefined };
+  | {
+      readonly factory?: undefined;
+      readonly argument?: undefined;
+      readonly unavailable?: undefined;
+    }
+  | { readonly factory?: undefined; readonly unavailable: string };
 
 /** A choice that cannot be served; its words name parameters only. */
 export class BrowserChoiceError extends Error {
@@ -100,17 +114,19 @@ function knownPlatform(platform: string): Platform | undefined {
     : undefined;
 }
 
-function noBrowserOnThisPlatform(platform: string): BrowserChoiceError {
-  return new BrowserChoiceError(
-    `No browser is known on this platform (${platform}): use --browser=none, and open the URL the login prints on stderr`,
-  );
+function noBrowserOnThisPlatform(platform: string): BrowserMapping {
+  return {
+    unavailable: `No browser is known on this platform (${platform}): use --browser=none, and open the URL the login prints on stderr, or --browser-program=<program>`,
+  };
 }
 
 /**
  * The factory and argument for `choice` on `platform` (`process.platform`).
- * Throws `BrowserChoiceError` for a name outside the table, for a browser
- * on a platform with none, and for `--browser-program` beside `--browser`.
- * No `--browser`: `system`.
+ * Throws `BrowserChoiceError` for a name outside the table and for
+ * `--browser-program` beside `--browser`, on every platform. A browser on a
+ * platform with none answers `{ unavailable }`; `--browser-program` there runs
+ * the program as `linuxBrowser` does — a plain spawn of it. No `--browser`:
+ * `system`.
  */
 export function browserFor(
   choice: BrowserChoice,
@@ -124,8 +140,7 @@ export function browserFor(
   }
   const known = knownPlatform(platform);
   if (program !== undefined) {
-    if (!known) throw noBrowserOnThisPlatform(platform);
-    return { factory: NAMED[known], argument: program };
+    return { factory: NAMED[known ?? 'linux'], argument: program };
   }
   const word = (browser ?? 'system').trim().toLowerCase();
   if (!isBrowserName(word)) {
@@ -134,12 +149,12 @@ export function browserFor(
     );
   }
   if (word === 'none' || word === 'headless') return NO_BROWSER;
-  if (!known) throw noBrowserOnThisPlatform(platform);
+  if (!known) return noBrowserOnThisPlatform(platform);
   if (word === 'system' || word === 'auto') return { factory: DEFAULT[known] };
   return { factory: NAMED[known], argument: PROGRAMS[word][known] };
 }
 
-/** The browser a mapping names, built; `undefined` for no browser. */
+/** The browser a mapping names, built; `undefined` for no browser or an unavailable one. */
 export function browserOf(mapping: BrowserMapping): IBrowser | undefined {
   if (!mapping.factory) return undefined;
   if (mapping.argument === undefined) {

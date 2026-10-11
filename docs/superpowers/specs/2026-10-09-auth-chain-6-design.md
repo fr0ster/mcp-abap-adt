@@ -402,7 +402,7 @@ make compact-http depend on `@mcp-abap-adt/compact` → red (it reaches core).
 | `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.1.0` (prerequisite, D30) | core only |
 | `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^4.0.0` | core only |
 | `@mcp-abap-adt/auth-providers` | `^5.4.0` | `^6.0.1` | lib, core |
-| `@mcp-abap-adt/connection` | `^11.0.0` | `^15.0.0` (prerequisite, a major) | lib |
+| `@mcp-abap-adt/connection` | `^11.0.0` | `^15.0.0` (prerequisite, a major) | lib, core |
 | `@mcp-abap-adt/adt-clients` | `~27.0.0` (#288) | the prerequisite release, the next free minor on the 27 line (§18) | lib |
 | `@mcp-abap-adt/interfaces-adt-connection` | `^2.0.0` (#288) | `^2.1.0` (prerequisite) | lib |
 | `@mcp-abap-adt/interfaces-adt` | `^13.2.0` (#288) | the prerequisite release, the next free minor on the 13 line (§18) | lib |
@@ -627,7 +627,10 @@ change of the major).
   closed-gate answer is minted (D17).
 - **(D18) Startup** reads the settings and builds the provider —
   `getProvider(destination, { signal: startup })`, aborted when the check ends — so a destination
-  the broker refuses stops the start. Building sends nothing.
+  the broker refuses stops the start. Building sends nothing. Reading the settings of a `jwt` /
+  `authorization_code` destination also checks its browser (§8): a `--browser` with no browser on
+  this platform stops the start there, naming `browser`; a destination that never logs in is not
+  refused for it.
 - **The broker options the server states** (§6): `renewal`, `onWriteFailure` (by store mode, D12),
   `authDebug`, and for `jwt` / `authorization_code` `authorization` (§5.5, §8). The handler table
   (`basic`, `snc`, `jwt/authorization_code`, `jwt/none`) is unchanged.
@@ -1100,15 +1103,19 @@ sentence; inspection-only mode is the server's own `inspection_only` refusal.
 
 | `--browser` | `linux` | `darwin` | `win32` | other |
 |---|---|---|---|---|
-| `system` (default), `auto` | `linuxDefaultBrowser()` | `macDefaultBrowser()` | `windowsDefaultBrowser()` | refused at start: "use `--browser=none`" |
-| `chrome` | `linuxBrowser('google-chrome')` | `macBrowser('Google Chrome')` | `windowsBrowser('chrome')` | refused |
-| `edge` | `linuxBrowser('microsoft-edge')` | `macBrowser('Microsoft Edge')` | `windowsBrowser('msedge')` | refused |
-| `firefox` | `linuxBrowser('firefox')` | `macBrowser('Firefox')` | `windowsBrowser('firefox')` | refused |
+| `system` (default), `auto` | `linuxDefaultBrowser()` | `macDefaultBrowser()` | `windowsDefaultBrowser()` | unavailable: a `jwt` / `authorization_code` destination is refused at start (D18): "use `--browser=none`" |
+| `chrome` | `linuxBrowser('google-chrome')` | `macBrowser('Google Chrome')` | `windowsBrowser('chrome')` | unavailable |
+| `edge` | `linuxBrowser('microsoft-edge')` | `macBrowser('Microsoft Edge')` | `windowsBrowser('msedge')` | unavailable |
+| `firefox` | `linuxBrowser('firefox')` | `macBrowser('Firefox')` | `windowsBrowser('firefox')` | unavailable |
 | `none`, `headless` | no browser: the URL on stderr; the login waits | the same | the same | the same |
 
 `--browser-program=<program>` (`MCP_BROWSER_PROGRAM`, YAML `browser-program`, excludes
-`--browser`) runs the named program; a name outside the enum is refused at start. The mapping is a
-pure function returning `{ factory, argument }`, tested without constructing a browser. The
+`--browser`) runs the named program — `linuxBrowser(program)` on a platform outside the table, a
+plain spawn of the program; a name outside the enum, or `--browser-program` beside `--browser`, is
+refused at start on every platform. "Unavailable" refuses only where a login can happen: a `jwt` /
+`authorization_code` destination, at the startup check (D18); `basic`, `snc`, `jwt` / `none` and
+inspection-only mode start on any platform. The mapping is a pure function returning
+`{ factory, argument }` or `{ unavailable }`, tested without constructing a browser. The
 callback port keeps `--browser-auth-port` (default 61001). All of it lives in core.
 
 ## 9. Debug output and logging

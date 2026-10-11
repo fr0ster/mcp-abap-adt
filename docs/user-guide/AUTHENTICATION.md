@@ -16,8 +16,8 @@ not support`).
 A `.env` that is a destination by itself **must state `SAP_AUTH_TYPE`** (there is no default: a `.env` with a
 user and a password but no type is refused with `Destination "X" lacks: authType`; an ABAP service key
 states `jwt` / `authorization_code` itself). A `jwt` destination **must state `SAP_GRANT_TYPE`** too. A `.env` that states `jwt` without a grant
-is refused with `Destination "X" lacks: grantType` and a hint to regenerate it with
-`mcp-auth generate-env --grant <grant>` (see [Generate a `.env`](#generate-a-env)).
+is refused with `Destination "X" lacks: grantType` and a hint to write it again with
+`mcp-auth` (see [Generate a `.env`](#generate-a-env)), or to add `SAP_GRANT_TYPE` by hand.
 
 Other grants (`client_credentials`, `passcode`, the OIDC and SAML grants) and other types
 (`saml`, `certificate`, `kerberos`) are **not supported** by this server, even though the
@@ -115,7 +115,7 @@ Where the renewed session is written decides what a failed write means (no optio
 | Store | A failed write |
 |---|---|
 | the `--env` / `--env-path` file | **fails the request** (`unknown`, `persisting-tokens`), and the destination is refused until a write lands: it is your own file, and a write that did not land must be seen |
-| a named destination, with `--unsafe` (`sessions/X.env`) or without (in memory) | is logged on stderr, and the request goes on |
+| a named destination, with `--unsafe` (`sessions/X.env`) or without (in memory) | is logged (on stderr only with `DEBUG_AUTH_LOG=true`), and the request goes on |
 
 At shutdown a write still pending is reported on stderr as `"<destination>": <reason>` and the
 exit is `1`; the reason is the classified failure, never the store's own message.
@@ -137,17 +137,20 @@ destination, the first tool call logs in once; the token is then renewed as `--r
 
   | `--browser` | Linux | macOS | Windows | another platform |
   |---|---|---|---|---|
-  | `system` (default), `auto` | `xdg-open` | `open` | the default browser | refused at start: use `--browser=none` |
-  | `chrome` | `google-chrome` | `Google Chrome` | `chrome` | refused |
-  | `edge` | `microsoft-edge` | `Microsoft Edge` | `msedge` | refused |
-  | `firefox` | `firefox` | `Firefox` | `firefox` | refused |
+  | `system` (default), `auto` | `xdg-open` | `open` | the default browser | none: a `jwt` / `authorization_code` destination is refused at start (use `--browser=none` or `--browser-program`); other destinations start |
+  | `chrome` | `google-chrome` | `Google Chrome` | `chrome` | none (as above) |
+  | `edge` | `microsoft-edge` | `Microsoft Edge` | `msedge` | none (as above) |
+  | `firefox` | `firefox` | `Firefox` | `firefox` | none (as above) |
   | `none`, `headless` | no browser: the URL is printed on stderr; the login waits | the same | the same | the same |
 
-  A name outside the table is refused at start. The URL goes to stderr (never stdout) whatever
+  A name outside the table is refused at start, on every platform. On a platform outside the
+  table only a destination that logs in is refused for the missing browser, at the startup check;
+  `basic`, `snc`, `jwt` / `none` and inspection-only mode start. The URL goes to stderr (never stdout) whatever
   `DEBUG_AUTH_LOG` says, also when a browser could not be started.
 - `--browser-program=<program>` (or `MCP_BROWSER_PROGRAM`, YAML `browser-program`) runs the
   program you name instead: an executable on Linux, an application on macOS, a program on
-  Windows. It excludes `--browser`: giving both is refused at start.
+  Windows; elsewhere it is run as on Linux, with the URL as its one argument. It excludes
+  `--browser`: giving both is refused at start.
 - `--browser-auth-port=<port>` (or `MCP_BROWSER_AUTH_PORT`, YAML `browser-auth-port`):
   the callback port, **default `61001`** for every transport. A value that is not an integer
   from 1 to 65535 is refused at startup.
@@ -163,12 +166,16 @@ mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=61005
 
 ## Generate a `.env`
 
-The `mcp-auth` and `mcp-sso` commands live in **`@mcp-abap-adt/auth-broker-cli`**, not in
-`@mcp-abap-adt/auth-broker`:
+The `mcp-auth` command lives in **`@mcp-abap-adt/auth-broker-cli`** (3.x), not in
+`@mcp-abap-adt/auth-broker`. It logs in through the browser and writes the `.env`:
 
 ```bash
 npm install -g @mcp-abap-adt/auth-broker-cli
-mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
+# From a service key (--type xsuaa for an XSUAA key):
+mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap
+# Or a destination of the destination folder (sessions/<name>.env, else service-keys/<name>.json):
+mcp-auth --destination TRIAL --type abap
+# `mcp-auth --help` lists the other options
 ```
 
 The `.env` it writes states `SAP_AUTH_TYPE` and `SAP_GRANT_TYPE`. A `.env` written by an older

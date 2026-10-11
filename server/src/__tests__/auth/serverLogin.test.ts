@@ -7,6 +7,7 @@
  */
 
 import * as net from 'node:net';
+import { readFailure } from '@mcp-abap-adt/auth-errors';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import type {
   AuthorizationRequest,
@@ -184,10 +185,19 @@ describe('serverLogin over a real loopback strategy on port 0', () => {
     const rejected = expect(
       ended.finally(() => order.push('login settled')),
     ).rejects.toBeDefined();
+    // How it ended, read as auth-errors reads a thrown value: the composed
+    // strategy's own abort — the signal reached it through the wrapper.
+    const failure = ended.then(
+      () => undefined,
+      (error: unknown) => readFailure(error, 'token-request'),
+    );
     await open;
     controller.abort();
     await rejected;
     expect(order).toEqual(['listener closed', 'login settled']);
+    const read = await failure;
+    expect(read?.kind).toBe('interactive-login');
+    expect(read?.facts).toMatchObject({ outcome: 'aborted' });
     await bindsFree(seen.port as number);
   });
 });

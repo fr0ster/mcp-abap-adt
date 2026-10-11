@@ -936,7 +936,7 @@ describe('AuthBrokerFactory', () => {
 describe('describeAuthError', () => {
   const HINTS = {
     grantType:
-      'Regenerate the destination with `mcp-auth generate-env --grant <grant>` (from @mcp-abap-adt/auth-broker-cli).',
+      'Write the destination again with `mcp-auth --destination <name> --type abap|xsuaa` or `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (from @mcp-abap-adt/auth-broker-cli), or add SAP_GRANT_TYPE to its .env.',
     SAP_URL: "Set SAP_URL to the system's URL.",
     XSUAA_MCP_URL:
       "Set XSUAA_MCP_URL in the destination's sessions/<destination>.env to the system's URL.",

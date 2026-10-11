@@ -130,6 +130,9 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     this.renewal = config.renewal ?? 'refresh-then-login';
     this.context = {
       ...(config.browser !== undefined && { browser: config.browser }),
+      ...(config.browserUnavailable !== undefined && {
+        browserUnavailable: config.browserUnavailable,
+      }),
       ...(config.browserAuthPort !== undefined && {
         browserAuthPort: config.browserAuthPort,
       }),
@@ -204,7 +207,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         : {}),
     };
     try {
-      handler.checkSettings?.(settings);
+      handler.checkSettings?.(settings, this.context);
     } catch (error) {
       if (error instanceof SettingsError) {
         throw new DestinationConfigError(

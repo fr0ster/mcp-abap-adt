@@ -39,6 +39,12 @@ export interface IAuthBrokerFactoryConfig {
    * mapped by `browserFor`); absent: none — the URL on stderr.
    */
   browser?: IBrowser;
+  /**
+   * `--browser` names a browser this platform has none of (`browserFor`'s
+   * `unavailable` words): a `jwt` / `authorization_code` destination is
+   * refused for it at the startup check; the others never log in.
+   */
+  browserUnavailable?: string;
   /** The callback port of an interactive login; the strategy's default when absent. */
   browserAuthPort?: number;
   /** How the connector reaches the system (`--connection-type`). */

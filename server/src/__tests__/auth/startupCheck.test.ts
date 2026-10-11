@@ -13,6 +13,7 @@ import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { launch } from '../../launcher';
 import { StdioServer } from '../../StdioServer';
 import {
+  authorizationCodeLines,
   type BrokerBase,
   basicLines,
   brokerBase,
@@ -58,7 +59,7 @@ afterEach(() => {
   base.remove();
 });
 
-async function run(argv: string[]) {
+async function run(argv: string[], platform = 'linux') {
   process.argv = ['node', 'mcp-abap-adt', ...argv];
   const config = await new ServerConfigManager().getConfig();
   const stderr: string[] = [];
@@ -74,7 +75,7 @@ async function run(argv: string[]) {
       stderr: (line) => stderr.push(line),
       exit: (code) => exits.push(code),
       processLike,
-      platform: 'linux',
+      platform,
     },
   );
   return { stderr, exits };
@@ -115,5 +116,61 @@ describe('the startup check', () => {
     const signals = startupSignals();
     expect(signals).toHaveLength(1);
     expect(signals[0].aborted).toBe(true);
+  });
+
+  describe('a platform with no browser (§8): only a destination that logs in is refused', () => {
+    // basic stands for every destination that never logs in; jwt / none is
+    // refused by broker 5.0.1 for its unbound token (M8) until C1.
+    it('basic starts on freebsd with the default --browser', async () => {
+      const file = base.writeFile('conn.env', basicLines());
+      const { exits, stderr } = await run(
+        ['--transport=stdio', `--env-path=${file}`],
+        'freebsd',
+      );
+      expect(stderr.join('\n')).not.toContain('browser');
+      expect(exits).toEqual([]);
+      expect(stdioStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('inspection-only starts on freebsd', async () => {
+      const { exits } = await run(['--transport=stdio'], 'freebsd');
+      expect(exits).toEqual([]);
+      expect(stdioStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('jwt / authorization_code on freebsd: refused at the startup check, naming browser', async () => {
+      const file = base.writeFile('conn.env', authorizationCodeLines());
+      const { exits, stderr } = await run(
+        ['--transport=stdio', `--env-path=${file}`],
+        'freebsd',
+      );
+      expect(exits).toEqual([1]);
+      expect(stdioStart).not.toHaveBeenCalled();
+      const said = stderr.join('\n');
+      expect(said).toContain('Destination "default"');
+      expect(said).toContain('browser');
+      expect(said).toContain('--browser=none');
+    });
+
+    it('jwt / authorization_code on freebsd with --browser=none: starts', async () => {
+      const file = base.writeFile('conn.env', authorizationCodeLines());
+      const { exits } = await run(
+        ['--transport=stdio', `--env-path=${file}`, '--browser=none'],
+        'freebsd',
+      );
+      expect(exits).toEqual([]);
+      expect(stdioStart).toHaveBeenCalledTimes(1);
+    });
+
+    it('an unknown --browser name is refused on freebsd too, for a basic destination', async () => {
+      const file = base.writeFile('conn.env', basicLines());
+      const { exits, stderr } = await run(
+        ['--transport=stdio', `--env-path=${file}`, '--browser=opera'],
+        'freebsd',
+      );
+      expect(exits).toEqual([1]);
+      expect(stderr.join('\n')).toContain('--browser=none');
+      expect(stdioStart).not.toHaveBeenCalled();
+    });
   });
 });

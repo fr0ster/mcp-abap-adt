@@ -75,11 +75,13 @@ export class SettingsError extends Error {
 /** One fixed remedy per field the server knows how to fix. */
 const HINTS: Readonly<Record<string, string>> = {
   grantType:
-    'Regenerate the destination with `mcp-auth generate-env --grant <grant>` (from @mcp-abap-adt/auth-broker-cli).',
+    'Write the destination again with `mcp-auth --destination <name> --type abap|xsuaa` or `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (from @mcp-abap-adt/auth-broker-cli), or add SAP_GRANT_TYPE to its .env.',
   SAP_URL: "Set SAP_URL to the system's URL.",
   XSUAA_MCP_URL:
     "Set XSUAA_MCP_URL in the destination's sessions/<destination>.env to the system's URL.",
   'connection-type': 'SNC logs on over RFC: set --connection-type=rfc.',
+  browser:
+    'No browser is known on this platform for the login: start with --browser=none (open the URL the login prints on stderr) or --browser-program=<program>.',
   authorizationToken:
     'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
 };

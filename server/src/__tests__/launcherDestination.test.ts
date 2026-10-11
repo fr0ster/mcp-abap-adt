@@ -133,6 +133,7 @@ function recordingStrategy() {
 async function run(
   argv: string[],
   browserStrategy?: ReturnType<typeof recordingStrategy>['browserStrategy'],
+  platform = 'linux',
 ) {
   process.argv = ['node', 'mcp-abap-adt', ...argv];
   const config = await new ServerConfigManager().getConfig();
@@ -152,7 +153,7 @@ async function run(
         stderr: (line) => stderr.push(line),
         exit: (code) => exits.push(code),
         processLike,
-        platform: 'linux',
+        platform,
       },
     );
   } finally {
@@ -255,6 +256,19 @@ describe('the browser reaches the login strategy, mapped for the platform', () =
       `--auth-broker-path=${root}`,
       '--browser-program=my-browser',
     ]);
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(my-browser)',
+    );
+  });
+
+  it('--browser-program on a platform with no browser: the linux launch of that program', async () => {
+    writeKey('dest', abapKey);
+    const { strategy, exits } = await run(
+      [...stdio, `--auth-broker-path=${root}`, '--browser-program=my-browser'],
+      undefined,
+      'freebsd',
+    );
+    expect(exits).toEqual([]);
     expect((await browserOfTheLogin(strategy)).browser).toBe(
       'linuxBrowser(my-browser)',
     );

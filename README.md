@@ -377,11 +377,12 @@ The credential of the installed SNC product (for example a Secure Login Client) 
 
 **Generate a `.env` (JWT):**
 ```bash
-# Install the CLI globally (one-time setup) — it ships mcp-auth and mcp-sso
+# Install the CLI globally (one-time setup) — it ships mcp-auth
 npm install -g @mcp-abap-adt/auth-broker-cli
 
-# Write a .env that states its authentication and grant
-mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
+# Log in and write a .env that states its authentication and grant (--type xsuaa for an XSUAA key)
+mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap
+# or a destination: mcp-auth --destination TRIAL --type abap   (`mcp-auth --help` lists the rest)
 ```
 
 The `.env` states `SAP_AUTH_TYPE` and `SAP_GRANT_TYPE`; a `jwt` `.env` without a grant is refused at startup.

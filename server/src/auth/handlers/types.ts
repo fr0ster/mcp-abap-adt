@@ -15,6 +15,8 @@ import type { ServerLoginContext } from '../serverLogin.js';
  */
 export interface AuthHandlerContext {
   browser?: IBrowser;
+  /** `--browser` names a browser this platform has none of: the words (`browserFor`). */
+  browserUnavailable?: string;
   browserAuthPort?: number;
   /** The launcher passes auth-providers' `browserCallbackStrategy`; no default here. */
   browserStrategy: (
@@ -30,5 +32,5 @@ export interface AuthenticationHandler {
   /** The broker options this authentication needs — nothing else. */
   brokerOptions(context: AuthHandlerContext): Partial<AuthBrokerConfig>;
   /** Refuses settings this authentication cannot use; most accept all. */
-  checkSettings?(settings: SapConfig): void;
+  checkSettings?(settings: SapConfig, context: AuthHandlerContext): void;
 }

@@ -60,25 +60,30 @@ describe('browserFor: the §8 table', () => {
   });
 
   it.each(['system', 'auto', 'chrome', 'edge', 'firefox'])(
-    '--browser=%s on another platform: refused, use --browser=none',
+    '--browser=%s on another platform: unavailable, not thrown — the words say use --browser=none',
     (browser) => {
-      expect(() => browserFor({ browser }, 'freebsd')).toThrow(
+      const mapping = browserFor({ browser }, 'freebsd');
+      expect(mapping).toStrictEqual({ unavailable: expect.any(String) });
+      expect(mapping.unavailable).toContain('--browser=none');
+      expect(mapping.unavailable).toContain('freebsd');
+    },
+  );
+
+  it('no --browser on another platform: unavailable', () => {
+    expect(browserFor({}, 'aix').unavailable).toContain('--browser=none');
+  });
+
+  it.each(['linux', 'freebsd'])(
+    'an unknown name on %s: refused, use --browser=none',
+    (platform) => {
+      expect(() => browserFor({ browser: 'opera' }, platform)).toThrow(
         BrowserChoiceError,
       );
-      expect(() => browserFor({ browser }, 'freebsd')).toThrow(
+      expect(() => browserFor({ browser: 'opera' }, platform)).toThrow(
         '--browser=none',
       );
     },
   );
-
-  it('an unknown name: refused, use --browser=none', () => {
-    expect(() => browserFor({ browser: 'opera' }, 'linux')).toThrow(
-      BrowserChoiceError,
-    );
-    expect(() => browserFor({ browser: 'opera' }, 'linux')).toThrow(
-      '--browser=none',
-    );
-  });
 });
 
 describe('browserFor: --browser-program', () => {
@@ -93,15 +98,19 @@ describe('browserFor: --browser-program', () => {
     });
   });
 
-  it('on another platform: refused, use --browser=none', () => {
-    expect(() => browserFor({ program: 'my-browser' }, 'aix')).toThrow(
-      '--browser=none',
-    );
+  it('on another platform: the linux launch, a plain spawn of the program', () => {
+    expect(browserFor({ program: 'my-browser' }, 'aix')).toStrictEqual({
+      factory: linuxBrowser,
+      argument: 'my-browser',
+    });
   });
 
-  it('beside --browser: refused', () => {
-    expect(() =>
-      browserFor({ browser: 'firefox', program: 'my-browser' }, 'linux'),
-    ).toThrow('--browser-program excludes --browser');
-  });
+  it.each(['linux', 'freebsd'])(
+    'beside --browser on %s: refused',
+    (platform) => {
+      expect(() =>
+        browserFor({ browser: 'firefox', program: 'my-browser' }, platform),
+      ).toThrow('--browser-program excludes --browser');
+    },
+  );
 });

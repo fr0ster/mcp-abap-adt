@@ -1,3 +1,4 @@
+import { SettingsError } from '@mcp-abap-adt/lib/auth';
 import { serverLogin } from '../serverLogin';
 import type { AuthenticationHandler } from './types.js';
 
@@ -21,4 +22,13 @@ export const jwtAuthorizationCodeHandler: AuthenticationHandler = {
         context.login,
       ),
   }),
+  /**
+   * A browser login needs a browser this platform has (§8): an unavailable
+   * one refuses the destination at the startup check (D18), naming `browser`.
+   */
+  checkSettings(_settings, context) {
+    if (context.browserUnavailable !== undefined) {
+      throw new SettingsError('browser', context.browserUnavailable);
+    }
+  },
 };

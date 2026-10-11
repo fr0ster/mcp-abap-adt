@@ -130,27 +130,70 @@ describe('brokerOptions', () => {
   });
 });
 
+describe('jwt / authorization_code checkSettings: the browser (D18, §8)', () => {
+  const login = handlerFor('d', {
+    authType: 'jwt',
+    grantType: 'authorization_code',
+  });
+  it('an unavailable browser refuses, naming browser', () => {
+    let err: unknown;
+    try {
+      login.checkSettings?.(
+        {} as SapConfig,
+        context({ browser: undefined, browserUnavailable: 'no browser here' })
+          .ctx,
+      );
+    } catch (e) {
+      err = e;
+    }
+    expect(err).toBeInstanceOf(SettingsError);
+    expect((err as SettingsError).setting).toBe('browser');
+  });
+  it('a browser, or none chosen, is accepted', () => {
+    expect(() =>
+      login.checkSettings?.({} as SapConfig, context().ctx),
+    ).not.toThrow();
+    expect(() =>
+      login.checkSettings?.(
+        {} as SapConfig,
+        context({ browser: undefined }).ctx,
+      ),
+    ).not.toThrow();
+  });
+});
+
 describe('snc.checkSettings', () => {
   const snc = handlerFor('d', { authType: 'snc' });
   it('refuses a connection type other than rfc, naming connection-type', () => {
     let err: unknown;
     try {
-      snc.checkSettings?.({ connectionType: 'http' } as unknown as SapConfig);
+      snc.checkSettings?.(
+        { connectionType: 'http' } as unknown as SapConfig,
+        context().ctx,
+      );
     } catch (e) {
       err = e;
     }
     expect(err).toBeInstanceOf(SettingsError);
     expect((err as SettingsError).message).toContain('connection-type');
-    expect(() => snc.checkSettings?.({} as SapConfig)).toThrow(SettingsError);
+    expect(() => snc.checkSettings?.({} as SapConfig, context().ctx)).toThrow(
+      SettingsError,
+    );
   });
   it('accepts rfc', () => {
     expect(() =>
-      snc.checkSettings?.({ connectionType: 'rfc' } as unknown as SapConfig),
+      snc.checkSettings?.(
+        { connectionType: 'rfc' } as unknown as SapConfig,
+        context().ctx,
+      ),
     ).not.toThrow();
   });
-  it('the other handlers have no checkSettings', () => {
+  it('basic, jwt / none have no checkSettings', () => {
     expect(
       handlerFor('d', { authType: 'basic' }).checkSettings,
+    ).toBeUndefined();
+    expect(
+      handlerFor('d', { authType: 'jwt', grantType: 'none' }).checkSettings,
     ).toBeUndefined();
   });
 });

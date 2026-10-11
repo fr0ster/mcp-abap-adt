@@ -92,10 +92,10 @@ After `npm install -g @mcp-abap-adt/core` you have the `mcp-abap-adt` command (d
 `--transport=http` and `--transport=sse` serve the other MCP transports. `@mcp-abap-adt/compact` gives
 `mcp-abap-adt-compact`, which takes the same options.
 
-**To write a `.env` for JWT authentication**, install the CLI separately (`mcp-auth` and `mcp-sso` ship in `@mcp-abap-adt/auth-broker-cli`, not in `@mcp-abap-adt/auth-broker`):
+**To write a `.env` for JWT authentication**, install the CLI separately (`mcp-auth` ships in `@mcp-abap-adt/auth-broker-cli`, not in `@mcp-abap-adt/auth-broker`):
 ```bash
 npm install -g @mcp-abap-adt/auth-broker-cli
-mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
+mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap   # --type xsuaa for an XSUAA key; `mcp-auth --help` lists the rest
 ```
 A `jwt` `.env` must state `SAP_GRANT_TYPE`.
 
@@ -127,8 +127,8 @@ For JWT authentication (SAP BTP) with browser login, put the service key in `~/.
 # One-time setup: the CLI that writes destination files
 npm install -g @mcp-abap-adt/auth-broker-cli
 
-# Write a .env that states its authentication and grant
-mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
+# Log in and write a .env that states its authentication and grant (--type xsuaa for an XSUAA key)
+mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap   # `mcp-auth --help` lists the rest
 ```
 
 For RFC with basic authentication, add `SAP_CONNECTION_TYPE=rfc` to the basic `.env` above.

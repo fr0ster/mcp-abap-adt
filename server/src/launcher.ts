@@ -214,7 +214,8 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
 
 GENERATING A .ENV:
   Install the CLI: npm install -g @mcp-abap-adt/auth-broker-cli
-  Generate .env: mcp-auth generate-env --grant authorization_code   (mcp-auth --help lists the other flags)
+  Generate .env: mcp-auth --service-key <key.json> --output <file.env> --type abap|xsuaa
+             or: mcp-auth --destination <name> --type abap|xsuaa   (mcp-auth --help lists the rest)
   A jwt .env must state SAP_GRANT_TYPE.
 `;
 
@@ -397,7 +398,10 @@ export function factoryConfigFrom(
   collaborators: Pick<
     IAuthBrokerFactoryConfig,
     'browserStrategy' | 'logger' | 'promptLogger'
-  > & { browser?: IBrowser | undefined },
+  > & {
+    browser?: IBrowser | undefined;
+    browserUnavailable?: string | undefined;
+  },
 ): IAuthBrokerFactoryConfig {
   return {
     ...envFileOf(config),
@@ -406,6 +410,9 @@ export function factoryConfigFrom(
     unsafe: config.unsafe ?? false,
     ...(collaborators.browser !== undefined && {
       browser: collaborators.browser,
+    }),
+    ...(collaborators.browserUnavailable !== undefined && {
+      browserUnavailable: collaborators.browserUnavailable,
     }),
     ...(config.browserAuthPort !== undefined && {
       browserAuthPort: config.browserAuthPort,
@@ -572,13 +579,19 @@ export async function launch(
   // The browser of a login, mapped by the platform (D9); a choice that
   // cannot be served stops the start before anything is read.
   let browser: IBrowser | undefined;
+  let browserUnavailable: string | undefined;
   try {
-    browser = browserOf(
-      browserFor(
-        { browser: config.browser, program: config.browserProgram },
-        deps.platform ?? process.platform,
-      ),
+    const mapping = browserFor(
+      { browser: config.browser, program: config.browserProgram },
+      deps.platform ?? process.platform,
     );
+    // No browser on this platform refuses only a destination that logs in,
+    // at the startup check (D18); the others start.
+    if (mapping.unavailable !== undefined) {
+      browserUnavailable = mapping.unavailable;
+    } else {
+      browser = browserOf(mapping);
+    }
   } catch (error) {
     if (!(error instanceof BrowserChoiceError)) throw error;
     deps.stderr(`[MCP] ${error.message}`);
@@ -590,6 +603,7 @@ export async function launch(
     factoryConfigFrom(config, {
       browserStrategy: deps.browserStrategy,
       browser,
+      browserUnavailable,
       // A login prompts on stderr whatever DEBUG_AUTH_LOG says; the broker's
       // diagnostics stay gated (§9).
       promptLogger: promptLogger(deps.stderr, loggerForTransport),

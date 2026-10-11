@@ -20,12 +20,13 @@ All of this was measured on premise (2026-10-11), BASIS 816:
 
 - **`setBreakpoints` without `syncScope` replaces the whole set of the key.** It does so even with `validationOnly`.
   - In `user` mode, the key is the SAP user we log on as plus `requestUser`.
-  - In `terminal` mode, it is the SAP user plus `terminalId`.
+  - In `terminal` mode, it is the SAP user plus `terminalId`; a `terminalId` equal to `ideId` keys on the IDE id alone.
   - `ideId` does not separate breakpoints.
   - So every IDE of the same SAP user debugging the same request user shares one set.
 - **`stopListener` deletes the key's breakpoints.**
 - **The listener context is bound per ABAP session.** The first listen, check, stop or attach on a session fixes the identity of that session. So each identity needs a debug session of its own.
-- **`terminateDebugger` frees the debugger's own session and answers a plain `500`.** The program runs on. `analyseDebuggerFreed` reads that answer as success.
+- **`terminateDebugger` frees the debugger's own session and answers a plain `500`.** The program runs on. `analyseDebuggerFreed` reads that answer as success. The freed session takes no further request.
+- **The first `setDebuggerSettings` after an attach ignores `systemDebugging=false`.** This is server source; the answer cannot show it. `showDataAging` does not merge: when it is left out, it is off.
 - **`detachDebugger` leaves the debuggee running.** Without an id, the debugger leaves and the program runs on. An armed breakpoint can catch the same run again.
 - **The server ignores `skipCount` on external breakpoints.** The library refuses it.
 - **Another user needs authorisation.** Debugging another user's requests needs `S_DEVELOP` DEBUG ACTVT 90 on that user; without it the answer is `403`.
@@ -44,15 +45,15 @@ The bug this fixes, in 17.2.x:
     - With no terminal id configured, `terminal` is refused before the wire: "no terminal id is configured".
     - `request_user` together with `terminal` is refused before the wire, because the server reads no request user in terminal mode.
   - **`settings`.** Any of `system_debugging`, `update_debugging`, `create_exception_object`, `background_rfc` and `shared_object_debugging`, each a boolean. The session keeps them and applies them after each attach. A field left out keeps its value.
-- **`DebugStep`** gains two methods:
+- **`DebugStep`** gains two methods, ABAP only. Both are refused for an AMDP session. The transitions are under "The session and its owner".
   - **`detach`.** The debugger leaves and the program runs on. An armed breakpoint can catch it again.
-  - **`release_debugger`.** Frees the debugger. The program runs on, and the debug session's attachment ends. It is read with `analyseDebuggerFreed`.
+  - **`release_debugger`.** Frees the debugger. The program runs on. It is read with `analyseDebuggerFreed`.
 - **`DebugSetSettings`** (new). Changes the settings at the current stop and answers the settings in force. The session's kept settings are updated with it.
 - **`DebugSetBreakpoints` and `DebugDeleteBreakpoint`.**
   - The session keeps its full list and sends it whole on every change. Deleting is by id.
   - Nothing is re-asked one by one. Why a breakpoint was refused is read from the rows of the one answer. If a refusal cannot be paired with a requested breakpoint, the answer says so; it does not guess.
   - The descriptions say that the set is shared by every IDE of the same SAP user for the same request user (or terminal id), and is replaced as a whole.
-- **Breakpoint schema.** `condition` is accepted on a line breakpoint only. There is no `skip_count`.
+- **Breakpoint schema.** `condition` is accepted on a line breakpoint only. A condition on another kind is refused before the wire, naming the breakpoint. There is no `skip_count`. Core and compact descriptions that say "each with an optional condition" change to "a line breakpoint may carry a condition".
 - **Unchanged.** `DebugTerminate` and a step that runs to the end keep `analyseDebuggeeEnd`.
 
 ## Tools (compact)
@@ -66,57 +67,139 @@ Compact keeps its four debugger tools.
 
 ## The session and its owner
 
-- **Identity by mode.** `DebugSession` builds the identity from the start's arguments:
+**Identity and lifecycle.**
+
+- `DebugSession` builds the identity from the start's arguments:
   - `user`: `{ debuggingMode: 'user', requestUser, terminalId, ideId }`;
   - `terminal`: `{ debuggingMode: 'terminal', terminalId, ideId }`.
+- The identity is fixed for the life of the state handle. Another identity means another start, with another handle.
+- `stop()` clears the identity: the request user, the mode and the settings.
+- `reconciled` stays true for the life of the instance. The predecessor of stated ids is reconciled once per process, as today.
+- The listener and each attach already run on connections of their own. This stays, and a test pins that a listener for another request user never reuses a connection that served another identity.
 
-  The identity is fixed for the life of the state handle. Another identity means another start, with another handle.
-- **Sessions per identity.** The listener and each attach already run on connections of their own. This stays, and a test pins that a listener for another request user never reuses a connection that served another identity.
-- **Arming.**
-  - `armLocked` sends `armed ∪ new` in one request.
-  - `armed` is rebuilt from the placed rows of that answer.
-  - There is no `validationOnly` re-ask.
-- **Breakpoint conflict.** This is a choice of the host, stated like the ids: the request scope, then the environment variable `SAP_DEBUG_BREAKPOINT_CONFLICT`, then an option of `createDebuggerInstance` for an embedder.
-  - **`replace`** (the default) sends the full list.
-  - **`refuse-if-held`** asks `checkListener` first. If another listener holds the key, it refuses before the replacement, and the answer carries `readListenerConflict`'s `conflictText` and `ideUser`.
-- **Settings.** Kept on the session and applied after each attach. `DebugSetSettings` applies them and updates what is kept.
-- **Errors.**
-  - A listener conflict (`409`) carries `conflictText` and `ideUser` from `readListenerConflict`.
-  - A `403` for another user passes as SAP said it.
-  - The plain `500` of `release_debugger` is no failure.
+**Order at the start.** It is fixed because `stopListener` deletes the key's breakpoints:
+
+1. With `refuse-if-held`, the preflight runs first, on the control connection, never on a polling connection: `checkListener(identity)`.
+   - A `409` refuses the start, carrying `readListenerConflict`'s `conflictText` and `ideUser`. Nothing has been sent that changes anything.
+   - Our own listener under the same `ideId` is never reported as a conflict (measured: the same `ideId` never conflicts). So the check protects against another IDE, not against ourselves.
+   - The check is not atomic: a listener started between the check and the arming is not caught.
+2. The reconciliation of a stated-id predecessor (`stopListener`) runs only after a successful preflight. It deletes the key's breakpoints, which the arming then replaces.
+3. Arming, then listening, as today.
+
+`refuse-if-held` runs the same preflight before every later replacement (`DebugSetBreakpoints`), with the same rules.
+
+**The arming contract.**
+
+- The session keeps two lists:
+  - `requested`: the breakpoint definitions as the caller gave them, deduplicated by kind, target and condition;
+  - `armed`: the server's rows with ids, as now.
+- A change (a start with breakpoints, or `DebugSetBreakpoints`) sends `requested ∪ new` in one request. A delete by id removes the breakpoint from both lists and sends nothing else.
+- **Pairing answer rows with definitions:**
+  1. When the answer has one row per sent definition and the kinds agree position by position, rows pair by position. The integration test measures whether the server keeps the order; if it does not, this rule is dropped and the next one applies.
+  2. Otherwise, within one kind, a single sent definition pairs with a single row.
+  3. A refused row that pairs with nothing is reported as `unmatched: [{ error }]`, a new field of the answer, without guessing.
+
+  The server may rewrite a line URI in a placed row, so placed rows are matched by position or kind, never by URI equality.
+- **After the answer:**
+  - `armed` is exactly the placed rows of this answer, the surviving old breakpoints included.
+  - `requested` keeps only the definitions that were placed.
+  - The answer reports three things:
+    - `placed`: the full resulting set, not just this call;
+    - `refused`: this call's refusals, each with its definition;
+    - `lost`: earlier breakpoints that are no longer placed.
+- No `validationOnly` request is ever made.
+
+**Stop and a failed start.** `stopListener` deletes the key's breakpoints, so it is the authoritative cleanup.
+
+- **Stop.**
+  1. Release a held stop.
+  2. Stop the listener.
+  3. If `stopListener` succeeded, clear `armed` and `requested`, and drop any per-id deletion failure: the listener's deletion covered them.
+  4. If it failed, delete by id as today. What fails stays for the next stop.
+- **A failed start.** It runs the same cleanup as a stop. It no longer deletes by the ids "placed here", because after a replacement those ids no longer say what this start added.
+
+**Detach and release.**
+
+- **`detach`.**
+  1. `detachDebugger()` on the attached session.
+  2. The attachment is cleared and its connection closed. A close that fails is recorded, as today.
+  3. The listener, `requested` and `armed` stay, and polling resumes.
+  4. The state handle stays, and the answer is the listening state.
+- **`release_debugger`.**
+  1. `terminateDebugger()` with `analyseDebuggerFreed`.
+  2. The attaching session is freed by the server, so its connection is dropped without any further request and without a logoff.
+  3. The listener, `requested` and `armed` stay, and polling resumes.
+  4. The answer is the listening state.
+  5. A failure that is not the freed `500` (an ADT document, a gateway or HTML `500`, a `400`) stays a failure, and the attachment is kept for `DebugStop`.
+
+**Settings.**
+
+- The session keeps the requested preferences, the fields the caller set.
+- It reports the effective settings: the last answer of `setDebuggerSettings`.
+- After each attach it sends the preferences. If they set `system_debugging` to false, it sends them a second time, because the first call after an attach ignores that value (server source). The reported settings are those of the second answer.
+- `DebugSetSettings` merges into the preferences, applies them, and reports the effective settings.
+- `showDataAging` is not exposed. The library leaves it out, so it stays off, which is the server's default.
+
+**Breakpoint conflict.** This is a choice of the host, stated like the ids: the request scope, then the environment variable `SAP_DEBUG_BREAKPOINT_CONFLICT`, then an option of `createDebuggerInstance` for an embedder.
+
+- **`replace`** (the default) sends the full list.
+- **`refuse-if-held`** runs the preflight above.
+
+**Errors.**
+
+- A listener conflict (`409`) carries `conflictText` and `ideUser` from `readListenerConflict`.
+- A `403` for another user passes as SAP said it.
+- The plain `500` of `release_debugger` is no failure. Every other answer stays one.
 
 ## Dependencies and version
 
 - **Dependencies.** `@mcp-abap-adt/adt-clients ^28.0.0` and `@mcp-abap-adt/adt-strategies ^0.9.0`, plus `@mcp-abap-adt/interfaces-adt ^14.0.0` wherever a package of this repository depends on it directly. All are from the registry.
-- **Version.**
-  - The tools only gain optional parameters, methods and one tool, so nothing breaks for a model.
-  - If lib's public API changes in a way that breaks an embedder (a debugger type, a session or an owner signature), the release is 18.0.0. Otherwise it is 17.3.0.
-  - The plan checks this and states which.
+- **Version: 18.0.0.**
+  - lib's public surface exposes the upstream debugger types: the exported `Debugger`, `DebugSessionPorts`, and the breakpoint and answer signatures. Moving to interfaces-adt 14 and adt-clients 28 changes `attach`, makes the identity a union and refuses a condition on a non-line breakpoint.
+  - The answer gains `unmatched` and `lost`.
+  - The model-facing tools only gain optional parameters, methods and one tool.
+  - A migration note for embedders (`docs/` and the CHANGELOG) says what changed and what to do.
 
 ## Testing
 
-- **Unit.**
-  - **Identity by mode:**
-    - `terminal` without a terminal id is refused;
-    - `request_user` with `terminal` is refused.
-  - **Arming:**
-    - a second `DebugSetBreakpoints` sends the first breakpoints with the new ones;
-    - no `validationOnly` request is made;
-    - `armed` matches the answer;
-    - `refuse-if-held` refuses when `checkListener` answers `409`, carrying `conflictText` and `ideUser`.
-  - **New actions and settings:**
-    - `detach` and `release_debugger`, core and compact;
-    - `release_debugger`'s plain `500` reads as success;
-    - `DebugSetSettings`;
-    - settings applied after attach.
-  - **Descriptions:** the existing `toolDescriptionsCarryNoLiterals` covers the new text.
-- **Integration on premise.** Soft mode, with hard mode for the new tools. Each run is asked of the user first.
-  - **The regression:** two `DebugSetBreakpoints` in a row, and the program stops at both.
-  - **Another user:** `DebugStartListener` with `request_user` set to a second configured user. That user runs a class, and the run is caught, stepped and continued. Skipped unless a second user is configured.
-  - **`detach`:** the run finishes.
-  - **`release_debugger`:** the run finishes, and the session's answer is no failure.
-  - **Settings:** at the start and through `DebugSetSettings`.
-  - **Terminal mode without SAP GUI:** the listener starts and stops. No catch is asserted.
+**Unit tests**, with mocked ports:
+
+- **Identity by mode.** `terminal` without a terminal id is refused. `request_user` with `terminal` is refused.
+- **The order at the start.**
+  - With `refuse-if-held` and stated ids, a `409` from the preflight refuses the start before any `stopListener` or arming.
+  - The preflight runs on the control connection.
+  - Our own same-`ideId` listener does not block an update.
+- **The arming contract.**
+  - A second change sends `requested ∪ new`.
+  - No `validationOnly` request is made.
+  - Fixtures cover reordered rows, a rewritten line URI in a placed row, a refusal that pairs and one that does not (`unmatched`), and a partial refusal where an old breakpoint comes back refused (`lost`).
+  - `armed` and `requested` match the rules.
+- **Stop and a failed start.**
+  - After a successful `stopListener`, `armed` and `requested` are empty and per-id deletion failures are gone.
+  - After a failed `stopListener`, the per-id deletes run and their failures remain.
+  - A failed start runs the same cleanup.
+- **Detach and release.**
+  - Each ends in the listening state with the listener, `requested` and `armed` kept.
+  - `release_debugger` drops the freed connection without a further request.
+  - Its freed `500` (`text/plain` or empty) is no failure. An ADT document `500`, an HTML `500` and a `400` stay failures, with the attachment kept.
+  - Both are refused for AMDP.
+- **Settings.**
+  - The preferences are applied after attach.
+  - `system_debugging: false` is sent twice after an attach.
+  - `DebugSetSettings` merges, and the reported settings are the last answer's.
+- **Compact.** It gets the same parameters and actions, and they are refused for `kind: amdp`.
+- **Descriptions.**
+  - `toolDescriptionsCarryNoLiterals` covers the new text.
+  - A test pins that no breakpoint description says every kind takes a condition.
+
+**Integration on premise.** Soft mode, with hard mode for the new tools. Each run is asked of the user first.
+
+- **The regression.** Two `DebugSetBreakpoints` in a row, and the program stops at both. The answer's order of rows is recorded, which settles the positional pairing rule.
+- **Another user.** `DebugStartListener` with `request_user` set to a second configured user. That user runs a class; the run is caught, stepped and continued. Skipped unless a second user is configured.
+- **`detach`.** The run is caught again at the next pass of an armed line in a loop, then continued to its end.
+- **`release_debugger`.** The run finishes, the answer is no failure, and the listener catches the next run.
+- **Settings.** At the start and through `DebugSetSettings`, with the reported settings recorded after each.
+- **Terminal mode without SAP GUI.** The listener starts and stops. No catch is asserted.
 
 ## Documentation
 

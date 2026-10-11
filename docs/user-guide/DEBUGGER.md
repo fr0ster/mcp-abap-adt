@@ -182,7 +182,10 @@ ends by:
   listener's open poll — so a conflict right after a stop means a real other
   listener, not our own still letting go. A part that could not be undone is
   reported, kept, and retried by the next stop; the handle stays valid until
-  nothing is held.
+  nothing is held. A debuggee the listener caught as the stop began is attached
+  and released by the stop; measured on premise (2026-10-11), an attach after
+  the listener was stopped still succeeds, and a caught debuggee nobody attaches
+  is held by the system for about 30 seconds and then runs on.
 - **`AmdpDebugStop`**: the AMDP part only (below).
 - **the host**: stdio at exit, SSE when its connection closes, the pool at shutdown
   — each does the same complete stop and reports what it could not undo.
@@ -250,11 +253,12 @@ class (`class_name`, `line`).
   answers each breakpoint's state as confirmed.
 - `AmdpDebugWait` answers the events that arrived — a break with its variables and
   its call stack, the end of the execution, a warning. Under `terse` a break keeps
-  the first five frames in the order the system sends them (only single-frame
-  stacks have been recorded so far), each as the procedure, the ABAP address
-  (`object_type`, `object_name`, `line`) and the line in the database procedure
-  (`native_line`); a frame not compiled for debugging is marked
-  `not_debug_compiled`.
+  the top five frames — the system sends the innermost first (measured on
+  premise, 2026-10-11) — each as the procedure, the ABAP address (`object_type`,
+  `object_name`, `line`) and the line in the database procedure (`native_line`).
+  A caller not compiled for debugging is marked `not_debug_compiled` and keeps
+  its object only: the system answers its method's first line and native line 0
+  there, not where the call stands.
 - `AmdpDebugStep` steps `over` or `continue`s;
   `AmdpDebugGetTable` reads a table variable's rows (at most 100; an optional
   SELECT over it); `AmdpDebugCancel` cancels the execution.

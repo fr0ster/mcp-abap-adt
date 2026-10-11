@@ -547,8 +547,9 @@ export class DebugSession<O = unknown> {
   /**
    * Inside stop: a poll answered with a catch that no session will work. It is
    * attached on a connection of its own and released at once, so it does not wait
-   * for the system to let it go. Whether an attach still succeeds after the listener
-   * was stopped is not measured: either outcome is answered. Never throws.
+   * for the system to let it go (unattached, it is held about 30 seconds). An attach
+   * after the listener was stopped succeeds (measured on premise, 2026-10-11); a
+   * failure is answered all the same. Never throws.
    */
   private async releaseCaught(
     debuggee: DebuggeeReading,

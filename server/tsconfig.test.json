@@ -54,6 +54,9 @@
       ],
       "@mcp-abap-adt/sse": [
         "../sse/src/index.ts"
+      ],
+      "@mcp-abap-adt/lib/state": [
+        "../src/lib/state/index.ts"
       ]
     },
     "noEmit": true

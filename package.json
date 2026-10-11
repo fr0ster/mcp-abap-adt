@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/lib",
-  "version": "17.1.0",
+  "version": "17.2.2",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -63,6 +63,16 @@
       "types": "./dist/lib/httpTransport/index.d.ts",
       "import": "./dist/lib/httpTransport/index.js",
       "require": "./dist/lib/httpTransport/index.js"
+    },
+    "./debugger": {
+      "types": "./dist/lib/debugger/index.d.ts",
+      "import": "./dist/lib/debugger/index.js",
+      "require": "./dist/lib/debugger/index.js"
+    },
+    "./state": {
+      "types": "./dist/lib/state/index.d.ts",
+      "import": "./dist/lib/state/index.js",
+      "require": "./dist/lib/state/index.js"
     }
   },
   "typesVersions": {
@@ -99,6 +109,12 @@
       ],
       "http-transport": [
         "dist/lib/httpTransport/index.d.ts"
+      ],
+      "debugger": [
+        "dist/lib/debugger/index.d.ts"
+      ],
+      "state": [
+        "dist/lib/state/index.d.ts"
       ]
     }
   },
@@ -187,14 +203,14 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "~25.0.1",
-    "@mcp-abap-adt/adt-strategies": "^0.7.0",
+    "@mcp-abap-adt/adt-clients": "~27.0.0",
+    "@mcp-abap-adt/adt-strategies": "^0.8.1",
     "@mcp-abap-adt/auth-broker": "^4.1.0",
     "@mcp-abap-adt/auth-providers": "^5.4.0",
     "@mcp-abap-adt/auth-stores": "^3.3.0",
     "@mcp-abap-adt/connection": "^11.0.0",
-    "@mcp-abap-adt/interfaces-adt": "^12.0.1",
-    "@mcp-abap-adt/interfaces-adt-connection": "^1.0.1",
+    "@mcp-abap-adt/interfaces-adt": "^13.2.0",
+    "@mcp-abap-adt/interfaces-adt-connection": "^2.0.0",
     "@mcp-abap-adt/interfaces-auth": "^3.2.0",
     "@mcp-abap-adt/interfaces-auth-broker": "^1.2.0",
     "@mcp-abap-adt/interfaces-auth-sap": "^2.0.0",
@@ -260,6 +276,8 @@
       "^@mcp-abap-adt/lib/handlers/read$": "<rootDir>/src/lib/handlers/read.ts",
       "^@mcp-abap-adt/lib/handlers/write$": "<rootDir>/src/lib/handlers/write.ts",
       "^@mcp-abap-adt/lib/compact-shared$": "<rootDir>/src/lib/compact/index.ts",
+      "^@mcp-abap-adt/lib/debugger$": "<rootDir>/src/lib/debugger/index.ts",
+      "^@mcp-abap-adt/lib/state$": "<rootDir>/src/lib/state/index.ts",
       "^@mcp-abap-adt/lib/utils$": "<rootDir>/src/lib/utils.ts",
       "^@mcp-abap-adt/lib/config$": "<rootDir>/src/lib/config/index.ts",
       "^@mcp-abap-adt/lib/auth$": "<rootDir>/src/lib/auth/index.ts",

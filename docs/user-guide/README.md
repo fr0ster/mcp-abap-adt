@@ -53,6 +53,7 @@ mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
 - **[CLI_OPTIONS.md](CLI_OPTIONS.md)** - Every command-line option with its environment and YAML forms
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups and exposure
+- **[DEBUGGER.md](DEBUGGER.md)** - The opt-in debugger: debug sessions, the SAP ids, transports, what ends a session
 
 ## Getting Started
 

@@ -76,6 +76,8 @@ When using HTTP transport, a request can carry its own connection. The headers s
 | `x-sap-master-system` | No | Master system of created objects; wins over the destination's `.env` and the environment | `<system id>` |
 | `x-sap-responsible` | No | Responsible person of created objects; wins over the destination's `.env`, the environment and the login | `<user>` |
 | `x-sap-language` | No | Master language of created objects | `EN` |
+| `x-sap-debug-terminal-id` | No | The debugger's terminal id; wins over the destination's `.env` and the environment. Random per instance when none is stated | `<terminal id>` |
+| `x-sap-debug-ide-id` | No | The debugger's IDE id; same order. The system keys its listener conflict by it: a shared IDE id means shared catches and no conflict ([Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one)) | `<IDE id>` |
 
 \* A request that carries `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password` is a direct connection. A request that carries neither a destination nor such headers is served from the default destination (`--mcp`, `--env` or `--env-path`), or answered `400` if there is none.
 
@@ -263,6 +265,11 @@ SAP_SYSTEM_TYPE=onprem
 # without SAP_MASTER_SYSTEM the master system is left out of the request
 # SAP_RESPONSIBLE=<user>
 # SAP_MASTER_SYSTEM=<system id>
+
+# Debugger ids (optional, with the opt-in debug set): random per instance when absent;
+# the x-sap-debug-* headers win over these
+# SAP_DEBUG_TERMINAL_ID=<terminal id>
+# SAP_DEBUG_IDE_ID=<IDE id>
 ```
 
 ### SAP System Type
@@ -337,7 +344,7 @@ Whether a system is cloud is the kind its connection was built for: `SAP_SYSTEM_
 
 The server's own transports already scope the headers and the destination's `.env` per request. An embedding host has its own transport: the process environment is one process-wide value, right for one MCP session per process and wrong for a host that runs requests from different SAP users side by side — every concurrent create would use the same user.
 
-Wrap each request in a request scope instead (`requestContextFromHeaders(headers)` from the same entry point builds one from `x-sap-language`, `x-sap-responsible` and `x-sap-master-system`; `x-sap-login` is not read there — set `login` yourself when the request logs on as that user):
+Wrap each request in a request scope instead (`requestContextFromHeaders(headers)` from the same entry point builds one from `x-sap-language`, `x-sap-responsible`, `x-sap-master-system`, `x-sap-debug-terminal-id` and `x-sap-debug-ide-id`; `x-sap-login` is not read there — set `login` yourself when the request logs on as that user):
 
 ```typescript
 import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';

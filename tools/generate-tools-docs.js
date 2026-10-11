@@ -29,13 +29,13 @@ const OUTPUT_PATHS = {
   low: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LOW.md'),
   legacy: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LEGACY.md'),
 };
-const LEVELS = ['readonly', 'high', 'low'];
+const LEVELS = ['readonly', 'high', 'low', 'debug'];
 
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
 Usage: node tools/generate-tools-docs.js
 
-Scans src/handlers/**/(readonly|high|low)/*.ts and generates:
+Scans src/handlers/**/(readonly|high|low|debug)/*.ts and generates:
   docs/user-guide/AVAILABLE_TOOLS.md
   docs/user-guide/AVAILABLE_TOOLS_READONLY.md
   docs/user-guide/AVAILABLE_TOOLS_HIGH.md
@@ -636,6 +636,7 @@ function builtDefinitions() {
     includeLowLevel: true,
     includeSystem: true,
     includeSearch: true,
+    includeDebug: true,
   }).getHandlerEntries();
   const byName = new Map();
   for (const entry of entries)
@@ -658,6 +659,16 @@ function applyBuiltText(tools) {
     if (!definition) continue;
     if (typeof definition.description === 'string' && definition.description)
       tool.description = definition.description;
+    // The debug tools compose their schemas from shared spreads, which the file
+    // parser cannot follow: their whole (plain JSON) schema is taken from the build.
+    if (
+      tool.level === 'debug' &&
+      definition.inputSchema &&
+      definition.inputSchema.type === 'object'
+    ) {
+      tool.inputSchema = definition.inputSchema;
+      continue;
+    }
     const props = tool.inputSchema && tool.inputSchema.properties;
     if (!props) continue;
     for (const key of Object.keys(props)) {
@@ -748,6 +759,7 @@ function levelTitle(level) {
   if (level === 'readonly') return 'Read-Only';
   if (level === 'high') return 'High-Level';
   if (level === 'low') return 'Low-Level';
+  if (level === 'debug') return 'Debug';
   return level;
 }
 
@@ -796,6 +808,7 @@ function generateMarkdown(tools) {
     readonly: tools.filter((t) => t.level === 'readonly').length,
     high: tools.filter((t) => t.level === 'high').length,
     low: tools.filter((t) => t.level === 'low').length,
+    debug: tools.filter((t) => t.level === 'debug').length,
   };
 
   let md = `# Available Tools Reference - MCP ABAP ADT Server\n\n`;
@@ -804,12 +817,14 @@ function generateMarkdown(tools) {
   md += `- Total tools: ${summary.total}\n`;
   md += `- Read-only tools: ${summary.readonly}\n`;
   md += `- High-level tools: ${summary.high}\n`;
-  md += `- Low-level tools: ${summary.low}\n\n`;
+  md += `- Low-level tools: ${summary.low}\n`;
+  md += `- Debug tools: ${summary.debug}\n\n`;
 
   md += `## Handler Sets\n\n`;
   md += `- \`readonly\` -> [Read-Only Group](#read-only-group)\n`;
   md += `- \`high\` -> [High-Level Group](#high-level-group)\n`;
   md += `- \`low\` -> [Low-Level Group](#low-level-group)\n`;
+  md += `- \`debug\` (opt-in) -> [Debug Group](#debug-group)\n`;
   md += `- \`compact\` -> [High-Level / Compact](#high-level-compact)\n\n`;
 
   md += `## Navigation\n\n`;

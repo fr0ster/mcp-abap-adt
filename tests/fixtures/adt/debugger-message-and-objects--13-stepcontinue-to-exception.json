@@ -1,0 +1,26 @@
+{
+  "case": "debugger-message-and-objects",
+  "step": 13,
+  "stepTag": "stepcontinue-to-exception",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger?method=stepContinue",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger?method=stepContinue",
+    "headers": {
+      "Accept": "*/*",
+      "X-sap-adt-sessiontype": "stateful"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 500,
+    "headers": {
+      "content-length": "481",
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-message-and-objects--13-stepcontinue-to-exception.body.xml"
+  }
+}

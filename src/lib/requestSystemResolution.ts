@@ -145,21 +145,38 @@ function resolveOnce(
  */
 export function withDestinationSystemContext<T>(
   stated:
-    | { responsible?: string; login?: string; masterSystem?: string }
+    | {
+        responsible?: string;
+        login?: string;
+        masterSystem?: string;
+        debugTerminalId?: string;
+        debugIdeId?: string;
+      }
     | undefined,
   fn: () => T,
 ): T {
   const scope = getRequestContext();
-  const added: { responsible?: string; login?: string; masterSystem?: string } =
-    {};
+  const added: {
+    responsible?: string;
+    login?: string;
+    masterSystem?: string;
+    debugTerminalId?: string;
+    debugIdeId?: string;
+  } = {};
   if (stated?.responsible && !(scope && 'responsible' in scope)) {
     added.responsible = stated.responsible;
   }
   if (stated?.masterSystem && !(scope && 'masterSystem' in scope)) {
     added.masterSystem = stated.masterSystem;
   }
+  if (stated?.debugTerminalId && !(scope && 'debugTerminalId' in scope)) {
+    added.debugTerminalId = stated.debugTerminalId;
+  }
+  if (stated?.debugIdeId && !(scope && 'debugIdeId' in scope)) {
+    added.debugIdeId = stated.debugIdeId;
+  }
   if (stated?.login) added.login = stated.login;
-  if (!added.responsible && !added.masterSystem && !added.login) return fn();
+  if (Object.keys(added).length === 0) return fn();
   return runWithRequestContext(
     {
       ...scope,

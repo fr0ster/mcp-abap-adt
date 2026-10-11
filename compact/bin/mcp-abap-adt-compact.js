@@ -5,7 +5,8 @@
  *
  * Starts the server in THIS process so stdin/stdout stay wired to the MCP protocol
  * with no intermediate layer, exactly as `mcp-abap-adt` does. The tool list is the
- * compact facade's 22 tools and nothing else.
+ * compact facade's tools and nothing else: 25 with `rw`, the 16 that change nothing
+ * with `ro`, and four debug verbs beside either with `debug`.
  */
 const { main } = require('../dist/launcher.js');
 

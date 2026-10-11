@@ -1,0 +1,27 @@
+{
+  "case": "debugger-conversation",
+  "step": 13,
+  "stepTag": "children-lt-rows-1-2-120",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger?method=getChildVariables",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger?method=getChildVariables",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml",
+      "X-sap-adt-sessiontype": "stateful",
+      "Content-Type": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.debugger.ChildVariables"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><asx:abap xmlns:asx=\"http://www.sap.com/abapxml\" version=\"1.0\"><asx:values><DATA><HIERARCHIES><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>LT_ROWS[1]</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>LT_ROWS[2]</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>LT_ROWS[120]</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY></HIERARCHIES></DATA></asx:values></asx:abap>"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "565",
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.debugger.ChildVariables"
+    },
+    "bodyFile": "debugger-conversation--13-children-lt-rows-1-2-120.body.xml"
+  }
+}

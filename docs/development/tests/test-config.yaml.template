@@ -231,6 +231,27 @@ runtime_readonly_handlers:
         # Recommended fallback dump ID to avoid skip when feed is empty
         dump_id: ""
 
+# Debugger Handlers (ABAP and AMDP debugger, memory)
+# Nothing else may debug for the same SAP user while this runs (an IDE with a
+# breakpoint set holds the user's debugging). The probes are created, run and
+# deleted by the test; they go into `package` with no transport, never into
+# the default package's request.
+debugger_handlers:
+  test_cases:
+    - name: "debugger_chain"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "ABAP chain, conflict, stated ids, breakpoint semantics, memory, AMDP chain and its stop — on probes the test creates and deletes"
+      params:
+        package: "$TMP"
+        transport: ""
+        probe_class: "ZMCP_DBG_PROBE"
+        amdp_probe_class: "ZMCP_DBG_AMDP"
+        amdp_probe_ddl: "ZMCP_DBG_AMDP_TF"
+        # Repetitions of each single step and of each baseline run, for the timings
+        timing_repeats: 5
+        keep_probe: false
+
 # Environment Configuration
 # These values can be overridden by environment variables
 environment:

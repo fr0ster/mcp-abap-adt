@@ -53,6 +53,12 @@
       ],
       "@mcp-abap-adt/sse": [
         "../sse/dist/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/debugger": [
+        "../dist/lib/debugger/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/state": [
+        "../dist/lib/state/index.d.ts"
       ]
     }
   },

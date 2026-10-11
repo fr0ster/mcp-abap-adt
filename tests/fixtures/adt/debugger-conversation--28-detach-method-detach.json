@@ -1,0 +1,26 @@
+{
+  "case": "debugger-conversation",
+  "step": 28,
+  "stepTag": "detach-method-detach",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger?method=detach",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger?method=detach",
+    "headers": {
+      "Accept": "*/*",
+      "X-sap-adt-sessiontype": "stateful"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "headers": {
+      "content-length": "409",
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-conversation--28-detach-method-detach.body.xml"
+  }
+}

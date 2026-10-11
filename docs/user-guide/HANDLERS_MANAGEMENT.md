@@ -26,7 +26,10 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - System modifications
    - Database operations
 
-4. **compact** - Compact facade operations
+4. **compact** - Compact facade operations — served by its own command, `mcp-abap-adt-compact`
+   (`@mcp-abap-adt/compact`); this command refuses `--exposition=compact`. With `debug` in
+   that command's exposition (`ro,debug`, `rw,debug`) it adds four debugger verbs:
+   `HandlerDebugStart`, `HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`.
    - `HandlerValidate`
    - `HandlerActivate`
    - `HandlerLock`
@@ -66,11 +69,21 @@ V2 server supports flexible handler set configuration through the `--exposition`
      - `RUNTIME_PROFILE`: `viewProfiles`, `viewProfile`
      - `RUNTIME_DUMP`: `viewDumps`, `viewDump`
 
-5. **search** - Always included automatically
+5. **debug** - The debugger (opt-in, never part of the default)
+   - ABAP: `DebugStartListener`, `DebugTakeOverListener`, `DebugWait`, `DebugStop`,
+     breakpoints, stack, variables, watchpoints, steps, termination, memory
+   - AMDP: `AmdpDebugStart`, `AmdpDebugWait`, `AmdpDebugStep`, `AmdpDebugGetTable`,
+     `AmdpDebugSetBreakpoints`, `AmdpDebugCancel`, `AmdpDebugStop`
+   - Memory snapshots: `MemorySnapshotList`, `MemorySnapshotGet`, `MemorySnapshotDelta`
+   - A breakpoint or a listener catches **every request of the connected SAP user**,
+     which is why no default carries the set. Beside any other set, or alone.
+   - Sessions, handles, the SAP ids and what ends a session: [Debugger](DEBUGGER.md)
+
+6. **search** - Always included automatically
    - Object search
    - Code search
 
-6. **system** - Included only when the exposition includes `readonly` (added alongside the read-only group)
+7. **system** - Included only when the exposition includes `readonly` (added alongside the read-only group)
    - Where-used analysis (GetWhereUsed)
    - Type information (GetTypeInfo)
    - Object info (GetObjectInfo)
@@ -97,21 +110,21 @@ node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly
 # Read-only + high-level writes (recommended)
 node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly,high
 
-# Compact facade only
-node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=compact
-
 # Low-level writes (use instead of `high`, not together)
 node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly,low
+
+# The debugger beside the default sets (opt-in)
+node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly,high,debug
 ```
 
 #### Validation rules
 
 The launcher rejects invalid `--exposition` combinations at startup:
 
-- `compact` must be exposed alone — it replaces both `high` and `low`. Combining it with anything else errors out.
+- `compact` is refused: the compact facade is its own command, `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), whose `--exposition` takes `ro` or `rw`, and `debug` beside either.
 - `high` and `low` are mutually exclusive.
 
-Valid combinations: `[readonly]`, `[readonly, high]`, `[readonly, low]`, `[high]`, `[low]`, `[compact]`.
+Valid combinations: `[readonly]`, `[readonly, high]`, `[readonly, low]`, `[high]`, `[low]`, each with or without `debug`, and `[debug]` alone.
 
 #### Readonly / high-level dedup
 
@@ -156,7 +169,7 @@ npm run docs:tools
 ```
 
 This generates:
-- `docs/user-guide/AVAILABLE_TOOLS.md`
+- `docs/user-guide/AVAILABLE_TOOLS.md` (with the opt-in Debug group)
 - `docs/user-guide/AVAILABLE_TOOLS_READONLY.md`
 - `docs/user-guide/AVAILABLE_TOOLS_HIGH.md`
 - `docs/user-guide/AVAILABLE_TOOLS_LOW.md`
@@ -181,6 +194,9 @@ ls -la src/handlers/*/high/
 
 # Low-level handlers
 ls -la src/handlers/*/low/
+
+# Debug handlers
+ls -la src/handlers/debugger/debug/
 ```
 
 ## Handler Set Details
@@ -218,12 +234,27 @@ src/handlers/
 └── program/low/
 ```
 
+### Debug Handlers Location
+
+```
+src/handlers/
+└── debugger/debug/    # ABAP, AMDP and memory snapshot tools
+```
+
+They are thin over `src/lib/debugger/` (the debug sessions) and `src/lib/state/`
+(the instance state that holds them between tool calls and mints the
+`state_handle`), published as `@mcp-abap-adt/lib/debugger` and
+`@mcp-abap-adt/lib/state`. The compact verbs live in `compact/src/debug/`.
+
 ## Security Recommendations
 
 1. **Production**: Use only `readonly`
 2. **Development**: Use `readonly,high` 
 3. **Testing/Admin**: Use `readonly,high,low` with caution
 4. **Never expose low-level handlers to untrusted users**
+5. **Debugging**: add `debug` only while you debug. A breakpoint catches every request of
+   the connected SAP user, and a `state_handle` gives whoever holds it that user's debug
+   session — see [Debugger](DEBUGGER.md) and [Security](../../SECURITY.md)
 
 ## Implementation
 

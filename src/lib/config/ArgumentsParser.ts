@@ -6,6 +6,7 @@
 
 import { authParameterSource, readAuthParameters } from './authParameters';
 import { resolveEnvFilePath } from './envResolver';
+import { readStateIdleMinutes } from './stateIdleMinutes';
 import type { YamlConfig } from './yamlConfig';
 
 export interface ParsedArguments {
@@ -51,6 +52,8 @@ export interface ParsedArguments {
   sseEnableDnsProtection?: boolean;
   /** Port for browser auth callback server */
   browserAuthPort?: number;
+  /** The idle bound on held state, in minutes (at least 30, default 30) */
+  stateIdleMinutes?: number;
   /** Allow x-mcp-destination header to override default destination */
   allowDestinationHeader?: boolean;
   /** Browser for a login */
@@ -163,6 +166,12 @@ export class ArgumentsParser {
     result.mcp = auth.mcpDestination;
     result.authBrokerPath = auth.authBrokerPath;
     result.browserAuthPort = auth.browserAuthPort;
+    // CLI, then env, then YAML; a value under 30 or not whole is refused.
+    result.stateIdleMinutes = readStateIdleMinutes(
+      args,
+      process.env,
+      yaml as Record<string, unknown> | null | undefined,
+    );
     result.allowDestinationHeader = auth.allowDestinationHeader ?? false;
     result.browser = auth.browser;
     result.envDestination = auth.envDestination;

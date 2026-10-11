@@ -6,6 +6,7 @@ import {
   type SystemContextResolver,
   withResolvedSystemContext,
 } from '../requestSystemResolution.js';
+import { DebugHandlersGroup } from './groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from './groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './groups/ReadOnlyHandlersGroup.js';
@@ -59,6 +60,12 @@ export interface HandlerExporterOptions {
    * @default true
    */
   includeSearch?: boolean;
+
+  /**
+   * Debugger tools (default false): opt-in; they catch every request of the SAP user
+   * @default false
+   */
+  includeDebug?: boolean;
 
   /**
    * Asks the connection's system for the responsible person and master
@@ -161,6 +168,9 @@ export class HandlerExporter {
     }
     if (options?.includeSearch !== false) {
       this.handlerGroups.push(new SearchHandlersGroup(dummyContext));
+    }
+    if (options?.includeDebug === true) {
+      this.handlerGroups.push(new DebugHandlersGroup(dummyContext));
     }
   }
 

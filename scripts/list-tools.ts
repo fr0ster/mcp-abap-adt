@@ -3,6 +3,7 @@ import type { HandlerContext } from '../src/handlers/interfaces.js';
 // serves — so `compact` is no longer one of the groups here. Its 22 tools are
 // listed by `@mcp-abap-adt/compact`'s own tooling.
 import {
+  DebugHandlersGroup,
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -25,6 +26,7 @@ const groups = {
   low: new LowLevelHandlersGroup(ctx),
   system: new SystemHandlersGroup(ctx),
   search: new SearchHandlersGroup(ctx),
+  debug: new DebugHandlersGroup(ctx),
 };
 
 // Two input-schema shapes exist among the 362 tools (a codebase finding, not a script

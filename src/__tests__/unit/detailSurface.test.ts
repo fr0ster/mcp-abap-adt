@@ -49,7 +49,10 @@
  *     rather than trusting a rule applied silently.
  *  2. **The wiring.** A tool that declares `detail` must actually read
  *     `detailOf(args)` and pass it to `answer()`; a tool that does not must
- *     pass a literal. `detailWiring` (`scripts/lib/analyseOmissions.ts`)
+ *     pass a literal. The debug tools answer through the debugger's own
+ *     adapters, `debugAnswer(args, …)` / `debugStateAnswer(args, …)`, which
+ *     read `detailOf(args)` themselves; for them the wiring is that the
+ *     handler hands the adapter its own arguments, not a context of its own. `detailWiring` (`scripts/lib/analyseOmissions.ts`)
  *     proves this from the AST — a schema and a behaviour are two separate
  *     claims, and a count of how many tools carry `detail` cannot tell them
  *     apart (the wrong tools could sum to the right number).
@@ -107,6 +110,11 @@ jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
  *    runtime-profiling tools, because a reading genuinely is behind each of
  *    the two fields this answer combines.
  *
+ * The thirty debugger tools (`src/handlers/debugger/debug/`) joined with the
+ * debugger: each answers a parsed reading (a stop, variables, breakpoints, a
+ * memory snapshot view) with SAP's document beside it, through
+ * `debugAnswer`/`debugStateAnswer`, so terse, full and raw genuinely differ.
+ *
  * A decision belongs where a reviewer can see it — this array, not a rule
  * applied silently at test time — so the surface test below compares
  * against DATA, and a change to it is a change a reviewer has to approve.
@@ -142,6 +150,13 @@ const JSON_ANSWERING: readonly string[] = [
   'ActivateTable',
   'ActivateTableLow',
   'AddTransportObject',
+  'AmdpDebugCancel',
+  'AmdpDebugGetTable',
+  'AmdpDebugSetBreakpoints',
+  'AmdpDebugStart',
+  'AmdpDebugStep',
+  'AmdpDebugStop',
+  'AmdpDebugWait',
   'CheckBdefLow',
   'CheckClassLow',
   'CheckDataElementLow',
@@ -194,6 +209,25 @@ const JSON_ANSWERING: readonly string[] = [
   'CreateTransportLow',
   'CreateTransportTask',
   'CreateUnitTest',
+  'DebugCreateMemorySnapshot',
+  'DebugCreateWatchpoint',
+  'DebugDeleteBreakpoint',
+  'DebugDeleteWatchpoint',
+  'DebugGetMemorySizes',
+  'DebugGetStack',
+  'DebugGetVariables',
+  'DebugListBreakpoints',
+  'DebugListWatchpoints',
+  'DebugSetBreakpoints',
+  'DebugSetStackPosition',
+  'DebugSetVariable',
+  'DebugStartListener',
+  'DebugStep',
+  'DebugStepToLine',
+  'DebugStop',
+  'DebugTakeOverListener',
+  'DebugTerminate',
+  'DebugWait',
   'DeleteBehaviorDefinition',
   'DeleteBehaviorDefinitionLow',
   'DeleteBehaviorImplementation',
@@ -241,6 +275,9 @@ const JSON_ANSWERING: readonly string[] = [
   'GetUnitTestResult',
   'GetVirtualFoldersLow',
   'ListTransports',
+  'MemorySnapshotDelta',
+  'MemorySnapshotGet',
+  'MemorySnapshotList',
   'ReadPackage',
   'ReadTransportActionLog',
   'ReadTransportObjects',
@@ -404,7 +441,9 @@ it.each([
   // that ignores a correctly-wired context (passed inline, or bound to a
   // `const` and handed over by name — fix round 2's finding, live today in
   // five handlers that happen not to declare `detail`), and no `answer()`
-  // at all.
+  // at all. Two more for the debugger's adapters: one handed a context of
+  // its own instead of the tool's arguments, and one that reads `detail`
+  // from the arguments of a tool that does not offer it.
   ['declares-passes-none', ['FixtureDeclaresPassesNone']],
   ['declares-indirect-context', ['FixtureIndirectContext']],
   ['declares-shorthand', ['FixtureShorthand']],
@@ -414,6 +453,8 @@ it.each([
   // `answer()` in the file, so there is nothing to iterate and nothing to
   // report — indistinguishable from correct.
   ['declares-no-answer-call', ['FixtureDeclaresNoAnswerCall']],
+  ['declares-debug-fixed-level', ['FixtureDebugFixedLevel']],
+  ['undeclared-debug-reads-args', []],
 ] as const)('reports %s rather than skipping it', (fixture, declaring) => {
   expect(
     detailWiring(
@@ -421,6 +462,15 @@ it.each([
       new Set(declaring),
     ),
   ).toHaveLength(1);
+});
+
+it('accepts a debug tool that hands its arguments to the adapters', () => {
+  expect(
+    detailWiring(
+      ['src/__tests__/fixtures/detail/declares-debug-wired.ts'],
+      new Set(['FixtureDebugWired']),
+    ),
+  ).toEqual([]);
 });
 
 /**

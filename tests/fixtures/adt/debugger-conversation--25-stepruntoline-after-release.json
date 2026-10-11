@@ -1,0 +1,26 @@
+{
+  "case": "debugger-conversation",
+  "step": 25,
+  "stepTag": "stepruntoline-after-release",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger?method=stepRunToLine&uri=%2Fsap%2Fbc%2Fadt%2Foo%2Fclasses%2Fzcl_cv_dbg_measure%2Fsource%2Fmain%23start%3D34",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger?method=stepRunToLine&uri=%2Fsap%2Fbc%2Fadt%2Foo%2Fclasses%2Fzcl_cv_dbg_measure%2Fsource%2Fmain%23start%3D34",
+    "headers": {
+      "Accept": "*/*",
+      "X-sap-adt-sessiontype": "stateful"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 500,
+    "headers": {
+      "content-length": "515",
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-conversation--25-stepruntoline-after-release.body.xml"
+  }
+}

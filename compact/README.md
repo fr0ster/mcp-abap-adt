@@ -1,6 +1,6 @@
 # @mcp-abap-adt/compact
 
-The compact MCP server — the command that serves all 25.
+The compact MCP server — the command that serves all 25, and the four debugger verbs on request.
 
 ## What compact is
 
@@ -33,6 +33,7 @@ smaller install, and it is not a sandbox — code that deliberately reaches into
 npm install -g @mcp-abap-adt/compact
 mcp-abap-adt-compact                    # stdio, all 25 compact tools
 mcp-abap-adt-compact --exposition=ro    # the 16 that change nothing
+mcp-abap-adt-compact --exposition=rw,debug   # all 25 and the four debugger verbs
 mcp-abap-adt-compact --version
 ```
 
@@ -41,6 +42,16 @@ what a local server gives) or **`ro`** (the 16 tools that change nothing: no cre
 update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool
 list at all, so a client cannot call one). The object-oriented sets
 `readonly`/`high`/`low` belong to `mcp-abap-adt` and are refused here by name.
+
+**The debugger is opt-in.** `debug` beside `ro` or `rw` (`--exposition=ro,debug`)
+adds four verbs: `HandlerDebugStart` (`kind: abap|amdp`, the breakpoints, `take_over`,
+an optional background `run`; answers a `state_handle`), `HandlerDebugWait`,
+`HandlerDebugView` (stack, variables, memory, an AMDP table) and `HandlerDebugStep`
+(the steps, `terminate`, and `stop`, which ends the session). `debug` alone is
+refused: it names no half of the facade, and taking `rw` for it would open the write
+tools unasked. A breakpoint catches every request of the connected SAP user, which
+is why the verbs are never served by default. What a debug session is, what keeps it
+alive on each transport and what ends it: [Debugger](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 
 Configuration — connection, authentication, transports — is the same as
 `mcp-abap-adt`'s, because the launcher is the same one: this command passes its own

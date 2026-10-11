@@ -1,5 +1,8 @@
 /**
- * The responsible person is always sent; the master system only when known.
+ * The responsible person is sent wherever a create carries it; the master
+ * system only when known. A class and a behavior implementation carry none:
+ * SAP stores that attribute on them as the creator, not the responsible
+ * (adt-clients 26.0.1), so the vehicle here is a message class.
  *
  * Responsible: its own variable (the tool argument, `x-sap-responsible`,
  * `SAP_RESPONSIBLE` of the destination then of the process), else the login
@@ -20,12 +23,12 @@ import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationHigh } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationLow } from '../../handlers/behavior_implementation/low/handleCreateBehaviorImplementation';
-import {
-  TOOL_DEFINITION as CreateClassLowTool,
-  handleCreateClass as handleCreateClassLow,
-} from '../../handlers/class/low/handleCreateClass';
+import { handleCreateClass as handleCreateClassLow } from '../../handlers/class/low/handleCreateClass';
 import { handleReadClass } from '../../handlers/class/readonly/handleReadClass';
-import { handleCreateMessageClass } from '../../handlers/message_class/high/handleCreateMessageClass';
+import {
+  TOOL_DEFINITION as CreateMessageClassTool,
+  handleCreateMessageClass,
+} from '../../handlers/message_class/high/handleCreateMessageClass';
 import { handleCreateServiceDefinition } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { createAdtClient } from '../../lib/clients';
@@ -81,6 +84,23 @@ const CLASS_ARGS = {
 const createBody = (connection: ReturnType<typeof recordingConnection>) =>
   String(connection.requests.find((r) => r.method === 'POST')?.data);
 
+const MSAG_ARGS = {
+  message_class_name: 'ZMSG_PLACEHOLDER',
+  package_name: 'ZPACKAGE_PLACEHOLDER',
+  description: 'placeholder',
+};
+
+/** The vehicle: a create that carries the responsible person and master system. */
+const createMessageClass = async () => {
+  const connection = recordingConnection();
+  const result = await handleCreateMessageClass(
+    { connection, logger: undefined } as never,
+    MSAG_ARGS as never,
+  );
+  return { connection, result };
+};
+
+/** A class create, which carries neither. */
 const createClass = async () => {
   const connection = recordingConnection();
   const result = await handleCreateClassLow(
@@ -94,7 +114,7 @@ describe('on-premise', () => {
   it('basic: the login is the responsible, no master system is sent, nothing is refused', async () => {
     process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
     systemContextFromConfiguration();
-    const { connection, result } = await createClass();
+    const { connection, result } = await createMessageClass();
     expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
     expect(createBody(connection)).toContain(
       'adtcore:responsible="LOGIN_PLACEHOLDER"',
@@ -106,7 +126,7 @@ describe('on-premise', () => {
     process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
     process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
     systemContextFromConfiguration();
-    const { connection } = await createClass();
+    const { connection } = await createMessageClass();
     expect(createBody(connection)).toContain(
       'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
     );
@@ -117,14 +137,14 @@ describe('on-premise', () => {
       masterSystem: 'SYSTEM_PLACEHOLDER',
       responsible: 'USER_PLACEHOLDER',
     });
-    const stated = await createClass();
+    const stated = await createMessageClass();
     expect(createBody(stated.connection)).toContain(
       'adtcore:masterSystem="SYSTEM_PLACEHOLDER"',
     );
 
     resetSystemContextCache();
     setSystemContext({ responsible: 'USER_PLACEHOLDER' });
-    const unstated = await createClass();
+    const unstated = await createMessageClass();
     expect(textOf(unstated.result)).not.toContain(MISSING_RESPONSIBLE);
     expect(createBody(unstated.connection)).toContain(
       'adtcore:responsible="USER_PLACEHOLDER"',
@@ -135,7 +155,7 @@ describe('on-premise', () => {
   });
 
   it('SNC / a handed-over token with nothing stated: refused naming SAP_RESPONSIBLE, nothing sent', async () => {
-    const { connection, result } = await createClass();
+    const { connection, result } = await createMessageClass();
     // On-premise the login is SAP_USERNAME, or x-sap-login with x-sap-url;
     // on ABAP Cloud only the system's user.
     expect(textOf(result)).toContain('x-sap-login with x-sap-url');
@@ -146,7 +166,7 @@ describe('on-premise', () => {
     // The server's own refusal, not a claim about the connection.
     expect(JSON.parse(textOf(result))).toMatchObject({
       error: 'system_context_missing',
-      tool: 'CreateClassLow',
+      tool: 'CreateMessageClass',
     });
     expect(connection.requests).toEqual([]);
   });
@@ -233,7 +253,7 @@ describe('on-premise', () => {
   ] as const;
 
   it.each(bimpTools)(
-    'CreateBehaviorImplementation (%s), basic: the login is its responsible, no master system',
+    'CreateBehaviorImplementation (%s), basic: no responsible attribute, no master system, not refused',
     async (_tier, handler) => {
       process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
       systemContextFromConfiguration();
@@ -243,12 +263,20 @@ describe('on-premise', () => {
         BIMP_ARGS as never,
       );
       expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-      expect(createBody(connection)).toContain(
-        'adtcore:responsible="LOGIN_PLACEHOLDER"',
-      );
+      // adt-clients 26.0.1: SAP reads it as the creator, so it is not sent.
+      expect(createBody(connection)).not.toContain('adtcore:responsible');
       expect(createBody(connection)).not.toContain('adtcore:masterSystem');
     },
   );
+
+  it('a class create carries no responsible attribute, whatever the context says', async () => {
+    // adt-clients 26.0.1, measured on premise: SAP stores adtcore:responsible on
+    // a class create as the creator, and records the logon user as responsible.
+    setSystemContext({ responsible: 'USER_PLACEHOLDER' });
+    const { connection, result } = await createClass();
+    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
+    expect(createBody(connection)).not.toContain('adtcore:responsible');
+  });
 
   it.each(bimpTools)(
     'CreateBehaviorImplementation (%s), nothing stated: refused naming SAP_RESPONSIBLE, nothing sent',
@@ -347,8 +375,8 @@ describe('cloud', () => {
       registerHandlers: () => {},
       getHandlers: (): HandlerEntry[] => [
         {
-          toolDefinition: CreateClassLowTool as never,
-          handler: handleCreateClassLow as never,
+          toolDefinition: CreateMessageClassTool as never,
+          handler: handleCreateMessageClass as never,
         },
       ],
     },
@@ -371,7 +399,7 @@ describe('cloud', () => {
       handlersRegistry: registry,
       systemType: 'cloud',
     });
-    const result = await toolsOf(server).CreateClassLow.handler(CLASS_ARGS);
+    const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
     expect(lookup).toHaveBeenCalledTimes(1);
     expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
     expect(createBody(connection)).toContain('adtcore:masterSystem="CLD"');
@@ -388,7 +416,7 @@ describe('cloud', () => {
       handlersRegistry: registry,
       systemType: 'cloud',
     });
-    await toolsOf(server).CreateClassLow.handler(CLASS_ARGS);
+    await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
     expect(lookup).toHaveBeenCalledTimes(1);
     expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
   });
@@ -402,7 +430,7 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     await runWithRequestContext({ login: 'SCOPE_LOGIN' }, () =>
-      toolsOf(server).CreateClassLow.handler(CLASS_ARGS),
+      toolsOf(server).CreateMessageClass.handler(MSAG_ARGS),
     );
     expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
 
@@ -414,7 +442,7 @@ describe('cloud', () => {
       handlersRegistry: registry,
       systemType: 'cloud',
     });
-    await toolsOf(statedServer).CreateClassLow.handler(CLASS_ARGS);
+    await toolsOf(statedServer).CreateMessageClass.handler(MSAG_ARGS);
     expect(createBody(stated)).toContain('adtcore:responsible="STATED_USER"');
   });
 
@@ -428,7 +456,7 @@ describe('cloud', () => {
       handlersRegistry: registry,
       systemType: 'cloud',
     });
-    const result = await toolsOf(server).CreateClassLow.handler(CLASS_ARGS);
+    const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
     expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
     expect(connection.requests).toEqual([]);
   });
@@ -448,7 +476,7 @@ describe('cloud', () => {
       });
       const result = await runWithRequestContext(
         { responsible: undefined, masterSystem: undefined },
-        () => toolsOf(server).CreateClassLow.handler(CLASS_ARGS),
+        () => toolsOf(server).CreateMessageClass.handler(MSAG_ARGS),
       );
       if (filled) {
         expect(lookup).toHaveBeenCalledTimes(1);
@@ -474,7 +502,7 @@ describe('cloud', () => {
       handlersRegistry: registry,
       systemType: 'cloud',
     });
-    const result = await toolsOf(server).CreateClassLow.handler(CLASS_ARGS);
+    const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
     expect(textOf(result)).toContain(RESPONSIBLE_LOOKUP_FAILED);
     expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
     expect(textOf(result)).not.toContain('placeholder failure');
@@ -494,7 +522,7 @@ describe('cloud', () => {
       handlersRegistry: registry,
       systemType: 'cloud',
     });
-    const result = await toolsOf(server).CreateClassLow.handler(CLASS_ARGS);
+    const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
     expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
     expect(connection.requests).toEqual([]);
   });

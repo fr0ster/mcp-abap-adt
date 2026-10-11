@@ -1,0 +1,26 @@
+{
+  "case": "debugger-conversation",
+  "step": 4,
+  "stepTag": "listen",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger/listeners?debuggingMode=user&requestUser=SAPUSER01&terminalId=4D43504142414454000000000000DB01&ideId=mcp-abap-adt&timeout=60",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger/listeners?debuggingMode=user&requestUser=SAPUSER01&terminalId=4D43504142414454000000000000DB01&ideId=mcp-abap-adt&timeout=60",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml",
+      "X-sap-adt-sessiontype": "stateful"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "603",
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.debugger.DebuggeesList"
+    },
+    "bodyFile": "debugger-conversation--04-listen.body.xml"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "case": "debugger-message-and-objects",
+  "step": 8,
+  "stepTag": "tree-depth-1",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger?method=getChildVariables",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger?method=getChildVariables",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml",
+      "X-sap-adt-sessiontype": "stateful",
+      "Content-Type": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.debugger.ChildVariables"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><asx:abap xmlns:asx=\"http://www.sap.com/abapxml\" version=\"1.0\"><asx:values><DATA><HIERARCHIES><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>{O:126*\\CLASS=ZCL_CV_DBG_MEASURE}-MS_CFG</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>{O:126*\\CLASS=ZCL_CV_DBG_MEASURE}-MT_ITEMS[1]</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>{O:126*\\CLASS=ZCL_CV_DBG_MEASURE}-MR_NUMBER</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>{O:126*\\CLASS=ZCL_CV_DBG_MEASURE}-MO_CHILD</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>{O:128!\\CLASS=CL_ABAP_DATADESCR}-M_RTDD_OBJECT</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>{O:128!\\CLASS=CL_ABAP_TYPEDESCR}-DD_X031L_TABLE_CACHE</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>{O:128!\\CLASS=CL_ABAP_TYPEDESCR}-X030L_CACHE</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>{O:128!\\CLASS=CL_ABAP_TYPEDESCR}-_ME_XTYPE</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY><STPDA_ADT_VARIABLE_HIERARCHY><PARENT_ID>{O:128!\\CLASS=CL_ABAP_TYPEDESCR}-_ADMIN_TAB[1]</PARENT_ID></STPDA_ADT_VARIABLE_HIERARCHY></HIERARCHIES></DATA></asx:values></asx:abap>"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "2134",
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.debugger.ChildVariables"
+    },
+    "bodyFile": "debugger-message-and-objects--08-tree-depth-1.body.xml"
+  }
+}

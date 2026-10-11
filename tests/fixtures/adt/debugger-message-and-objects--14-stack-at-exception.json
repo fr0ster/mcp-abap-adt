@@ -1,0 +1,26 @@
+{
+  "case": "debugger-message-and-objects",
+  "step": 14,
+  "stepTag": "stack-at-exception",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/debugger/stack?method=getStack&emode=_&semanticURIs=true",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger/stack?method=getStack&emode=_&semanticURIs=true",
+    "headers": {
+      "Accept": "*/*",
+      "X-sap-adt-sessiontype": "stateful"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "headers": {
+      "content-length": "485",
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-message-and-objects--14-stack-at-exception.body.xml"
+  }
+}

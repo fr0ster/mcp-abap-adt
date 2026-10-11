@@ -11,6 +11,8 @@
  * shared module that pulled a write route would hand one to the read-only package
  * and undo the capability split (`compactCapabilitySplit.test.ts`).
  */
+
+export { DETAIL_PROPERTY } from '../strategies/detail.js';
 export {
   type LowObjectType,
   toLowObjectType,

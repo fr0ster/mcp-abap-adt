@@ -1,5 +1,5 @@
 /**
- * The compact surface stays frozen — the same 25 tools with the same parameters.
+ * The compact surface stays frozen — the same 29 tools — 25, plus the four debug verbs served with `--exposition=…,debug`.
  *
  * **Why it lives here now.** `tests/fixtures/tools/surface.json` in `lib` froze all
  * 370 tools, 22 of them compact. The facade moved into packages, so `lib`'s fixture
@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
+import { compactDebugEntries } from '../debug/group';
 
 interface Row {
   group: string;
@@ -47,6 +48,7 @@ describe('the compact tool surface', () => {
   const current = [
     ...compactReadOnlyEntries(context),
     ...compactModifyEntries(context),
+    ...compactDebugEntries(),
   ].map((entry) => ({
     group: 'compact',
     name: entry.toolDefinition.name,
@@ -62,8 +64,8 @@ describe('the compact tool surface', () => {
   }));
 
   it('enumerates the whole facade, so the assertions below are not vacuous', () => {
-    expect(frozen).toHaveLength(25);
-    expect(current).toHaveLength(25);
+    expect(frozen).toHaveLength(29);
+    expect(current).toHaveLength(29);
   });
 
   it('has the same tools', () => {

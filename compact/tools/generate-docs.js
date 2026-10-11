@@ -57,6 +57,20 @@ const LOCAL = {
     'index.js',
   ),
   '@mcp-abap-adt/lib/utils': path.join(REPO, 'dist', 'lib', 'utils.js'),
+  '@mcp-abap-adt/lib/debugger': path.join(
+    REPO,
+    'dist',
+    'lib',
+    'debugger',
+    'index.js',
+  ),
+  '@mcp-abap-adt/lib/state': path.join(
+    REPO,
+    'dist',
+    'lib',
+    'state',
+    'index.js',
+  ),
   '@mcp-abap-adt/lib/config': path.join(
     REPO,
     'dist',
@@ -84,8 +98,8 @@ Module._resolveFilename = function patched(request, ...rest) {
 };
 const OUT = path.join(__dirname, '..', 'docs', 'AVAILABLE_TOOLS.md');
 
-function requireFresh(pkg) {
-  const dist = path.join(REPO, pkg, 'dist', 'index.js');
+function requireFresh(pkg, file = 'index.js') {
+  const dist = path.join(REPO, pkg, 'dist', file);
   if (!fs.existsSync(dist)) {
     throw new Error(
       `${pkg}/dist is missing. Run \`npm run build\` in ${pkg} first.`,
@@ -131,6 +145,8 @@ function page(entries) {
   md += `- Tools: ${entries.length}\n`;
   md += '- Read-only half: `@mcp-abap-adt/compact-readonly`\n';
   md += '- Modifying half: `@mcp-abap-adt/compact-modify`\n';
+  md +=
+    '- Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`\n';
   md += '- Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)\n\n';
   md += '## How it works\n\n';
   md +=
@@ -144,7 +160,10 @@ function page(entries) {
   for (const { half, entry } of entries) {
     const tool = entry.toolDefinition;
     md += `### ${tool.name}\n\n`;
-    md += `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
+    md +=
+      half === 'debug'
+        ? '**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)\n\n'
+        : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
     const available = tool.available_in
       ? [...tool.available_in].sort().join(', ')
@@ -176,6 +195,9 @@ function main() {
     ...modify
       .compactModifyEntries(context)
       .map((entry) => ({ half: 'modify', entry })),
+    ...requireFresh('compact', path.join('debug', 'group.js'))
+      .compactDebugEntries()
+      .map((entry) => ({ half: 'debug', entry })),
   ];
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, page(entries), 'utf8');

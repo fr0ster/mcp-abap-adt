@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../handlers/interfaces.js';
+import type { ArgsOf } from './argsOf.js';
 
 // Re-export HandlerContext for consumers
 export type { HandlerContext };
@@ -41,6 +42,23 @@ export type ToolHandler = (context: HandlerContext, args: any) => Promise<any>;
 export interface HandlerEntry {
   toolDefinition: ToolDefinition;
   handler: ToolHandler;
+}
+
+/**
+ * Pairs a tool definition with its handler, checked by the compiler: the
+ * handler must take the arguments the definition's schema declares
+ * (`ArgsOf`). The entry it answers is the ordinary, erased `HandlerEntry`, so
+ * registration is unchanged; the handler takes `(context, args)`, and every
+ * registration path passes the call's context to such a handler.
+ */
+export function defineTool<const D extends ToolDefinition>(
+  toolDefinition: D,
+  handler: (
+    context: HandlerContext,
+    args: ArgsOf<D['inputSchema']>,
+  ) => Promise<unknown>,
+): HandlerEntry {
+  return { toolDefinition, handler: handler as ToolHandler };
 }
 
 /**

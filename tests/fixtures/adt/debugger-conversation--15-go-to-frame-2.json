@@ -1,0 +1,25 @@
+{
+  "case": "debugger-conversation",
+  "step": 15,
+  "stepTag": "go-to-frame-2",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "PUT",
+    "url": "/sap/bc/adt/debugger/stack/type/ABAP/position/11",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger/stack/type/ABAP/position/11",
+    "headers": {
+      "Accept": "*/*",
+      "X-sap-adt-sessiontype": "stateful"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "0"
+    },
+    "bodyFile": null
+  }
+}

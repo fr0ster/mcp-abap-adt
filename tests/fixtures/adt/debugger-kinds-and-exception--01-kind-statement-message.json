@@ -1,0 +1,27 @@
+{
+  "case": "debugger-kinds-and-exception",
+  "step": 1,
+  "stepTag": "kind-statement-message",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger/breakpoints",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger/breakpoints",
+    "headers": {
+      "Accept": "*/*",
+      "X-sap-adt-sessiontype": "stateful",
+      "Content-Type": "application/xml"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<dbg:breakpoints xmlns:dbg=\"http://www.sap.com/adt/debugger\" xmlns:adtcore=\"http://www.sap.com/adt/core\" debuggingMode=\"user\" scope=\"external\" requestUser=\"SAPUSER01\" terminalId=\"4D43504142414454000000000000DB01\" ideId=\"mcp-abap-adt\">\n  <breakpoint kind=\"statement\" enabled=\"true\" statement=\"MESSAGE\"/>\n</dbg:breakpoints>"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "197",
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "bodyFile": "debugger-kinds-and-exception--01-kind-statement-message.body.xml"
+  }
+}

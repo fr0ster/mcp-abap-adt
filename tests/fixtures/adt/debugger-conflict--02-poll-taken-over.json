@@ -1,0 +1,23 @@
+{
+  "case": "debugger-conflict",
+  "step": 2,
+  "stepTag": "poll-taken-over",
+  "capturedAt": "2026-10-11",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger/listeners?debuggingMode=user&requestUser=SAPUSER01&terminalId=B6E1A852FFC430C85B1CCA7336EAEB7A&ideId=EFE6099B5B1209B8BE8B66096C1F6C38&timeout=60&checkConflict=true&isNotifiedOnConflict=true",
+    "params": null,
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml"
+    },
+    "headersNote": "On premise (2026-10-11), through this package's debugger sessions (DEBUG_HTTP_WIRE); user, system and host replaced by placeholders; Location headers as measured by a separate probe the same day. Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 409,
+    "headers": {
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-conflict--02-poll-taken-over.body.xml"
+  }
+}

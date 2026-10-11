@@ -47,7 +47,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/lib": "^17.0.0",
+    "@mcp-abap-adt/lib": "^17.2.2",
     "@mcp-abap-adt/logger": "^0.4.1",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "express": "^5.2.1"
@@ -79,6 +79,7 @@
       "^@mcp-abap-adt/lib/auth$": "<rootDir>/../src/lib/auth/index.ts",
       "^@mcp-abap-adt/lib/logger$": "<rootDir>/../src/lib/handlerLogger.ts",
       "^@mcp-abap-adt/lib/request-context$": "<rootDir>/../src/lib/requestContext.ts",
+      "^@mcp-abap-adt/lib/state$": "<rootDir>/../src/lib/state/index.ts",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     }
   },

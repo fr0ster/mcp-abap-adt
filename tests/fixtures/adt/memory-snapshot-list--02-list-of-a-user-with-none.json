@@ -1,0 +1,23 @@
+{
+  "case": "memory-snapshot-list",
+  "step": 2,
+  "stepTag": "list-of-a-user-with-none",
+  "capturedAt": "2026-10-10",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/runtime/memory/snapshots?user=SAPUSER_NONE",
+    "params": null,
+    "headers": {
+      "Accept": "application/vnd.sap.adt.runtime.memory.snapshots.v1+xml"
+    },
+    "headersNote": "On premise, SAP_BASIS 816, through this package, for a user whose role carries S_MEM_SNAP; trimmed to two snapshots; user, system and server replaced by placeholders. Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/vnd.sap.adt.runtime.memory.snapshots.v1+xml"
+    },
+    "bodyFile": "memory-snapshot-list--02-list-of-a-user-with-none.body.xml"
+  }
+}

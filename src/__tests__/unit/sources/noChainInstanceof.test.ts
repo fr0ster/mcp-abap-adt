@@ -16,6 +16,15 @@
  * The scan's own rules are load-bearing: each fixture under
  * `__fixtures__/failureScan/refused` is one way past a name-based scan and
  * must be reported; each under `clean` must not.
+ *
+ * Known limits — shapes the scan does not follow, left to review:
+ * - `Reflect.get(v, 'message')` and other reflective reads;
+ * - computed keys (`v[key]` with a non-literal `key`);
+ * - an aliased sink (`const log = console.error; log(v)`);
+ * - DOM-style callback parameters (`onerror = (e) => …`) and any rejection
+ *   handler other than `.catch(h)` / `.then(_, h)`;
+ * - a thrown value handed to a function outside the program (another
+ *   package's), whose parameters are not followed.
  */
 
 import * as fs from 'node:fs';
@@ -47,22 +56,22 @@ const THROWN_SCOPE = [
  */
 const ALLOWED: ReadonlyArray<{ where: string; text: string; why: string }> = [
   {
-    where: 'http/src/InstancePool.ts',
+    where: 'http/src/InstancePool.ts:83',
     text: 'e.message',
     why: "the held state's undo words in the pool's shutdown report (A10)",
   },
   {
-    where: 'http/src/InstancePool.ts',
+    where: 'http/src/InstancePool.ts:83',
     text: 'String(e)',
     why: "the held state's undo words in the pool's shutdown report (A10)",
   },
 ];
 
+/** Keyed by file, line and exact expression: any other read in that file fails. */
 const isAllowed = (finding: Finding) =>
   ALLOWED.some(
     (allowed) =>
-      finding.where.startsWith(`${allowed.where}:`) &&
-      finding.text === allowed.text,
+      finding.where === allowed.where && finding.text === allowed.text,
   );
 
 describe('the sources (D14, §9)', () => {
@@ -94,8 +103,7 @@ describe('the sources (D14, §9)', () => {
     for (const allowed of ALLOWED) {
       expect(
         findings.some(
-          (f) =>
-            f.where.startsWith(`${allowed.where}:`) && f.text === allowed.text,
+          (f) => f.where === allowed.where && f.text === allowed.text,
         ),
       ).toBe(true);
     }

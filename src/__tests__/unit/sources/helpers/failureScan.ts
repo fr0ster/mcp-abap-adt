@@ -156,6 +156,24 @@ function isChainClass(
   );
 }
 
+/** Whether `callee` resolves to one of `names` of Node's `util` module. */
+function isNodeUtil(
+  checker: ts.TypeChecker,
+  callee: ts.Expression,
+  names: readonly string[],
+): boolean {
+  const symbol = checker.getSymbolAtLocation(
+    ts.isPropertyAccessExpression(callee) ? callee.name : callee,
+  );
+  if (!symbol) return false;
+  const target = resolved(checker, symbol);
+  if (!names.includes(target.getName())) return false;
+  return (target.declarations ?? []).some((d) => {
+    const file = d.getSourceFile().fileName.split(path.sep).join('/');
+    return file.includes('/@types/node/util.d.ts');
+  });
+}
+
 function walk(node: ts.Node, visit: (node: ts.Node) => void): void {
   visit(node);
   node.forEachChild((child) => walk(child, visit));
@@ -256,10 +274,45 @@ export function scanProgram(
     return symbol !== undefined && tainted.has(symbol);
   };
 
+  /**
+   * Whether `expression` evaluates to a tainted value: the value itself,
+   * either branch of `?:`, either side of `??` / `||` / `&&`, or a property or
+   * element read back from a literal that holds one (`{ e: caught }.e`,
+   * `[caught][0]`).
+   */
+  const flowsTainted = (expression: ts.Expression | undefined): boolean => {
+    if (expression === undefined) return false;
+    const target = strip(expression);
+    if (isTainted(target)) return true;
+    if (ts.isConditionalExpression(target)) {
+      return flowsTainted(target.whenTrue) || flowsTainted(target.whenFalse);
+    }
+    if (
+      ts.isBinaryExpression(target) &&
+      (target.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken ||
+        target.operatorToken.kind === ts.SyntaxKind.BarBarToken ||
+        target.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
+    ) {
+      return flowsTainted(target.left) || flowsTainted(target.right);
+    }
+    if (
+      ts.isPropertyAccessExpression(target) ||
+      ts.isElementAccessExpression(target)
+    ) {
+      const holder = strip(target.expression);
+      return (
+        (ts.isObjectLiteralExpression(holder) ||
+          ts.isArrayLiteralExpression(holder)) &&
+        holdsTainted(holder)
+      );
+    }
+    return false;
+  };
+
   /** A tainted value, or one held in an object or array literal, or either branch of `?:`. */
   const holdsTainted = (expression: ts.Expression): boolean => {
     const target = strip(expression);
-    if (isTainted(target)) return true;
+    if (flowsTainted(target)) return true;
     if (ts.isObjectLiteralExpression(target)) {
       return target.properties.some((property) => {
         if (ts.isPropertyAssignment(property)) {
@@ -301,7 +354,11 @@ export function scanProgram(
     for (const element of name.elements) {
       if (ts.isOmittedExpression(element)) continue;
       const key = element.propertyName ?? element.name;
-      if (ts.isIdentifier(key) && FORBIDDEN_PROPERTIES.has(key.text)) {
+      if (
+        ts.isObjectBindingPattern(name) &&
+        ts.isIdentifier(key) &&
+        FORBIDDEN_PROPERTIES.has(key.text)
+      ) {
         report('thrown', element);
         continue;
       }
@@ -327,10 +384,15 @@ export function scanProgram(
             : method === 'then'
               ? node.arguments[1]
               : undefined;
-        if (handler && isFunctionLike(handler)) {
-          const first = handler.parameters[0];
-          if (first) taintName(first.name);
-        }
+        // An inline handler, or a named one the program declares.
+        const fn =
+          handler === undefined
+            ? undefined
+            : isFunctionLike(handler)
+              ? handler
+              : calleeFunction(checker, handler);
+        const first = fn?.parameters[0];
+        if (first) taintName(first.name);
       }
     });
   }
@@ -338,13 +400,18 @@ export function scanProgram(
     changed = false;
     for (const source of sources) {
       walk(source, (node) => {
-        if (ts.isVariableDeclaration(node) && isTainted(node.initializer)) {
-          changed = taintName(node.name) || changed;
+        if (ts.isVariableDeclaration(node) && node.initializer !== undefined) {
+          const source = node.initializer;
+          // A literal holding one taints every name destructured from it.
+          const flows = ts.isIdentifier(node.name)
+            ? flowsTainted(source)
+            : flowsTainted(source) || holdsTainted(source);
+          if (flows) changed = taintName(node.name) || changed;
         }
         if (
           ts.isBinaryExpression(node) &&
           node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-          isTainted(node.right) &&
+          flowsTainted(node.right) &&
           ts.isIdentifier(node.left)
         ) {
           changed = taintName(node.left) || changed;
@@ -354,7 +421,7 @@ export function scanProgram(
           if (!fn) return;
           node.arguments.forEach((argument, index) => {
             const parameter = fn.parameters[index];
-            if (parameter && isTainted(argument)) {
+            if (parameter && flowsTainted(argument)) {
               changed = taintName(parameter.name) || changed;
             }
           });
@@ -384,7 +451,7 @@ export function scanProgram(
           ts.isBinaryExpression(node.parent) &&
           node.parent.left === node &&
           node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
-        if (!written && isTainted(node.expression)) report('thrown', node);
+        if (!written && flowsTainted(node.expression)) report('thrown', node);
       }
       if (ts.isTemplateSpan(node) && holdsTainted(node.expression)) {
         report('thrown', node.parent);
@@ -392,18 +459,29 @@ export function scanProgram(
       if (
         ts.isBinaryExpression(node) &&
         node.operatorToken.kind === ts.SyntaxKind.PlusToken &&
-        (isTainted(node.left) || isTainted(node.right))
+        (flowsTainted(node.left) || flowsTainted(node.right))
       ) {
         report('thrown', node);
       }
       if (ts.isCallExpression(node)) {
         const callee = strip(node.expression);
+        // `v.toString()`.
+        if (
+          ts.isPropertyAccessExpression(callee) &&
+          callee.name.text === 'toString' &&
+          flowsTainted(callee.expression)
+        ) {
+          report('thrown', node);
+          return;
+        }
         const anyTainted = node.arguments.some((a) => holdsTainted(a));
         if (!anyTainted) return;
         const calleeText = callee.getText();
         if (ts.isIdentifier(callee) && callee.text === 'String') {
           report('thrown', node);
         } else if (calleeText === 'JSON.stringify') {
+          report('thrown', node);
+        } else if (isNodeUtil(checker, callee, ['inspect', 'format'])) {
           report('thrown', node);
         } else if (calleeText === 'process.stderr.write') {
           report('thrown', node);

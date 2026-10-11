@@ -589,6 +589,25 @@ describe('the start', () => {
       expect(world.opened).toEqual([]);
     });
 
+    it.each([
+      ['user', {}],
+      ['terminal', { debuggingMode: 'terminal' as const }],
+    ])('a blank request_user in %s mode is refused before the wire, not read as omitted', async (_, mode) => {
+      for (const blank of ['', '   ']) {
+        const world = fakeWorld();
+        const session = new DebugSession(world.ports, {
+          ...IDS,
+          terminalStated: true,
+        }).bind('origin');
+        await expect(
+          session.start('refuse', { ...mode, requestUser: blank }),
+        ).rejects.toThrow(new DebugRefusedError('request_user is empty'));
+        expect(world.log).toEqual([]);
+        expect(world.opened).toEqual([]);
+        expect(session.holdsState()).toBe(false);
+      }
+    });
+
     it('terminal mode keys on the configured terminal id and asks for no request user', async () => {
       const world = fakeWorld();
       const asked = jest.spyOn(world.ports, 'requestUser');
@@ -954,9 +973,14 @@ Replace `identity()` by:
   protected async identityFor(
     options: DebugStartOptions,
   ): Promise<IDebuggerIdentity> {
-    const named = options.requestUser?.trim() || undefined;
+    // Presence is checked before any normalisation: a supplied blank is refused in
+    // every mode, never read as "not supplied".
+    const supplied = options.requestUser !== undefined;
+    const named = options.requestUser?.trim();
+    if (supplied && !named)
+      throw new DebugRefusedError('request_user is empty');
     if (options.debuggingMode === 'terminal') {
-      if (named !== undefined)
+      if (supplied)
         throw new DebugRefusedError(
           'request_user does not apply to terminal mode: the system reads no request user there',
         );
@@ -969,7 +993,7 @@ Replace `identity()` by:
       };
     }
     const requestUser = (
-      named ?? (await this.ports.requestUser(this.requireOrigin()))
+      named || (await this.ports.requestUser(this.requireOrigin()))
     ).toUpperCase();
     return {
       debuggingMode: 'user',
@@ -1116,9 +1140,13 @@ In `armLocked` likewise: `const dbg = await this.controlDebugger();` first, then
             ...(await this.dropListener()),
             ...(await this.closeControl()),
           ];
-          this.fixed = undefined;
-          this.preferences = {};
-          if (failures.length === 0) throw error;
+          // The identity and the settings go only with a complete cleanup (Task 4
+          // replaces this branch by `settle(failures)`).
+          if (failures.length === 0) {
+            this.fixed = undefined;
+            this.preferences = {};
+            throw error;
+          }
           const notClosed = `not closed: ${failures.join('; ')}`;
           if (error instanceof Error) {
             error.message = `${error.message}; ${notClosed}`;
@@ -1313,7 +1341,8 @@ import {
 import { readBreakpoints } from '../../../lib/debugger/readings';
 import { rowsXml } from './fakes';
 
-const line = (n: number, condition?: string): IDebuggerBreakpoint => ({
+type LineBreakpoint = Extract<IDebuggerBreakpoint, { kind: 'line' }>;
+const line = (n: number, condition?: string): LineBreakpoint => ({
   kind: 'line',
   uri: `/sap/bc/adt/oo/classes/class_a/source/main#start=${n}`,
   ...(condition ? { condition } : {}),
@@ -2153,6 +2182,53 @@ describe('the cleanup', () => {
     expect(world.calls).toEqual(['checkListener']);
   });
 
+  it('a close that fails during a refusal before any change keeps the identity; a new start is refused; DebugStop completes the cleanup and a start is accepted', async () => {
+    const world = fakeWorld();
+    world.checkAnswers.push(CONFLICT_409);
+    const realClose = world.ports.closeConnection;
+    let once = true;
+    world.ports.closeConnection = async (c) => {
+      if (once) {
+        once = false;
+        throw new Error('close refused');
+      }
+      return realClose(c);
+    };
+    const session = new DebugSession(
+      world.ports,
+      { ...IDS, stated: true },
+      { breakpointConflict: 'refuse-if-held' },
+    ).bind('origin');
+    await expect(
+      session.start('refuse', {
+        requestUser: 'SAPUSER02',
+        settings: { systemDebugging: true },
+        breakpoints: [A],
+      }),
+    ).rejects.toThrow(/global debugging scope.*not closed: .*close refused/);
+    expect(world.calls).not.toContain('stopListener');
+    expect(session.currentIdentity()).toMatchObject({
+      debuggingMode: 'user',
+      requestUser: 'SAPUSER02',
+    });
+    expect(session.preferredSettings()).toEqual({ systemDebugging: true });
+    expect(session.holdsState()).toBe(true);
+    await expect(session.start('refuse', { breakpoints: [A] })).rejects.toThrow(
+      NOT_COMPLETE,
+    );
+    await session.stop();
+    expect(session.currentIdentity()).toBeUndefined();
+    expect(session.preferredSettings()).toEqual({});
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    world.breakpointAnswers.push(ROWS);
+    const again = session.start('refuse', { breakpoints: [A, EXC] });
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(LISTEN_NOTHING());
+    await expect(again).resolves.toBeDefined();
+    expect(session.currentIdentity()).toMatchObject({ debuggingMode: 'user' });
+  });
+
   it('a failed stop keeps the identity and the settings; a new start is refused; the retry addresses the same key; a complete one clears them', async () => {
     const world = fakeWorld();
     const { session } = await armed(world, {
@@ -2461,7 +2537,29 @@ Remove `releaseLocked` and `undoArmed`. Add:
         );
 ```
 
-remove `before` and `placedHere`, and replace the after-change branch of the catch (everything below the `if (!this.changed) { … }` block) with:
+remove `before` and `placedHere`, and make the refused-before-any-change branch (Task 2's `if (!this.changed)` block) settle like every other cleanup path — its two lines `this.fixed = undefined; this.preferences = {};` and the conditional clearing Task 2 wrote become one call, so the identity and the settings are cleared only when the connections this start opened all closed:
+
+```ts
+        if (!this.changed) {
+          // Refused before any change: no stopListener and no deletion — only the
+          // connections this start opened close. A close that fails is kept like any
+          // other cleanup failure: the identity stays, a new start is refused, DebugStop finishes it.
+          const failures = [
+            ...(await this.dropListener()),
+            ...(await this.closeControl()),
+          ];
+          this.settle(failures);
+          if (failures.length === 0) throw error;
+          const notClosed = `not closed: ${failures.join('; ')}`;
+          if (error instanceof Error) {
+            error.message = `${error.message}; ${notClosed}`;
+            throw error;
+          }
+          throw new DebugListenerError(`${thrown(error)}; ${notClosed}`);
+        }
+```
+
+and replace the after-change branch of the catch (everything below the `if (!this.changed) { … }` block) with:
 
 ```ts
         // A start that failed after a change runs the stop's cleanup. It no longer
@@ -3381,6 +3479,28 @@ describe('the debugger descriptions', () => {
     });
   });
 
+  it.each([
+    ['blank in user mode', { request_user: '   ' }, 'request_user is empty'],
+    [
+      'blank with terminal',
+      { request_user: '', debugging_mode: 'terminal' as const },
+      'request_user is empty',
+    ],
+    [
+      'non-blank with terminal',
+      { request_user: 'sapuser02', debugging_mode: 'terminal' as const },
+      'request_user does not apply to terminal mode',
+    ],
+  ])('a request_user %s is a tool error before the wire, with no handle', async (_, extra, text) => {
+    const { world, context } = install();
+    const r: any = await handleDebugStartListener(context as any, extra);
+    expect(r.isError).toBe(true);
+    expect(r.content).toHaveLength(1);
+    expect(r.content[0].text).toContain(text);
+    expect(world.log).toEqual([]);
+    expect(world.opened).toEqual([]);
+  });
+
   it('terminal mode with no configured terminal id is a tool error before the wire, with no handle', async () => {
     const { world, context } = install();
     const r: any = await handleDebugStartListener(context as any, {
@@ -3531,7 +3651,7 @@ Expected: `handleDebugSetSettings` missing; the description still says "each wit
 
 - [ ] **Step 3: Implement the schemas**
 
-`src/lib/debugger/schemas.ts` (import `type DebugSettings, type DebugStartOptions` beside `RunTarget`):
+`src/lib/debugger/schemas.ts` (import `DebugRefusedError, type DebugSettings, type DebugStartOptions` from `./DebugSession` beside `RunTarget`):
 
 ```ts
 export const USER_MODE_SENTENCE =
@@ -3619,13 +3739,23 @@ export function settingsFromArgs(raw: SettingsArg): DebugSettings {
   return out;
 }
 
-/** A start's identity and settings; what is not given stays out, and the session decides the default. */
+/** A start's identity and settings; what is not given stays out, and the session decides the default. Throws `DebugRefusedError` for a supplied blank `request_user`, or a supplied one with terminal mode. */
 export function startOptionsFromArgs(
   args: StartArgs,
 ): Pick<DebugStartOptions, 'requestUser' | 'debuggingMode' | 'settings'> {
-  const requestUser = args.request_user?.trim();
+  // Presence first, then normalisation: a supplied blank is refused in every mode
+  // and a supplied name with terminal is refused, both before the wire. The session
+  // makes the same checks; this keeps the refusal at the tool boundary too.
+  if (args.request_user !== undefined && !args.request_user.trim())
+    throw new DebugRefusedError('request_user is empty');
+  if (args.request_user !== undefined && args.debugging_mode === 'terminal')
+    throw new DebugRefusedError(
+      'request_user does not apply to terminal mode: the system reads no request user there',
+    );
   return {
-    ...(requestUser ? { requestUser } : {}),
+    ...(args.request_user !== undefined
+      ? { requestUser: args.request_user.trim() }
+      : {}),
     ...(args.debugging_mode ? { debuggingMode: args.debugging_mode } : {}),
     ...(args.settings ? { settings: settingsFromArgs(args.settings) } : {}),
   };

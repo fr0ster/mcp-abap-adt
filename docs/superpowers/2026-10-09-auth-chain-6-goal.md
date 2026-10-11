@@ -54,6 +54,16 @@ server.
 - **An SSE connection's server instance is disposed when the connection
   closes**, as the server disposes everything it owns, and SSE connections
   take part in shutdown exactly as Streamable HTTP requests do.
+- **State a tool holds between calls keeps its holder.** The debugger's
+  session lives in a server instance: stdio's, an SSE connection's, or, over
+  Streamable HTTP, an instance of the server's pool, reached by the
+  `state_handle` a `tools/call` carries. The pool moves into the HTTP package
+  as it is. Held state ends by its tool's stop, by the idle bound
+  `--state-idle-minutes` (the project owner's stated exception to "no
+  timeouts"), or by the host (shutdown, an SSE close). The rules of this
+  change hold for pooled instances too: each request's credentials come from
+  its own headers, its cancellation ends its waits, and shutdown aborts,
+  awaits and disposes them.
 
 Some decisions the chain leaves to its consumer: how long an interactive login
 may wait, what cancels it, and what a failure looks like to the user. The
@@ -150,6 +160,10 @@ never hides one and never guesses one.
     destination and `x-mcp-destination` are gone: pass `x-sap-*` headers.
   - Compact: over stdio as today, over Streamable HTTP and over SSE, each
     from its own package.
+  - The debugger (`--exposition=…,debug`; compact `debug` beside `ro` or
+    `rw`) on every transport, with its held state, its pool over Streamable
+    HTTP, `--state-idle-minutes` and its ids (`x-sap-debug-*` headers,
+    `SAP_DEBUG_*`).
   - Embedded consumers: the migration note names every change they meet.
 - **The Docker images and the release artifacts follow the split.**
   - **`docker/Dockerfile`** (today: HTTP with `--allow-destination-header`,
@@ -230,7 +244,9 @@ never hides one and never guesses one.
      credential for another destination, or for means it was not obtained
      for.
    - **Per-request credentials are never stored or shared.** Credentials from
-     headers serve only the request that carried them.
+     headers serve only the request that carried them — with one exception:
+     held state (a debug session) keeps the connections it opened, with the
+     credential they were opened with, until that state ends.
 4. **The modes are separated by package.** The default destination, the
    broker, auth-stores, session files and interactive login exist in
    `@mcp-abap-adt/core` (stdio) only. The HTTP and SSE packages work only
@@ -279,9 +295,8 @@ never hides one and never guesses one.
 - New grants, client certificates for the server, and passwordless HTTP
   login.
 - `mcp-auth snc`, which is the CLI's own change (3.1.0).
-- A pool of MCP server instances for the HTTP package (state that outlives
-  one request, such as a debugger session named by a handle). It follows
-  this change, once the split has landed.
+- Changes to the debugger, its held state and the instance pool beyond what
+  the rules of this change require of them.
 
 ## Open — for the spec
 

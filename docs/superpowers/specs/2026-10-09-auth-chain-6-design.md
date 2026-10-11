@@ -12,7 +12,8 @@ File and line references are to this worktree's code at `d0fa6d5c` (the server's
 repositories at their release commits: auth-broker 5.0.1 (`5ec4e5f`), auth-providers 6.0.1
 (`6ea3c5f`), auth-errors 2.2.0 (`40bd4a4`), connection 14.0.1 (`6f6bb41`), auth-stores 4.0.0
 (`2dbced7`), adt-clients 25.0.1 (`342b8f1b`), interfaces-adt-connection 2.0.0 / 1.0.1
-(`5954a9f`).
+(`5954a9f`). The debugger's held state, the instance pool and the idle bound (§2, §3.8) are read
+from this branch after main (#288, the debugger #290–#292) was merged into it (`e53028f0`, A0).
 
 ## 0. Contents
 
@@ -31,7 +32,7 @@ repositories at their release commits: auth-broker 5.0.1 (`5ec4e5f`), auth-provi
 13. Version, release and how the change is committed
 14. Tests
 15. Live measurements
-16. Overlap with the parallel debugger work
+16. The debugger, merged from main
 17. Holds throughout: how each holds
 18. Decisions taken by the user, and questions for the user
 
@@ -46,9 +47,10 @@ repositories at their release commits: auth-broker 5.0.1 (`5ec4e5f`), auth-provi
 | Success: a request ends when its client ends it, in every mode | §3.1, §5; D4, D5, D7, D8, D10, D31, D32, D34, D40 |
 | Success: session writes are the server's stated choice | §6.2–§6.4; D12, D33 |
 | Goal: an SSE connection's instance is disposed when it closes; SSE takes part in shutdown | §6.4; D33, D51 |
+| Goal: state a tool holds keeps its holder; the pool moves into the HTTP package as it is | §2, §3.8; D33, D39, D51, D52 |
 | Success: renewal is the server's stated choice | §6.1; D11 |
 | Success: debug output is opt-in and safe | §9; D24–D27 |
-| Success: what works today keeps working, or the migration note says what to do | §8, §10, §12; D9, D19, D21, D30, D39 |
+| Success: what works today keeps working, or the migration note says what to do | §3.8, §8, §10, §12; D9, D19, D21, D30, D39, D52 |
 | Success: Docker images and release artifacts follow the split | §11; D41 |
 | Success: one release | §13; D29, D42 |
 | Success: measured on real systems before release | §15 |
@@ -123,6 +125,48 @@ The facts the design changes, each checked against the file:
 - **Regular expressions over untrusted input** in files this change touches:
   `destinationName.ts:9`, `:21`, `:31`; `authParameters.ts:195`; `utils.ts:249-250`, `:320-321`,
   `:366`.
+- **Held state (main's debugger, lib 17.2.x).** A tool may keep state between calls in its server
+  instance (`InstanceState`, `src/lib/state/`): the debugger's session (`DebugHandlersGroup` with
+  `--exposition=…,debug`; compact's four verbs, `compact/src/debug/`, with `debug` beside `ro` /
+  `rw`) holds a listener and connections of its own, opened through `openFreshConnection` from the
+  connection of the call that started it (`src/lib/debugger/ports.ts`, which builds `AbapDebugger`,
+  `AmdpDebugger` and `AdtExecutor` directly, not through `createAdtClient`). `BaseMcpServer`
+  exposes `stateHandle`, `holdsState()`, `dispose()` (undoes the held state; callable again — each
+  call retries what was left), `shutdownState()` (dispose, settle, once more, settle; answers what
+  is left) and `idle()` (every tool call of the instance settled). Held state ends by its stop
+  tool, by the host, or by **the idle bound**: `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` /
+  YAML `state-idle-minutes`, whole minutes from 30 to 35 791, default 30, counted only while no
+  tool call of the instance runs (`src/lib/state/idleBound.ts`, `src/lib/config/stateIdleMinutes.ts`)
+  — the project owner's one exception to "no timeouts" (`docs/user-guide/DEBUGGER.md`, *What ends a
+  session*). Every transport hands `stateIdleMinutes` and a `stateLogger` (stderr) to its
+  instances (`server/src/launcher.ts`).
+- **Who keeps the instance.** stdio: the process; its shutdown awaits `closeInstanceState(server)`
+  (`server/src/stateClose.ts`: `shutdownState()`, leftovers thrown) before the factory's settle, so
+  the provider gate is still open while the state is undone. SSE (`sse/src/SseServer.ts`): one
+  instance per connection; a close removes the session from the map, calls `transport.close()` and
+  `server.close()` unawaited, and tracks `server.shutdownState()` in `closingSessions`, its
+  leftovers on the state logger; `stop()` shuts down the state of every open session and awaits the
+  closing ones, with no timer, and rejects with what was left — it neither aborts nor awaits running
+  tools, and ends no stream; the session enters the map before `await server.connect(transport)`,
+  the `close` listener is installed after it, and a failed `connect` deletes the entry without
+  shutting the state down. Streamable HTTP (`http/src/StreamableHttpServer.ts`,
+  `http/src/InstancePool.ts`): **the instance pool** — a `tools/call` whose arguments carry
+  `state_handle` is served by the instance that handle names (an unknown handle gets a new instance,
+  which answers that the state is not available), any other request by a new instance; one request
+  at a time per instance (a lease); every request sets its own connection context from its own
+  headers, also on a kept instance, and awaits its instance's `idle()` before giving it back; after
+  the request the instance is kept while it holds state, else disposed; a disposal that fails keeps
+  the instance for a retry; the idle bound's stop empties the state and the pool evicts the instance
+  (`onEmpty`); a JSON-RPC batch carrying `state_handle` is answered `400`; `stop()` closes the
+  listener, stops admission (`503`), awaits running requests and disposals, disposes every held
+  instance, settles, retries once and rejects with what was left, each instance named by an
+  ordinal, never by its handle. The handle is a bearer secret: no owner, no check of the caller, no
+  limit of the server's (`InstancePool.ts`; `DEBUGGER.md`: "treat the `state_handle` like a
+  password").
+- **The debugger's ids**: `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` (the request scope; SSE:
+  the opening request), then `SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` of the destination's
+  `.env`, then the environment (`src/lib/debugger/ids.ts`, `src/lib/requestContext.ts`,
+  `server/src/auth/destinationStores.ts`).
 - **Docker** (`docker/Dockerfile`): installs core and compact from npm, runs `mcp-abap-adt
   --allow-destination-header` over HTTP (`MCP_TRANSPORT=http`), mounts `service-keys/` and
   `sessions/` under `AUTH_BROKER_PATH=/app`, checks `/mcp/health`; `docker-compose.yml` mounts
@@ -353,15 +397,15 @@ make compact-http depend on `@mcp-abap-adt/compact` → red (it reaches core).
 
 ### 3.3 Dependency ranges (D1)
 
-| Dependency | 17.1.0 (lib) | 18.0.0 | Where |
+| Dependency | 17.2.2 (lib, after A0) | 18.0.0 | Where |
 |---|---|---|---|
 | `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.1.0` (prerequisite, D30) | core only |
 | `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^4.0.0` | core only |
 | `@mcp-abap-adt/auth-providers` | `^5.4.0` | `^6.0.1` | lib, core |
 | `@mcp-abap-adt/connection` | `^11.0.0` | `^15.0.0` (prerequisite, a major) | lib |
-| `@mcp-abap-adt/adt-clients` | `~25.0.1` | `^26.1.0` (prerequisite, on the debugger release) | lib |
-| `@mcp-abap-adt/interfaces-adt-connection` | `^1.0.1` | `^2.1.0` (prerequisite) | lib |
-| `@mcp-abap-adt/interfaces-adt` | `^12.0.1` | `^13.2.0` (prerequisite) | lib |
+| `@mcp-abap-adt/adt-clients` | `~27.0.0` (#288) | the prerequisite release, the next free minor on the 27 line (§18) | lib |
+| `@mcp-abap-adt/interfaces-adt-connection` | `^2.0.0` (#288) | `^2.1.0` (prerequisite) | lib |
+| `@mcp-abap-adt/interfaces-adt` | `^13.2.0` (#288) | the prerequisite release, the next free minor on the 13 line (§18) | lib |
 | `@mcp-abap-adt/interfaces-auth` | `^3.2.0` | `^7.5.0` | lib, core |
 | `@mcp-abap-adt/auth-errors` | — | `^2.2.0` | lib, core, http, sse |
 | `@mcp-abap-adt/interfaces-auth-broker` | `^1.2.0` | `^1.3.0` | core only |
@@ -394,16 +438,16 @@ the failure answer that remains is lib's (§7.3, D50). Every SSE option stays, i
 
 | Entry | Keeps | Loses (moved or deleted) |
 |---|---|---|
-| `@mcp-abap-adt/lib` / `handlers` / `handlers/read` / `handlers/write` / `utils` / `logger` / `request-context` / `compact-shared` | as today | — |
-| `@mcp-abap-adt/lib/embeddable` | `BaseMcpServer` (with the `ConnectionSource` contract, §4, and `dispose()`, D51), `EmbeddableMcpServer`, `ConnectionContext`, `IHttpApplication`, `MockAbapConnection`, `IServerConfig` | the transport, HTTP, SSE and destination fields of `IServerConfig` — each to the package that reads it |
-| `@mcp-abap-adt/lib/auth` | `failureOf` (§7.1), `credentialFromHeaders`, `credentialFromSapConfig`, `errorClassOf`, the server's own refusal classes used by lib | `AuthBrokerFactory`, `IAuthBrokerFactory(Config)`, `IDestinations`, `DestinationSystemContext`, `SettleReport`, `assertDestinationName`, `DestinationRefusal`, `UnsupportedAuthenticationError`, `describeAuthError`, the `DestinationConfigError` and `browserCallbackStrategy` re-exports — to core (`@mcp-abap-adt/core/auth`), or deleted |
-| `@mcp-abap-adt/lib/config` | the parameter machinery (table-driven reading of CLI, environment and YAML forms, help and template generation), the shared rows (`--exposition`, `--system-type`, `--conf`; the TLS rows `--tls-cert` / `--tls-key` / `--tls-ca`, read by http and sse, D50) | the destination, browser, `--unsafe` and transport rows — to core; the Streamable HTTP rows — to http; the SSE rows — to sse |
+| `@mcp-abap-adt/lib` / `handlers` / `handlers/read` / `handlers/write` / `utils` / `logger` / `request-context` / `compact-shared` / `debugger` / `state` | as today (`state`: `InstanceState`, the idle bound, `stateLoggerOf`, read by http and sse) | — |
+| `@mcp-abap-adt/lib/embeddable` | `BaseMcpServer` (with the `ConnectionSource` contract, §4, main's held-state methods, and `dispose()` extended, D51), `EmbeddableMcpServer`, `ConnectionContext`, `IHttpApplication`, `MockAbapConnection`, `IServerConfig` | the transport, HTTP, SSE and destination fields of `IServerConfig` — each to the package that reads it |
+| `@mcp-abap-adt/lib/auth` | `failureOf` (§7.1), `credentialFromHeaders`, `credentialFromSapConfig`, `errorClassOf`, the server's own refusal classes used by lib, `DestinationSystemContext` (read by `BaseMcpServer` and `withDestinationSystemContext` for the header path's login and main's debugger ids; core's destination reader fills it) | `AuthBrokerFactory`, `IAuthBrokerFactory(Config)`, `IDestinations`, `SettleReport`, `assertDestinationName`, `DestinationRefusal`, `UnsupportedAuthenticationError`, `describeAuthError`, the `DestinationConfigError` and `browserCallbackStrategy` re-exports — to core (`@mcp-abap-adt/core/auth`), or deleted |
+| `@mcp-abap-adt/lib/config` | the parameter machinery (table-driven reading of CLI, environment and YAML forms, help and template generation), the shared rows (`--exposition`, `--system-type`, `--conf`, `--state-idle-minutes` (§3.8); the TLS rows `--tls-cert` / `--tls-key` / `--tls-ca`, read by http and sse, D50) | the destination, browser, `--unsafe` and transport rows — to core; the Streamable HTTP rows — to http; the SSE rows — to sse |
 | `@mcp-abap-adt/lib/http-transport` **(new, D50)** | what http and sse share and neither may take from the other: `checkDnsRebinding` / `withDnsRebindingProtection`, `createServerListener` / `getProtocol`, the header connection source (`headerSource`: `credentialFromHeaders` per request or per SSE connection, the two `400` sentences of §4.2), the HTTP-transport shutdown sequence (§6.4) | — |
 
 **lib also exports the tool-set contract** (`@mcp-abap-adt/lib/tool-set`, D37): `ToolSet` — the
 groups a server serves, given the base context and the exposition; the exposition's words, default
-and help — and `fullToolSet` (readonly, high, low, search, system: today's `launch`,
-`launcher.ts:514-563`). **core exports** `./launcher` — `main({ toolSet, program, version })`, and
+and help — and `fullToolSet` (readonly, high, low, debug, search, system: today's `launch`, the
+group building of `server/src/launcher.ts` after A0, `debug` adding `DebugHandlersGroup`). **core exports** `./launcher` — `main({ toolSet, program, version })`, and
 `./auth` (the moved destination layer, for an embedder that builds a stdio server of its own).
 **http exports** `main({ toolSet, program, version })` and `StreamableHttpServer` (to mount on a
 consumer's app, `app` option). **sse exports** `main({ toolSet, program, version })` and
@@ -435,12 +479,15 @@ transport's, the same for any set.
   Each bin is flag-free about its transport. The full bins are the same with `fullToolSet`.
   `compact-readonly` and `compact-modify` stay as they are.
 - **Where the compact tool set is built (D49).** It is composed of the two halves' entry builders
-  (`compactReadOnlyEntries`, `compactModifyEntries`) with the exposition `ro` / `rw`, default `rw`
-  (`compact/src/launcher.ts`'s `parseCompactExposition`, its help, and `CompactHandlersGroup` of
-  `compact/src/group.ts`). None of the three compact packages may take it from another (two of them
+  (`compactReadOnlyEntries`, `compactModifyEntries`) with the exposition `ro` / `rw`, default `rw`,
+  and `debug` beside either (never alone) for the four debugger verbs (`compact/src/launcher.ts`'s
+  `parseCompactExposition` and `parseCompactDebug`, its help, `CompactHandlersGroup` of
+  `compact/src/group.ts`, and `CompactDebugHandlersGroup` with its handlers in `compact/src/debug/`,
+  which import lib only). None of the three compact packages may take it from another (two of them
   would reach core through `@mcp-abap-adt/compact`), and the halves stay as they are, so the
   composition moves to **lib's `tool-set`**: `compactToolSetOf({ readOnly, modify })` — the group
-  that composes the two builders, the exposition's words, parser, default and help — and each
+  that composes the two builders, the compact debugger verbs (`compact/src/debug/` moves with
+  it), the exposition's words, parser, default and help — and each
   compact package's `compactToolSet` is that call with its two halves' builders. One
   implementation, no dependency of lib on the halves (they depend on lib).
 - Reasons: the transport's behaviour exists once (core, http, sse), so full and compact cannot
@@ -470,7 +517,7 @@ destination, no `x-mcp-destination`, no broker, no stores, no session file, no l
 - **Per connection, not per request.** SSE's unit is the connection: the instance built at the
   `GET` lives as long as its connection and serves its `POST`s, so state a tool keeps between calls
   (a debugger session) lives in the instance while the connection is open, as with stdio. Its
-  close disposes that instance (D51).
+  close disposes that instance — main already shuts its state down; D51 completes it.
 - Rejected: removing SSE (the earlier draft: a client that speaks only SSE would break, for no
   technical need); SSE inside `@mcp-abap-adt/http` (one package carrying two transports' options,
   and a second transport's code in every Streamable HTTP install).
@@ -491,15 +538,60 @@ nothing of either transport; `credentialFromHeaders` is already lib's (`lib/auth
   sse one per SSE connection;
 - the TLS parameter rows (`--tls-cert`, `--tls-key`, `--tls-ca`, `MCP_TLS_*`), read by both;
 - **the HTTP-transport shutdown sequence** (§6.4): latch, stop listening, abort, await settlement,
-  then the transport's own last step (sse: dispose its connections' instances) — one
+  then the transport's own last step (http: the pool's shutdown, §3.8; sse: close its connections' instances, D51) — one
   implementation, each transport passing its listener and its last step.
 
-What stays in each package is only its transport: `StreamableHttpServer` and its options (http);
-`SseServer`, its session map and its options (sse). `destinationRequest.ts`'s destination part is
+What stays in each package is only its transport: `StreamableHttpServer`, its instance pool
+(`InstancePool`, §3.8) and its options (http); `SseServer`, its session map and its options (sse). `destinationRequest.ts`'s destination part is
 deleted (§3.4); nothing of it is shared. Rejected: a fourth package for the helpers (a package
 with no mode of its own, published only to be shared); duplicating them in http and sse (two
 implementations of one rule, H6); sse depending on http (a Streamable HTTP install in every SSE
 one, and the rule the user set).
+
+### 3.8 Held state, the instance pool and the idle bound (D52)
+
+**(D52, amended) The instance pool is main's, and this change carries it into `@mcp-abap-adt/http`
+as it is** (§2): routing by `state_handle`, the lease, kept while holding, disposed when empty, the
+retry of a failed disposal, `onEmpty`, the batch refusal, `stop()`'s drain and report, the bearer
+handle. SSE keeps one instance per connection, stdio its one instance, the embedder its own. The
+idle bound stays lib's option, handed by every transport to its instances. This change does to them
+only what its own rules require:
+
+- **Credentials (D39).** A request routed to a kept instance sets that instance's connection source
+  from its own `x-sap-*` headers (`headerSource`, D50, in place of today's
+  `setConnectionContextFromHeaders`, which already runs on every request); its tool calls'
+  connections are built from them. **Held state keeps the connections it opened** — a debug
+  session's own, through `openFreshConnection` (D20, the factory's record: the credential of the
+  call that opened them) — until the state ends: the one exception to "nothing across requests"
+  (goal, H3). No destination, no broker and no store reaches a pooled instance (D38).
+- **The request signal (§5).** A pooled instance's tool calls go through lib's one wrapper like any
+  instance's: each request's signal ends its waits and stops its sends. The held state's own work —
+  the listener's polls and a background run, which go on after the call that started them
+  returned, the idle bound's stop and the host's dispose — is not a request's and runs outside any
+  request's signal (`runWithoutRequestSignal`, D40's mechanism), so a request's end (D4) never cuts
+  it. The debugger builds its clients directly (§2), so C3's site list records each of them and
+  decides it by this rule.
+- **The registry and the latch (D33).** A pooled instance's tool calls register in the one registry
+  of live tools; the process latch refuses a call routed to a pooled instance once shutdown began,
+  as it refuses any; the pool's own admission refusal (`503`) stays in front of it.
+- **Shutdown (D33).** http's sequence aborts and awaits the pooled instances' tools with every
+  other; its last step is the pool's own shutdown (main's `InstancePool.shutdown()`), whose
+  leftovers make the exit `1` (§6.4).
+- **Eviction (D51).** Every way an instance leaves the pool — nothing held after its request, the
+  idle bound's stop, a stop tool, shutdown — goes through the same awaited `BaseMcpServer.dispose()`,
+  which D51 extends to close the connections the instance built once nothing is held. The pool
+  disposes an instance only when no request works on it (its lease, after `idle()`) and never routes
+  a request to an instance it is disposing (it revalidates), so pool eviction needs no instance
+  latch; the instance latch is the SSE close's and shutdown's (D51).
+- **The idle bound** stays the project owner's stated exception (H5): an option of every binary that
+  serves tools (§10.1), from lib's shared row, unchanged.
+- **Not changed here**: the handle's bearer semantics and the absence of a limit (§18, question 1),
+  the debugger's tools.
+
+Reasons: the pool is shipped behaviour users rely on (`docs/user-guide/DEBUGGER.md`); redesigning
+it is no part of this change (goal, *Out of scope*); the rules this change sets for every instance
+would not hold if pooled instances were exempt. Rejected: dropping the pool until a later change
+(a regression of a published release); a second registry or shutdown for pooled instances (H6).
 
 ## 4. Credentials, per package
 
@@ -551,9 +643,11 @@ change of the major).
   `credentialFromHeaders` (lib) — `x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or
   `x-sap-login` + `x-sap-password` — builds `TokenAuthProvider.fixed(token)` or
   `new BasicAuthProvider(user, password)` (auth-providers 6 kept both constructors, connection
-  `docs/MIGRATION-13.0.md`), a per-request server instance and a per-request connection over the
-  HTTP wire. Nothing is stored, shared or cached across requests (H3); no broker, no store, no
-  login exists in the package (D38).
+  `docs/MIGRATION-13.0.md`) and the request's connections over the HTTP wire, on a server instance
+  that is new for the request or the pooled one its `state_handle` names (§3.8) — either way the
+  request's own headers give its source. Nothing is stored, shared or cached across requests (H3),
+  except the connections held state opened, until it ends (§3.8); no broker, no store, no login
+  exists in the package (D38).
 - **A request without them** is answered `400` in fixed words: "this server takes credentials only
   from the request's headers: send x-sap-url with x-sap-jwt-token, or with x-sap-login and
   x-sap-password". **A request carrying `x-mcp-destination`** is answered `400` too: "destinations
@@ -564,7 +658,8 @@ change of the major).
 - **SSE (D48)** follows the same rules through the same `headerSource` (D50), with the connection
   as its unit: the `x-sap-*` headers of the `GET` that opens the SSE connection give that
   connection's credentials, and its instance and connection serve its `POST`s; nothing is shared
-  with another connection, nothing outlives it (D51), nothing is stored. A `GET` without them is
+  with another connection, nothing outlives it (D51), nothing is stored; its held state (a debug
+  session) lives as long as the connection or until its stop or the idle bound (§3.8). A `GET` without them is
   answered `400` with the first sentence above; a `GET` or a `POST` carrying `x-mcp-destination` is
   answered `400` with the second. A `POST` is routed by its `sessionId` alone: its own `x-sap-*`
   headers are not read, so a connection's credential is the one it opened with.
@@ -666,6 +761,7 @@ passes it.
 | `resolveOnce` (`requestSystemResolution.ts:104-125`): the cloud system-context lookup shared by concurrent requests | **its own attempt (D44)**: auth-errors' `sharedAttempt` per resolver and connection — each caller joins with its own signal; the lookup runs with the attempt's signal (alive while any caller waits, aborted when the last leaves) passed to `getSystemInformation`; a caller that leaves is released at once; an aborted or failed lookup is never memoised (the attempt leaves its slot, the next caller starts afresh); only a completed answer is kept, as today |
 | the consumer's `freshConnection` (§4.3) | the factory receives `{ signal }`; its connection's requests carry it through the client |
 | `getManagedConnection` / `getAdtClient` (`utils.ts:386-536`, `clients.ts:53-61`) — the legacy `SapConfig` path | no request scope there: no signal |
+| the debugger's clients (`src/lib/debugger/ports.ts`: `AbapDebugger`, `AmdpDebugger`, `AdtExecutor`, built directly on the session's own connections, §2) | a debugger tool call's own sends: its request's signal, through the same `signal: () => currentRequestSignal()` option `createAdtClient` passes (they are not built by it); the held state's own work (the listener's polls, a background run, the idle bound's and the host's stop): none: started outside any request's signal scope (§3.8), since a function read at send time would otherwise find the starting call's signal, aborted when that call ended (D4) |
 
 - **Releases are never cancelled (D40).** Because the client reads the signal per request
   (`() => currentRequestSignal()`), a release is sent unsignalled by running it outside the
@@ -703,17 +799,19 @@ passes it.
 - **(D7) One retry after another caller's abort** (stdio): `connect()` failing `interactive-login`
   `aborted` while this request's signal is live is retried once — a later request inside the abort
   window of another's starts afresh. Read by `kind`, once.
-- **(D13) The connection a request uses**: HTTP builds one per request; SSE one per SSE connection,
-  kept by that connection's instance until it closes (D51); stdio keeps its connection while
-  `getProvider` answers the same provider, and builds a new one when the broker built a new
-  provider.
+- **(D13) The connection a request uses**: HTTP builds one per request, on its new or pooled
+  instance (§3.8); SSE one per SSE connection, kept by that connection's instance until it closes
+  (D51); stdio keeps its connection while `getProvider` answers the same provider, and builds a new
+  one when the broker built a new provider. Held state's own connections (a debug session's) are
+  the state's, on every transport, and close with it (§3.8, D51).
 
 ### 5.4 The HTTP and SSE packages
 
 A client that disconnects closes its transport, which aborts its in-flight requests'
 `extra.signal` (§2): the request signal ends its waits and stops its sends. There is no setup phase
-before dispatch (no destination, no login): over Streamable HTTP the per-request server, the header
-provider and the connection are built inside the request. Over SSE they are built when the `GET`
+before dispatch (no destination, no login): over Streamable HTTP the header provider and the
+connection are built inside the request, on a new server instance or the pooled one its
+`state_handle` names (§3.8). Over SSE they are built when the `GET`
 opens the connection, and each `POST`'s tool call is a request of its own
 with its own signal; a client that closes its SSE connection ends every request in flight on it and
 disposes its instance (D51).
@@ -779,8 +877,9 @@ documented limit.
 - **One registry of live tools, every transport.** lib's tool wrapper (`BaseMcpServer`, the one
   wrapper every package uses) registers each tool call — its controller, its settlement and the
   server instance it runs in — in one process-wide registry in lib (`src/lib/activeTools.ts`),
-  across every server instance; core's, http's and sse's shutdowns and sse's connection close
-  (D51) use it, and none has a second implementation. It answers for the whole process and for one
+  across every server instance — stdio's, an SSE connection's, a new or pooled Streamable HTTP one
+  (§3.8); core's, http's and sse's shutdowns and sse's connection close (D51) use it, and none has
+  a second implementation. It answers for the whole process and for one
   instance (`abortAll(instance?)`, `settled(instance?)`). A tool **settles** when its handler's
   promise settles — after its releases (D40) were sent and answered.
 - **The admission latch.** The registry holds a synchronous shutdown latch, set **first**, in the
@@ -797,8 +896,10 @@ documented limit.
 - **core**, in this order: set the latch; stop taking input; abort every registered tool; **await their
   settlement** — the provider gate is still open, so a release can still be authorized with the
   credential held (a refresh included), but no interactive login starts once the shutdown began
-  (the login wrapper answers `interactive-login` `aborted` with the shutdown sentence); then close
-  the provider gate (minted answer, D17); dispose every strategy the factory composed; drain the
+  (the login wrapper answers `interactive-login` `aborted` with the shutdown sentence); then **close
+  the instance** (D51's close: its held state shut down — today's `closeInstanceState`, kept in
+  this place, before the gate, so a debugger stop's requests are still authorized; a leftover is a
+  stderr line in fixed words and exit `1`); then close the provider gate (minted answer, D17); dispose every strategy the factory composed; drain the
   counted calls; `flush({ signal })` the broker — **no deadline of the server's choosing** (`SHUTDOWN_DEADLINE_MS` and the drain's
   timer, `countedProvider.ts:69-82`, are removed); exit `0`, or `1` with one stderr line per fact
   (`"<destination>": <reason>`, the reason `classify(entry, 'persisting-tokens').reason`).
@@ -808,39 +909,60 @@ documented limit.
   YAML `shutdown-timeout`, **no default**), ends it early — exit `1`, naming what was pending.
   What that costs is documented with the option: a pending write is lost, and a discarded refresh
   token can come back.
-- **http**: set the latch; stop listening; abort every registered tool (the same registry, across the
-  per-request server instances); **await their settlement** — each aborted tool's releases
-  (D40: an unlock, sent outside the request's signal) land before exit, so a shutdown never leaves
-  a SAP lock held; then exit `0`. The same escapes as core and no others: a `SIGTERM` / `SIGINT`
-  after the start, or `--shutdown-timeout`, ends the wait early — exit `1`, naming the requests
-  still cleaning up; **no deadline by default**. Nothing is persisted, so nothing is flushed.
+- **http**: set the latch, and stop the pool's admission in the same tick (main's `503`); stop
+  listening; abort every registered tool (the same registry, across the new and the pooled server
+  instances, §3.8); **await their settlement** — each aborted tool's releases (D40: an unlock, sent
+  outside the request's signal) land before exit, so a shutdown never leaves a SAP lock held; then
+  the transport's last step, **the pool's shutdown** (main's `InstancePool.shutdown()`: await the
+  requests and disposals still running, dispose every held or retained instance through
+  `dispose()` (D51), settle, retry once, report what is left — each instance by its ordinal, never
+  its handle); exit `0`, or `1` with one stderr line per leftover. Main's `stop()` already closes the
+  listener and runs that pool shutdown, and its running requests await their instance's `idle()`;
+  what this change adds is the latch, the abort, the escapes and the exit lines. The same escapes as
+  core and no others: a `SIGTERM` / `SIGINT` after the start, or `--shutdown-timeout`, ends the wait
+  early — exit `1`, naming the requests still cleaning up; **no deadline by default**. Nothing is
+  persisted, so nothing is flushed.
 - **sse**, exactly as http (the one sequence of lib's `http-transport`, D50): set the latch; stop
   listening — no new SSE connection, no `POST` admitted —; abort every registered tool, across the
   open connections' instances; **await their settlement** (their releases land before exit); then
-  `dispose()` every open connection's instance (D51) and end its stream; exit `0`. The same escapes
+  close every open connection's instance (D51's close, joined when the connection is already
+  closing) and end its stream; exit `0`, or `1` with one stderr line per leftover. Main's `stop()`
+  already shuts down every open session's state and awaits the closing ones; it aborts no tool,
+  awaits none and ends no stream — this change adds those. The same escapes
   and no others: a `SIGTERM` / `SIGINT` after the start, or `--shutdown-timeout`, ends the wait
   early — exit `1`, naming the requests still cleaning up; no deadline by default. Nothing is
   flushed.
-- **(D51) An SSE connection that closes disposes its instance — decided by the user.** Today the
-  close only deletes the session's map entry (`SseServer.ts:387-392`; `transport.close()` and
-  `server.close()` are not awaited). By the ownership rule (the server owns the instances and the
-  connections it builds) and D33's order (drain, then dispose), a close — the client's, or the
-  stream's failure — runs, for that connection only: **stop its input** (the session leaves the
-  routing map first, so a later `POST` for its `sessionId` is answered as an unknown session, and
-  the instance's latch is set); **abort** that instance's registered tools; **await their
-  settlement** (`settled(instance)`: an aborted tool's releases land); then **`dispose()`** the
-  instance — `BaseMcpServer.dispose()`, new and awaited: it closes the connection it built
-  (`disconnect()`, a failure logged in fixed words), closes its MCP server and transport, and is
-  idempotent. A process shutdown that meets a closing connection awaits the same dispose; no
-  connection's dispose waits for another's. Nothing is bounded by a timer of the server's (H5).
-  **The setup window counts too.** Today the session enters the map before `await
-  server.connect(transport)` and the response's `close` listener is installed only after it
-  (`SseServer.ts:365-387`); a failed `connect` deletes the entry without disposing. So the close
-  tracking is installed **before the first setup await**: one idempotent cleanup promise per
-  connection, reached by the response's `close`, by the stream's failure and by a rejected
-  `connect` alike; an instance whose connection closed during setup is never published to the
-  routing map (or is removed by that same cleanup), and the cleanup runs once — latch, abort,
-  settle, dispose. A shutdown during setup awaits that same promise.
+- **(D51) An SSE connection that closes disposes its instance — decided by the user; this change
+  completes what main already does.** By the ownership rule (the server owns the instances and the
+  connections it builds) and D33's order (drain, then dispose).
+  - **What main does, and what is kept** (§2): the session leaves the routing map first, so a later
+    `POST` for its `sessionId` is answered as an unknown session; the state is shut down
+    (`shutdownState()`); one tracked promise per closing session, which `stop()` awaits; no timer;
+    leftovers reported on the state logger.
+  - **What this change adds**, for that connection only, in this order: **the instance latch**, set
+    in the same tick the close begins, so a `POST` already admitted whose body completes after it
+    reaches no tool (RF6; today it would run on the closing instance); **abort** that instance's
+    registered tools (`abortAll(instance)`; today only the SDK's transport close aborts their
+    `extra.signal`); **await their settlement** (`settled(instance)`; today nothing awaits them, so
+    the state's stop can race a running tool and an aborted tool's release can be cut off); then
+    `shutdownState()` (main's); then close the instance's MCP server and transport, awaited (today
+    unawaited). This sequence is **the instance close**, one lib implementation, one promise per
+    instance (a second caller joins it): the SSE close, SSE's and core's shutdowns use it.
+  - **`BaseMcpServer.dispose()` is main's, extended — not new.** It stays awaited and callable again
+    (each call retries what the state could not undo — the pool's retry and `shutdownState()` rely
+    on it); this change adds that, once nothing is held, it closes the connections the instance
+    built (`disconnect()`, each once, a failure logged in fixed words); an injected connection is
+    the consumer's and is never closed. The pool's eviction uses it as it is (§3.8).
+  - **The setup window** (missing on main): the session enters the map before `await
+    server.connect(transport)`, the response's `close` listener is installed only after it, and a
+    failed `connect` deletes the entry without shutting the state down. So the close tracking is
+    installed **before the first setup await**: one cleanup promise per connection, reached by the
+    response's `close`, by the stream's failure and by a rejected `connect` alike; an instance whose
+    connection closed during setup is never published to the routing map (or is removed by that
+    same cleanup), and the instance close runs once. A shutdown during setup awaits that same
+    promise (RF8).
+  - A process shutdown that meets a closing connection joins its close, never a second one (RF7); no
+    connection's close waits for another's. Nothing is bounded by a timer of the server's (H5).
 
 ## 7. Failures: how they are read and what an MCP client sees
 
@@ -1021,10 +1143,12 @@ its table**. The help, the YAML template and the validation come from it.
 
 | Binary | Options |
 |---|---|
-| `mcp-abap-adt` (core) | `--mcp`, `--env`, `--env-path` / `MCP_ENV_PATH`, `--auth-broker-path` / `AUTH_BROKER_PATH`, `--unsafe` / `MCP_UNSAFE`, `--browser` / `MCP_BROWSER`, `--browser-program`, `--browser-auth-port` / `MCP_BROWSER_AUTH_PORT`, `--connection-type` / `SAP_CONNECTION_TYPE`, `--system-type` / `SAP_SYSTEM_TYPE`, `--login-timeout`, `--renewal`, `--shutdown-timeout`, `--auth-debug` (no env), `--exposition`, `--conf`, `--help`, `--version` |
-| `mcp-abap-adt-http` | today's HTTP options, same names: `--host` / `--http-host` / `MCP_HTTP_HOST`, `--port` / `--http-port` / `MCP_HTTP_PORT`, `--path` / `--http-path`, `--http-json-response` / `MCP_HTTP_ENABLE_JSON_RESPONSE`, `--http-allowed-hosts` / `MCP_HTTP_ALLOWED_HOSTS`, `--http-allowed-origins` / `MCP_HTTP_ALLOWED_ORIGINS`, `--http-enable-dns-protection` / `MCP_HTTP_ENABLE_DNS_PROTECTION`, `--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`); `--system-type` / `SAP_SYSTEM_TYPE`, `--shutdown-timeout`, `--exposition`, `--conf`, `--help`, `--version` |
-| `mcp-abap-adt-sse` (D48) | today's SSE options, same names: `--sse-host` / `MCP_SSE_HOST`, `--sse-port` / `MCP_SSE_PORT`, the SSE and `POST` paths, `--sse-allowed-hosts` / `MCP_SSE_ALLOWED_HOSTS`, `--sse-allowed-origins` / `MCP_SSE_ALLOWED_ORIGINS`, `--sse-enable-dns-protection` / `MCP_SSE_ENABLE_DNS_PROTECTION`, `--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`, lib's shared rows, D50); `--system-type` / `SAP_SYSTEM_TYPE`, `--shutdown-timeout`, `--exposition`, `--conf`, `--help`, `--version` |
-| `mcp-abap-adt-compact`, `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse` (D49) | core's, respectively http's and sse's, table with compact's `--exposition` (`ro` / `rw`) — the tool set's, nothing else |
+| `mcp-abap-adt` (core) | `--mcp`, `--env`, `--env-path` / `MCP_ENV_PATH`, `--auth-broker-path` / `AUTH_BROKER_PATH`, `--unsafe` / `MCP_UNSAFE`, `--browser` / `MCP_BROWSER`, `--browser-program`, `--browser-auth-port` / `MCP_BROWSER_AUTH_PORT`, `--connection-type` / `SAP_CONNECTION_TYPE`, `--system-type` / `SAP_SYSTEM_TYPE`, `--login-timeout`, `--renewal`, `--shutdown-timeout`, `--auth-debug` (no env), `--exposition` (with `debug`), `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`; the debugger's ids `SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` (the destination's `.env`, then the environment) |
+| `mcp-abap-adt-http` | today's HTTP options, same names: `--host` / `--http-host` / `MCP_HTTP_HOST`, `--port` / `--http-port` / `MCP_HTTP_PORT`, `--path` / `--http-path`, `--http-json-response` / `MCP_HTTP_ENABLE_JSON_RESPONSE`, `--http-allowed-hosts` / `MCP_HTTP_ALLOWED_HOSTS`, `--http-allowed-origins` / `MCP_HTTP_ALLOWED_ORIGINS`, `--http-enable-dns-protection` / `MCP_HTTP_ENABLE_DNS_PROTECTION`, `--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`); `--system-type` / `SAP_SYSTEM_TYPE`, `--shutdown-timeout`, `--exposition` (with `debug`), `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` (the pool's held state, §3.8), `--conf`, `--help`, `--version`; per request the headers `x-sap-debug-terminal-id` / `x-sap-debug-ide-id`, then `SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` of the environment |
+| `mcp-abap-adt-sse` (D48) | today's SSE options, same names: `--sse-host` / `MCP_SSE_HOST`, `--sse-port` / `MCP_SSE_PORT`, the SSE and `POST` paths, `--sse-allowed-hosts` / `MCP_SSE_ALLOWED_HOSTS`, `--sse-allowed-origins` / `MCP_SSE_ALLOWED_ORIGINS`, `--sse-enable-dns-protection` / `MCP_SSE_ENABLE_DNS_PROTECTION`, `--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`, lib's shared rows, D50); `--system-type` / `SAP_SYSTEM_TYPE`, `--shutdown-timeout`, `--exposition` (with `debug`), `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`; the opening request's `x-sap-debug-terminal-id` / `x-sap-debug-ide-id`, then `SAP_DEBUG_*` of the environment |
+| `mcp-abap-adt-compact`, `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse` (D49) | core's, respectively http's and sse's, table with compact's `--exposition` (`ro` / `rw`, `debug` beside either) — the tool set's, nothing else |
+
+`--state-idle-minutes` is one shared row of lib (CLI beats environment beats YAML, `--state-idle-minutes=<minutes>`, refused at start outside 30–35 791 or when not a whole number, as main reads it), in every binary's table; `--exposition`'s `debug` and the debugger ids keep main's meaning on every transport.
 
 **Removed parameters stop the start, naming where they went (D39)** — the mechanism 16.0.0 used
 (`REMOVED_PARAMETERS`, `authParameters.ts:118-158`), not a cross-mode check:
@@ -1061,13 +1185,14 @@ its table**. The help, the YAML template and the validation come from it.
 | `handlers/jwtAuthorizationCode.ts:5-18` | `oneLoginAtATime(strategy({ browser: string, port }), lock)` | `serverLogin(browserCallbackStrategy({ browser?: IBrowser, port }), context)` (D8) |
 | `countedProvider.ts:24-27`, `:69-82` | unminted refusal; drain timer | minted; no timer |
 | `shutdown.ts:22-23`, `:71`, `:94-97` | 30 s; `settle(30_000)`; end and close two triggers | D33 |
-| `launcher.ts` (core) | every transport; `promptsOnStderr`; `factoryConfigFrom`; `checkAndSummarise` | stdio only; folded into the wrapper; D9–D12, D24; D18, D25 |
+| `launcher.ts` (core) | every transport; `promptsOnStderr`; `factoryConfigFrom`; `checkAndSummarise`; `stateIdleMinutes` / `stateLogger` to every transport | stdio only; folded into the wrapper; D9–D12, D24; D18, D25; http's and sse's launchers hand `stateIdleMinutes` / `stateLogger` on as core's does (§3.8) |
+| `stateClose.ts` (core, main's `closeInstanceState`) | the stdio instance's held state shut down before the factory's settle | D51's instance close, in D33's core order |
 | `StdioServer.ts:34-35`, `:51-67` | context set once; fake refusing provider | destination source; `inspection_only` |
-| `StreamableHttpServer.ts` (→ http) | destinations, `FirstConnectLock`, headers | headers only (D39), through lib's `headerSource` (D50); no `IDestinations` in its constructor |
-| `SseServer.ts` (→ sse) | destinations, `FirstConnectLock`, headers; a close deletes the map entry only | headers of the opening `GET` only (D48), through `headerSource`; no `IDestinations`; a close disposes the instance (D51) |
+| `StreamableHttpServer.ts` (→ http) | destinations, `FirstConnectLock`, headers; the instance pool by `state_handle` (`InstancePool.ts`), `stop()` draining it | headers only (D39), through lib's `headerSource` (D50), on new and pooled instances alike; no `IDestinations` in its constructor; the pool carried as it is (§3.8, D52); `stop()` in D33's http order |
+| `SseServer.ts` (→ sse) | destinations, `FirstConnectLock`, headers; a close removes the session, closes unawaited and shuts the state down (`shutdownState()`); `stop()` shuts down every session's state | headers of the opening `GET` only (D48), through `headerSource`; no `IDestinations`; a close runs D51's instance close (latch, abort, settle, state, MCP server), the setup window included; `stop()` in D33's sse order |
 | `dnsRebindingProtection.ts`, `tlsUtils.ts` (→ lib) | in core, then http | `@mcp-abap-adt/lib/http-transport` (D50) |
 | `destinationRequest.ts` | destination header, first-connect lock, failure answer | the destination part deleted; the failure answer is lib's §7.3 |
-| `BaseMcpServer.ts:98-230`, `:257` | context setters; `getConnection()`; `(args)`; no dispose | the source (§4); `getConnection(signal)`; `(args, extra)`, the signal scope, D5, D7, §7.2; `dispose()` and the instance's latch (D51) |
+| `BaseMcpServer.ts` (context setters, `getConnection()`, the tool wrapper) | context setters; `getConnection()`; `(args)`; held state: `dispose()`, `shutdownState()`, `idle()` (main) | the source (§4); `getConnection(signal)`; `(args, extra)`, the signal scope, D5, D7, §7.2; `dispose()` extended and the instance close with its latch (D51) |
 | `clients.ts:34-51` | `new GuardedAdtClient(connection, logger, options)` | `+ signal: () => currentRequestSignal()` (read per request) |
 | `withLock.ts:26-40`, `:107` | `runRelease(release, handle)` | the release inside `runWithoutRequestSignal` (D40) |
 | `credentialSources.ts:33-59` | default branch → basic | D19 |
@@ -1088,7 +1213,7 @@ its table**. The help, the YAML template and the validation come from it.
 - `@mcp-abap-adt/http`: `StreamableHttpServer(handlersRegistry, options)` — no destinations argument.
 - `@mcp-abap-adt/sse`: `SseServer(handlersRegistry, options)` — no destinations argument.
 - `@mcp-abap-adt/lib/http-transport` (D50): the shared helpers; `@mcp-abap-adt/lib/tool-set`:
-  `ToolSet`, `fullToolSet`, `compactToolSetOf` (D49); `BaseMcpServer.dispose()` (D51).
+  `ToolSet`, `fullToolSet`, `compactToolSetOf` (D49); `BaseMcpServer.dispose()` extended (D51).
 
 ## 11. Docker images and release artifacts
 
@@ -1111,7 +1236,8 @@ its table**. The help, the YAML template and the validation come from it.
   `docker-compose.headerless.yml`, which is deleted), with no volume; `docker-compose.inspect.yml`
   unchanged.
 - **Workflows**: `ci.yml` and `release.yml` lint, build, type-check and test every new package —
-  `http/`, `sse/`, `compact-http/`, `compact-sse/` — beside the others, pack them all, install the
+  `http/` and `sse/` with their own suites, `compact-http/` and `compact-sse/` through the root
+  suite as the compact packages are today (§14) — beside the others, pack them all, install the
   tarballs and run `--version` / `--help` of all six bins (`mcp-abap-adt`, `mcp-abap-adt-http`,
   `mcp-abap-adt-sse`, `mcp-abap-adt-compact`, `mcp-abap-adt-compact-http`,
   `mcp-abap-adt-compact-sse`), and build the image from the tarballs; `scripts/publish-all.sh`
@@ -1135,16 +1261,21 @@ its table**. The help, the YAML template and the validation come from it.
 - **HTTP users**: install `@mcp-abap-adt/http`, run `mcp-abap-adt-http`; credentials only from
   `x-sap-*` headers per request; the default destination, `x-mcp-destination`,
   `--allow-destination-header`, service-key and session mounts are gone; the Docker image changed
-  accordingly.
+  accordingly. The debugger keeps working as in 17.2: the pool
+  by `state_handle`, `--state-idle-minutes`, `x-sap-debug-*`; `SAP_DEBUG_*` of a destination's
+  `.env` no longer applies (no destinations) — send the headers or set the environment.
 - **SSE users**: SSE keeps working, from its own package: install `@mcp-abap-adt/sse`, run
   `mcp-abap-adt-sse` (`--transport=sse` is gone); the SSE options keep their names; credentials
   only from the `x-sap-*` headers of the request that opens the SSE connection; the default
   destination, `x-mcp-destination`, `--allow-destination-header`, service-key and session mounts
-  are gone; a connection's server instance is disposed when it closes.
+  are gone; when a connection closes, its running tools are aborted and awaited (their releases
+  land) before its instance is disposed; the debugger and `--state-idle-minutes` as in 17.2, with
+  the same `.env` note as HTTP.
 - **compact users**: one package per transport — over stdio `mcp-abap-adt-compact`
   (`@mcp-abap-adt/compact`) as today; over Streamable HTTP `mcp-abap-adt-compact-http`
   (`@mcp-abap-adt/compact-http`); over SSE `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`);
-  each identical to its full transport's bin but for the tool set.
+  each identical to its full transport's bin but for the tool set; `debug` beside `ro` / `rw` on
+  each.
 - **stdio users**: `--transport` is gone — remove it (D39); the first start after upgrading logs in
   once per `jwt` / `authorization_code` destination (broker 5 reads earlier sessions as unbound);
   a `jwt` / `none` destination keeps working — the broker binds the token on first use and writes
@@ -1160,7 +1291,8 @@ its table**. The help, the YAML template and the validation come from it.
   `ConnectionContext`; `lib/auth` lost the destination layer (now `core/auth`); `IAuthBrokerFactoryConfig`'s
   required options; `StreamableHttpServer` moved to `@mcp-abap-adt/http` and `SseServer` to
   `@mcp-abap-adt/sse`, each without its destinations argument; the shared transport helpers are
-  `@mcp-abap-adt/lib/http-transport`; `BaseMcpServer.dispose()`; `AbapConnection` (connection 15 on interfaces-adt-connection 2) answers `unknown` by
+  `@mcp-abap-adt/lib/http-transport`; `BaseMcpServer.dispose()` also closes the connections the
+  instance built once its state is empty; `AbapConnection` (connection 15 on interfaces-adt-connection 2) answers `unknown` by
   default — name the type or narrow it; the chain's own migrations (auth-providers 6, broker 5,
   connection 12–15).
 
@@ -1171,7 +1303,8 @@ read-once sentence), `CLI_OPTIONS.md` (per binary), `CLIENT_CONFIGURATION.md`, `
 `docs/configuration/YAML_CONFIG.md` (per binary), `docs/installation/INSTALLATION.md` and
 `examples/SERVICE_KEY_SETUP.md`, `docs/deployment/DOCKER.md`, `RELEASE.md`, `MCP_REGISTRY.md`,
 `docs/architecture/ARCHITECTURE.md`, `CONNECTION_ISOLATION.md`,
-`docs/development/tests/TESTING_AUTH.md`, `DEBUGGING.md`, `src/embeddable/docs/ARCHITECTURE.md`
+`docs/development/tests/TESTING_AUTH.md`, `DEBUGGING.md`, `docs/user-guide/DEBUGGER.md` (the
+packages that keep the instance, §3.8), `src/embeddable/docs/ARCHITECTURE.md`
 (the signal contract), `src/lib/config/README.md`, the moved `UNIFIED_BROKER_LOGIC.md`, each
 launcher's help.
 
@@ -1213,7 +1346,9 @@ the real broker 5 and providers 6, a token endpoint and an ADT stand-in on `127.
 fake that plays the user. No test launches a program (`node:child_process` mocked where strategies
 are composed). Every rule a test protects is shown load-bearing: break it, watch it fail, revert.
 Each package runs its own suite (`npm --prefix http test`, `npm --prefix sse test` beside
-`server/`; the compact packages' own).
+`server/`); the compact packages' suites — `compact`, `compact-readonly`, `compact-modify`, and the
+new `compact-http`, `compact-sse` — run in the root `npm test`, whose Jest `roots` name them, as on
+main (they have no Jest configuration of their own).
 
 ### 14.1 Packages and options
 
@@ -1227,7 +1362,13 @@ Each package runs its own suite (`npm --prefix http test`, `npm --prefix sse tes
   with its words; `--transport`, with any value, stops every binary naming the binary to use.
 - **HTTP credentials**: a request with `x-sap-*` basic and with a token reaches the stand-in with
   that credential; none, or `x-mcp-destination`, answers `400` with its words; two concurrent
-  requests with different users never see each other's credential.
+  requests with different users never see each other's credential; a request routed by
+  `state_handle` to a kept instance (§3.8) builds its own connections from its own headers, not
+  from the request that created the instance.
+- **Held state on every transport (§3.8)**: `--state-idle-minutes` is in every binary's table and
+  reaches the instances (a value under 30 stops the start, as main); the pool's existing suites
+  (`InstancePool.test.ts`, `streamableHttpPool.test.ts`) pass unchanged in `http/`; `debug` in
+  `--exposition` serves the debugger tools on the full and the compact sets of each transport.
 - **SSE credentials (D48)**: an SSE connection opened with `x-sap-*` basic and with a token serves
   its `POST`s with that credential; a `GET` without them, or a `GET` / `POST` with
   `x-mcp-destination`, answers `400` with its words; two concurrent connections with different
@@ -1359,15 +1500,26 @@ connection, which is disconnected, and no provider is constructed; without it,
   body completes after it reaches no tool. *Breaks:* dispose the instances before `settled()` (the
   `UNLOCK` is cut off); exit without awaiting the tools.
 - **An SSE connection that closes disposes its instance (D51)**: a connection with no tool in
-  flight closes → its instance's `dispose()` ran once (its connection disconnected, its MCP server
-  closed), the session left the map, and a later `POST` for its `sessionId` is answered as an
-  unknown session; a connection closed while a tool holds a lock (the update held at the
-  stand-in) → no update is sent after the close, the `UNLOCK` lands, and only then is the instance
-  disposed; a tool call routed to the closing instance is refused before any connection; another
-  open connection's tools and instance are untouched. *Breaks:* restore today's close (delete the
-  entry only) → no dispose, its connection left open; dispose before `settled(instance)` → the
-  `UNLOCK` is cut off; abort through the process-wide `abortAll()` → the other connection's tool
-  is aborted.
+  flight closes → its instance close ran once (its state shut down once, its connections
+  disconnected, its MCP server closed), the session left the map, and a later `POST` for its
+  `sessionId` is answered as an unknown session (main's, kept); a connection closed while a tool
+  holds a lock (the update held at the stand-in) → no update is sent after the close, the `UNLOCK`
+  lands, and only then is the state shut down; a tool call routed to the closing instance is
+  refused before any connection; another open connection's tools and instance are untouched.
+  *Breaks:* restore main's close (state shut down with no latch, abort or settle) → the `UNLOCK` is
+  cut off and the late call runs; abort through the process-wide `abortAll()` → the other
+  connection's tool is aborted.
+- **`BaseMcpServer.dispose()` (D51)**: callable again — a second call after a failed state undo
+  retries it (main's contract, which the pool relies on); the connections the instance built are
+  disconnected once nothing is held, each once; an injected connection is never disconnected.
+  *Break:* make `dispose()` a no-op after its first call → the pool's retry test red.
+- **The pool at shutdown and eviction (§3.8)**: a pooled instance's tool holding a lock when
+  `SIGTERM` arrives is aborted with every other, its `UNLOCK` lands, then the pool's shutdown
+  disposes the held instance; a state that cannot be undone makes the exit `1` with a line naming
+  the instance by its ordinal and never the handle; an instance evicted by the idle bound (fake
+  time) or by its stop tool has its connections disconnected. *Breaks:* run the pool's shutdown
+  before `settled()` → the `UNLOCK` cut off; skip the connection close in `dispose()` → the evicted
+  instance's connections left open.
 - `--renewal=refresh-only`: no login; `renewal-declined` with the server's sentence.
 - **Read once per process (D3)**: the settings are read once; a failed read is not kept.
 
@@ -1412,32 +1564,32 @@ browser and profile and that they are ready:
 3. basic over HTTP and over RFC (stdio).
 4. SNC over RFC on Windows, over stdio.
 
-## 16. Overlap with the parallel debugger work
+## 16. The debugger, merged from main
 
-The debugger investigation (`research/adt-debugger-investigation`) touches `tools/` only so far;
-debugger tools would add handlers and touch shared files. The move is its own commit (D42), so a
-rebase follows renames. Footprint in shared files:
+The debugger landed on main (#290–#292, lib 17.2.x) and is merged into this branch (A0); the move
+commits (D42) came first, and the merge followed the renames. What it brought, and where this change
+meets it:
 
-| Shared file | What this change does there |
-|---|---|
-| `src/embeddable/BaseMcpServer.ts` | the source, `getConnection(signal)`, the wrapper's `extra`, the signal scope, D5 |
-| `src/lib/clients.ts` | the `signal` function passed by `createAdtClient` |
-| `src/lib/strategies/withLock.ts` | `runRelease` outside the request's signal |
-| `src/lib/utils.ts` | `return_error`'s first lines and two regexes; one request's `signal` |
-| `src/lib/packageSessions.ts`, `handleDeletePackage.ts`, `requestSystemResolution.ts` | D20, D21, the lookup's own attempt (D44) |
-| `src/lib/handlers/interfaces.ts`, `src/lib/requestContext.ts`, handler signatures | untouched |
-| `server/src/*`, `compact/src/*` | split between core, http and sse, compact one package per transport (D42, commits 1 and 2; D49) |
-| adt-clients and interfaces-adt | the debugger releases land first; this change's prerequisites build on them (§3.1) |
-| `tools/` | untouched |
+| Debugger part | Where after the split | What this change does there |
+|---|---|---|
+| `src/lib/debugger/`, `src/lib/state/`, `DebugHandlersGroup` (lib) | lib, as today | nothing, beyond §3.8's rule for the state's own work (outside any request's signal) and C3's site list |
+| `compact/src/debug/` (the four compact verbs, lib imports only) | lib's `tool-set`, with `compactToolSetOf` (D49) | moved so compact-http and compact-sse serve them |
+| `InstancePool.ts`, the pool in `StreamableHttpServer.ts` | http (moved at A0) | carried as it is (§3.8, D52); header sources per request, the registry, D33's order |
+| `SseServer.ts`'s state close and `stop()` drain | sse | completed by D51 and D33 |
+| `stateClose.ts`, the stdio shutdown's state close | core | kept in D33's core order |
+| `--state-idle-minutes` (`src/lib/config/stateIdleMinutes.ts`) | lib's shared row | in every binary's table (§10.1) |
+| `x-sap-debug-*`, `SAP_DEBUG_*` (`requestContext.ts`, `ids.ts`, core's `destinationStores.ts`) | lib; the `.env` reader in core | unchanged; over http and sse no destination `.env` exists (§12) |
+| `src/embeddable/BaseMcpServer.ts` held-state methods | lib | `dispose()` extended (D51); the source, `getConnection(signal)`, the wrapper's `extra`, the signal scope, D5 |
 
-A debugger listener (a long request) is bounded by nothing of the server's and cancelled by its MCP
-request like any request. Over stdio and SSE the debugger's state lives in the instance for as long
-as the process, respectively the SSE connection, lives (D51 disposes it with the connection).
-**Not in this change (D52):** a pool of MCP server instances for the HTTP package — a `debug_session`
-handle returned by the starting tool, a `tools/call` carrying a held handle served by its instance
-after a check of the caller, a per-instance lease, an awaited `dispose()` and a shutdown order. It
-follows once the split has landed, as its own change; this change only gives it `dispose()` and the
-per-instance registry (D51) to build on.
+The other shared files this change touches: `src/lib/clients.ts` (the `signal` function of
+`createAdtClient`), `src/lib/strategies/withLock.ts` (`runRelease` outside the request's signal),
+`src/lib/utils.ts` (`return_error`'s first lines, two regexes, one request's `signal`),
+`src/lib/packageSessions.ts`, `handleDeletePackage.ts`, `requestSystemResolution.ts` (D20, D21,
+D44); `src/lib/handlers/interfaces.ts`, handler signatures and `tools/` stay untouched.
+
+A debugger tool call is a request like any: its own waits and sends end with its signal. The
+listener that polls on after its starting call returned is the held state's, bounded by the idle
+bound and ended by its stop, the host or the system — never by a request's end (§3.8).
 
 ## 17. Holds throughout: how each holds
 
@@ -1445,10 +1597,10 @@ per-instance registry (D51) to build on.
 |---|---|
 | H1 The consumer composes; nobody guesses | renewal, write failures, bounds, the browser, `authDebug` stated (D9–D12, D24); no default collaborator in the factory; refusals instead of guesses (D9, D19, D21, D39) |
 | H2 Nothing goes out that should not | §7.3, §9; the URL only on stderr from the providers; nothing on stdout; §14.6 |
-| H3 A credential stays bound | providers only from the broker in core, the destination read once per process and its edit documented (D3); header credentials per request (http) or per SSE connection (sse), never stored or shared, an SSE connection's disposed with it (D39, D48, D51); injected connections never re-authenticated (§4.3) |
+| H3 A credential stays bound | providers only from the broker in core, the destination read once per process and its edit documented (D3); header credentials per request (http, on new and pooled instances alike) or per SSE connection (sse), never stored or shared, an SSE connection's disposed with it (D39, D48, D51); the one exception the goal states — held state keeps the connections it opened until it ends (§3.8, D52); injected connections never re-authenticated (§4.3) |
 | H4 The modes are separated by package | D35, D36, D38, D48, D49: broker, stores, destinations, session files and logins only in core (and compact over stdio, through core); http and sse work only with header credentials, no server-held credential, and never depend on each other — what they share is lib's (D50); compact over HTTP and SSE never reaches core; embedded keeps none, consumer connections unwrapped, given the signal (§5.2) |
-| H5 No built-in timeouts | no login bound and no shutdown deadline by default (D10, D33); an SSE connection's dispose waits on no timer (D51); the 30 s deadline and the drain timer removed |
-| H6 One implementation of each rule | the shared transport helpers and the HTTP-transport shutdown once, in lib (D50); the compact tool set once, `compactToolSetOf` (D49); one registry of live tools for every shutdown and every SSE close (D33, D51); failures read by auth-errors (§7.1); the broker's shared build; the broker's refresh state; auth-providers' browsers (D9); cancellation at the send boundaries the connection's (§3.1), the signal and the structured failure carried by adt-clients; the shared lookup on auth-errors' `sharedAttempt` |
+| H5 No built-in timeouts | no login bound and no shutdown deadline by default (D10, D33); an SSE connection's dispose waits on no timer (D51); the 30 s deadline and the drain timer removed; the idle bound on held state (`--state-idle-minutes`) is the project owner's stated exception, main's, carried (§3.8) |
+| H6 One implementation of each rule | the shared transport helpers and the HTTP-transport shutdown once, in lib (D50); the compact tool set once, `compactToolSetOf` (D49); one registry of live tools for every shutdown and every SSE close, pooled instances included (D33, D51, §3.8); one instance close (D51); main's pool, not a second one (D52); failures read by auth-errors (§7.1); the broker's shared build; the broker's refresh state; auth-providers' browsers (D9); cancellation at the send boundaries the connection's (§3.1), the signal and the structured failure carried by adt-clients; the shared lookup on auth-errors' `sharedAttempt` |
 | H7 Registry only | every range published; the four prerequisites of §3.1 first; §13 |
 | H8 No regular expressions over untrusted input | D26; a source test |
 
@@ -1479,8 +1631,9 @@ per-instance registry (D51) to build on.
 | D48 | **SSE stays — the removal is cancelled**: some clients still speak only SSE, there is no data on who uses it, and removing it has no technical need; it lives in `@mcp-abap-adt/sse` (`sse/`, bin `mcp-abap-adt-sse`), HTTP+SSE only, credentials from the user's headers per connection, exactly the rules of `@mcp-abap-adt/http`; depends on lib and auth-providers only |
 | D49 | **compact is one package per transport**, by the principle of D35: `@mcp-abap-adt/compact` (stdio, on core, bin `mcp-abap-adt-compact`), `@mcp-abap-adt/compact-http` (on http, bin `mcp-abap-adt-compact-http`), `@mcp-abap-adt/compact-sse` (on sse, bin `mcp-abap-adt-compact-sse`); compact over HTTP or SSE pulls no broker or stores through core; behaviour identical to the full server on each transport, only the tool set and how its sets are formed differ; `compact-readonly` / `compact-modify` unchanged |
 | D50 | http and sse never depend on each other; the helpers both need go where both can use them without a broker or stores path — lib, unless the code shows a better place (read: lib, §3.7) |
-| D51 | an SSE connection's close disposes its instance (today the map entry is only deleted), by the ownership rule and D33's order; SSE connections take part in shutdown exactly as Streamable HTTP requests do; in this PR |
-| D52 | the pool of MCP instances for the HTTP package (debugger handle `debug_session`) is **not** in this PR; it follows after the split |
+| D51 | an SSE connection's close disposes its instance, by the ownership rule and D33's order; SSE connections take part in shutdown exactly as Streamable HTTP requests do; in this PR (amended after main's debugger: built on main's close and `dispose()`, which already shut the state down) |
+| D52 | ~~the pool of MCP instances for the HTTP package is not in this PR~~ — **superseded by main**: the pool shipped with the debugger (#290–#292); this PR carries it into `@mcp-abap-adt/http` as it is, its rules applied to pooled instances (§3.8) |
+| — | the idle bound on held state (`--state-idle-minutes`, default 30) is the project owner's one exception to "no timeouts" (`DEBUGGER.md`) |
 | D39 (amended) | `--transport` stays removed; each of the six bins is flag-free about its transport |
 | D29 (amended) | one PR, one major 18 for all nine packages |
 
@@ -1494,12 +1647,15 @@ are still free. Wherever this spec names interfaces-adt 13.2.0, adt-clients 25.1
 as a prerequisite, read that release; the plan checks each number with `npm view` before it is
 used.
 
-**Questions for the user**: none open.
+**Questions for the user**:
 
-**Follow-up after this change** (D52): the pool of MCP server instances for `@mcp-abap-adt/http` —
-the starting tool returns an explicit handle (`debug_session`), a `tools/call` carrying a held
-handle is served by its instance after a check of the caller, an instance with nothing left leaves
-the pool; with a per-instance lease, an awaited `dispose()` (D51 gives it one) and a shutdown order.
+1. **The `state_handle` is a bearer secret (main's pool).** Whoever presents it reaches the instance
+   and its held state, which keeps the connections it opened with the credential of the request that
+   opened them (§3.8); there is no check of the caller and no limit per owner. The earlier D52
+   follow-up planned "a check of the caller". This change carries the pool as it is; whether a
+   pooled instance should be served only to the caller it was created for (for example the same
+   `x-sap-url` and user), and whether a limit is wanted, is the user's decision — in this PR or in
+   a change of its own.
 
 **Possible later improvements**, each its own change in its repository: auth-stores
 `EnvDestinationStore.fromContent` / key stores `fromKey` (projections from content read once); the

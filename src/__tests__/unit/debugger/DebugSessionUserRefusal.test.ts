@@ -71,7 +71,7 @@ describe("the system's refusal of a request user", () => {
         });
         await expect(started).rejects.toThrow(DebugRefusedError);
         await expect(started).rejects.toThrow(SAID);
-        expect(world.calls).toEqual(['setBreakpoints:1']);
+        expect(world.calls).toEqual(['checkListener', 'setBreakpoints:1']);
         expect(new Set(world.closed)).toEqual(new Set(world.opened));
         expect(session.currentIdentity()).toBeUndefined();
         expect(session.listBreakpoints()).toEqual([]);
@@ -82,14 +82,14 @@ describe("the system's refusal of a request user", () => {
       },
     );
 
-    it('under refuse-if-held the calls are exactly the preflight and the arming', async () => {
+    it('under refuse-if-held with take-over the calls are exactly the preflight and the arming', async () => {
       const world = fakeWorld();
       world.breakpointAnswers.push(NOT_AUTHORIZED);
       const session = new DebugSession(world.ports, IDS, {
         breakpointConflict: 'refuse-if-held',
       }).bind('origin');
       await expect(
-        session.start('refuse', {
+        session.start('takeOver', {
           breakpoints: [A],
           requestUser: 'SAPUSER03',
         }),
@@ -105,7 +105,11 @@ describe("the system's refusal of a request user", () => {
       await expect(
         session.start('refuse', { breakpoints: [A] }),
       ).rejects.toThrow(DebugRequestError);
-      expect(world.calls).toEqual(['setBreakpoints:1', 'stopListener']);
+      expect(world.calls).toEqual([
+        'checkListener',
+        'setBreakpoints:1',
+        'stopListener',
+      ]);
     });
   });
 
@@ -163,7 +167,11 @@ describe("the system's refusal of a request user", () => {
           'L10',
           'E1',
         ]);
-        expect(world.calls).toEqual(['setBreakpoints:2', 'listen:3']);
+        expect(world.calls).toEqual([
+          'checkListener',
+          'setBreakpoints:2',
+          'listen:3',
+        ]);
         expect(new Set(world.closed)).toEqual(new Set(world.opened));
         expect(session.currentIdentity()).toBeUndefined();
         expect(session.listBreakpoints()).toEqual([]);
@@ -220,6 +228,7 @@ describe("the system's refusal of a request user", () => {
       );
       await expect(started).rejects.not.toThrow(/not undone/);
       expect(world.calls).toEqual([
+        'checkListener',
         'setBreakpoints:2',
         'listen:3',
         'stopListener',
@@ -238,6 +247,7 @@ describe("the system's refusal of a request user", () => {
       world.polls[0].resolve(refusedResponse('listener broke'));
       await expect(started).rejects.toThrow(/not undone: listener: /);
       expect(world.calls).toEqual([
+        'checkListener',
         'setBreakpoints:2',
         'listen:3',
         'stopListener',
@@ -265,6 +275,7 @@ describe("the system's refusal of a request user", () => {
       await expect(started).rejects.toThrow(SAID);
       await expect(started).rejects.not.toThrow(/not undone/);
       expect(world.calls).toEqual([
+        'checkListener',
         'stopListener',
         'setBreakpoints:1',
         'stopListener',
@@ -290,6 +301,7 @@ describe("the system's refusal of a request user", () => {
       );
       await expect(started).rejects.not.toThrow(/not undone/);
       expect(world.calls).toEqual([
+        'checkListener',
         'stopListener',
         'setBreakpoints:1',
         'stopListener',
@@ -315,7 +327,11 @@ describe("the system's refusal of a request user", () => {
       await expect(
         session.start('refuse', { breakpoints: [A] }),
       ).rejects.toThrow(DebugRequestError);
-      expect(world.calls).toEqual(['setBreakpoints:1', 'stopListener']);
+      expect(world.calls).toEqual([
+        'checkListener',
+        'setBreakpoints:1',
+        'stopListener',
+      ]);
     });
 
     it('at the stopListener: the per-id deletes run and the debt stays', async () => {

@@ -293,6 +293,27 @@ premise (2026-10-10, both conflict modes, all four combinations of the ids):
 - a breakpoint caught for whichever listener of that user was active — under
   take-over the newcomer caught a breakpoint only the first one had set.
 
+Measured again on premise (2026-10-12, BASIS 816: same SAP user, two ideIds,
+user mode, refuse, the first IDE armed and listening):
+
+- the user-mode breakpoint set is the user's (with the request user); the
+  ideId does not separate it: the newcomer's arming replaced the first IDE's
+  set, and although its listen was refused `409` and the first listener kept
+  listening, the run stopped at the newcomer's line, not the first one's;
+- a stopListener under another ideId of the same user ends the other IDE's
+  listener: after it the first IDE's poll returned at once with an empty answer,
+  and listening again caught nothing — its set was gone too (so was it after a
+  deletion of the newcomer's own breakpoint: the arming had already replaced it);
+- a `checkListener` before anything else answered `409` and left the first IDE
+  untouched.
+
+So under listener mode refuse a start checks the listener on the control
+connection before it reconciles or arms, whatever the breakpoint conflict says,
+and a `409` there is a refusal before any change. The check is not atomic: a
+listener another IDE starts between it and our listen has its set replaced by
+our arming and its listener ended by our rollback's stopListener. That race is
+accepted and documented, not handled (stated by the user 2026-10-12).
+
 Both ids are random per instance by default, so a second instance of the same
 SAP user meets the conflict and its answer reaches the model as it is; a shared
 id is the consumer's explicit choice. The idle bound on waiting for the user

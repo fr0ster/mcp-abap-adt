@@ -61,7 +61,8 @@ export function resolveDebuggerIds(
 /**
  * What a change does to the breakpoints another IDE of the same SAP user holds
  * under the same key: `replace` sends the full list, `refuse-if-held` first asks
- * whether another IDE holds the key and refuses if so. The host's choice,
+ * whether another IDE holds the key and refuses if so (under listener mode
+ * refuse a start and a replacement ask in either case). The host's choice,
  * stated like the ids: the request scope (a header, or the destination's
  * `.env` entered into it), then the environment, then the embedder's option.
  */

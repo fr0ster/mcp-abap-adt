@@ -345,14 +345,33 @@ export class DebugSession<O = unknown> {
     };
   }
   /**
-   * refuse-if-held: asks on the control connection — never on a polling one —
-   * whether another debugger holds the key. Changes nothing. Our own listener
-   * under the same ideId is no conflict (measured on premise, 2026-10-10), so
-   * this protects against another IDE, not against ourselves. Not atomic: a
-   * listener started between this check and the arming is not seen.
+   * Asks on the control connection — never on a polling one — whether another
+   * debugger holds the user's debugging, and refuses on a 409 before anything is
+   * sent. Changes nothing. Runs under listener mode `refuse` (the user's ruling,
+   * 2026-10-12), whatever the breakpoint conflict says, and under
+   * `refuse-if-held` in every mode; under take-over with `replace` there is no
+   * check.
+   *
+   * Why under `refuse`: the listen's own 409 comes too late. Measured on premise
+   * (2026-10-12, BASIS 816), same user, two ideIds, user mode, refuse, the first
+   * IDE armed and listening: the check before anything else answers 409 and the
+   * first IDE is untouched; an arming, then a listen refused 409, leaves its
+   * listener standing but replaces its breakpoints — the user-mode set belongs
+   * to the user, the ideId does not separate it — so the run stops at the
+   * newcomer's line; a stopListener after that ends the first IDE's listener at
+   * once; a deletion after that leaves its set gone all the same.
+   *
+   * Our own listener under the same ideId is no conflict (measured on premise,
+   * 2026-10-10), so this protects against another IDE, not against ourselves.
+   *
+   * Not atomic. A listener another IDE starts between this check and our listen
+   * has its set replaced by our arming, and our rollback's stopListener after
+   * the listen's 409 ends its listener. That race is accepted and documented,
+   * not handled (the user's ruling, 2026-10-12).
    */
   private async preflight(identity: IDebuggerIdentity): Promise<void> {
-    if (this.breakpointConflict !== 'refuse-if-held') return;
+    if (this.mode !== 'refuse' && this.breakpointConflict !== 'refuse-if-held')
+      return;
     const checked = await (await this.controlDebugger())
       .checkListener(identity)
       .catch(asFailure);
@@ -609,8 +628,10 @@ export class DebugSession<O = unknown> {
       const ownControl = this.control === undefined;
       let armed: DebugView<BreakpointsAnswer> | undefined;
       try {
-        // 1. the preflight; 2. the reconciliation (stopListener deletes the key's
-        // breakpoints, so it runs only after the preflight); 3. the arming, then listening.
+        // 1. the preflight (under refuse, or refuse-if-held); 2. the reconciliation
+        // (stated ids only: its stopListener deletes the user's breakpoints and ends
+        // a listener another IDE of the user holds, so it runs only after the
+        // preflight); 3. the arming, then listening.
         await this.preflight(identity);
         await this.beforeFirstListen(identity);
         armed = await this.armLocked(breakpoints);

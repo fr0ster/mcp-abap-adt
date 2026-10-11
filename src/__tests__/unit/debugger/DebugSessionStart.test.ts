@@ -32,9 +32,10 @@ describe('the start', () => {
     ids: ConstructorParameters<typeof DebugSession>[1] = IDS,
     options: ConstructorParameters<typeof DebugSession>[2] = {},
     start: Partial<Parameters<DebugSession['start']>[1]> = {},
+    conflict: Parameters<DebugSession['start']>[0] = 'refuse',
   ) {
     const session = new DebugSession(world.ports, ids, options).bind('origin');
-    const started = session.start('refuse', { ...START, ...start });
+    const started = session.start(conflict, { ...START, ...start });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await started;
@@ -225,14 +226,27 @@ describe('the start', () => {
       expect(on('listen')).not.toBe(on('checkListener'));
     });
 
-    it('replace (the default) sends no check', async () => {
+    it('under take-over it is checked all the same', async () => {
+      const { world } = await listening(
+        fakeWorld(),
+        IDS,
+        HELD,
+        { breakpoints: [LINE] },
+        'takeOver',
+      );
+      expect(world.calls.slice(0, 2)).toEqual([
+        'checkListener',
+        'setBreakpoints:1',
+      ]);
+    });
+
+    it('take-over with replace (the default) sends no check', async () => {
       const { world } = await listening(
         fakeWorld(),
         IDS,
         {},
-        {
-          breakpoints: [LINE],
-        },
+        { breakpoints: [LINE] },
+        'takeOver',
       );
       expect(world.calls).not.toContain('checkListener');
     });
@@ -260,6 +274,69 @@ describe('the start', () => {
     });
   });
 
+  // The user's ruling (2026-10-12), on a measurement on premise the same day: under
+  // refuse the listen's own 409 comes after our arming has replaced the user's
+  // breakpoints — the set is the user's, whatever the ideId — so a start checks
+  // the listener first, whatever the breakpoint conflict says.
+  describe('under listener mode refuse, with replace (the default)', () => {
+    it('the calls begin with the check on the control connection, before the arming', async () => {
+      const { world } = await listening(
+        fakeWorld(),
+        IDS,
+        {},
+        {
+          breakpoints: [LINE],
+        },
+      );
+      expect(world.calls).toEqual([
+        'checkListener',
+        'setBreakpoints:1',
+        `listen:${FIRST_POLL_HOLD_SECONDS}`,
+        expect.stringMatching(/^listen:/),
+      ]);
+      const on = (call: string) =>
+        world.log.find((c) => c.call === call)!.connection;
+      expect(on('setBreakpoints')).toBe(on('checkListener'));
+      expect(on('listen')).not.toBe(on('checkListener'));
+    });
+
+    it('a 409 there refuses the start before any change: no arming, no stopListener, no deletion', async () => {
+      const world = fakeWorld();
+      world.checkAnswers.push(CONFLICT_409);
+      const session = new DebugSession(world.ports, IDS).bind('origin');
+      await expect(
+        session.start('refuse', { breakpoints: [LINE] }),
+      ).rejects.toThrow(DebugConflictError);
+      expect(world.calls).toEqual(['checkListener']);
+      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      expect(session.holdsState()).toBe(false);
+      expect(session.currentIdentity()).toBeUndefined();
+    });
+
+    it('with stated ids the check comes before the reconciliation too', async () => {
+      const world = fakeWorld();
+      world.checkAnswers.push(CONFLICT_409);
+      const session = new DebugSession(world.ports, {
+        ...IDS,
+        stated: true,
+      }).bind('origin');
+      await expect(
+        session.start('refuse', { breakpoints: [LINE] }),
+      ).rejects.toThrow(DebugConflictError);
+      expect(world.calls).toEqual(['checkListener']);
+    });
+
+    it('a later replacement is checked first as well', async () => {
+      const { session, world } = await listening(fakeWorld(), IDS, {});
+      world.calls.length = 0;
+      await session.setBreakpoints([LINE]);
+      expect(world.calls.slice(0, 2)).toEqual([
+        'checkListener',
+        'setBreakpoints:2',
+      ]);
+    });
+  });
+
   // Review Focus 5, after the user's decision that a start arms at least one
   // breakpoint: a start can no longer reach its first listen with nothing armed,
   // so a 409 there always follows an arming the system accepted, and the rollback
@@ -272,6 +349,7 @@ describe('the start', () => {
     world.polls[0].resolve(CONFLICT_409());
     await expect(started).rejects.toThrow(DebugConflictError);
     expect(world.calls).toEqual([
+      'checkListener',
       'setBreakpoints:1',
       `listen:${FIRST_POLL_HOLD_SECONDS}`,
       'stopListener',

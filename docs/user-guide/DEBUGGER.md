@@ -250,9 +250,12 @@ class (`class_name`, `line`).
   answers each breakpoint's state as confirmed.
 - `AmdpDebugWait` answers the events that arrived — a break with its variables and
   its call stack, the end of the execution, a warning. Under `terse` a break keeps
-  the top five frames, each as the procedure, the ABAP address (`object_type`,
-  `object_name`, `line`) and the line in the database procedure (`native_line`);
-  a frame not compiled for debugging is marked `not_debug_compiled`. `AmdpDebugStep` steps `over` or `continue`s;
+  the first five frames in the order the system sends them (only single-frame
+  stacks have been recorded so far), each as the procedure, the ABAP address
+  (`object_type`, `object_name`, `line`) and the line in the database procedure
+  (`native_line`); a frame not compiled for debugging is marked
+  `not_debug_compiled`.
+- `AmdpDebugStep` steps `over` or `continue`s;
   `AmdpDebugGetTable` reads a table variable's rows (at most 100; an optional
   SELECT over it); `AmdpDebugCancel` cancels the execution.
 - **Stop releases a suspended debuggee first.** A stop alone never releases it

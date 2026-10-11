@@ -18,7 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **An AMDP break carries its call stack.** `AmdpEvent.stack` reads the frames
   of an `ON_BREAK` (procedure, ABAP position and line, schema and native line,
   whether the frame is compiled for debugging); the terse event of
-  `AmdpDebugWait` and compact's `HandlerDebugWait` keeps the top five as
+  `AmdpDebugWait` and compact's `HandlerDebugWait` keeps the first five, in the
+  order the system sends them, as
   `procedure`, `address` and `native_line`, marking a frame not compiled for
   debugging.
 - `@mcp-abap-adt/core` and `@mcp-abap-adt/compact` require

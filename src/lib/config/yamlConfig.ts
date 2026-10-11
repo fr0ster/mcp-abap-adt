@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml } from 'js-yaml';
 import { authParametersTemplate, validateAuthYaml } from './authParameters.js';
+import { validateStateIdleYaml } from './stateIdleMinutes.js';
 
 export interface YamlConfig {
   transport?: string;
@@ -20,7 +21,9 @@ export interface YamlConfig {
   'allow-destination-header'?: boolean;
   'connection-type'?: string;
   'system-type'?: string;
-  // Handler sets: readonly, high, low. `compact` is recognised and refused —
+  /** The idle bound on held state, in minutes (at least 30, default 30). */
+  'state-idle-minutes'?: number | string;
+  // Handler sets: readonly, high, low, debug. `compact` is recognised and refused —
   // that facade is the @mcp-abap-adt/compact command.
   exposition?: string | string[];
   http?: {
@@ -80,6 +83,7 @@ export function validateYamlConfig(config: YamlConfig): {
 } {
   const errors: string[] = [
     ...validateAuthYaml(config as Record<string, unknown>),
+    ...validateStateIdleYaml(config as Record<string, unknown>),
   ];
 
   // Validate transport
@@ -241,7 +245,13 @@ transport: stdio
 # This file is configuration only: secrets and the session belong in .env files or the
 # environment, and a key that looks like a secret is refused.
 ${authParametersTemplate()}
-# Handler sets to expose: readonly, high, low
+# Held state (a debug session) ends after this many minutes without a tool call.
+# A whole number, at least 30. A call in flight pauses it; a listener's own
+# background re-poll does not count as a call.
+# Also: --state-idle-minutes, MCP_STATE_IDLE_MINUTES
+state-idle-minutes: 30
+
+# Handler sets to expose: readonly, high, low, debug (the debugger, opt-in)
 # (compact moved to the @mcp-abap-adt/compact command and is refused here)
 # Default: readonly,high
 # Use comma-separated list or YAML array

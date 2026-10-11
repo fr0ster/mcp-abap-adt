@@ -13,6 +13,7 @@ import {
   requestContextFromHeaders,
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
+import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
@@ -23,9 +24,23 @@ import {
   FirstConnectLock,
 } from './destinationRequest.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
+import {
+  BatchWithHandleError,
+  handleOf,
+  InstancePool,
+  type Poolable,
+  PoolClosedError,
+} from './InstancePool.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
 export interface StreamableHttpServerOptions {
+  /**
+   * The idle bound on held state, in minutes: each instance's state ends
+   * after this long without a tool call. At least 30; default 30.
+   */
+  stateIdleMinutes?: number;
+  /** Where the state's lifecycle lines go; default stderr, always on. */
+  stateLogger?: StateLogger;
   /**
    * Host to bind to (only used when no external app is provided)
    * @default "127.0.0.1"
@@ -81,6 +96,20 @@ export interface StreamableHttpServerOptions {
   enableDnsRebindingProtection?: boolean;
 }
 
+type Headers = Record<string, string | string[] | undefined>;
+
+/** What the pool keeps of a per-request server, and what the request handler drives on it. */
+interface PerRequestServerApi extends Poolable {
+  connect: BaseMcpServer['connect'];
+  idle(): Promise<void>;
+  setConnectionContextPublic: (
+    destination: string,
+    destinations: IDestinations,
+  ) => Promise<void>;
+  setConnectionContextFromHeadersPublic: (headers: Headers) => void;
+  connectPublic: () => Promise<unknown>;
+}
+
 /**
  * Minimal Streamable HTTP server implementation.
  * Creates new transport for each HTTP POST and forwards request to the MCP server.
@@ -106,6 +135,10 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly enableDnsRebindingProtection?: boolean;
   /** Per-destination lock around the first connect: it serialises the first login. */
   private readonly firstConnect = new FirstConnectLock();
+  /** The instances that hold state between requests (spec D9). */
+  private readonly pool = new InstancePool<PerRequestServerApi>();
+  private readonly stateIdleMinutes?: number;
+  private readonly stateLogger: StateLogger;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -117,7 +150,13 @@ export class StreamableHttpServer extends BaseMcpServer {
       name: 'mcp-abap-adt',
       version: opts?.version ?? CORE_VERSION,
       logger: opts?.logger ?? noopLogger,
+      // Validated by the base: a misconfiguration stops the start.
+      stateIdleMinutes: opts?.stateIdleMinutes,
+      // From the options as given: the silent default above is never the state's.
+      stateLogger: stateLoggerOf(opts ?? {}),
     });
+    this.stateIdleMinutes = opts?.stateIdleMinutes;
+    this.stateLogger = stateLoggerOf(opts ?? {});
     this.version = opts?.version ?? CORE_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
@@ -161,8 +200,8 @@ export class StreamableHttpServer extends BaseMcpServer {
       }
 
       try {
-        const server = this.createPerRequestServer();
         let destination: string | undefined;
+        let fromHeaders = false;
 
         // Priority 1: x-mcp-destination (only with --allow-destination-header),
         // refused when it is not a destination name
@@ -178,9 +217,7 @@ export class StreamableHttpServer extends BaseMcpServer {
         // The settings and the credential come from the headers, no destination
         else if (this.hasSapConnectionHeaders(req.headers)) {
           destination = undefined;
-          if (!isPing) {
-            server.setConnectionContextFromHeadersPublic(req.headers);
-          }
+          fromHeaders = true;
         }
         // Priority 3: Use default destination
         else if (this.defaultDestination) {
@@ -196,22 +233,20 @@ export class StreamableHttpServer extends BaseMcpServer {
           return;
         }
 
-        // Skip SAP connection setup for ping — it's a protocol-level check,
-        // no need to acquire JWT tokens or contact the SAP system
-        if (!isPing && destination) {
-          // The first request of a destination connects inside the lock:
-          // two first logins must not race for the same callback port
-          const chosen = destination;
-          await this.firstConnect.run(
-            chosen,
-            () => server.setConnectionContextPublic(chosen, this.destinations),
-            () => server.connectPublic(),
-          );
+        let handle: string | undefined;
+        try {
+          handle = handleOf(req.body);
+        } catch (err) {
+          if (err instanceof BatchWithHandleError) {
+            res.status(400).send(err.message);
+            return;
+          }
+          throw err;
         }
 
         const authSource = destination
           ? `destination=${destination}`
-          : this.hasSapConnectionHeaders(req.headers)
+          : fromHeaders
             ? 'x-sap-* headers'
             : 'none';
         if (!isPing) {
@@ -220,22 +255,74 @@ export class StreamableHttpServer extends BaseMcpServer {
           );
         }
 
-        const transport = new StreamableHTTPServerTransport({
-          sessionIdGenerator: undefined, // stateless mode to avoid ID collisions
-          enableJsonResponse: this.enableJsonResponse,
-        });
+        await this.pool.serve(
+          { handle },
+          () => this.createPerRequestServer(),
+          async (server) => {
+            // A client that left while this request waited for the lease gets nothing.
+            if (res.destroyed) return;
+            const transport = new StreamableHTTPServerTransport({
+              sessionIdGenerator: undefined, // stateless mode to avoid ID collisions
+              enableJsonResponse: this.enableJsonResponse,
+            });
+            let transportClosed: Promise<void> | undefined;
+            const closeTransport = () => {
+              transportClosed ??= transport.close().catch(() => undefined);
+              return transportClosed;
+            };
+            const disconnected = new Promise<void>((resolve) =>
+              res.once('close', () => {
+                void closeTransport();
+                resolve();
+              }),
+            );
+            try {
+              // The request's own credentials, every time — also on a kept instance.
+              if (!isPing && fromHeaders) {
+                server.setConnectionContextFromHeadersPublic(req.headers);
+              } else if (!isPing && destination) {
+                // Skip SAP connection setup for ping — it's a protocol-level check.
+                // The first request of a destination connects inside the lock:
+                // two first logins must not race for the same callback port
+                const chosen = destination;
+                await this.firstConnect.run(
+                  chosen,
+                  () =>
+                    server.setConnectionContextPublic(
+                      chosen,
+                      this.destinations,
+                    ),
+                  () => server.connectPublic(),
+                );
+              }
 
-        res.on('close', () => {
-          void transport.close();
-        });
-
-        await server.connect(transport);
-        // Scope what the request states — x-sap-language, x-sap-responsible,
-        // x-sap-master-system — to this request's dispatch, so it cannot
-        // leak into other requests/modes via a process-global cache (#110).
-        await runWithRequestContext(
-          requestContextFromHeaders(req.headers),
-          () => transport.handleRequest(req, res, req.body),
+              await server.connect(transport);
+              // Scope what the request states — x-sap-language, x-sap-responsible,
+              // x-sap-master-system — to this request's dispatch, so it cannot
+              // leak into other requests/modes via a process-global cache (#110).
+              const dispatch = runWithRequestContext(
+                requestContextFromHeaders(req.headers),
+                () => transport.handleRequest(req, res, req.body),
+              );
+              // JSON mode answers when the handler has; SSE mode when the stream
+              // ends. A client that disconnects first must not hold the lease on
+              // a dispatch that waits for a handler.
+              let failed: { error: unknown } | undefined;
+              await Promise.race([
+                dispatch.catch((error) => {
+                  failed = { error };
+                }),
+                disconnected,
+              ]);
+              // A dispatch that failed is answered below, as before the pool.
+              if (failed) throw failed.error;
+            } finally {
+              await closeTransport();
+              // The instance goes back only when its tool handlers have settled:
+              // they do not consume the transport's abort signal.
+              await server.idle();
+            }
+          },
         );
         if (!isPing) {
           console.error(
@@ -243,6 +330,10 @@ export class StreamableHttpServer extends BaseMcpServer {
           );
         }
       } catch (err) {
+        if (err instanceof PoolClosedError) {
+          if (!res.headersSent) res.status(503).send(err.message);
+          return;
+        }
         const answer = destinationFailureAnswer(err);
         if (!answer.known) {
           // No words for it: its class only — a message may quote a file (H4).
@@ -360,16 +451,23 @@ export class StreamableHttpServer extends BaseMcpServer {
   }
 
   /**
-   * Stops taking connections (shutdown, step 1). Requests already running are
-   * not waited for, nor is an open stream: the factory's gate holds them.
-   * Embedded on an external app, there is no listener of its own to stop.
+   * Stops taking connections (shutdown, step 1), then the pool: no request is
+   * admitted any more, the running ones finish, every instance that holds
+   * state is disposed and waited for (no timer). Rejects with what could not
+   * be undone. Embedded on an external app, there is no listener of its own
+   * to stop, but the pool is still ours to drain.
    */
   async stop(): Promise<void> {
     const server = this.standaloneServer;
-    if (!server) return;
-    this.standaloneServer = undefined;
-    server.close();
-    server.closeIdleConnections();
+    if (server) {
+      this.standaloneServer = undefined;
+      server.close();
+      server.closeIdleConnections();
+    }
+    const failures = await this.pool.shutdown();
+    if (failures.length) {
+      throw new Error(`state cleanup failed: ${failures.join('; ')}`);
+    }
   }
 
   /**
@@ -387,24 +485,15 @@ export class StreamableHttpServer extends BaseMcpServer {
     return !!(hasUrl && (hasJwtAuth || hasBasicAuth));
   }
 
-  private createPerRequestServer(): {
-    connect: BaseMcpServer['connect'];
-    setConnectionContextPublic: (
-      destination: string,
-      destinations: IDestinations,
-    ) => Promise<void>;
-    setConnectionContextFromHeadersPublic: (
-      headers: Record<string, string | string[] | undefined>,
-    ) => void;
-    connectPublic: () => Promise<unknown>;
-  } {
+  private createPerRequestServer(): PerRequestServerApi {
     class PerRequestServer extends BaseMcpServer {
       constructor(
         private readonly registry: IHandlersRegistry,
         version: string,
         logger: Logger,
+        state: { stateIdleMinutes?: number; stateLogger?: StateLogger },
       ) {
-        super({ name: 'mcp-abap-adt', version, logger });
+        super({ name: 'mcp-abap-adt', version, logger, ...state });
         this.registerHandlers(this.registry);
       }
 
@@ -430,6 +519,10 @@ export class StreamableHttpServer extends BaseMcpServer {
       this.handlersRegistry,
       this.version,
       this.logger,
+      {
+        stateIdleMinutes: this.stateIdleMinutes,
+        stateLogger: this.stateLogger,
+      },
     );
   }
 }

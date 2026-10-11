@@ -1,0 +1,27 @@
+{
+  "case": "debugger-message-and-objects",
+  "step": 1,
+  "stepTag": "kinds-accept",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger/breakpoints",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger/breakpoints",
+    "headers": {
+      "Accept": "*/*",
+      "X-sap-adt-sessiontype": "stateful",
+      "Content-Type": "application/xml"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<dbg:breakpoints xmlns:dbg=\"http://www.sap.com/adt/debugger\" xmlns:adtcore=\"http://www.sap.com/adt/core\" debuggingMode=\"user\" scope=\"external\" requestUser=\"SAPUSER01\" terminalId=\"4D43504142414454000000000000DB01\" ideId=\"mcp-abap-adt\">\n  <breakpoint kind=\"line\" enabled=\"true\" adtcore:uri=\"/sap/bc/adt/oo/classes/zcl_cv_dbg_measure/source/main#start=56\"/>\n  <breakpoint kind=\"statement\" enabled=\"true\" statement=\"MESSAGE\"/>\n  <breakpoint kind=\"exception\" enabled=\"true\" exceptionClass=\"CX_SY_ZERODIVIDE\"/>\n  <breakpoint kind=\"message\" enabled=\"true\" msgId=\"ZCV\" msgNo=\"777\" msgTy=\"S\"/>\n  <breakpoint kind=\"message\" enabled=\"true\" msgId=\"ZCV\" msgNo=\"777\"/>\n  <breakpoint kind=\"message\" enabled=\"true\" msgId=\"ZCV\" msgNo=\"777\" msgTy=\"S\" condition=\"LV_MARKER = 'CVDBG-7Q4'\"/>\n  <breakpoint kind=\"exception\" enabled=\"true\" exceptionClass=\"CX_SY_ZERODIVIDE\" condition=\"LV_MARKER = 'CVDBG-7Q4'\"/>\n  <breakpoint kind=\"badi\" enabled=\"true\" badiName=\"BADI_X\"/>\n  <breakpoint kind=\"method\" enabled=\"true\" className=\"ZCL_CV_DBG_MEASURE\" methodName=\"DOUBLE\"/>\n</dbg:breakpoints>"
+  },
+  "response": {
+    "status": 400,
+    "headers": {
+      "content-length": "576",
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-message-and-objects--01-kinds-accept.body.xml"
+  }
+}

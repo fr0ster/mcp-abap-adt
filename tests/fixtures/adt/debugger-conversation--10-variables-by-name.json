@@ -1,0 +1,27 @@
+{
+  "case": "debugger-conversation",
+  "step": 10,
+  "stepTag": "variables-by-name",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger?method=getVariables",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger?method=getVariables",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml",
+      "X-sap-adt-sessiontype": "stateful",
+      "Content-Type": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.debugger.Variables"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><asx:abap xmlns:asx=\"http://www.sap.com/abapxml\" version=\"1.0\"><asx:values><DATA><STPDA_ADT_VARIABLE><ID>LV_MARKER</ID></STPDA_ADT_VARIABLE><STPDA_ADT_VARIABLE><ID>LV_COUNTER</ID></STPDA_ADT_VARIABLE><STPDA_ADT_VARIABLE><ID>LT_ROWS</ID></STPDA_ADT_VARIABLE><STPDA_ADT_VARIABLE><ID>LS_ROW</ID></STPDA_ADT_VARIABLE><STPDA_ADT_VARIABLE><ID>SY-SUBRC</ID></STPDA_ADT_VARIABLE><STPDA_ADT_VARIABLE><ID>ME</ID></STPDA_ADT_VARIABLE></DATA></asx:values></asx:abap>"
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "664",
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.debugger.Variables"
+    },
+    "bodyFile": "debugger-conversation--10-variables-by-name.body.xml"
+  }
+}

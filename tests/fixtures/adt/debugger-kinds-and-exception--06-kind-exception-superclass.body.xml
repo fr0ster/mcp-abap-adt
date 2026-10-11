@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><dbg:breakpoints xmlns:dbg="http://www.sap.com/adt/debugger"><breakpoint kind="exception" id="KIND=5.EXCEPTION_CLASS=CX_SY_ARITHMETIC_ERROR" exceptionClass="CX_SY_ARITHMETIC_ERROR"/></dbg:breakpoints>

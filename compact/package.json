@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/compact",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-compact",
-  "version": "17.1.0",
+  "version": "17.2.0",
   "description": "The compact MCP server for SAP ABAP ADT: one tool per operation with the object in the arguments \u2014 25 tools instead of 370, for a host that cannot build a retrieval pipeline of its own. Connects over HTTP, RFC or SNC, configured as @mcp-abap-adt/core; RFC and SNC need the SAP NW RFC SDK at install time.",
   "license": "AGPL-3.0-only",
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
@@ -60,8 +60,8 @@
   "dependencies": {
     "@mcp-abap-adt/compact-modify": "^17.0.0",
     "@mcp-abap-adt/compact-readonly": "^17.0.0",
-    "@mcp-abap-adt/core": "^17.0.0",
-    "@mcp-abap-adt/lib": "^17.0.0"
+    "@mcp-abap-adt/core": "^17.2.0",
+    "@mcp-abap-adt/lib": "^17.2.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

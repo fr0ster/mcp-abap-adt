@@ -26,6 +26,8 @@
       "@mcp-abap-adt/lib/handlers/read": ["./src/lib/handlers/read.ts"],
       "@mcp-abap-adt/lib/handlers/write": ["./src/lib/handlers/write.ts"],
       "@mcp-abap-adt/lib/compact-shared": ["./src/lib/compact/index.ts"],
+      "@mcp-abap-adt/lib/debugger": ["./src/lib/debugger/index.ts"],
+      "@mcp-abap-adt/lib/state": ["./src/lib/state/index.ts"],
       "@mcp-abap-adt/lib/utils": ["./src/lib/utils.ts"],
       "@mcp-abap-adt/lib/config": ["./src/lib/config/index.ts"],
       "@mcp-abap-adt/compact-readonly": ["./compact-readonly/src/index.ts"],

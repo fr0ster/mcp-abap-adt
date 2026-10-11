@@ -3,15 +3,16 @@
 Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
-- Tools: 25
+- Tools: 29
 - Read-only half: `@mcp-abap-adt/compact-readonly`
 - Modifying half: `@mcp-abap-adt/compact-modify`
+- Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`
 - Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)
 
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 25 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 29 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 
@@ -507,4 +508,68 @@ per request.
 - `max_size_for_trace_file` — Maximum trace file size.
 - `amdp_trace` — Enable AMDP tracing.
 - `max_time_for_tracing` — Maximum tracing time.
+
+### HandlerDebugStart
+
+**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+
+**Description:** Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. take_over: abap — Displaces another debugger listening for the same user; amdp — ends an AMDP session of this user left behind. Catches every request of the connected SAP user, not only programs run by this server.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `kind` (required) — abap debugs ABAP code; amdp debugs SQLScript methods of a class.
+- `breakpoints` (required) — abap: a line, an exception class, an ABAP statement or a message, each with an optional condition. amdp: object_name (the class) and line of each.
+- `take_over` — Takes over from an existing debugger of this user instead of refusing.
+- `run` — A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+### HandlerDebugWait
+
+**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+
+**Description:** State of a debug session after waiting up to hold_seconds; for AMDP, its events.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
+- `hold_seconds` — Longest wait for a change, at most 30 seconds.
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+### HandlerDebugView
+
+**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+
+**Description:** The stopped debuggee: stack, variables (by name, or the scopes), memory, or an AMDP table variable's rows.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
+- `what` (required) — stack, variables and memory read an ABAP stop; table reads an AMDP stop.
+- `names` — variables: names to read, a path reads a component or a table row; the scopes when omitted. table: the table variable, first entry.
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+### HandlerDebugStep
+
+**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+
+**Description:** Moves the stopped debuggee (into, over, return, continue, run or jump to a line), ends it where it stands, or ends the debug session.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
+- `action` (required) — into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.
+- `object_type` — For a line: CLAS, PROG, INCL or FUNC.
+- `object_name` — For a line: the object holding it.
+- `line` — For a line: the line in the object source.
+- `include` — For a class: definitions, implementations, macros or testclasses; the main source when omitted.
+- `parent_name` — For a function module: its function group.
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 

@@ -5,10 +5,91 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [17.2.0] - 2026-10-11
+
+The debugger: ABAP and AMDP debugging as an opt-in tool set, a debug session that
+lives between tool calls on every transport, and the instance state that holds it.
+Five schemas now refuse values their handlers used to bend (see Changed).
+
+### Added
+
+- **The `debug` set** (`--exposition=…,debug`; opt-in, never part of the default,
+  because a breakpoint catches every request of the connected SAP user), 29 tools:
+  - ABAP: `DebugStartListener` and `DebugTakeOverListener` (arm breakpoints, listen,
+    attach the first program caught, optionally run a class or report in the
+    background; refuse, or displace, another debugger of the same user),
+    `DebugWait`, `DebugSetBreakpoints`, `DebugDeleteBreakpoint`,
+    `DebugListBreakpoints`, `DebugGetStack`, `DebugSetStackPosition`,
+    `DebugGetVariables`, `DebugSetVariable`, `DebugStep`, `DebugStepToLine`,
+    `DebugTerminate`, `DebugCreateWatchpoint`, `DebugListWatchpoints`,
+    `DebugDeleteWatchpoint`, `DebugGetMemorySizes`, `DebugCreateMemorySnapshot`,
+    `DebugStop`;
+  - AMDP: `AmdpDebugStart` (a background run starts once the system confirmed the
+    breakpoints), `AmdpDebugSetBreakpoints`, `AmdpDebugWait`, `AmdpDebugStep`,
+    `AmdpDebugGetTable`, `AmdpDebugCancel`, `AmdpDebugStop` (releases a suspended
+    debuggee first);
+  - memory snapshots: `MemorySnapshotList`, `MemorySnapshotGet`,
+    `MemorySnapshotDelta` (need the memory snapshot authorization; the list is
+    empty without it).
+
+  It debugs what it starts itself, in the system's user mode; terminal debugging,
+  other users' requests and attaching to a process it did not start are not
+  offered. Every answer takes `detail` (`terse`, `full`, `raw`). See
+  `docs/user-guide/DEBUGGER.md`.
+- **A debug session is named by a `state_handle`** (128 random bits) that the
+  starting tool answers and every other session tool takes; an unknown handle and an
+  ended session's get the same answer, `state is not available`. The handle is a
+  bearer secret: keeping it safe is the deployer's (`SECURITY.md`, new). The state
+  lives in the server instance: stdio keeps it in the process, SSE in its session,
+  and Streamable HTTP in a pool of instances that routes each `tools/call` by its
+  `state_handle` (one request at a time per instance; a batch carrying a handle is
+  refused). Every host stops what an instance holds before letting it go.
+- **The idle bound on held state**: `--state-idle-minutes`, env
+  `MCP_STATE_IDLE_MINUTES`, YAML `state-idle-minutes` — default 30, at least 30, at
+  most 35791. Held state ends after that many minutes without a tool call on its
+  instance; a call in flight pauses it, a listener's own re-poll does not count. The
+  end is a complete stop, logged on stderr without the handle.
+- **The debugger's SAP ids** can be stated: headers `x-sap-debug-terminal-id` and
+  `x-sap-debug-ide-id`, `SAP_DEBUG_TERMINAL_ID` and `SAP_DEBUG_IDE_ID` in the
+  destination's `.env` or the environment; otherwise random per instance. The
+  system keys its listener conflict by the IDE id, so sharing one is a deliberate
+  choice; with stated ids, a restarted server's first start ends the listener its
+  predecessor left.
+- **Library** (`@mcp-abap-adt/lib`): subpaths `./debugger` (the debug sessions,
+  their readings and schemas) and `./state` (`InstanceState`, the idle bound);
+  `DebugHandlersGroup`, `defineTool` and the `ArgsOf` type from `./handlers`;
+  `HandlerExporter` option `includeDebug` (default `false`); `EmbeddableMcpServer`
+  options `stateIdleMinutes` and `stateLogger` (default: the logger passed, else
+  stderr), and its `state`, `stateHandle`, `holdsState()`, `dispose()`,
+  `shutdownState()` and `idle()`; `requestContextFromHeaders` reads the two debug
+  headers; `readStateIdleMinutes` and its names from `./config`.
+- **Compact**: `--exposition=ro,debug` or `rw,debug` adds four verbs —
+  `HandlerDebugStart` (`kind: abap|amdp`, `take_over`, `run`), `HandlerDebugWait`,
+  `HandlerDebugView`, `HandlerDebugStep` (`stop` ends the session) — 29 tools in all.
+  `debug` alone is refused.
+- `docs/user-guide/DEBUGGER.md`; the generated tool reference has a Debug group.
 
 ### Changed
 
+- **Tool arguments are checked at any depth, with their ranges.** The JSON schema
+  of a tool becomes one zod schema recursively — nested objects and arrays included —
+  with `integer` as a whole number, and `minimum` and `minItems` enforced. What that
+  changes for callers:
+  - **a fraction is refused where an integer is declared** on five tools, whose
+    handlers used to truncate it: `RunATC` (`max_findings`), `RuntimeRunClass` and
+    `RuntimeRunClassWithProfiling` (`max_trace_attempts`, `trace_retry_delay_ms`),
+    `GetObjectInfo` (`maxDepth`), `GetPackageTree` (`max_depth`);
+  - **`RuntimeRunClass` and `RuntimeRunClassWithProfiling` refuse an out-of-range
+    `max_trace_attempts` (under 1) or `trace_retry_delay_ms` (under 0)**, which their
+    handlers silently replaced with the defaults; the schema always declared these
+    minimums;
+  - **nested values are validated**: `GetVirtualFoldersLow`'s
+    `preselection[].values` must be an array of strings, as its handler already
+    assumed.
+- **Versions**: `@mcp-abap-adt/core` and the three compact packages require
+  `@mcp-abap-adt/lib` `^17.2.0`, and `@mcp-abap-adt/compact` requires
+  `@mcp-abap-adt/core` `^17.2.0` — the releases that ship `lib/debugger` and
+  `lib/state`.
 - **On `@mcp-abap-adt/adt-clients` 27.0.0** (with `adt-strategies` 0.8.1,
   `interfaces-adt` 13.2.0 and `interfaces-adt-connection` 2.0.0). Every factory
   of the client now answers a contract; what that changed here:

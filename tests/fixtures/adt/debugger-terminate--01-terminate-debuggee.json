@@ -1,0 +1,25 @@
+{
+  "case": "debugger-terminate",
+  "step": 1,
+  "stepTag": "terminate-debuggee",
+  "capturedAt": "2026-10-10",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger?method=terminateDebuggee",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger?method=terminateDebuggee",
+    "headers": {
+      "Accept": "application/xml",
+      "X-sap-adt-sessiontype": "stateful"
+    },
+    "headersNote": "On premise, SAP_BASIS 816, through this package on a stateful debug session opened for the attach; Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 500,
+    "headers": {
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-terminate--01-terminate-debuggee.body.xml"
+  }
+}

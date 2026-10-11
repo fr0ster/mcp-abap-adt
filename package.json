@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/lib",
-  "version": "17.1.0",
+  "version": "17.2.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -58,6 +58,16 @@
       "types": "./dist/lib/compact/index.d.ts",
       "import": "./dist/lib/compact/index.js",
       "require": "./dist/lib/compact/index.js"
+    },
+    "./debugger": {
+      "types": "./dist/lib/debugger/index.d.ts",
+      "import": "./dist/lib/debugger/index.js",
+      "require": "./dist/lib/debugger/index.js"
+    },
+    "./state": {
+      "types": "./dist/lib/state/index.d.ts",
+      "import": "./dist/lib/state/index.js",
+      "require": "./dist/lib/state/index.js"
     }
   },
   "typesVersions": {
@@ -91,6 +101,12 @@
       ],
       "compact-shared": [
         "dist/lib/compact/index.d.ts"
+      ],
+      "debugger": [
+        "dist/lib/debugger/index.d.ts"
+      ],
+      "state": [
+        "dist/lib/state/index.d.ts"
       ]
     }
   },
@@ -252,6 +268,8 @@
       "^@mcp-abap-adt/lib/handlers/read$": "<rootDir>/src/lib/handlers/read.ts",
       "^@mcp-abap-adt/lib/handlers/write$": "<rootDir>/src/lib/handlers/write.ts",
       "^@mcp-abap-adt/lib/compact-shared$": "<rootDir>/src/lib/compact/index.ts",
+      "^@mcp-abap-adt/lib/debugger$": "<rootDir>/src/lib/debugger/index.ts",
+      "^@mcp-abap-adt/lib/state$": "<rootDir>/src/lib/state/index.ts",
       "^@mcp-abap-adt/lib/utils$": "<rootDir>/src/lib/utils.ts",
       "^@mcp-abap-adt/lib/config$": "<rootDir>/src/lib/config/index.ts",
       "^@mcp-abap-adt/compact-readonly$": "<rootDir>/compact-readonly/src/index.ts",

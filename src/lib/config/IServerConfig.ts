@@ -27,7 +27,7 @@ export type Transport = 'stdio' | 'sse' | 'http';
  * that asks for it is recognised and refused with that pointer
  * (`validateExposition`) rather than parsed as a typo or silently ignored.
  */
-export type HandlerSet = 'readonly' | 'high' | 'low' | 'compact';
+export type HandlerSet = 'readonly' | 'high' | 'low' | 'compact' | 'debug';
 
 export interface IServerConfig {
   // ============================================================================
@@ -136,6 +136,13 @@ export interface IServerConfig {
    * the env file brings, as for the connection type.
    */
   systemTypeSource?: string;
+
+  /**
+   * The idle bound on held state: it ends after this many minutes without a
+   * tool call (`--state-idle-minutes`, `MCP_STATE_IDLE_MINUTES`,
+   * `state-idle-minutes`). A whole number, at least 30; default 30.
+   */
+  stateIdleMinutes?: number;
 
   // ============================================================================
   // LEGACY FIELDS (for v1 backward compatibility)

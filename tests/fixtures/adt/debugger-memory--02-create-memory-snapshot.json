@@ -1,0 +1,23 @@
+{
+  "case": "debugger-memory",
+  "step": 2,
+  "stepTag": "create-memory-snapshot",
+  "capturedAt": "2026-10-11",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/debugger/actions?action=memorySnapshot",
+    "params": null,
+    "headers": {
+      "Accept": "application/xml"
+    },
+    "headersNote": "On premise (2026-10-11), through this package's debugger sessions (DEBUG_HTTP_WIRE); user, system and host replaced by placeholders. The wire log prints no response headers: content-type is the one the request accepted. Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-type": "application/xml"
+    },
+    "bodyFile": "debugger-memory--02-create-memory-snapshot.body.xml"
+  }
+}

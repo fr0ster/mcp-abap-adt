@@ -17,6 +17,7 @@ import {
 import type { HandlerContext, IHandlerGroup } from '@mcp-abap-adt/lib/handlers';
 import {
   CompositeHandlersRegistry,
+  DebugHandlersGroup,
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -24,6 +25,7 @@ import {
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '@mcp-abap-adt/lib/handlers';
+import { type StateLogger, stderrStateLogger } from '@mcp-abap-adt/lib/state';
 import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
@@ -33,6 +35,7 @@ import { SseServer } from './SseServer.js';
 import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';
 import { StreamableHttpServer } from './StreamableHttpServer.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
+import { closeInstanceState } from './stateClose.js';
 
 const stderrLogger: ILogger = {
   info: (...args: any[]) => console.error(...args),
@@ -49,6 +52,13 @@ const silentLogger: ILogger = {
 };
 const loggerForTransport =
   process.env.DEBUG_AUTH_LOG === 'true' ? stderrLogger : silentLogger;
+
+/**
+ * The state's lifecycle lines — the idle bound's end of a state, a cleanup
+ * that failed — on stderr whatever DEBUG_AUTH_LOG says: they are what an
+ * operator needs to see, and the transport logger is silent by default.
+ */
+export const stateLoggerForTransport: StateLogger = stderrStateLogger;
 
 type Transport = 'stdio' | 'sse' | 'http';
 
@@ -99,6 +109,8 @@ ENVIRONMENT VARIABLES:
     MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
     MCP_BROWSER                    Browser for a login: chrome|edge|firefox|system|headless|none
     MCP_BROWSER_AUTH_PORT          Login callback port, 1-65535 (default: 61001)
+    MCP_STATE_IDLE_MINUTES         Held state (a debug session) ends after this many minutes
+                                   without a tool call: at least 30 (default: 30)
     MCP_TLS_CERT                   Path to TLS certificate file (PEM)
     MCP_TLS_KEY                    Path to TLS private key file (PEM)
     MCP_TLS_CA                     Path to TLS CA certificate file (PEM, optional)
@@ -177,6 +189,11 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    .env; the environment; on a cloud system, the system id.
                                    Otherwise left out of the request, never refused
                                    The environment is read once: later changes are not picked up
+    SAP_DEBUG_TERMINAL_ID          The debugger's terminal id and IDE id (with --exposition=...,debug),
+    SAP_DEBUG_IDE_ID               each on its own. First found: x-sap-debug-terminal-id /
+                                   x-sap-debug-ide-id; the destination's .env; the environment.
+                                   Else random per instance. A shared IDE id shares the user's
+                                   catches without the system's listener conflict
 
   HTTP/SSE Headers (System Context; SSE: the session's opening request):
     x-sap-master-system            Master system for this request (wins over the .env and env)
@@ -184,6 +201,8 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     x-sap-login                    With x-sap-url (on-premise): the login, the responsible when
                                    none is stated; on a destination request it is not read
     x-sap-language                 Master/original language for created objects (overrides SAP_LANGUAGE)
+    x-sap-debug-terminal-id        The debugger's terminal id (wins over the .env and env)
+    x-sap-debug-ide-id             The debugger's IDE id (wins over the .env and env)
 
 GENERATING A .ENV:
   Install the CLI: npm install -g @mcp-abap-adt/auth-broker-cli
@@ -531,7 +550,9 @@ export async function launch(
   if (exposition.includes('low')) {
     overridingGroups.push(new LowLevelHandlersGroup(baseContext));
   }
-
+  if (exposition.includes('debug')) {
+    overridingGroups.push(new DebugHandlersGroup(baseContext));
+  }
   for (const group of options.extraGroups?.(baseContext) ?? []) {
     overridingGroups.push(group);
   }
@@ -608,13 +629,21 @@ export async function launch(
 
     const server = new StdioServer(handlersRegistry, destinations, {
       version: options.version,
+      stateIdleMinutes: config.stateIdleMinutes,
+      stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,
     });
     activeServer = server;
     // Under stdio a signal is not the end of input: the factory's gate holds.
     installShutdown({
       factory,
-      servers: [],
+      servers: [
+        {
+          // The instance owns what it holds (a listener, a session) until it is
+          // gone; the close waits for that and reports what was left.
+          close: () => closeInstanceState(server),
+        },
+      ],
       onStdinEnd: true,
       exit: deps.exit,
       stderr: deps.stderr,
@@ -627,6 +656,8 @@ export async function launch(
   if (config.transport === 'sse') {
     const server = new SseServer(handlersRegistry, factory, {
       version: options.version,
+      stateIdleMinutes: config.stateIdleMinutes,
+      stateLogger: stateLoggerForTransport,
       host: config.host,
       port: config.port,
       ssePath: config.ssePath,
@@ -654,6 +685,8 @@ export async function launch(
   // http
   const server = new StreamableHttpServer(handlersRegistry, factory, {
     version: options.version,
+    stateIdleMinutes: config.stateIdleMinutes,
+    stateLogger: stateLoggerForTransport,
     host: config.host,
     port: config.port,
     enableJsonResponse: config.httpJsonResponse,

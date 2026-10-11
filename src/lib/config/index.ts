@@ -16,6 +16,12 @@ export type {
 } from './IServerConfig.js';
 // Server configuration manager
 export { ServerConfigManager } from './ServerConfigManager.js';
+export {
+  readStateIdleMinutes,
+  STATE_IDLE_CLI,
+  STATE_IDLE_ENV,
+  STATE_IDLE_YAML,
+} from './stateIdleMinutes.js';
 export { validateExposition } from './validateExposition.js';
 export type { YamlConfig } from './yamlConfig.js';
 // YAML configuration

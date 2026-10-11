@@ -1,0 +1,25 @@
+{
+  "case": "debugger-conversation",
+  "step": 2,
+  "stepTag": "breakpoints-get",
+  "capturedAt": "2026-10-08",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/debugger/breakpoints?debuggingMode=user&requestUser=SAPUSER01&terminalId=4D43504142414454000000000000DB01&ideId=mcp-abap-adt&scope=external",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/debugger/breakpoints?debuggingMode=user&requestUser=SAPUSER01&terminalId=4D43504142414454000000000000DB01&ideId=mcp-abap-adt&scope=external",
+    "headers": {
+      "Accept": "*/*",
+      "X-sap-adt-sessiontype": "stateful"
+    },
+    "headersNote": "Raw HTTP over one stateful session (X-sap-adt-sessiontype: stateful on every request); Authorization, Cookie and CSRF are not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "content-length": "0"
+    },
+    "bodyFile": null
+  }
+}

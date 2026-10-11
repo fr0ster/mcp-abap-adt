@@ -37,6 +37,18 @@ export interface RequestContext {
    * known it is left out of the request.
    */
   masterSystem?: string;
+  /**
+   * The debugger's terminal id, as stated: `x-sap-debug-terminal-id`, or
+   * `SAP_DEBUG_TERMINAL_ID` of the request's destination. Same presence rule
+   * as `responsible`; when none is stated the debugger generates one.
+   */
+  debugTerminalId?: string;
+  /**
+   * The debugger's IDE id, as stated: `x-sap-debug-ide-id`, or
+   * `SAP_DEBUG_IDE_ID` of the request's destination. Same presence rule as
+   * `debugTerminalId`.
+   */
+  debugIdeId?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -66,7 +78,8 @@ function headerValue(
  * `responsible` / `masterSystem` — each of these present only when its header
  * carries a value, so a request that states none leaves the destination's
  * `.env`, the process configuration, the login and the cloud lookup to fill
- * it. `x-sap-login` is not read here: it is a login only on an `x-sap-*`
+ * it. `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` enter the same way as
+ * `debugTerminalId` / `debugIdeId`. `x-sap-login` is not read here: it is a login only on an `x-sap-*`
  * basic connection, which the server enters itself.
  */
 export function requestContextFromHeaders(
@@ -74,10 +87,14 @@ export function requestContextFromHeaders(
 ): RequestContext {
   const responsible = headerValue(headers, 'x-sap-responsible');
   const masterSystem = headerValue(headers, 'x-sap-master-system');
+  const debugTerminalId = headerValue(headers, 'x-sap-debug-terminal-id');
+  const debugIdeId = headerValue(headers, 'x-sap-debug-ide-id');
   return {
     masterLanguage: headerValue(headers, 'x-sap-language'),
     ...(responsible ? { responsible } : {}),
     ...(masterSystem ? { masterSystem } : {}),
+    ...(debugTerminalId ? { debugTerminalId } : {}),
+    ...(debugIdeId ? { debugIdeId } : {}),
   };
 }
 

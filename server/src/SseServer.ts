@@ -14,6 +14,11 @@ import {
   requestContextFromHeaders,
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
+import {
+  parseStateIdleMinutes,
+  type StateLogger,
+  stateLoggerOf,
+} from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
@@ -27,6 +32,13 @@ import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
 export interface SseServerOptions {
+  /**
+   * The idle bound on held state, in minutes: each instance's state ends
+   * after this long without a tool call. At least 30; default 30.
+   */
+  stateIdleMinutes?: number;
+  /** Where the state's lifecycle lines go; default stderr, always on. */
+  stateLogger?: StateLogger;
   /**
    * Host to bind to (only used when no external app is provided)
    * @default "127.0.0.1"
@@ -106,6 +118,8 @@ export class SseServer {
   private readonly postPath: string;
   private readonly defaultDestination?: string;
   private readonly sessions = new Map<string, SessionEntry>();
+  /** Disposals of closed sessions still running; stop() waits for them. */
+  private readonly closingSessions = new Set<Promise<string[]>>();
   /** Per-destination lock around the first connect: it serialises the first login. */
   private readonly firstConnect = new FirstConnectLock();
   private readonly logger: Logger;
@@ -117,6 +131,8 @@ export class SseServer {
   private readonly allowedHosts?: string[];
   private readonly allowedOrigins?: string[];
   private readonly enableDnsRebindingProtection?: boolean;
+  private readonly stateIdleMinutes?: number;
+  private readonly stateLogger: StateLogger;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -137,6 +153,13 @@ export class SseServer {
     this.allowedHosts = opts?.allowedHosts;
     this.allowedOrigins = opts?.allowedOrigins;
     this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
+    // Refused here, at startup, rather than at a session's first request.
+    this.stateIdleMinutes =
+      opts?.stateIdleMinutes === undefined
+        ? undefined
+        : parseStateIdleMinutes(opts.stateIdleMinutes, 'stateIdleMinutes');
+    // From the options as given: the silent default of `this.logger` is never the state's.
+    this.stateLogger = stateLoggerOf(opts ?? {});
   }
 
   /**
@@ -257,13 +280,33 @@ export class SseServer {
    * Stops taking connections (shutdown, step 1). Requests already running are
    * not waited for, nor is an open stream: the factory's gate holds them.
    * Embedded on an external app, there is no listener of its own to stop.
+   * It then waits for the state of every session to be gone, and rejects with
+   * what could not be undone.
    */
   async stop(): Promise<void> {
     const server = this.standaloneServer;
-    if (!server) return;
-    this.standaloneServer = undefined;
-    server.close();
-    server.closeIdleConnections();
+    if (server) {
+      this.standaloneServer = undefined;
+      server.close();
+      server.closeIdleConnections();
+    }
+
+    // Every open session's instance is disposed, and the sessions that closed
+    // earlier are waited for (no timer): on an external app there is no
+    // listener here, but the sessions are still ours to drain.
+    const pending = [...this.closingSessions];
+    for (const [id, entry] of this.sessions) {
+      pending.push(
+        entry.server
+          .shutdownState()
+          .then((left) => left.map((l) => `${id}: ${l}`)),
+      );
+    }
+    this.sessions.clear();
+    const failures = (await Promise.all(pending)).flat();
+    if (failures.length) {
+      throw new Error(`state cleanup failed: ${failures.join('; ')}`);
+    }
   }
 
   private async handleGet(req: any, res: any): Promise<void> {
@@ -312,8 +355,14 @@ export class SseServer {
         private readonly registry: IHandlersRegistry,
         readonly loggerImpl: Logger,
         readonly ver: string,
+        state: { stateIdleMinutes?: number; stateLogger?: StateLogger },
       ) {
-        super({ name: 'mcp-abap-adt-sse', version: ver, logger: loggerImpl });
+        super({
+          name: 'mcp-abap-adt-sse',
+          version: ver,
+          logger: loggerImpl,
+          ...state,
+        });
       }
       async init(
         dest: string | undefined,
@@ -338,6 +387,10 @@ export class SseServer {
       this.handlersRegistry,
       this.logger,
       this.version,
+      {
+        stateIdleMinutes: this.stateIdleMinutes,
+        stateLogger: this.stateLogger,
+      },
     );
     try {
       await server.init(
@@ -386,9 +439,25 @@ export class SseServer {
     // Register cleanup handler AFTER successful connection
     res.on('close', () => {
       console.error(`[SSE CLOSE] Connection closed for session ${sessionId}`);
-      this.sessions.delete(sessionId);
+      const owned = this.sessions.delete(sessionId);
       void transport.close();
       void server.close();
+      // stop() took the session already and disposes it itself: its drain
+      // reports the outcome, so a late close adds nothing untracked.
+      if (!owned) return;
+      // The session's instance is owned until its state is gone: it settles on its own (an AMDP
+      // session when its last event batch arrives); stop() waits for it.
+      const closing = server.shutdownState().then((left) => {
+        if (left.length) {
+          // The state's line: always written (stderr unless an embedder chose a logger).
+          this.stateLogger.error(
+            `[SSE CLOSE] state cleanup for session ${sessionId} left: ${left.join('; ')}`,
+          );
+        }
+        return left.map((l) => `${sessionId}: ${l}`);
+      });
+      this.closingSessions.add(closing);
+      void closing.finally(() => this.closingSessions.delete(closing));
     });
   }
 

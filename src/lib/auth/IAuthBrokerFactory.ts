@@ -22,6 +22,10 @@ export interface DestinationSystemContext {
   login?: string;
   /** `SAP_MASTER_SYSTEM`. */
   masterSystem?: string;
+  /** `SAP_DEBUG_TERMINAL_ID`. */
+  debugTerminalId?: string;
+  /** `SAP_DEBUG_IDE_ID`. */
+  debugIdeId?: string;
 }
 
 export interface IDestinations {

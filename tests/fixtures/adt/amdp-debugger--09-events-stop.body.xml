@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?><amdpdbg:mainResponseList xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger"><amdpdbg:mainResponse amdpdbg:kind="STOP" amdpdbg:requestId="0CC47A1E68C11FE1B19E9556FA0E55CB" amdpdbg:mainId="0CC47A1E68C11FE1B19E95002B84B5CB" amdpdbg:debuggeeId=""><amdpdbg:value/></amdpdbg:mainResponse></amdpdbg:mainResponseList>
+no sync before the stop event read ended ok ["STOP"] 263 ms after the stop

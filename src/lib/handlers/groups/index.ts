@@ -6,6 +6,7 @@
  * to use different sets of handlers.
  */
 
+export { DebugHandlersGroup } from './DebugHandlersGroup.js';
 export { HighLevelHandlersGroup } from './HighLevelHandlersGroup.js';
 export { LowLevelHandlersGroup } from './LowLevelHandlersGroup.js';
 export { ReadOnlyHandlersGroup } from './ReadOnlyHandlersGroup.js';

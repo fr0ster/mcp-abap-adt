@@ -1,3 +1,4 @@
+import { analyseDebuggerFreed } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
@@ -89,6 +90,8 @@ export function fakeWorld() {
   const polls: Array<ReturnType<typeof deferred<any>> & { hold?: number }> = [];
   const opened: IAbapConnection[] = [];
   const closed: IAbapConnection[] = [];
+  /** Connections dropped without a request: their ABAP session was freed by the system. */
+  const dropped: IAbapConnection[] = [];
   const calls: string[] = [];
   const modes: string[] = [];
   const run = deferred<RunOutcome>();
@@ -163,6 +166,16 @@ export function fakeWorld() {
         calls.push(`terminate:${o?.analyse ? 'analysed' : 'plain'}`);
         return DONE();
       },
+      detachDebugger: async () => {
+        calls.push('detachDebugger');
+        return DONE();
+      },
+      terminateDebugger: async (o: any) => {
+        calls.push(
+          `terminateDebugger:${o?.analyse === analyseDebuggerFreed ? 'freed' : 'other'}`,
+        );
+        return DONE();
+      },
       setBreakpoints: async (_i: unknown, list: any[], o: any) => {
         if (o?.validationOnly) {
           calls.push(`validate:${list.length}`);
@@ -222,6 +235,9 @@ export function fakeWorld() {
     closeConnection: async (c) => {
       closed.push(c);
     },
+    dropConnection: (c) => {
+      dropped.push(c);
+    },
     abapDebugger: (c, mode) => {
       modes.push(String(mode));
       return make(c);
@@ -234,6 +250,7 @@ export function fakeWorld() {
     polls,
     opened,
     closed,
+    dropped,
     calls,
     log,
     modes,

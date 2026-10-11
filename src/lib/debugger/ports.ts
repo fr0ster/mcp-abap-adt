@@ -80,6 +80,9 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
   return {
     openConnection: openStateful,
     closeConnection: closeOwn,
+    // The system freed this ABAP session itself (terminateDebugger); the next request
+    // on it would answer 400, and a logoff is a request. Nothing to send: forget it.
+    dropConnection: () => {},
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
       new AbapDebugger(c, undefined, undefined, { onConflict }),
     requestUser: (context) => requestUserOf(context.connection),

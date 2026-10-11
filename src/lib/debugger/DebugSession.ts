@@ -16,7 +16,10 @@ import {
   type IDebuggerListenerConflict,
   readListenerConflict,
 } from '@mcp-abap-adt/adt-clients';
-import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDebuggeeEnd,
+  analyseDebuggerFreed,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IDebuggerBreakpoint,
@@ -66,6 +69,11 @@ export type RunOutcome =
 export interface DebugSessionPorts<O = unknown> {
   openConnection(origin: O): Promise<IAbapConnection>;
   closeConnection(connection: IAbapConnection): Promise<void>;
+  /**
+   * Forgets a connection whose ABAP session the system freed itself
+   * (`terminateDebugger`): nothing more is sent on it, not even a logoff.
+   */
+  dropConnection(connection: IAbapConnection): void;
   abapDebugger(
     connection: IAbapConnection,
     onConflict: IDebuggerListenerConflict,
@@ -871,6 +879,50 @@ export class DebugSession<O = unknown> {
       await this.releaseStop(stop);
       return { state: 'ended', reason: 'terminated' };
     });
+  }
+
+  /** The debugger leaves and the program runs on; an armed breakpoint can catch it again. */
+  detach(): Promise<DebugState> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      const answer = await stop.debugger.detachDebugger();
+      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      await this.leaveStop(stop, 'close');
+      return this.report();
+    });
+  }
+
+  /** Frees the debugger; the program runs on, and the session listens on. */
+  releaseDebugger(): Promise<DebugState> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      // terminateDebugger frees this ABAP session, and the system answers that with a
+      // plain ICF 500 (errata "The debugger freeing its session is answered as an ICF
+      // 500", measured on premise (2026-10-11), BASIS 816): analyseDebuggerFreed takes
+      // exactly that shape as no failure. An ADT document, an HTML 500 or a 400 stay
+      // failures, and the attachment is kept for DebugStop.
+      const answer = await stop.debugger.terminateDebugger({
+        analyse: analyseDebuggerFreed,
+      });
+      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      await this.leaveStop(stop, 'drop');
+      return this.report();
+    });
+  }
+
+  /**
+   * Inside the serial: the stop is left — its connection closed (a close that
+   * throws is kept and recorded), or, freed by the system, dropped without a
+   * request — and the listener polls again. The breakpoints stay.
+   */
+  private async leaveStop(stop: Stop, how: 'close' | 'drop'): Promise<void> {
+    if (this.current !== stop) return;
+    this.current = undefined;
+    if (how === 'drop') this.ports.dropConnection(stop.connection);
+    else await this.closeOrRecord(stop.connection, "the debuggee's connection");
+    const listener = this.listener;
+    if (listener && this.failure === undefined)
+      void this.loop(listener, this.generation);
   }
 
   getStack(): Promise<DebugView<StopView>> {

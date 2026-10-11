@@ -107,6 +107,12 @@ interface Stop {
   debugger: Debugger;
   view: StopView;
 }
+/** An attached debuggee whose release failed: only its attaching session can release it. */
+interface OwedRelease {
+  connection: IAbapConnection;
+  debugger: Debugger;
+  what: string;
+}
 
 const bodyOf = (a: IAdtResponse<unknown>): string =>
   a.ok ? String(a.getResult().value ?? '') : '';
@@ -490,10 +496,14 @@ export class DebugSession<O = unknown> {
         return false;
       }
       if (generation !== this.generation) {
-        // Overtaken while attaching: released at once; a release that fails is recorded.
+        // Overtaken while attaching: released at once. A release that fails is recorded,
+        // and the debuggee is kept with its connection for the next stop to release.
         const notReleased = await this.release(dbg);
-        if (notReleased) this.cleanupFailures.push(notReleased);
-        await this.closeOrRecord(connection, "the debuggee's connection");
+        if (notReleased) {
+          this.cleanupFailures.push(notReleased);
+          this.owed.add({ connection, debugger: dbg, what: 'the debuggee' });
+        } else
+          await this.closeOrRecord(connection, "the debuggee's connection");
         return false;
       }
       const stack = await dbg.getStack();
@@ -562,7 +572,12 @@ export class DebugSession<O = unknown> {
         failures.push(`${what} was not attached: ${messageOf(attached)}`);
       else {
         const notReleased = await this.release(dbg);
-        if (notReleased) failures.push(`${what}: ${notReleased}`);
+        if (notReleased) {
+          // Kept with the session that attached it: the next stop retries the release there.
+          failures.push(`${what}: ${notReleased}`);
+          this.owed.add({ connection, debugger: dbg, what });
+          return;
+        }
       }
     } catch (error) {
       failures.push(`${what} was not released: ${thrown(error)}`);
@@ -792,6 +807,8 @@ export class DebugSession<O = unknown> {
   private cleanupFailures: string[] = [];
   /** Connections whose work is done but whose close threw: the next stop closes them. */
   private readonly unclosed = new Set<IAbapConnection>();
+  /** Attached debuggees whose release failed, each with its connection: the next stop retries. */
+  private readonly owed = new Set<OwedRelease>();
 
   /** Inside stop: a close that throws keeps the connection for the next stop and is named. */
   private async closeOrKeep(
@@ -875,6 +892,20 @@ export class DebugSession<O = unknown> {
       try {
         for (const connection of [...this.unclosed])
           await this.closeOrKeep(connection, 'a connection', failures);
+        for (const owed of [...this.owed]) {
+          const notReleased = await this.release(owed.debugger);
+          if (notReleased) {
+            failures.push(`${owed.what}: ${notReleased}`); // kept: a later stop retries
+            continue;
+          }
+          // Released: only its connection may be left, and a retry must not release twice.
+          this.owed.delete(owed);
+          await this.closeOrKeep(
+            owed.connection,
+            `${owed.what}'s connection`,
+            failures,
+          );
+        }
         const stop = this.current;
         if (stop) {
           const released = await stop.debugger
@@ -972,7 +1003,8 @@ export class DebugSession<O = unknown> {
       !!this.run ||
       this.failure !== undefined ||
       this.cleanupFailures.length > 0 ||
-      this.unclosed.size > 0
+      this.unclosed.size > 0 ||
+      this.owed.size > 0
     );
   }
 

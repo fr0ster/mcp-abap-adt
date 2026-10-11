@@ -139,8 +139,49 @@ describe('DebugSession lifecycle', () => {
     );
     expect(world.calls.some((c) => c.startsWith('attach:'))).toBe(true);
     expect(session.holdsState()).toBe(true);
-    // The connection opened for it was closed all the same.
-    expect(world.closed).toContain(world.opened[world.opened.length - 1]);
+  });
+
+  it('a caught debuggee whose release failed is kept with its connection, and the next stop retries the release before closing it', async () => {
+    const { session, world } = await started();
+    world.stepAnswers.push(refusedResponse('release refused'));
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      world.polls[1].resolve(LISTEN_CATCH());
+      return okResponse(undefined);
+    };
+    const releases = () =>
+      world.calls.filter((c) => c === 'step:stepContinue:analysed').length;
+    await expect(session.stop()).rejects.toThrow(/release refused/);
+    expect(releases()).toBe(1);
+    const attaching = world.opened[world.opened.length - 1];
+    expect(world.closed).not.toContain(attaching); // only the attaching session can release it
+    expect(session.holdsState()).toBe(true);
+    delete world.override.stopListener;
+    await expect(session.stop()).resolves.toBeUndefined();
+    expect(releases()).toBe(2); // retried on the session that attached it
+    expect(world.closed).toContain(attaching);
+    expect(world.calls.filter((c) => c.startsWith('attach:'))).toHaveLength(1);
+    expect(session.holdsState()).toBe(false);
+    expect(session.failures()).toEqual([]);
+  });
+
+  it('a caught debuggee whose release fails again stays owed, and is named by each stop', async () => {
+    const { session, world } = await started();
+    world.override.step = async () => refusedResponse('release refused');
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      world.polls[1].resolve(LISTEN_CATCH());
+      return okResponse(undefined);
+    };
+    await expect(session.stop()).rejects.toThrow(/release refused/);
+    await expect(session.stop()).rejects.toThrow(
+      /a debuggee caught during the stop .*: the debuggee was not released: .*release refused/,
+    );
+    expect(session.holdsState()).toBe(true);
+    delete world.override.step;
+    await expect(session.stop()).resolves.toBeUndefined();
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
   });
 
   it('a run finishing after stop reports nothing and its connection closes once', async () => {
@@ -368,8 +409,12 @@ describe('DebugSession lifecycle', () => {
         /the debuggee was not released: work process busy/,
       );
       expect(session.holdsState()).toBe(true);
+      const attaching = world.opened[world.opened.length - 1];
+      expect(world.closed).not.toContain(attaching); // kept: only it can release the debuggee
       delete world.override.step;
       await expect(session.stop()).resolves.toBeUndefined();
+      expect(world.calls).toContain('step:stepContinue:analysed'); // the retried release
+      expect(world.closed).toContain(attaching);
       expect(session.holdsState()).toBe(false);
     });
   });

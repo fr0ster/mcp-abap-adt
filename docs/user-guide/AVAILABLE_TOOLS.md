@@ -4,16 +4,18 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 342
+- Total tools: 371
 - Read-only tools: 68
 - High-level tools: 157
 - Low-level tools: 117
+- Debug tools: 29
 
 ## Handler Sets
 
 - `readonly` -> [Read-Only Group](#read-only-group)
 - `high` -> [High-Level Group](#high-level-group)
 - `low` -> [Low-Level Group](#low-level-group)
+- `debug` (opt-in) -> [Debug Group](#debug-group)
 - `compact` -> [High-Level / Compact](#high-level-compact)
 
 ## Navigation
@@ -432,6 +434,37 @@ Generated from code in `src/handlers/**` (not from docs).
     - [ValidateTableLow](#validatetablelow-low-level-table)
   - [Transport](#low-level-transport)
     - [CreateTransportLow](#createtransportlow-low-level-transport)
+- [Debug Group](#debug-group)
+  - [Debugger](#debug-debugger)
+    - [AmdpDebugCancel](#amdpdebugcancel-debug-debugger)
+    - [AmdpDebugGetTable](#amdpdebuggettable-debug-debugger)
+    - [AmdpDebugSetBreakpoints](#amdpdebugsetbreakpoints-debug-debugger)
+    - [AmdpDebugStart](#amdpdebugstart-debug-debugger)
+    - [AmdpDebugStep](#amdpdebugstep-debug-debugger)
+    - [AmdpDebugStop](#amdpdebugstop-debug-debugger)
+    - [AmdpDebugWait](#amdpdebugwait-debug-debugger)
+    - [DebugCreateMemorySnapshot](#debugcreatememorysnapshot-debug-debugger)
+    - [DebugCreateWatchpoint](#debugcreatewatchpoint-debug-debugger)
+    - [DebugDeleteBreakpoint](#debugdeletebreakpoint-debug-debugger)
+    - [DebugDeleteWatchpoint](#debugdeletewatchpoint-debug-debugger)
+    - [DebugGetMemorySizes](#debuggetmemorysizes-debug-debugger)
+    - [DebugGetStack](#debuggetstack-debug-debugger)
+    - [DebugGetVariables](#debuggetvariables-debug-debugger)
+    - [DebugListBreakpoints](#debuglistbreakpoints-debug-debugger)
+    - [DebugListWatchpoints](#debuglistwatchpoints-debug-debugger)
+    - [DebugSetBreakpoints](#debugsetbreakpoints-debug-debugger)
+    - [DebugSetStackPosition](#debugsetstackposition-debug-debugger)
+    - [DebugSetVariable](#debugsetvariable-debug-debugger)
+    - [DebugStartListener](#debugstartlistener-debug-debugger)
+    - [DebugStep](#debugstep-debug-debugger)
+    - [DebugStepToLine](#debugsteptoline-debug-debugger)
+    - [DebugStop](#debugstop-debug-debugger)
+    - [DebugTakeOverListener](#debugtakeoverlistener-debug-debugger)
+    - [DebugTerminate](#debugterminate-debug-debugger)
+    - [DebugWait](#debugwait-debug-debugger)
+    - [MemorySnapshotDelta](#memorysnapshotdelta-debug-debugger)
+    - [MemorySnapshotGet](#memorysnapshotget-debug-debugger)
+    - [MemorySnapshotList](#memorysnapshotlist-debug-debugger)
 
 ---
 
@@ -2953,7 +2986,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
 **Parameters:**
-- `activate` (boolean, optional (default: true)) - Activate and generate the service binding after create. Default: true.
+- `activate` (boolean, optional (default: true)) - Activate the service binding after create, then read its service group. Default: true.
 - `binding_variant` (string, optional (default: ODATA_V4_UI)) - Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.
 - `description` (string, optional) - Optional description. Defaults to service_binding_name when omitted.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
@@ -5317,4 +5350,392 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-10-01*
+<a id="debug-group"></a>
+## Debug Group
+
+<a id="debug-debugger"></a>
+### Debug / Debugger
+
+<a id="amdpdebugcancel-debug-debugger"></a>
+#### AmdpDebugCancel (Debug / Debugger)
+**Description:** [debug] Cancels the stopped AMDP debuggee's execution.
+
+**Source:** `src/handlers/debugger/debug/handleAmdpDebugCancel.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="amdpdebuggettable-debug-debugger"></a>
+#### AmdpDebugGetTable (Debug / Debugger)
+**Description:** [debug] Rows of a table variable at the AMDP stop, up to 100; optionally through a SELECT over it.
+
+**Source:** `src/handlers/debugger/debug/handleAmdpDebugGetTable.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `query` (string, optional) - A SELECT over the variable.
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+- `variable` (string, required) - The table variable to read.
+
+---
+
+<a id="amdpdebugsetbreakpoints-debug-debugger"></a>
+#### AmdpDebugSetBreakpoints (Debug / Debugger)
+**Description:** [debug] Replaces the AMDP breakpoints of a debug session, as confirmed by the system. Catches every request of the connected SAP user, not only programs run by this server.
+
+**Source:** `src/handlers/debugger/debug/handleAmdpDebugSetBreakpoints.ts`
+
+**Parameters:**
+- `breakpoints` (array, required) - Lines in SQLScript methods of a class.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="amdpdebugstart-debug-debugger"></a>
+#### AmdpDebugStart (Debug / Debugger)
+**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, not only programs run by this server.
+
+**Source:** `src/handlers/debugger/debug/handleAmdpDebugStart.ts`
+
+**Parameters:**
+- `breakpoints` (array, required) - Lines in SQLScript methods of a class.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
+- `stop_existing` (boolean, optional (default: false)) - Ends an AMDP debug session of this user left behind.
+
+---
+
+<a id="amdpdebugstep-debug-debugger"></a>
+#### AmdpDebugStep (Debug / Debugger)
+**Description:** [debug] Steps the stopped AMDP debuggee over a statement or on to the next stop.
+
+**Source:** `src/handlers/debugger/debug/handleAmdpDebugStep.ts`
+
+**Parameters:**
+- `action` (string, required) - over runs the current statement, continue runs to the next stop.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="amdpdebugstop-debug-debugger"></a>
+#### AmdpDebugStop (Debug / Debugger)
+**Description:** [debug] Ends the AMDP part of a debug session, releasing a suspended debuggee first; a part that could not be undone is reported and kept.
+
+**Source:** `src/handlers/debugger/debug/handleAmdpDebugStop.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="amdpdebugwait-debug-debugger"></a>
+#### AmdpDebugWait (Debug / Debugger)
+**Description:** [debug] AMDP events of a debug session after waiting up to hold_seconds.
+
+**Source:** `src/handlers/debugger/debug/handleAmdpDebugWait.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `hold_seconds` (number, optional (default: 10)) - Longest wait for a change, at most 30 seconds.
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugcreatememorysnapshot-debug-debugger"></a>
+#### DebugCreateMemorySnapshot (Debug / Debugger)
+**Description:** [debug] Writes a memory snapshot of the stopped debuggee and answers the file written.
+
+**Source:** `src/handlers/debugger/debug/handleDebugCreateMemorySnapshot.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugcreatewatchpoint-debug-debugger"></a>
+#### DebugCreateWatchpoint (Debug / Debugger)
+**Description:** [debug] Watches a variable of the stopped debuggee: it stops when the variable changes, optionally under a condition.
+
+**Source:** `src/handlers/debugger/debug/handleDebugCreateWatchpoint.ts`
+
+**Parameters:**
+- `condition` (string, optional) - Stops only when this ABAP condition holds.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `name` (string, required) - Variable to watch; a path reaches a component.
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugdeletebreakpoint-debug-debugger"></a>
+#### DebugDeleteBreakpoint (Debug / Debugger)
+**Description:** [debug] Removes one breakpoint of a debug session.
+
+**Source:** `src/handlers/debugger/debug/handleDebugDeleteBreakpoint.ts`
+
+**Parameters:**
+- `breakpoint_id` (string, required) - Breakpoint id.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugdeletewatchpoint-debug-debugger"></a>
+#### DebugDeleteWatchpoint (Debug / Debugger)
+**Description:** [debug] Removes a watchpoint.
+
+**Source:** `src/handlers/debugger/debug/handleDebugDeleteWatchpoint.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+- `watchpoint_id` (string, required) - Watchpoint id.
+
+---
+
+<a id="debuggetmemorysizes-debug-debugger"></a>
+#### DebugGetMemorySizes (Debug / Debugger)
+**Description:** [debug] Memory the stopped debuggee uses. Needs a stopped debuggee.
+
+**Source:** `src/handlers/debugger/debug/handleDebugGetMemorySizes.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debuggetstack-debug-debugger"></a>
+#### DebugGetStack (Debug / Debugger)
+**Description:** [debug] Call stack of the stopped debuggee, each frame as an object address and as its technical place. Needs a stopped debuggee.
+
+**Source:** `src/handlers/debugger/debug/handleDebugGetStack.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debuggetvariables-debug-debugger"></a>
+#### DebugGetVariables (Debug / Debugger)
+**Description:** [debug] Variables of the stopped debuggee, by name or as members of a parent. Needs a stopped debuggee.
+
+**Source:** `src/handlers/debugger/debug/handleDebugGetVariables.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `names` (array, optional) - Variables by name; a path reads a component or a table row.
+- `parents` (array, optional) - Instead of names: members of these scopes, objects or tables.
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debuglistbreakpoints-debug-debugger"></a>
+#### DebugListBreakpoints (Debug / Debugger)
+**Description:** [debug] Breakpoints a debug session armed.
+
+**Source:** `src/handlers/debugger/debug/handleDebugListBreakpoints.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debuglistwatchpoints-debug-debugger"></a>
+#### DebugListWatchpoints (Debug / Debugger)
+**Description:** [debug] Watchpoints of the stopped debuggee.
+
+**Source:** `src/handlers/debugger/debug/handleDebugListWatchpoints.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugsetbreakpoints-debug-debugger"></a>
+#### DebugSetBreakpoints (Debug / Debugger)
+**Description:** [debug] Adds breakpoints to a debug session — line, exception class, ABAP statement or message, with an optional condition — and reports which the system refused and why. Catches every request of the connected SAP user, not only programs run by this server.
+
+**Source:** `src/handlers/debugger/debug/handleDebugSetBreakpoints.ts`
+
+**Parameters:**
+- `breakpoints` (array, required) - Breakpoints: a line, an exception class, an ABAP statement or a message; each with an optional condition.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugsetstackposition-debug-debugger"></a>
+#### DebugSetStackPosition (Debug / Debugger)
+**Description:** [debug] Selects the stack frame variables are read in; what runs next does not change. Needs a stopped debuggee.
+
+**Source:** `src/handlers/debugger/debug/handleDebugSetStackPosition.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `position` (integer, required) - Frame position as the stack numbers it; the stopped frame has the highest position.
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugsetvariable-debug-debugger"></a>
+#### DebugSetVariable (Debug / Debugger)
+**Description:** [debug] Sets a variable of the stopped debuggee. Needs a stopped debuggee.
+
+**Source:** `src/handlers/debugger/debug/handleDebugSetVariable.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `name` (string, required) - Variable to set; a path reaches a component.
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+- `value` (string, required) - New value; converted to the type by the system.
+
+---
+
+<a id="debugstartlistener-debug-debugger"></a>
+#### DebugStartListener (Debug / Debugger)
+**Description:** [debug] Opens a debug session of the connected SAP user: arms breakpoints, listens for a debuggee and attaches the first one caught; refused while another debugger listens for that user. Catches every request of the connected SAP user, not only programs run by this server.
+
+**Source:** `src/handlers/debugger/debug/handleDebugStartListener.ts`
+
+**Parameters:**
+- `breakpoints` (array, optional) - Breakpoints: a line, an exception class, an ABAP statement or a message; each with an optional condition.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
+
+---
+
+<a id="debugstep-debug-debugger"></a>
+#### DebugStep (Debug / Debugger)
+**Description:** [debug] Moves the stopped debuggee into a call, over it, out of the current one, or on to the next stop.
+
+**Source:** `src/handlers/debugger/debug/handleDebugStep.ts`
+
+**Parameters:**
+- `action` (string, required) - into enters the call, over runs it, return leaves the current one, continue runs to the next stop.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugsteptoline-debug-debugger"></a>
+#### DebugStepToLine (Debug / Debugger)
+**Description:** [debug] Runs or jumps the stopped debuggee to a line.
+
+**Source:** `src/handlers/debugger/debug/handleDebugStepToLine.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `include` (string, optional) - For a class: definitions, implementations, macros or testclasses; the main source when omitted.
+- `line` (integer, required) - For a line: the line in the object source.
+- `mode` (string, required) - run executes up to the line; jump moves there without executing what lies between.
+- `object_name` (string, required) - For a line: the object holding it.
+- `object_type` (string, required) - For a line: CLAS, PROG, INCL or FUNC.
+- `parent_name` (string, optional) - For a function module: its function group.
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugstop-debug-debugger"></a>
+#### DebugStop (Debug / Debugger)
+**Description:** [debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes the connections; a part that could not be undone is reported and kept.
+
+**Source:** `src/handlers/debugger/debug/handleDebugStop.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugtakeoverlistener-debug-debugger"></a>
+#### DebugTakeOverListener (Debug / Debugger)
+**Description:** [debug] Opens a debug session of the connected SAP user: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Catches every request of the connected SAP user, not only programs run by this server.
+
+**Source:** `src/handlers/debugger/debug/handleDebugTakeOverListener.ts`
+
+**Parameters:**
+- `breakpoints` (array, optional) - Breakpoints: a line, an exception class, an ABAP statement or a message; each with an optional condition.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
+
+---
+
+<a id="debugterminate-debug-debugger"></a>
+#### DebugTerminate (Debug / Debugger)
+**Description:** [debug] Ends the stopped debuggee where it stands; the program does not run on.
+
+**Source:** `src/handlers/debugger/debug/handleDebugTerminate.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugwait-debug-debugger"></a>
+#### DebugWait (Debug / Debugger)
+**Description:** [debug] State of a debug session after waiting up to hold_seconds; a debugger that took the user over is an error carrying the system's message.
+
+**Source:** `src/handlers/debugger/debug/handleDebugWait.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `hold_seconds` (number, optional (default: 10)) - Longest wait for a change, at most 30 seconds.
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="memorysnapshotdelta-debug-debugger"></a>
+#### MemorySnapshotDelta (Debug / Debugger)
+**Description:** [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+
+**Source:** `src/handlers/debugger/debug/handleMemorySnapshotDelta.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `from_id` (string, required) - Snapshot id to compare from.
+- `key` (string, optional) - Object key, for children and references.
+- `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
+- `to_id` (string, required) - Snapshot id to compare to.
+- `view` (string, optional (default: overview)) - overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.
+
+---
+
+<a id="memorysnapshotget-debug-debugger"></a>
+#### MemorySnapshotGet (Debug / Debugger)
+**Description:** [debug] One memory snapshot in a view: header, memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.
+
+**Source:** `src/handlers/debugger/debug/handleMemorySnapshotGet.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `key` (string, optional) - Object key, for children and references.
+- `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
+- `snapshot_id` (string, required) - Snapshot id.
+- `view` (string, optional (default: overview)) - header: the snapshot; overview: memory by kind; ranking: the largest objects; children: what an object holds; references: what holds an object.
+
+---
+
+<a id="memorysnapshotlist-debug-debugger"></a>
+#### MemorySnapshotList (Debug / Debugger)
+**Description:** [debug] Memory snapshots the system lists. Empty without the memory snapshot authorization.
+
+**Source:** `src/handlers/debugger/debug/handleMemorySnapshotList.ts`
+
+**Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `user` (string, optional) - Only the snapshots of this SAP user.
+
+---
+
+*Last updated: 2026-10-11*

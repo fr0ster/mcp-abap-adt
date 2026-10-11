@@ -31,14 +31,27 @@ describe('release metadata names the version npm will carry', () => {
     }
   });
 
-  it('every sibling range accepts this major', () => {
+  // A sibling range is a caret on this major; its floor may be raised to the
+  // release that ships what the dependant needs (17.2.0: `lib/debugger` and
+  // `lib/state`), never above the version released here.
+  it('every sibling range is a caret on this major, its floor at most this version', () => {
     const siblings = Object.values(manifests).map((m) => m.name);
+    const parts = (v: string) => v.split('.').map(Number);
+    const atMost = (floor: string, top: string) => {
+      const [a, b] = [parts(floor), parts(top)];
+      for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i];
+      return true;
+    };
     for (const manifest of Object.values(manifests)) {
       for (const [dep, range] of Object.entries(manifest.dependencies ?? {})) {
         if (!siblings.includes(dep)) continue;
-        expect(`${manifest.name} → ${dep} ${range}`).toBe(
-          `${manifest.name} → ${dep} ^${major}.0.0`,
+        const floor = /^\^(\d+\.\d+\.\d+)$/.exec(String(range))?.[1];
+        expect(`${manifest.name} → ${dep} ${range}`).toMatch(
+          new RegExp(`→ ${dep} \\^${major}\\.\\d+\\.\\d+$`),
         );
+        expect(
+          `${manifest.name} → ${dep} floor within ${version}: ${floor !== undefined && atMost(floor, version)}`,
+        ).toBe(`${manifest.name} → ${dep} floor within ${version}: true`);
       }
     }
   });

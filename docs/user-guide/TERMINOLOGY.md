@@ -9,7 +9,7 @@ A **destination** is a name for one SAP system and how to log on to it. Two kind
 - **Named** (`--mcp=TRIAL`, or the `x-mcp-destination` header with `--allow-destination-header`): read field by field from `sessions/TRIAL.env` (wins) and `service-keys/TRIAL.json`, in the platform directories (`~/.config/mcp-abap-adt/` on Linux/macOS).
 - **An env file** (`--env`, `--env-path`, `MCP_ENV_PATH`): one file that states everything. Nothing is looked up in the working directory; a `.env` there is read only when named (`--env-path=./.env`).
 
-The server supports four authentications for a destination: basic, SNC, JWT with browser login, JWT you hold. See [Authentication & Destinations](AUTHENTICATION.md).
+`mcp-abap-adt` (stdio) supports three authentications for a destination: basic, SNC, JWT with browser login; a JWT you hold goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse`. See [Authentication & Destinations](AUTHENTICATION.md).
 
 ## Service Key
 

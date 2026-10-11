@@ -18,10 +18,12 @@ broker's `renewal` says.
    `factory.getProvider`, never the broker's own `getProvider`.
 3. **The destination states its authentication.** The service key store answers the *means*
    (`authType`, `grantType`, URL, client); the session store holds the *secret* alone. The factory
-   checks them against the vocabulary and picks one of the four handlers.
-4. **Four authentications, exactly**: `basic` (HTTP or RFC), `snc` (RFC only), `jwt` /
-   `authorization_code` (browser login), `jwt` / `none` (a token you hold). Anything else is
-   refused with `Destination "X" uses <type> / <grant>, which this server does not support`.
+   checks them against the vocabulary and picks one of the three handlers.
+4. **Three authentications, exactly**: `basic` (HTTP or RFC), `snc` (RFC only), `jwt` /
+   `authorization_code` (browser login). Anything else is refused with `Destination "X" uses
+   <type> / <grant>, which this server does not support` — `jwt` / `none` (a token you hold)
+   included, with the hint that the token goes in the `x-sap-jwt-token` header of
+   `mcp-abap-adt-http` / `mcp-abap-adt-sse`, or that `mcp-auth` creates the session (D53).
 5. **A destination's settings are read once per process.** Nothing watches the files; a `.env`
    change from outside takes effect on restart. Editing a destination's files while the server
    runs is not supported and may combine old and new values until the next start.

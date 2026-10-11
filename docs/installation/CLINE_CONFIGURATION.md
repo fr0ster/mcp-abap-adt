@@ -31,11 +31,9 @@ to choose: [Installation variants](INSTALLATION.md#installation-variants). Ready
    SAP_AUTH_TYPE=basic
    SAP_USERNAME=<your ABAP user>
    SAP_PASSWORD=<your password>
-   # or a JWT you hold:
-   # SAP_AUTH_TYPE=jwt
-   # SAP_GRANT_TYPE=none
-   # SAP_JWT_TOKEN=<token>
    ```
+
+   A token you hold is not served over stdio: send it in the `x-sap-jwt-token` header to `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or create the session with `mcp-auth`.
 
    All authentications: [Authentication & Destinations](../user-guide/AUTHENTICATION.md).
 

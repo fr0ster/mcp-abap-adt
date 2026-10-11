@@ -213,7 +213,7 @@ npx mcp-abap-adt --transport=http --port=3000
 
 #### Configuration
 
-The server supports **four authentications** — basic (HTTP or RFC), SNC (RFC, passwordless), JWT with browser login and JWT you hold — see [Authentication & Destinations](../user-guide/AUTHENTICATION.md). A destination lives in one of two places:
+`mcp-abap-adt` (stdio) supports **three authentications** — basic (HTTP or RFC), SNC (RFC, passwordless) and JWT with browser login; a JWT you hold goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse` — see [Authentication & Destinations](../user-guide/AUTHENTICATION.md). A destination lives in one of two places:
 
 1. **Named destination** (`--mcp=<destination>`): `service-keys/<destination>.json` and `sessions/<destination>.env`, read field by field
 2. **A `.env` file** (`--env` or `--env-path`): one file, read and written back with a renewed token
@@ -263,13 +263,14 @@ For single-configuration scenarios, you can use a `.env` file:
 After installation, create a `.env` file with your SAP connection details:
 
 ```bash
-# Create .env file (a JWT you hold)
+# Create .env file (basic; a token you hold goes in the x-sap-jwt-token header
+# of mcp-abap-adt-http / mcp-abap-adt-sse, never in a stdio .env)
 cat > .env << 'EOF'
 SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
-SAP_AUTH_TYPE=jwt
-SAP_GRANT_TYPE=none
-SAP_JWT_TOKEN=your-jwt-token
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=<your ABAP user>
+SAP_PASSWORD=<your password>
 # System type: cloud (default), onprem, or legacy
 SAP_SYSTEM_TYPE=cloud
 EOF
@@ -390,7 +391,7 @@ You can also configure the server using environment variables.
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
-- `SAP_JWT_TOKEN` - JWT token (with `SAP_GRANT_TYPE=none`)
+- `SAP_JWT_TOKEN` - The session's token, written by `mcp-auth` or the server (a token you hold goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse`)
 - `SAP_REFRESH_TOKEN` - Refresh token for token renewal
 - `SAP_UAA_URL` - UAA URL for OAuth2
 - `SAP_UAA_CLIENT_ID` - UAA Client ID

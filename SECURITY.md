@@ -37,8 +37,9 @@ Credentials (`x-sap-*` headers) and state handles travel in every request, so
 The server serves HTTPS when it is given a certificate and its key:
 
 ```bash
-mcp-abap-adt --transport=http --host=0.0.0.0 --port=3000 \
+mcp-abap-adt-http --host=0.0.0.0 --port=3000 \
   --tls-cert=/path/server.crt --tls-key=/path/server.key [--tls-ca=/path/ca.crt]
+# HTTP+SSE: mcp-abap-adt-sse takes the same --tls-* options
 ```
 
 ```yaml

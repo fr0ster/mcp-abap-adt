@@ -11,7 +11,7 @@
 - **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
 - Works with **On-Premise (ECC/S/4HANA)** and **ABAP Cloud (BTP)** systems
 - Legacy systems (BASIS < 7.50) are **not supported at present**: that support is parked on the `parked/legacy-support` branch until it can be tried against a live legacy system
-- Four authentications: **basic** (HTTP or RFC), **SNC** (passwordless, RFC), **JWT with browser login** (service key, ABAP or XSUAA) and **JWT you already hold**
+- Three authentications over stdio: **basic** (HTTP or RFC), **SNC** (passwordless, RFC), **JWT with browser login** (service key, ABAP or XSUAA); a **JWT you already hold** goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse`
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Several installation variants: the **full** server (`@mcp-abap-adt/core`) or the **compact** one (`@mcp-abap-adt/compact`), each connecting to the system over **HTTP**, **RFC** or **SNC** — see [Installation variants](docs/installation/INSTALLATION.md#installation-variants)
 - Rich tool surface for ABAP objects, metadata, transports, and search
@@ -73,7 +73,7 @@ Standard service key paths:
 - Unix (Linux/macOS): `~/.config/mcp-abap-adt/service-keys/<destination>.json`
 - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\<destination>.json`
 
-The server supports exactly four authentications; each is a destination stated in a service key, a `.env`, or both:
+`mcp-abap-adt` (stdio) supports exactly three authentications, each a destination stated in a service key, a `.env`, or both; a JWT you hold is sent in headers to the HTTP or SSE server:
 
 | Authentication | `.env` keys |
 |----------------|-------------|

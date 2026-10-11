@@ -271,10 +271,9 @@ stored, shared or cached across them. Over SSE a `POST` is routed by its `sessio
 ## Errors you may meet at startup
 
 - `Destination "X" cannot be used: <fields>` — the destination states less than its
-  authentication needs, or a session it cannot use, followed by one hint where the server knows
-  the remedy (`grantType`, `SAP_URL`, `XSUAA_MCP_URL`, `connection-type`, `authorizationToken`,
-  `issuedFor` / `issuedBy`). A refusal naming `issuedFor` / `issuedBy` gets: "the session is
-  bound to another destination's means: regenerate it with mcp-auth".
+  authentication needs, followed by one hint where the server knows the remedy (`grantType`,
+  `SAP_URL`, `XSUAA_MCP_URL`, `connection-type`). A session bound to another destination's means
+  is not refused: it is not used, and the destination logs in afresh.
 - `Destination "X" cannot be used: its session record is not in the store's format` — the
   session file holds a record no writer of the chain produces (auth-stores 5 refuses it as
   `record-format`): a token without `SAP_ISSUED_FOR` / `SAP_ISSUED_BY` beside it (an older

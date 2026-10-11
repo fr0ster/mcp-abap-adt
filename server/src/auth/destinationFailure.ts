@@ -95,12 +95,6 @@ export const HINTS: Readonly<Record<string, string>> = {
   'connection-type': 'SNC logs on over RFC: set --connection-type=rfc.',
   browser:
     'Start with --browser=none and open the URL the login prints on stderr, or give --browser-program=<program>.',
-  authorizationToken:
-    'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
-  issuedFor:
-    "the session is bound to another destination's means: regenerate it with mcp-auth",
-  issuedBy:
-    "the session is bound to another destination's means: regenerate it with mcp-auth",
 };
 
 export interface DestinationFailureOptions {

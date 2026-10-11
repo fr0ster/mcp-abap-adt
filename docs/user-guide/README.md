@@ -27,10 +27,12 @@ the sessions store, or `--mcp=<destination>` for a service key):
 cat > /path/to/<destination>.env << 'EOF'
 SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
-SAP_AUTH_TYPE=jwt
-SAP_GRANT_TYPE=none
-SAP_JWT_TOKEN=<token>
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=<your ABAP user>
+SAP_PASSWORD=<your password>
 EOF
+
+# A token you hold is not served over stdio: send it in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse, or create the session with mcp-auth.
 
 # stdio (for MCP clients)
 mcp-abap-adt --env-path=/path/to/<destination>.env

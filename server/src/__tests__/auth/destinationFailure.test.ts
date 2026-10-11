@@ -32,9 +32,6 @@ import {
   SYSTEM_URL,
 } from '../helpers/factoryFixture';
 
-const ISSUED_HINT =
-  "the session is bound to another destination's means: regenerate it with mcp-auth";
-
 const KNOWN = {
   grantType:
     'Write the destination again with `mcp-auth --destination <name> --type abap|xsuaa` or `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (from @mcp-abap-adt/auth-broker-cli), or add SAP_GRANT_TYPE to its .env.',
@@ -42,10 +39,8 @@ const KNOWN = {
   XSUAA_MCP_URL:
     "Set XSUAA_MCP_URL in the destination's sessions/<destination>.env to the system's URL.",
   'connection-type': 'SNC logs on over RFC: set --connection-type=rfc.',
-  authorizationToken:
-    'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
-  issuedFor: ISSUED_HINT,
-  issuedBy: ISSUED_HINT,
+  browser:
+    'Start with --browser=none and open the URL the login prints on stderr, or give --browser-program=<program>.',
 } as const;
 
 function payload(thrown: unknown): Record<string, unknown> {
@@ -55,24 +50,24 @@ function payload(thrown: unknown): Record<string, unknown> {
 }
 
 describe('a DestinationConfigError', () => {
-  it.each(Object.keys(KNOWN) as Array<keyof typeof KNOWN>)(
-    'names %s with its own hint and no other',
-    (field) => {
-      const answer = payload(
-        new DestinationConfigError('dest', [field], 'fixed reason'),
-      );
-      expect(answer).toEqual({
-        error: 'destination_refused',
-        message: `Destination "dest" cannot be used: ${field}`,
-        hint: KNOWN[field],
-      });
-    },
-  );
+  // `browser` has a headline of its own (below).
+  it.each(
+    (Object.keys(KNOWN) as Array<keyof typeof KNOWN>).filter(
+      (field) => field !== 'browser',
+    ),
+  )('names %s with its own hint and no other', (field) => {
+    const answer = payload(
+      new DestinationConfigError('dest', [field], 'fixed reason'),
+    );
+    expect(answer).toEqual({
+      error: 'destination_refused',
+      message: `Destination "dest" cannot be used: ${field}`,
+      hint: KNOWN[field],
+    });
+  });
 
-  it('the hints are the ones the server holds', () => {
-    for (const [field, hint] of Object.entries(KNOWN)) {
-      expect(HINTS[field]).toBe(hint);
-    }
+  it('the hints are the ones the server holds, and no other', () => {
+    expect(HINTS).toEqual(KNOWN);
   });
 
   it('a field without a known remedy: the headline alone', () => {
@@ -88,14 +83,14 @@ describe('a DestinationConfigError', () => {
     const answer = payload(
       new DestinationConfigError(
         'dest',
-        ['uaaUrl', 'issuedFor', 'issuedBy', 'grantType'],
+        ['uaaUrl', 'SAP_URL', 'grantType', 'SAP_URL'],
         'r',
       ),
     );
     expect(answer.message).toBe(
-      'Destination "dest" cannot be used: uaaUrl, issuedFor, issuedBy, grantType',
+      'Destination "dest" cannot be used: uaaUrl, SAP_URL, grantType, SAP_URL',
     );
-    expect(answer.hint).toBe(`${ISSUED_HINT}\n${KNOWN.grantType}`);
+    expect(answer.hint).toBe(`${KNOWN.SAP_URL}\n${KNOWN.grantType}`);
   });
 
   it('a carried error: its hint first, then the fields’ hints; cause_kind its kind', () => {
@@ -220,9 +215,9 @@ describe('through a real --env file (broker 5.0.1)', () => {
   });
 
   it("jwt / authorization_code whose SAP_ISSUED_* name another destination's means: not refused — the broker does not use the stored session (measured)", async () => {
-    // The issuedFor / issuedBy refusal and its hint (HINTS, above) answer a
+    // Broker 5.0.1 refuses naming issuedFor / issuedBy only for a
     // handed-over credential, which no handler of stdio serves any more
-    // (D53). For a grant the provider obtains, broker 5.0.1 discards a
+    // (D53), so the server holds no hint for them. For a grant the provider obtains, broker 5.0.1 discards a
     // session bound elsewhere and the provider obtains a new one.
     const warnings: string[] = [];
     const file = base.writeFile('conn.env', [

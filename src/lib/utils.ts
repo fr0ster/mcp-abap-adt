@@ -1187,7 +1187,7 @@ SAP CONNECTION (.env file):
                                    (the .env joins it, never over a value set), then YAML
   SAP_USERNAME                     SAP username (required for basic auth)
   SAP_PASSWORD                     SAP password (required for basic auth)
-  SAP_JWT_TOKEN                    JWT token (with SAP_GRANT_TYPE=none)
+  SAP_JWT_TOKEN                    The session's token (written by mcp-auth or the server)
   SAP_SNC_PARTNERNAME              snc (RFC only, no user, no password): the system's SNC name
   SAP_SNC_QOP / SAP_SNC_LIB / SAP_SNC_MYNAME   snc, optional
   XSUAA_MCP_URL                    An XSUAA service key's system URL, in sessions/<destination>.env
@@ -1267,8 +1267,9 @@ DOCUMENTATION:
   Configuration:   docs/user-guide/CLIENT_CONFIGURATION.md
 
 AUTHENTICATION:
-  Four authentications: basic, snc (RFC only), jwt/authorization_code (browser login),
-  jwt/none (a token you hold). A jwt .env must state SAP_GRANT_TYPE.
+  Three authentications: basic, snc (RFC only), jwt/authorization_code (browser login).
+  A token you hold is not served over stdio: send it in the x-sap-jwt-token header
+  to mcp-abap-adt-http or mcp-abap-adt-sse. A jwt .env must state SAP_GRANT_TYPE.
   To write a .env: npm install -g @mcp-abap-adt/auth-broker-cli, then
   mcp-auth --service-key <key.json> --output <file.env> --type abap|xsuaa
 

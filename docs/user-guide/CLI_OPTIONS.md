@@ -500,8 +500,8 @@ These are typically set in `.env` file:
 - `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` - Optional
 
 **JWT/OAuth2 Authentication:**
-- `SAP_GRANT_TYPE` - `authorization_code` or `none` (**required** with `SAP_AUTH_TYPE=jwt`)
-- `SAP_JWT_TOKEN` - The token (with `SAP_GRANT_TYPE=none`; otherwise the server stores the one it obtained)
+- `SAP_GRANT_TYPE` - `authorization_code` (**required** with `SAP_AUTH_TYPE=jwt`). A token you hold is not served over stdio: send it in the `x-sap-jwt-token` header to `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or create the session with `mcp-auth`.
+- `SAP_JWT_TOKEN` - The session's token, written by `mcp-auth` or the server (never by hand)
 - `SAP_REFRESH_TOKEN` - Refresh token for automatic token renewal
 - `SAP_UAA_URL` - UAA URL for OAuth2 (alternative: `UAA_URL`)
 - `SAP_UAA_CLIENT_ID` - UAA Client ID (alternative: `UAA_CLIENT_ID`)
@@ -616,8 +616,10 @@ sudo cat > /etc/mcp-abap-adt/prod.env << EOF
 SAP_URL=https://prod.sap.company.example
 SAP_CLIENT=200
 SAP_AUTH_TYPE=jwt
-SAP_GRANT_TYPE=none
-SAP_JWT_TOKEN=production-jwt-token
+SAP_GRANT_TYPE=authorization_code
+SAP_UAA_URL=https://uaa.company.example
+SAP_UAA_CLIENT_ID=<client id>
+SAP_UAA_CLIENT_SECRET=<client secret>
 EOF
 
 # Run with explicit config

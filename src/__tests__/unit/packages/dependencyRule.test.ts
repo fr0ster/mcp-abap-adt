@@ -257,10 +257,55 @@ function walk(row: Row, mode: Mode): Graph {
   return graph;
 }
 
-const built = PACKAGES.every((row) =>
-  fs.existsSync(path.join(ROOT, row.dir, 'dist', 'index.js')),
-);
-const MODES: Mode[] = built ? ['src', 'dist'] : ['src'];
+/**
+ * Which graphs are walked. Every package built: `src` and `dist`. A package
+ * not built: under CI the `dist` check is refused, never dropped (a reordered
+ * workflow must turn red); locally it is skipped with the reason printed.
+ */
+function distDecision(
+  unbuilt: readonly string[],
+  ci: boolean,
+): { modes: Mode[]; refusal?: string; skip?: string } {
+  if (unbuilt.length === 0) return { modes: ['src', 'dist'] };
+  const words = `not built: ${unbuilt.join(', ')} — run npm run build first`;
+  return ci
+    ? { modes: ['src'], refusal: `the dist graph cannot be checked: ${words}` }
+    : { modes: ['src'], skip: `[dependencyRule] dist graph skipped: ${words}` };
+}
+
+const unbuilt = PACKAGES.filter(
+  (row) => !fs.existsSync(path.join(ROOT, row.dir, 'dist', 'index.js')),
+).map((row) => row.name);
+const ON_CI = (process.env.CI ?? '') !== '' && process.env.CI !== 'false';
+const decision = distDecision(unbuilt, ON_CI);
+if (decision.skip !== undefined) console.log(decision.skip);
+const MODES: Mode[] = decision.modes;
+
+describe('the dist graph is checked when it can be', () => {
+  it('under CI, every package is built (an unbuilt one is refused, not skipped)', () => {
+    if (decision.refusal !== undefined) throw new Error(decision.refusal);
+  });
+
+  it('every package built: src and dist', () => {
+    expect(distDecision([], true)).toEqual({ modes: ['src', 'dist'] });
+    expect(distDecision([], false)).toEqual({ modes: ['src', 'dist'] });
+  });
+
+  it('a package not built under CI: refused, naming it', () => {
+    expect(distDecision(['@mcp-abap-adt/http'], true)).toEqual({
+      modes: ['src'],
+      refusal:
+        'the dist graph cannot be checked: not built: @mcp-abap-adt/http — run npm run build first',
+    });
+  });
+
+  it('a package not built locally: skipped, with the reason printed', () => {
+    expect(distDecision(['@mcp-abap-adt/http'], false)).toEqual({
+      modes: ['src'],
+      skip: '[dependencyRule] dist graph skipped: not built: @mcp-abap-adt/http — run npm run build first',
+    });
+  });
+});
 
 describe.each(PACKAGES)('$name: published manifest', (row) => {
   const manifest = manifestOf(row.dir);

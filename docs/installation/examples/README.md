@@ -27,9 +27,9 @@ Nothing is read from the working directory.
 | `cline-stdio-compact-config.json` | Compact server (`mcp-abap-adt-compact`), same arguments |
 | `cline-stdio-snc-config.json` | RFC / SNC on Windows: the SDK's `lib` directory on `PATH` |
 | `cline-stdio-ca-config.json` | A system whose certificate a company CA issued: `NODE_EXTRA_CA_CERTS` |
-| `cline-http-config.json` | Client of a server started with `--transport=http` |
+| `cline-http-config.json` | Client of `mcp-abap-adt-http`, its credentials in `x-sap-*` headers |
 | `cline-http-service-key-config.json` | The same, choosing the destination per request (`x-mcp-destination`) |
-| `cline-sse-config.json` | Client of a server started with `--transport=sse` |
+| `cline-sse-config.json` | Client of `mcp-abap-adt-sse`, its credentials in the opening request's `x-sap-*` headers |
 
 ## 1. Full server over HTTP (stdio)
 
@@ -63,7 +63,7 @@ SAP_PASSWORD=<your password>
 SAP_SYSTEM_TYPE=onprem
 ```
 
-For a JWT you hold: `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN=<token>`. All
+A token you hold is not served over stdio: send it in the `x-sap-jwt-token` header to `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or create the session with `mcp-auth`. All
 authentications: [Authentication & Destinations](../../user-guide/AUTHENTICATION.md).
 
 ## 2. Compact server

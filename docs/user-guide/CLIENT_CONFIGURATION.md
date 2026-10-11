@@ -113,7 +113,7 @@ For on-premise systems using basic authentication:
 
 ## Destinations
 
-The server supports **four authentications** — basic (HTTP or RFC), SNC (RFC only, passwordless), JWT with browser login (`authorization_code`) and JWT you hold (`none`). The full table, with the `.env` keys of each, is in [Authentication & Destinations](AUTHENTICATION.md); this section is about wiring a client to one.
+`mcp-abap-adt` (stdio) supports **three authentications** — basic (HTTP or RFC), SNC (RFC only, passwordless) and JWT with browser login (`authorization_code`); a JWT you hold goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse`. The full table, with the `.env` keys of each, is in [Authentication & Destinations](AUTHENTICATION.md); this section is about wiring a client to one.
 
 A process serves **one default destination**, chosen by:
 

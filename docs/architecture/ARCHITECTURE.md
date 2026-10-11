@@ -161,14 +161,13 @@ The server calls `getProvider(destination)` and hands the provider to the connec
 | **Runtime role** | Built by the broker for a destination; the connector calls its four methods |
 | **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios`, `express`, `open` |
 
-The server supports four authentications, each served by one handler (`server/src/auth/handlers/`):
+core (stdio) supports three authentications, each served by one handler (`server/src/auth/handlers/`); `jwt` / `none` is refused (D53) — a token you hold is http's and sse's `x-sap-jwt-token` header (`TokenAuthProvider.fixed`):
 
 | Authentication | `SAP_AUTH_TYPE` / `SAP_GRANT_TYPE` | Provider |
 |:---|:---|:---|
 | Basic (HTTP or RFC) | `basic` | `BasicAuthProvider` |
 | SNC (RFC only, passwordless) | `snc` | `SncLogonProvider` |
 | JWT, browser login | `jwt` / `authorization_code` | `AuthorizationCodeProvider` |
-| JWT you hold | `jwt` / `none` | `TokenAuthProvider` |
 
 Adding an authentication means a handler there, a row in this table and a test; nothing else. The package ships other providers (client credentials, passcode, the OIDC and SAML ones); this server does not serve them, and a destination that states one is refused at startup.
 
@@ -653,7 +652,7 @@ For troubleshooting:
 ### 7.4 Strengths
 
 - **Strict interface isolation** prevents accidental coupling between packages
-- **Four authentications** -- basic, SNC, JWT with browser login, JWT you hold -- covering on-premise through BTP cloud
+- **Three authentications over stdio** -- basic, SNC, JWT with browser login -- and a JWT you hold in the HTTP and SSE headers, covering on-premise through BTP cloud
 - **Operation chain model** provides atomic, auditable CRUD sequences with automatic lock/unlock
 - **Exposition control** enables deployment profiles (read-only, full CRUD, low-level)
 - **Transport flexibility** (stdio, HTTP, SSE) adapts to different client architectures

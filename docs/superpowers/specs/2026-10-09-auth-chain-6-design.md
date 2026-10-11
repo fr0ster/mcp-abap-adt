@@ -665,7 +665,9 @@ change of the major).
   new login, never "no session"). The server checks no record itself: the store is the only one
   with access to the record, so it alone decides whether the record is its own (goal, *Holds
   throughout* 3). The binding rule is the broker's, unchanged (auth-broker 5.0.x): a token to ABAP
-  needs both `issuedFor` and `issuedBy`, an XSUAA token `issuedBy` only, basic none.
+  needs both `issuedFor` and `issuedBy`, an XSUAA token `issuedBy` only, basic none. A token
+  session bound to another destination's means is not refused: the broker does not use it (its
+  warn line) and the provider logs in again (measured, A5).
 
 ### 4.2 HTTP (`@mcp-abap-adt/http`) and SSE (`@mcp-abap-adt/sse`): only the user's headers
 
@@ -1086,7 +1088,7 @@ An `isError` result, JSON in the shape of the server's local failures (`src/lib/
 | Source | `error` | `kind` | `message` | `hint` |
 |---|---|---|---|---|
 | a chain failure | `authentication_failed` | its `kind` | its `reason` | its `hint` |
-| `DestinationConfigError` (core) | `destination_refused` | — (`cause_kind` when it carries an error) | `Destination "<name>" cannot be used: <fields>` | the carried hint, then one fixed hint per known field (`HINTS`; `issuedFor` / `issuedBy`: "the session is bound to another destination's means: regenerate it with mcp-auth" — removing the binding keys is no remedy under auth-stores 5, D54) |
+| `DestinationConfigError` (core) | `destination_refused` | — (`cause_kind` when it carries an error) | `Destination "<name>" cannot be used: <fields>` | the carried hint, then one fixed hint per known field (`HINTS`: `grantType`, `SAP_URL`, `XSUAA_MCP_URL`, `connection-type`, `browser`). No hint for `issuedFor` / `issuedBy` / `authorizationToken`: broker 5.0.1 names them only on the `none` path (a handed-over credential), which stdio refuses after D53 (measured, A5). A token session bound to another destination's means is not refused: the broker discards it with its warn line and the provider logs in again |
 | a store's refused record (`StorageError`, `reason: 'record-format'`, core, D54) | `destination_refused` | — | `Destination "<name>" cannot be used: its session record is not in the store's format` (the server's own fixed words with the destination it serves, never the store's `message`) | "regenerate the session with mcp-auth: `mcp-auth --destination <name> --type abap\|xsuaa`, or `mcp-auth --service-key <file> --output <file> --type abap\|xsuaa` (from @mcp-abap-adt/auth-broker-cli)" |
 | `ADT_REQUEST_ABORTED` | `request_aborted` | — | fixed words | — |
 | `UnsupportedAuthenticationError` for `jwt` / `none` (core, D53) | `destination_refused` | — | `Destination "<name>" uses jwt / none, which this server does not support` | "a token you hold is sent in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the session with mcp-auth" |
@@ -1429,8 +1431,8 @@ main (they have no Jest configuration of their own).
 ### 14.2 Failures (§7)
 
 One test per source through a real request — a provider's `AuthProviderFailure`, connection's
-`AuthRefusedError` (`refused-after-renewal`), core's `DestinationConfigError` (a `jwt` /
-`authorization_code` session bound to another destination's means), core's refused record (an
+`AuthRefusedError` (`refused-after-renewal`), core's `DestinationConfigError` (a destination
+missing a field its authentication needs), core's refused record (an
 `--env` file whose token has no `SAP_ISSUED_*` beside it, on auth-stores 5: `destination_refused`
 with D54's words and hint, no login started, no request sent), a failure inside a handler on a server-built **and on an injected** connection (through `IAdtError.refusal`), `ADT_REQUEST_ABORTED`; each asserts
 `error`, `kind`, `message`, `hint` as `render` gives them and no diagnostics. Source tests: no
@@ -1583,7 +1585,8 @@ only. The summary prints no character of a secret. stdout stays empty under stdi
 
 The browser table (pure function); every parameter row per binary; stdio `basic` (HTTP and RFC,
 mocked transport), `snc`, `jwt` / `authorization_code` — with its own binding (served) and with
-another destination's (refused naming the field); `jwt` / `none` refused at start naming where it
+another destination's (not used: the broker's warn line, a new login — measured on broker 5.0.1);
+`jwt` / `none` refused at start naming where it
 went (D53); a malformed session record refused with the store's `record-format` (D54);
 HTTP headers; `SapConfig` refusals (D19); embedded with an injected connection. The existing suites
 are moved and updated, not deleted (`brokerFactory`, `destinationRouting` → HTTP headers,

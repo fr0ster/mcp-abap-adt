@@ -1,8 +1,9 @@
-# Debugger on adt-clients 28 — design
+# Debugger on adt-clients 29 — design
 
-The consumer side of fr0ster/mcp-abap-adt-clients#217 (adt-clients 28.0.0, interfaces-adt 14.0.0, adt-strategies 0.9.0).
+The consumer side of fr0ster/mcp-abap-adt-clients#217 (adt-clients 29.0.0, interfaces-adt 15.0.0, adt-strategies 0.10.0).
 The library side, its measurements and its errata are in adt-clients: `docs/research/debugger-modes.md`,
-`docs/research/debugger-endpoints.md`, `docs/usage/MIGRATION-28.md`, `docs/usage/ERRATA.md`.
+`docs/research/debugger-endpoints.md`, `docs/usage/MIGRATION-28.md`, `docs/usage/MIGRATION-29.md`, `docs/usage/ERRATA.md`.
+The file keeps its name (`-28-`), as does the branch; the contract is 29's.
 
 ## Goal
 
@@ -28,7 +29,11 @@ All of this was measured on premise (2026-10-11), BASIS 816:
 - **`terminateDebugger` frees the debugger's own session and answers a plain `500`.** The program runs on. `analyseDebuggerFreed` reads that answer as success. The freed session takes no further request.
 - **The first `setDebuggerSettings` after an attach ignores `systemDebugging=false`.** This is server source; the answer cannot show it. `showDataAging` does not merge: when it is left out, it is off.
 - **`detachDebugger` leaves the debuggee running.** Without an id, the debugger leaves and the program runs on. An armed breakpoint can catch the same run again.
-- **The server ignores `skipCount` on external breakpoints.** The library refuses it.
+- **The server echoes the caller's `clientId` on every answer row.** adt-clients 29 sends a `clientId` on each breakpoint row that has one. The answer carries it back on every row, placed and refused alike.
+  - The rows do not keep the request's order: the refused rows came first.
+  - Ids are renumbered, so a row's id says nothing about which request row it answers.
+  - A placed line row also echoes `adtcore:uri` and `condition`.
+  - So neither the position nor the id pairs an answer row with its request; the `clientId` does.
 - **Another user needs authorisation.** Debugging another user's requests needs `S_DEVELOP` DEBUG ACTVT 90 on that user; without it the answer is `403`.
 
 The bug this fixes, in 17.2.x:
@@ -51,9 +56,9 @@ The bug this fixes, in 17.2.x:
 - **`DebugSetSettings`** (new). Changes the settings at the current stop and answers the settings in force. The session's kept settings are updated with it.
 - **`DebugSetBreakpoints` and `DebugDeleteBreakpoint`.**
   - The session keeps its full list and sends it whole on every change. Deleting is by id.
-  - Nothing is re-asked one by one. Why a breakpoint was refused is read from the rows of the one answer. If a refusal cannot be paired with a requested breakpoint, the answer says so; it does not guess.
+  - Nothing is re-asked one by one. Why a breakpoint was refused is read from the rows of the one answer, each row paired with its breakpoint by the `clientId` the session sent with it. A row that carries no `clientId` of this request is reported as unexpected; it is never guessed.
   - The descriptions say that the set is shared by every IDE of the same SAP user for the same request user (or terminal id), and is replaced as a whole.
-- **Breakpoint schema.** `condition` is accepted on a line breakpoint only. A condition on another kind is refused before the wire, naming the breakpoint. There is no `skip_count`. Core and compact descriptions that say "each with an optional condition" change to "a line breakpoint may carry a condition".
+- **Breakpoint schema.** `condition` is accepted on a line breakpoint only. A condition on another kind is refused before the wire, naming the breakpoint. Core and compact descriptions that say "each with an optional condition" change to "a line breakpoint may carry a condition".
 - **Unchanged.** `DebugTerminate` and a step that runs to the end keep `analyseDebuggeeEnd`.
 
 ## Tools (compact)
@@ -93,30 +98,31 @@ Compact keeps its four debugger tools.
 **The arming contract.**
 
 - The session keeps two lists:
-  - `requested`: the breakpoint definitions as the caller gave them, deduplicated by kind, target and condition;
+  - `requested`: the breakpoint definitions as the caller gave them, deduplicated by kind, target and condition, each with the `clientId` the session assigned it;
   - `armed`: the server's rows with ids, as now.
-- A change (a start with breakpoints, or `DebugSetBreakpoints`) sends `requested ∪ new` in one request. A delete by id removes the breakpoint from both lists and sends nothing else.
-- **Pairing answer rows with definitions:**
-  1. When the answer has one row per sent definition and the kinds agree position by position, rows pair by position. The integration test measures whether the server keeps the order; if it does not, this rule is dropped and the next one applies.
-  2. Otherwise, within one kind, a single sent definition pairs with a single row.
-  3. A refused row that pairs with nothing is reported as `unmatched: [{ error }]`, a new field of the answer, without guessing.
-  4. **Placed rows that cannot be paired** (positional pairing unavailable and several definitions of one kind): nothing is silently discarded.
-     - Every sent definition of that kind stays in `requested`.
-     - `armed` holds the placed rows.
-     - The answer reports `ambiguous: [kind]`, and for that kind `lost` is not reported.
-     - A later change re-sends those definitions. One the server refuses again is reported again, which costs a row and loses nothing.
-     - **The one exception to "a delete by id removes the breakpoint from both lists".** In a kind marked ambiguous, an id cannot be tied to one definition. So `DebugDeleteBreakpoint` for a breakpoint of that kind is refused before the wire: "this kind's breakpoints cannot be told apart; `DebugStop` clears them". This avoids both deleting the wrong definition and re-arming the deleted one on the next change.
-     - The kind stops being ambiguous as soon as a later answer pairs by position.
-     - This path exists only if the integration test finds that the server does not keep the order of the rows.
-
-  The server may rewrite a line URI in a placed row, so placed rows are matched by position or kind, never by URI equality.
+- **The `clientId`.** The session assigns each definition its tag when the definition first enters `requested`: `bp` followed by a decimal counter the session instance keeps (`bp1`, `bp2`, …).
+  - The tag stays with the definition for as long as it is in `requested`, so every re-send carries the same tag.
+  - The counter never goes back and is never reset, not by a stop and not by a new start of the same instance. A tag is never reused, so an echo of an earlier definition can never pair with a later one.
+  - It is unique within a request by construction: deduplication leaves one definition per key, and each definition has one tag.
+  - It is short and contains only `[a-z0-9]`. The library escapes the value, but this one needs no escaping, and its length does not depend on a URI or a condition, so no field length of the server comes into question.
+  - A tag derived from the definition (kind, target and condition) was rejected. It is as long as the URI and the condition together and carries whatever characters a condition holds. Its only gain would be the same tag for the same definition across a delete and a re-add, and pairing is per request, so that gains nothing.
+  - A `clientId` on a definition handed to the session is not the caller's to choose: the session's tag replaces it on the wire, and the tool schemas have no such field.
+- A change (a start with breakpoints, or `DebugSetBreakpoints`) sends `requested ∪ new` in one request, every row with its tag. A delete by id removes the breakpoint from both lists and sends nothing else. An id the session does not hold is refused before the wire.
+- **Pairing answer rows with definitions** is by the echoed `clientId` alone:
+  - A row whose `clientId` is a tag sent in this request answers that definition: placed when it has an id, refused when it has none (with the row's reason, if it gives one).
+  - A sent definition that no row answers was not placed. It is refused, or lost if it was sent before, without a reason.
+  - **A row that cannot be paired** is reported as `unexpected: [{ kind, id?, clientId?, error? }]`, a new field of the answer, and never paired by guess. That is a row with no `clientId`, a row with a `clientId` this request did not send, or a second row for a tag already answered. A conforming server never sends one.
+    - A placed row of this kind is still on the server under the key. So it is in `placed` and in `armed`, where a delete by its id and the stop reach it. Deleting it touches no definition.
+    - A refused row of this kind only appears in `unexpected`.
+  - The server may rewrite a line URI in a placed row and echoes the condition. Neither is used for pairing; the tag is.
 - **After the answer:**
   - `armed` is exactly the placed rows of this answer, the surviving old breakpoints included.
   - `requested` keeps only the definitions that were placed.
-  - The answer reports three things:
+  - The answer reports four things:
     - `placed`: the full resulting set, not just this call;
-    - `refused`: this call's refusals, each with its definition;
-    - `lost`: earlier breakpoints that are no longer placed.
+    - `refused`: this call's definitions that were not placed, each with its definition and the reason its row gave;
+    - `lost`: earlier definitions that are no longer placed, the same way;
+    - `unexpected`: the rows that could not be paired.
 - No `validationOnly` request is ever made.
 
 **Stop and a failed start.** `stopListener` deletes the key's breakpoints, so it is the authoritative cleanup.
@@ -164,12 +170,13 @@ Compact keeps its four debugger tools.
 
 ## Dependencies and version
 
-- **Dependencies.** `@mcp-abap-adt/adt-clients ^28.0.0` and `@mcp-abap-adt/adt-strategies ^0.9.0`, plus `@mcp-abap-adt/interfaces-adt ^14.0.0` wherever a package of this repository depends on it directly. All are from the registry.
+- **Dependencies.** `@mcp-abap-adt/adt-clients ^29.0.0` and `@mcp-abap-adt/adt-strategies ^0.10.0`, plus `@mcp-abap-adt/interfaces-adt ^15.0.0` wherever a package of this repository depends on it directly. All are from the registry, and `npm ls @mcp-abap-adt/interfaces-adt` shows one version (adt-strategies 0.10.0 declares the same `^15`).
+  - 29 is chosen over 28 because it is the first release that sends `clientId`, which the arming contract pairs by. interfaces-adt 15 is the contract it is built on; adt-strategies 0.10.0 is the release on that contract.
 - **Version: 18.0.0.**
-  - lib's public surface exposes the upstream debugger types: the exported `Debugger`, `DebugSessionPorts`, and the breakpoint and answer signatures. Moving to interfaces-adt 14 and adt-clients 28 changes `attach`, makes the identity a union and refuses a condition on a non-line breakpoint.
-  - The answer gains `unmatched` and `lost`.
+  - lib's public surface exposes the upstream debugger types: the exported `Debugger`, `DebugSessionPorts`, and the breakpoint and answer signatures. Moving to interfaces-adt 15 and adt-clients 29 changes `attach`, makes the identity a union and refuses a condition on a non-line breakpoint. The breakpoint types lose `skipCount` and gain `clientId`.
+  - The answer gains `unexpected` and `lost`.
   - The model-facing tools only gain optional parameters, methods and one tool.
-  - A migration note for embedders (`docs/` and the CHANGELOG) says what changed and what to do.
+  - A migration note for embedders (`docs/` and the CHANGELOG) says what changed and what to do: declare the new ranges; drop `skipCount`, which no longer compiles; a `clientId` on a definition handed to the session is replaced by the session's own; read `unexpected` and `lost` from the answer.
 
 ## Testing
 
@@ -181,11 +188,12 @@ Compact keeps its four debugger tools.
   - The preflight runs on the control connection.
   - Our own same-`ideId` listener does not block an update.
 - **The arming contract.**
-  - A second change sends `requested ∪ new`.
-  - Ambiguous placed rows of one kind keep every definition and report `ambiguous`.
-  - A delete by id in an ambiguous kind is refused before the wire.
+  - A second change sends `requested ∪ new`, each definition with the same tag it had before and a new one with the next tag.
+  - Tags are never reused, also across a stop and a new start of the same instance.
   - No `validationOnly` request is made.
-  - Fixtures cover reordered rows, a rewritten line URI in a placed row, a refusal that pairs and one that does not (`unmatched`), and a partial refusal where an old breakpoint comes back refused (`lost`).
+  - Fixtures cover rows out of the request's order (refused first), several definitions of one kind each paired exactly, a rewritten line URI in a placed row, a refusal with its definition, a definition no row answers, and a partial refusal where an old breakpoint comes back refused (`lost`).
+  - `unexpected`: a row without a `clientId`, a row with a tag this request did not send, and a second row for one tag are reported and paired with nothing. A placed one of them stays in `placed` and `armed`.
+  - A delete by id removes exactly its definition, and the next change does not re-send it. An unknown id is refused before the wire.
   - `armed` and `requested` match the rules.
 - **Stop and a failed start.**
   - After a successful `stopListener`, `armed` and `requested` are empty and per-id deletion failures are gone.
@@ -210,7 +218,7 @@ Compact keeps its four debugger tools.
 
 **Integration on premise.** Soft mode, with hard mode for the new tools. Each run is asked of the user first.
 
-- **The regression.** Two `DebugSetBreakpoints` in a row, and the program stops at both. The answer's order of rows is recorded, which settles the positional pairing rule.
+- **The regression.** Two `DebugSetBreakpoints` in a row, and the program stops at both. Both answers have `unexpected` empty. A third change adds a line that takes no breakpoint: exactly that definition is `refused`, the other two stay placed, and nothing is `lost`.
 - **Another user.** `DebugStartListener` with `request_user` set to a second configured user. That user runs a class; the run is caught, stepped and continued. Skipped unless a second user is configured.
 - **`detach`.** The run is caught again at the next pass of an armed line in a loop, then continued to its end.
 - **`release_debugger`.** The run finishes, the answer is no failure, and the listener catches the next run.

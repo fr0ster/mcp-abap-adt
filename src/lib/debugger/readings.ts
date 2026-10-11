@@ -285,6 +285,53 @@ export function placeOf(frame: FrameReading): PlaceReading {
   };
 }
 
+/** The debugger settings in force, as `setDebuggerSettings` answers them; `showDataAging` is not read (not offered). */
+export interface SettingsReading {
+  systemDebugging?: boolean;
+  updateDebugging?: boolean;
+  createExceptionObject?: boolean;
+  backgroundRFC?: boolean;
+  sharedObjectDebugging?: boolean;
+}
+const SETTINGS = [
+  'systemDebugging',
+  'updateDebugging',
+  'createExceptionObject',
+  'backgroundRFC',
+  'sharedObjectDebugging',
+] as const;
+
+export function readSettings(xml: string): SettingsReading {
+  const node: Node = parse(xml)?.settings ?? {};
+  const out: SettingsReading = {};
+  for (const k of SETTINGS) {
+    const v = text(node[k]);
+    if (v === 'true' || v === 'false') out[k] = v === 'true';
+  }
+  return out;
+}
+
+/** The settings under the names the tools take them by. */
+export function terseSettings(r: SettingsReading) {
+  return {
+    ...(r.systemDebugging !== undefined
+      ? { system_debugging: r.systemDebugging }
+      : {}),
+    ...(r.updateDebugging !== undefined
+      ? { update_debugging: r.updateDebugging }
+      : {}),
+    ...(r.createExceptionObject !== undefined
+      ? { create_exception_object: r.createExceptionObject }
+      : {}),
+    ...(r.backgroundRFC !== undefined
+      ? { background_rfc: r.backgroundRFC }
+      : {}),
+    ...(r.sharedObjectDebugging !== undefined
+      ? { shared_object_debugging: r.sharedObjectDebugging }
+      : {}),
+  };
+}
+
 /**
  * How many frames, from the top, a terse stop keeps. Real stacks run to some 20
  * or 25 frames, so an ordinary one passes whole; only a deep one is cut, and then

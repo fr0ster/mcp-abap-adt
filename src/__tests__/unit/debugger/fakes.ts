@@ -85,6 +85,12 @@ export const placeAll = (list: Array<Record<string, any>>) =>
     }),
   );
 
+/** A settings answer: the six attributes in force (the shape measured on premise (2026-10-11), BASIS 816). */
+export const settingsXml = (s: Record<string, boolean | undefined> = {}) => {
+  const v = (k: string) => String(s[k] ?? false);
+  return `<?xml version="1.0" encoding="utf-8"?><dbg:settings xmlns:dbg="http://www.sap.com/adt/debugger" systemDebugging="${v('systemDebugging')}" createExceptionObject="${v('createExceptionObject')}" backgroundRFC="${v('backgroundRFC')}" sharedObjectDebugging="${v('sharedObjectDebugging')}" showDataAging="false" updateDebugging="${v('updateDebugging')}"/>`;
+};
+
 export function fakeWorld() {
   const log: WireCall[] = [];
   const polls: Array<ReturnType<typeof deferred<any>> & { hold?: number }> = [];
@@ -104,6 +110,8 @@ export function fakeWorld() {
   const sent: any[][] = [];
   /** What the next setBreakpoints answers, in order; every row placed (`placeAll`) when none is left. */
   const breakpointAnswers: Array<(sent: any[]) => any> = [];
+  /** What the next setDebuggerSettings answers, in order; the settings sent echoed (`settingsXml`) when none is left. */
+  const settingsAnswers: Array<() => any> = [];
   /** Members put here replace the fake's on every debugger, cached ones included. */
   const override: Record<string, any> = {};
   const make = (connection: IAbapConnection): Debugger => {
@@ -201,6 +209,12 @@ export function fakeWorld() {
           corpusBody('debugger-run-to-line--07-variables-at-write'),
         );
       },
+      setDebuggerSettings: async (s: Record<string, boolean>) => {
+        calls.push(`settings:${JSON.stringify(s)}`);
+        return (
+          settingsAnswers.shift() ?? (() => okResponse(settingsXml(s)))
+        )();
+      },
       createWatchpoint: async () =>
         okResponse('<dbg:watchpoints xmlns:dbg="x"/>'),
       listWatchpoints: async () =>
@@ -260,6 +274,7 @@ export function fakeWorld() {
     checkAnswers,
     sent,
     breakpointAnswers,
+    settingsAnswers,
     override,
     setValidationAnswers: (a: Array<() => any>) => {
       validationAnswers = a;

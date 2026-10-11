@@ -47,8 +47,10 @@ import {
   readBreakpoints,
   readDebuggee,
   readDebuggeeEnd,
+  readSettings,
   readStack,
   readVariables,
+  type SettingsReading,
   type StackReading,
   type VariablesReading,
 } from './readings';
@@ -86,6 +88,10 @@ export interface StopView {
   attach: AttachReading;
   stack: StackReading;
   stackError?: string;
+  /** The settings in force after this attach applied the preferences. */
+  settings?: SettingsReading;
+  /** Why applying them failed; the stop stands. */
+  settingsError?: string;
   raw: { debuggee: string; attach: string; stack: string };
 }
 export type EndReason =
@@ -159,6 +165,8 @@ interface Stop {
   connection: IAbapConnection;
   debugger: Debugger;
   view: StopView;
+  /** Whether this attach has had its first setDebuggerSettings. */
+  settingsSent?: boolean;
 }
 /** An attached debuggee whose release failed: only its attaching session can release it. */
 interface OwedRelease {
@@ -222,8 +230,10 @@ export class DebugSession<O = unknown> {
   protected fixed?: IDebuggerIdentity;
   /** True once something that changes the system was sent: the cleanup owes a stopListener. */
   protected changed = false;
-  /** The settings the caller set; applied after each attach (Task 6). */
+  /** The settings the caller set; applied after each attach. */
   protected preferences: DebugSettings = {};
+  /** The last answer of setDebuggerSettings. */
+  protected effective?: SettingsReading;
 
   constructor(
     protected readonly ports: DebugSessionPorts<O>,
@@ -684,6 +694,13 @@ export class DebugSession<O = unknown> {
           },
         },
       };
+      // The preferences after each attach; a failure leaves the stop standing and is named.
+      if (Object.keys(this.preferences).length > 0) {
+        const stop = this.current;
+        await this.applySettings(stop).catch((e: unknown) => {
+          stop.view = { ...stop.view, settingsError: thrown(e) };
+        });
+      }
       return true;
     } catch (error) {
       // The failure and the drop below happen whatever the close does; a close that throws is kept.
@@ -1092,6 +1109,43 @@ export class DebugSession<O = unknown> {
     return { ...this.preferences };
   }
 
+  /** The settings in force: the last answer of setDebuggerSettings. */
+  settingsInForce(): SettingsReading | undefined {
+    return this.effective;
+  }
+
+  /** At the current stop: merges into the preferences, applies them, answers the settings in force. */
+  setSettings(patch: DebugSettings): Promise<DebugView<SettingsReading>> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      this.preferences = { ...this.preferences, ...patch };
+      return this.applySettings(stop);
+    });
+  }
+
+  /**
+   * Sends the preferences at a stop. The first call after an attach ignores
+   * systemDebugging=false (server source, BASIS 816, read 2026-10-11), and its
+   * answer cannot show it, so then they are sent a second time; what is
+   * reported is the last answer.
+   */
+  private async applySettings(stop: Stop): Promise<DebugView<SettingsReading>> {
+    const first = !stop.settingsSent;
+    stop.settingsSent = true;
+    let answer = await stop.debugger.setDebuggerSettings(this.preferences);
+    if (answer.ok && first && this.preferences.systemDebugging === false)
+      answer = await stop.debugger.setDebuggerSettings(this.preferences);
+    if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+    const raw = bodyOf(answer);
+    this.effective = readSettings(raw);
+    stop.view = {
+      ...stop.view,
+      settings: this.effective,
+      settingsError: undefined,
+    };
+    return { value: this.effective, raw };
+  }
+
   /**
    * Inside the serial: everything off — DebugStop, a start that failed after a
    * change, dispose, shutdown. stopListener deletes the key's breakpoints
@@ -1227,6 +1281,7 @@ export class DebugSession<O = unknown> {
     this.fixed = undefined;
     this.changed = false;
     this.preferences = {};
+    this.effective = undefined;
   }
 
   /** Anything a later stop still has to undo — what refuses a new start. */

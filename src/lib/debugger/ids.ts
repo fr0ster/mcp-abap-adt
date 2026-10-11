@@ -43,18 +43,17 @@ export function statedDebuggerIds(
 /**
  * Stated ids where given, random ones elsewhere. `stated` is true when either
  * id came from configuration: only a stated id can have a predecessor to
- * reconcile with. `terminalStated` is true when the terminal id itself did.
+ * reconcile with. Terminal mode needs no stated terminal id: the runs this
+ * server starts carry the ids they are caught by, random ones included.
  */
 export function resolveDebuggerIds(
   env: NodeJS.ProcessEnv = process.env,
-): DebuggerIds & { stated: boolean; terminalStated: boolean } {
+): DebuggerIds & { stated: boolean } {
   const stated = statedDebuggerIds(env);
   return {
     terminalId: stated.terminalId ?? newDebuggerId(),
     ideId: stated.ideId ?? newDebuggerId(),
     stated: stated.terminalId !== undefined || stated.ideId !== undefined,
-    // Terminal mode keys on a terminal id the host configured: a random one names no terminal.
-    terminalStated: stated.terminalId !== undefined,
   };
 }
 

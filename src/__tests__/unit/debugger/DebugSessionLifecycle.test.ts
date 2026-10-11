@@ -22,11 +22,12 @@ describe('DebugSession lifecycle', () => {
     run?: { kind: 'class' | 'program'; name: string },
     ids: any = IDS,
     world = fakeWorld(),
+    mode: { debuggingMode?: 'user' | 'terminal' } = {},
   ) {
     const session = new DebugSession(world.ports, ids).bind('origin');
     const s = session.start('refuse', {
       ...START,
-      ...START,
+      ...mode,
       ...(run ? { run } : {}),
     });
     await until(() => world.polls.length === 1);
@@ -45,6 +46,35 @@ describe('DebugSession lifecycle', () => {
       reason: 'run_finished',
       run: { ok: true, output: 'total 6' },
     });
+  });
+
+  // Measured on premise (2026-10-12): a terminal-mode listener catches only a run
+  // that carries its terminal id and IDE id; a user-mode one keys on the request user.
+  it("a run under terminal mode carries the identity's ids", async () => {
+    const { session, world } = await started(
+      { kind: 'class', name: 'CLASS_A' },
+      IDS,
+      fakeWorld(),
+      { debuggingMode: 'terminal' },
+    );
+    const identity = session.currentIdentity()!;
+    expect(world.runs).toEqual([
+      {
+        target: { kind: 'class', name: 'CLASS_A' },
+        debuggee: { terminalId: identity.terminalId, ideId: identity.ideId },
+      },
+    ]);
+    expect(world.runs[0].debuggee).toEqual({
+      terminalId: IDS.terminalId,
+      ideId: IDS.ideId,
+    });
+  });
+
+  it('a run under user mode carries no ids', async () => {
+    const { world } = await started({ kind: 'program', name: 'PROGRAM_A' });
+    expect(world.runs).toEqual([
+      { target: { kind: 'program', name: 'PROGRAM_A' }, debuggee: undefined },
+    ]);
   });
 
   it("stop releases the debuggee, stops the listener (which deletes the key's breakpoints), closes every connection once", async () => {

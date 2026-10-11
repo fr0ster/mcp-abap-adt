@@ -10,6 +10,7 @@ import {
   type IDebuggerListenerConflict,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
 import { openFreshConnection } from '../packageSessions';
@@ -58,19 +59,29 @@ async function closeOwn(connection: IAbapConnection): Promise<void> {
   await (connection as { disconnect?: () => Promise<void> }).disconnect?.();
 }
 
-async function run(
+/**
+ * Runs the target in the background. With `debuggee` the run carries those
+ * ids, so the terminal-mode listener under them catches it; without them only
+ * a user-mode listener does.
+ */
+export async function run(
   connection: IAbapConnection,
   target: RunTarget,
+  debuggee?: IDebuggeeIds,
 ): Promise<RunOutcome> {
   const executor = new AdtExecutor(connection);
+  const options = {
+    analyse: analyseException,
+    ...(debuggee ? { debuggee } : {}),
+  };
   const answer =
     target.kind === 'class'
       ? await executor
           .getClassExecutor(ourClassExecutor)
-          .run({ className: target.name }, { analyse: analyseException })
+          .run({ className: target.name }, options)
       : await executor
           .getProgramExecutor(ourProgramExecutor)
-          .run({ programName: target.name }, { analyse: analyseException });
+          .run({ programName: target.name }, options);
   return answer.ok
     ? { ok: true, output: String(answer.getResult().value ?? '') }
     : { ok: false, message: answer.getError().message };

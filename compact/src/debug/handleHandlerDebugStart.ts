@@ -42,7 +42,7 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         default: false,
         description:
-          'abap: takes over from another debugger listening for this user instead of refusing; the breakpoints of the same key — the SAP user with the request user, or with the terminal id — are replaced. amdp: ends an AMDP session of this user left behind instead of refusing.',
+          'abap: takes over from another debugger listening for this user instead of refusing; in either debugging mode the breakpoints of this SAP user are replaced. amdp: ends an AMDP session of this user left behind instead of refusing.',
       },
       ...START_PROPERTIES,
       ...RUN_PROPERTY,

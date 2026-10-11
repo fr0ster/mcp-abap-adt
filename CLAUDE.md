@@ -325,9 +325,25 @@ id is the consumer's explicit choice. The idle bound on waiting for the user
 (not under 30 minutes, the user's exception to "no timeouts") ends a forgotten
 session.
 
-The debugger here debugs what it starts itself, under `debuggingMode=user`.
-Request-based (terminal) debugging, other users' requests and attaching to a
-process we did not start wait on adt-clients (fr0ster/mcp-abap-adt-clients#217).
+Terminal mode works for the runs this server starts, measured on premise
+(2026-10-12, BASIS 816):
+
+- a terminal-mode listener catches a request by the terminal id and IDE id it
+  carries in `SAP-PASSPORT`; a run URL has no parameter for them. A run started
+  with `debuggee: { terminalId, ideId }` (adt-clients 29.1.0) carries them and is
+  caught by the terminal-mode listener under those ids and by no other; without
+  them no terminal-mode listener catches it. Random ids work, so terminal mode
+  needs no configured terminal id: a stated one only replaces the random one;
+- two listeners of one SAP user in terminal mode under other ids both listen,
+  and each run is caught only by its own listener;
+- the breakpoint set is still the SAP user's: `setBreakpoints` under other ids
+  replaced the other's set, in terminal mode as in user mode;
+- a stopListener under other ids left the other terminal-mode listener running
+  (in user mode it ended it).
+
+So under terminal mode our own run carries the session's ids, and in user mode
+none. A request started elsewhere does not carry our ids, so terminal mode does
+not catch it.
 
 This holds for this repository (stated by the user 2026-10-10); a handle in
 another project may mean something else, and the global MCP rules still apply

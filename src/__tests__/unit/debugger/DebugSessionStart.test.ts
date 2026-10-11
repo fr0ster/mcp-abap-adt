@@ -69,25 +69,26 @@ describe('the start', () => {
   );
 
   describe('identity by mode', () => {
-    it('terminal mode without a configured terminal id is refused before the wire', async () => {
+    it('terminal mode needs no configured terminal id: random ids are accepted', async () => {
       const world = fakeWorld();
-      const session = new DebugSession(world.ports, IDS).bind('origin');
-      await expect(
-        session.start('refuse', { ...START, debuggingMode: 'terminal' }),
-      ).rejects.toThrow(
-        new DebugRefusedError('terminal mode: no terminal id is configured'),
+      const { session } = await listening(
+        world,
+        IDS,
+        {},
+        {
+          debuggingMode: 'terminal',
+        },
       );
-      expect(world.log).toEqual([]);
-      expect(world.opened).toEqual([]);
-      expect(session.holdsState()).toBe(false);
+      expect(session.currentIdentity()).toEqual({
+        debuggingMode: 'terminal',
+        terminalId: IDS.terminalId,
+        ideId: IDS.ideId,
+      });
     });
 
     it('request_user with terminal mode is refused before the wire', async () => {
       const world = fakeWorld();
-      const session = new DebugSession(world.ports, {
-        ...IDS,
-        terminalStated: true,
-      }).bind('origin');
+      const session = new DebugSession(world.ports, IDS).bind('origin');
       await expect(
         session.start('refuse', {
           ...START,
@@ -107,10 +108,7 @@ describe('the start', () => {
       async (_, mode) => {
         for (const blank of ['', '   ']) {
           const world = fakeWorld();
-          const session = new DebugSession(world.ports, {
-            ...IDS,
-            terminalStated: true,
-          }).bind('origin');
+          const session = new DebugSession(world.ports, IDS).bind('origin');
           await expect(
             session.start('refuse', { ...START, ...mode, requestUser: blank }),
           ).rejects.toThrow(new DebugRefusedError('request_user is empty'));
@@ -121,12 +119,12 @@ describe('the start', () => {
       },
     );
 
-    it('terminal mode keys on the configured terminal id and asks for no request user', async () => {
+    it("terminal mode keys on the session's terminal id and asks for no request user", async () => {
       const world = fakeWorld();
       const asked = jest.spyOn(world.ports, 'requestUser');
       const { session } = await listening(
         world,
-        { ...IDS, terminalStated: true },
+        IDS,
         {},
         { debuggingMode: 'terminal' },
       );

@@ -402,18 +402,27 @@ describe('debugger handlers', () => {
     },
   );
 
-  it('terminal mode with no configured terminal id is a tool error before the wire, with no handle', async () => {
+  it('terminal mode needs no configured terminal id: the start is accepted under the session ids', async () => {
     const { world, context } = install();
-    const r: any = await handleDebugStartListener(context as any, {
+    const started = handleDebugStartListener(context as any, {
       breakpoints: BP,
       debugging_mode: 'terminal',
     });
-    expect(r.isError).toBe(true);
-    expect(r.content).toHaveLength(1);
-    expect(r.content[0].text).toContain(
-      'terminal mode: no terminal id is configured',
-    );
-    expect(world.log).toEqual([]);
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(LISTEN_NOTHING());
+    const r: any = await started;
+    expect(r.isError).toBeFalsy();
+    expect(world.log.find((c) => c.call === 'listen')!.args[0]).toEqual({
+      debuggingMode: 'terminal',
+      terminalId: IDS.terminalId,
+      ideId: IDS.ideId,
+    });
+    expect(json(r)).toMatchObject({
+      debugging_mode: 'terminal',
+      terminal_id: IDS.terminalId,
+      ide_id: IDS.ideId,
+    });
+    expect(json(r)).not.toHaveProperty('request_user');
   });
 
   describe('every tool reaches its port', () => {

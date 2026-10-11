@@ -128,6 +128,8 @@ export function fakeWorld() {
   const calls: string[] = [];
   const modes: string[] = [];
   const run = deferred<RunOutcome>();
+  /** What each run was started with: its target and the ids it carries, if any. */
+  const runs: Array<{ target: unknown; debuggee: unknown }> = [];
   const stepAnswers: any[] = [];
   const attachAnswers: Array<() => Promise<any>> = [];
   /** What the next checkListener answers, in order; free (`done`) when none is left. */
@@ -284,7 +286,10 @@ export function fakeWorld() {
       return make(c);
     },
     requestUser: async () => 'SAPUSER01',
-    run: async () => run.promise,
+    run: async (_c, target, debuggee) => {
+      runs.push({ target, debuggee });
+      return run.promise;
+    },
   };
   return {
     ports,
@@ -296,6 +301,7 @@ export function fakeWorld() {
     log,
     modes,
     run,
+    runs,
     stepAnswers,
     attachAnswers,
     checkAnswers,

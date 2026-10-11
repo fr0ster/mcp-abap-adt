@@ -72,10 +72,7 @@ export class DebuggerInstance implements StatePart {
  * `BaseMcpServer.debuggerFor()` passes it here.
  */
 export function createDebuggerInstance(
-  ids: DebuggerIds & {
-    stated: boolean;
-    terminalStated?: boolean;
-  } = resolveDebuggerIds(),
+  ids: DebuggerIds & { stated: boolean } = resolveDebuggerIds(),
   options: { breakpointConflict?: BreakpointConflict } = {},
 ): DebuggerInstance {
   return new DebuggerInstance({

@@ -14,7 +14,7 @@ export const USER_MODE_SENTENCE =
 export const TAKE_OVER_SENTENCE =
   'Displaces another debugger listening for the same user.';
 const SHARED_SET_PREDICATE =
-  'are one set, shared by every IDE of the same SAP user debugging the same request user (or terminal id), and each change replaces that set as a whole.';
+  'are one set, shared by every IDE of the same SAP user in either debugging mode, and each change replaces that set as a whole.';
 /** The shared set as a fragment, lower case, for a text that scopes it (compact: `abap: …`). */
 export const SHARED_SET_FACT = `the breakpoints ${SHARED_SET_PREDICATE}`;
 export const SHARED_SET_SENTENCE = `Its breakpoints ${SHARED_SET_PREDICATE}`;
@@ -153,7 +153,7 @@ export const DEBUGGING_MODE_PROPERTY = {
     type: 'string',
     enum: ['user', 'terminal'],
     description:
-      'user (when omitted) catches the requests of the request user; terminal catches the requests carrying the terminal id this server is configured with, and is refused when none is configured.',
+      'user (when omitted) catches the requests of the request user; terminal catches only the runs this debug session starts, which carry its ids, not requests started elsewhere, and needs no configuration.',
   },
 } as const;
 

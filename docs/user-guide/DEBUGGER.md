@@ -82,6 +82,11 @@ What the system does with them, measured on premise and on the cloud
   conflicts: both listeners stay, and the newer one catches. Another IDE id of the
   same SAP user conflicts — see [Conflicts are errors](#conflicts-are-errors).
 - The terminal id changes nothing in user mode.
+- In **terminal mode** (`debugging_mode: terminal`) a listener catches only the
+  requests that carry its terminal id and IDE id, and the runs this server
+  starts for the debug session carry them (measured on premise, 2026-10-12), so
+  terminal mode needs neither id configured: a stated id only replaces the random
+  one. A request started elsewhere carries no such ids and is not caught.
 - **Breakpoints belong to the SAP user, not to an id**: whichever listener of that
   user is active catches them.
 

@@ -123,8 +123,12 @@ describe('the cleanup', () => {
     );
     const terminal = new DebugSession(world.ports, IDS).bind('origin');
     await expect(
-      terminal.start('refuse', { ...START, debuggingMode: 'terminal' }),
-    ).rejects.toThrow('terminal mode: no terminal id is configured');
+      terminal.start('refuse', {
+        ...START,
+        debuggingMode: 'terminal',
+        requestUser: 'SAPUSER02',
+      }),
+    ).rejects.toThrow('request_user does not apply to terminal mode');
     expect(world.calls).toEqual(['checkListener']);
   });
 

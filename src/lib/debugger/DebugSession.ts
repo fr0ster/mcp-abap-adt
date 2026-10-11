@@ -23,6 +23,7 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
+  IDebuggeeIds,
   IDebuggerBreakpoint,
   IDebuggerIdentity,
   IDebuggerSettings,
@@ -82,7 +83,15 @@ export interface DebugSessionPorts<O = unknown> {
     onConflict: IDebuggerListenerConflict,
   ): Debugger;
   requestUser(origin: O): Promise<string>;
-  run(connection: IAbapConnection, target: RunTarget): Promise<RunOutcome>;
+  /**
+   * `debuggee` makes the run carry those ids, so a terminal-mode listener under
+   * them catches it; without it only a user-mode listener does.
+   */
+  run(
+    connection: IAbapConnection,
+    target: RunTarget,
+    debuggee?: IDebuggeeIds,
+  ): Promise<RunOutcome>;
 }
 export interface StopView {
   debuggee: DebuggeeReading;
@@ -129,7 +138,10 @@ export interface DebugStartOptions {
   run?: RunTarget;
   /** User mode: whose requests are caught; the connected user when omitted. */
   requestUser?: string;
-  /** `user` (the default) or `terminal`, which keys on the configured terminal id. */
+  /**
+   * `user` (the default) or `terminal`, which catches only the runs this
+   * session starts: they carry its terminal id and IDE id.
+   */
   debuggingMode?: DebuggingMode;
   /** Applied after each attach; see `setSettings`. */
   settings?: DebugSettings;
@@ -283,7 +295,7 @@ export class DebugSession<O = unknown> {
 
   constructor(
     protected readonly ports: DebugSessionPorts<O>,
-    readonly ids: DebuggerIds & { stated?: boolean; terminalStated?: boolean },
+    readonly ids: DebuggerIds & { stated?: boolean },
     options: DebugSessionOptions = {},
   ) {
     this.breakpointConflict = options.breakpointConflict ?? 'replace';
@@ -323,10 +335,6 @@ export class DebugSession<O = unknown> {
       if (supplied)
         throw new DebugRefusedError(
           'request_user does not apply to terminal mode: the system reads no request user there',
-        );
-      if (!this.ids.terminalStated)
-        throw new DebugRefusedError(
-          'terminal mode: no terminal id is configured',
         );
       return {
         debuggingMode: 'terminal',
@@ -1234,8 +1242,21 @@ export class DebugSession<O = unknown> {
     this.reconciled = true;
   }
 
+  /**
+   * The ids our own run carries under terminal mode, so the listener under
+   * them catches it; none in user mode, where the request user is the key.
+   */
+  protected debuggeeIds(): IDebuggeeIds | undefined {
+    const identity = this.fixed;
+    return identity?.debuggingMode === 'terminal'
+      ? { terminalId: identity.terminalId, ideId: identity.ideId }
+      : undefined;
+  }
+
   protected startRun(target: RunTarget, generation: number): void {
     this.run = { generation };
+    // Taken now: the identity this start fixed, whatever a later stop clears.
+    const debuggee = this.debuggeeIds();
     void (async () => {
       let connection: IAbapConnection | undefined;
       let outcome: RunOutcome | undefined;
@@ -1243,7 +1264,7 @@ export class DebugSession<O = unknown> {
         connection = await this.open();
         if (this.run?.generation === generation) {
           this.run.connection = connection;
-          outcome = await this.ports.run(connection, target);
+          outcome = await this.ports.run(connection, target, debuggee);
         }
       } catch (error) {
         outcome = { ok: false, message: thrown(error) };

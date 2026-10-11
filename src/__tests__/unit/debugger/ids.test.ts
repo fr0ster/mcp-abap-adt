@@ -52,12 +52,15 @@ describe('debugger ids', () => {
 });
 
 describe('the terminal id and the breakpoint conflict, as stated', () => {
-  it('says whether the terminal id itself was stated', () => {
+  it('a configured terminal id replaces the random one; none configured is random, never missing', () => {
     expect(
-      resolveDebuggerIds({ SAP_DEBUG_TERMINAL_ID: 'T1' }).terminalStated,
-    ).toBe(true);
-    expect(resolveDebuggerIds({ SAP_DEBUG_IDE_ID: 'I1' }).terminalStated).toBe(
-      false,
+      resolveDebuggerIds({ SAP_DEBUG_TERMINAL_ID: 'T1' }),
+    ).not.toHaveProperty('terminalStated');
+    expect(resolveDebuggerIds({ SAP_DEBUG_TERMINAL_ID: 'T1' }).terminalId).toBe(
+      'T1',
+    );
+    expect(resolveDebuggerIds({ SAP_DEBUG_IDE_ID: 'I1' }).terminalId).toMatch(
+      /^[0-9A-F]{32}$/,
     );
   });
 

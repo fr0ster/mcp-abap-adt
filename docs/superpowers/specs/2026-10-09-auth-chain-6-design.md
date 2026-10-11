@@ -11,7 +11,7 @@ File and line references are to this worktree's code at `d0fa6d5c` (the server's
 `server/src/…`, `compact/…`, `docker/…`) and to the published packages read from their
 repositories at their release commits: auth-broker 5.0.1 (`5ec4e5f`), auth-providers 6.0.1
 (`6ea3c5f`), auth-errors 2.2.0 (`40bd4a4`), connection 14.0.1 (`6f6bb41`), auth-stores 4.0.0
-(`2dbced7`), adt-clients 25.0.1 (`342b8f1b`), interfaces-adt-connection 2.0.0 / 1.0.1
+(`2dbced7`) and 5.0.0 (`9894674`), adt-clients 25.0.1 (`342b8f1b`), interfaces-adt-connection 2.0.0 / 1.0.1
 (`5954a9f`). The debugger's held state, the instance pool and the idle bound (§2, §3.8) are read
 from this branch after main (#288, the debugger #290–#292) was merged into it (`e53028f0`, A0).
 
@@ -50,7 +50,7 @@ from this branch after main (#288, the debugger #290–#292) was merged into it 
 | Goal: state a tool holds keeps its holder; the pool moves into the HTTP package as it is | §2, §3.8; D33, D39, D51, D52 |
 | Success: renewal is the server's stated choice | §6.1; D11 |
 | Success: debug output is opt-in and safe | §9; D24–D27 |
-| Success: what works today keeps working, or the migration note says what to do | §3.8, §8, §10, §12; D9, D19, D21, D30, D39, D52 |
+| Success: what works today keeps working, or the migration note says what to do | §3.8, §8, §10, §12; D9, D19, D21, D39, D52, D53, D54 |
 | Success: Docker images and release artifacts follow the split | §11; D41 |
 | Success: one release | §13; D29, D42 |
 | Success: measured on real systems before release | §15 |
@@ -229,6 +229,12 @@ outside the repository; each becomes a test in §14):
   destination's means", auth-broker `src/destinations.ts:338-379`, `handedOverProvider`). With the
   two lines `bindingOf(means)` answers added, the provider presents `Bearer <token>`. Nothing in the
   chain writes them for a held token: the CLI does so for `saml` / `none` only (`--cookie`).
+  **What it led to** (decided by the user, §18): not a broker change (D30, auth-broker 5.1.0, is
+  withdrawn) but **`jwt` / `none` leaves stdio** (D53) — a token you hold is sent in
+  `x-sap-jwt-token` to the HTTP or SSE package — and **only the chain's own session format is
+  read** (D54): auth-stores 5.0.0 refuses a record not of its format, a credential without both
+  binding keys included, so a hand-written `SAP_JWT_TOKEN` file is refused by the store before
+  the broker sees it.
 
 ## 3. Packages and dependencies
 
@@ -237,8 +243,8 @@ outside the repository; each becomes a test in §14):
 **Decided by the user: option (a)** — the per-request signal is the connection's to honour, at
 every boundary it owns; the server passes it and waits for the releases. The signal reaches a
 consumer's connection only through adt-clients (the one code between the tools and a connection,
-§2), and adt-clients' options and failures are contracts of interfaces-adt; and the broker must
-handle a handed-over token's binding itself (D30). All of it targets **the current lines**: the
+§2), and adt-clients' options and failures are contracts of interfaces-adt. No broker release is
+a prerequisite (D30 withdrawn, §18). All of it targets **the current lines**: the
 user's debugger work moved them — `@mcp-abap-adt/interfaces-adt` 13.1.0 is published ("debugger
 contracts", tag `interfaces-adt-v13.1.0`, on `interfaces-adt-connection ^2.0.0`), and adt-clients'
 open PR #207 (`feat/debugger`, "AbapDebugger", from a fork) is still on 25.0.1 with
@@ -329,18 +335,24 @@ open PR #207 (`feat/debugger`, "AbapDebugger", from a fork) is still on 25.0.1 w
      request; a cancel between lock and update sends the unlock and not the update; an
      `AuthRefusedError` and an `AuthProviderFailure` reach `IAdtError.refusal` as the same objects;
      a 403 with an ADT body carries no `refusal`.
-5. **`@mcp-abap-adt/auth-broker` 5.1.0** (`mcp-abap-adt-auth-broker`; a minor) — **D30, a defect
-   for the broker** (measured, §2 M8): a `jwt` / `none` (or `saml` / `none`) destination whose
-   session holds the handed-over token or cookies **and no binding at all** (`issuedFor` and
-   `issuedBy` both absent) is bound by the broker to the destination it is read for: the provider
-   is built, and the broker writes `bindingOf(means)` beside the credential through the
-   destination's write queue (under its `onWriteFailure`). A binding that is **present and
-   different** stays refused as in 5.0.1 — that is what stops a credential copied into another
-   destination. Tests: an unbound `jwt` / `none` file is served and written with its binding; a
-   mismatched one is refused naming the field; the CLI and the token API unchanged.
+5. ~~**`@mcp-abap-adt/auth-broker` 5.1.0** — bind an unbound handed-over credential (D30)~~ —
+   **withdrawn** (§18): a handed-over token leaves stdio (D53), and a session record without its
+   binding is not of the chain's format (D54), so nothing is left for the broker to bind. The
+   binding rule stays auth-broker 5.0.x's: a token to ABAP carries both `issuedFor` and
+   `issuedBy`, an XSUAA token `issuedBy` only (XSUAA has no system URL), basic none.
 
-**Order**: 0 (debugger releases) → 1 → 2 → 3 (on 1) and 4 (on 1, 2 and 26.0.0) → 5 (independent of
-1–4) → this server's 18.0.0. Each is published before the next is built against it (H7). **The
+**Already published, taken as they are** (no change of ours is a prerequisite):
+`@mcp-abap-adt/auth-stores` **5.0.0** — a store validates the record it holds against its own
+format and refuses one that is not of it with `StorageError` (`code` `STORAGE_ERROR`, `reason:
+'record-format'`), in fixed words naming the store and the destination and ending "regenerate it
+with mcp-auth"; it never composes a legacy binding; a record with no token and no cookies is no
+session. auth-broker 5.0.1 passes that error unchanged to the caller of `getProvider` /
+`getToken`. A broker / CLI change onto auth-stores 5 is in progress in those repositories; if
+**the auth-broker / auth-broker-cli releases on auth-stores 5** are published before C2, the
+server takes them there (checked with `npm view`), and waits for nothing if they are not.
+
+**Order**: 0 (debugger releases) → 1 → 2 → 3 (on 1) and 4 (on 1, 2 and 26.0.0) → this server's
+18.0.0. Each is published before the next is built against it (H7). **The
 server's own move to interfaces-adt 13 / interfaces-adt-connection 2 comes with it**: lib's ranges
 become `^13.2.0` / `^2.1.0` and connection `^15.0.0`. In the move the server fixes what that costs it:
 the test helper's `makeAdtRequest` stub interfaces-adt-connection 2.0.0's notes measured, and every
@@ -352,8 +364,8 @@ read of an answer's `data` through `AbapConnection` in the 8 files of `src` that
 
 | Consumer | Uses | What it needs for connection 15 |
 |---|---|---|
-| auth-broker 5.0.1 | `devDependencies` `^14.0.0`; tests only (`src/__tests__/broker/connection14.test.ts`, `live/adtProbe.ts`, `live/getProvider.live.test.ts`); README examples name connection 14 | nothing to release; its tests and README move to 15 in its own next change (or with 5.1.0) |
-| auth-providers 6.0.1, auth-stores 4.0.0, auth-errors 2.2.0 | no import of connection | nothing |
+| auth-broker 5.0.1 | `devDependencies` `^14.0.0`; tests only (`src/__tests__/broker/connection14.test.ts`, `live/adtProbe.ts`, `live/getProvider.live.test.ts`); README examples name connection 14 | nothing to release; its tests and README move to 15 in its own next change |
+| auth-providers 6.0.1, auth-stores 5.0.0, auth-errors 2.2.0 | no import of connection | nothing |
 | adt-clients | `devDependencies` `^10.0.2`, test harness and scripts; its source types come from interfaces-adt-connection | its interfaces-adt-connection 2 move (26.0.0) already meets the `unknown` default; its dev range moves to `^15` with 26.1.0 |
 | cloud-llm-hub | runtime `^10.0.3`, `lib ^16`, interfaces-adt-connection `^1.0.1`; `AbapConnection` and `SapConfig` types (`srv/mcp-manager.ts`), connectors and CSRF constants (`srv/connections/*`), its own `CloudSdkAbapConnection` with `makeAdtRequest<T = any>` | when it takes lib 18: connection `^15`, interfaces-adt-connection `^2.1`; reads through `AbapConnection` typed or narrowed; its own `makeAdtRequest<T = any>` still satisfies the interface; honour the request signal (§5.2) — its own change |
 | mcp-abap-adt-proxy, calm server | proxy on connection `^9.4`; calm none | out of scope (goal); each migrates in its own change |
@@ -399,8 +411,8 @@ make compact-http depend on `@mcp-abap-adt/compact` → red (it reaches core).
 
 | Dependency | 17.2.2 (lib, after A0) | 18.0.0 | Where |
 |---|---|---|---|
-| `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.1.0` (prerequisite, D30) | core only |
-| `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^4.0.0` | core only |
+| `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.0.1`, or the range of the auth-broker release on auth-stores 5 when one is published before C2 (§3.1) | core only |
+| `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^5.0.0` (D54) | core only |
 | `@mcp-abap-adt/auth-providers` | `^5.4.0` | `^6.0.1` | lib, core |
 | `@mcp-abap-adt/connection` | `^11.0.0` | `^15.0.0` (prerequisite, a major) | lib, core |
 | `@mcp-abap-adt/adt-clients` | `~27.0.0` (#288) | the prerequisite release, the next free minor on the 27 line (§18) | lib |
@@ -633,13 +645,27 @@ change of the major).
   refused for it.
 - **The broker options the server states** (§6): `renewal`, `onWriteFailure` (by store mode, D12),
   `authDebug`, and for `jwt` / `authorization_code` `authorization` (§5.5, §8). The handler table
-  (`basic`, `snc`, `jwt/authorization_code`, `jwt/none`) is unchanged.
+  is `basic`, `snc`, `jwt/authorization_code` — `jwt/none` is removed (D53).
 - **Inspection-only mode** (stdio without a destination) is the server's own refusal before any
   connection (D17).
-- **(D30) A `jwt` / `none` destination** (a token you hold) is the broker's to bind (auth-broker
-  5.1.0, §3.1): with no binding in its session the broker binds it to this destination and writes
-  `bindingOf(means)` back; a different binding is refused naming the field. The server writes no
-  binding and the migration note asks the user to write none.
+- ~~**(D30)** A `jwt` / `none` destination bound by the broker (auth-broker 5.1.0)~~ —
+  **withdrawn** (§18), replaced by D53 and D54.
+- **(D53) stdio serves no token you hold.** A `jwt` / `none` destination (`SAP_AUTH_TYPE=jwt`,
+  `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN` in an `--env` file) is refused by the handler table as
+  any authentication the server does not serve (`UnsupportedAuthenticationError`,
+  `destination_refused`, naming `jwt / none`), at the startup check (D18) and before any request;
+  its hint says where it went: "a token you hold is sent in the x-sap-jwt-token header to
+  mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the session with mcp-auth". Reason
+  (M8): the chain writes no binding for a held token, and a session record without one is not of
+  the chain's format (D54); a token handed over per request is what HTTP and SSE already serve.
+- **(D54) Only the chain's own session format.** core's session records are written by `mcp-auth`
+  (auth-broker-cli 3.x) or by the broker itself; an older format or a hand-written record is not
+  supported. auth-stores 5.0.0 refuses such a record with `StorageError` `reason:
+  'record-format'`, and the broker passes it on unchanged; core answers it as §7.3 says (never a
+  new login, never "no session"). The server checks no record itself: the store is the only one
+  with access to the record, so it alone decides whether the record is its own (goal, *Holds
+  throughout* 3). The binding rule is the broker's, unchanged (auth-broker 5.0.x): a token to ABAP
+  needs both `issuedFor` and `issuedBy`, an XSUAA token `issuedBy` only, basic none.
 
 ### 4.2 HTTP (`@mcp-abap-adt/http`) and SSE (`@mcp-abap-adt/sse`): only the user's headers
 
@@ -861,7 +887,7 @@ with `mcp-auth`, or start without it."
 
 **Where a session write happens at all**: only in stdio, and only for a **token destination** —
 `jwt` / `authorization_code` (cloud, SSO: the session secret is the token the server obtains and
-renews) and, with D30, the binding of a handed-over `jwt` / `none` token. `basic` and `snc`
+renews; the broker writes its binding beside it). `basic` and `snc`
 destinations obtain no session secret and are never written; HTTP and embedded write nothing.
 `--session-write-failure` does not exist. Under `'continue'` the broker's `warn` line for a failed
 write goes to stderr whatever `DEBUG_AUTH_LOG` says, so the goal's "unless a write that failed was
@@ -984,7 +1010,10 @@ documented limit.
 5. else `undefined` — not an authentication failure, answered as today.
 
 **core** reads first `isDestinationConfigError(thrown)` (auth-broker, structural) → its
-`destination`, `missingFields` and carried `error` (classified), then lib's `failureOf`. Reason:
+`destination`, `missingFields` and carried `error` (classified); then a store's refused record
+(D54): an own `code` equal to `STORE_ERROR_CODES.STORAGE_ERROR` and an own `reason` equal to
+`'record-format'`, each read guarded (`readOwn`), never the error's `message` and never
+`instanceof StorageError`; then lib's `failureOf`. Reason:
 lib depends on no broker (D38), and auth-errors decides what a value is (H6).
 
 ### 7.2 Where failures are caught
@@ -1057,8 +1086,10 @@ An `isError` result, JSON in the shape of the server's local failures (`src/lib/
 | Source | `error` | `kind` | `message` | `hint` |
 |---|---|---|---|---|
 | a chain failure | `authentication_failed` | its `kind` | its `reason` | its `hint` |
-| `DestinationConfigError` (core) | `destination_refused` | — (`cause_kind` when it carries an error) | `Destination "<name>" cannot be used: <fields>` | the carried hint, then one fixed hint per known field (`HINTS`; `issuedFor` / `issuedBy`: "the token in the session is bound to other means: write it again, or remove `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`") |
+| `DestinationConfigError` (core) | `destination_refused` | — (`cause_kind` when it carries an error) | `Destination "<name>" cannot be used: <fields>` | the carried hint, then one fixed hint per known field (`HINTS`; `issuedFor` / `issuedBy`: "the session is bound to another destination's means: regenerate it with mcp-auth" — removing the binding keys is no remedy under auth-stores 5, D54) |
+| a store's refused record (`StorageError`, `reason: 'record-format'`, core, D54) | `destination_refused` | — | `Destination "<name>" cannot be used: its session record is not in the store's format` (the server's own fixed words with the destination it serves, never the store's `message`) | "regenerate the session with mcp-auth: `mcp-auth --destination <name> --type abap\|xsuaa`, or `mcp-auth --service-key <file> --output <file> --type abap\|xsuaa` (from @mcp-abap-adt/auth-broker-cli)" |
 | `ADT_REQUEST_ABORTED` | `request_aborted` | — | fixed words | — |
+| `UnsupportedAuthenticationError` for `jwt` / `none` (core, D53) | `destination_refused` | — | `Destination "<name>" uses jwt / none, which this server does not support` | "a token you hold is sent in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the session with mcp-auth" |
 | the server's own refusal | `destination_refused` / `fresh_connection_unavailable` / `inspection_only` / `credentials_required` (HTTP, SSE) | — | fixed words | — |
 
 Out, always: `diagnostics` (to stderr only), `facts` beyond `kind`, any thrown value's `message`, a
@@ -1113,7 +1144,7 @@ sentence; inspection-only mode is the server's own `inspection_only` refusal.
 `--browser`) runs the named program — `linuxBrowser(program)` on a platform outside the table, a
 plain spawn of the program; a name outside the enum, or `--browser-program` beside `--browser`, is
 refused at start on every platform. "Unavailable" refuses only where a login can happen: a `jwt` /
-`authorization_code` destination, at the startup check (D18); `basic`, `snc`, `jwt` / `none` and
+`authorization_code` destination, at the startup check (D18); `basic`, `snc` and
 inspection-only mode start on any platform. The mapping is a pure function returning
 `{ factory, argument }` or `{ unavailable }`, tested without constructing a browser. The
 callback port keeps `--browser-auth-port` (default 61001). All of it lives in core.
@@ -1286,8 +1317,13 @@ its table**. The help, the YAML template and the validation come from it.
   each.
 - **stdio users**: `--transport` is gone — remove it (D39); the first start after upgrading logs in
   once per `jwt` / `authorization_code` destination (broker 5 reads earlier sessions as unbound);
-  a `jwt` / `none` destination keeps working — the broker binds the token on first use and writes
-  the binding back (D30); editing a destination's files while the server runs is
+  **a token you hold (`jwt` / `none`, `SAP_JWT_TOKEN` in an `--env` file) is no longer served
+  over stdio** — send it in `x-sap-jwt-token` to `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or
+  create a stdio session with `mcp-auth` (D53); **only session records written by `mcp-auth` or
+  by the server are read** — a record of an older format or written by hand is refused naming the
+  destination: regenerate it with `mcp-auth --destination <name> --type abap|xsuaa` or `mcp-auth
+  --service-key <file> --output <file> --type abap|xsuaa`; removing `SAP_ISSUED_FOR` /
+  `SAP_ISSUED_BY` is no longer a remedy (D54); editing a destination's files while the server runs is
   unsupported — restart after any change (D3); `--browser` table, unknown names refused, `none`
   waits, `--browser-program`; no login timeout (it was 30 s) and `--login-timeout`; no shutdown
   deadline (it was 30 s), `--shutdown-timeout` and the second signal; `--renewal`; a failed write
@@ -1302,7 +1338,7 @@ its table**. The help, the YAML template and the validation come from it.
   `@mcp-abap-adt/lib/http-transport`; `BaseMcpServer.dispose()` also closes the connections the
   instance built once its state is empty; `AbapConnection` (connection 15 on interfaces-adt-connection 2) answers `unknown` by
   default — name the type or narrow it; the chain's own migrations (auth-providers 6, broker 5,
-  connection 12–15).
+  connection 12–15, auth-stores 5).
 
 **Updated**: `README.md`, `server/README.md`, a new `http/README.md`, `sse/README.md`,
 `compact-http/README.md` and `compact-sse/README.md`, `compact/README.md`, `CHANGELOG.md` (18.0.0, with
@@ -1322,7 +1358,7 @@ launcher's help.
   included, from PR #287 — **decided by the user: one PR, one major release**.
 - **The server waits for its prerequisites** (§3.1) — the user's debugger releases first
   (interfaces-adt 13.1.0, adt-clients 26.0.0), then interfaces-adt-connection 2.1.0,
-  interfaces-adt 13.2.0, connection 15.0.0, adt-clients 26.1.0 and auth-broker 5.1.0 — then
+  interfaces-adt 13.2.0, connection 15.0.0 and adt-clients 26.1.0 — then
   releases per `RELEASE.md`: manifests and
   sibling ranges, metadata, CHANGELOG and docs, `npm ci`, build, `test:check`, `npm test`
   (binSmoke), each package's own tests, `release:dry` ending `Published: 9  Skipped: 0`; the
@@ -1349,7 +1385,7 @@ launcher's help.
 
 ## 14. Tests
 
-**Shape**: unit suites need nothing outside the process — auth-stores 4 in temporary directories,
+**Shape**: unit suites need nothing outside the process — auth-stores 5 in temporary directories,
 the real broker 5 and providers 6, a token endpoint and an ADT stand-in on `127.0.0.1`, an `IBrowser`
 fake that plays the user. No test launches a program (`node:child_process` mocked where strategies
 are composed). Every rule a test protects is shown load-bearing: break it, watch it fail, revert.
@@ -1391,8 +1427,10 @@ main (they have no Jest configuration of their own).
 ### 14.2 Failures (§7)
 
 One test per source through a real request — a provider's `AuthProviderFailure`, connection's
-`AuthRefusedError` (`refused-after-renewal`), core's `DestinationConfigError` (a `jwt` / `none`
-without binding), a failure inside a handler on a server-built **and on an injected** connection (through `IAdtError.refusal`), `ADT_REQUEST_ABORTED`; each asserts
+`AuthRefusedError` (`refused-after-renewal`), core's `DestinationConfigError` (a `jwt` /
+`authorization_code` session bound to another destination's means), core's refused record (an
+`--env` file whose token has no `SAP_ISSUED_*` beside it, on auth-stores 5: `destination_refused`
+with D54's words and hint, no login started, no request sent), a failure inside a handler on a server-built **and on an injected** connection (through `IAdtError.refusal`), `ADT_REQUEST_ABORTED`; each asserts
 `error`, `kind`, `message`, `hint` as `render` gives them and no diagnostics. Source tests: no
 `instanceof` of a chain class, no `.message` read in the auth modules, no regex in the touched
 files. Each §7.4 sentence under its condition.
@@ -1542,8 +1580,9 @@ only. The summary prints no character of a secret. stdout stays empty under stdi
 ### 14.7 What works today
 
 The browser table (pure function); every parameter row per binary; stdio `basic` (HTTP and RFC,
-mocked transport), `snc`, `jwt` / `authorization_code`, `jwt` / `none` — with no binding (bound and
-written back by auth-broker 5.1.0, M8), with its own, and with another destination's (refused);
+mocked transport), `snc`, `jwt` / `authorization_code` — with its own binding (served) and with
+another destination's (refused naming the field); `jwt` / `none` refused at start naming where it
+went (D53); a malformed session record refused with the store's `record-format` (D54);
 HTTP headers; `SapConfig` refusals (D19); embedded with an injected connection. The existing suites
 are moved and updated, not deleted (`brokerFactory`, `destinationRouting` → HTTP headers,
 `packageSessions`, `credentialSources`, `connectionFactory`, `returnError`, `shutdown`,
@@ -1605,7 +1644,7 @@ bound and ended by its stop, the host or the system — never by a request's end
 |---|---|
 | H1 The consumer composes; nobody guesses | renewal, write failures, bounds, the browser, `authDebug` stated (D9–D12, D24); no default collaborator in the factory; refusals instead of guesses (D9, D19, D21, D39) |
 | H2 Nothing goes out that should not | §7.3, §9; the URL only on stderr from the providers; nothing on stdout; §14.6 |
-| H3 A credential stays bound | providers only from the broker in core, the destination read once per process and its edit documented (D3); header credentials per request (http, on new and pooled instances alike) or per SSE connection (sse), never stored or shared, an SSE connection's disposed with it (D39, D48, D51); the one exception the goal states — held state keeps the connections it opened until it ends (§3.8, D52); injected connections never re-authenticated (§4.3) |
+| H3 A credential stays bound | providers only from the broker in core, the destination read once per process and its edit documented (D3); header credentials per request (http, on new and pooled instances alike) or per SSE connection (sse), never stored or shared, an SSE connection's disposed with it (D39, D48, D51); the one exception the goal states — held state keeps the connections it opened until it ends (§3.8, D52); injected connections never re-authenticated (§4.3); each party keeps its role — the store judges its record, the broker the binding, the system the credential; the server judges none (D54) |
 | H4 The modes are separated by package | D35, D36, D38, D48, D49: broker, stores, destinations, session files and logins only in core (and compact over stdio, through core); http and sse work only with header credentials, no server-held credential, and never depend on each other — what they share is lib's (D50); compact over HTTP and SSE never reaches core; embedded keeps none, consumer connections unwrapped, given the signal (§5.2) |
 | H5 No built-in timeouts | no login bound and no shutdown deadline by default (D10, D33); an SSE connection's dispose waits on no timer (D51); the 30 s deadline and the drain timer removed; the idle bound on held state (`--state-idle-minutes`) is the project owner's stated exception, main's, carried (§3.8) |
 | H6 One implementation of each rule | the shared transport helpers and the HTTP-transport shutdown once, in lib (D50); the compact tool set once, `compactToolSetOf` (D49); one registry of live tools for every shutdown and every SSE close, pooled instances included (D33, D51, §3.8); one instance close (D51); main's pool, not a second one (D52); failures read by auth-errors (§7.1); the broker's shared build; the broker's refresh state; auth-providers' browsers (D9); cancellation at the send boundaries the connection's (§3.1), the signal and the structured failure carried by adt-clients; the shared lookup on auth-errors' `sharedAttempt` |
@@ -1629,12 +1668,12 @@ bound and ended by its stop, the host or the system — never by a request's end
 | D35 | `@mcp-abap-adt/http`, bin `mcp-abap-adt-http`, directory `http/` |
 | D37 | compact over HTTP wanted; behaviour identical, only the tool set differs |
 | D34 | the abort's code is the connection's own, `ADT_REQUEST_ABORTED` |
-| D30 | the broker binds a handed-over token itself — a prerequisite (auth-broker 5.1.0) |
+| D30 | ~~the broker binds a handed-over token itself — a prerequisite (auth-broker 5.1.0)~~ — **withdrawn**, 2026-10-11 (below) |
 | D22 | ownership of a handed-over fresh connection passes to the server |
 | D27, D47 | "server text" is an authorization server's or IdP's; ADT's own authorization errors reach the client as ADT errors |
 | D39 | `--transport` removed entirely, refused naming the binary to use |
 | §3.1 | the prerequisites on the current lines, after the debugger releases; the goal's *Out of scope* names them; connection is 15.0.0, a major, no compatibility shim |
-| D30 (contract), 2026-10-10 | auth-broker 5.1.0 binds a handed-over credential **only when its session holds no binding at all** (`issuedFor` and `issuedBy` both absent); a present, different binding stays refused, as in 5.0.1 |
+| D30 (contract), 2026-10-10 | ~~auth-broker 5.1.0 binds a handed-over credential only when its session holds no binding at all~~ — **withdrawn** with D30, 2026-10-11 |
 | — , 2026-10-10 | **this spec is approved**; the plan is written against it |
 | D48 | **SSE stays — the removal is cancelled**: some clients still speak only SSE, there is no data on who uses it, and removing it has no technical need; it lives in `@mcp-abap-adt/sse` (`sse/`, bin `mcp-abap-adt-sse`), HTTP+SSE only, credentials from the user's headers per connection, exactly the rules of `@mcp-abap-adt/http`; depends on lib and auth-providers only |
 | D49 | **compact is one package per transport**, by the principle of D35: `@mcp-abap-adt/compact` (stdio, on core, bin `mcp-abap-adt-compact`), `@mcp-abap-adt/compact-http` (on http, bin `mcp-abap-adt-compact-http`), `@mcp-abap-adt/compact-sse` (on sse, bin `mcp-abap-adt-compact-sse`); compact over HTTP or SSE pulls no broker or stores through core; behaviour identical to the full server on each transport, only the tool set and how its sets are formed differ; `compact-readonly` / `compact-modify` unchanged |
@@ -1644,6 +1683,11 @@ bound and ended by its stop, the host or the system — never by a request's end
 | — | the idle bound on held state (`--state-idle-minutes`, default 30) is the project owner's one exception to "no timeouts" (`DEBUGGER.md`) |
 | D39 (amended) | `--transport` stays removed; each of the six bins is flag-free about its transport |
 | D29 (amended) | one PR, one major 18 for all nine packages |
+| — , 2026-10-11 | **roles**: a session store encapsulates storing a secret (a file, a database, anything) and is the only one with access to the stored record, so it validates the record against its own format; a provider obtains, renews and presents; the broker composes; only the target system or the identity provider decides whether a credential is valid |
+| D54, 2026-10-11 | **only the chain's own session format**: records come from `mcp-auth` (auth-broker-cli 3.x) or the broker; older formats and hand-written records are not supported; auth-stores **5.0.0** (published) refuses a record not of its format with `StorageError` `reason: 'record-format'` and composes no legacy binding, a record with no token or cookies is no session; auth-broker 5.0.1 passes that error to the caller; the server answers it with fixed words and the hint to regenerate with `mcp-auth` (§7.3) |
+| — , 2026-10-11 | the binding fields per row are auth-broker 5.0.x's, unchanged: a token to ABAP needs both `issuedFor` and `issuedBy`; XSUAA has no system URL, so `issuedBy` only; basic none |
+| B1 / D30, 2026-10-11 | **withdrawn**: auth-broker 5.1.0 ("bind an unbound handed-over credential") is cancelled; no broker release is a prerequisite of the server for binding; a broker / CLI change onto auth-stores 5 is separate, and C2 takes its releases if they are published by then (§3.1) |
+| D53, 2026-10-11 | **`jwt` / `none` leaves stdio**: a token you hold (`SAP_JWT_TOKEN` with `SAP_GRANT_TYPE=none` in an `--env` file) is no longer served over stdio; a handed-over token stays only in the HTTP and SSE headers (`x-sap-jwt-token`); the migration note says so and points to `mcp-auth` for stdio sessions; M8 (§2) is the measurement that led here |
 
 **Settled by the registry, not a decision** (2026-10-10, `npm view`): the version numbers §3.1, §3.3
 and §13 assumed for two prerequisites were taken by other releases the same day —

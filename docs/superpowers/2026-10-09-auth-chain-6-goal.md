@@ -11,7 +11,7 @@ The server `mcp-abap-adt` stands on the auth chain as it is published now:
 |---|---|
 | auth-broker | 5.0.x |
 | auth-providers | 6.0.x |
-| auth-stores | 4.0.x |
+| auth-stores | 5.0.x |
 | connection | 15.0.x — a major on interfaces-adt-connection 2, with a per-request signal (below) |
 | interfaces-auth | 7.5.x |
 | auth-errors | 2.2.x |
@@ -150,8 +150,16 @@ never hides one and never guesses one.
   emits carries a secret, server text, an authorization URL or `state`.
 - **What works today keeps working, or the migration note says what to do.**
   - stdio (`mcp-abap-adt`): `--mcp`, `--env`, `--env-path`, the destination
-    folder and service keys; basic, `jwt` / `authorization_code`, `jwt` /
-    `none`, SNC; the browser choice and the callback port.
+    folder and service keys; basic, `jwt` / `authorization_code`, SNC; the
+    browser choice and the callback port.
+  - stdio no longer serves a token you hold (`jwt` / `none` in an `--env`
+    file, `SAP_JWT_TOKEN`). The migration note says so: a token you hold is
+    sent in the `x-sap-jwt-token` header to the HTTP or SSE package, and a
+    stdio session is created with `mcp-auth`.
+  - stdio reads only session records of the chain's own format, written by
+    `mcp-auth` or by the broker. The migration note says so: a record of an
+    older format, or written by hand, is refused naming the destination;
+    regenerate it with `mcp-auth`.
   - HTTP: `x-sap-*` headers keep working, served by the HTTP package and its
     bin. The migration note says where HTTP moved, and that the default
     destination and `x-mcp-destination` are gone: pass `x-sap-*` headers.
@@ -247,6 +255,13 @@ never hides one and never guesses one.
      headers serve only the request that carried them — with one exception:
      held state (a debug session) keeps the connections it opened, with the
      credential they were opened with, until that state ends.
+   - **Each party keeps its own role.** A session store holds the stored
+     record and is the only one that reads it, so it alone decides whether
+     the record is of its format; a provider obtains, renews and presents a
+     credential; the broker composes them and decides whether a binding
+     matches the destination; only the target system or the identity
+     provider decides whether a credential is valid. The server judges none
+     of these: it passes on what each says.
 4. **The modes are separated by package.** The default destination, the
    broker, auth-stores, session files and interactive login exist in
    `@mcp-abap-adt/core` (stdio) only. The HTTP and SSE packages work only
@@ -286,9 +301,7 @@ never hides one and never guesses one.
   - `@mcp-abap-adt/connection` 15.0.0 — a major on interfaces-adt-connection 2,
     with the signal honoured at every send boundary, HTTP and RFC;
   - `@mcp-abap-adt/adt-clients` 26.1.0 — the signal on every request, releases
-    never cancelled, the refusal kept;
-  - `@mcp-abap-adt/auth-broker` 5.1.0 — a handed-over token without a binding
-    bound by the broker itself.
+    never cancelled, the refusal kept.
 
   Any other defect found there goes to its own repository, and the server waits
   for the fix to be published.

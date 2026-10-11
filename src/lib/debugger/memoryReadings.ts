@@ -66,7 +66,9 @@ const group = (node: unknown): Record<string, unknown> =>
   node && typeof node === 'object' ? (node as Record<string, unknown>) : {};
 
 export function readMemorySizes(xml: string): MemorySizesReading {
-  const doc = group((readXmlDocument(xml) as any)?.memorySizes);
+  const doc = group(
+    (readXmlDocument(xml) as { memorySizes?: unknown })?.memorySizes,
+  );
   const abap = group(doc.abap);
   const internal = group(doc.internal);
   const external = group(doc.external);

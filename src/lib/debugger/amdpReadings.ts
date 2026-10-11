@@ -87,7 +87,10 @@ function breakpointState(b: any): AmdpBreakpointState {
   };
 }
 
-function frameOf(f: any): AmdpFrame {
+type Attributes = Record<string, unknown>;
+function frameOf(
+  f: Attributes & { abapPosition?: Attributes; nativePosition?: Attributes },
+): AmdpFrame {
   const abap = f.abapPosition ?? {};
   const native = f.nativePosition ?? {};
   const line = lineOf(abap.uri);

@@ -10,21 +10,23 @@
  * timer of ours. Every change goes through one Serial; the long poll runs
  * outside it and its answer is dropped when the generation moved on.
  */
-import type {
-  AbapDebugger,
-  abapDebuggerDocuments,
-  IDebuggerListenerConflict,
+import {
+  type AbapDebugger,
+  type abapDebuggerDocuments,
+  type IDebuggerListenerConflict,
+  readListenerConflict,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtResponse,
   IDebuggerBreakpoint,
   IDebuggerIdentity,
+  IDebuggerSettings,
   IDebuggerStepMethod,
   IDebuggerStepToLineMethod,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { DebuggerIds } from './ids';
+import type { BreakpointConflict, DebuggerIds } from './ids';
 import {
   type AttachReading,
   type BreakpointReading,
@@ -90,11 +92,41 @@ export interface BreakpointsAnswer {
   placed: BreakpointReading[];
   refused: Array<{ requested: IDebuggerBreakpoint; error: string }>;
 }
+export type DebuggingMode = 'user' | 'terminal';
+/** What a caller may set; `showDataAging` is left out, so it stays off, the system's default. */
+export type DebugSettings = Omit<IDebuggerSettings, 'showDataAging'>;
+export interface DebugStartOptions {
+  breakpoints?: IDebuggerBreakpoint[];
+  run?: RunTarget;
+  /** User mode: whose requests are caught; the connected user when omitted. */
+  requestUser?: string;
+  /** `user` (the default) or `terminal`, which keys on the configured terminal id. */
+  debuggingMode?: DebuggingMode;
+  /** Applied after each attach; see `setSettings`. */
+  settings?: DebugSettings;
+}
+export interface DebugSessionOptions {
+  /** The host's choice; `replace` when omitted. */
+  breakpointConflict?: BreakpointConflict;
+}
 
 export class DebugListenerError extends Error {}
 export class DebugStateError extends Error {}
 export class DebugRequestError extends Error {}
 export class DebugCleanupError extends Error {}
+/** Refused before anything was sent. */
+export class DebugRefusedError extends Error {}
+/** Another debugger holds the user's debugging (409), as `readListenerConflict` reads it. */
+export class DebugConflictError extends DebugListenerError {
+  constructor(
+    readonly conflictText: string,
+    readonly ideUser?: string,
+  ) {
+    super(
+      `another debugger holds this debugging: ${conflictText}${ideUser ? ` (IDE user ${ideUser})` : ''}`,
+    );
+  }
+}
 
 interface Listener {
   connection: IAbapConnection;
@@ -125,10 +157,29 @@ const asFailure = (e: unknown) =>
     getError: () => ({ origin: 'connection', message: thrown(e) }),
   }) as unknown as IAdtResponse<string>;
 
+/** A condition on a breakpoint other than a line is refused before the wire, naming it. */
+export function refuseConditionOffLine(
+  list: readonly IDebuggerBreakpoint[],
+): void {
+  list.forEach((b, i) => {
+    if (b.kind !== 'line' && (b as { condition?: string }).condition)
+      throw new DebugRefusedError(
+        `breakpoints[${i}] (${b.kind}): a condition applies to a line breakpoint only`,
+      );
+  });
+}
+
+/** A failed listener answer: the holder named when it is the system's conflict. */
+function listenerError(answer: IAdtResponse<unknown>): DebugListenerError {
+  const held = answer.ok ? undefined : readListenerConflict(answer.getError());
+  return held
+    ? new DebugConflictError(held.conflictText, held.ideUser)
+    : new DebugListenerError(messageOf(answer));
+}
+
 export class DebugSession<O = unknown> {
   protected readonly serial = new Serial();
   protected origin?: O;
-  protected user?: string;
   protected mode: IDebuggerListenerConflict = 'refuse';
   protected control?: Listener;
   protected readonly armed = new Map<string, BreakpointReading>();
@@ -139,11 +190,21 @@ export class DebugSession<O = unknown> {
   protected readonly notices: DebugState[] = [];
   private readonly waiters = new Set<() => void>();
   private readonly closedConnections = new WeakSet<object>();
+  protected readonly breakpointConflict: BreakpointConflict;
+  /** The identity of this debug session: fixed by a start, kept until a cleanup succeeded completely. */
+  protected fixed?: IDebuggerIdentity;
+  /** True once something that changes the system was sent: the cleanup owes a stopListener. */
+  protected changed = false;
+  /** The settings the caller set; applied after each attach (Task 6). */
+  protected preferences: DebugSettings = {};
 
   constructor(
     protected readonly ports: DebugSessionPorts<O>,
-    readonly ids: DebuggerIds & { stated?: boolean },
-  ) {}
+    readonly ids: DebuggerIds & { stated?: boolean; terminalStated?: boolean },
+    options: DebugSessionOptions = {},
+  ) {
+    this.breakpointConflict = options.breakpointConflict ?? 'replace';
+  }
 
   bind(origin: O): this {
     this.origin = origin;
@@ -156,16 +217,78 @@ export class DebugSession<O = unknown> {
       throw new DebugStateError('the debugger has no connection yet');
     return this.origin;
   }
-  protected async identity(): Promise<IDebuggerIdentity> {
-    this.user ??= (
-      await this.ports.requestUser(this.requireOrigin())
+  /** The identity in force: undefined before a start and after a complete cleanup. */
+  currentIdentity(): IDebuggerIdentity | undefined {
+    return this.fixed;
+  }
+  protected requireIdentity(): IDebuggerIdentity {
+    if (!this.fixed)
+      throw new DebugStateError('this debug session has not started');
+    return this.fixed;
+  }
+  /** From a start's arguments; a mode they do not fit is refused before the wire. */
+  protected async identityFor(
+    options: DebugStartOptions,
+  ): Promise<IDebuggerIdentity> {
+    // Presence is checked before any normalisation: a supplied blank is refused in
+    // every mode, never read as "not supplied".
+    const supplied = options.requestUser !== undefined;
+    const named = options.requestUser?.trim();
+    if (supplied && !named)
+      throw new DebugRefusedError('request_user is empty');
+    if (options.debuggingMode === 'terminal') {
+      if (supplied)
+        throw new DebugRefusedError(
+          'request_user does not apply to terminal mode: the system reads no request user there',
+        );
+      if (!this.ids.terminalStated)
+        throw new DebugRefusedError(
+          'terminal mode: no terminal id is configured',
+        );
+      return {
+        debuggingMode: 'terminal',
+        terminalId: this.ids.terminalId,
+        ideId: this.ids.ideId,
+      };
+    }
+    const requestUser = (
+      named || (await this.ports.requestUser(this.requireOrigin()))
     ).toUpperCase();
     return {
       debuggingMode: 'user',
-      requestUser: this.user,
+      requestUser,
       terminalId: this.ids.terminalId,
       ideId: this.ids.ideId,
     };
+  }
+  /**
+   * refuse-if-held: asks on the control connection — never on a polling one —
+   * whether another debugger holds the key. Changes nothing. Our own listener
+   * under the same ideId is no conflict (measured on premise, 2026-10-10), so
+   * this protects against another IDE, not against ourselves. Not atomic: a
+   * listener started between this check and the arming is not seen.
+   */
+  private async preflight(identity: IDebuggerIdentity): Promise<void> {
+    if (this.breakpointConflict !== 'refuse-if-held') return;
+    const checked = await (await this.controlDebugger())
+      .checkListener(identity)
+      .catch(asFailure);
+    if (!checked.ok) {
+      const error = listenerError(checked);
+      throw error instanceof DebugConflictError
+        ? error
+        : new DebugRequestError(messageOf(checked));
+    }
+  }
+  /** Closes the control connection; a close that throws is kept for the next stop and named. */
+  private async closeControl(): Promise<string[]> {
+    const control = this.control;
+    this.control = undefined;
+    const kept = await this.closeOrRecord(
+      control?.connection,
+      "the breakpoints' connection",
+    );
+    return kept ? [kept] : [];
   }
   protected async open(): Promise<IAbapConnection> {
     return this.ports.openConnection(this.requireOrigin());
@@ -192,13 +315,13 @@ export class DebugSession<O = unknown> {
     }
     return this.control.debugger;
   }
-  private changed?: () => void;
+  private observer?: () => void;
   observe(onChange: () => void): void {
-    this.changed = onChange;
+    this.observer = onChange;
   }
   protected notify(): void {
     for (const w of [...this.waiters]) w();
-    this.changed?.();
+    this.observer?.();
   }
 
   /** Every change goes through here: one at a time, and observers hear of it afterwards — whatever it did. */
@@ -219,7 +342,11 @@ export class DebugSession<O = unknown> {
   setBreakpoints(
     list: IDebuggerBreakpoint[],
   ): Promise<DebugView<BreakpointsAnswer>> {
-    return this.mutate(() => this.armLocked(list));
+    return this.mutate(async () => {
+      refuseConditionOffLine(list);
+      await this.preflight(this.requireIdentity());
+      return this.armLocked(list);
+    });
   }
 
   /** Inside the serial. */
@@ -227,8 +354,9 @@ export class DebugSession<O = unknown> {
     list: IDebuggerBreakpoint[],
   ): Promise<DebugView<BreakpointsAnswer>> {
     {
-      const identity = await this.identity();
+      const identity = this.requireIdentity();
       const dbg = await this.controlDebugger();
+      this.changed = true;
       const answer = await dbg.setBreakpoints(identity, list);
       if (!answer.ok) throw new DebugRequestError(messageOf(answer));
       const raw = bodyOf(answer);
@@ -267,7 +395,7 @@ export class DebugSession<O = unknown> {
   deleteBreakpoint(id: string): Promise<void> {
     return this.mutate(async () => {
       const answer = await (await this.controlDebugger()).deleteBreakpoint(
-        await this.identity(),
+        this.requireIdentity(),
         id,
       );
       if (!answer.ok) throw new DebugRequestError(messageOf(answer));
@@ -281,30 +409,37 @@ export class DebugSession<O = unknown> {
 
   // --- listener -----------------------------------------------------------------
   start(
-    mode: IDebuggerListenerConflict,
-    options: { breakpoints?: IDebuggerBreakpoint[]; run?: RunTarget } = {},
+    conflict: IDebuggerListenerConflict,
+    options: DebugStartOptions = {},
   ): Promise<DebugState & { breakpoints?: BreakpointsAnswer }> {
     return this.mutate(async () => {
       if (this.listener || this.current)
         throw new DebugStateError(
           'a listener is already running for this debug session',
         );
-      const identity = await this.identity();
-      this.mode = mode;
+      // Refusals before the wire: nothing is opened, nothing is sent.
+      refuseConditionOffLine(options.breakpoints ?? []);
+      const identity = await this.identityFor(options);
+      this.mode = conflict;
       this.failure = undefined;
-      await this.beforeFirstListen(identity); // Task 5: reconciliation
+      this.fixed = identity;
+      this.preferences = { ...(options.settings ?? {}) };
       const before = new Set(this.armed.keys());
       const placedHere = () =>
         [...this.armed.values()].filter((b) => !before.has(b.id!));
       let armed: DebugView<BreakpointsAnswer> | undefined;
       try {
+        // 1. the preflight; 2. the reconciliation (stopListener deletes the key's
+        // breakpoints, so it runs only after the preflight); 3. the arming, then listening.
+        await this.preflight(identity);
+        await this.beforeFirstListen(identity);
         armed = options.breakpoints?.length
           ? await this.armLocked(options.breakpoints)
           : undefined;
         const connection = await this.open();
         const listener: Listener = {
           connection,
-          debugger: this.ports.abapDebugger(connection, mode),
+          debugger: this.ports.abapDebugger(connection, conflict),
         };
         const generation = ++this.generation;
         this.listener = listener;
@@ -314,19 +449,47 @@ export class DebugSession<O = unknown> {
           FIRST_POLL_HOLD_SECONDS,
         );
         listener.open = undefined; // handled here
-        if (!first.ok) throw new DebugListenerError(messageOf(first));
+        if (!first.ok) {
+          const error = listenerError(first);
+          // A refused listener (409) changed nothing; any other failure leaves its state unknown.
+          if (!(error instanceof DebugConflictError)) this.changed = true;
+          throw error;
+        }
+        this.changed = true;
         const caught = readDebuggee(bodyOf(first));
         if (caught) await this.attachTo(caught, bodyOf(first), generation);
         if (!this.current && this.owns(listener, generation))
           void this.loop(listener, generation);
         if (options.run && this.owns(listener, generation))
-          this.startRun(options.run, generation); // Task 5
+          this.startRun(options.run, generation);
         // Inside the protected part: an attach that failed is reported here (report() throws its failure).
         return {
           ...this.report(),
           ...(armed ? { breakpoints: armed.value } : {}),
         };
       } catch (error) {
+        if (!this.changed) {
+          // Refused before any change — a preflight 409, a failure of the preflight
+          // itself, a first listen refused 409 with nothing armed or reconciled. No
+          // stopListener and no deletion: only the connections this start opened close.
+          const failures = [
+            ...(await this.dropListener()),
+            ...(await this.closeControl()),
+          ];
+          // The identity and the settings go only with a complete cleanup (Task 4
+          // replaces this branch by `settle(failures)`).
+          if (failures.length === 0) {
+            this.fixed = undefined;
+            this.preferences = {};
+            throw error;
+          }
+          const notClosed = `not closed: ${failures.join('; ')}`;
+          if (error instanceof Error) {
+            error.message = `${error.message}; ${notClosed}`;
+            throw error;
+          }
+          throw new DebugListenerError(`${thrown(error)}; ${notClosed}`);
+        }
         // A refused or failed start leaves nothing it armed. Each undo runs whatever the other did,
         // and what could not be undone is named in the error the start fails with.
         const failures: string[] = [];
@@ -419,7 +582,7 @@ export class DebugSession<O = unknown> {
   /** Never rejects: whatever throws in it becomes the listener's failure, reported by the next wait. */
   private async loop(listener: Listener, generation: number): Promise<void> {
     try {
-      const identity = await this.identity();
+      const identity = this.requireIdentity();
       for (;;) {
         if (!this.owns(listener, generation) || this.current) return;
         const answer = await this.poll(listener, identity, LISTEN_HOLD_SECONDS);
@@ -448,7 +611,7 @@ export class DebugSession<O = unknown> {
     if (!this.owns(listener, generation)) return false; // a stop took it, and its answer
     listener.open = undefined; // handled here
     if (!answer.ok) {
-      this.failure = messageOf(answer);
+      this.failure = listenerError(answer).message;
       await this.dropListener();
       this.notify();
       return false;
@@ -479,7 +642,7 @@ export class DebugSession<O = unknown> {
     }
     let connection: IAbapConnection | undefined;
     try {
-      const identity = await this.identity();
+      const identity = this.requireIdentity();
       connection = await this.open();
       const dbg = this.ports.abapDebugger(connection, this.mode);
       const attached = await dbg.attach(
@@ -560,7 +723,7 @@ export class DebugSession<O = unknown> {
     const what = `a debuggee caught during the stop (${debuggee.debuggeeId})`;
     let connection: IAbapConnection | undefined;
     try {
-      const identity = await this.identity();
+      const identity = this.requireIdentity();
       connection = await this.open();
       const dbg = this.ports.abapDebugger(connection, this.mode);
       const attached = await dbg
@@ -625,12 +788,12 @@ export class DebugSession<O = unknown> {
     if (this.failure !== undefined) {
       const message = this.failure;
       this.failure = undefined;
-      this.changed?.(); // consuming it may leave nothing held
+      this.observer?.(); // consuming it may leave nothing held
       throw new DebugListenerError(message);
     }
     const notice = this.notices.shift();
     if (notice) {
-      this.changed?.();
+      this.observer?.();
       return notice;
     }
     if (this.current) return { state: 'stopped', stop: this.current.view };
@@ -848,9 +1011,11 @@ export class DebugSession<O = unknown> {
     if (!this.ids.stated || this.reconciled) return;
     // A predecessor under these ids may have left a listener (D12); its absence is no failure.
     // It counts as done only once the request was sent: a start that failed before it retries.
-    await (await this.controlDebugger())
-      .stopListener(identity)
-      .catch(() => undefined);
+    // stopListener deletes the key's breakpoints too, which the arming then replaces.
+    // A connection that cannot be opened sends nothing: that start failed before any change.
+    const control = await this.controlDebugger();
+    this.changed = true;
+    await control.stopListener(identity).catch(() => undefined);
     this.reconciled = true;
   }
 
@@ -926,7 +1091,7 @@ export class DebugSession<O = unknown> {
           }
         }
         if (this.armed.size > 0 || this.listener) {
-          const identity = await this.identity();
+          const identity = this.requireIdentity();
           const control = await this.controlDebugger();
           for (const id of [...this.armed.keys()]) {
             const deleted = await control

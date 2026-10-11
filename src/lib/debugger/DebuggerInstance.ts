@@ -2,7 +2,12 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import type { StatePart } from '../state/InstanceState';
 import { AmdpSession } from './AmdpSession';
 import { DebugCleanupError, DebugSession } from './DebugSession';
-import { type DebuggerIds, resolveDebuggerIds } from './ids';
+import {
+  type BreakpointConflict,
+  type DebuggerIds,
+  resolveBreakpointConflict,
+  resolveDebuggerIds,
+} from './ids';
 import { liveAmdpPorts, liveDebugPorts } from './ports';
 
 const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -55,11 +60,22 @@ export class DebuggerInstance implements StatePart {
   }
 }
 
+/**
+ * The breakpoint conflict is the host's: the request scope, the environment,
+ * then `options.breakpointConflict`; an embedder overriding
+ * `BaseMcpServer.debuggerFor()` passes it here.
+ */
 export function createDebuggerInstance(
-  ids: DebuggerIds & { stated: boolean } = resolveDebuggerIds(),
+  ids: DebuggerIds & {
+    stated: boolean;
+    terminalStated?: boolean;
+  } = resolveDebuggerIds(),
+  options: { breakpointConflict?: BreakpointConflict } = {},
 ): DebuggerInstance {
   return new DebuggerInstance({
-    abap: new DebugSession(liveDebugPorts(), ids),
+    abap: new DebugSession(liveDebugPorts(), ids, {
+      breakpointConflict: resolveBreakpointConflict(options.breakpointConflict),
+    }),
     amdp: new AmdpSession(liveAmdpPorts()),
   });
 }

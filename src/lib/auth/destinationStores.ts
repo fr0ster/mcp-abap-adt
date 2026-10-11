@@ -65,7 +65,8 @@ export interface DestinationStores {
 
 /**
  * `SAP_RESPONSIBLE`, `SAP_USERNAME` (the login), `SAP_MASTER_SYSTEM`,
- * `SAP_DEBUG_TERMINAL_ID` and `SAP_DEBUG_IDE_ID` of a
+ * `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID` and
+ * `SAP_DEBUG_BREAKPOINT_CONFLICT` of a
  * destination's own `.env`; a key not stated, or a file that is absent or
  * unreadable, is absent from the answer. Nothing else in the file is kept.
  */
@@ -83,12 +84,14 @@ export function readDestinationSystemContext(
   const masterSystem = parsed.SAP_MASTER_SYSTEM;
   const debugTerminalId = parsed.SAP_DEBUG_TERMINAL_ID;
   const debugIdeId = parsed.SAP_DEBUG_IDE_ID;
+  const debugBreakpointConflict = parsed.SAP_DEBUG_BREAKPOINT_CONFLICT;
   return {
     ...(responsible ? { responsible } : {}),
     ...(login ? { login } : {}),
     ...(masterSystem ? { masterSystem } : {}),
     ...(debugTerminalId ? { debugTerminalId } : {}),
     ...(debugIdeId ? { debugIdeId } : {}),
+    ...(debugBreakpointConflict ? { debugBreakpointConflict } : {}),
   };
 }
 

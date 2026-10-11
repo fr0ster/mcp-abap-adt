@@ -1,3 +1,4 @@
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import type {
@@ -30,6 +31,15 @@ export const LISTEN_CATCH = () =>
 export const LISTEN_NOTHING = () => okResponse('');
 export const CONFLICT = () =>
   refusedResponse('Another debugger is already listening (SY 530)');
+/** The system's 409 to a listener or a check while another IDE holds the user (recorded on premise, sanitised). */
+export const CONFLICT_409 = () =>
+  refusedResponse('An exception was raised', {
+    response: {
+      status: 409,
+      headers: { 'content-type': 'application/xml' },
+      data: corpusBody('debugger-conflict--01-listen-refused'),
+    },
+  } as unknown as Partial<IAdtError>);
 /** The default strategies' shapes: `done` answers nothing (adt-clients `nothing`). */
 export const DONE = () => okResponse(undefined);
 
@@ -50,6 +60,8 @@ export function fakeWorld() {
   const run = deferred<RunOutcome>();
   const stepAnswers: any[] = [];
   const attachAnswers: Array<() => Promise<any>> = [];
+  /** What the next checkListener answers, in order; free (`done`) when none is left. */
+  const checkAnswers: Array<() => any> = [];
   let validationAnswers: Array<() => any> = [];
   /** Members put here replace the fake's on every debugger, cached ones included. */
   const override: Record<string, any> = {};
@@ -60,6 +72,10 @@ export function fakeWorld() {
         const d = deferred<any>();
         polls.push(Object.assign(d, { hold: o?.holdSeconds }));
         return d.promise;
+      },
+      checkListener: async () => {
+        calls.push('checkListener');
+        return (checkAnswers.shift() ?? DONE)();
       },
       stopListener: async () => {
         calls.push('stopListener');
@@ -185,6 +201,7 @@ export function fakeWorld() {
     run,
     stepAnswers,
     attachAnswers,
+    checkAnswers,
     override,
     setValidationAnswers: (a: Array<() => any>) => {
       validationAnswers = a;

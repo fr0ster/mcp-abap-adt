@@ -194,6 +194,11 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    x-sap-debug-ide-id; the destination's .env; the environment.
                                    Else random per instance. A shared IDE id shares the user's
                                    catches without the system's listener conflict
+    SAP_DEBUG_BREAKPOINT_CONFLICT  replace (default) or refuse-if-held: whether a change of the
+                                   debugger's breakpoints first asks if another IDE of the same
+                                   SAP user holds them, and refuses if so. First found:
+                                   x-sap-debug-breakpoint-conflict; the destination's .env;
+                                   the environment
 
   HTTP/SSE Headers (System Context; SSE: the session's opening request):
     x-sap-master-system            Master system for this request (wins over the .env and env)
@@ -203,6 +208,7 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     x-sap-language                 Master/original language for created objects (overrides SAP_LANGUAGE)
     x-sap-debug-terminal-id        The debugger's terminal id (wins over the .env and env)
     x-sap-debug-ide-id             The debugger's IDE id (wins over the .env and env)
+    x-sap-debug-breakpoint-conflict The debugger's breakpoint conflict (wins over the .env and env)
 
 GENERATING A .ENV:
   Install the CLI: npm install -g @mcp-abap-adt/auth-broker-cli

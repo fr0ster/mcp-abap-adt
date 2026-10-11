@@ -43,15 +43,43 @@ export function statedDebuggerIds(
 /**
  * Stated ids where given, random ones elsewhere. `stated` is true when either
  * id came from configuration: only a stated id can have a predecessor to
- * reconcile with.
+ * reconcile with. `terminalStated` is true when the terminal id itself did.
  */
 export function resolveDebuggerIds(
   env: NodeJS.ProcessEnv = process.env,
-): DebuggerIds & { stated: boolean } {
+): DebuggerIds & { stated: boolean; terminalStated: boolean } {
   const stated = statedDebuggerIds(env);
   return {
     terminalId: stated.terminalId ?? newDebuggerId(),
     ideId: stated.ideId ?? newDebuggerId(),
     stated: stated.terminalId !== undefined || stated.ideId !== undefined,
+    // Terminal mode keys on a terminal id the host configured: a random one names no terminal.
+    terminalStated: stated.terminalId !== undefined,
   };
+}
+
+/**
+ * What a change does to the breakpoints another IDE of the same SAP user holds
+ * under the same key: `replace` sends the full list, `refuse-if-held` first asks
+ * whether another IDE holds the key and refuses if so. The host's choice,
+ * stated like the ids: the request scope (a header, or the destination's
+ * `.env` entered into it), then the environment, then the embedder's option.
+ */
+export type BreakpointConflict = 'replace' | 'refuse-if-held';
+const BREAKPOINT_CONFLICTS: readonly string[] = ['replace', 'refuse-if-held'];
+
+export function resolveBreakpointConflict(
+  fallback?: BreakpointConflict,
+  env: NodeJS.ProcessEnv = process.env,
+): BreakpointConflict {
+  const stated =
+    getRequestContext()?.debugBreakpointConflict?.trim() ||
+    env.SAP_DEBUG_BREAKPOINT_CONFLICT?.trim() ||
+    fallback ||
+    'replace';
+  if (!BREAKPOINT_CONFLICTS.includes(stated))
+    throw new Error(
+      `SAP_DEBUG_BREAKPOINT_CONFLICT: ${stated} is neither replace nor refuse-if-held`,
+    );
+  return stated as BreakpointConflict;
 }

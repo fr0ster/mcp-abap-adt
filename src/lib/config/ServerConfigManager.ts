@@ -263,7 +263,7 @@ HANDLER EXPOSITION:
                                    --exposition=readonly       (readonly + search + system)
                                    --exposition=readonly,high  (readonly + high + search + system)
                                    --exposition=readonly,low   (readonly + low + search + system)
-                                   --exposition=high           (high only, NO search/system)
+                                   --exposition=high           (high + search, no system)
                                    --exposition=readonly,debug (readonly + debug + search + system)
 
                                    'high' and 'low' are mutually exclusive and the

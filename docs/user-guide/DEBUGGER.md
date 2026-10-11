@@ -186,7 +186,9 @@ ends by:
 - **`AmdpDebugStop`**: the AMDP part only (below).
 - **the host**: stdio at exit, SSE when its connection closes, the pool at shutdown
   — each does the same complete stop and reports what it could not undo.
-- **the SAP system**, for example when it ends a debuggee.
+- **the SAP system**, when it answers the listener with an error or a conflict
+  notification (another IDE took the user's debugging over): the listener ends.
+  A debuggee that ends on its own ends only that debuggee; the session listens on.
 - **the idle bound** — the project owner's one exception to "no timeouts": held
   state ends when **no tool call** has reached its instance for
   `--state-idle-minutes` (env `MCP_STATE_IDLE_MINUTES`, YAML `state-idle-minutes`;
@@ -226,9 +228,10 @@ At a stop, `DebugGetMemorySizes` reads what the debuggee uses, and
 `MemorySnapshotList`, `MemorySnapshotGet` and `MemorySnapshotDelta` work on the
 snapshots the system lists, outside any debug session (no handle). They need the
 memory snapshot authorization (`S_MEM_SNAP`): **without it the list is empty**,
-not refused, so an empty list may mean a missing authorization. A view
-(`overview`, `ranking`, `children`, `references`) answers at most `max_objects`
-objects (default 50); `children` and `references` need the object `key`.
+not refused, so an empty list may mean a missing authorization. A snapshot is
+read as a `header`, an `overview`, or a `ranking`, `children` or `references`
+view; the last three answer at most `max_objects` objects (default 50), and
+`children` and `references` need the object `key`.
 
 ## AMDP
 

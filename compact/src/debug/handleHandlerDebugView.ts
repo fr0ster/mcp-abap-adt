@@ -1,8 +1,10 @@
 import { DETAIL_PROPERTY } from '@mcp-abap-adt/lib/compact-shared';
 import {
   debugAnswer,
+  readMemorySizes,
   readXmlDocument,
   STATE_HANDLE_PROPERTY,
+  terseMemorySizes,
   terseStop,
   terseVariables,
 } from '@mcp-abap-adt/lib/debugger';
@@ -102,7 +104,7 @@ export async function handleHandlerDebugView(
             return debugAnswer(
               args,
               async () => d.abap.getMemorySizes(),
-              readXmlDocument,
+              (xml) => terseMemorySizes(readMemorySizes(xml)),
               readXmlDocument,
             );
           default:

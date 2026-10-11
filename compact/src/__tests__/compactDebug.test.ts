@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { type AmdpSession, DebuggerInstance } from '@mcp-abap-adt/lib/debugger';
 import type { ArgsOf } from '@mcp-abap-adt/lib/handlers';
 import { InstanceState } from '@mcp-abap-adt/lib/state';
@@ -11,6 +13,15 @@ import {
   parseCompactDebug,
   parseCompactExposition,
 } from '../launcher';
+
+/** The memory sizes as recorded on premise (2026-10-11). */
+const MEMORY_SIZES = readFileSync(
+  join(
+    __dirname,
+    '../../../tests/fixtures/adt/debugger-memory--01-memory-sizes.body.xml',
+  ),
+  'utf8',
+);
 
 /** What each verb takes: the compiler checks every call below against its schema. */
 interface VerbArgs {
@@ -178,7 +189,7 @@ function fakeAbap(held: { on: boolean }) {
     },
     getMemorySizes: async () => {
       calls.push(['getMemorySizes']);
-      return { value: '<m a="1"/>', raw: '<m a="1"/>' };
+      return { value: MEMORY_SIZES, raw: MEMORY_SIZES };
     },
     stop: async () => {
       calls.push(['stop']);
@@ -446,7 +457,11 @@ describe('compact debug verbs on the fake sessions', () => {
     const mem = json(
       await t.call('HandlerDebugView', { state_handle: h, what: 'memory' }),
     );
-    expect(mem).toBeDefined();
+    expect(mem).toEqual({
+      abap_objects_used: 236362,
+      internal_used: 4271832,
+      internal_peak_used: 5526872,
+    });
     expect(t.abap.map((c) => c[0])).toEqual([
       'getStack',
       'getVariables',

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [17.2.1] - 2026-10-11
+
+### Changed
+
+- **Memory sizes under `terse`** (`DebugGetMemorySizes`, and `HandlerDebugView`
+  with `what: memory` in compact) answer three numbers in bytes —
+  `abap_objects_used`, `internal_used`, `internal_peak_used` — instead of the
+  parsed document; `full` is the parsed document and `raw` SAP's, as before. The
+  library reads the whole document as `readMemorySizes` (numbers, named after its
+  elements) and projects it with `terseMemorySizes`.
+- **An AMDP break carries its call stack.** `AmdpEvent.stack` reads the frames
+  of an `ON_BREAK` (procedure, ABAP position and line, schema and native line,
+  whether the frame is compiled for debugging); the terse event of
+  `AmdpDebugWait` and compact's `HandlerDebugWait` keeps the top five as
+  `procedure`, `address` and `native_line`, marking a frame not compiled for
+  debugging.
+- `@mcp-abap-adt/core` and `@mcp-abap-adt/compact` require
+  `@mcp-abap-adt/lib` `^17.2.1`.
+
 ## [17.2.0] - 2026-10-11
 
 The debugger: ABAP and AMDP debugging as an opt-in tool set, a debug session that

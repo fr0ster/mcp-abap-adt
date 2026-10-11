@@ -223,7 +223,11 @@ visible, for example in an IDE's debugging of the same SAP user.
 ## Memory and memory snapshots
 
 At a stop, `DebugGetMemorySizes` reads what the debuggee uses, and
-`DebugCreateMemorySnapshot` writes a snapshot and answers the file written.
+`DebugCreateMemorySnapshot` writes a snapshot and answers the file written. Under
+`terse` the sizes are three numbers in bytes — `abap_objects_used` (what the
+program's own data objects hold), `internal_used` and `internal_peak_used` (its
+internal session now and at most so far); `full` answers every size the system
+sends.
 
 `MemorySnapshotList`, `MemorySnapshotGet` and `MemorySnapshotDelta` work on the
 snapshots the system lists, outside any debug session (no handle). They need the
@@ -244,8 +248,11 @@ class (`class_name`, `line`).
   then does it start the optional background run. `stop_existing` ends an AMDP
   session of this user left behind. `AmdpDebugSetBreakpoints` replaces the set and
   answers each breakpoint's state as confirmed.
-- `AmdpDebugWait` answers the events that arrived — a break with its variables, the
-  end of the execution, a warning. `AmdpDebugStep` steps `over` or `continue`s;
+- `AmdpDebugWait` answers the events that arrived — a break with its variables and
+  its call stack, the end of the execution, a warning. Under `terse` a break keeps
+  the top five frames, each as the procedure, the ABAP address (`object_type`,
+  `object_name`, `line`) and the line in the database procedure (`native_line`);
+  a frame not compiled for debugging is marked `not_debug_compiled`. `AmdpDebugStep` steps `over` or `continue`s;
   `AmdpDebugGetTable` reads a table variable's rows (at most 100; an optional
   SELECT over it); `AmdpDebugCancel` cancels the execution.
 - **Stop releases a suspended debuggee first.** A stop alone never releases it

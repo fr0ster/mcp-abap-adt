@@ -283,6 +283,24 @@ export function placeOf(frame: FrameReading): PlaceReading {
 }
 
 /**
+ * How many frames, from the top, a terse stop keeps. Real stacks run to some 20
+ * or 25 frames, so an ordinary one passes whole; only a deep one is cut, and then
+ * `stack_depth` says how deep it was, so a model can ask for `full`.
+ */
+export const TERSE_STACK_FRAMES = 50;
+
+/** The frames a terse answer keeps, and the depth when it cut them. */
+export function terseFrames<F, T>(
+  frames: F[],
+  project: (frame: F) => T,
+): { frames: T[]; depth?: number } {
+  return {
+    frames: frames.slice(0, TERSE_STACK_FRAMES).map(project),
+    ...(frames.length > TERSE_STACK_FRAMES ? { depth: frames.length } : {}),
+  };
+}
+
+/**
  * Terse shortens by count, never by precision: a flag SAP raised is always named,
  * one it did not raise is left out.
  */
@@ -306,9 +324,11 @@ export function terseStop(
   const unresolvable = attach.reachedBreakpoints.filter(
     (b) => b.unresolvableCondition,
   );
+  const kept = terseFrames(stack.frames, placeOf);
   return {
     at,
-    frames: stack.frames.slice(0, 5).map(placeOf),
+    frames: kept.frames,
+    ...(kept.depth ? { stack_depth: kept.depth } : {}),
     ...(debuggee.attachImpossible ? { attach_impossible: true } : {}),
     ...(debuggee.dump ? { dump: debuggee.dump } : {}),
     // DEBUGGEE is the ordinary catch (every recorded one); any other kind relates to the dump.

@@ -118,7 +118,8 @@ describe('debugger handlers', () => {
       line: 32,
     });
     expect(waited.at.include).toBe('ZCL_CV_DBG_MEASURE============CM002');
-    expect(waited.frames).toHaveLength(5);
+    expect(waited.frames.length).toBeGreaterThan(5);
+    expect(waited).not.toHaveProperty('stack_depth');
     expect(
       (
         await handleDebugGetStack(context as any, {
@@ -400,7 +401,7 @@ describe('debugger handlers', () => {
         await call(handleDebugSetStackPosition, { position: 7 }),
       );
       expect(world.calls).toContain('setStackPosition:7');
-      expect(moved.frames).toHaveLength(5);
+      expect(moved.frames.length).toBeGreaterThan(5);
       await call(handleDebugSetVariable, { name: 'lv_counter', value: '3' });
       expect(world.calls).toContain('setVariableValue:LV_COUNTER');
       const ended = json(await call(handleDebugTerminate));

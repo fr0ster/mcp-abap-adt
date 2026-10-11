@@ -8,6 +8,7 @@ import {
   readDebuggeeEnd,
   readStack,
   readVariables,
+  TERSE_STACK_FRAMES,
   terseStop,
   terseVariables,
 } from '../../../lib/debugger/readings';
@@ -109,10 +110,11 @@ describe('readings of the debugger documents (recorded answers)', () => {
     ).toBeUndefined();
   });
 
-  it('terse: where the stop stands — the object address AND the technical place — and five frames as precise', () => {
+  it('terse: where the stop stands — the object address AND the technical place — and every frame of an ordinary stack', () => {
+    const stack = readStack(corpusBody('debugger-run-to-line--04-stack'));
     const t = terseStop(
       readDebuggee(corpusBody('debugger-run-to-line--02-listen'))!,
-      readStack(corpusBody('debugger-run-to-line--04-stack')),
+      stack,
       readAttach(corpusBody('debugger-run-to-line--03-attach')),
     );
     expect(t.at).toEqual({
@@ -126,12 +128,31 @@ describe('readings of the debugger documents (recorded answers)', () => {
       include: 'ZCL_CV_DBG_MEASURE============CM002',
       include_line: 32,
     });
-    expect(t.frames).toHaveLength(5);
+    expect(t.frames).toHaveLength(stack.frames.length);
+    expect(t.frames.length).toBeGreaterThan(5);
+    expect(t).not.toHaveProperty('stack_depth');
     expect(t.frames[1].address).toEqual({
       object_type: 'CLAS',
       object_name: 'CL_OO_ADT_RES_CLASSRUN',
       line: 105,
     });
+  });
+  it('terse cuts a deep stack at its top frames and says how deep it was', () => {
+    const stack = readStack(corpusBody('debugger-run-to-line--04-stack'));
+    const deep = {
+      ...stack,
+      frames: Array.from(
+        { length: TERSE_STACK_FRAMES + 7 },
+        (_, i) => stack.frames[i % stack.frames.length],
+      ),
+    };
+    const t = terseStop(
+      readDebuggee(corpusBody('debugger-run-to-line--02-listen'))!,
+      deep,
+      readAttach(corpusBody('debugger-run-to-line--03-attach')),
+    );
+    expect(t.frames).toHaveLength(TERSE_STACK_FRAMES);
+    expect(t.stack_depth).toBe(TERSE_STACK_FRAMES + 7);
   });
 
   it('terse variables: name, type, value', () => {

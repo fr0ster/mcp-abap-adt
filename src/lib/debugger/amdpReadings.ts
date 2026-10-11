@@ -5,6 +5,7 @@
  */
 import { XMLParser } from 'fast-xml-parser';
 import { addressOf, type ObjectAddress } from './objectUri';
+import { terseFrames } from './readings';
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -207,7 +208,9 @@ export function readAmdpPreview(xml: string): {
  * A frame as a model acts on it: the procedure, the ABAP address a breakpoint
  * or a read takes, and the line in the database procedure. Language, frame
  * type and index are left out; a frame not compiled for debugging is named,
- * since it cannot be stepped in.
+ * since it cannot be stepped in, and keeps no lines: the system answers its
+ * method's first line and native line 0 there, not where the call stands
+ * (measured on premise, 2026-10-11).
  */
 export interface TerseAmdpFrame {
   procedure: string;
@@ -217,7 +220,7 @@ export interface TerseAmdpFrame {
 }
 
 export function terseAmdpFrame(f: AmdpFrame): TerseAmdpFrame {
-  const address =
+  const found =
     addressOf(f.uri) ??
     (f.objectName
       ? {
@@ -226,11 +229,30 @@ export function terseAmdpFrame(f: AmdpFrame): TerseAmdpFrame {
           ...(f.line !== undefined ? { line: f.line } : {}),
         }
       : undefined);
+  if (!f.isDebugCompiled) {
+    const address =
+      found && (({ line: _methodLine, ...object }) => object)(found);
+    return {
+      procedure: f.procedure,
+      ...(address ? { address } : {}),
+      not_debug_compiled: true,
+    };
+  }
   return {
     procedure: f.procedure,
-    ...(address ? { address } : {}),
+    ...(found ? { address: found } : {}),
     ...(f.nativeLine !== undefined ? { native_line: f.nativeLine } : {}),
-    ...(f.isDebugCompiled ? {} : { not_debug_compiled: true as const }),
+  };
+}
+
+function terseStack(stack: AmdpFrame[]): {
+  stack: TerseAmdpFrame[];
+  stack_depth?: number;
+} {
+  const kept = terseFrames(stack, terseAmdpFrame);
+  return {
+    stack: kept.frames,
+    ...(kept.depth ? { stack_depth: kept.depth } : {}),
   };
 }
 
@@ -243,6 +265,7 @@ export function terseAmdpEvent(e: AmdpEvent): {
   variables: Array<{ name: string; value: string }>;
   breakpoints?: AmdpBreakpointState[];
   stack?: TerseAmdpFrame[];
+  stack_depth?: number;
 } {
   return {
     kind: e.kind,
@@ -252,9 +275,8 @@ export function terseAmdpEvent(e: AmdpEvent): {
     variables: e.variables,
     // An INVALID breakpoint and the system's reason reach the model.
     ...(e.breakpoints.length ? { breakpoints: e.breakpoints } : {}),
-    // The top frames, as the ABAP stop keeps them (terseStop).
-    ...(e.stack?.length
-      ? { stack: e.stack.slice(0, 5).map(terseAmdpFrame) }
-      : {}),
+    // The top frames, as the ABAP stop keeps them (terseStop): the system sends the
+    // innermost first, its index counting from 1 at the outermost (measured on premise, 2026-10-11).
+    ...(e.stack?.length ? terseStack(e.stack) : {}),
   };
 }

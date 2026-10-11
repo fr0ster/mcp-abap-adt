@@ -125,7 +125,9 @@ The listener attaches the first program caught **automatically**: a caught progr
 is attachable only while it waits, and the seconds between two model calls can
 lose it. `DebugWait` (compact `HandlerDebugWait`) then answers `stopped`, with where
 the program stands — the object address a breakpoint takes and the system's
-technical place — and the top of the stack.
+technical place — and the stack. Under `terse` the stack keeps up to 50 frames
+from the top, so an ordinary one (some 20–25 frames) comes whole; a deeper one
+is cut and `stack_depth` says how deep it was — `detail: full` answers all of it.
 
 One debuggee at a time. While one is stopped, the listener does not poll; it
 resumes once that one is released (a step that runs it to its end, `continue`
@@ -182,7 +184,10 @@ ends by:
   listener's open poll — so a conflict right after a stop means a real other
   listener, not our own still letting go. A part that could not be undone is
   reported, kept, and retried by the next stop; the handle stays valid until
-  nothing is held.
+  nothing is held. A debuggee the listener caught as the stop began is attached
+  and released by the stop; measured on premise (2026-10-11), an attach after
+  the listener was stopped still succeeds, and a caught debuggee nobody attaches
+  is held by the system for about 30 seconds and then runs on.
 - **`AmdpDebugStop`**: the AMDP part only (below).
 - **the host**: stdio at exit, SSE when its connection closes, the pool at shutdown
   — each does the same complete stop and reports what it could not undo.
@@ -250,11 +255,12 @@ class (`class_name`, `line`).
   answers each breakpoint's state as confirmed.
 - `AmdpDebugWait` answers the events that arrived — a break with its variables and
   its call stack, the end of the execution, a warning. Under `terse` a break keeps
-  the first five frames in the order the system sends them (only single-frame
-  stacks have been recorded so far), each as the procedure, the ABAP address
-  (`object_type`, `object_name`, `line`) and the line in the database procedure
-  (`native_line`); a frame not compiled for debugging is marked
-  `not_debug_compiled`.
+  up to 50 frames from the top, as the ABAP stop does (`stack_depth` when cut) —
+  the system sends the innermost first (measured on premise, 2026-10-11) — each as the procedure, the ABAP address (`object_type`,
+  `object_name`, `line`) and the line in the database procedure (`native_line`).
+  A caller not compiled for debugging is marked `not_debug_compiled` and keeps
+  its object only: the system answers its method's first line and native line 0
+  there, not where the call stands.
 - `AmdpDebugStep` steps `over` or `continue`s;
   `AmdpDebugGetTable` reads a table variable's rows (at most 100; an optional
   SELECT over it); `AmdpDebugCancel` cancels the execution.

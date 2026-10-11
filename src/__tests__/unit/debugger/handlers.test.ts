@@ -8,6 +8,7 @@ import { handleDebugGetVariables } from '../../../handlers/debugger/debug/handle
 import { handleDebugListBreakpoints } from '../../../handlers/debugger/debug/handleDebugListBreakpoints';
 import { handleDebugListWatchpoints } from '../../../handlers/debugger/debug/handleDebugListWatchpoints';
 import { handleDebugSetBreakpoints } from '../../../handlers/debugger/debug/handleDebugSetBreakpoints';
+import { handleDebugSetSettings } from '../../../handlers/debugger/debug/handleDebugSetSettings';
 import { handleDebugSetStackPosition } from '../../../handlers/debugger/debug/handleDebugSetStackPosition';
 import { handleDebugSetVariable } from '../../../handlers/debugger/debug/handleDebugSetVariable';
 import { handleDebugStartListener } from '../../../handlers/debugger/debug/handleDebugStartListener';
@@ -36,6 +37,8 @@ import {
 } from './fakes';
 
 const json = (r: any) => JSON.parse(r.content[0].text);
+/** The one breakpoint a start needs: a start without one is refused. */
+const BP = [{ statement: 'WRITE' }];
 
 function install() {
   const world = fakeWorld();
@@ -58,7 +61,7 @@ async function startedListening(
   world: ReturnType<typeof fakeWorld>,
   context: any,
 ) {
-  const started = handleDebugStartListener(context, {});
+  const started = handleDebugStartListener(context, { breakpoints: BP });
   await until(() => world.polls.length === 1);
   world.polls[0].resolve(LISTEN_NOTHING());
   return json(await started);
@@ -68,7 +71,7 @@ describe('debugger handlers', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('the group serves the 19 ABAP tools', () => {
+  it('the group serves the 20 ABAP tools', () => {
     const names = new DebugHandlersGroup({} as any)
       .getHandlers()
       .map((e) => e.toolDefinition.name);
@@ -77,6 +80,7 @@ describe('debugger handlers', () => {
       'DebugTakeOverListener',
       'DebugWait',
       'DebugSetBreakpoints',
+      'DebugSetSettings',
       'DebugDeleteBreakpoint',
       'DebugListBreakpoints',
       'DebugGetStack',
@@ -103,6 +107,16 @@ describe('debugger handlers', () => {
       state_handle: state.handle,
       terminal_id: IDS.terminalId,
       ide_id: IDS.ideId,
+      debugging_mode: 'user',
+      request_user: 'SAPUSER01',
+      breakpoints: {
+        placed: [
+          { kind: 'statement', id: 'ID1', clientId: 'bp1', statement: 'WRITE' },
+        ],
+        refused: [],
+        lost: [],
+        unexpected: [],
+      },
     });
     await until(() => world.polls.length === 2);
     world.polls[1].resolve(LISTEN_CATCH());
@@ -135,7 +149,10 @@ describe('debugger handlers', () => {
   it('every detail of the start answers the state handle', async () => {
     for (const detail of ['terse', 'full', 'raw'] as const) {
       const { world, state, context } = install();
-      const started = handleDebugStartListener(context as any, { detail });
+      const started = handleDebugStartListener(context as any, {
+        breakpoints: BP,
+        detail,
+      });
       await until(() => world.polls.length === 1);
       world.polls[0].resolve(LISTEN_NOTHING());
       const r: any = await started;
@@ -200,11 +217,13 @@ describe('debugger handlers', () => {
       state_handle: state.handle,
       breakpoints: [{ object_type: 'CLAS', object_name: 'ZCL_A', line: 7 }],
     });
+    // The start's breakpoint travels with the new one.
     expect(seen[0]).toEqual([
+      { kind: 'statement', statement: 'WRITE', clientId: 'bp1' },
       {
         kind: 'line',
         uri: '/sap/bc/adt/oo/classes/zcl_a/source/main#start=7',
-        clientId: 'bp1',
+        clientId: 'bp2',
       },
     ]);
   });
@@ -292,7 +311,9 @@ describe('debugger handlers', () => {
 
   it('a refused start that left nothing answers no handle', async () => {
     const { world, context } = install();
-    const started = handleDebugStartListener(context as any, {});
+    const started = handleDebugStartListener(context as any, {
+      breakpoints: BP,
+    });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT());
     const r: any = await started;
@@ -314,11 +335,11 @@ describe('debugger handlers', () => {
     };
     const first = instance();
     const second = instance();
-    const a = handleDebugStartListener(first as any, {});
+    const a = handleDebugStartListener(first as any, { breakpoints: BP });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     expect((await a).isError).toBeFalsy();
-    const b = handleDebugStartListener(second as any, {});
+    const b = handleDebugStartListener(second as any, { breakpoints: BP });
     await until(() => world.polls.length === 3);
     // The fake scripts SAP's answer to the second listener; which ids SAP keys on is not this test's.
     world.polls[2].resolve(CONFLICT());
@@ -328,10 +349,79 @@ describe('debugger handlers', () => {
     expect(first.state.holdsState()).toBe(true);
   });
 
+  it('a start takes the request user, the mode and the settings; the answer names the identity', async () => {
+    const { world, context } = install();
+    const started = handleDebugStartListener(context as any, {
+      breakpoints: BP,
+      request_user: 'sapuser02',
+      debugging_mode: 'user',
+      settings: { system_debugging: true, background_rfc: false },
+    });
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(LISTEN_NOTHING());
+    const answer = json(await started);
+    expect(world.log.find((c) => c.call === 'listen')!.args[0]).toMatchObject({
+      debuggingMode: 'user',
+      requestUser: 'SAPUSER02',
+    });
+    expect(answer).toMatchObject({
+      debugging_mode: 'user',
+      request_user: 'SAPUSER02',
+    });
+    expect(context.debugger().abap.preferredSettings()).toEqual({
+      systemDebugging: true,
+      backgroundRFC: false,
+    });
+  });
+
+  it.each([
+    ['blank in user mode', { request_user: '   ' }, 'request_user is empty'],
+    [
+      'blank with terminal',
+      { request_user: '', debugging_mode: 'terminal' as const },
+      'request_user is empty',
+    ],
+    [
+      'non-blank with terminal',
+      { request_user: 'sapuser02', debugging_mode: 'terminal' as const },
+      'request_user does not apply to terminal mode',
+    ],
+  ])(
+    'a request_user %s is a tool error before the wire, with no handle',
+    async (_, extra, text) => {
+      const { world, context } = install();
+      const r: any = await handleDebugStartListener(context as any, {
+        breakpoints: BP,
+        ...extra,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content).toHaveLength(1);
+      expect(r.content[0].text).toContain(text);
+      expect(world.log).toEqual([]);
+      expect(world.opened).toEqual([]);
+    },
+  );
+
+  it('terminal mode with no configured terminal id is a tool error before the wire, with no handle', async () => {
+    const { world, context } = install();
+    const r: any = await handleDebugStartListener(context as any, {
+      breakpoints: BP,
+      debugging_mode: 'terminal',
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content).toHaveLength(1);
+    expect(r.content[0].text).toContain(
+      'terminal mode: no terminal id is configured',
+    );
+    expect(world.log).toEqual([]);
+  });
+
   describe('every tool reaches its port', () => {
     async function stopped() {
       const k = install();
-      const started = handleDebugStartListener(k.context as any, {});
+      const started = handleDebugStartListener(k.context as any, {
+        breakpoints: BP,
+      });
       await until(() => k.world.polls.length === 1);
       k.world.polls[0].resolve(LISTEN_CATCH());
       await started;
@@ -352,35 +442,40 @@ describe('debugger handlers', () => {
 
     it('the take-over start opens its debugger in take-over mode', async () => {
       const { world, context } = install();
-      const started = handleDebugTakeOverListener(context as any, {});
+      const started = handleDebugTakeOverListener(context as any, {
+        breakpoints: BP,
+      });
       await until(() => world.polls.length === 1);
       world.polls[0].resolve(LISTEN_NOTHING());
       await started;
-      expect(world.modes).toEqual(['takeOver']);
+      // The arming's control connection and the listener's, both in the mode.
+      expect(world.modes).toEqual(['takeOver', 'takeOver']);
     });
 
     it('the plain start opens its debugger refusing a second one', async () => {
       const { world, context } = install();
       await startedListening(world, context);
-      expect(world.modes).toEqual(['refuse']);
+      // The arming's control connection and the listener's, both in the mode.
+      expect(world.modes).toEqual(['refuse', 'refuse']);
     });
 
-    it('an empty breakpoint list arms nothing at a start', async () => {
+    it('a start without a breakpoint is a tool error before the wire, with no handle', async () => {
       for (const start of [
         handleDebugStartListener,
         handleDebugTakeOverListener,
-      ]) {
-        const { world, context } = install();
-        const started = start(context as any, { breakpoints: [] });
-        await until(() => world.polls.length === 1);
-        world.polls[0].resolve(LISTEN_NOTHING());
-        expect(((await started) as any).isError).toBe(false);
-        expect(
-          world.calls.some(
-            (c) => c.startsWith('setBreakpoints') || c.startsWith('validate'),
-          ),
-        ).toBe(false);
-      }
+      ])
+        for (const args of [{}, { breakpoints: [] }]) {
+          const { world, context } = install();
+          const r: any = await start(context as any, args as any);
+          expect(r.isError).toBe(true);
+          expect(r.content).toHaveLength(1);
+          expect(r.content[0].text).toContain(
+            'a start needs at least one breakpoint',
+          );
+          expect(world.log).toEqual([]);
+          expect(world.opened).toEqual([]);
+          expect(context.state.holdsState()).toBe(false);
+        }
     });
 
     it('Step maps every action to its method', async () => {
@@ -394,6 +489,82 @@ describe('debugger handlers', () => {
         await call(handleDebugStep, { action });
         expect(world.calls).toContain(`step:${method}:analysed`);
       }
+    });
+
+    it('Step: detach and release_debugger reach the session and answer the listening state', async () => {
+      const { world, call } = await stopped();
+      expect(json(await call(handleDebugStep, { action: 'detach' }))).toEqual({
+        state: 'listening',
+      });
+      expect(world.calls).toContain('detachDebugger');
+      await until(() => world.polls.length === 2);
+      world.polls[1].resolve(LISTEN_CATCH());
+      await until(
+        () => world.calls.filter((c) => c === 'getStack').length === 2,
+      );
+      expect(
+        json(await call(handleDebugStep, { action: 'release_debugger' })),
+      ).toEqual({ state: 'listening' });
+      expect(world.calls).toContain('terminateDebugger:freed');
+    });
+
+    it('Step: detach and release_debugger are refused for an AMDP session, before the wire', async () => {
+      const world = fakeWorld();
+      const state = new InstanceState();
+      const amdp = {
+        holdsState: () => true,
+        pending: () => false,
+        failures: () => [],
+        bind() {
+          return this;
+        },
+        observe() {},
+        stop: async () => {},
+      } as unknown as AmdpSession<any>;
+      const dbg = new DebuggerInstance({
+        abap: new DebugSession(world.ports as any, IDS),
+        amdp,
+      });
+      state.attach(dbg);
+      const context = {
+        connection: {} as any,
+        logger: undefined,
+        state,
+        debugger: () => dbg,
+      };
+      for (const action of ['detach', 'release_debugger'] as const) {
+        const r: any = await handleDebugStep(context as any, {
+          state_handle: state.handle,
+          action,
+        });
+        expect(r.isError).toBe(true);
+        expect(r.content[0].text).toContain(
+          `action: ${action} does not apply to an AMDP debug session`,
+        );
+      }
+      expect(world.log).toEqual([]);
+    });
+
+    it('SetSettings maps its fields and answers the settings in force under the tool names', async () => {
+      const { world, call } = await stopped();
+      const r = json(
+        await call(handleDebugSetSettings, {
+          system_debugging: false,
+          background_rfc: true,
+        }),
+      );
+      expect(world.calls.filter((c) => c.startsWith('settings:'))).toEqual(
+        Array(2).fill(
+          'settings:{"systemDebugging":false,"backgroundRFC":true}',
+        ),
+      );
+      expect(r).toEqual({
+        system_debugging: false,
+        update_debugging: false,
+        create_exception_object: false,
+        background_rfc: true,
+        shared_object_debugging: false,
+      });
     });
 
     it('StepToLine runs or jumps to the line URI', async () => {

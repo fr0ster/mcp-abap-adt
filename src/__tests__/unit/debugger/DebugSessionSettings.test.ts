@@ -10,6 +10,7 @@ import {
   IDS,
   LISTEN_CATCH,
   LISTEN_NOTHING,
+  START,
   settingsXml,
   until,
 } from './fakes';
@@ -23,7 +24,11 @@ describe('the debugger settings', () => {
 
   async function caught(settings?: DebugSettings, world = fakeWorld()) {
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const s = session.start('refuse', settings ? { settings } : {});
+    const s = session.start('refuse', {
+      ...START,
+      ...START,
+      ...(settings ? { settings } : {}),
+    });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
@@ -106,7 +111,7 @@ describe('the debugger settings', () => {
   it('setSettings without a stop is refused and sends nothing', async () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const s = session.start('refuse');
+    const s = session.start('refuse', START);
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
@@ -120,7 +125,10 @@ describe('the debugger settings', () => {
   it("a catch on the start's own first poll gets the preferences", async () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const s = session.start('refuse', { settings: { updateDebugging: true } });
+    const s = session.start('refuse', {
+      ...START,
+      settings: { updateDebugging: true },
+    });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_CATCH());
     const state = await s;

@@ -8,7 +8,10 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { TOOL_DEFINITION as AmdpSetBreakpoints } from '../../../handlers/debugger/debug/handleAmdpDebugSetBreakpoints';
 import { TOOL_DEFINITION as SetBreakpoints } from '../../../handlers/debugger/debug/handleDebugSetBreakpoints';
+import { TOOL_DEFINITION as SetSettings } from '../../../handlers/debugger/debug/handleDebugSetSettings';
 import { TOOL_DEFINITION as SetStackPosition } from '../../../handlers/debugger/debug/handleDebugSetStackPosition';
+import { TOOL_DEFINITION as StartListener } from '../../../handlers/debugger/debug/handleDebugStartListener';
+import { TOOL_DEFINITION as TakeOverListener } from '../../../handlers/debugger/debug/handleDebugTakeOverListener';
 import { TOOL_DEFINITION as Wait } from '../../../handlers/debugger/debug/handleDebugWait';
 import { TOOL_DEFINITION as SnapshotGet } from '../../../handlers/debugger/debug/handleMemorySnapshotGet';
 import { TOOL_DEFINITION as VirtualFolders } from '../../../handlers/system/low/handleGetVirtualFolders';
@@ -27,6 +30,9 @@ class BoundaryServer extends BaseMcpServer {
       SetStackPosition,
       SetBreakpoints,
       AmdpSetBreakpoints,
+      StartListener,
+      TakeOverListener,
+      SetSettings,
       SnapshotGet,
       VirtualFolders,
     ].map((toolDefinition) => ({ toolDefinition, handler: this.handler }));
@@ -112,6 +118,28 @@ describe('the MCP boundary validates debug tool arguments', () => {
       { state_handle: handle, breakpoints: [] },
     ],
     [
+      'a debugging mode outside its enum',
+      StartListener.name,
+      { breakpoints: [{ statement: 'WRITE' }], debugging_mode: 'process' },
+    ],
+    [
+      'a setting that is not a boolean',
+      SetSettings.name,
+      { state_handle: handle, system_debugging: 'yes' },
+    ],
+    ['a start without breakpoints', StartListener.name, {}],
+    [
+      'a start with an empty breakpoint list',
+      StartListener.name,
+      { breakpoints: [] },
+    ],
+    ['a take-over start without breakpoints', TakeOverListener.name, {}],
+    [
+      'a take-over start with an empty breakpoint list',
+      TakeOverListener.name,
+      { breakpoints: [] },
+    ],
+    [
       'a limit below its minimum',
       SnapshotGet.name,
       { snapshot_id: 'S1', view: 'ranking', max_objects: 0 },
@@ -123,6 +151,22 @@ describe('the MCP boundary validates debug tool arguments', () => {
     expect(result.isError).toBe(true);
     expect(textOf(result)).toMatch(/Input validation error/);
     expect(server.handler).not.toHaveBeenCalled();
+    await client.close();
+  });
+
+  it('a start with none of the new parameters reaches the handler without them: no default fills them in', async () => {
+    const server = new BoundaryServer();
+    const client = await connected(server);
+    // A start needs one breakpoint; nothing else is given.
+    const result = await client.callTool({
+      name: StartListener.name,
+      arguments: { breakpoints: [{ statement: 'WRITE' }] },
+    });
+    expect(result.isError).toBeFalsy();
+    const received = server.handler.mock.calls[0][1] as Record<string, unknown>;
+    expect(received).not.toHaveProperty('request_user');
+    expect(received).not.toHaveProperty('debugging_mode');
+    expect(received).not.toHaveProperty('settings');
     await client.close();
   });
 

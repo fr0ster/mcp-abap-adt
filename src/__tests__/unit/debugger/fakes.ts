@@ -26,6 +26,13 @@ export async function until(cond: () => boolean): Promise<void> {
   if (!cond()) throw new Error('condition never held');
 }
 
+/**
+ * What every ABAP start needs at least: one breakpoint (a start without one is
+ * refused before the wire). A statement breakpoint, so no object is named.
+ */
+export const START = {
+  breakpoints: [{ kind: 'statement' as const, statement: 'WRITE' }],
+};
 export const IDS = { terminalId: 'T'.repeat(32), ideId: 'I'.repeat(32) };
 export const LISTEN_CATCH = () =>
   okResponse(corpusBody('debugger-run-to-line--02-listen'));

@@ -4,9 +4,17 @@ import {
   DebugRefusedError,
   DebugRequestError,
   DebugSession,
+  FIRST_POLL_HOLD_SECONDS,
 } from '../../../lib/debugger/DebugSession';
 import { refusedResponse } from '../../helpers/fakeClient';
-import { CONFLICT_409, fakeWorld, IDS, LISTEN_NOTHING, until } from './fakes';
+import {
+  CONFLICT_409,
+  fakeWorld,
+  IDS,
+  LISTEN_NOTHING,
+  START,
+  until,
+} from './fakes';
 
 const LINE: IDebuggerBreakpoint = {
   kind: 'line',
@@ -25,19 +33,42 @@ describe('the start', () => {
     start: Parameters<DebugSession['start']>[1] = {},
   ) {
     const session = new DebugSession(world.ports, ids, options).bind('origin');
-    const started = session.start('refuse', start);
+    const started = session.start('refuse', { ...START, ...START, ...start });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await started;
     return { session, world };
   }
 
+  // The user's decision (2026-10-11): a start arms at least one breakpoint. A model
+  // that forgets them learns it before anything is sent, not from a listener that
+  // can catch nothing of its own.
+  it.each([
+    ['no breakpoints', {}],
+    ['an empty breakpoint list', { breakpoints: [] }],
+  ])(
+    'a start with %s is refused before the wire, holding nothing',
+    async (_, start) => {
+      for (const conflict of ['refuse', 'takeOver'] as const) {
+        const world = fakeWorld();
+        const session = new DebugSession(world.ports, IDS).bind('origin');
+        await expect(session.start(conflict, start)).rejects.toThrow(
+          new DebugRefusedError('a start needs at least one breakpoint'),
+        );
+        expect(world.log).toEqual([]);
+        expect(world.opened).toEqual([]);
+        expect(session.currentIdentity()).toBeUndefined();
+        expect(session.holdsState()).toBe(false);
+      }
+    },
+  );
+
   describe('identity by mode', () => {
     it('terminal mode without a configured terminal id is refused before the wire', async () => {
       const world = fakeWorld();
       const session = new DebugSession(world.ports, IDS).bind('origin');
       await expect(
-        session.start('refuse', { debuggingMode: 'terminal' }),
+        session.start('refuse', { ...START, debuggingMode: 'terminal' }),
       ).rejects.toThrow(
         new DebugRefusedError('terminal mode: no terminal id is configured'),
       );
@@ -54,6 +85,7 @@ describe('the start', () => {
       }).bind('origin');
       await expect(
         session.start('refuse', {
+          ...START,
           debuggingMode: 'terminal',
           requestUser: 'SAPUSER02',
         }),
@@ -75,7 +107,7 @@ describe('the start', () => {
             terminalStated: true,
           }).bind('origin');
           await expect(
-            session.start('refuse', { ...mode, requestUser: blank }),
+            session.start('refuse', { ...START, ...mode, requestUser: blank }),
           ).rejects.toThrow(new DebugRefusedError('request_user is empty'));
           expect(world.log).toEqual([]);
           expect(world.opened).toEqual([]);
@@ -121,6 +153,7 @@ describe('the start', () => {
       const session = new DebugSession(world.ports, IDS).bind('origin');
       await expect(
         session.start('refuse', {
+          ...START,
           breakpoints: [
             LINE,
             {
@@ -147,7 +180,7 @@ describe('the start', () => {
         HELD,
       ).bind('origin');
       const error = await session
-        .start('refuse', { breakpoints: [LINE] })
+        .start('refuse', { ...START, breakpoints: [LINE] })
         .catch((e: unknown) => e);
       expect(error).toBeInstanceOf(DebugConflictError);
       expect((error as DebugConflictError).conflictText).toMatch(
@@ -165,7 +198,7 @@ describe('the start', () => {
       world.checkAnswers.push(() => refusedResponse('No authorization'));
       const session = new DebugSession(world.ports, IDS, HELD).bind('origin');
       await expect(
-        session.start('refuse', { breakpoints: [LINE] }),
+        session.start('refuse', { ...START, breakpoints: [LINE] }),
       ).rejects.toThrow(new DebugRequestError('No authorization'));
       expect(world.calls).toEqual(['checkListener']);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
@@ -205,9 +238,10 @@ describe('the start', () => {
       const { session, world } = await listening(fakeWorld(), IDS, HELD);
       world.calls.length = 0;
       await session.setBreakpoints([LINE]);
+      // The start's breakpoint travels with the new one.
       expect(world.calls.slice(0, 2)).toEqual([
         'checkListener',
-        'setBreakpoints:1',
+        'setBreakpoints:2',
       ]);
     });
 
@@ -223,15 +257,22 @@ describe('the start', () => {
     });
   });
 
-  // Review Focus 5.
-  it('a first listen refused 409 with nothing armed or reconciled is a refusal before any change: no stopListener', async () => {
+  // Review Focus 5, after the user's decision that a start arms at least one
+  // breakpoint: a start can no longer reach its first listen with nothing armed,
+  // so a 409 there always follows an arming the system accepted, and the rollback
+  // owes the stopListener that removes it.
+  it('a first listen refused 409 after the arming rolls the arming back with a stopListener and holds nothing', async () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const started = session.start('refuse');
+    const started = session.start('refuse', START);
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT_409());
     await expect(started).rejects.toThrow(DebugConflictError);
-    expect(world.calls).not.toContain('stopListener');
+    expect(world.calls).toEqual([
+      'setBreakpoints:1',
+      `listen:${FIRST_POLL_HOLD_SECONDS}`,
+      'stopListener',
+    ]);
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
     expect(session.holdsState()).toBe(false);
     expect(session.currentIdentity()).toBeUndefined();

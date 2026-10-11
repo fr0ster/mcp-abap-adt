@@ -4,8 +4,8 @@ import { debugAnswer } from '../../../lib/debugger/answer';
 import {
   BREAKPOINTS_PROPERTY,
   breakpointsFromArgs,
+  SHARED_SET_SENTENCE,
   STATE_HANDLE_PROPERTY,
-  USER_MODE_SENTENCE,
 } from '../../../lib/debugger/schemas';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
@@ -14,7 +14,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DebugSetBreakpoints',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Adds breakpoints to a debug session — line, exception class, ABAP statement or message, with an optional condition — and reports which the system refused and why. ${USER_MODE_SENTENCE}`,
+  description: `[debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints no longer placed, and any answer row it cannot pair with a breakpoint. ${SHARED_SET_SENTENCE}`,
   inputSchema: {
     type: 'object',
     properties: {

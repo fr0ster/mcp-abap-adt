@@ -124,6 +124,7 @@ export type DebuggingMode = 'user' | 'terminal';
 /** What a caller may set; `showDataAging` is left out, so it stays off, the system's default. */
 export type DebugSettings = Omit<IDebuggerSettings, 'showDataAging'>;
 export interface DebugStartOptions {
+  /** At least one: a start without a breakpoint is refused before the wire. */
   breakpoints?: IDebuggerBreakpoint[];
   run?: RunTarget;
   /** User mode: whose requests are caught; the connected user when omitted. */
@@ -588,7 +589,13 @@ export class DebugSession<O = unknown> {
           'the cleanup of this debug session is not complete: DebugStop it, then start again',
         );
       // Refusals before the wire: nothing is opened, nothing is sent.
-      refuseConditionOffLine(options.breakpoints ?? []);
+      // A start arms at least one breakpoint (the user's decision, 2026-10-11): a
+      // caller that forgot them learns it here, not from a listener that can catch
+      // nothing it asked for.
+      const breakpoints = options.breakpoints ?? [];
+      if (!breakpoints.length)
+        throw new DebugRefusedError('a start needs at least one breakpoint');
+      refuseConditionOffLine(breakpoints);
       const identity = await this.identityFor(options);
       this.mode = conflict;
       this.failure = undefined;
@@ -604,9 +611,7 @@ export class DebugSession<O = unknown> {
         // breakpoints, so it runs only after the preflight); 3. the arming, then listening.
         await this.preflight(identity);
         await this.beforeFirstListen(identity);
-        armed = options.breakpoints?.length
-          ? await this.armLocked(options.breakpoints)
-          : undefined;
+        armed = await this.armLocked(breakpoints);
         const connection = await this.open();
         const listener: Listener = {
           connection,

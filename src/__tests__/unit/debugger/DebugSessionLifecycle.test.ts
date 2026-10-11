@@ -10,6 +10,7 @@ import {
   IDS,
   LISTEN_CATCH,
   LISTEN_NOTHING,
+  START,
   until,
 } from './fakes';
 
@@ -23,7 +24,11 @@ describe('DebugSession lifecycle', () => {
     world = fakeWorld(),
   ) {
     const session = new DebugSession(world.ports, ids).bind('origin');
-    const s = session.start('refuse', run ? { run } : {});
+    const s = session.start('refuse', {
+      ...START,
+      ...START,
+      ...(run ? { run } : {}),
+    });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
@@ -207,7 +212,8 @@ describe('DebugSession lifecycle', () => {
     world.override.deleteBreakpoint = async () =>
       refusedResponse('not authorised');
     await expect(session.stop()).rejects.toThrow(DebugCleanupError);
-    expect(session.listBreakpoints()).toHaveLength(1);
+    // The start's breakpoint and the one set after it.
+    expect(session.listBreakpoints()).toHaveLength(2);
     expect(session.holdsState()).toBe(true);
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
@@ -287,7 +293,8 @@ describe('DebugSession lifecycle', () => {
         IDS,
         world,
       );
-      const runConnection = world.opened[1];
+      // The start's arming opened the control connection, then the listener's.
+      const runConnection = world.opened[2];
       const realClose = world.ports.closeConnection;
       let once = true;
       world.ports.closeConnection = async (c) => {
@@ -437,9 +444,11 @@ describe('DebugSession lifecycle', () => {
       ...IDS,
       stated: true,
     }).bind('origin');
-    await expect(session.start('refuse')).rejects.toThrow(/no route to host/);
+    await expect(session.start('refuse', START)).rejects.toThrow(
+      /no route to host/,
+    );
     expect(world.calls).not.toContain('stopListener');
-    const s = session.start('refuse');
+    const s = session.start('refuse', START);
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
@@ -517,6 +526,7 @@ describe('DebugSession lifecycle', () => {
     async function failedStart(world = fakeWorld()) {
       const session = new RunRefused(world.ports, IDS).bind('origin');
       const s = session.start('refuse', {
+        ...START,
         run: { kind: 'class', name: 'ZCL_X' },
       });
       await until(() => world.polls.length === 1);

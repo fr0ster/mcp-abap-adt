@@ -725,7 +725,9 @@ describe('Debugger handlers (integration)', () => {
         const rounds: unknown[] = [];
         for (let i = 0; i < 3; i++) {
           const a = newInstance();
-          const first = await call(a, 'DebugStartListener', {});
+          const first = await call(a, 'DebugStartListener', {
+            breakpoints: [line('mark')],
+          });
           expect(first.isError).toBe(false);
           // Past the short first poll: the long poll is open when the stop comes.
           await pause(4000);
@@ -735,7 +737,9 @@ describe('Debugger handlers (integration)', () => {
           timing(`${mode} pool.stop(listening)`, stop.ms);
           expect(stop.isError).toBe(false);
           const b = newInstance();
-          const next = await call(b, 'DebugStartListener', {});
+          const next = await call(b, 'DebugStartListener', {
+            breakpoints: [line('mark')],
+          });
           timing(`${mode} pool.start-after-stop`, next.ms);
           rounds.push({
             stop_ms: Math.round(stop.ms),
@@ -811,7 +815,9 @@ describe('Debugger handlers (integration)', () => {
         softOnly('the conflict needs two instances');
         const a = newInstance();
         const b = newInstance();
-        const first = await call(a, 'DebugStartListener', {});
+        const first = await call(a, 'DebugStartListener', {
+          breakpoints: [line('mark')],
+        });
         expect(first.isError).toBe(false);
         const handleA = first.json.state_handle;
         const second = await call(b, 'DebugStartListener', {
@@ -850,13 +856,17 @@ describe('Debugger handlers (integration)', () => {
         softOnly('the conflict needs two instances');
         const a = newInstance();
         const b = newInstance();
-        const first = await call(a, 'DebugStartListener', {});
+        const first = await call(a, 'DebugStartListener', {
+          breakpoints: [line('mark')],
+        });
         expect(first.isError).toBe(false);
         const handleA = first.json.state_handle;
         // Past the first instance's short first poll: its long poll is open.
         await pause(5000);
         const t0 = now();
-        const taken = await call(b, 'DebugTakeOverListener', {});
+        const taken = await call(b, 'DebugTakeOverListener', {
+          breakpoints: [line('mark')],
+        });
         measure('2-takeover', 'second instance, other ids, take-over', {
           isError: taken.isError,
           answer: taken.json ?? taken.text.slice(0, 600),
@@ -900,7 +910,9 @@ describe('Debugger handlers (integration)', () => {
           await pause(5000);
           const b = newInstance(ids);
           const startedAt = now();
-          const second = await call(b, 'DebugStartListener', {});
+          const second = await call(b, 'DebugStartListener', {
+            breakpoints: [line('mark')],
+          });
           measure('3', 'successor under the same stated ids', {
             isError: second.isError,
             answer: second.json ?? second.text.slice(0, 600),
@@ -949,7 +961,9 @@ describe('Debugger handlers (integration)', () => {
             stated: true,
           });
           const startedAt = now();
-          const started = await call(inst, 'DebugStartListener', {});
+          const started = await call(inst, 'DebugStartListener', {
+            breakpoints: [line('mark')],
+          });
           measure('3-ide', 'instance under the IDE-like listener’s ideId', {
             isError: started.isError,
             answer: started.json ?? started.text.slice(0, 600),

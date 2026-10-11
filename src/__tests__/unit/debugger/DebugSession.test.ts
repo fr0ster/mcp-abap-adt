@@ -16,6 +16,7 @@ import {
   LISTEN_CATCH,
   LISTEN_NOTHING,
   rowsXml,
+  START,
   until,
 } from './fakes';
 
@@ -25,11 +26,11 @@ describe('DebugSession', () => {
 
   async function listening(world = fakeWorld()) {
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const started = session.start('refuse');
+    const started = session.start('refuse', START);
     await until(() => world.polls.length === 1);
     expect(world.polls[0].hold).toBe(FIRST_POLL_HOLD_SECONDS);
     world.polls[0].resolve(LISTEN_NOTHING());
-    await expect(started).resolves.toEqual({ state: 'listening' });
+    await expect(started).resolves.toMatchObject({ state: 'listening' });
     await until(() => world.polls.length === 2);
     expect(world.polls[1].hold).toBe(LISTEN_HOLD_SECONDS);
     return { session, world };
@@ -63,12 +64,13 @@ describe('DebugSession', () => {
     const ran = jest.spyOn(world.ports, 'run');
     const session = new DebugSession(world.ports, IDS).bind('origin');
     const started = session.start('refuse', {
+      ...START,
       run: { kind: 'class', name: 'ZCL_X' },
     });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT());
     await expect(started).rejects.toThrow(DebugListenerError);
-    expect(world.closed).toEqual(world.opened);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
     expect(ran).not.toHaveBeenCalled();
     expect((await session.wait(0)).state).toBe('idle');
   });
@@ -77,6 +79,7 @@ describe('DebugSession', () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
     const started = session.start('refuse', {
+      ...START,
       breakpoints: [
         {
           kind: 'line',
@@ -102,6 +105,7 @@ describe('DebugSession', () => {
     });
     const session = new DebugSession(world.ports, IDS).bind('origin');
     const started = session.start('refuse', {
+      ...START,
       breakpoints: [
         {
           kind: 'line',
@@ -127,6 +131,7 @@ describe('DebugSession', () => {
       return realClose(c);
     };
     const started = session.start('refuse', {
+      ...START,
       breakpoints: [
         {
           kind: 'line',
@@ -143,7 +148,7 @@ describe('DebugSession', () => {
   it('a debuggee caught on the first poll is attached at once', async () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const started = session.start('refuse');
+    const started = session.start('refuse', START);
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_CATCH());
     await expect(started).resolves.toMatchObject({ state: 'stopped' });
@@ -170,7 +175,9 @@ describe('DebugSession', () => {
 
   it('a second start is refused', async () => {
     const { session } = await listening();
-    await expect(session.start('refuse')).rejects.toThrow(DebugStateError);
+    await expect(session.start('refuse', START)).rejects.toThrow(
+      DebugStateError,
+    );
   });
 
   it('wait returns on a catch, before its hold ends, and holds at most 30 s', async () => {
@@ -294,6 +301,9 @@ describe('DebugSession', () => {
   });
 
   describe('the breakpoint set', () => {
+    // A start arms at least one breakpoint: W, the start's own, is the set's first
+    // definition and travels with every later change.
+    const W = START.breakpoints[0];
     const A = {
       kind: 'line',
       uri: '/sap/bc/adt/oo/classes/class_a/source/main#start=10',
@@ -305,80 +315,108 @@ describe('DebugSession', () => {
     const EXC = { kind: 'exception', exceptionClass: 'CX_A' } as const;
     const STMT = { kind: 'statement', statement: 'MESSAGE' } as const;
     const NOT_HERE = 'Cannot create a breakpoint at this position';
-    // The tags follow the order the session first saw each definition: bp1, bp2, …
-    const ROW_A = { kind: 'line', id: 'L10', clientId: 'bp1', uri: A.uri };
+    // The tags follow the order the session first saw each definition: bp1 (the
+    // start's), bp2, …
+    const ROW_W = {
+      kind: 'statement',
+      id: 'W1',
+      clientId: 'bp1',
+      statement: 'WRITE',
+    };
+    const ROW_A = { kind: 'line', id: 'L10', clientId: 'bp2', uri: A.uri };
     const ROW_EXC = {
       kind: 'exception',
       id: 'E1',
-      clientId: 'bp2',
+      clientId: 'bp3',
       exceptionClass: 'CX_A',
     };
+    /** Listening, the start's breakpoint placed as W1; `world.sent[0]` is the start's arming. */
+    async function armed() {
+      const world = fakeWorld();
+      world.breakpointAnswers.push(() => okResponse(rowsXml([ROW_W])));
+      const { session } = await listening(world);
+      return { world, session };
+    }
 
     it('a second change sends the first set with the new one, each with its tag, and keeps both', async () => {
-      const world = fakeWorld();
-      const { session } = await listening(world);
+      const { world, session } = await armed();
       world.breakpointAnswers.push(
-        () => okResponse(rowsXml([ROW_A])),
-        () => okResponse(rowsXml([ROW_EXC, ROW_A])),
+        () => okResponse(rowsXml([ROW_W, ROW_A])),
+        () => okResponse(rowsXml([ROW_EXC, ROW_A, ROW_W])),
       );
       await session.setBreakpoints([A]);
       const second = await session.setBreakpoints([EXC]);
       expect(world.sent).toEqual([
-        [{ ...A, clientId: 'bp1' }],
+        [{ ...W, clientId: 'bp1' }],
         [
-          { ...A, clientId: 'bp1' },
-          { ...EXC, clientId: 'bp2' },
+          { ...W, clientId: 'bp1' },
+          { ...A, clientId: 'bp2' },
+        ],
+        [
+          { ...W, clientId: 'bp1' },
+          { ...A, clientId: 'bp2' },
+          { ...EXC, clientId: 'bp3' },
         ],
       ]);
-      expect(second.value.placed.map((r) => r.id)).toEqual(['E1', 'L10']);
+      expect(second.value.placed.map((r) => r.id)).toEqual(['E1', 'L10', 'W1']);
       expect(second.value.unexpected).toEqual([]);
-      expect(session.requestedBreakpoints()).toEqual([A, EXC]);
-      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['E1', 'L10']);
+      expect(session.requestedBreakpoints()).toEqual([W, A, EXC]);
+      expect(session.listBreakpoints().map((r) => r.id)).toEqual([
+        'E1',
+        'L10',
+        'W1',
+      ]);
     });
 
     // Review Focus 6.
     it("a caller's clientId does not reach the wire: the session's tag does", async () => {
-      const world = fakeWorld();
-      const { session } = await listening(world);
+      const { world, session } = await armed();
       const a = await session.setBreakpoints([{ ...EXC, clientId: 'own' }]);
-      expect(world.sent).toEqual([[{ ...EXC, clientId: 'bp1' }]]);
-      expect(a.value.placed).toHaveLength(1);
+      expect(world.sent.slice(1)).toEqual([
+        [
+          { ...W, clientId: 'bp1' },
+          { ...EXC, clientId: 'bp2' },
+        ],
+      ]);
+      expect(a.value.placed).toHaveLength(2);
       expect(a.value.refused).toEqual([]);
       expect(a.value.unexpected).toEqual([]);
     });
 
     it('no validationOnly request is ever made', async () => {
-      const world = fakeWorld();
-      const { session } = await listening(world);
+      const { world, session } = await armed();
       await session.setBreakpoints([A, B, { kind: 'line', uri: '/x#start=2' }]);
       expect(world.calls.filter((c) => c.startsWith('validate'))).toEqual([]);
     });
 
     it('two lines answered out of order, the refusal first: each pairs by its tag, the refusal names its definition', async () => {
-      const world = fakeWorld();
-      const { session } = await listening(world);
+      const { world, session } = await armed();
       world.breakpointAnswers.push(() =>
         okResponse(
-          rowsXml([{ kind: 'line', clientId: 'bp2', error: NOT_HERE }, ROW_A]),
+          rowsXml([
+            { kind: 'line', clientId: 'bp3', error: NOT_HERE },
+            ROW_A,
+            ROW_W,
+          ]),
         ),
       );
       const a = await session.setBreakpoints([A, B]);
       expect(a.value.refused).toEqual([{ requested: B, error: NOT_HERE }]);
       expect(a.value.lost).toEqual([]);
       expect(a.value.unexpected).toEqual([]);
-      expect(session.requestedBreakpoints()).toEqual([A]);
-      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10']);
+      expect(session.requestedBreakpoints()).toEqual([W, A]);
+      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10', 'W1']);
     });
 
     it('an earlier breakpoint the system no longer places is lost, with its reason', async () => {
-      const world = fakeWorld();
-      const { session } = await listening(world);
+      const { world, session } = await armed();
       world.breakpointAnswers.push(
-        () => okResponse(rowsXml([ROW_A])),
+        () => okResponse(rowsXml([ROW_W, ROW_A])),
         () =>
           okResponse(
             rowsXml([
-              { kind: 'line', clientId: 'bp1', error: 'Source changed' },
+              ROW_W,
+              { kind: 'line', clientId: 'bp2', error: 'Source changed' },
               ROW_EXC,
             ]),
           ),
@@ -389,29 +427,30 @@ describe('DebugSession', () => {
         { requested: A, error: 'Source changed' },
       ]);
       expect(next.value.refused).toEqual([]);
-      expect(session.requestedBreakpoints()).toEqual([EXC]);
-      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['E1']);
+      expect(session.requestedBreakpoints()).toEqual([W, EXC]);
+      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['W1', 'E1']);
     });
 
     it('a delete by id removes exactly its definition, of two of one kind, and sends nothing else; the next change does not re-send it', async () => {
-      const world = fakeWorld();
-      const { session } = await listening(world);
+      const { world, session } = await armed();
       world.breakpointAnswers.push(
         () =>
           okResponse(
             rowsXml([
-              { kind: 'line', id: 'L1', clientId: 'bp2', uri: B.uri },
+              ROW_W,
+              { kind: 'line', id: 'L1', clientId: 'bp3', uri: B.uri },
               ROW_A,
             ]),
           ),
         () =>
           okResponse(
             rowsXml([
+              ROW_W,
               ROW_A,
               {
                 kind: 'statement',
                 id: 'S1',
-                clientId: 'bp3',
+                clientId: 'bp4',
                 statement: 'MESSAGE',
               },
             ]),
@@ -421,21 +460,22 @@ describe('DebugSession', () => {
       world.calls.length = 0;
       await session.deleteBreakpoint('L1');
       expect(world.calls).toEqual(['deleteBreakpoint:L1']);
-      expect(session.requestedBreakpoints()).toEqual([A]);
-      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10']);
+      expect(session.requestedBreakpoints()).toEqual([W, A]);
+      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['W1', 'L10']);
       await session.setBreakpoints([STMT]);
-      expect(world.sent[1]).toEqual([
-        { ...A, clientId: 'bp1' },
-        { ...STMT, clientId: 'bp3' },
+      expect(world.sent[2]).toEqual([
+        { ...W, clientId: 'bp1' },
+        { ...A, clientId: 'bp2' },
+        { ...STMT, clientId: 'bp4' },
       ]);
     });
 
     it('an unexpected placed row is reported and stays armed; deleting it touches no definition', async () => {
-      const world = fakeWorld();
-      const { session } = await listening(world);
+      const { world, session } = await armed();
       world.breakpointAnswers.push(() =>
         okResponse(
           rowsXml([
+            ROW_W,
             ROW_A,
             { kind: 'statement', id: 'S9', statement: 'MESSAGE' },
           ]),
@@ -443,17 +483,20 @@ describe('DebugSession', () => {
       );
       const a = await session.setBreakpoints([A]);
       expect(a.value.unexpected).toEqual([{ kind: 'statement', id: 'S9' }]);
-      expect(a.value.placed.map((r) => r.id)).toEqual(['L10', 'S9']);
-      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10', 'S9']);
+      expect(a.value.placed.map((r) => r.id)).toEqual(['W1', 'L10', 'S9']);
+      expect(session.listBreakpoints().map((r) => r.id)).toEqual([
+        'W1',
+        'L10',
+        'S9',
+      ]);
       await session.deleteBreakpoint('S9');
-      expect(session.requestedBreakpoints()).toEqual([A]);
-      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10']);
+      expect(session.requestedBreakpoints()).toEqual([W, A]);
+      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['W1', 'L10']);
     });
 
     // Review Focus 2.
     it('a delete by an id the session does not hold is refused before the wire', async () => {
-      const world = fakeWorld();
-      const { session } = await listening(world);
+      const { world, session } = await armed();
       await expect(session.deleteBreakpoint('L99')).rejects.toThrow(
         new DebugRefusedError(
           'no breakpoint L99 is armed in this debug session',
@@ -474,18 +517,17 @@ describe('DebugSession', () => {
     });
 
     it('a failed replacement keeps both lists for the next change', async () => {
-      const world = fakeWorld();
-      const { session } = await listening(world);
+      const { world, session } = await armed();
       world.breakpointAnswers.push(
-        () => okResponse(rowsXml([ROW_A])),
+        () => okResponse(rowsXml([ROW_W, ROW_A])),
         () => refusedResponse('Too many breakpoints'),
       );
       await session.setBreakpoints([A]);
       await expect(session.setBreakpoints([EXC])).rejects.toThrow(
         /Too many breakpoints/,
       );
-      expect(session.requestedBreakpoints()).toEqual([A]);
-      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10']);
+      expect(session.requestedBreakpoints()).toEqual([W, A]);
+      expect(session.listBreakpoints().map((r) => r.id)).toEqual(['W1', 'L10']);
     });
   });
 
@@ -529,7 +571,7 @@ describe('DebugSession', () => {
       const realClose = world.ports.closeConnection;
       let refuse = true;
       world.ports.closeConnection = async (c) => {
-        if (refuse && c === world.opened[1]) throw new Error('close failed');
+        if (refuse && c === world.opened[2]) throw new Error('close failed');
         return realClose(c);
       };
       world.polls[1].resolve(LISTEN_CATCH());
@@ -558,6 +600,7 @@ describe('DebugSession', () => {
         refusedResponse('Breakpoint is locked');
       const session = new DebugSession(world.ports, IDS).bind('origin');
       const started = session.start('refuse', {
+        ...START,
         breakpoints: [
           {
             kind: 'line',

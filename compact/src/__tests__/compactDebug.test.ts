@@ -74,7 +74,7 @@ describe('compact debug', () => {
       (e) => e.toolDefinition.name === 'HandlerDebugStart',
     )!;
     expect(start.toolDefinition.description).toMatch(
-      /every request of the connected SAP user/,
+      /every request of the request user/,
     );
     expect(start.toolDefinition.description).toMatch(
       /Displaces another debugger/,

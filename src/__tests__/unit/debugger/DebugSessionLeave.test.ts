@@ -10,6 +10,7 @@ import {
   LISTEN_CATCH,
   LISTEN_NOTHING,
   rowsXml,
+  START,
   until,
 } from './fakes';
 
@@ -30,7 +31,7 @@ describe('leaving a debuggee running', () => {
       ),
     );
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const s = session.start('refuse', { breakpoints: [A] });
+    const s = session.start('refuse', { ...START, breakpoints: [A] });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
@@ -108,7 +109,7 @@ describe('leaving a debuggee running', () => {
   it('without a stop both are refused and send nothing', async () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
-    const s = session.start('refuse');
+    const s = session.start('refuse', START);
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;

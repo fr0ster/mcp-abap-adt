@@ -3,7 +3,10 @@
  *
  * core reads first what only core knows — a `DestinationConfigError`
  * (auth-broker's `isDestinationConfigError`, structural): its destination,
- * the fields it names and the error it carries — then lib's `failureOf`.
+ * the fields it names and the error it carries; then a session record the
+ * store refused as not of its format (auth-stores 5's `StorageError`,
+ * `reason: 'record-format'`, read by its own `code` and `reason`, D54) —
+ * then lib's `failureOf`.
  * Built from field names, vetted vocabulary and auth-errors' words only,
  * never a message or a stored value (H4).
  */
@@ -39,6 +42,13 @@ export class DestinationRefusal extends ServerRefusal {
  */
 export const JWT_NONE_HINT =
   'a token you hold is sent in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the session with mcp-auth';
+
+/**
+ * The hint of a session record the store refused as not of its format (D54,
+ * spec §7.3).
+ */
+export const RECORD_FORMAT_HINT =
+  'regenerate the session with mcp-auth: `mcp-auth --destination <name> --type abap|xsuaa`, or `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (from @mcp-abap-adt/auth-broker-cli)';
 
 /** The hint of each refusal that has one, recorded when it is built (never read off the value). */
 const UNSUPPORTED_HINTS = new WeakMap<object, string>();
@@ -88,12 +98,14 @@ export const HINTS: Readonly<Record<string, string>> = {
   authorizationToken:
     'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
   issuedFor:
-    'the token in the session is bound to other means: write it again, or remove `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`',
+    "the session is bound to another destination's means: regenerate it with mcp-auth",
   issuedBy:
-    'the token in the session is bound to other means: write it again, or remove `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`',
+    "the session is bound to another destination's means: regenerate it with mcp-auth",
 };
 
 export interface DestinationFailureOptions {
+  /** The destination the server serves: named by a refusal whose error does not carry it. */
+  readonly destination?: string;
   /** The platform a browser login found no browser on (default `process.platform`). */
   readonly platform?: string;
   /** The server's own sentence beside a chain failure (§7.4). */
@@ -146,8 +158,36 @@ function destinationConfigFailure(
 }
 
 /**
+ * A session record the store refused as not of its format (D54): the
+ * server's own fixed words with the destination it serves — never the
+ * store's message, never a value of the record. Read by structure: an own
+ * `code` `STORAGE_ERROR` and an own `reason` `'record-format'`.
+ */
+function recordFormatFailure(
+  thrown: unknown,
+  destination: string | undefined,
+): ReadFailure | undefined {
+  if (
+    readOwn(thrown, 'code') !== 'STORAGE_ERROR' ||
+    readOwn(thrown, 'reason') !== 'record-format'
+  ) {
+    return undefined;
+  }
+  const subject =
+    destination === undefined
+      ? 'The destination'
+      : `Destination "${destination}"`;
+  return {
+    error: 'destination_refused',
+    message: `${subject} cannot be used: its session record is not in the store's format`,
+    hint: RECORD_FORMAT_HINT,
+  };
+}
+
+/**
  * What `thrown` is, as the client's answer: a `DestinationConfigError`
- * first, then lib's `failureOf`; `undefined` when neither knows it. Total.
+ * first, then a record the store refused, then lib's `failureOf`;
+ * `undefined` when none knows it. Total.
  */
 export function destinationFailureOf(
   thrown: unknown,
@@ -157,6 +197,8 @@ export function destinationFailureOf(
     const platform = options.platform ?? process.platform;
     const destination = destinationConfigFailure(thrown, platform);
     if (destination !== undefined) return destination;
+    const record = recordFormatFailure(thrown, options.destination);
+    if (record !== undefined) return record;
     const read = failureOf(thrown);
     const moved =
       typeof thrown === 'object' && thrown !== null
@@ -184,7 +226,7 @@ export function destinationFailureWords(
   destination: string,
   options: DestinationFailureOptions = {},
 ): string {
-  const read = destinationFailureOf(thrown, options);
+  const read = destinationFailureOf(thrown, { ...options, destination });
   if (read === undefined) {
     return `Destination "${destination}" cannot be read: ${errorClassOf(thrown)}`;
   }

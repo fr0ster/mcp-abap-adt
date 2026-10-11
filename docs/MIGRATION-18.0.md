@@ -86,11 +86,20 @@ The packages, all at **18.0.0**:
   or create the session with `mcp-auth` (a `jwt` / `authorization_code` destination). stdio serves
   three authentications: `basic`, `snc`, `jwt` / `authorization_code`.
 - **The auth chain is 6.0.** The server runs on `@mcp-abap-adt/auth-broker` 5,
-  `@mcp-abap-adt/auth-providers` 6 and `@mcp-abap-adt/auth-stores` 4. Your `.env` files and
-  service keys keep working as they are.
-- **The first start logs in once per destination.** A `jwt` / `authorization_code` destination
-  logs in on its first tool call; from then on the token is refreshed, and a new login happens only
-  when the refresh token is gone or refused.
+  `@mcp-abap-adt/auth-providers` 6 and `@mcp-abap-adt/auth-stores` 5. Service keys keep working
+  as they are; a destination's means in a `.env` too.
+- **Only the chain's own session format is read** (auth-stores 5). Session records written by
+  `mcp-auth` (`@mcp-abap-adt/auth-broker-cli` 3.x) or by the server are read as before. A
+  destination with no session record logs in on first use (a `.env` holding only the means is no
+  session). An existing record of an older format — a token with no `SAP_ISSUED_FOR` /
+  `SAP_ISSUED_BY` beside it (written by auth-stores 2.x–3.0, auth-broker 3.x or by hand), a token
+  and cookies both, an expiry that is not epoch milliseconds — **stops the start**, without a login:
+  `Destination "X" cannot be used: its session record is not in the store's format`, with the hint
+  *regenerate the session with mcp-auth: `mcp-auth --destination <name> --type abap|xsuaa`, or
+  `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (from
+  @mcp-abap-adt/auth-broker-cli)*. A tool call answers the same, `destination_refused`. Removing
+  `SAP_ISSUED_*` is no longer a remedy: regenerate the session with `mcp-auth`. A session bound to
+  another destination's means is not used; the destination logs in afresh.
 - **`--browser` is mapped by the platform** to one of auth-providers' browsers:
 
   | `--browser` | Linux | macOS | Windows | another platform |

@@ -82,6 +82,20 @@ name with a path separator, `..` or a leading dot is refused before any file is 
 `XSUAA_MCP_URL` in `sessions/X.env`; stating `SAP_URL` there is refused naming
 `XSUAA_MCP_URL`. An ABAP service key carries its own URL.
 
+### The session format
+
+A session record — the token or cookies, the refresh token, the expiry and the binding
+(`SAP_ISSUED_FOR` / `SAP_ISSUED_BY`, or `XSUAA_ISSUED_FOR` / `XSUAA_ISSUED_BY`) — is written by
+`mcp-auth` (`@mcp-abap-adt/auth-broker-cli` 3.x) or by the server, and only such a record is read
+(`@mcp-abap-adt/auth-stores` 5). The session store alone judges it: a record its writer would never
+produce — a token without both binding keys beside it, a token and cookies both, an expiry that is
+not epoch milliseconds — is refused as a whole (`record-format`), and the server answers
+`Destination "X" cannot be used: its session record is not in the store's format` with the hint to
+regenerate it with `mcp-auth` (below). Nothing of the record reaches an answer or a log line, no
+login starts, and the file is left as it is. A file with the means and no token or cookies is no
+session: the destination logs in. Whether a binding matches the destination is the broker's: a
+session bound to another destination's means is not used, and the destination logs in afresh.
+
 ### What is written back
 
 The session — the token and its refresh token — is the server's to keep current:
@@ -135,8 +149,8 @@ key, never the value). See [YAML Configuration](../configuration/YAML_CONFIG.md)
 ## Browser login (JWT / `authorization_code`)
 
 When there is no valid token, the server opens the system's login page and waits for the
-redirect on a local callback port. On the first start of a `jwt` / `authorization_code`
-destination, the first tool call logs in once; the token is then renewed as `--renewal` says.
+redirect on a local callback port. A `jwt` / `authorization_code` destination with no session
+logs in on its first tool call; the token is then renewed as `--renewal` says.
 
 - `--browser=<name>` (or `MCP_BROWSER`, YAML `browser`) picks the browser, mapped by the
   platform to one of `@mcp-abap-adt/auth-providers`' browsers:
@@ -259,15 +273,22 @@ stored, shared or cached across them. Over SSE a `POST` is routed by its `sessio
 - `Destination "X" cannot be used: <fields>` — the destination states less than its
   authentication needs, or a session it cannot use, followed by one hint where the server knows
   the remedy (`grantType`, `SAP_URL`, `XSUAA_MCP_URL`, `connection-type`, `authorizationToken`,
-  `issuedFor` / `issuedBy`). A token in the session bound to other means (`issuedFor` /
-  `issuedBy`) gets: "the token in the session is bound to other means: write it again, or
-  remove `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`".
+  `issuedFor` / `issuedBy`). A refusal naming `issuedFor` / `issuedBy` gets: "the session is
+  bound to another destination's means: regenerate it with mcp-auth".
+- `Destination "X" cannot be used: its session record is not in the store's format` — the
+  session file holds a record no writer of the chain produces (auth-stores 5 refuses it as
+  `record-format`): a token without `SAP_ISSUED_FOR` / `SAP_ISSUED_BY` beside it (an older
+  `mcp-auth` or auth-broker, or written by hand), a token and cookies both, or an expiry that is
+  not epoch milliseconds. The start stops and no login starts; a tool call answers the same,
+  `destination_refused`. The hint: "regenerate the session with mcp-auth: `mcp-auth --destination
+  <name> --type abap|xsuaa`, or `mcp-auth --service-key <file> --output <file> --type
+  abap|xsuaa` (from @mcp-abap-adt/auth-broker-cli)". The file is left as it is.
 - `Destination "X" logs in through a browser, and none is known on this platform (<platform>)`
   — a `jwt` / `authorization_code` destination on a platform outside the browser table, with
   the hint "Start with --browser=none and open the URL the login prints on stderr, or give
   --browser-program=<program>."
 - `Destination "X" uses <type> / <grant>, which this server does not support` — an
-  authentication outside the four above (`certificate` and `kerberos` have no grant: `uses certificate`).
+  authentication outside the three above (`certificate` and `kerberos` have no grant: `uses certificate`).
 - `--env-path: the file does not exist: <path>` — an env file you named is missing; the server
   falls back to nothing.
 - `--auth-broker was removed in 16.0.0 — remove it from the configuration` (likewise

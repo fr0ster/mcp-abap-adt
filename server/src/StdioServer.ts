@@ -37,6 +37,8 @@ export class StdioServer extends BaseMcpServer {
   private readonly sentenceFor:
     | ((error: IAuthProviderError) => string | undefined)
     | undefined;
+  /** The destination served, named by a refusal whose error does not carry it. */
+  private destination: string | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -56,7 +58,10 @@ export class StdioServer extends BaseMcpServer {
 
   /** The destination layer's failures first, then lib's reader (§7.1). */
   protected override readFailure(thrown: unknown): ReadFailure | undefined {
-    return destinationFailureOf(thrown, { sentenceFor: this.sentenceFor });
+    return destinationFailureOf(thrown, {
+      sentenceFor: this.sentenceFor,
+      ...(this.destination !== undefined && { destination: this.destination }),
+    });
   }
 
   /**
@@ -68,6 +73,7 @@ export class StdioServer extends BaseMcpServer {
     transport: Transport = new StdioServerTransport(),
   ): Promise<void> {
     if (destination !== undefined && this.destinations) {
+      this.destination = destination;
       this.setConnectionContext({
         kind: 'built',
         source: destinationSource(destination, this.destinations),

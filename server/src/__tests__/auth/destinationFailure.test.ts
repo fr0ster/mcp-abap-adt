@@ -33,7 +33,7 @@ import {
 } from '../helpers/factoryFixture';
 
 const ISSUED_HINT =
-  'the token in the session is bound to other means: write it again, or remove `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`';
+  "the session is bound to another destination's means: regenerate it with mcp-auth";
 
 const KNOWN = {
   grantType:

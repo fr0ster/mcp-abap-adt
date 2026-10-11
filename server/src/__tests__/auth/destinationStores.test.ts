@@ -98,15 +98,27 @@ describe('destination stores', () => {
       });
     });
 
-    it('the session store reads the token of a jwt file', async () => {
+    it('the session store reads the token of a jwt file of its format', async () => {
+      const file = path.join(root, 'conn.env');
+      fs.writeFileSync(
+        file,
+        `SAP_URL=${URL_}\nSAP_AUTH_TYPE=jwt\nSAP_JWT_TOKEN=tok-1\nSAP_ISSUED_FOR=${URL_}\nSAP_ISSUED_BY=issuer-record\n`,
+      );
+      const s = storesFor(mode(file));
+      const session = await s.sessionStore.loadSession('default');
+      expect(session?.authorizationToken).toBe('tok-1');
+    });
+
+    it('a token without its binding keys is not of the store format: refused, record-format (auth-stores 5)', async () => {
       const file = path.join(root, 'conn.env');
       fs.writeFileSync(
         file,
         `SAP_URL=${URL_}\nSAP_AUTH_TYPE=jwt\nSAP_JWT_TOKEN=tok-1\n`,
       );
       const s = storesFor(mode(file));
-      const session = await s.sessionStore.loadSession('default');
-      expect(session?.authorizationToken).toBe('tok-1');
+      await expect(s.sessionStore.loadSession('default')).rejects.toMatchObject(
+        { code: 'STORAGE_ERROR', reason: 'record-format' },
+      );
     });
 
     it('a renewed secret rewrites the three secret keys and leaves every other line', async () => {

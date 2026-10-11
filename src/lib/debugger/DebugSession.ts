@@ -161,6 +161,7 @@ export class DebugSession<O = unknown> {
       await this.ports.requestUser(this.requireOrigin())
     ).toUpperCase();
     return {
+      debuggingMode: 'user',
       requestUser: this.user,
       terminalId: this.ids.terminalId,
       ideId: this.ids.ideId,
@@ -482,7 +483,7 @@ export class DebugSession<O = unknown> {
       connection = await this.open();
       const dbg = this.ports.abapDebugger(connection, this.mode);
       const attached = await dbg.attach(
-        identity.requestUser,
+        identity,
         debuggee.debuggeeId,
         debuggee.instance ? { server: debuggee.instance } : {},
       );
@@ -564,7 +565,7 @@ export class DebugSession<O = unknown> {
       const dbg = this.ports.abapDebugger(connection, this.mode);
       const attached = await dbg
         .attach(
-          identity.requestUser,
+          identity,
           debuggee.debuggeeId,
           debuggee.instance ? { server: debuggee.instance } : {},
         )

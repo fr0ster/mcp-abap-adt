@@ -139,28 +139,35 @@ export function breakpointsFromArgs(
   raw: readonly BreakpointArg[],
 ): IDebuggerBreakpoint[] {
   return raw.map((b, i) => {
-    const condition = b.condition ? { condition: b.condition } : {};
+    // Only a line breakpoint takes a condition: the system ignores it on the
+    // other kinds, and interfaces-adt 15 does not type it there.
+    const noCondition = (kind: string) => {
+      if (b.condition)
+        throw new Error(
+          `breakpoints[${i}] (${kind}): a condition applies to a line breakpoint only`,
+        );
+    };
     if (b.exception_class) {
+      noCondition('exception');
       return {
         kind: 'exception',
         exceptionClass: b.exception_class.toUpperCase(),
-        ...condition,
       };
     }
     if (b.statement) {
+      noCondition('statement');
       return {
         kind: 'statement',
         statement: b.statement.toUpperCase(),
-        ...condition,
       };
     }
     if (b.message) {
+      noCondition('message');
       return {
         kind: 'message',
         msgId: b.message.id.toUpperCase(),
         msgNo: b.message.number,
         msgTy: b.message.type.toUpperCase(),
-        ...condition,
       };
     }
     if (b.object_type && b.object_name && b.line !== undefined) {
@@ -175,7 +182,7 @@ export function breakpointsFromArgs(
           },
           b.line,
         ),
-        ...condition,
+        ...(b.condition ? { condition: b.condition } : {}),
       };
     }
     throw new Error(

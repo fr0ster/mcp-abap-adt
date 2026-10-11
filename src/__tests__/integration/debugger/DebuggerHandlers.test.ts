@@ -394,7 +394,10 @@ describe('Debugger handlers (integration)', () => {
     const requestUser = await requestUserOf(connection);
     const started = now();
     const poll = dbg
-      .listen({ requestUser, ...ids }, { holdSeconds: 60 })
+      .listen(
+        { debuggingMode: 'user', requestUser, ...ids },
+        { holdSeconds: 60 },
+      )
       .then((a) => ({
         status: a.ok ? 'ok' : `error: ${a.getError().message}`,
         body: a.ok ? String(a.getResult().value ?? '') : '',

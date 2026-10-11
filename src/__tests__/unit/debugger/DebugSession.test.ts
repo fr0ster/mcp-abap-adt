@@ -39,6 +39,19 @@ describe('DebugSession', () => {
     return { session, world };
   }
 
+  it('the identity states user mode, and the attach names the same identity', async () => {
+    const { world } = await stopped();
+    const listen = world.log.find((c) => c.call === 'listen')!;
+    expect(listen.args[0]).toEqual({
+      debuggingMode: 'user',
+      requestUser: 'SAPUSER01',
+      terminalId: IDS.terminalId,
+      ideId: IDS.ideId,
+    });
+    const attach = world.log.find((c) => c.call === 'attach')!;
+    expect(attach.args[0]).toEqual(listen.args[0]);
+  });
+
   it('the first poll is short and decides the start; then the long poll stands', async () => {
     await listening();
   });

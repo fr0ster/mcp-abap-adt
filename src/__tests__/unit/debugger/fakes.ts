@@ -33,7 +33,15 @@ export const CONFLICT = () =>
 /** The default strategies' shapes: `done` answers nothing (adt-clients `nothing`). */
 export const DONE = () => okResponse(undefined);
 
+export interface WireCall {
+  call: string;
+  /** The fake connection's id: the index in `opened`. */
+  connection: number;
+  args: unknown[];
+}
+
 export function fakeWorld() {
+  const log: WireCall[] = [];
   const polls: Array<ReturnType<typeof deferred<any>> & { hold?: number }> = [];
   const opened: IAbapConnection[] = [];
   const closed: IAbapConnection[] = [];
@@ -45,99 +53,111 @@ export function fakeWorld() {
   let validationAnswers: Array<() => any> = [];
   /** Members put here replace the fake's on every debugger, cached ones included. */
   const override: Record<string, any> = {};
-  const make = (): Debugger =>
-    new Proxy(
-      {
-        listen: (_i: unknown, o: any) => {
-          calls.push(`listen:${o?.holdSeconds}`);
-          const d = deferred<any>();
-          polls.push(Object.assign(d, { hold: o?.holdSeconds }));
-          return d.promise;
-        },
-        stopListener: async () => {
-          calls.push('stopListener');
-          // As the system does: the open poll answers, empty, once the listener is stopped.
-          for (const p of polls) p.resolve(LISTEN_NOTHING());
-          return DONE();
-        },
-        attach: async (_u: string, id: string, o: any) => {
-          calls.push(`attach:${id}:${o?.server}`);
-          return (
-            attachAnswers.shift() ??
-            (async () =>
-              okResponse(corpusBody('debugger-run-to-line--03-attach')))
-          )();
-        },
-        getStack: async () => {
-          calls.push('getStack');
-          return okResponse(corpusBody('debugger-run-to-line--04-stack'));
-        },
-        getVariables: async () => {
-          calls.push('getVariables');
-          return okResponse(
-            corpusBody('debugger-run-to-line--07-variables-at-write'),
-          );
-        },
-        getChildVariables: async () => {
-          calls.push('getChildVariables');
-          return okResponse(
-            corpusBody('debugger-conversation--07-children-root'),
-          );
-        },
-        step: async (m: string, o: any) => {
-          calls.push(`step:${m}:${o?.analyse ? 'analysed' : 'plain'}`);
-          return (
-            stepAnswers.shift() ??
-            okResponse(corpusBody('debugger-run-to-line--05-stepruntoline'))
-          );
-        },
-        stepToLine: async (m: string, uri: string) => {
-          calls.push(`stepToLine:${m}:${uri}`);
-          return (
-            stepAnswers.shift() ??
-            okResponse(corpusBody('debugger-run-to-line--05-stepruntoline'))
-          );
-        },
-        terminateDebuggee: async (o: any) => {
-          calls.push(`terminate:${o?.analyse ? 'analysed' : 'plain'}`);
-          return DONE();
-        },
-        setBreakpoints: async (_i: unknown, list: any[], o: any) => {
-          if (o?.validationOnly) {
-            calls.push(`validate:${list.length}`);
-            return (validationAnswers.shift() ?? (() => okResponse('')))();
-          }
-          calls.push(`setBreakpoints:${list.length}`);
-          return okResponse(
-            corpusBody('debugger-conversation--01-breakpoints-set'),
-          );
-        },
-        deleteBreakpoint: async (_i: unknown, id: string) => {
-          calls.push(`deleteBreakpoint:${id}`);
-          return DONE();
-        },
-        setStackPosition: async (p: number) => {
-          calls.push(`setStackPosition:${p}`);
-          return DONE();
-        },
-        setVariableValue: async (n: string) => {
-          calls.push(`setVariableValue:${n}`);
-          return okResponse(
-            corpusBody('debugger-run-to-line--07-variables-at-write'),
-          );
-        },
-        createWatchpoint: async () =>
-          okResponse('<dbg:watchpoints xmlns:dbg="x"/>'),
-        listWatchpoints: async () =>
-          okResponse('<dbg:watchpoints xmlns:dbg="x"/>'),
-        deleteWatchpoint: async () => DONE(),
-        getMemorySizes: async () =>
-          okResponse(corpusBody('debugger-memory--01-memory-sizes')),
-        createMemorySnapshot: async () =>
-          okResponse(corpusBody('debugger-memory--02-create-memory-snapshot')),
-      } as Record<string, any>,
-      { get: (target, key: string) => override[key] ?? target[key] },
-    ) as unknown as Debugger;
+  const make = (connection: IAbapConnection): Debugger => {
+    const members: Record<string, any> = {
+      listen: (_i: unknown, o: any) => {
+        calls.push(`listen:${o?.holdSeconds}`);
+        const d = deferred<any>();
+        polls.push(Object.assign(d, { hold: o?.holdSeconds }));
+        return d.promise;
+      },
+      stopListener: async () => {
+        calls.push('stopListener');
+        // As the system does: the open poll answers, empty, once the listener is stopped.
+        for (const p of polls) p.resolve(LISTEN_NOTHING());
+        return DONE();
+      },
+      attach: async (_identity: unknown, id: string, o: any) => {
+        calls.push(`attach:${id}:${o?.server}`);
+        return (
+          attachAnswers.shift() ??
+          (async () =>
+            okResponse(corpusBody('debugger-run-to-line--03-attach')))
+        )();
+      },
+      getStack: async () => {
+        calls.push('getStack');
+        return okResponse(corpusBody('debugger-run-to-line--04-stack'));
+      },
+      getVariables: async () => {
+        calls.push('getVariables');
+        return okResponse(
+          corpusBody('debugger-run-to-line--07-variables-at-write'),
+        );
+      },
+      getChildVariables: async () => {
+        calls.push('getChildVariables');
+        return okResponse(
+          corpusBody('debugger-conversation--07-children-root'),
+        );
+      },
+      step: async (m: string, o: any) => {
+        calls.push(`step:${m}:${o?.analyse ? 'analysed' : 'plain'}`);
+        return (
+          stepAnswers.shift() ??
+          okResponse(corpusBody('debugger-run-to-line--05-stepruntoline'))
+        );
+      },
+      stepToLine: async (m: string, uri: string) => {
+        calls.push(`stepToLine:${m}:${uri}`);
+        return (
+          stepAnswers.shift() ??
+          okResponse(corpusBody('debugger-run-to-line--05-stepruntoline'))
+        );
+      },
+      terminateDebuggee: async (o: any) => {
+        calls.push(`terminate:${o?.analyse ? 'analysed' : 'plain'}`);
+        return DONE();
+      },
+      setBreakpoints: async (_i: unknown, list: any[], o: any) => {
+        if (o?.validationOnly) {
+          calls.push(`validate:${list.length}`);
+          return (validationAnswers.shift() ?? (() => okResponse('')))();
+        }
+        calls.push(`setBreakpoints:${list.length}`);
+        return okResponse(
+          corpusBody('debugger-conversation--01-breakpoints-set'),
+        );
+      },
+      deleteBreakpoint: async (_i: unknown, id: string) => {
+        calls.push(`deleteBreakpoint:${id}`);
+        return DONE();
+      },
+      setStackPosition: async (p: number) => {
+        calls.push(`setStackPosition:${p}`);
+        return DONE();
+      },
+      setVariableValue: async (n: string) => {
+        calls.push(`setVariableValue:${n}`);
+        return okResponse(
+          corpusBody('debugger-run-to-line--07-variables-at-write'),
+        );
+      },
+      createWatchpoint: async () =>
+        okResponse('<dbg:watchpoints xmlns:dbg="x"/>'),
+      listWatchpoints: async () =>
+        okResponse('<dbg:watchpoints xmlns:dbg="x"/>'),
+      deleteWatchpoint: async () => DONE(),
+      getMemorySizes: async () =>
+        okResponse(corpusBody('debugger-memory--01-memory-sizes')),
+      createMemorySnapshot: async () =>
+        okResponse(corpusBody('debugger-memory--02-create-memory-snapshot')),
+    };
+    return new Proxy(members, {
+      get: (target, key: string) => {
+        const member = override[key] ?? target[key];
+        if (typeof member !== 'function') return member;
+        return (...args: unknown[]) => {
+          log.push({
+            call: key,
+            connection: (connection as unknown as { id: number }).id,
+            args,
+          });
+          return member(...args);
+        };
+      },
+    }) as unknown as Debugger;
+  };
   const ports: DebugSessionPorts<string> = {
     openConnection: async () => {
       const c = { id: opened.length } as unknown as IAbapConnection;
@@ -147,9 +167,9 @@ export function fakeWorld() {
     closeConnection: async (c) => {
       closed.push(c);
     },
-    abapDebugger: (_c, mode) => {
+    abapDebugger: (c, mode) => {
       modes.push(String(mode));
-      return make();
+      return make(c);
     },
     requestUser: async () => 'SAPUSER01',
     run: async () => run.promise,
@@ -160,6 +180,7 @@ export function fakeWorld() {
     opened,
     closed,
     calls,
+    log,
     modes,
     run,
     stepAnswers,

@@ -41,10 +41,11 @@ function replaying(name: string, body?: string): IAbapConnection {
 }
 
 const IDENTITY = {
+  debuggingMode: 'user',
   requestUser: 'SAPUSER01',
   terminalId: 'T'.repeat(32),
   ideId: 'I'.repeat(32),
-};
+} as const;
 const bodyOf = (a: any) =>
   a.ok ? a.getResult().value : `FAILED: ${a.getError().message}`;
 
@@ -59,7 +60,7 @@ const DOCUMENT_MEMBERS: Array<
   [
     'attach',
     'debugger-run-to-line--03-attach',
-    (d) => d.attach('SAPUSER01', 'X', {}),
+    (d) => d.attach(IDENTITY, 'X', {}),
   ],
   ['getStack', 'debugger-run-to-line--04-stack', (d) => d.getStack()],
   [

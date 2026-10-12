@@ -375,6 +375,75 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
     expect(result.content[0].text).toContain('Syntax error');
   });
 
+  it('a run that ended in error is a failure, even with no error message', async () => {
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        status: 202,
+        headers: { location: '/sap/bc/adt/activation/runs/RUN-3' },
+      },
+      {
+        data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="error"/>',
+      },
+      { data: '' },
+    ]);
+
+    const result: any = await handleCreateFunctionGroupUnitTest(
+      ctx(connection) as any,
+      { function_group_name: 'zfg_x', test_class_source: 'x' },
+    );
+
+    expect(result.isError).toBe(true);
+  });
+
+  it('waits on the run with long polls and no timer of its own', async () => {
+    const timer = jest.spyOn(global, 'setTimeout');
+    try {
+      // A run that never settles: six long polls, back to back, then a failure.
+      const running = {
+        data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="running"/>',
+      };
+      const connection = recordingConnection([
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        {
+          status: 202,
+          headers: { location: '/sap/bc/adt/activation/runs/RUN-4' },
+        },
+        running,
+        running,
+        running,
+        running,
+        running,
+        running,
+        { data: '' },
+      ]);
+
+      const result: any = await handleCreateFunctionGroupUnitTest(
+        ctx(connection) as any,
+        { function_group_name: 'zfg_x', test_class_source: 'x' },
+      );
+
+      expect(result.isError).toBe(true);
+      const polls = connection.requests.filter((r) =>
+        r.url.includes('/activation/runs/RUN-4?'),
+      );
+      expect(polls).toHaveLength(6);
+      expect(polls.every((r) => r.url.includes('withLongPolling=true'))).toBe(
+        true,
+      );
+      const ours = timer.mock.calls.filter(([, ms]) => ms === 1000);
+      expect(ours).toHaveLength(0);
+    } finally {
+      timer.mockRestore();
+    }
+  });
+
   it("a function group's main program: SAPL<group>, namespace in front", () => {
     expect(functionGroupMainProgram('zfg_x')).toBe('SAPLZFG_X');
     expect(functionGroupMainProgram('/ns/group')).toBe('/NS/SAPLGROUP');

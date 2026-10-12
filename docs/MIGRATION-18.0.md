@@ -2,7 +2,8 @@
 
 All five packages (`lib`, `core`, `compact`, `compact-readonly`, `compact-modify`) are
 **18.0.0**. The debugger moved to `@mcp-abap-adt/adt-clients` 29, `@mcp-abap-adt/interfaces-adt`
-15 and `@mcp-abap-adt/adt-strategies` 0.10. Nothing outside the debugger changed.
+15 and `@mcp-abap-adt/adt-strategies` 0.10. Outside the debugger, one answer changed: a
+function group's ABAP Unit test write (below).
 
 ## A model, an MCP client, a configuration
 
@@ -79,3 +80,16 @@ A host that wants a take-over to ask first sets `SAP_DEBUG_BREAKPOINT_CONFLICT=r
    the environment). The order is the request scope, then the environment, then your
    `breakpointConflict` — a fallback, which the environment overrides. A host overriding
    `BaseMcpServer.debuggerFor()` passes the option there.
+
+## A function group's ABAP Unit tests
+
+`CreateFunctionGroupUnitTest` and `UpdateFunctionGroupUnitTest` now activate the test include,
+the group and its main program `SAPL<group>` in one activation run. Before, the main program
+stayed inactive and ABAP Unit answered an empty run result for a group whose tests had just
+been written. What a caller meets:
+
+- `terse` is unchanged.
+- `detail: full` answers the run — `run_id` and `status` — instead of the parsed activation
+  checklist; `detail: raw` carries the run's results document.
+- A run that is refused, ends in `failed` or `error`, or does not finish is answered as a
+  failure.

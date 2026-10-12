@@ -21,8 +21,11 @@ The debugger on `@mcp-abap-adt/adt-clients` 29 (`interfaces-adt` 15, `adt-strate
 - A second `DebugSetBreakpoints` removed the breakpoints of the first, and an ambiguous refusal re-asked with `validationOnly` removed the whole set: the system replaces the key's set on every request (measured on premise (2026-10-11), BASIS 816). The session sends its whole set every time, each breakpoint tagged with a `clientId` the system echoes, and pairs the answer rows by that tag without re-asking.
 - A refuse start (`DebugStartListener`, compact without `take_over`) meeting another IDE's listener of the same SAP user replaced that IDE's breakpoints before its listen was refused `409`: the user-mode set is the SAP user's with the request user, whatever the IDE id (measured on premise, 2026-10-12). It now asks the system first (`checkListener`) and is refused before anything is changed; every later `DebugSetBreakpoints` of that session asks the same way. The check is not atomic; the remaining race is documented.
 
+- `CreateFunctionGroupUnitTest` and `UpdateFunctionGroupUnitTest` left the group's main program inactive, so ABAP Unit found no test class and answered an empty run result. Writing the test include regenerates `SAPL<group>` with the `INCLUDE` added; the group was then activated alone with the pre-audit, which is answered `200` with the inactive list instead of an activation, and that passed as a success (measured on premise, BASIS 816, 2026-10-12). The include, the group and its main program are now activated in one run without the pre-audit, and a refused or unfinished run is a failure.
+
 ### Changed
 
+- **`CreateFunctionGroupUnitTest` / `UpdateFunctionGroupUnitTest` with `detail: full`** answer the activation run (`run_id`, `status`) instead of the parsed activation checklist; `detail: raw` carries the run's results document. `terse` is unchanged.
 - **`DebugStartListener` and `DebugTakeOverListener` require `breakpoints`, at least one**; a start without them is refused by the schema, and by the session before anything is sent.
 - The breakpoints answer is the whole set: `placed`, `refused` (this call's, each with its definition), `lost`, `unexpected`. A delete by an id the session does not hold is refused before the wire.
 - A condition on a non-line breakpoint is refused, naming it.

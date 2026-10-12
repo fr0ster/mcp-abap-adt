@@ -290,13 +290,22 @@ async function activateWithMainProgram(
     { analyse: analyseException },
   );
   if (!started.ok) return started as unknown as Answer;
+  // Long polls back to back, no timer of ours: the server holds each one
+  // until the run moves.
   const outcome = await awaitActivationRun(
     utils as unknown as ActivationRunSource,
     started.getResult().value,
     analyseException,
+    6,
+    0,
   );
   const refusals = outcome.messages.filter(isRefusal);
-  if (!outcome.settled || refusals.length > 0 || outcome.status === 'failed') {
+  if (
+    !outcome.settled ||
+    refusals.length > 0 ||
+    outcome.status === 'failed' ||
+    outcome.status === 'error'
+  ) {
     return failedWith({
       origin: 'refusal',
       message: refusals.length

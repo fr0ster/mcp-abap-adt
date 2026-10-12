@@ -105,21 +105,32 @@ describe('oneLoginAtATime on a real port', () => {
     });
   }
 
-  /** A real strategy whose "browser" requests the callback itself. */
+  /**
+   * A real strategy whose browser (an `IBrowser`, auth-providers 6) requests
+   * the callback itself: to the URL's `redirect_uri`, with its `state` — a
+   * login is bound to its attempt. `open` resolves once the browser was
+   * asked, as the contract says; the callback goes out after it.
+   */
   function strategyOn(port: number, code: string, log: string[]) {
     return browserCallbackStrategy({
       port,
-      timeoutMs: 5000,
-      browser: 'system',
-      openUrl: async (_url, _browser, redirectUri) => {
-        log.push(`open ${code}`);
-        await get(`${redirectUri}?code=${code}`);
+      browser: {
+        open: async (url: string) => {
+          log.push(`open ${code}`);
+          const at = new URL(url);
+          const redirect = at.searchParams.get('redirect_uri') ?? '';
+          const state = at.searchParams.get('state') ?? '';
+          setImmediate(() => {
+            get(`${redirect}?code=${code}&state=${state}`).catch(() => {});
+          });
+        },
       },
     });
   }
 
   const request = {
-    buildAuthorizationUrl: async (redirectUri: string) => redirectUri,
+    buildAuthorizationUrl: async (redirectUri: string) =>
+      `https://idp.example.test/authorize?redirect_uri=${encodeURIComponent(redirectUri)}&state=S-1`,
   } as AuthorizationRequest;
 
   it('two logins on one port both succeed, and the port is free between them', async () => {

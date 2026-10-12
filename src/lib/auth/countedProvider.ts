@@ -3,9 +3,9 @@
  *
  * `countedProvider` forwards each of the four `IAuthProvider` calls unchanged
  * and counts the ones not yet answered. A renewal happens inside one of those
- * calls and its `onTokens` write is submitted before the call answers
- * (broker 4), so once the count is zero every renewal has reached the
- * broker's writer and `flush()` covers it.
+ * calls and its session write is queued before the call answers (broker 5,
+ * through the provider's persistence), so once the count is zero every
+ * renewal has reached the broker's writer and `flush()` covers it.
  *
  * Behind a closed gate no call starts: each answers the shutdown refusal at
  * once, without reaching the inner provider — Oops, never a throw. A call
@@ -13,6 +13,7 @@
  * Nothing opens the gate again.
  */
 
+import { authError } from '@mcp-abap-adt/auth-errors';
 import type {
   AuthOutcome,
   IAuthProvider,
@@ -21,9 +22,22 @@ import type {
   IRequestTarget,
 } from '@mcp-abap-adt/interfaces-auth';
 
+/**
+ * A provider that has no credential at all: "this connection has no
+ * credential to renew", minted (interfaces-auth 7 takes no written refusal).
+ */
+export const NO_CREDENTIAL_REFUSAL: AuthOutcome = Object.freeze({
+  ok: false,
+  refusal: authError.connection({ problem: 'no-credential' }),
+});
+
+/**
+ * A refusal is minted, never written (interfaces-auth 7): the shutdown is the
+ * login's abort, in auth-errors' words — "the authorization was aborted".
+ */
 export const SHUTDOWN_REFUSAL: AuthOutcome = Object.freeze({
   ok: false,
-  refusal: Object.freeze({ reason: 'the server is shutting down' }),
+  refusal: authError['interactive-login']({ outcome: 'aborted' }),
 });
 
 export class ProviderGate {

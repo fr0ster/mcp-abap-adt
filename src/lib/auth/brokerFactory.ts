@@ -12,6 +12,7 @@
  */
 
 import { AuthBroker, DestinationConfigError } from '@mcp-abap-adt/auth-broker';
+import { isMinted } from '@mcp-abap-adt/auth-errors';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { getPlatformPaths } from '../stores/platformPaths';
@@ -48,19 +49,30 @@ interface Built {
   stores: DestinationStores;
 }
 
-const ENTRY = /^"[^"\n]*": [A-Za-z_$][\w$]*$/;
+/**
+ * A broker 5 `SessionWriteFailure`, read by its fields: the destination and
+ * the minted error (`persisting-tokens`), whose words are auth-errors' own.
+ */
+function writeFailureLine(entry: unknown): string | undefined {
+  if (typeof entry !== 'object' || entry === null) return undefined;
+  const { destination, error } = entry as {
+    destination?: unknown;
+    error?: { reason?: unknown };
+  };
+  if (typeof destination !== 'string' || !isMinted(error)) return undefined;
+  return `"${destination}": ${error.reason}`;
+}
 
 /**
- * A rejecting `flush()` as `"<destination>": <ErrorClass>` lines: the
- * broker's `AggregateError` entries when they have that shape, else the
+ * A rejecting `flush()` as `"<destination>": <words>` lines: each of the
+ * broker's `SessionWriteFailure`s with its minted reason, else the
  * destination and the class of what was thrown.
  */
 function notStoredOf(destination: string, error: unknown): string[] {
   if (error instanceof AggregateError) {
-    const lines = error.errors.map((entry: unknown) =>
-      entry instanceof Error && ENTRY.test(entry.message)
-        ? entry.message
-        : `"${destination}": ${errorClassOf(entry)}`,
+    const lines = error.errors.map(
+      (entry: unknown) =>
+        writeFailureLine(entry) ?? `"${destination}": ${errorClassOf(entry)}`,
     );
     if (lines.length > 0) return lines;
   }

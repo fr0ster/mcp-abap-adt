@@ -7,6 +7,7 @@
  * process — so the next request tries again, once.
  */
 
+import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
@@ -32,12 +33,14 @@ class TestServer extends BaseMcpServer {
   }
 }
 
-const REASON = 'the login was refused (placeholder)';
+const REFUSAL = authError['credential-refused']({
+  credential: 'user-password',
+});
 
 function refusingProvider() {
   const prepare = jest.fn(async () => ({
     ok: false as const,
-    refusal: { reason: REASON },
+    refusal: REFUSAL,
   }));
   const ok = async () => ({ ok: true as const });
   const provider: IAuthProvider = {
@@ -129,6 +132,9 @@ describe('a refused credential', () => {
   it('is answered in its own fixed words', async () => {
     const { provider } = refusingProvider();
     const error = await request(destinationsOf(provider));
-    expect(describeAuthError(error)).toBe(REASON);
+    // `AuthRefusedError`'s message: `reason — hint`, both auth-errors' words.
+    expect(describeAuthError(error)).toBe(
+      `${REFUSAL.reason} — ${REFUSAL.hint}`,
+    );
   });
 });

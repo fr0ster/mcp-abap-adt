@@ -347,7 +347,9 @@ describe('stdio inspection-only mode: the stand-in destinations', () => {
     expect(settings).not.toHaveProperty('password');
   });
 
-  it('its provider refuses every moment, naming how to connect', async () => {
+  // The refusal is minted (interfaces-auth 7 takes no written words): how to
+  // connect is said on stderr at startup (launcherDestination checks it).
+  it('its provider refuses every moment, as a connection with no credential', async () => {
     const provider = await inspectionOnlyDestinations().getProvider('mock');
     const outcomes = [
       await provider.prepare(),
@@ -358,8 +360,11 @@ describe('stdio inspection-only mode: the stand-in destinations', () => {
     for (const outcome of outcomes) {
       expect(outcome.ok).toBe(false);
       if (!outcome.ok) {
-        expect(outcome.refusal.reason).toContain('--mcp');
-        expect(outcome.refusal.reason).toContain('--env-path');
+        expect(outcome.refusal.kind).toBe('connection');
+        expect(outcome.refusal.facts).toEqual({ problem: 'no-credential' });
+        expect(outcome.refusal.reason).toBe(
+          'this connection has no credential to renew',
+        );
       }
     }
   });

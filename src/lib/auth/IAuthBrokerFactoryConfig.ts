@@ -4,7 +4,10 @@
  * library adds no default collaborator (H2).
  */
 
-import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
+import type {
+  IAuthorizationStrategy,
+  IBrowser,
+} from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 export interface IAuthBrokerFactoryConfig {
@@ -22,7 +25,10 @@ export interface IAuthBrokerFactoryConfig {
   authBrokerPath?: string;
   /** Whether a named destination's secret is written to `sessions/`. */
   unsafe: boolean;
-  /** The browser of an interactive login (`--browser`). */
+  /**
+   * The browser of an interactive login, as `--browser` names it; the
+   * handler turns it into the `IBrowser` the strategy takes (`browserFor`).
+   */
   browser: string;
   /** The callback port of an interactive login; the strategy's default when absent. */
   browserAuthPort?: number;
@@ -34,8 +40,8 @@ export interface IAuthBrokerFactoryConfig {
    * default here.
    */
   browserStrategy: (options: {
-    browser: string;
-    port?: number;
+    browser?: IBrowser | undefined;
+    port?: number | undefined;
   }) => IAuthorizationStrategy<string>;
   logger?: ILogger;
 }

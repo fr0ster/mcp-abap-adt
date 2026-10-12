@@ -3,7 +3,8 @@
  * only — never a value read from a file (H4).
  */
 
-import { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
+import { isDestinationConfigError } from '@mcp-abap-adt/auth-broker';
+import { StorageError } from '@mcp-abap-adt/auth-stores';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { DestinationGrant } from '@mcp-abap-adt/interfaces-auth-broker';
 import type { AuthType } from './vocabulary.js';
@@ -82,19 +83,28 @@ const HINTS: Readonly<Record<string, string>> = {
   'connection-type': 'SNC logs on over RFC: set --connection-type=rfc.',
   authorizationToken:
     'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
+  // auth-broker 5: a handed-over credential (`none`) is used only beside the
+  // exact binding of the destination's means.
+  issuedFor:
+    'A token or cookies you hold need SAP_ISSUED_FOR and SAP_ISSUED_BY beside them, stating whom they were issued for: see the authentication guide.',
+  issuedBy:
+    'A token or cookies you hold need SAP_ISSUED_FOR and SAP_ISSUED_BY beside them, stating whom they were issued for: see the authentication guide.',
 };
 
 /**
  * The words a user reads for an authentication error the server knows:
  * a `DestinationConfigError` (the fields it lacks, then one fixed hint per
  * field with a known remedy), an `UnsupportedAuthenticationError`, or a
- * `DestinationRefusal` (its own vetted words), or the connector's
- * `AuthRefusedError` (the provider's fixed wording).
+ * `DestinationRefusal` (its own vetted words), the connector's
+ * `AuthRefusedError` (the provider's fixed wording), or a session store's
+ * refusal of a record not in its format (auth-stores 5: fixed words naming
+ * the store and the destination, and how to regenerate it).
  * `undefined` for anything else — the caller reports it as before. Built from
  * field names and vetted vocabulary only, never a message or a stored value.
  */
 export function describeAuthError(error: unknown): string | undefined {
-  if (error instanceof DestinationConfigError) {
+  // Structural, as auth-broker 5 says: no `instanceof` across copies.
+  if (isDestinationConfigError(error)) {
     const fields = error.missingFields;
     const lines = [
       `Destination "${error.destination}" lacks: ${fields.join(', ')}`,
@@ -106,6 +116,9 @@ export function describeAuthError(error: unknown): string | undefined {
     return lines.join('\n');
   }
   if (error instanceof DestinationRefusal) return error.message;
+  if (error instanceof StorageError && error.reason === 'record-format') {
+    return error.message;
+  }
   // The connector's refusal: its wording is fixed by the provider (spec §8).
   if (error instanceof AuthRefusedError) return error.message;
   if (error instanceof UnsupportedAuthenticationError) {

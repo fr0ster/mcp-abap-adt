@@ -157,6 +157,7 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
   JWT/OAuth2 Authentication (SAP_GRANT_TYPE is required with jwt):
     SAP_GRANT_TYPE                 authorization_code (browser login) | none (a token you hold)
     SAP_JWT_TOKEN                  JWT token (with SAP_GRANT_TYPE=none)
+    SAP_ISSUED_FOR, SAP_ISSUED_BY  Whom the token was issued for (required beside it)
     SAP_REFRESH_TOKEN              Refresh token (the server stores the one it obtains)
     SAP_UAA_URL                    UAA URL for OAuth2
     SAP_UAA_CLIENT_ID              UAA Client ID
@@ -384,17 +385,15 @@ export function effectiveSystemType(
 }
 
 /**
- * The login strategy, with prompts that reach the user. auth-providers'
- * strategy speaks to the user through the request's logger — the URL to open
- * under `--browser=none`/`headless`, or `auto` when it could not open one — and
- * that logger is the broker's, silent unless DEBUG_AUTH_LOG is set. A prompt
- * the user cannot see makes the login impassable: it times out.
+ * The login strategy, with its progress lines on stderr. auth-providers 6
+ * prompts the authorization URL on stderr itself, never through a logger;
+ * what reaches the request's logger are fixed lines — at `info` "the
+ * authorization URL was shown", a browser that failed to open — and that
+ * logger is the broker's, silent unless DEBUG_AUTH_LOG is set.
  *
- * So the strategy gets its own logger: `info`, the level the strategy prompts
- * at, is a line on stderr always; `warn`, `error` and `debug` stay the
- * broker's — diagnostics, gated, and they may quote an error's message (H4).
- * Not "no logger" (auth-providers then writes prompts to stderr itself): that
- * would also drop those diagnostics under DEBUG_AUTH_LOG. Never stdout (H3).
+ * So the strategy gets its own logger: `info` is a line on stderr always, so
+ * the user sees what the login is doing; `warn`, `error` and `debug` stay the
+ * broker's — diagnostics, gated (H4). Never stdout (H3).
  */
 export function promptsOnStderr(
   browserStrategy: IAuthBrokerFactoryConfig['browserStrategy'],

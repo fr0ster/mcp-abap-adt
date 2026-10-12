@@ -293,15 +293,78 @@ premise (2026-10-10, both conflict modes, all four combinations of the ids):
 - a breakpoint caught for whichever listener of that user was active — under
   take-over the newcomer caught a breakpoint only the first one had set.
 
+Measured again on premise (2026-10-12, BASIS 816: same SAP user, two ideIds,
+user mode, refuse, the first IDE armed and listening):
+
+- the user-mode breakpoint set is the user's (with the request user); the
+  ideId does not separate it: the newcomer's arming replaced the first IDE's
+  set, and although its listen was refused `409` and the first listener kept
+  listening, the run stopped at the newcomer's line, not the first one's;
+- a stopListener under another ideId of the same user ends the other IDE's
+  listener: after it the first IDE's poll returned at once with an empty answer,
+  and listening again caught nothing — its set was gone too;
+- deleting only the newcomer's own breakpoint by id instead left the first
+  IDE's listener running, but it caught nothing: the arming had already
+  replaced its set;
+- a `checkListener` before anything else answered `409` and left the first IDE
+  untouched;
+- a `checkListener` under the identity of a listener of our own that is running
+  answered `200` and left it listening, in user and terminal mode alike — so
+  the check does not refuse a session's own later arming.
+
+So under listener mode refuse a start checks the listener on the control
+connection before it reconciles or arms, whatever the breakpoint conflict says,
+and a `409` there is a refusal before any change. The check is not atomic: a
+listener another IDE starts between it and our listen has its set replaced by
+our arming and its listener ended by our rollback's stopListener. That race is
+accepted and documented, not handled (stated by the user 2026-10-12).
+
 Both ids are random per instance by default, so a second instance of the same
 SAP user meets the conflict and its answer reaches the model as it is; a shared
 id is the consumer's explicit choice. The idle bound on waiting for the user
 (not under 30 minutes, the user's exception to "no timeouts") ends a forgotten
 session.
 
-The debugger here debugs what it starts itself, under `debuggingMode=user`.
-Request-based (terminal) debugging, other users' requests and attaching to a
-process we did not start wait on adt-clients (fr0ster/mcp-abap-adt-clients#217).
+In user mode the debugger catches the requests of the connected user or of
+another named by `request_user` (measured end to end on premise, 2026-10-11,
+BASIS 816; it needs the debug authorization on that user). ADT cannot attach to
+a request or a process that is already running: a request is enabled for
+catching when it starts.
+
+Terminal mode works for the runs this server starts, measured on premise
+(2026-10-12, BASIS 816):
+
+- a terminal-mode listener catches a request by the terminal id and IDE id it
+  carries in `SAP-PASSPORT`; a run URL has no parameter for them. A run started
+  with `debuggee: { terminalId, ideId }` (adt-clients 29.1.0) carries them and is
+  caught by the terminal-mode listener under those ids and by no other; without
+  them no terminal-mode listener catches it. Random ids work, so terminal mode
+  needs no configured terminal id: a stated one only replaces the random one;
+- two listeners of one SAP user in terminal mode under other ids both listen,
+  and each run is caught only by its own listener;
+- the breakpoint set is still the SAP user's: `setBreakpoints` under other ids
+  replaced the other's set, in terminal mode as in user mode;
+- a stopListener under other ids left the other terminal-mode listener running
+  (in user mode it ended it).
+
+So under terminal mode our own run carries the session's ids, and in user mode
+none. Any other request is caught in terminal mode only if it carries the same
+ids, so a terminal start without a run catches only such requests.
+
+A stop right after a run ended races the listener's next poll (measured on
+premise, 2026-10-12): the loop polls again at once when a run ends, and a
+stopListener the system processes before that poll registers leaves the poll
+holding its full hold (60 s), which the stop awaits. 17.2 deleted breakpoints by
+id first, which happened to delay the stopListener enough. So while the open
+poll has not answered, the stop sends stopListener once more; in the clean
+integration run the second one woke the poll and the stop took 0.4 s, but in an
+earlier run it took 60 s anyway, and in a terminal-mode run (2026-10-12) the
+second one, sent 0.44 s after the first, did not wake the poll either. A
+stopListener does wake our own registered poll in both modes (probe, same day:
+answered 0.1–0.3 s after the stop, user and terminal mode alike), so the poll
+was not registered yet. One retry narrows the race, it does not close
+it; that is accepted and documented, not handled further (stated by the user
+2026-10-12).
 
 This holds for this repository (stated by the user 2026-10-10); a handle in
 another project may mean something else, and the global MCP rules still apply

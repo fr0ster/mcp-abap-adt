@@ -163,6 +163,11 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     SAP_DEBUG_IDE_ID               each on its own. First found: the destination's .env; the
                                    environment. Else random per instance. A shared IDE id shares
                                    the user's catches without the system's listener conflict
+    SAP_DEBUG_BREAKPOINT_CONFLICT  replace (default) or refuse-if-held: whether a take-over of
+                                   the debugger, and every later change of its breakpoints, first
+                                   asks if another debugger listens for the same SAP user, and
+                                   refuses if so (a start without take-over always asks). First
+                                   found: the destination's .env; the environment
 
   Streamable HTTP and SSE are served by mcp-abap-adt-http (@mcp-abap-adt/http) and
   mcp-abap-adt-sse (@mcp-abap-adt/sse), with credentials from each request's x-sap-* headers.

@@ -23,6 +23,7 @@ export interface RecordedRequest {
   url: string;
   data?: unknown;
   params?: unknown;
+  headers?: Record<string, string>;
 }
 
 export interface RecordingConnection extends IAbapConnection {
@@ -76,6 +77,7 @@ export function recordingConnection(
         url: options.url,
         data: options.data,
         params: options.params,
+        ...(options.headers ? { headers: { ...options.headers } } : {}),
       });
       const answer = answers[index];
       index += 1;

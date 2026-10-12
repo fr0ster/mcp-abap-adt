@@ -125,6 +125,9 @@ export async function ensureSharedPackage(
         superPackage: sharedConfig.super_package,
         softwareComponent: sharedConfig.software_component || undefined,
         transportLayer: sharedConfig.transport_layer || undefined,
+        // A super package that records changes needs it of the package: the
+        // system refuses one without ("Change recording must be activated").
+        recordChanges: sharedConfig.record_changes === true || undefined,
         packageType: 'development',
         transportRequest,
       },

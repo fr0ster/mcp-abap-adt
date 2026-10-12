@@ -2,7 +2,7 @@ import type { McpResult } from '../answer';
 import { detailOf } from '../strategies/detail';
 import { return_error } from '../utils';
 import type { DebugState, DebugView, StopView } from './DebugSession';
-import { terseStop } from './readings';
+import { terseSettings, terseStop } from './readings';
 
 const asText = (value: unknown) => ({
   type: 'text' as const,
@@ -85,6 +85,8 @@ export async function debugStateAnswer(
         ...rest,
         ...terseStop(stop.debuggee, stop.stack, stop.attach),
         ...(stop.stackError ? { stack_error: stop.stackError } : {}),
+        ...(stop.settings ? { settings: terseSettings(stop.settings) } : {}),
+        ...(stop.settingsError ? { settings_error: stop.settingsError } : {}),
       };
     },
     (s) => s,

@@ -4,11 +4,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 371
+- Total tools: 372
 - Read-only tools: 68
 - High-level tools: 157
 - Low-level tools: 117
-- Debug tools: 29
+- Debug tools: 30
 
 ## Handler Sets
 
@@ -453,6 +453,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [DebugListBreakpoints](#debuglistbreakpoints-debug-debugger)
     - [DebugListWatchpoints](#debuglistwatchpoints-debug-debugger)
     - [DebugSetBreakpoints](#debugsetbreakpoints-debug-debugger)
+    - [DebugSetSettings](#debugsetsettings-debug-debugger)
     - [DebugSetStackPosition](#debugsetstackposition-debug-debugger)
     - [DebugSetVariable](#debugsetvariable-debug-debugger)
     - [DebugStartListener](#debugstartlistener-debug-debugger)
@@ -5475,7 +5476,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugdeletebreakpoint-debug-debugger"></a>
 #### DebugDeleteBreakpoint (Debug / Debugger)
-**Description:** [debug] Removes one breakpoint of a debug session.
+**Description:** [debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. Refused for an id the session does not hold.
 
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteBreakpoint.ts`
 
@@ -5563,14 +5564,31 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugsetbreakpoints-debug-debugger"></a>
 #### DebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Adds breakpoints to a debug session — line, exception class, ABAP statement or message, with an optional condition — and reports which the system refused and why. Catches every request of the connected SAP user, not only programs run by this server.
+**Description:** [debug] Adds breakpoints to a debug session — a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition — and answers the whole set placed, this call's refusals each with its breakpoint and reason, earlier breakpoints no longer placed, and any answer row it cannot pair with a breakpoint. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugSetBreakpoints.ts`
 
 **Parameters:**
-- `breakpoints` (array, required) - Breakpoints: a line, an exception class, an ABAP statement or a message; each with an optional condition.
+- `breakpoints` (array, required) - Breakpoints: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
 - `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugsetsettings-debug-debugger"></a>
+#### DebugSetSettings (Debug / Debugger)
+**Description:** [debug] Changes the debugger settings at the current stop and answers the settings in force; a field left out keeps its value. The debug session applies them again after each later attach.
+
+**Source:** `src/handlers/debugger/debug/handleDebugSetSettings.ts`
+
+**Parameters:**
+- `background_rfc` (boolean, optional) - Debugs background RFC calls.
+- `create_exception_object` (boolean, optional) - Creates the exception object even where a CATCH does not ask for it.
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `shared_object_debugging` (boolean, optional) - Debugs shared objects.
+- `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+- `system_debugging` (boolean, optional) - Steps into system programs and stops at breakpoints there.
+- `update_debugging` (boolean, optional) - Debugs update tasks.
 
 ---
 
@@ -5603,25 +5621,28 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugstartlistener-debug-debugger"></a>
 #### DebugStartListener (Debug / Debugger)
-**Description:** [debug] Opens a debug session of the connected SAP user: arms breakpoints, listens for a debuggee and attaches the first one caught; refused while another debugger listens for that user. Catches every request of the connected SAP user, not only programs run by this server.
+**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught; refused before anything is placed while another debugger listens for that user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStartListener.ts`
 
 **Parameters:**
-- `breakpoints` (array, optional) - Breakpoints: a line, an exception class, an ABAP statement or a message; each with an optional condition.
+- `breakpoints` (array, required) - Breakpoints, at least one: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
+- `debugging_mode` (string, optional) - user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
 - `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `request_user` (string, optional) - User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
 - `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
+- `settings` (object, optional) - Debugger settings, applied after each attach; a field left out keeps its value.
 
 ---
 
 <a id="debugstep-debug-debugger"></a>
 #### DebugStep (Debug / Debugger)
-**Description:** [debug] Moves the stopped debuggee into a call, over it, out of the current one, or on to the next stop.
+**Description:** [debug] Moves the stopped debuggee into a call, over it, out of the current one or on to the next stop; or leaves it running, the listener and the breakpoints kept, by detaching or by freeing the debugger.
 
 **Source:** `src/handlers/debugger/debug/handleDebugStep.ts`
 
 **Parameters:**
-- `action` (string, required) - into enters the call, over runs it, return leaves the current one, continue runs to the next stop.
+- `action` (string, required) - into enters the call, over runs it, return leaves the current one, continue runs to the next stop; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on. detach and release_debugger apply to ABAP only.
 - `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -5659,14 +5680,17 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="debugtakeoverlistener-debug-debugger"></a>
 #### DebugTakeOverListener (Debug / Debugger)
-**Description:** [debug] Opens a debug session of the connected SAP user: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Catches every request of the connected SAP user, not only programs run by this server.
+**Description:** [debug] Opens a debug session: arms breakpoints, listens for a debuggee and attaches the first one caught. Displaces another debugger listening for the same user. Needs at least one breakpoint. Takes whose requests are caught, the debugging mode and the debugger settings. In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server. Its breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole.
 
 **Source:** `src/handlers/debugger/debug/handleDebugTakeOverListener.ts`
 
 **Parameters:**
-- `breakpoints` (array, optional) - Breakpoints: a line, an exception class, an ABAP statement or a message; each with an optional condition.
+- `breakpoints` (array, required) - Breakpoints, at least one: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
+- `debugging_mode` (string, optional) - user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
 - `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `request_user` (string, optional) - User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
 - `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
+- `settings` (object, optional) - Debugger settings, applied after each attach; a field left out keeps its value.
 
 ---
 
@@ -5738,4 +5762,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-10-11*
+*Last updated: 2026-10-12*

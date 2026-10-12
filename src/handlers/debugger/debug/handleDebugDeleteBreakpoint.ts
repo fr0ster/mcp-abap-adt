@@ -9,7 +9,8 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DebugDeleteBreakpoint',
   available_in: ['onprem', 'cloud'] as const,
-  description: '[debug] Removes one breakpoint of a debug session.',
+  description:
+    '[debug] Removes one breakpoint of a debug session by its id; the rest of the set stays armed. Refused for an id the session does not hold.',
   inputSchema: {
     type: 'object',
     properties: {

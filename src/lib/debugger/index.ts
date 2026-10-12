@@ -2,6 +2,7 @@ export * from './AmdpSession';
 export * from './access';
 export * from './amdpReadings';
 export * from './answer';
+export * from './arming';
 export * from './DebuggerInstance';
 export * from './DebugSession';
 export * from './ids';

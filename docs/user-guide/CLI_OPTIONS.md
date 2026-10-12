@@ -216,6 +216,11 @@ See [Authentication & Destinations](AUTHENTICATION.md) for the supported authent
 destination's `.env`, then the process environment; else random per instance. See
 [Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one).
 
+`SAP_DEBUG_BREAKPOINT_CONFLICT` (`replace`, the default, or `refuse-if-held`): whether a take-over
+of the debugger, and every later change of its breakpoints, first asks if another debugger
+listens for the same SAP user, and refuses if so. Same order. See
+[Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key).
+
 ## `mcp-abap-adt-http` (Streamable HTTP)
 
 No destination, no login: each request's credentials come from its `x-sap-url`, `x-sap-client`,
@@ -238,8 +243,9 @@ only by mcp-abap-adt (stdio); send x-sap-* headers").
 
 Per request, the system context comes from the headers `x-sap-responsible`,
 `x-sap-master-system`, `x-sap-language`, and the debugger's `x-sap-debug-terminal-id` /
-`x-sap-debug-ide-id`; then `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_DEBUG_TERMINAL_ID`,
-`SAP_DEBUG_IDE_ID` of the environment. Held state is reached again with its `state_handle`, on
+`x-sap-debug-ide-id` / `x-sap-debug-breakpoint-conflict`; then `SAP_RESPONSIBLE`,
+`SAP_MASTER_SYSTEM`, `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID`,
+`SAP_DEBUG_BREAKPOINT_CONFLICT` of the environment. Held state is reached again with its `state_handle`, on
 the instance that holds it.
 
 **What `mcp-abap-adt-http` refuses** (each stops the start, naming the form you used):
@@ -299,7 +305,8 @@ answered `400`; a `GET` or `POST` with `x-mcp-destination` is answered `400`.
 | `--tls-key=<path>` | `MCP_TLS_KEY` | `sse.tls.key` | path | TLS private key (PEM); with `--tls-cert`, HTTPS |
 | `--tls-ca=<path>` | `MCP_TLS_CA` | `sse.tls.ca` | path | CA certificate (PEM), optional, beside cert and key |
 
-The opening `GET`'s `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` (and the other system
+The opening `GET`'s `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` /
+`x-sap-debug-breakpoint-conflict` (and the other system
 context headers) come first, then `SAP_DEBUG_*` of the environment. Held state lives in the
 connection's instance until the connection closes.
 
@@ -340,8 +347,9 @@ compact facade is its own binaries, `mcp-abap-adt-compact`, `-compact-http` and 
 whose `--exposition` takes `ro` / `rw` and `debug` beside either). A set the binary does not serve
 stops the start in its words. The search tools are always served, the system tools with `readonly`.
 
-`debug` is the debugger — opt-in, never part of the default, because a breakpoint or a
-listener catches every request of the connected SAP user. It goes beside any other set,
+`debug` is the debugger — opt-in, never part of the default, because in user mode a
+breakpoint or a listener catches every request of the request user (the connected SAP
+user unless another is named). It goes beside any other set,
 or alone. See [Debugger](DEBUGGER.md) and [Handlers Management](HANDLERS_MANAGEMENT.md).
 
 ```bash
@@ -393,12 +401,14 @@ These are typically set in the destination's `.env` file:
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
 - `SAP_MASTER_SYSTEM` - Master system of created objects (the system id), optional; no tool takes it as an argument. In the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<destination>.env`) or the process environment; the destination's `.env` wins over the environment. On a cloud system the system is asked when none is stated; otherwise the attribute is left out of the request and the system applies itself. Never refused
 - `SAP_RESPONSIBLE` - Responsible person of created objects, optional. Same order; when none is stated, the login (on-premise: `SAP_USERNAME` of the destination, then of the environment; on a cloud system only the system's user). A create that finds none (SNC) is refused naming `SAP_RESPONSIBLE`, nothing sent. A message class is created with the system's own default responsible (the one exception)
-- `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID` - The debugger's terminal id and IDE id, optional, each on its own. In the destination's own `.env` or the process environment, the `.env` first. Read when an instance's debugger is first used; when none is stated, each is random per instance. The system keys its listener conflict by the IDE id: a shared one means shared catches and no conflict — your choice, see [Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one). Not validated by the server
+- `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID` - The debugger's terminal id and IDE id, optional, each on its own. In the destination's own `.env` or the process environment, the `.env` first. Read when an instance's debugger is first used; when none is stated, each is random per instance. The system keys its listener conflict by the IDE id: a shared one means shared catches and no conflict — your choice, see [Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one). Terminal mode catches the requests that carry both ids, and the runs the server starts carry them; it needs neither stated. Not validated by the server
+- `SAP_DEBUG_BREAKPOINT_CONFLICT` - `replace` (default) or `refuse-if-held`: whether a take-over of the debugger, and every later change of its breakpoints, first asks if another debugger listens for the same SAP user, and refuses if so (a start without take-over always asks). Same order (on `mcp-abap-adt-http` / `mcp-abap-adt-sse`, the `x-sap-debug-breakpoint-conflict` header first). An unknown value is refused. See [Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key)
 
 On `mcp-abap-adt-http` and `mcp-abap-adt-sse` the system context comes from the request's headers
 (`x-sap-responsible`, `x-sap-master-system`, `x-sap-language`, `x-sap-debug-terminal-id`,
-`x-sap-debug-ide-id`), then `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_DEBUG_TERMINAL_ID`,
-`SAP_DEBUG_IDE_ID` of the environment; with `x-sap-login`, the login is the responsible when none
+`x-sap-debug-ide-id`, `x-sap-debug-breakpoint-conflict`), then `SAP_RESPONSIBLE`,
+`SAP_MASTER_SYSTEM`, `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID`, `SAP_DEBUG_BREAKPOINT_CONFLICT`
+of the environment; with `x-sap-login`, the login is the responsible when none
 is stated.
 
 **SNC (RFC only, no user, no password):**

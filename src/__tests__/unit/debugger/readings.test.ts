@@ -6,12 +6,15 @@ import {
   readBreakpoints,
   readDebuggee,
   readDebuggeeEnd,
+  readSettings,
   readStack,
   readVariables,
   TERSE_STACK_FRAMES,
+  terseSettings,
   terseStop,
   terseVariables,
 } from '../../../lib/debugger/readings';
+import { settingsXml } from './fakes';
 
 describe('readings of the debugger documents (recorded answers)', () => {
   it('the listener catch names the debuggee and its server', () => {
@@ -298,6 +301,31 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
     });
     it('no exception document: the line as it was', () => {
       expect(failureText({ message: 'socket hang up' })).toBe('socket hang up');
+    });
+  });
+});
+
+describe('readSettings', () => {
+  it('reads the five settings a caller may set; showDataAging is not read', () => {
+    expect(
+      readSettings(settingsXml({ systemDebugging: true, backgroundRFC: true })),
+    ).toEqual({
+      systemDebugging: true,
+      createExceptionObject: false,
+      backgroundRFC: true,
+      sharedObjectDebugging: false,
+      updateDebugging: false,
+    });
+  });
+  it('an empty answer reads as nothing known', () => {
+    expect(readSettings('')).toEqual({});
+  });
+  it('terse names them as the tools do', () => {
+    expect(
+      terseSettings({ systemDebugging: false, backgroundRFC: true }),
+    ).toEqual({
+      system_debugging: false,
+      background_rfc: true,
     });
   });
 });

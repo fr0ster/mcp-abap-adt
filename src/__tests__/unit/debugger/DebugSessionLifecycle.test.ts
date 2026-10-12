@@ -10,6 +10,7 @@ import {
   IDS,
   LISTEN_CATCH,
   LISTEN_NOTHING,
+  START,
   until,
 } from './fakes';
 
@@ -21,9 +22,14 @@ describe('DebugSession lifecycle', () => {
     run?: { kind: 'class' | 'program'; name: string },
     ids: any = IDS,
     world = fakeWorld(),
+    mode: { debuggingMode?: 'user' | 'terminal' } = {},
   ) {
     const session = new DebugSession(world.ports, ids).bind('origin');
-    const s = session.start('refuse', run ? { run } : {});
+    const s = session.start('refuse', {
+      ...START,
+      ...mode,
+      ...(run ? { run } : {}),
+    });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
@@ -32,7 +38,10 @@ describe('DebugSession lifecycle', () => {
   }
 
   it('a background run starts only after the first poll, and ends as ended with its output', async () => {
-    const { session, world } = await started({ kind: 'class', name: 'ZCL_X' });
+    const { session, world } = await started({
+      kind: 'class',
+      name: 'CLASS_X',
+    });
     world.run.resolve({ ok: true, output: 'total 6' });
     await until(() => session.holdsState() && world.closed.length === 1);
     expect(await session.wait(0)).toEqual({
@@ -42,7 +51,32 @@ describe('DebugSession lifecycle', () => {
     });
   });
 
-  it('stop releases the debuggee, deletes breakpoints, stops the listener, closes every connection once', async () => {
+  // Measured on premise (2026-10-12): a terminal-mode listener catches only a run
+  // that carries its terminal id and IDE id; a user-mode one keys on the request user.
+  it("a run under terminal mode carries the identity's ids", async () => {
+    const { session, world } = await started(
+      { kind: 'class', name: 'CLASS_A' },
+      IDS,
+      fakeWorld(),
+      { debuggingMode: 'terminal' },
+    );
+    const identity = session.currentIdentity()!;
+    expect(world.runs).toEqual([
+      {
+        target: { kind: 'class', name: 'CLASS_A' },
+        debuggee: { terminalId: identity.terminalId, ideId: identity.ideId },
+      },
+    ]);
+  });
+
+  it('a run under user mode carries no ids', async () => {
+    const { world } = await started({ kind: 'program', name: 'PROGRAM_A' });
+    expect(world.runs).toEqual([
+      { target: { kind: 'program', name: 'PROGRAM_A' }, debuggee: undefined },
+    ]);
+  });
+
+  it("stop releases the debuggee, stops the listener (which deletes the key's breakpoints), closes every connection once", async () => {
     const { session, world } = await started();
     await session.setBreakpoints([
       {
@@ -54,9 +88,10 @@ describe('DebugSession lifecycle', () => {
     await until(() => world.calls.includes('getStack'));
     await session.stop();
     expect(world.calls).toContain('step:stepContinue:analysed');
-    expect(
-      world.calls.some((c) => c.startsWith('deleteBreakpoint:KIND=0.')),
-    ).toBe(true);
+    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(
+      false,
+    );
+    expect(session.listBreakpoints()).toEqual([]);
     expect(world.calls).toContain('stopListener');
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
     expect(world.closed.length).toBe(world.opened.length);
@@ -157,7 +192,7 @@ describe('DebugSession lifecycle', () => {
     expect(world.closed).not.toContain(attaching); // only the attaching session can release it
     expect(session.holdsState()).toBe(true);
     delete world.override.stopListener;
-    await expect(session.stop()).resolves.toBeUndefined();
+    await expect(session.stop()).resolves.toEqual([]);
     expect(releases()).toBe(2); // retried on the session that attached it
     expect(world.closed).toContain(attaching);
     expect(world.calls.filter((c) => c.startsWith('attach:'))).toHaveLength(1);
@@ -179,13 +214,16 @@ describe('DebugSession lifecycle', () => {
     );
     expect(session.holdsState()).toBe(true);
     delete world.override.step;
-    await expect(session.stop()).resolves.toBeUndefined();
+    await expect(session.stop()).resolves.toEqual([]);
     expect(session.holdsState()).toBe(false);
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
   });
 
   it('a run finishing after stop reports nothing and its connection closes once', async () => {
-    const { session, world } = await started({ kind: 'class', name: 'ZCL_X' });
+    const { session, world } = await started({
+      kind: 'class',
+      name: 'CLASS_X',
+    });
     await session.stop();
     world.run.resolve({ ok: true, output: 'late' });
     await jest.advanceTimersByTimeAsync(0);
@@ -202,13 +240,16 @@ describe('DebugSession lifecycle', () => {
         uri: '/sap/bc/adt/oo/classes/zcl_cv_dbg_measure/source/main#start=32',
       },
     ]);
+    world.override.stopListener = async () => refusedResponse('listener busy');
     world.override.deleteBreakpoint = async () =>
       refusedResponse('not authorised');
     await expect(session.stop()).rejects.toThrow(DebugCleanupError);
-    expect(session.listBreakpoints()).toHaveLength(1);
+    // The start's breakpoint and the one set after it.
+    expect(session.listBreakpoints()).toHaveLength(2);
     expect(session.holdsState()).toBe(true);
+    delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
-    await expect(session.stop()).resolves.toBeUndefined(); // the retry undoes what was left
+    await expect(session.stop()).resolves.toEqual([]); // the retry undoes what was left
     expect(session.holdsState()).toBe(false);
   });
 
@@ -234,6 +275,83 @@ describe('DebugSession lifecycle', () => {
     );
   });
 
+  it.each([
+    ['user mode, the IDE id alone stated', {}, { stated: true }, true],
+    [
+      'terminal mode, the IDE id alone stated',
+      { debuggingMode: 'terminal' as const },
+      { stated: true },
+      false,
+    ],
+    [
+      'terminal mode, the terminal id stated',
+      { debuggingMode: 'terminal' as const },
+      { stated: true, terminalStated: true },
+      true,
+    ],
+    [
+      'terminal mode, nothing stated',
+      { debuggingMode: 'terminal' as const },
+      {},
+      false,
+    ],
+  ])(
+    'the first start reconciles a predecessor only under ids that can have one: %s',
+    async (_, mode, stated, reconciles) => {
+      const world = fakeWorld();
+      await started(undefined, { ...IDS, ...stated }, world, mode);
+      expect(world.calls.includes('stopListener')).toBe(reconciles);
+    },
+  );
+
+  // Measured on premise (2026-10-12): a poll sent just before the stop can reach
+  // the system after the stopListener and then holds its full hold.
+  it('a stop whose first stopListener left the open poll unanswered stops the listener once more, before awaiting the poll', async () => {
+    const { session, world } = await started();
+    const open = world.polls[1];
+    let answered = false;
+    let stops = 0;
+    const unansweredAtSecond: boolean[] = [];
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      stops++;
+      if (stops === 2) {
+        unansweredAtSecond.push(!answered);
+        answered = true;
+        open.resolve(LISTEN_NOTHING());
+      }
+      return okResponse(undefined);
+    };
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(world.calls.filter((c) => c === 'stopListener')).toHaveLength(2);
+    expect(unansweredAtSecond).toEqual([true]);
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
+  it('a stop whose stopListener answered the open poll stops the listener once', async () => {
+    const { session, world } = await started();
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(world.calls.filter((c) => c === 'stopListener')).toHaveLength(1);
+    expect(session.holdsState()).toBe(false);
+  });
+
+  it('a second stopListener that fails is no failure of the stop: the first one succeeded', async () => {
+    const { session, world } = await started();
+    const open = world.polls[1];
+    let stops = 0;
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      stops++;
+      if (stops === 1) return okResponse(undefined);
+      open.resolve(LISTEN_NOTHING()); // the system answers the poll at last
+      return refusedResponse('listener already stopped');
+    };
+    await expect(session.stop()).resolves.toEqual([]);
+    expect(stops).toBe(2);
+    expect(session.holdsState()).toBe(false);
+  });
+
   describe('a close that throws during stop', () => {
     function closeFailsOnce(world: ReturnType<typeof fakeWorld>) {
       const realClose = world.ports.closeConnection;
@@ -256,7 +374,7 @@ describe('DebugSession lifecycle', () => {
       await expect(failed).rejects.toThrow(/close refused/);
       expect(session.holdsState()).toBe(true);
       expect(session.failures().join()).toMatch(/close refused/);
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
     });
@@ -269,7 +387,7 @@ describe('DebugSession lifecycle', () => {
       closeFailsOnce(world);
       await expect(session.stop()).rejects.toThrow(DebugCleanupError);
       expect(session.holdsState()).toBe(true);
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(
         world.calls.filter((c) => c === 'step:stepContinue:analysed'),
       ).toHaveLength(1);
@@ -280,11 +398,12 @@ describe('DebugSession lifecycle', () => {
     it("the run's connection is fenced, kept and named; a late run reports nothing", async () => {
       const world = fakeWorld();
       const { session } = await started(
-        { kind: 'class', name: 'ZCL_X' },
+        { kind: 'class', name: 'CLASS_X' },
         IDS,
         world,
       );
-      const runConnection = world.opened[1];
+      // The start's arming opened the control connection, then the listener's.
+      const runConnection = world.opened[2];
       const realClose = world.ports.closeConnection;
       let once = true;
       world.ports.closeConnection = async (c) => {
@@ -299,7 +418,7 @@ describe('DebugSession lifecycle', () => {
       world.run.resolve({ ok: true, output: 'late' });
       await jest.advanceTimersByTimeAsync(0);
       expect((await session.wait(0)).state).toBe('idle');
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
     });
@@ -330,7 +449,7 @@ describe('DebugSession lifecycle', () => {
       try {
         const world = fakeWorld();
         const { session } = await started(
-          { kind: 'class', name: 'ZCL_X' },
+          { kind: 'class', name: 'CLASS_X' },
           IDS,
           world,
         );
@@ -348,7 +467,7 @@ describe('DebugSession lifecycle', () => {
         );
         expect(session.holdsState()).toBe(true);
         gate.refuse = false;
-        await expect(session.stop()).resolves.toBeUndefined();
+        await expect(session.stop()).resolves.toEqual([]);
         expect(session.holdsState()).toBe(false);
         expect(new Set(world.closed)).toEqual(new Set(world.opened));
       } finally {
@@ -368,7 +487,7 @@ describe('DebugSession lifecycle', () => {
       );
       expect(session.holdsState()).toBe(true);
       gate.refuse = false;
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
     });
@@ -388,7 +507,7 @@ describe('DebugSession lifecycle', () => {
         /the debuggee's connection was not closed: close refused/,
       );
       gate.refuse = false;
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
     });
@@ -412,7 +531,7 @@ describe('DebugSession lifecycle', () => {
       const attaching = world.opened[world.opened.length - 1];
       expect(world.closed).not.toContain(attaching); // kept: only it can release the debuggee
       delete world.override.step;
-      await expect(session.stop()).resolves.toBeUndefined();
+      await expect(session.stop()).resolves.toEqual([]);
       expect(world.calls).toContain('step:stepContinue:analysed'); // the retried release
       expect(world.closed).toContain(attaching);
       expect(session.holdsState()).toBe(false);
@@ -434,9 +553,11 @@ describe('DebugSession lifecycle', () => {
       ...IDS,
       stated: true,
     }).bind('origin');
-    await expect(session.start('refuse')).rejects.toThrow(/no route to host/);
+    await expect(session.start('refuse', START)).rejects.toThrow(
+      /no route to host/,
+    );
     expect(world.calls).not.toContain('stopListener');
-    const s = session.start('refuse');
+    const s = session.start('refuse', START);
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
@@ -514,7 +635,8 @@ describe('DebugSession lifecycle', () => {
     async function failedStart(world = fakeWorld()) {
       const session = new RunRefused(world.ports, IDS).bind('origin');
       const s = session.start('refuse', {
-        run: { kind: 'class', name: 'ZCL_X' },
+        ...START,
+        run: { kind: 'class', name: 'CLASS_X' },
       });
       await until(() => world.polls.length === 1);
       world.polls[0].resolve(LISTEN_CATCH());

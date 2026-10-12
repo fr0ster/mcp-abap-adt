@@ -84,10 +84,26 @@ describe('compact debug', () => {
       (e) => e.toolDefinition.name === 'HandlerDebugStart',
     )!;
     expect(start.toolDefinition.description).toMatch(
-      /every request of the connected SAP user/,
+      /every request of the request user/,
     );
     expect(start.toolDefinition.description).toMatch(
       /Displaces another debugger/,
+    );
+    expect(start.toolDefinition.description).toMatch(
+      /replaces that set as a whole/,
+    );
+    // The shared set is the ABAP listener's key; the AMDP session has none.
+    expect(start.toolDefinition.description).toMatch(
+      /abap: the breakpoints are one set/,
+    );
+    expect(start.toolDefinition.description).not.toMatch(/Its breakpoints/);
+    expect(start.toolDefinition.description).toMatch(
+      /abap is refused before anything is placed while another debugger listens/,
+    );
+    const takeOver = (start.toolDefinition.inputSchema as any).properties
+      .take_over.description as string;
+    expect(takeOver).toMatch(
+      /^abap: takes over .* are replaced\. amdp: ends an AMDP session/,
     );
     expect(start.toolDefinition.description).not.toMatch(/[.;,][.;,]/);
   });
@@ -116,7 +132,7 @@ describe('compact debug', () => {
 });
 
 const json = (r: any) => JSON.parse(r.content[0].text);
-const URI = '/sap/bc/adt/oo/classes/zcl_a/source/main#start=7';
+const URI = '/sap/bc/adt/oo/classes/class_a/source/main#start=7';
 const frame = {
   uri: URI,
   event: 'METHOD M',
@@ -151,6 +167,15 @@ function fakeAbap(held: { on: boolean }) {
     },
     observe() {},
     ids: { terminalId: 'T', ideId: 'I' },
+    currentIdentity: () => undefined,
+    detach: async () => {
+      calls.push(['detach']);
+      return { state: 'listening' };
+    },
+    releaseDebugger: async () => {
+      calls.push(['releaseDebugger']);
+      return { state: 'listening' };
+    },
     start: async (mode: unknown, o: unknown) => {
       calls.push(['start', mode, o]);
       held.on = true;
@@ -224,7 +249,7 @@ function fakeAmdp(held: { on: boolean }) {
       held.on = true;
       return {
         mainId: 'M1',
-        breakpoints: [{ class_name: 'ZCL_A', line: 14, state: 'PENDING' }],
+        breakpoints: [{ class_name: 'CLASS_A', line: 14, state: 'PENDING' }],
       };
     },
     wait: async (s: unknown): ReturnType<AmdpSession['wait']> => {
@@ -292,19 +317,137 @@ function install() {
 }
 
 describe('compact debug verbs on the fake sessions', () => {
+  it('start abap passes request_user, debugging_mode and settings to the session', async () => {
+    const t = install();
+    await t.call('HandlerDebugStart', {
+      kind: 'abap',
+      breakpoints: [{ exception_class: 'cx_a' }],
+      request_user: 'sapuser02',
+      debugging_mode: 'user',
+      settings: { system_debugging: true },
+    });
+    expect(t.abap[0]).toEqual([
+      'start',
+      'refuse',
+      {
+        breakpoints: [{ kind: 'exception', exceptionClass: 'CX_A' }],
+        run: undefined,
+        requestUser: 'sapuser02',
+        debuggingMode: 'user',
+        settings: { systemDebugging: true },
+      },
+    ]);
+  });
+
+  it.each([
+    ['a blank request_user', { request_user: '  ' }, 'request_user is empty'],
+    [
+      'request_user with terminal mode',
+      { request_user: 'sapuser02', debugging_mode: 'terminal' as const },
+      'request_user does not apply to terminal mode',
+    ],
+  ])(
+    'start abap with %s is refused before the wire',
+    async (_, extra, text) => {
+      const t = install();
+      const r = await t.call('HandlerDebugStart', {
+        kind: 'abap',
+        breakpoints: [{ exception_class: 'cx_a' }],
+        ...extra,
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain(text);
+      expect(t.abap).toEqual([]);
+    },
+  );
+
+  it('start abap answers the identity in force: debugging_mode and request_user', async () => {
+    const t = install();
+    const abap = (t.state as any).parts[0].abap;
+    abap.currentIdentity = () => ({
+      debuggingMode: 'user',
+      requestUser: 'SAPUSER02',
+      terminalId: 'T',
+    });
+    const r = await t.call('HandlerDebugStart', {
+      kind: 'abap',
+      breakpoints: [{ exception_class: 'cx_a' }],
+      request_user: 'sapuser02',
+    });
+    expect(json(r)).toEqual({
+      state: 'listening',
+      state_handle: t.state.handle,
+      terminal_id: 'T',
+      ide_id: 'I',
+      debugging_mode: 'user',
+      request_user: 'SAPUSER02',
+    });
+  });
+
+  it.each([
+    ['request_user', { request_user: 'sapuser02' }],
+    ['debugging_mode', { debugging_mode: 'terminal' as const }],
+    ['settings', { settings: { system_debugging: true } }],
+  ])('start amdp with %s is refused before the wire', async (_, extra) => {
+    const t = install();
+    const r = await t.call('HandlerDebugStart', {
+      kind: 'amdp',
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
+      ...extra,
+    });
+    expect(r.isError).toBe(true);
+    expect(r.content[0].text).toContain(
+      'request_user, debugging_mode and settings apply to kind abap only',
+    );
+    expect(t.amdp).toEqual([]);
+  });
+
+  it('step on ABAP: detach and release_debugger reach the session', async () => {
+    const t = install();
+    await t.call('HandlerDebugStart', {
+      kind: 'abap',
+      breakpoints: [{ exception_class: 'cx_a' }],
+    });
+    const h = { state_handle: t.state.handle };
+    await t.call('HandlerDebugStep', { ...h, action: 'detach' });
+    await t.call('HandlerDebugStep', { ...h, action: 'release_debugger' });
+    expect(t.abap.map((c) => c[0])).toEqual([
+      'start',
+      'detach',
+      'releaseDebugger',
+    ]);
+  });
+
+  it('step on AMDP: detach and release_debugger are refused', async () => {
+    const t = install();
+    await t.call('HandlerDebugStart', {
+      kind: 'amdp',
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
+    });
+    const h = { state_handle: t.state.handle };
+    for (const action of ['detach', 'release_debugger'] as const) {
+      const r = await t.call('HandlerDebugStep', { ...h, action });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain(
+        `action: ${action} does not apply to an amdp debug session`,
+      );
+    }
+    expect(t.amdp.map((c) => c[0])).toEqual(['start']);
+  });
+
   it('start abap: refuse by default, takeOver on take_over; the answer carries handle and ids', async () => {
     const t = install();
     const r = await t.call('HandlerDebugStart', {
       kind: 'abap',
-      breakpoints: [{ object_type: 'CLAS', object_name: 'zcl_a', line: 7 }],
-      run: { kind: 'class', name: 'zcl_a' },
+      breakpoints: [{ object_type: 'CLAS', object_name: 'class_a', line: 7 }],
+      run: { kind: 'class', name: 'class_a' },
     });
     expect(t.abap[0]).toEqual([
       'start',
       'refuse',
       {
         breakpoints: [{ kind: 'line', uri: URI }],
-        run: { kind: 'class', name: 'ZCL_A' },
+        run: { kind: 'class', name: 'CLASS_A' },
       },
     ]);
     expect(json(r)).toEqual({
@@ -327,19 +470,19 @@ describe('compact debug verbs on the fake sessions', () => {
     const r = await t.call('HandlerDebugStart', {
       kind: 'amdp',
       take_over: true,
-      breakpoints: [{ object_name: 'zcl_a', line: 14 }],
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
     });
     expect(t.amdp[0]).toEqual([
       'start',
       {
         stopExisting: true,
-        breakpoints: [{ class_name: 'zcl_a', line: 14 }],
+        breakpoints: [{ class_name: 'class_a', line: 14 }],
         run: undefined,
       },
     ]);
     expect(json(r)).toEqual({
       mainId: 'M1',
-      breakpoints: [{ class_name: 'ZCL_A', line: 14, state: 'PENDING' }],
+      breakpoints: [{ class_name: 'CLASS_A', line: 14, state: 'PENDING' }],
       state_handle: t.state.handle,
     });
   });
@@ -367,7 +510,7 @@ describe('compact debug verbs on the fake sessions', () => {
     };
     const r2 = await t2.call('HandlerDebugStart', {
       kind: 'amdp',
-      breakpoints: [{ object_name: 'zcl_a', line: 14 }],
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
     });
     expect(r2.isError).toBe(true);
     expect(r2.content.map((c: any) => c.text).join('\n')).toContain(
@@ -379,7 +522,7 @@ describe('compact debug verbs on the fake sessions', () => {
     const t = install();
     await t.call('HandlerDebugStart', {
       kind: 'amdp',
-      breakpoints: [{ object_name: 'zcl_a', line: 14 }],
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
     });
     const r = await t.call('HandlerDebugStart', {
       kind: 'abap',
@@ -394,7 +537,7 @@ describe('compact debug verbs on the fake sessions', () => {
     });
     const r2 = await t2.call('HandlerDebugStart', {
       kind: 'amdp',
-      breakpoints: [{ object_name: 'zcl_a', line: 14 }],
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
     });
     expect(r2.isError).toBe(true);
     expect(t2.amdp).toEqual([]);
@@ -413,7 +556,7 @@ describe('compact debug verbs on the fake sessions', () => {
     expect(a.state).toBe('stopped');
     expect(a.at.address).toEqual({
       object_type: 'CLAS',
-      object_name: 'ZCL_A',
+      object_name: 'CLASS_A',
       line: 7,
     });
     expect(a.at.include_line).toBe(9);
@@ -531,13 +674,13 @@ describe('compact debug verbs on the fake sessions', () => {
       state_handle: h,
       action: 'run_to_line',
       object_type: 'CLAS',
-      object_name: 'zcl_b',
+      object_name: 'class_b',
       line: 20,
     });
     expect(t.abap[0]).toEqual([
       'stepToLine',
       'stepRunToLine',
-      '/sap/bc/adt/oo/classes/zcl_b/source/main#start=20',
+      '/sap/bc/adt/oo/classes/class_b/source/main#start=20',
     ]);
     // No object given: the object of the top frame.
     await t.call('HandlerDebugStep', {
@@ -550,7 +693,7 @@ describe('compact debug verbs on the fake sessions', () => {
       [
         'stepToLine',
         'stepJumpToLine',
-        '/sap/bc/adt/oo/classes/zcl_a/source/main#start=12',
+        '/sap/bc/adt/oo/classes/class_a/source/main#start=12',
       ],
     ]);
     const ended = json(

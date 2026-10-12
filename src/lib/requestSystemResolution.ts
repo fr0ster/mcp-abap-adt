@@ -151,6 +151,7 @@ export function withDestinationSystemContext<T>(
         masterSystem?: string;
         debugTerminalId?: string;
         debugIdeId?: string;
+        debugBreakpointConflict?: string;
       }
     | undefined,
   fn: () => T,
@@ -162,6 +163,7 @@ export function withDestinationSystemContext<T>(
     masterSystem?: string;
     debugTerminalId?: string;
     debugIdeId?: string;
+    debugBreakpointConflict?: string;
   } = {};
   if (stated?.responsible && !(scope && 'responsible' in scope)) {
     added.responsible = stated.responsible;
@@ -174,6 +176,12 @@ export function withDestinationSystemContext<T>(
   }
   if (stated?.debugIdeId && !(scope && 'debugIdeId' in scope)) {
     added.debugIdeId = stated.debugIdeId;
+  }
+  if (
+    stated?.debugBreakpointConflict &&
+    !(scope && 'debugBreakpointConflict' in scope)
+  ) {
+    added.debugBreakpointConflict = stated.debugBreakpointConflict;
   }
   if (stated?.login) added.login = stated.login;
   if (Object.keys(added).length === 0) return fn();

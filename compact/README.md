@@ -49,12 +49,14 @@ list at all, so a client cannot call one). The object-oriented sets
 
 **The debugger is opt-in.** `debug` beside `ro` or `rw` (`--exposition=ro,debug`)
 adds four verbs: `HandlerDebugStart` (`kind: abap|amdp`, the breakpoints, `take_over`,
-an optional background `run`; answers a `state_handle`), `HandlerDebugWait`,
-`HandlerDebugView` (stack, variables, memory, an AMDP table) and `HandlerDebugStep`
-(the steps, `terminate`, and `stop`, which ends the session). `debug` alone is
+an optional background `run`, and for `abap` `request_user`, `debugging_mode` and
+`settings`; answers a `state_handle`), `HandlerDebugWait`, `HandlerDebugView` (stack,
+variables, memory, an AMDP table) and `HandlerDebugStep` (the steps, `detach` and
+`release_debugger`, `terminate`, and `stop`, which ends the session). `debug` alone is
 refused: it names no half of the facade, and taking `rw` for it would open the write
-tools unasked. A breakpoint catches every request of the connected SAP user, which
-is why the verbs are never served by default. What a debug session is, what keeps it
+tools unasked. In user mode a breakpoint catches every request of the request
+user (the connected SAP user unless another is named), which is why the verbs are never
+served by default. What a debug session is, what keeps it
 alive on each transport and what ends it: [Debugger](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 
 Configuration — the destination, authentication, the login — is the same as

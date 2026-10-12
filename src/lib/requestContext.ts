@@ -49,6 +49,13 @@ export interface RequestContext {
    * `debugTerminalId`.
    */
   debugIdeId?: string;
+  /**
+   * The debugger's breakpoint conflict (`replace` or `refuse-if-held`), as
+   * stated: `x-sap-debug-breakpoint-conflict`, or
+   * `SAP_DEBUG_BREAKPOINT_CONFLICT` of the request's destination. Same
+   * presence rule as `debugTerminalId`.
+   */
+  debugBreakpointConflict?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -78,8 +85,9 @@ function headerValue(
  * `responsible` / `masterSystem` — each of these present only when its header
  * carries a value, so a request that states none leaves the destination's
  * `.env`, the process configuration, the login and the cloud lookup to fill
- * it. `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` enter the same way as
- * `debugTerminalId` / `debugIdeId`. `x-sap-login` is not read here: it is a login only on an `x-sap-*`
+ * it. `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` /
+ * `x-sap-debug-breakpoint-conflict` enter the same way as `debugTerminalId` /
+ * `debugIdeId` / `debugBreakpointConflict`. `x-sap-login` is not read here: it is a login only on an `x-sap-*`
  * basic connection, which the server enters itself.
  */
 export function requestContextFromHeaders(
@@ -89,12 +97,17 @@ export function requestContextFromHeaders(
   const masterSystem = headerValue(headers, 'x-sap-master-system');
   const debugTerminalId = headerValue(headers, 'x-sap-debug-terminal-id');
   const debugIdeId = headerValue(headers, 'x-sap-debug-ide-id');
+  const debugBreakpointConflict = headerValue(
+    headers,
+    'x-sap-debug-breakpoint-conflict',
+  );
   return {
     masterLanguage: headerValue(headers, 'x-sap-language'),
     ...(responsible ? { responsible } : {}),
     ...(masterSystem ? { masterSystem } : {}),
     ...(debugTerminalId ? { debugTerminalId } : {}),
     ...(debugIdeId ? { debugIdeId } : {}),
+    ...(debugBreakpointConflict ? { debugBreakpointConflict } : {}),
   };
 }
 

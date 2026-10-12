@@ -19,4 +19,6 @@ export interface DestinationSystemContext {
   debugTerminalId?: string;
   /** `SAP_DEBUG_IDE_ID`. */
   debugIdeId?: string;
+  /** `SAP_DEBUG_BREAKPOINT_CONFLICT`. */
+  debugBreakpointConflict?: string;
 }

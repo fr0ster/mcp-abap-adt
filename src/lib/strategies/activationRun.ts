@@ -222,7 +222,9 @@ export async function awaitActivationRun(
     }
     status = runStatusOf(answered.getResult().value);
     if (SETTLED.has(status)) break;
-    if (attempt < attempts) {
+    // `delayMs: 0` asks for no pause and no timer: each request is a long
+    // poll the server holds until the run moves, so the next one simply follows.
+    if (attempt < attempts && delayMs > 0) {
       await new Promise((resolve) => setTimeout(resolve, delayMs));
     }
   }

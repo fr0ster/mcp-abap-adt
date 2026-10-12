@@ -34,6 +34,7 @@
  * and where no RAG runs; without it the next `$TMP` returns and nothing notices
  * until a consumer's retrieval degrades.
  */
+import { compactDebugEntries } from '../../lib/compact/debug/group';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 
 /**
@@ -128,16 +129,20 @@ const parametersOf = (definition: {
 const TAKES_NO_PARAMETERS = ['RuntimeListProfilerTraceFiles'];
 
 describe('descriptions carry no incidental literals', () => {
-  const tools = new HandlerExporter({
-    includeReadOnly: true,
-    includeHighLevel: true,
-    includeLowLevel: true,
-    includeSystem: true,
-    includeSearch: true,
-    includeDebug: true,
-  })
-    .getHandlerEntries()
-    .map((e) => e.toolDefinition);
+  const tools = [
+    ...new HandlerExporter({
+      includeReadOnly: true,
+      includeHighLevel: true,
+      includeLowLevel: true,
+      includeSystem: true,
+      includeSearch: true,
+      includeDebug: true,
+    })
+      .getHandlerEntries()
+      .map((e) => e.toolDefinition),
+    // The compact debug verbs (their own package): their text joins the same rule.
+    ...compactDebugEntries().map((e) => e.toolDefinition),
+  ];
 
   it('the classes catch new literals and leave generic text alone', () => {
     for (const literal of [

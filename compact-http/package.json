@@ -58,10 +58,10 @@
     "start": "node ./bin/mcp-abap-adt-compact-http.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/compact-modify": "^17.2.2",
-    "@mcp-abap-adt/compact-readonly": "^17.2.2",
+    "@mcp-abap-adt/compact-modify": "^18.0.0",
+    "@mcp-abap-adt/compact-readonly": "^18.0.0",
     "@mcp-abap-adt/http": "^17.1.0",
-    "@mcp-abap-adt/lib": "^17.2.2"
+    "@mcp-abap-adt/lib": "^18.0.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

@@ -2155,6 +2155,12 @@
   },
   {
     "group": "debug",
+    "name": "DebugSetSettings",
+    "inputs": "state_handle*, system_debugging, update_debugging, create_exception_object, background_rfc, shared_object_debugging, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "debug",
     "name": "DebugCreateWatchpoint",
     "inputs": "state_handle*, name*, condition, detail",
     "available_in": "cloud, onprem"

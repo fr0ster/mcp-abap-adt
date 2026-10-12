@@ -3,7 +3,10 @@
  * recorded endpoint answers: the fakes in fakes.ts return exactly this.
  */
 import { AbapDebugger } from '@mcp-abap-adt/adt-clients';
-import { analyseDebuggeeEnd } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseDebuggeeEnd,
+  analyseDebuggerFreed,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -41,10 +44,11 @@ function replaying(name: string, body?: string): IAbapConnection {
 }
 
 const IDENTITY = {
+  debuggingMode: 'user',
   requestUser: 'SAPUSER01',
   terminalId: 'T'.repeat(32),
   ideId: 'I'.repeat(32),
-};
+} as const;
 const bodyOf = (a: any) =>
   a.ok ? a.getResult().value : `FAILED: ${a.getError().message}`;
 
@@ -59,7 +63,7 @@ const DOCUMENT_MEMBERS: Array<
   [
     'attach',
     'debugger-run-to-line--03-attach',
-    (d) => d.attach('SAPUSER01', 'X', {}),
+    (d) => d.attach(IDENTITY, 'X', {}),
   ],
   ['getStack', 'debugger-run-to-line--04-stack', (d) => d.getStack()],
   [
@@ -119,5 +123,77 @@ describe('what AbapDebugger members answer through their default strategies', ()
     ).step('stepContinue', { analyse: analyseDebuggeeEnd });
     expect(answer.ok).toBe(true);
     expect(readDebuggeeEnd(bodyOf(answer) as string)).toBe('debuggeeEnded');
+  });
+});
+
+/** One wire answer; a status of 400 or more is thrown the way the transport throws it. */
+function answering(
+  status: number,
+  headers: Record<string, string>,
+  data: unknown,
+): IAbapConnection {
+  const wire = { status, statusText: '', headers, data } as IAdtWireResponse;
+  return {
+    async connect() {},
+    async getBaseUrl() {
+      return 'https://example.com';
+    },
+    getSessionId() {
+      return null;
+    },
+    setSessionType() {},
+    async makeAdtRequest() {
+      if (status >= 400)
+        throw Object.assign(
+          new Error(`Request failed with status code ${status}`),
+          { response: wire },
+        );
+      return wire;
+    },
+  } as unknown as IAbapConnection;
+}
+
+describe('terminateDebugger under analyseDebuggerFreed (errata: the debugger freeing its session is answered as an ICF 500)', () => {
+  const free = (
+    status: number,
+    headers: Record<string, string>,
+    data: unknown,
+  ) =>
+    new AbapDebugger(answering(status, headers, data)).terminateDebugger({
+      analyse: analyseDebuggerFreed,
+    });
+
+  it.each([
+    [
+      'a plain 500 served as text/plain',
+      { 'content-type': 'text/plain' },
+      'Internal Server Error',
+    ],
+    ['a plain 500 with an empty body', {}, ''],
+  ])('%s is no failure', async (_, headers, data) => {
+    expect((await free(500, headers, data)).ok).toBe(true);
+  });
+
+  it.each([
+    [
+      'a 500 carrying an ADT exception document',
+      500,
+      { 'content-type': 'application/xml' },
+      corpusBody('debugger-terminate--01-terminate-debuggee'),
+    ],
+    [
+      'a 500 served as HTML',
+      500,
+      { 'content-type': 'text/html' },
+      '<html><body>Internal Server Error</body></html>',
+    ],
+    [
+      'a 400',
+      400,
+      { 'content-type': 'text/plain' },
+      'Session no longer exists',
+    ],
+  ])('%s stays a failure', async (_, status, headers, data) => {
+    expect((await free(status, headers, data)).ok).toBe(false);
   });
 });

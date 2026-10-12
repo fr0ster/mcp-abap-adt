@@ -176,6 +176,22 @@ export const LOGIN_TIMEOUT_ROW: Parameter = {
   help: `Ends a browser login that has not finished after this many seconds (1-${MAX_LOGIN_TIMEOUT_SECONDS}). Default: none — a login ends when it finishes, the user refuses it, or its request ends`,
 };
 
+/**
+ * The login bound as the user set it, for D10's sentence: the form it came
+ * from (`parameterSource`) with its value — `` `--login-timeout=300` ``,
+ * `` `MCP_LOGIN_TIMEOUT=300` ``, or `` `login-timeout: 300` in the
+ * configuration file ``.
+ */
+export function statedLoginTimeout(seconds: number, source?: string): string {
+  if (source === LOGIN_TIMEOUT_ROW.env) {
+    return `\`${LOGIN_TIMEOUT_ROW.env}=${seconds}\``;
+  }
+  if (source !== undefined && !source.startsWith('--')) {
+    return `\`${LOGIN_TIMEOUT_ROW.yaml}: ${seconds}\` in the configuration file`;
+  }
+  return `\`${LOGIN_TIMEOUT_ROW.cli}=${seconds}\``;
+}
+
 /** `--allow-destination-header`: there is no header to allow any more. */
 const ALLOW_DESTINATION_HEADER_REMOVED = {
   cli: ['--allow-destination-header'],
@@ -262,6 +278,11 @@ export interface CoreConfig extends IServerConfig {
   browserAuthPort?: number;
   /** `--login-timeout` in seconds (D10): the bound on each login; absent: none. */
   loginTimeout?: number;
+  /**
+   * The form `loginTimeout` came from: `--login-timeout`,
+   * `MCP_LOGIN_TIMEOUT`, or `login-timeout (config file)`.
+   */
+  loginTimeoutSource?: string;
   /** SAP connection type: http (default) or rfc */
   connectionType?: 'http' | 'rfc';
   /**
@@ -332,6 +353,8 @@ export function readCoreConfig(
     renewal: values.renewal as CoreConfig['renewal'],
     browserAuthPort: values.browserAuthPort as number | undefined,
     loginTimeout: values.loginTimeout as number | undefined,
+    loginTimeoutSource:
+      values.loginTimeout === undefined ? undefined : source('loginTimeout'),
     connectionType: values.connectionType as CoreConfig['connectionType'],
     connectionTypeSource: source('connectionType'),
   };

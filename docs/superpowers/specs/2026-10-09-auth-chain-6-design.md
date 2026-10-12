@@ -867,7 +867,14 @@ port is free when a cancelled login ends, and the next request can log in.
 .signal, AbortSignal.timeout(ms)])` — the login, not the request; when it fired the answer adds
 "The login was ended by the server's login timeout (`--login-timeout=<n>`)". A whole number from 1
 to 86 400, parsed by plain code. The HTTP package and the embedded server have no login, so no
-bound.
+bound. *Implemented (A8)* as a timer of the login's own, started with each `authorize` and cleared
+when the login settles, its controller combined with the request's signal through `AbortSignal.any`
+— not `AbortSignal.timeout(ms)`, whose timer cannot be cleared: no timer stays pending after a
+login. The sentence ends with a period like the other server sentences and names the bound in the
+form it was set (`--login-timeout=<n>`, `MCP_LOGIN_TIMEOUT=<n>`, `login-timeout: <n>` in the
+configuration file; an embedder's `loginTimeoutMs: <ms>`); a login the bound ended is recorded on
+its failure, so another login starting before that failure is read changes neither the sentence nor
+D7's reading.
 
 ## 6. Renewal, session writes, shutdown (stdio)
 

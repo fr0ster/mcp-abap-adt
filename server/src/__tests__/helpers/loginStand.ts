@@ -225,6 +225,8 @@ export interface StandOptions {
   auth?: 'basic' | 'jwt';
   /** The factory's `loginTimeoutMs`. */
   loginTimeoutMs?: number;
+  /** The factory's `loginTimeoutStated`. */
+  loginTimeoutStated?: string;
   /**
    * Holds a `prepare()` that answers a refusal before the connect sees it,
    * until the returned promise settles: the abort window — after a login was
@@ -320,6 +322,9 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
     browserStrategy: (o) => strategyOf(browserCallbackStrategy(o)),
     promptLogger: silentLogger,
     logger: silentLogger,
+    ...(options.loginTimeoutStated !== undefined && {
+      loginTimeoutStated: options.loginTimeoutStated,
+    }),
     ...(options.loginTimeoutMs !== undefined && {
       loginTimeoutMs: options.loginTimeoutMs,
     }),

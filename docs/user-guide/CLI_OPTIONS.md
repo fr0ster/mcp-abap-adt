@@ -208,7 +208,9 @@ mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
 
 A bound on each browser login, opt-in: a login that has not finished after this many seconds is
 ended `aborted`, and the tool call answers the chain's words with the server's sentence "The login
-was ended by the server's login timeout (`--login-timeout=<n>`)". A whole number from 1 to
+was ended by the server's login timeout (`--login-timeout=<n>`)." — naming the bound in the form
+you set it (`MCP_LOGIN_TIMEOUT=<n>`, or `login-timeout: <n>` in the configuration file). A whole
+number from 1 to
 86400; `0`, `86401`, `1.5` or `abc` are refused at startup. **There is no default**: without it a
 login ends when the browser answers, the identity provider refuses, or the request that waits for
 it ends — a client that cancels its request, or closes its connection, ends the login it started

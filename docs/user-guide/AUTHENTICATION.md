@@ -181,7 +181,8 @@ logs in on its first tool call; the token is then renewed as `--renewal` says.
   port is free again as soon as a login ends, cancelled or not.
 - `--login-timeout=<seconds>` (or `MCP_LOGIN_TIMEOUT`, YAML `login-timeout`; 1 to 86400) bounds
   each login, opt-in: a login still waiting then ends `aborted`, answered with "The login was
-  ended by the server's login timeout (`--login-timeout=<n>`)". No default.
+  ended by the server's login timeout (`--login-timeout=<n>`)." — the bound named in the form it
+  was set. No default.
 - At startup the server reads the destination and builds its credential (nothing is sent): a
   destination the broker refuses stops the start, exit `1`, with the error's own words.
 

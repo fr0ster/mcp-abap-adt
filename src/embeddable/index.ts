@@ -18,7 +18,10 @@ export {
 } from '../lib/activeTools.js';
 export {
   currentRequestSignal,
+  RequestAbortedError,
+  raceRequestSignal,
   runWithRequestSignal,
+  throwIfRequestAborted,
 } from '../lib/requestSignal.js';
 export * from './BaseMcpServer.js';
 export * from './ConnectionContext.js';

@@ -21,19 +21,24 @@ export const REFRESH_ONLY_SENTENCE =
 /** D17: a provider call behind the closed gate, or a login after the shutdown began. */
 export const SHUTDOWN_SENTENCE = 'The server is shutting down.';
 
-/** D10: the login was ended by `--login-timeout=<seconds>`. */
-export function loginTimeoutSentence(seconds: number): string {
-  return `The login was ended by the server's login timeout (\`--login-timeout=${seconds}\`)`;
+/**
+ * D10: the login was ended by the login bound, named as it was set —
+ * `stated` (`` `--login-timeout=300` ``, `` `MCP_LOGIN_TIMEOUT=300` ``, …).
+ */
+export function loginTimeoutSentence(stated: string): string {
+  return `The login was ended by the server's login timeout (${stated}).`;
 }
 
 export interface ServerState {
   readonly renewal: RenewalMode;
   readonly shuttingDown: boolean;
-  /**
-   * `--login-timeout`'s seconds when the bound ended the last login (D10);
-   * absent when it did not, or there is no bound.
-   */
-  readonly loginTimeoutFired?: number | undefined;
+  /** `--login-timeout` (D10): which logins it ended, and how it was set; absent: no bound. */
+  readonly loginBound?:
+    | {
+        readonly stated: string;
+        ended(error: IAuthProviderError): boolean;
+      }
+    | undefined;
 }
 
 /** The server's sentence for `error` in `state`; `undefined` when it has none. */
@@ -46,8 +51,8 @@ export function serverSentence(
   }
   if (error.kind === 'interactive-login' && error.facts.outcome === 'aborted') {
     if (state.shuttingDown) return SHUTDOWN_SENTENCE;
-    if (state.loginTimeoutFired !== undefined) {
-      return loginTimeoutSentence(state.loginTimeoutFired);
+    if (state.loginBound?.ended(error) === true) {
+      return loginTimeoutSentence(state.loginBound.stated);
     }
   }
   return undefined;
@@ -64,6 +69,6 @@ export function serverEndedLogin(
   return (
     error.kind === 'interactive-login' &&
     error.facts.outcome === 'aborted' &&
-    (state.shuttingDown || state.loginTimeoutFired !== undefined)
+    (state.shuttingDown || state.loginBound?.ended(error) === true)
   );
 }

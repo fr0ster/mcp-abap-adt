@@ -36,6 +36,7 @@ import {
   type CoreConfig,
   coreParameters,
   readCoreConfig,
+  statedLoginTimeout,
 } from './config/coreParameters';
 import { hydrateSystemContextFromEnvFile } from './config/envFileContext';
 import { StdioServer } from './StdioServer.js';
@@ -431,6 +432,10 @@ export function factoryConfigFrom(
     ...(config.renewal && { renewal: config.renewal }),
     ...(config.loginTimeout !== undefined && {
       loginTimeoutMs: config.loginTimeout * 1000,
+      loginTimeoutStated: statedLoginTimeout(
+        config.loginTimeout,
+        config.loginTimeoutSource,
+      ),
     }),
     browserStrategy: collaborators.browserStrategy,
     promptLogger: collaborators.promptLogger,

@@ -195,7 +195,8 @@ packages, each with one binary and its transport's options only:
   its connection) ends the login it started once no other request waits for it. To bound a login,
   set **`--login-timeout=<seconds>`** (`MCP_LOGIN_TIMEOUT`, YAML `login-timeout`; a whole number
   from 1 to 86400, no default): a login still waiting then ends `aborted`, answered with "The
-  login was ended by the server's login timeout (`--login-timeout=<n>`)".
+  login was ended by the server's login timeout (`--login-timeout=<n>`)." (the bound named in the
+  form you set it).
 - **A cancelled request does not reach its tool**, on every transport: once its client cancels
   it (or closes its connection), its waits end — a shared connect or login goes on for the other
   requests waiting for it — and the call is answered `request_aborted`.
@@ -231,12 +232,16 @@ packages, each with one binary and its transport's options only:
   (`promptLogger(stderr, diagnostics)`), `renewal?: 'refresh-then-login' | 'refresh-only'`, and
   `loginTimeoutMs?` (`--login-timeout` in milliseconds; absent: no bound).
 - **Each tool call has a request signal** (`BaseMcpServer`): aborted when the MCP request's
-  `extra.signal` aborts, when the call ends, and at shutdown. The handler runs inside the request
-  signal scope — `currentRequestSignal()` from `@mcp-abap-adt/lib/embeddable` reads it — and a
-  call cancelled before its tool starts is answered `request_aborted` without reaching it. A
+  `extra.signal` aborts, and when the call ends. The handler runs inside the request
+  signal scope — `currentRequestSignal()` reads it — and a call cancelled before its tool starts is
+  answered `request_aborted` (`RequestAbortedError`) without reaching it; the tools a registry
+  registers itself (`registerAllTools`) are tracked the same way. A
   `ConnectionSource.resolve(signal)` gets it and should race its own waits against it
-  (`raceRequestSignal(work, signal)` from `@mcp-abap-adt/lib/auth`). Live calls are listed by
-  `activeTools()` and aborted by `abortActiveTools()` (`@mcp-abap-adt/lib/embeddable`).
+  (`raceRequestSignal(work, signal)`). Live calls are listed by `activeTools()` and aborted by
+  `abortActiveTools()`. All of these come from `@mcp-abap-adt/lib/embeddable`.
+- **`IAuthBrokerFactoryConfig.loginTimeoutStated?`** names the bound in D10's sentence (the
+  launcher passes the form the user set, `` `--login-timeout=300` ``); absent, the sentence names
+  `` `loginTimeoutMs: <ms>` ``, never a value the CLI would refuse.
 - **`IDestinations.getProvider(destination, { signal })`** takes the request's signal, and
   `settle(deadlineMs, { signal })` hands it to the broker's `flush`. `SettleReport.notStored` lines
   are `"<destination>": <reason>`, the reason auth-errors' classification.

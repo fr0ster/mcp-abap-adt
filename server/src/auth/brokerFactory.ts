@@ -137,7 +137,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     this.bound =
       config.loginTimeoutMs === undefined
         ? undefined
-        : loginBound(config.loginTimeoutMs);
+        : loginBound(config.loginTimeoutMs, config.loginTimeoutStated);
     this.context = {
       ...(config.browser !== undefined && { browser: config.browser }),
       ...(config.browserUnavailable !== undefined && {
@@ -171,9 +171,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return {
       renewal: this.renewal,
       shuttingDown: this.gate.closed,
-      ...(this.bound?.fired === true && {
-        loginTimeoutFired: this.bound.ms / 1000,
-      }),
+      ...(this.bound !== undefined && { loginBound: this.bound }),
     };
   }
 

@@ -1,7 +1,7 @@
 /**
  * A later request starts afresh (D7, spec §5.3, §14.4.7): R1's browser login
  * is cancelled, which ends it — R1 was its only party. Inside the abort
- * abortWindow — the login ended, the connect waiting for it not yet failed; held
+ * window — the login ended, the connect waiting for it not yet failed; held
  * open here by holding the provider's refused `prepare()` — R2 arrives, gets
  * the same provider and joins the same `connect()`, which then fails
  * `interactive-login` `aborted`. R2's own signal is live, so its connect is
@@ -40,12 +40,12 @@ afterEach(async () => {
   await s.close();
 });
 
-it('R2 inside the abort abortWindow of R1 logs in afresh', async () => {
+it('R2 inside the abort window of R1 logs in afresh', async () => {
   s.browser.answering(false);
   const r1 = s.call('r1');
   await s.browser.opened(1);
   r1.cancel();
-  // R1's login ended aborted; the connect has not failed yet: the abortWindow.
+  // R1's login ended aborted; the connect has not failed yet: the abort window.
   await refused.promise;
   await until(() => s.active() === 0 && s.logins.length === 1);
   expect(s.logins).toEqual(['aborted']);

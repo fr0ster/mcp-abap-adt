@@ -18,27 +18,51 @@
  * callback port is free when a login ends, cancelled or not.
  */
 
+import { readFailure } from '@mcp-abap-adt/auth-errors';
 import type {
   AuthorizationOutcome,
   AuthorizationRequest,
   IAuthorizationStrategy,
+  IAuthProviderError,
 } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 /**
- * `--login-timeout` (D10): the bound on each login, and whether it ended the
- * last one — the server's own state its sentence is keyed on.
+ * `--login-timeout` (D10): the bound on each login, how it was stated, and
+ * which logins it ended — the server's own state its sentence is keyed on.
+ * A login's end is recorded on the failure that login ended with, never as
+ * "the last login": another login starting before that failure is read
+ * cannot take the sentence away, nor make the failure look like another
+ * caller's abort (D7).
  */
 export interface LoginBound {
   /** The bound, in milliseconds. */
   readonly ms: number;
-  /** Whether the bound ended the last login; reset when a login starts. */
-  fired: boolean;
+  /** How the bound was set, as the sentence names it (`` `--login-timeout=300` ``). */
+  readonly stated: string;
+  /** Whether the bound ended the login that failed with `error`. */
+  ended(error: IAuthProviderError): boolean;
+  /** Records that the bound ended the login that failed with `error`. */
+  record(error: IAuthProviderError): void;
 }
 
-/** A bound of `ms` milliseconds, not fired. */
-export function loginBound(ms: number): LoginBound {
-  return { ms, fired: false };
+/**
+ * A bound of `ms` milliseconds; `stated` is how it was set (default: the
+ * embedder's option, `` `loginTimeoutMs: <ms>` ``).
+ */
+export function loginBound(
+  ms: number,
+  stated = `\`loginTimeoutMs: ${ms}\``,
+): LoginBound {
+  const endedByBound = new WeakSet<IAuthProviderError>();
+  return {
+    ms,
+    stated,
+    ended: (error) => endedByBound.has(error),
+    record: (error) => {
+      endedByBound.add(error);
+    },
+  };
 }
 
 export interface ServerLoginContext {
@@ -96,26 +120,28 @@ export function serverLogin(
  * One login under `--login-timeout` (D10): the strategy gets the request's
  * signal combined with the bound's, so either ends the login. The bound is
  * the login's, not the request's: its timer starts with the login and is
- * cleared when the login settles, so no timer outlives it. Whether the bound
- * ended this login is kept on `bound` — reset as the login starts.
+ * cleared when the login settles, so no timer outlives it. A login the bound
+ * ended has its failure recorded on `bound`.
  */
 async function bounded(
   bound: LoginBound,
   request: AuthorizationRequest,
   run: (signal: AbortSignal) => Promise<AuthorizationOutcome<string>>,
 ): Promise<AuthorizationOutcome<string>> {
-  bound.fired = false;
   const elapsed = new AbortController();
-  const timer = setTimeout(() => {
-    bound.fired = true;
-    elapsed.abort();
-  }, bound.ms);
+  const timer = setTimeout(() => elapsed.abort(), bound.ms);
   const signal =
     request.signal === undefined
       ? elapsed.signal
       : AbortSignal.any([request.signal, elapsed.signal]);
   try {
     return await run(signal);
+  } catch (error) {
+    // Ended by the bound — not by the request's own signal.
+    if (elapsed.signal.aborted && request.signal?.aborted !== true) {
+      bound.record(readFailure(error, 'token-request'));
+    }
+    throw error;
   } finally {
     clearTimeout(timer);
   }

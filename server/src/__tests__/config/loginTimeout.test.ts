@@ -83,5 +83,18 @@ describe('--login-timeout', () => {
     expect('loginTimeoutMs' in factoryConfigFrom(read([]), collaborators)).toBe(
       false,
     );
+    // How the user set it, for the sentence: its form, with its value.
+    expect(
+      factoryConfigFrom(read(['--login-timeout=2']), collaborators)
+        .loginTimeoutStated,
+    ).toBe('`--login-timeout=2`');
+    expect(
+      factoryConfigFrom(read([], { MCP_LOGIN_TIMEOUT: '3' }), collaborators)
+        .loginTimeoutStated,
+    ).toBe('`MCP_LOGIN_TIMEOUT=3`');
+    expect(
+      factoryConfigFrom(read([], {}, { 'login-timeout': 4 }), collaborators)
+        .loginTimeoutStated,
+    ).toBe('`login-timeout: 4` in the configuration file');
   });
 });

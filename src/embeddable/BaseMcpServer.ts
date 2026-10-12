@@ -413,38 +413,9 @@ export abstract class BaseMcpServer extends McpServer {
             }
           };
 
-          // Tracked from its entry — before the connection is acquired — so
-          // idle() cannot miss a call still acquiring its connection. The same
-          // entry and end are the user activity the state's idle bound counts:
-          // it pauses while the call runs and counts from its end.
-          //
-          // Each call has a request signal of its own (§5.1): aborted when
-          // the request's `extra.signal` aborts (the client cancelled, its
-          // transport closed), when the call ends whatever its outcome (D4:
-          // the broker releases the party it attached only then), and by
-          // the process's shutdown through the registry of live calls, where
-          // the call is registered here, before anything else.
-          const wrappedHandler = (args: unknown, extra?: ToolCallExtra) => {
-            const controller = new AbortController();
-            const unregister = registerActiveTool(controller);
-            const requestSignal = extra?.signal;
-            const onRequestAbort = () => controller.abort();
-            if (requestSignal?.aborted) controller.abort();
-            else requestSignal?.addEventListener('abort', onRequestAbort);
-            this.state.callStarted();
-            const call = runCall(args, controller.signal);
-            this.inFlight.add(call);
-            call
-              .finally(() => {
-                requestSignal?.removeEventListener('abort', onRequestAbort);
-                controller.abort();
-                unregister();
-                this.inFlight.delete(call);
-                this.state.callEnded();
-              })
-              .catch(() => undefined); // runCall answers every failure; nothing rejects unhandled
-            return call;
-          };
+          // Tracked from its entry, with its own request signal (`trackCall`).
+          const wrappedHandler = (args: unknown, extra?: ToolCallExtra) =>
+            this.trackCall(extra, (signal) => runCall(args, signal));
 
           // Convert JSON Schema to Zod if needed, otherwise pass as-is
           const zodSchema =
@@ -487,10 +458,101 @@ export abstract class BaseMcpServer extends McpServer {
         }
       }
     } else {
-      // Fallback: use registerAllTools directly (handlers won't have connection injected)
-      // This should not happen in normal flow
-      handlersRegistry.registerAllTools(this);
+      // A registry that registers its own tools: no connection is injected,
+      // but every tool it registers goes through the same call tracking —
+      // its request signal, the registry of live calls, the request signal
+      // scope, and D5 — as the tools above.
+      handlersRegistry.registerAllTools(this.trackingRegistrations());
     }
+  }
+  /**
+   * One tool call, tracked from its entry — before the connection is
+   * acquired — so idle() cannot miss a call still acquiring its connection.
+   * The same entry and end are the user activity the state's idle bound
+   * counts: it pauses while the call runs and counts from its end.
+   *
+   * Each call has a request signal of its own (§5.1): aborted when the
+   * request's `extra.signal` aborts (the client cancelled, its transport
+   * closed), when the call ends whatever its outcome (D4: the broker releases
+   * the party it attached only then), and by the process's shutdown through
+   * the registry of live calls, where the call is registered here, before
+   * anything else.
+   */
+  private trackCall<T>(
+    extra: ToolCallExtra | undefined,
+    run: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    const controller = new AbortController();
+    const unregister = registerActiveTool(controller);
+    const requestSignal = extra?.signal;
+    const onRequestAbort = () => controller.abort();
+    if (requestSignal?.aborted) controller.abort();
+    else requestSignal?.addEventListener('abort', onRequestAbort);
+    this.state.callStarted();
+    const call = run(controller.signal);
+    this.inFlight.add(call);
+    call
+      .finally(() => {
+        requestSignal?.removeEventListener('abort', onRequestAbort);
+        controller.abort();
+        unregister();
+        this.inFlight.delete(call);
+        this.state.callEnded();
+      })
+      .catch(() => undefined); // the caller answers the failure; nothing rejects unhandled
+    return call;
+  }
+
+  /**
+   * This server, as a registry that registers its own tools sees it: each
+   * callback given to `registerTool` (or the older `tool`) is tracked like
+   * the tools of a handler group — its request signal, the registry of live
+   * calls, the request signal scope — and a call whose signal aborted before
+   * the tool starts is answered `request_aborted` without reaching it (D5).
+   */
+  private trackingRegistrations(): McpServer {
+    const track =
+      (callback: (...callbackArgs: unknown[]) => unknown) =>
+      (...callbackArgs: unknown[]) => {
+        // The SDK passes `extra` last: `(args, extra)` or `(extra)`.
+        const extra = callbackArgs[callbackArgs.length - 1] as
+          | ToolCallExtra
+          | undefined;
+        return this.trackCall(extra, async (signal) => {
+          try {
+            throwIfRequestAborted(signal);
+            return await runWithRequestSignal(signal, async () =>
+              callback(...callbackArgs),
+            );
+          } catch (error) {
+            const read = readGuarded((t) => this.readFailure(t), error);
+            if (read !== undefined) return answerRead(read);
+            throw error;
+          }
+        });
+      };
+    const wrapLast = (registerArgs: unknown[]): unknown[] => {
+      const last = registerArgs[registerArgs.length - 1];
+      return typeof last === 'function'
+        ? [
+            ...registerArgs.slice(0, -1),
+            track(last as (...callbackArgs: unknown[]) => unknown),
+          ]
+        : registerArgs;
+    };
+    return new Proxy(this, {
+      get: (target, property) => {
+        if (property === 'registerTool' || property === 'tool') {
+          const register = Reflect.get(target, property) as (
+            ...registerArgs: unknown[]
+          ) => unknown;
+          return (...registerArgs: unknown[]) =>
+            register.apply(target, wrapLast(registerArgs));
+        }
+        const value = Reflect.get(target, property);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
   }
 }
 

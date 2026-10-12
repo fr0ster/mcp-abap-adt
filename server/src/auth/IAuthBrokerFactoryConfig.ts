@@ -58,6 +58,12 @@ export interface IAuthBrokerFactoryConfig {
    */
   loginTimeoutMs?: number;
   /**
+   * How the bound was set, as D10's sentence names it — the launcher's form
+   * as the user gave it (`` `--login-timeout=300` ``). Absent: the option
+   * itself, `` `loginTimeoutMs: <ms>` ``.
+   */
+  loginTimeoutStated?: string;
+  /**
    * Builds the login strategy of the `authorization_code` handler. The
    * launcher passes auth-providers' `browserCallbackStrategy`; there is no
    * default here. The factory wraps it in `serverLogin`.

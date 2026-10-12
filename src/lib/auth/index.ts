@@ -4,12 +4,6 @@
 
 /** The browser strategy the program passes to the factory (Ruling 1). */
 export { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
-/** A cancelled request (D34) and the race a server's own wait runs (D32). */
-export {
-  RequestAbortedError,
-  raceRequestSignal,
-  throwIfRequestAborted,
-} from '../requestSignal';
 export {
   answerFailure,
   answerRead,

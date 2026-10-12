@@ -16,8 +16,10 @@
  * new provider (D13).
  */
 
-import { raceRequestSignal } from '@mcp-abap-adt/lib/auth';
-import type { ConnectionSource } from '@mcp-abap-adt/lib/embeddable';
+import {
+  type ConnectionSource,
+  raceRequestSignal,
+} from '@mcp-abap-adt/lib/embeddable';
 import type { IDestinations } from './auth/IAuthBrokerFactory.js';
 
 export function destinationSource(

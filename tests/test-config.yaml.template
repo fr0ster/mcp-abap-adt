@@ -123,6 +123,9 @@ shared_dependencies:
   super_package: ""                          # super package (optional, leave "" if none)
   software_component: "ZLOCAL"               # ← CHANGE: "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
   transport_layer: ""
+  # Whether the shared package records changes: required (true) when its super
+  # package does, which a transportable on-premise package does
+  record_changes: false
 
   tables:
     - name: "ZMCP_SHR_RTABL"
@@ -651,7 +654,7 @@ shared_objects:
   unit_test_class:
     class_name: "ZMCP_BLD_CLSUT_L1"
     # package_name: "ZMCP_SHR_PKG"  # Uses environment.default_package if omitted
-    transport_request: ""
+    # transport_request: ""  # Uses environment.default_transport if omitted; "" forces no request, and a transportable package then gets a generated one
     description: "Shared container class for unit test integration tests"
 
 # ============================================================================
@@ -1883,7 +1886,7 @@ cds_unit_test:
         class_name: "ZMCP_BLD_CDSUT_H1"
         # package_name: "ZMCP_SHR_PKG"  # Uses environment.default_package if omitted
         cds_view_name: "ZMCP_BLD_CDSV_H1"
-        transport_request: ""
+        # transport_request: ""  # Uses environment.default_transport if omitted; "" forces no request, and a transportable package then gets a generated one
         test_class_source: |
           CLASS LTC_ZMCP_BLD_CDSV_H1 DEFINITION FINAL
             FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.

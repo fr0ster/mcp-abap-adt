@@ -97,6 +97,8 @@ package.json
 !/compact-readonly/package.json
 !/compact-modify/package.json
 !/compact/package.json
+!/compact-http/package.json
+!/compact-sse/package.json
 .npm-cache/**
 SAP_ADT.json
 dev.json

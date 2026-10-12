@@ -345,6 +345,17 @@ So under terminal mode our own run carries the session's ids, and in user mode
 none. Any other request is caught in terminal mode only if it carries the same
 ids, so a terminal start without a run catches only such requests.
 
+A stop right after a run ended races the listener's next poll (measured on
+premise, 2026-10-12): the loop polls again at once when a run ends, and a
+stopListener the system processes before that poll registers leaves the poll
+holding its full hold (60 s), which the stop awaits. 17.2 deleted breakpoints by
+id first, which happened to delay the stopListener enough. So while the open
+poll has not answered, the stop sends stopListener once more; in the clean
+integration run the second one woke the poll and the stop took 0.4 s, but in an
+earlier run it took 60 s anyway. One retry narrows the race, it does not close
+it; that is accepted and documented, not handled further (stated by the user
+2026-10-12).
+
 This holds for this repository (stated by the user 2026-10-10); a handle in
 another project may mean something else, and the global MCP rules still apply
 there.

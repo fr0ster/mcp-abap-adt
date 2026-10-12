@@ -1406,7 +1406,9 @@ export class DebugSession<O = unknown> {
           // that poll has not settled, the listener is stopped once more, on the same
           // identity. No timer: only whether the answer has come. Its failure is no
           // debt — the first stop succeeded and deleted the key's breakpoints; at worst
-          // the poll holds until the system answers it.
+          // the poll holds until the system answers it. One retry narrows the race and
+          // does not close it (a 60 s stop was seen once with it); documented, not
+          // handled further (DEBUGGER.md, What ends a session).
           if (open && !settledPolls.has(open))
             await control.stopListener(identity).catch(() => undefined);
           await this.retireListener(listener, open, failures);

@@ -188,7 +188,13 @@ ends by:
   breakpoints this session armed, stops the listener and closes the connections,
   ABAP and AMDP alike. It returns only after the system has answered the
   listener's open poll — so a conflict right after a stop means a real other
-  listener, not our own still letting go. A part that could not be undone is
+  listener, not our own still letting go. A stop right after a run ended can
+  take up to the listener's hold (60 s) instead of under a second: the listener
+  polls again at once when a run ends, and if that poll reaches the system after
+  the stop, nothing wakes it. The stop then stops the listener once more, which
+  in our runs answered it at once; when even that one arrives first, the stop
+  waits for the poll's hold. The race is the system's and is documented, not
+  closed (measured on premise, 2026-10-12). A part that could not be undone is
   reported, kept, and retried by the next stop; the handle stays valid until
   nothing is held. A debuggee the listener caught as the stop began is attached
   and released by the stop; measured on premise (2026-10-11), an attach after

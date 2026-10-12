@@ -66,7 +66,10 @@ A host that wants a take-over to ask first sets `SAP_DEBUG_BREAKPOINT_CONFLICT=r
    treats the set as gone after its stop, not measured); it deletes by id only when the
    listener's stop fails.
    The identity and the settings stay until a stop undid everything, and a new start is refused
-   until then; `holdsState()` stays true while a listener's stop is owed.
+   until then; `holdsState()` stays true while a listener's stop is owed. One exception: when the
+   system refuses the listener's stop for the user (`403` `notAuthorized`, `404` `invalidUser`),
+   the breakpoints are let go, not deleted — they stay on the system — the stop answers a note
+   naming them, and the session ends; nothing is owed and no later stop retries it.
 8. **The host's breakpoint conflict.** `createDebuggerInstance(ids?, { breakpointConflict? })`;
    `resolveDebuggerIds()` also answers `terminalStated` (the terminal id came from configuration,
    which is when terminal mode reconciles with a predecessor); `resolveBreakpointConflict()` is

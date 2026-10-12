@@ -230,13 +230,15 @@ user there.
 - **The breakpoint set is still the SAP user's**: terminal mode separates the
   listeners and the catches, not the breakpoints (next section).
 - **A second terminal-mode session of the same SAP user is refused under
-  refuse.** The system would accept both listeners, but the start's listener
-  check answers `409` while the other one listens (measured on premise
-  (2026-10-12), BASIS 816), so `DebugStartListener` (compact `HandlerDebugStart`
-  without `take_over`) is refused before anything is changed. A take-over
-  (`DebugTakeOverListener`, compact `take_over: true`) does not ask under the
-  default `replace`, and both listen — but its arming replaces the other
-  session's breakpoints, since the set is the SAP user's.
+  refuse.** The system itself accepts a second terminal-mode listener once its
+  breakpoints are armed, and both listen, each catching its own runs; but the
+  start's listener check answers `409` while the other one listens (measured on
+  premise (2026-10-12), BASIS 816), so `DebugStartListener` (compact
+  `HandlerDebugStart` without `take_over`) is refused before anything is
+  changed. A take-over (`DebugTakeOverListener`, compact `take_over: true`) does
+  not ask under the default `replace`, and its arming replaces the other
+  session's breakpoints, since the set is the SAP user's; whether the other
+  listener then keeps listening in terminal mode is not measured.
 
 ## The breakpoint set and its key
 

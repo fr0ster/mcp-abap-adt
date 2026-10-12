@@ -365,8 +365,10 @@ ends by:
   key included (measured in user mode; in terminal mode the session takes the
   set as gone after the stop, not measured) — and closes the connections, ABAP and AMDP alike. Only when the
   listener's stop fails are this session's breakpoints deleted one by one; when the
-  system refuses it for the user (`403`, `404`), nothing is deleted, the answer
-  names the breakpoints left on the system, and the session ends. It returns only
+  system refuses it for the user (`403` `notAuthorized`, `404` `invalidUser`),
+  nothing is deleted and the answer names the breakpoints left on the system; the
+  session ends when nothing else failed (another failure, such as a connection
+  that did not close, is kept for the next stop as usual). It returns only
   after the system has answered the listener's open poll — so a conflict right
   after a stop means a real other listener, not our own still letting go. A stop right after a run ended can
   take up to the listener's hold (60 s) instead of under a second: the listener

@@ -512,7 +512,10 @@ describe('Debugger handlers (integration)', () => {
     let handle: string | undefined;
     return {
       hold(answer: Answer) {
-        const h = answer.json?.state_handle;
+        // A failed start that still holds state answers its handle in a later block.
+        const h =
+          answer.json?.state_handle ??
+          /"state_handle"\s*:\s*"([^"]+)"/.exec(answer.text)?.[1];
         if (typeof h === 'string' && h) handle = h;
         return { state_handle: String(h ?? '') };
       },
@@ -1432,10 +1435,14 @@ describe('Debugger handlers (integration)', () => {
             detached.isError ? detached.text.slice(0, 400) : detached.json,
           );
           expect(detached.isError).toBe(false);
-          expect(detached.json.state).toBe('listening');
           // Measured on premise (2026-10-12): the same run is not caught again at the
-          // loop's next pass — the system answers the detach as the run ends.
-          const finished = await untilRunFinished(inst, h.state_handle);
+          // loop's next pass — the system answers the detach as the run ends, so the
+          // answer is listening, or the run's end when it was reported first.
+          const finished =
+            detached.json.reason === 'run_finished'
+              ? detached
+              : (expect(detached.json.state).toBe('listening'),
+                await untilRunFinished(inst, h.state_handle));
           measure('detach', 'the run after the detach', finished.json?.run);
           expect(finished.json?.run).toMatchObject({
             ok: true,

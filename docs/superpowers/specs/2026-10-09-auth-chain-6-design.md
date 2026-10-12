@@ -44,7 +44,9 @@ from this branch after main (#288, the debugger #290–#292) was merged into it 
 | Success: each package has only its own options and its own credentials | §3, §4, §10; D35, D38, D39, D48 |
 | Success: failures reach the user as the chain made them | §7; D14, D15, D17, D28, D45, D46 |
 | Success: a connection derived from an injected one stays the consumer's | §4.3; D20–D22 |
-| Success: a request ends when its client ends it, in every mode | §3.1, §5, §6.4; D4, D5, D7, D8, D10, D31 (its server side withdrawn), D32, D34, D55 (D40 withdrawn) |
+| Success: a request ends when its client ends it, in every mode | §3.1, §5, §6.4; D4, D5, D7, D8, D10, D32, D55, D56 (D31, D34, D40 withdrawn) |
+| No cancellation against ABAP; stateful only for lock, unlock and activation; listed long tools take a `timeout` on their own connection (D56) | §5.1, §5.7, §5.8, §6.4, §15; D56 |
+| The low tool set leaves the full binaries; compact is its analogue (D56) | §3.9, §10.1, §12; D56 |
 | Success: session writes are the server's stated choice | §6.2–§6.4; D12, D33 |
 | Goal: an SSE connection's instance is disposed when it closes; SSE takes part in shutdown | §6.4; D33, D51 |
 | Goal: state a tool holds keeps its holder; the pool moves into the HTTP package as it is | §2, §3.8; D33, D39, D51, D52 |
@@ -57,7 +59,7 @@ from this branch after main (#288, the debugger #290–#292) was merged into it 
 | Open 1 — the HTTP and SSE packages, compact per transport: names, options, shared helpers | §3.2, §3.5, §3.6, §10.1, §10.2; D35, D37, D38, D48, D49, D50 |
 | Open 2 — what lib exports after the move | §3.4; D36 |
 | Open 3 — the login bound | §5.6; D10 |
-| Open 4 — how cancellation reaches the broker, the providers and the connection; `LoginLock` | §3.1, §5; D4, D8, D31, D32, D55 |
+| Open 4 — how cancellation reaches the broker, the providers and the connection; `LoginLock` | §3.1, §5; D4, D8, D32, D55, D56 (D31 withdrawn) |
 | Open 5 — renewal and failed writes outside `--unsafe` | §6; D11, D12 |
 | Open 6 — what an MCP client sees per `kind` | §7.3, §7.4 |
 | Open 7 — the browser choice | §8; D9 |
@@ -240,7 +242,7 @@ outside the repository; each becomes a test in §14):
 
 ### 3.1 Prerequisites in other repositories
 
-**Decided by the user: option (a)** — the per-request signal is the connection's to honour, at
+*(History — superseded by D56, below.)* **Decided by the user: option (a)** — the per-request signal is the connection's to honour, at
 every boundary it owns; the server passes it and waits for the releases. The signal reaches a
 consumer's connection only through adt-clients (the one code between the tools and a connection,
 §2), and adt-clients' options and failures are contracts of interfaces-adt. No broker release is
@@ -250,16 +252,24 @@ contracts", tag `interfaces-adt-v13.1.0`, on `interfaces-adt-connection ^2.0.0`)
 open PR #207 (`feat/debugger`, "AbapDebugger", from a fork) is still on 25.0.1 with
 `interfaces-adt ^12`. Nothing below needs the 1.x / 12.x lines, so nothing is mirrored there.
 
-**Amended by D55 (§18): the prerequisites stay as built; the server no longer passes the signal
-to a tool's requests.** interfaces-adt-connection 2.1.0, interfaces-adt 15.4.0 and connection
-15.1.0 are published, adt-clients 30.1.0 (B5) is built. The signal they honour is optional, and
-the server does not pass it for the requests a tool sends to SAP (§5.2): a started tool runs to the
-end. What the server takes from them is `IAdtError.refusal` (§7, from B5) and the
-`ADT_REQUEST_ABORTED` code (D34); the one request of the server's that still carries a signal is
-the shared system-context lookup's `getSystemInformation` (D44). adt-clients' "releases are never
-cancelled" stays adt-clients' own; the server does not rely on it — a lock is released by its
-session's logoff (§6.4). The text below describes the prerequisites as specified and built; "the
-server passes it" and "waits for the releases" are no longer the server's.
+**Superseded by D56 (§18): the per-request signal is removed from the whole chain.** The releases
+below (items 1–4) were specified, and items 1–3 published, on 2026-10-12; the signal is now removed
+by majors, and **the server's prerequisites are the removal chain**, each published before C2
+takes it (H7):
+
+| Package | Version | What |
+|---|---|---|
+| `@mcp-abap-adt/interfaces-adt-connection` | 3.0.0 | no `IAbapRequestOptions.signal`, no `ADT_REQUEST_ERROR` |
+| `@mcp-abap-adt/interfaces-adt` | 16.0.0 | no `IAdtClientOptions.signal`, no `IAdtError.refusal`; on interfaces-adt-connection 3 |
+| `@mcp-abap-adt/connection` | 16.0.0 | no signal checks, no `IAdtEstablishContext.signal`, no `ADT_REQUEST_ABORTED`; `disconnect()` resolves once the logoff has been **written** to the socket, not answered |
+| `@mcp-abap-adt/adt-clients` | 31.0.0 | moves to those contracts; B5 (30.1.0, the signal per request and `refusal`) is discarded |
+
+So the server takes nothing of the signal: no `IAdtError.refusal` (an auth failure inside a tool
+reaches the model with the connection's own message, §7.2), no `ADT_REQUEST_ABORTED` (D34
+withdrawn), no signal on any request it sends — the shared system-context lookup's included
+(D44, §5.2). adt-clients' "releases are never cancelled" is gone with the signal; a lock is
+released by its session's logoff (§6.4). The text below (items 0–4, the order) is history: what
+was specified and built before D56.
 
 **The debugger releases land first; the prerequisites build on them:**
 
@@ -362,11 +372,12 @@ session. auth-broker 5.0.1 passes that error unchanged to the caller of `getProv
 **the auth-broker / auth-broker-cli releases on auth-stores 5** are published before C2, the
 server takes them there (checked with `npm view`), and waits for nothing if they are not.
 
-**Order**: 0 (debugger releases) → 1 → 2 → 3 (on 1) and 4 (on 1, 2 and 26.0.0) → this server's
-19.0.0. Each is published before the next is built against it (H7). **The
+**Order** (history; D56's order is interfaces-adt-connection 3.0.0 → interfaces-adt 16.0.0 and
+connection 16.0.0 → adt-clients 31.0.0 → this server's 19.0.0): 0 (debugger releases) → 1 → 2 → 3
+(on 1) and 4 (on 1, 2 and 26.0.0) → this server's 19.0.0. Each is published before the next is built against it (H7). **The
 server's own move to interfaces-adt 15 / interfaces-adt-connection 2 comes with it** (main's
 18.0.0 and the merge of main took interfaces-adt `^15.1.0`, adt-clients `^29.1.0`, connection
-`^15.0.1`): lib's ranges become B3's / `^2.1.0` and connection B4's (§18, 2026-10-12). In the move the server fixes what that costs it:
+`^15.0.1`): lib's ranges become the removal chain's (D56: interfaces-adt `^16.0.0`, interfaces-adt-connection `^3.0.0`, connection `^16.0.0`, adt-clients `^31.0.0`). In the move the server fixes what that costs it:
 the test helper's `makeAdtRequest` stub interfaces-adt-connection 2.0.0's notes measured, and every
 read of an answer's `data` through `AbapConnection` in the 8 files of `src` that import the alias
 (`BaseMcpServer.ts`, `EmbeddableMcpServer.ts`, `clients.ts`, …) — typed or narrowed, never cast to
@@ -379,7 +390,7 @@ read of an answer's `data` through `AbapConnection` in the 8 files of `src` that
 | auth-broker 5.0.1 | `devDependencies` `^14.0.0`; tests only (`src/__tests__/broker/connection14.test.ts`, `live/adtProbe.ts`, `live/getProvider.live.test.ts`); README examples name connection 14 | nothing to release; its tests and README move to 15 in its own next change |
 | auth-providers 6.0.1, auth-stores 5.0.0, auth-errors 2.2.0 | no import of connection | nothing |
 | adt-clients | `devDependencies` `^10.0.2`, test harness and scripts; its source types come from interfaces-adt-connection | its interfaces-adt-connection 2 move (26.0.0) already meets the `unknown` default; its dev range moves to `^15` with 26.1.0 |
-| cloud-llm-hub | runtime `^10.0.3`, `lib ^16`, interfaces-adt-connection `^1.0.1`; `AbapConnection` and `SapConfig` types (`srv/mcp-manager.ts`), connectors and CSRF constants (`srv/connections/*`), its own `CloudSdkAbapConnection` with `makeAdtRequest<T = any>` | when it takes lib 19: connection `^15`, interfaces-adt-connection `^2.1`; reads through `AbapConnection` typed or narrowed; its own `makeAdtRequest<T = any>` still satisfies the interface; no request signal reaches its connection's requests (D55); a `freshConnection` factory it gives receives one (§4.3) — its own change |
+| cloud-llm-hub | runtime `^10.0.3`, `lib ^16`, interfaces-adt-connection `^1.0.1`; `AbapConnection` and `SapConfig` types (`srv/mcp-manager.ts`), connectors and CSRF constants (`srv/connections/*`), its own `CloudSdkAbapConnection` with `makeAdtRequest<T = any>` | when it takes lib 19: connection `^16`, interfaces-adt-connection `^3`; reads through `AbapConnection` typed or narrowed; its own `makeAdtRequest<T = any>` still satisfies the interface; no signal reaches its connection or a `freshConnection` factory it gives (D56, §4.3) — its own change |
 | mcp-abap-adt-proxy, calm server | proxy on connection `^9.4`; calm none | out of scope (goal); each migrates in its own change |
 | this server's embedders | `EmbeddableMcpServerOptions.connection: AbapConnection` | the migration note (§12): the alias's `unknown` default |
 
@@ -426,10 +437,10 @@ make compact-http depend on `@mcp-abap-adt/compact` → red (it reaches core).
 | `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.0.6` (on auth-stores 5 and connection 15), or a later release found at C2 (§3.1) | core only |
 | `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^5.0.1` (D54) | core only |
 | `@mcp-abap-adt/auth-providers` | `^5.4.0` | `^6.0.2` | lib, core |
-| `@mcp-abap-adt/connection` | `^11.0.0` | the prerequisite release, the next minor on the 15 line (B4; §18, 2026-10-12) | lib, core |
-| `@mcp-abap-adt/adt-clients` | `~27.0.0` (#288; main's 18.0.0: `^29.1.0`) | the prerequisite release, the next minor on the 29 line (B5; §18, 2026-10-12) | lib |
-| `@mcp-abap-adt/interfaces-adt-connection` | `^2.0.0` (#288) | `^2.1.0` (prerequisite) | lib |
-| `@mcp-abap-adt/interfaces-adt` | `^13.2.0` (#288; main's 18.0.0: `^15.1.0`) | the prerequisite release, the next minor on the 15 line (B3; §18, 2026-10-12) | lib |
+| `@mcp-abap-adt/connection` | `^11.0.0` | `^16.0.0` (the removal chain, D56) | lib, core |
+| `@mcp-abap-adt/adt-clients` | `~27.0.0` (#288; main's 18.0.0: `^29.1.0`) | `^31.0.0` (the removal chain, D56) | lib |
+| `@mcp-abap-adt/interfaces-adt-connection` | `^2.0.0` (#288) | `^3.0.0` (the removal chain, D56) | lib |
+| `@mcp-abap-adt/interfaces-adt` | `^13.2.0` (#288; main's 18.0.0: `^15.1.0`) | `^16.0.0` (the removal chain, D56) | lib |
 | `@mcp-abap-adt/interfaces-auth` | `^3.2.0` | `^7.5.0` | lib, core |
 | `@mcp-abap-adt/auth-errors` | — | `^2.2.1` | lib, core, http, sse |
 | `@mcp-abap-adt/interfaces-auth-broker` | `^1.2.0` | `^1.3.0` | core only |
@@ -440,8 +451,9 @@ make compact-http depend on `@mcp-abap-adt/compact` → red (it reaches core).
 One copy of `interfaces-auth` 7 and of `auth-errors` 2 resolves (`npm ls`). The `auth` script is
 removed. Reason: each chain range is the release the goal names; the prerequisites of §3.1 are
 published before the server. Type check for the server: `test:check` compiles a typecheck file
-that reads `IAdtError.refusal` — it fails against interfaces-adt 13.1.x. It passes no signal to
-`AdtClient`: the server gives a tool's client none (D55).
+that states, with `@ts-expect-error`, that `IAbapRequestOptions.signal`, `IAdtClientOptions.signal`
+and `IAdtError.refusal` do not exist — it fails against the 2.1 / 15.x / 15.1 / 30.x releases that
+carried them (D56).
 
 ### 3.4 What moves, and what lib exports (D36)
 
@@ -470,7 +482,7 @@ the failure answer that remains is lib's (§7.3, D50). Every SSE option stays, i
 
 **lib also exports the tool-set contract** (`@mcp-abap-adt/lib/tool-set`, D37): `ToolSet` — the
 groups a server serves, given the base context and the exposition; the exposition's words, default
-and help — and `fullToolSet` (readonly, high, low, debug, search, system: today's `launch`, the
+and help — and `fullToolSet` (readonly, high, debug, search, system — **no low, D56, §3.9**: today's `launch`, the
 group building of `server/src/launcher.ts` after A0, `debug` adding `DebugHandlersGroup`). **core exports** `./launcher` — `main({ toolSet, program, version })`, and
 `./auth` (the moved destination layer, for an embedder that builds a stdio server of its own).
 **http exports** `main({ toolSet, program, version })` and `StreamableHttpServer` (to mount on a
@@ -620,6 +632,37 @@ it is no part of this change (goal, *Out of scope*); the rules this change sets 
 would not hold if pooled instances were exempt. Rejected: dropping the pool until a later change
 (a regression of a published release); a second registry or shutdown for pooled instances (H6).
 
+### 3.9 The low tool set leaves the full binaries (D56)
+
+**(D56, decided by the user) Everyone who needs low has compact.** The low set
+(`LowLevelHandlersGroup`, `src/lib/handlers/groups/LowLevelHandlersGroup.ts`, and its 117 handlers
+under `src/handlers/*/low/`) is removed from the full binaries' tool set (`fullToolSet`:
+`mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse`); compact is its full analogue —
+`HandlerLock` / `HandlerUnlock` / `HandlerUpdate`, `HandlerActivate`, `HandlerValidate`,
+`HandlerCheckRun`, `HandlerDelete`, `HandlerGet`, `HandlerSearch`, … — on every transport.
+
+- **No gap-filling in high or readonly.** Nothing is added to them for the removal.
+- **The low → compact mapping table**: each low tool → the compact handler and action that does
+  the same, built from the code (the low group's registrations, compact's entry builders) and
+  checked against it by a test; **a low capability compact does not have is a finding for the
+  user to decide** — listed, never silently added anywhere. The table is the migration note's
+  (§12).
+- **`--exposition=…,low` goes**: `low` is no longer a word of the full binaries' exposition; given,
+  it stops the start naming where it went — "the low set is gone from mcp-abap-adt / -http / -sse;
+  use mcp-abap-adt-compact (or -compact-http / -compact-sse)" (§10.1).
+- **Compact keeps `HandlerLock` / `HandlerUnlock` / `HandlerUpdate`**: a lock held across calls is
+  the consumer's choice there; keeping it short is the consumer's job — documented in compact's
+  READMEs, not engineered. Its session ends with the instance (§6.4, D56).
+- **Every tool of the full binaries is atomic**: it locks only its own object, lock → write →
+  unlock inside one call (`withLock`); nothing more is needed. Standalone lock and unlock leave
+  with the low set.
+- Whether the handler files under `src/handlers/*/low/` stay (imported by compact or high) or are
+  deleted is read from the code in the task: a file nothing registers any more is deleted.
+
+Reasons: two tool sets offering the same operations is one too many; compact already serves every
+transport with the same capabilities; a lock held between calls is exactly the state the server
+cannot clean up while the instance lives (D56 (2)), so the full binaries hold none.
+
 ## 4. Credentials, per package
 
 `BaseMcpServer` (lib) stops holding "settings and a credential" and holds one **connection
@@ -724,7 +767,7 @@ keyed by the connection object, never from the connection's configuration:
 | The connection | A fresh one comes from |
 |---|---|
 | built by the server (`createAbapConnection`: a destination, `x-sap-*`, a `SapConfig`) | the factory's record — the same settings and the same credential object |
-| injected, with `freshConnection` given | `await freshConnection({ signal })` — the consumer's factory, with the current request's signal |
+| injected, with `freshConnection` given | `await freshConnection()` — the consumer's factory; it receives no signal (D56: a fresh connection is made inside a started tool, which runs to its end) |
 | injected without it (or set through `setAbapConnectionOverride`) | **refused**: "This operation needs an ABAP session of its own; the connection was given by the host, which supplied no fresh-connection factory (`freshConnection`)" |
 
 ```ts
@@ -732,12 +775,13 @@ interface EmbeddableMcpServerOptions {
   // …
   /**
    * A connection of its own for an operation that needs a new ABAP session:
-   * RFC CreatePackage / LockPackage, DeletePackage with force_new_connection.
-   * The connection is built by you, with its credential; honour `signal`. Once
-   * returned it is the server's: the server closes it like its own, with
-   * disconnect() (a logoff). Without it those operations are refused.
+   * RFC CreatePackage / LockPackage, DeletePackage with force_new_connection,
+   * and every listed long tool's own connection (§5.8). The connection is built by
+   * you, with its credential. Once returned it is the server's: the server
+   * closes it like its own, with disconnect() (a logoff). Without it those
+   * operations are refused.
    */
-  freshConnection?: (options: { signal?: AbortSignal }) => Promise<IAbapConnection>;
+  freshConnection?: () => Promise<IAbapConnection>;
 }
 ```
 
@@ -751,8 +795,8 @@ interface EmbeddableMcpServerOptions {
   the operation (or under a package lock's handle, `lockSessions`), its requests carry no request
   signal (D55), and it is closed with `disconnect()` when the operation or the lock ends, on every
   path, failures included (D55's rule), a failure of the close logged in fixed words. What the
-  consumer keeps is what it built in: the connection's credential and its factory's honouring of
-  the signal it receives.
+  consumer keeps is what it built in: the connection's credential. *(D56: the factory receives no
+  signal; A9 built it with `{ signal }`, and C2 removes that.)*
 - **A connection the consumer injects** (not one its factory returned) stays the consumer's: the
   server never closes it; logging it off is the consumer's (D55).
 - **(D19) `credentialFromSapConfig` refuses instead of guessing**: an `authType` outside `basic`,
@@ -767,7 +811,7 @@ interface EmbeddableMcpServerOptions {
 
 | Signal | Created | Aborted | Given to |
 |---|---|---|---|
-| **request** | per MCP request, in the tool wrapper (every package) | the request's `extra.signal` aborts (client cancel, transport close), or the request ends (`finally`) | the request signal scope (§5.2), read by D5's check before the tool and by the server's own waits (D32): `connect()`, `getProvider` (core) and its login, the shared system-context lookup (D44); `openFreshConnection` and the consumer's `freshConnection`. **Not** the requests a tool sends to SAP: no `AdtClient`, direct request or debugger client gets it (D55) |
+| **request** | per MCP request, in the tool wrapper (every package) | the request's `extra.signal` aborts (client cancel, transport close), or the request ends (`finally`) | the request signal scope (§5.2), read by D5's check before the tool and by the server's own waits (D32): `connect()`, `getProvider` (core) and its login, a caller's wait on the shared system-context lookup (D44). **Nothing that is sent to SAP** — no `AdtClient`, direct request, debugger client, connection or connector gets it, and no `freshConnection` factory (D55, D56); connection 16 has no signal to take |
 | **startup** | the core launcher's check | the check ends | `getProvider` of the check |
 | **shutdown** | once | a `SIGTERM` / `SIGINT` after the shutdown started, or `--shutdown-timeout` (§6.4) — never by default | `flush({ signal })`, the drain |
 | **login bound** | per `authorize` of core's strategy wrapper, when configured | the bound elapses | the strategy, combined with `AuthorizationRequest.signal` (§5.6) |
@@ -777,26 +821,36 @@ releases `getProvider`'s party only on its abort, so a live party left behind wo
 login alive after its own waiter left. Shutdown aborts no request: it latches and awaits them
 (§6.4, D55).
 
-**(D55) A signal is the consumer's message "I no longer need this — close".** What it closes
-depends on what the consumer let go of:
+**(D55, D56) A signal is the consumer's message "I no longer need this — close".** There is no
+real cancellation against ABAP: the most the server can do is a logoff and closing a connector
+(D56). The MCP SDK's `extra.signal` has **one remaining use**: the server's own waits that send
+nothing to SAP — the browser login, `connect()`, the provider build — and the rule that a
+request cancelled before its tool starts never reaches it (D5, A8); it is not a connector or
+contract feature. What a signal closes depends on what the consumer let go of:
 
 | The consumer | What ends | What runs on |
 |---|---|---|
-| **cancels a call** (`notifications/cancelled`, or the request's `extra.signal` otherwise) | its waits — the login, `connect()`, `getProvider`'s build, the system-context lookup (D32, D44); a request whose tool has not started never reaches it (D5) | a tool already running runs to the end and answers (§5.2); the session and its connection live on |
+| **cancels a call** (`notifications/cancelled`, or the request's `extra.signal` otherwise) | its waits — the login, `connect()`, `getProvider`'s build, its wait on the system-context lookup (D32, D44); a request whose tool has not started never reaches it (D5) | a tool already running runs to the end and answers (§5.2); **nothing is done to SAP** — no logoff, no reopen while the instance lives (D56): a reopen would drop locks under the LLM or leave them in the old session the new one collides with; the session and its connection live on |
 | **closes its transport** — an SSE connection (D51), stdio's stdin (its `end` / `close` starts the shutdown, M7, §6.4), an HTTP instance the pool releases (§3.8) | the instance stops admitting calls (its latch), awaits the running ones, then closes every connection it owns with `disconnect()` — the logoff (§6.4) | nothing of that instance |
 | **shuts the process down** (`SIGTERM` / `SIGINT`) | the same for every instance (§6.4); `--shutdown-timeout` or a second signal ends the waiting, and the logoff is still sent | nothing |
+| **gives a listed long tool a `timeout`** (§5.8) | that tool's wait, and its own connection, closed with a logoff — SAP finishes the request and closes the session | the instance, its connections and every other call |
+
+**Logoff happens only at an instance's end** — pool eviction, the idle bound, a stop tool, an SSE
+close, stdin's end, shutdown — and at the end of a connection made for one operation (a fresh
+connection, a listed long tool's own, §5.8); **a reopen only when SAP already lost the session** (D56).
 
 ### 5.2 Where a request's signal goes, and where it does not
 
 **(D31) Decided by the user: option (a)** — the connection honours the signal (§3.1); ~~the server
 passes it~~ — **the server side is withdrawn by D55**: the server passes no request signal to the
-requests a tool sends to SAP. The prerequisites stay built (§3.1).
+requests a tool sends to SAP; and **D56 removes the signal from the whole chain** (§3.1): no
+connection, connector or client of the chain takes one any more.
 
 - **The request signal scope** (`src/lib/requestSignal.ts`, an `AsyncLocalStorage` of its own —
   not the system-context request scope, which stdio does not enter and whose presence changes
   what `getEffectiveSystemContext` answers): the tool wrapper runs the handler inside
   `runWithRequestSignal(signal, …)`; `currentRequestSignal()` reads it — for the server's own
-  waits (D32), D5's check and the consumer's `freshConnection` factory (§4.3), nothing else.
+  waits (D32) and D5's check, nothing else (D56: not the consumer's `freshConnection` factory).
 - **(D55) A started tool runs to the end.** SAP ABAP has no request cancel and no rollback across
   ADT requests: a request that reached ADT runs to its end, and SAP's transactionality is its own,
   inside one request. A tool cut between its requests — a lock, a write, an activation, an
@@ -805,8 +859,9 @@ requests a tool sends to SAP. The prerequisites stay built (§3.1).
   `AdtClient`; the debugger's clients (`src/lib/debugger/ports.ts`), the server's own requests
   (`handleGetServiceBindingPreviewUrl.ts:225`, `utils.ts:717`) and the preview's
   `getSystemInformation` (`handleGetServiceBindingPreviewUrl.ts:145`) carry none. A started tool's
-  answer is produced; a client that left by then receives nothing. The one request of the server's
-  that carries a signal is the shared system-context lookup's (D44): the attempt's signal, a read.
+  answer is produced; a client that left by then receives nothing. No request of the server's
+  carries a signal (D56) — the shared system-context lookup's included (D44: a caller's wait ends
+  with its signal, the lookup runs to its end).
 - **What each connection the server hands on carries** — checked site by site (`grep` over every
   package's `src` for `createAbapConnection`, `openFreshConnection`, `inOwnSessionOverRfc`,
   `connectionForPackageLock`, `connectionHoldingPackageLock`, `releasePackageLockSession`,
@@ -821,8 +876,8 @@ requests a tool sends to SAP. The prerequisites stay built (§3.1).
 | `connectionForPackageLock` (`:110-135`) — `LockPackage` over RFC | no request signal; `lockSessions` keeps the raw connection |
 | `connectionHoldingPackageLock` (`:138-143`) — `UpdatePackage` (`handleUpdatePackage.ts:151`), `UnlockPackage` (`handleUnlockPackage.ts:112`) | no request signal |
 | `releasePackageLockSession` (`:149-157`) | none: a close carries no request; its `disconnect()` is the logoff |
-| `resolveOnce` (`requestSystemResolution.ts:104-125`): the cloud system-context lookup shared by concurrent requests | **its own attempt (D44)**: auth-errors' `sharedAttempt` per resolver and connection — each caller joins with its own signal; the lookup runs with the attempt's signal (alive while any caller waits, aborted when the last leaves) passed to `getSystemInformation`; a caller that leaves is released at once; an aborted or failed lookup is never memoised (the attempt leaves its slot, the next caller starts afresh); only a completed answer is kept, as today |
-| the consumer's `freshConnection` (§4.3) | the factory receives `{ signal }`; its connection's requests carry none |
+| `resolveOnce` (`requestSystemResolution.ts:104-125`): the cloud system-context lookup shared by concurrent requests | **its own attempt (D44, amended by D56)**: one shared lookup per resolver and connection — each caller races its own signal and is released at once when it leaves; the lookup itself carries no signal and runs to its end even when every caller left (D56: nothing sent to SAP is cancelled); a failed lookup is never memoised (the next caller starts afresh); a completed answer is kept, as today |
+| the consumer's `freshConnection` (§4.3) | the factory receives no signal (D56); its connection's requests carry none |
 | `getManagedConnection` / `getAdtClient` (`utils.ts:386-536`, `clients.ts:53-61`) — the legacy `SapConfig` path | no request scope there: no signal |
 | the debugger's clients (`src/lib/debugger/ports.ts`: `AbapDebugger`, `AmdpDebugger`, `AdtExecutor`, built directly on the session's own connections, §2) | no signal: a debugger tool call's own sends and the held state's own work (the listener's polls, a background run, the idle bound's and the host's stop) alike |
 
@@ -832,9 +887,7 @@ requests a tool sends to SAP. The prerequisites stay built (§3.1).
   an unlock SAP refused (D46), a lock tool's own lock — is released by its session's logoff
   (§6.4, D55); an unlock tool is its own request, like any.
 - **Injected connections are not wrapped** and receive no request signal in their requests'
-  options (D55); the consumer's `freshConnection` factory receives the request's signal (§4.3),
-  and honouring it is the consumer's contract, stated in the embedding docs and the migration
-  note.
+  options (D55); the consumer's `freshConnection` factory receives none either (D56, §4.3).
 - **No view, no gate**: the earlier drafts' per-request view and provider-side gate are gone.
 
 ### 5.3 In a request
@@ -852,9 +905,11 @@ requests a tool sends to SAP. The prerequisites stay built (§3.1).
   window of another's starts afresh. Read by `kind`, once.
 - **(D13) The connection a request uses**: HTTP builds one per request, on its new or pooled
   instance (§3.8); SSE one per SSE connection, kept by that connection's instance until it closes
-  (D51); stdio keeps its connection while `getProvider` answers the same provider, and builds a new
-  one when the broker built a new provider — the replaced connection is closed with a logoff
-  (D55). Held state's own connections (a debug session's) are the state's, on every transport, and
+  (D51); stdio keeps its connection for the instance's life — **no reopen while the instance
+  lives, only when SAP already lost the session** (D56). *(Before D56: a new connection when the
+  broker built a new provider. Whether `getProvider` can still answer a new provider in stdio,
+  with the settings read once (D3), is read from the code in C15; if it can, the case is reported
+  to the user, not handled by a reopen.)* Held state's own connections (a debug session's) are the state's, on every transport, and
   close with it (§3.8, D51).
 
 ### 5.4 The HTTP and SSE packages
@@ -896,6 +951,62 @@ form it was set (`--login-timeout=<n>`, `MCP_LOGIN_TIMEOUT=<n>`, `login-timeout:
 configuration file; an embedder's `loginTimeoutMs: <ms>`); a login the bound ended is recorded on
 its failure, so another login starting before that failure is read changes neither the sentence nor
 D7's reading.
+
+### 5.7 Stateful only for lock, unlock and activation (D56)
+
+**(D56, decided by the user)** The stateful window of a tool is exactly **lock → write → unlock**,
+and **activation** — activation requires a stateful session (a measured result, recorded in
+adt-clients' `activation.js`: "Requires stateful session mode"). **Everything else runs
+stateless**, the listed long tools included (§5.8). Activation runs to its end, with no
+`timeout` unless the user puts it on the list.
+
+- **Where a session turns stateful today**, read from the code: the server's
+  `restoreSessionInConnection` (`src/lib/utils.ts:605-631`, `setSessionType('stateful')`), the
+  debugger's ports (`src/lib/debugger/ports.ts:48`) and adt-clients' own operations (63 files of its
+  `dist` call `setSessionType('stateful')` — lock, update, activation, …). The task (C15) lists each
+  site with the window it opens and where the connection returns to stateless; a site that opens a
+  session outside lock → write → unlock or activation, or leaves the connection stateful after its
+  window, is changed in the server, or — when it is adt-clients' — reported to the user as a
+  finding of that repository, not worked around.
+- **A shared connection** (stdio's kept one; an HTTP pooled instance's): how one tool's window
+  meets another call on the same connection is read in C15 and reported with the site list; the
+  rule is not bent to fit it.
+- **Compact's `HandlerLock`** keeps its window open across calls until `HandlerUnlock` — the
+  consumer's choice (§3.9); the window ends at the latest with the instance's logoff (§6.4).
+- **The ADT debugger's stateful sessions** — attach and steps need a debuggee session — are the
+  debugger's session (its held state, §3.8, §16), not a tool's stateful use; they end with its stop,
+  the idle bound, the host or shutdown, as today.
+
+### 5.8 Listed long tools take a `timeout` on their own connection (D56)
+
+**(D56, decided by the user) Long tools named in the list take an optional `timeout`** — **no
+default** (no value = wait until done) — **the one written exception to the no-timeouts rule**
+(H5, §17); each runs on its own stateless connection; a timeout or the end closes that connection
+with the logoff. The timeout is **not defined by a category** (GET, read-only, stateless — a
+stateless `POST` may write) **but by an explicit, named list of tools, decided tool by tool by the
+user** (e.g. where-used, `GetWhereUsed`, and the like).
+
+- **The list.** The implementer drafts the candidates from the code (C16): the tools whose call
+  can run long — where-used, object and source search, ATC, unit-test runs and their status, run
+  class / program, the profiler, dumps, every poll loop (`pollRun.ts`, `startRun.ts`, …) — each
+  with what it sends (method, path, body; stateful or not). **The user approves the list before
+  any code**; no tool gets the timeout without being on the approved list. **Activation and the
+  debugger are not on it unless the user puts them there.** The approved list is kept in a file a
+  source test reads (a listed tool without the parameter, or a tool outside the list with it,
+  fails).
+- **Each listed long call runs stateless on its own connection** — the server's fresh-connection
+  path (`openFreshConnection`, §4.3) — not the instance's, so nothing the instance holds is
+  touched.
+- **When the call ends, or its timeout fires**, that connection is closed with `disconnect()` — the
+  logoff (connection 16: resolved once written); SAP finishes the request and closes the session;
+  nothing else is affected. The timer is the call's own, cleared when the call settles: **no timer
+  is left pending** after a call that finished (as the login bound, §5.6). The timed-out answer
+  says, in fixed words, that the wait was ended by its `timeout` and that SAP finishes the request
+  on its own.
+- **The tool description** advises a `timeout` below the MCP client's own request limit (the
+  TypeScript SDK's client cancels at 60 s by default), and says that a cancel does nothing to SAP.
+- **No connection to make one from**: on an injected connection without `freshConnection`, a
+  listed long tool is refused with D20's words, as every fresh-connection operation is (§4.3).
 
 ## 6. Renewal, session writes, shutdown (stdio)
 
@@ -939,12 +1050,14 @@ documented limit.
   destroyed is closed: a connection dropped without `disconnect()` is a resource leak, because
   its SAP session — and every lock the session holds — stays open until SAP's own timeout ends it.
   `disconnect()` is the logoff, and a logoff releases the session's locks (measured, §15); nothing
-  else is relied on to release a lock. So every place the server creates a connection, or takes
+  else is relied on to release a lock. On connection 16 `disconnect()` resolves once the logoff
+  has been **written** to the socket, not answered (D56): SAP queues it behind a request still
+  running in the session and releases the locks afterwards, even with the client gone (§15). So every place the server creates a connection, or takes
   ownership of one, has a defined end that calls `disconnect()`, each once, on every path —
   failures included — a failure of the close logged in fixed words:
   - stdio's kept connection (`BaseMcpServer.getConnection`), at exit (the instance's `dispose()`);
-  - a connection replaced — by a reconnect, or because the broker built a new provider for a
-    refreshed destination (D13) — when it is replaced;
+  - a connection replaced — only when SAP already lost its session (D56; D13) — when it is
+    replaced;
   - a connection built for a caller who cancelled, that was its alone (D32, RF1), when the
     `connect()` settles;
   - the fresh connections — `openFreshConnection`, `inOwnSessionOverRfc`, and the consumer's
@@ -953,6 +1066,7 @@ documented limit.
     unlock, or the instance's close;
   - the debugger session's own connections, at its stop, the idle bound's stop, the host's stop
     and `dispose()`;
+  - a listed long tool's own connection (§5.8, D56), when its call ends or its `timeout` fires;
   - an instance's connections when the pool disposes it (§3.8), when an SSE connection closes
     (D51) and at shutdown.
 
@@ -1066,8 +1180,9 @@ documented limit.
 1. `isAuthProviderFailure(thrown)` → `readFailure(thrown, 'unfamiliar-error')`;
 2. an own `refusal` with a known `kind` → `classify(refusal, 'unfamiliar-error')` (connection's
    `AuthRefusedError`);
-3. an own `code` equal to `ADT_REQUEST_ERROR.ABORTED` → `request_aborted`, fixed words;
-3b. an `IAdtError` (or adt-clients' thrown error) with an own `refusal` → step 1 or 2 on that value;
+3. ~~an own `code` equal to `ADT_REQUEST_ERROR.ABORTED` → `request_aborted`~~ and
+3b. ~~an `IAdtError` with an own `refusal`~~ — **removed by D56**: connection 16 has no such code,
+   interfaces-adt 16 no `refusal`; what A4 built for them is removed in C2;
 4. the server's own refusal classes;
 5. else `undefined` — not an authentication failure, answered as today.
 
@@ -1081,13 +1196,19 @@ lib depends on no broker (D38), and auth-errors decides what a value is (H6).
 ### 7.2 Where failures are caught
 
 - **Outside a handler** — the tool wrapper's `catch`, the core launcher's check: the reader first.
-- **Inside a handler**: adt-clients 25.1.0 keeps the structured failure — `IAdtError.refusal`,
-  or a thrown error's own `refusal` (§3.1) — so `failureOf` reads it through auth-errors
-  (`classify(refusal, 'unfamiliar-error')`) for **every** connection, the consumer's included,
-  without wrapping one. A handler's error result whose failure carries a `refusal` is answered as
-  §7.3. The earlier drafts' failure observer on server-built connections and D16's "words only for
-  an injected connection" are gone (H6: one place carries the failure).
+- **Inside a handler (D56)**: there is no `IAdtError.refusal` — an auth failure inside a tool
+  reaches the model **with the connection's own message** (fixed words, with the hint, as
+  connection mints them), as it is: adt-clients carries it as `IAdtError { origin: 'connection',
+  message }` (§2), and the handler's answer passes it on. The server neither recognises nor
+  re-renders it there; it wraps no connection to learn more. The earlier drafts' failure observer
+  on server-built connections and D16's "words only for an injected connection" are gone.
 - `return_error` and `answer()` call the reader first.
+- ~~**(D45)**~~ and ~~**(D46)**~~ below are **withdrawn by D56** (C7 and C8 are not built): both
+  read the structured refusal adt-clients no longer carries. What remains true without them: a
+  handler's text holds the connection's own fixed words for an auth failure, never a secret
+  (connection mints them); a release that fails is reported in `cleanup` as today, and a lock it
+  left is released by the session's logoff at the instance's end (§6.4). The text is kept as
+  history.
 - **(D45) An auth failure ends the tool call before any conversion.** A failure that carries a
   refusal — readable by `failureOf` — is recognised **before** a handler or wrapper turns an error
   into text, a partial result or a new `Error`, and ends the tool call as that failure (§7.3); a
@@ -1150,7 +1271,8 @@ An `isError` result, JSON in the shape of the server's local failures (`src/lib/
 | a chain failure | `authentication_failed` | its `kind` | its `reason` | its `hint` |
 | `DestinationConfigError` (core) | `destination_refused` | — (`cause_kind` when it carries an error) | `Destination "<name>" cannot be used: <fields>` | the carried hint, then one fixed hint per known field (`HINTS`: `grantType`, `SAP_URL`, `XSUAA_MCP_URL`, `connection-type`, `browser`). No hint for `issuedFor` / `issuedBy` / `authorizationToken`: broker 5.0.1 names them only on the `none` path (a handed-over credential), which stdio refuses after D53 (measured, A5). A token session bound to another destination's means is not refused: the broker discards it with its warn line and the provider logs in again |
 | a store's refused record (`StorageError`, `reason: 'record-format'`, core, D54) | `destination_refused` | — | `Destination "<name>" cannot be used: its session record is not in the store's format` (the server's own fixed words with the destination it serves, never the store's `message`) | "regenerate the session with mcp-auth: `mcp-auth --destination <name> --type abap\|xsuaa`, or `mcp-auth --service-key <file> --output <file> --type abap\|xsuaa` (from @mcp-abap-adt/auth-broker-cli)" |
-| `ADT_REQUEST_ABORTED` | `request_aborted` | — | fixed words | — |
+| ~~`ADT_REQUEST_ABORTED`~~ — removed by D56 | — | — | — | — |
+| an auth failure inside a tool (D56) | as the handler answers today (`IAdtError` `origin: 'connection'`) | — | the connection's own fixed words, with its hint | in the message |
 | `UnsupportedAuthenticationError` for `jwt` / `none` (core, D53) | `destination_refused` | — | `Destination "<name>" uses jwt / none, which this server does not support` | "a token you hold is sent in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the session with mcp-auth" |
 | the server's own refusal | `destination_refused` / `fresh_connection_unavailable` / `inspection_only` / `credentials_required` (HTTP, SSE) | — | fixed words | — |
 
@@ -1167,10 +1289,10 @@ as today:
 - connection does not ask the credential about a `403` (`credentialRejection` answers only a
   wire's refused logon or a `401`, `AbstractAbapConnection.ts:1626-1640`), so no `rejected()`, no
   renewal, no `AuthRefusedError`; adt-clients reads the answer as `AdtSAPError` →
-  `IAdtError { origin: 'refusal', message: <SAP's text>, adtType, … }`, with **no `refusal`**
-  (§3.1, adt-clients' contract); `answer()` renders it as today (`failurePayload`, `message` and
+  `IAdtError { origin: 'refusal', message: <SAP's text>, adtType, … }` (interfaces-adt 16 has no
+  `refusal` field at all, D56); `answer()` renders it as today (`failurePayload`, `message` and
   `raw_body`);
-- `failureOf` reads a `refusal` only — never a status, never `origin` — so a `403` is never
+- `failureOf` never reads a status or `origin` (and, D56, a handler's `IAdtError` not at all) — so a `403` is never
   relabelled `authentication_failed`. A `system-refused` failure (`not-authorized`, `403`) exists in
   the chain only as a provider's verdict inside `rejected()`, which the connection does not call for
   a `403`;
@@ -1263,6 +1385,10 @@ its table**. The help, the YAML template and the validation come from it.
   for SSE `mcp-abap-adt-sse`"; in `mcp-abap-adt-sse` and `mcp-abap-adt-compact-sse`, "`--transport`
   is gone: `mcp-abap-adt-sse` serves SSE; for stdio run `mcp-abap-adt`, for Streamable HTTP
   `mcp-abap-adt-http`".
+- **`low` in `--exposition`** of `mcp-abap-adt`, `mcp-abap-adt-http` and `mcp-abap-adt-sse` (CLI
+  and YAML alike — `EXPOSITION_ROW` has no environment form; D56, §3.9): "the low
+  set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http /
+  -compact-sse)";
 - in the stdio binaries, `--allow-destination-header`; the SSE options (`--sse-host`,
   `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`,
   `MCP_SSE_*`: "SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)"); the HTTP ones
@@ -1315,7 +1441,8 @@ everywhere is `MCP_TRANSPORT`: it stated the transport, and a binary now is one.
 ### 10.3 The exported API, for embedders
 
 - `@mcp-abap-adt/lib/embeddable`: `ConnectionContext` (§4), `EmbeddableMcpServerOptions.freshConnection`
-  (§4.3), `BaseMcpServer`'s `ConnectionSource`.
+  (§4.3; no signal, D56), `BaseMcpServer`'s `ConnectionSource`.
+- `@mcp-abap-adt/lib/tool-set`: `fullToolSet` without the low set (D56, §3.9).
 - `@mcp-abap-adt/lib/auth`: §3.4; `describeAuthError` → `failureOf`.
 - `@mcp-abap-adt/core/auth`: the destination layer — `AuthBrokerFactory` with
   `IAuthBrokerFactoryConfig` (`browser?: IBrowser`, `browserStrategy` with that option, `renewal`
@@ -1383,6 +1510,21 @@ everywhere is `MCP_TRANSPORT`: it stated the transport, and a binary now is one.
   instance is disposed and its ADT sessions closed with a logoff, which releases their SAP locks
   (D55); the debugger and `--state-idle-minutes` as in 17.2, with
   the same `.env` note as HTTP.
+- **low users (D56)**: **the low set is gone from mcp-abap-adt / -http / -sse; use
+  mcp-abap-adt-compact (or -compact-http / -compact-sse)** — with the low → compact mapping table
+  (each low tool → the compact handler and action that does the same, §3.9); `--exposition=…,low`
+  stops the start with that sentence; standalone lock / unlock are compact's `HandlerLock` /
+  `HandlerUnlock` (keep a lock short — yours to manage); every full-binary tool locks, writes and
+  unlocks its own object inside one call.
+- **every transport (D56)**: **the long tools named in the note's list** (approved by the user
+  tool by tool — where-used and the like) **take an optional `timeout`** (seconds, no default —
+  no value waits until done); each runs stateless on its own
+  connection, closed with a logoff when it ends or its timeout fires; set it below your MCP
+  client's request limit (the TypeScript SDK's client cancels at 60 s), because **a cancel does
+  nothing to SAP**: no request is recalled, no session is logged off or reopened while the instance
+  lives; a tool not on the list — activation and the debugger, unless the user put them there —
+  takes no `timeout` and runs to its end; a tool's
+  session is stateful only for lock → write → unlock and activation.
 - **compact users**: one package per transport — over stdio `mcp-abap-adt-compact`
   (`@mcp-abap-adt/compact`) as today; over Streamable HTTP `mcp-abap-adt-compact-http`
   (`@mcp-abap-adt/compact-http`); over SSE `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`);
@@ -1407,17 +1549,19 @@ everywhere is `MCP_TRANSPORT`: it stated the transport, and a binary now is one.
   to the `--env` file fails the request, under `--unsafe` it warns; `--auth-debug`; the summary
   shows presence only; `DeletePackage` no longer falls back; `npm run auth` → `mcp-auth` of
   `@mcp-abap-adt/auth-broker-cli`; failures as §7.3.
-- **Embedders**: `freshConnection`; **honour the signal** the factory receives — the server
-  promises nothing more for a factory that ignores it; the requests a tool sends carry no request
-  signal (D55); a connection the factory returned is the server's and is closed with
+- **Embedders**: `freshConnection` — called with no signal (D56), also for a listed long
+  tool's own connection (§5.8); nothing in the chain takes a request signal any more (connection 16,
+  interfaces-adt-connection 3, interfaces-adt 16, adt-clients 31: no `signal`, no
+  `ADT_REQUEST_ABORTED`, no `IAdtError.refusal`); connection 16's `disconnect()` resolves once the
+  logoff is written; a connection the factory returned is the server's and is closed with
   `disconnect()`, an injected one stays yours to close;
   `ConnectionContext`; `lib/auth` lost the destination layer (now `core/auth`); `IAuthBrokerFactoryConfig`'s
   required options; `StreamableHttpServer` moved to `@mcp-abap-adt/http` and `SseServer` to
   `@mcp-abap-adt/sse`, each without its destinations argument; the shared transport helpers are
   `@mcp-abap-adt/lib/http-transport`; `BaseMcpServer.dispose()` also closes the connections the
-  instance built once its state is empty; `AbapConnection` (connection 15 on interfaces-adt-connection 2) answers `unknown` by
-  default — name the type or narrow it; the chain's own migrations (auth-providers 6, broker 5,
-  connection 12–15, auth-stores 5).
+  instance built once its state is empty; `AbapConnection` (connection 16 on interfaces-adt-connection 3) answers `unknown` by
+  default — name the type or narrow it; `fullToolSet` has no low set; the chain's own migrations (auth-providers 6, broker 5,
+  connection 12–16, auth-stores 5).
 
 **Updated**: `README.md`, `server/README.md`, a new `http/README.md`, `sse/README.md`,
 `compact-http/README.md` and `compact-sse/README.md`, `compact/README.md`, `CHANGELOG.md` (19.0.0, with
@@ -1434,11 +1578,15 @@ launcher's help.
 ## 13. Version, release and how the change is committed
 
 - **(D29) Nine packages at 19.0.0**, the four new ones (http, sse, compact-http, compact-sse)
-  included, from PR #287 — **decided by the user: one PR, one major release**.
+  included, from PR #287 — **decided by the user: one PR, one major release**; D56's changes (the
+  low set gone, stateful only for lock, unlock and activation, listed long tools' `timeout`, no signal)
+  ship in it too, not in a release of their own — the low set gone, the logoff on every connector
+  close, the `timeout` of listed long calls, the auth stack update and the package split are its
+  scope.
 - **The server waits for its prerequisites** (§3.1) — the user's debugger releases first
-  (main's 18.0.0: interfaces-adt 15.1.0, adt-clients 29.1.0), then interfaces-adt-connection
-  2.1.0, and the next minors of interfaces-adt (15 line), connection (15 line) and adt-clients
-  (29 line) — B3–B5, §18, 2026-10-12 — then
+  (main's 18.0.0: interfaces-adt 15.1.0, adt-clients 29.1.0), then the removal chain (D56):
+  interfaces-adt-connection 3.0.0, interfaces-adt 16.0.0, connection 16.0.0, adt-clients 31.0.0 —
+  then
   releases per `RELEASE.md`: manifests and
   sibling ranges, metadata, CHANGELOG and docs, `npm ci`, build, `test:check`, `npm test`
   (binSmoke), each package's own tests, `release:dry` ending `Published: 9  Skipped: 0`; the
@@ -1510,10 +1658,12 @@ One test per source through a real request — a provider's `AuthProviderFailure
 `AuthRefusedError` (`refused-after-renewal`), core's `DestinationConfigError` (a destination
 missing a field its authentication needs), core's refused record (an
 `--env` file whose token has no `SAP_ISSUED_*` beside it, on auth-stores 5: `destination_refused`
-with D54's words and hint, no login started, no request sent), a failure inside a handler on a server-built **and on an injected** connection (through `IAdtError.refusal`), `ADT_REQUEST_ABORTED`; each asserts
+with D54's words and hint, no login started, no request sent), a failure inside a handler on a server-built **and on an injected** connection (D56: the connection's own message reaches the tool result as it is; no `IAdtError.refusal`, no `ADT_REQUEST_ABORTED`); each asserts
 `error`, `kind`, `message`, `hint` as `render` gives them and no diagnostics. Source tests: no
 `instanceof` of a chain class, no `.message` read in the auth modules, no regex in the touched
 files. Each §7.4 sentence under its condition.
+
+*The two blocks below are withdrawn with D45 and D46 (D56; C7, C8 not built), kept as history.*
 
 **Conversion sites (D45)**, each through real adt-clients against a stand-in that answers `401`
 twice (a credential refused): **GetIncludesList** — a source read (P3: answered as the auth
@@ -1537,14 +1687,14 @@ after an auth-failed release → the activation is sent.
 ### 14.3 Injected connections and fresh connections
 
 **An auth failure inside a handler on an injected connection** (a consumer connection that throws
-`AuthRefusedError` from `makeAdtRequest`): the tool result carries `error`, `kind`, `message` and
-`hint` exactly as `render` gives them, read from `IAdtError.refusal`; the connection was not
-wrapped (its `makeAdtRequest` is the consumer's own function, identity checked).
+`AuthRefusedError` from `makeAdtRequest`): the tool result carries the connection's own message
+— its fixed words and hint — as it is (D56); the connection was not wrapped (its `makeAdtRequest`
+is the consumer's own function, identity checked).
 
 
 For `CreatePackage` (high, low), `LockPackage` over RFC and `DeletePackage` with
 `force_new_connection`, on an injected connection whose configuration holds no usable credential:
-with `freshConnection` the factory is called with the request's signal, the operation runs on its
+with `freshConnection` the factory is called with no signal (D56), the operation runs on its
 connection, which is disconnected, and no provider is constructed; without it,
 `fresh_connection_unavailable`, nothing sent. *Breaks:* restore the configuration fallback; restore
 `DeletePackage`'s fallback.
@@ -1557,8 +1707,8 @@ connection, which is disconnected, and no provider is constructed; without it,
    stand-in's log holds the `LOCK`, the update, the activation and the `UNLOCK`, and the tool's
    answer is produced; no `makeAdtRequest` of a tool carries a signal (stdio's kept connection,
    two concurrent requests on it, an injected connection, a factory's connection); the consumer's
-   factory receives the request's signal. *Break:* pass the request's signal to `createAdtClient`
-   → the update is missing from the log.
+   factory receives no signal (D56). *Break:* end the handler on the request's `extra.signal` →
+   the update is missing from the log.
 2. **The substitution sites (§5.2)**: (a) `CreatePackage` high and low over RFC and (b)
    `DeletePackage` with `force_new_connection` — the fresh connection's requests carry no signal,
    and the connection is disconnected when the operation ends, on success and on failure;
@@ -1566,13 +1716,13 @@ connection, which is disconnected, and no provider is constructed; without it,
    signal; U cancelled after its tool started runs to the end and keeps the session; X unlocks and
    closes the lock session with a logoff. *Break:* skip `releasePackageLockSession`'s
    `disconnect()` → no logoff in the log.
-2a. **The shared system-context lookup (D44)**: two cloud requests share one lookup held at the
-   stand-in; **one waiter cancels** → it is released at once, the lookup goes on, the other gets
-   its context, and the answer is memoised; **every waiter cancels** → the lookup's request is
-   aborted (nothing more of it is sent), nothing is memoised, and a later request starts a fresh
-   lookup and succeeds; a failed lookup is not memoised either. *Breaks:* run the lookup under the
-   first caller's signal (the second is refused); memoise the attempt before it settles (the later
-   request inherits the abort).
+2a. **The shared system-context lookup (D44, amended by D56)**: two cloud requests share one
+   lookup held at the stand-in; **one waiter cancels** → it is released at once, the lookup goes
+   on, the other gets its context, and the answer is memoised; **every waiter cancels** → each is
+   released at once, the lookup's request still runs to its end (no signal, D56), and its
+   completed answer is memoised — a later request uses it without a new lookup; a failed lookup is
+   not memoised. *Breaks:* tie the lookup to the first caller (the second is refused when the first
+   leaves); memoise a failed lookup (the later request inherits the failure).
 3. ~~**A cancelled mutation is never sent**~~ — withdrawn by D55; in its place **a request
    cancelled before its tool starts never reaches it, and one cancelled after changes nothing it
    sends**: a server-built connection against the stand-in; R1 and R2 tool calls that `POST`; R1
@@ -1699,6 +1849,35 @@ CI builds `docker/Dockerfile` from the tarballs and, on the image: `mcp-abap-adt
 `/mcp/health` `200`, a `tools/call` with `x-sap-*` headers against a stand-in;
 `Dockerfile.inspect` builds and `mcp-abap-adt --version` answers.
 
+### 14.9 No cancellation, the low set, the stateful window, listed long tools (D56)
+
+- **The low set is gone (§3.9)**: `fullToolSet`'s tool list on each of the three full binaries
+  holds no low tool; `--exposition=readonly,low` stops each with D56's sentence; the compact sets
+  are unchanged. **The mapping table** (`tools/low-to-compact.json`): every low tool registered on
+  the branch before the removal has a row naming the compact handler and action, or is listed as a
+  finding; a test drives each mapped row's compact call against the stand-in and compares the ADT
+  requests it sends with the low tool's (method, path, body shape). *Breaks:* leave one low tool in
+  `fullToolSet` → the tool-list test red; map a low tool to a compact action that sends another
+  request → its row red.
+- **The stateful window (§5.7)**: against the stand-in, which records each request's
+  `x-sap-adt-sessiontype`, a full-binary update sends lock, write and unlock stateful and every
+  other request of the tool stateless; an activation is stateful; a read, a search and a long run
+  are stateless, also right after a lock tool's call on the same connection ended. *Break:* leave
+  the connection stateful after the unlock → the next read red.
+- **A cancel does nothing to SAP (D56 (2))**: a call cancelled after its tool started — the
+  stand-in sees no logoff and no new session for the instance, and the next call runs in the same
+  session. *Break:* disconnect on the request's abort → red.
+- **Listed long tools (§5.8)**, one case per handler in the long-handler list: with `timeout`
+  and a request held at the stand-in, the timeout fires → the answer is the timed-out answer,
+  **the handler's own connection gets `disconnect()`**,
+  the instance's connection does not, and the instance's next call works; without `timeout` the
+  call waits until the stand-in answers; **no timer is pending** after a call that finished, timed
+  out or not (fake time); the own connection is stateless and is disconnected when the call ends
+  normally too. A source test: every tool on the approved list declares `timeout`, and no tool
+  outside it does. *Breaks:* run a long call
+  on the instance's connection → the instance's connection disconnected, red; skip the timer's
+  clear → a pending timer, red; drop `timeout` from one listed handler → the source test red.
+
 ## 15. Live measurements
 
 Before release, each recorded with its date and platform (never a system id) in `CHANGELOG.md`
@@ -1722,6 +1901,15 @@ a lock handle), sent no `UNLOCK`, and was closed with `disconnect()` (the sessio
 answered); SM12 then showed no lock for it. Before the release this is repeated through the server
 (a lock tool, then shutdown and an SSE close) and recorded as above.
 
+**Measured (2026-10-12, on premise; the user's runs) — what a logoff does while a request runs
+(D56):** with a long request running in the same stateful session, SAP queues the logoff behind it;
+when the request ends, the session closes and its lock is gone — also when the client is gone. A
+connection dropped without a logoff keeps its lock until SAP's own timeout (the user's experience,
+many times). Activation requires a stateful session (measured; recorded in adt-clients'
+`activation.js`). Before the release, a listed long tool's `timeout` through the server is
+measured: the timed-out call's own session is logged off, SAP finishes the request, and the
+instance's session and its locks are untouched (C12).
+
 ## 16. The debugger, merged from main
 
 The debugger landed on main (#290–#292, lib 17.2.x) and is merged into this branch (A0); the move
@@ -1730,7 +1918,7 @@ meets it:
 
 | Debugger part | Where after the split | What this change does there |
 |---|---|---|
-| `src/lib/debugger/`, `src/lib/state/`, `DebugHandlersGroup` (lib) | lib, as today | nothing, beyond §3.8's rule (no request signal on its clients, D55) and D55's rule for its own connections (closed with a logoff at its stop, the idle bound's stop, the host's stop and `dispose()`) |
+| `src/lib/debugger/`, `src/lib/state/`, `DebugHandlersGroup` (lib) | lib, as today | nothing, beyond §3.8's rule (no request signal on its clients, D55), D55's rule for its own connections (closed with a logoff at its stop, the idle bound's stop, the host's stop and `dispose()`), and D56: its stateful debuggee sessions are the debugger's session, not a tool's stateful use (§5.7); its tools take no `timeout` unless the user puts them on the list (§5.8) |
 | `compact/src/debug/` (the four compact verbs, lib imports only) | lib's `tool-set`, with `compactToolSetOf` (D49) | moved so compact-http and compact-sse serve them |
 | `InstancePool.ts`, the pool in `StreamableHttpServer.ts` | http (moved at A0) | carried as it is (§3.8, D52); header sources per request, the registry, D33's order |
 | `SseServer.ts`'s state close and `stop()` drain | sse | completed by D51 and D33 |
@@ -1757,9 +1945,9 @@ bound and ended by its stop, the host or the system — never by a request's end
 | H2 Nothing goes out that should not | §7.3, §9; the URL only on stderr from the providers; nothing on stdout; §14.6 |
 | H3 A credential stays bound | providers only from the broker in core, the destination read once per process and its edit documented (D3); header credentials per request (http, on new and pooled instances alike) or per SSE connection (sse), never stored or shared, an SSE connection's disposed with it (D39, D48, D51); the one exception the goal states — held state keeps the connections it opened until it ends (§3.8, D52); injected connections never re-authenticated (§4.3); each party keeps its role — the store judges its record, the broker the binding, the system the credential; the server judges none (D54) |
 | H4 The modes are separated by package | D35, D36, D38, D48, D49: broker, stores, destinations, session files and logins only in core (and compact over stdio, through core); http and sse work only with header credentials, no server-held credential, and never depend on each other — what they share is lib's (D50); compact over HTTP and SSE never reaches core; embedded keeps none, consumer connections unwrapped, the consumer's factory given the signal (§4.3, §5.2) |
-| H5 No built-in timeouts | no login bound and no shutdown deadline by default (D10, D33); an SSE connection's dispose waits on no timer (D51); the 30 s deadline and the drain timer removed; the idle bound on held state (`--state-idle-minutes`) is the project owner's stated exception, main's, carried (§3.8) |
-| H6 One implementation of each rule | the shared transport helpers and the HTTP-transport shutdown once, in lib (D50); the compact tool set once, `compactToolSetOf` (D49); one registry of live tools for every shutdown and every SSE close, pooled instances included (D33, D51, §3.8); one instance close (D51); main's pool, not a second one (D52); failures read by auth-errors (§7.1); the broker's shared build; the broker's refresh state; auth-providers' browsers (D9); the structured failure carried by adt-clients (§3.1) — the server cancels no request a tool sent (D55); a lock released by the session's logoff, `disconnect()`, not by a release machinery of the server's (D55); the shared lookup on auth-errors' `sharedAttempt` |
-| H7 Registry only | every range published; the four prerequisites of §3.1 first; §13 |
+| H5 No built-in timeouts | no login bound and no shutdown deadline by default (D10, D33); an SSE connection's dispose waits on no timer (D51); the 30 s deadline and the drain timer removed; the idle bound on held state (`--state-idle-minutes`) is the project owner's stated exception, main's, carried (§3.8); **the listed long tools' optional `timeout` parameter, no default, is the one written exception to the no-timeouts rule** (D56, §5.8) |
+| H6 One implementation of each rule | the shared transport helpers and the HTTP-transport shutdown once, in lib (D50); the compact tool set once, `compactToolSetOf` (D49); one registry of live tools for every shutdown and every SSE close, pooled instances included (D33, D51, §3.8); one instance close (D51); main's pool, not a second one (D52); failures read by auth-errors (§7.1); the broker's shared build; the broker's refresh state; auth-providers' browsers (D9); the server cancels no request a tool sent (D55), and nothing in the chain can (D56); a lock released by the session's logoff, `disconnect()`, not by a release machinery of the server's (D55); the shared lookup on auth-errors' `sharedAttempt` |
+| H7 Registry only | every range published; the removal chain of §3.1 (D56) first; §13 |
 | H8 No regular expressions over untrusted input | D26; a source test |
 
 ## 18. Decisions taken by the user, and questions for the user
@@ -1769,7 +1957,7 @@ bound and ended by its stop, the host or the system — never by a request's end
 | # | Decision |
 |---|---|
 | D3 | (c) document, don't engineer: a destination is read once per process; editing its files while the server runs is unsupported, restart after any change |
-| D31 | (a) a per-request signal in connection, a prerequisite; ~~the server passes it~~ — **its server side withdrawn by D55** (2026-10-12): the prerequisites stay built, the server passes no signal to a tool's requests |
+| D31 | (a) a per-request signal in connection, a prerequisite; ~~the server passes it~~ — **its server side withdrawn by D55** (2026-10-12); **the signal itself removed from the whole chain by D56** (2026-10-12) |
 | D12 (`--unsafe`) | `onWriteFailure: 'continue'`; no `--session-write-failure` |
 | — | HTTP serves only per-request header credentials; the default destination exists only for stdio |
 | — | the package split (core stdio, a new HTTP package, lib without broker and stores) |
@@ -1778,7 +1966,7 @@ bound and ended by its stop, the host or the system — never by a request's end
 | D12 (`--env` file) | `'fail'`, fixed; a session write happens only in stdio and only for token destinations |
 | D35 | `@mcp-abap-adt/http`, bin `mcp-abap-adt-http`, directory `http/` |
 | D37 | compact over HTTP wanted; behaviour identical, only the tool set differs |
-| D34 | the abort's code is the connection's own, `ADT_REQUEST_ABORTED` |
+| D34 | ~~the abort's code is the connection's own, `ADT_REQUEST_ABORTED`~~ — **withdrawn by D56**: connection 16 has no such code, and the server answers no `request_aborted` |
 | D30 | ~~the broker binds a handed-over token itself — a prerequisite (auth-broker 5.1.0)~~ — **withdrawn**, 2026-10-11 (below) |
 | D22 | ownership of a handed-over fresh connection passes to the server |
 | D27, D47 | "server text" is an authorization server's or IdP's; ADT's own authorization errors reach the client as ADT errors |
@@ -1799,8 +1987,9 @@ bound and ended by its stop, the host or the system — never by a request's end
 | — , 2026-10-11 | the binding fields per row are auth-broker 5.0.x's, unchanged: a token to ABAP needs both `issuedFor` and `issuedBy`; XSUAA has no system URL, so `issuedBy` only; basic none |
 | B1 / D30, 2026-10-11 | **withdrawn**: auth-broker 5.1.0 ("bind an unbound handed-over credential") is cancelled; no broker release is a prerequisite of the server for binding; a broker / CLI change onto auth-stores 5 is separate, and C2 takes its releases if they are published by then (§3.1) |
 | D53, 2026-10-11 | **`jwt` / `none` leaves stdio**: a token you hold (`SAP_JWT_TOKEN` with `SAP_GRANT_TYPE=none` in an `--env` file) is no longer served over stdio; a handed-over token stays only in the HTTP and SSE headers (`x-sap-jwt-token`); the migration note says so and points to `mcp-auth` for stdio sessions; M8 (§2) is the measurement that led here |
-| D55, 2026-10-12 | **a started tool runs to the end; a logoff releases the locks.** Facts: SAP ABAP has no request-cancel mechanism and no rollback across ADT requests — a request that reached ADT runs to its end, transactionality is SAP's own inside one request; a session closed with a logoff releases its locks (measured, §15). Decided: (1) **a correct logoff** — every ADT session the server owns is closed with `disconnect()`: at shutdown (core, http with its pool, sse), when an SSE connection closes its instance, when a pooled instance is disposed, at stdio's exit; **a connector that is destroyed is closed** — a connection dropped without `disconnect()` is a resource leak (its session and locks stay open until SAP's own timeout), so every connection the server creates or takes over has a defined end that calls it, on every path (§6.4); an injected connection is the consumer's to close; nothing else is relied on to release a lock; (2) **no lock control** — no machinery keeps unlocks or releases out of the signal: D40 and `runWithoutRequestSignal` are dropped, C4 is withdrawn; (3) **the controller's ruling, as the consequence**: a request's signal no longer reaches the requests a tool sends to SAP — a started tool runs to the end and answers; the signal still ends the request before its tool starts (D5), the server's own waits (D32: `connect()`, `getProvider`'s build, the login and its bound D10, the lookup D44) and shutdown's drain; C3 (D31's server side) is withdrawn, `createAdtClient` and the debugger's clients pass no signal; shutdown latches, awaits running tools, then closes every session with a logoff, and the shutdown signal (`--shutdown-timeout`, a second `SIGTERM` / `SIGINT`, never by default) ends the wait while the logoff is still sent; a signal is the consumer's message "I no longer need this — close" (§5.1); (4) the prerequisites already built stay — interfaces-adt-connection 2.1.0, interfaces-adt 15.4.0, connection 15.1.0 (published), adt-clients 30.1.0 (B5, built): the signal they honour is optional and not passed for a tool's requests; from B5 the server needs `IAdtError.refusal` |
+| D55, 2026-10-12 | **a started tool runs to the end; a logoff releases the locks.** Facts: SAP ABAP has no request-cancel mechanism and no rollback across ADT requests — a request that reached ADT runs to its end, transactionality is SAP's own inside one request; a session closed with a logoff releases its locks (measured, §15). Decided: (1) **a correct logoff** — every ADT session the server owns is closed with `disconnect()`: at shutdown (core, http with its pool, sse), when an SSE connection closes its instance, when a pooled instance is disposed, at stdio's exit; **a connector that is destroyed is closed** — a connection dropped without `disconnect()` is a resource leak (its session and locks stay open until SAP's own timeout), so every connection the server creates or takes over has a defined end that calls it, on every path (§6.4); an injected connection is the consumer's to close; nothing else is relied on to release a lock; (2) **no lock control** — no machinery keeps unlocks or releases out of the signal: D40 and `runWithoutRequestSignal` are dropped, C4 is withdrawn; (3) **the controller's ruling, as the consequence**: a request's signal no longer reaches the requests a tool sends to SAP — a started tool runs to the end and answers; the signal still ends the request before its tool starts (D5), the server's own waits (D32: `connect()`, `getProvider`'s build, the login and its bound D10, the lookup D44) and shutdown's drain; C3 (D31's server side) is withdrawn, `createAdtClient` and the debugger's clients pass no signal; shutdown latches, awaits running tools, then closes every session with a logoff, and the shutdown signal (`--shutdown-timeout`, a second `SIGTERM` / `SIGINT`, never by default) ends the wait while the logoff is still sent; a signal is the consumer's message "I no longer need this — close" (§5.1); (4) **superseded by D56**: the per-request signal is removed from the whole chain (interfaces-adt-connection 3.0.0, interfaces-adt 16.0.0, connection 16.0.0, adt-clients 31.0.0); B5 (adt-clients 30.1.0) is discarded, and the server takes neither `IAdtError.refusal` nor `ADT_REQUEST_ABORTED`; where a session ends and what a cancel does to SAP are D56's |
 | D40, D31 (server side), C3, C4, 2026-10-12 | **withdrawn by D55**: "releases are never cancelled" (D40) and its `runWithoutRequestSignal`, the signal through `createAdtClient` (C3), the release-site list (C4); the IDs stay so references keep their meaning |
+| D56, 2026-10-12 | **No signal, no cancellation; low leaves the full binaries; listed long tools take a timeout on their own connection** — the user's decisions, recorded as given (decision 3 as corrected by the user the same day, decision 4 as corrected for activation, decision 5 as finally given: an explicit list of tools the user approves): (1) **The per-request signal is removed from the whole chain as a mistake.** Published 2026-10-12 and now being removed by majors: `@mcp-abap-adt/interfaces-adt-connection` 3.0.0 (no `IAbapRequestOptions.signal`, `ADT_REQUEST_ERROR`), `@mcp-abap-adt/interfaces-adt` 16.0.0 (no `IAdtClientOptions.signal`, no `IAdtError.refusal`), `@mcp-abap-adt/connection` 16.0.0 (no signal checks, no `IAdtEstablishContext.signal`, no `ADT_REQUEST_ABORTED`; and `disconnect()` resolves once the logoff has been WRITTEN to the socket, not answered), `@mcp-abap-adt/adt-clients` 31.0.0 (moves to those contracts). B5 (adt-clients 30.1.0) is discarded. The server takes these in C2. C3, C4 stay withdrawn; C6/C7: no `IAdtError.refusal` — an auth failure inside a tool reaches the model with the connection's own message (fixed words, with the hint), as it is. (2) **There is no real cancellation against ABAP; the most the server can do is a logoff and closing a connector.** A lock without UNLOCK is released by the session's logoff; with a long request running in the same stateful session SAP queues the logoff behind it and the lock is gone afterwards, even when the client is gone; a connection dropped without a logoff keeps the lock (§15). A cancelled MCP call does nothing to SAP: no logoff, no reopen while the instance lives (a reopen either drops locks under the LLM or leaves them in the old session the new one collides with). Logoff happens only at an instance's end (pool eviction, idle bound, stop tool, SSE close, stdin end, shutdown); a reopen only when SAP already lost the session. Every connector the server owns is closed with `disconnect()` (logoff) — a connector dropped without it is a resource leak. The MCP SDK's `extra.signal` stays only for the server's own waits that send nothing to SAP (browser login, `connect()`, the provider build) and the "a cancelled request before its tool starts never reaches it" rule — the one remaining use; it is not a connector or contract feature. (3) **The low tool set leaves the full binaries** (`mcp-abap-adt`, `-http`, `-sse`): everyone who needs low has compact — compact is its full analogue (`HandlerLock` / `HandlerUnlock` / `HandlerUpdate`, `HandlerActivate`, `HandlerValidate`, `HandlerCheckRun`, `HandlerDelete`, `HandlerGet`, `HandlerSearch`, …); no gap-filling in high / readonly; a low → compact mapping table (each low tool → the compact handler and action that does the same) is built and checked against the code, and any low capability compact does not have is a finding for the user to decide, not silently added anywhere; `--exposition=…,low` goes; the migration note: "the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)", with that table. Compact keeps `HandlerLock` / `HandlerUnlock` / `HandlerUpdate`; keeping a lock short is the consumer's job (documented, not engineered). Every tool of the full binaries is atomic: it locks only its own object, lock → write → unlock inside one call; nothing more is needed. (4) **Stateful only for lock, unlock and activation.** The stateful window is lock → write → unlock, and activation (activation requires a stateful session — a measured result, recorded in adt-clients' `activation.js`); everything else — listed long calls included — runs stateless. The ADT debugger's own stateful sessions (attach and steps need a debuggee session) are the debugger's session, not a tool's stateful use. (5) **Long tools named in the list take an optional `timeout`** (no default; the one written exception to the no-timeouts rule); each runs on its own stateless connection; a timeout or the end closes that connection with the logoff (as finally given by the user the same day, replacing the earlier wordings: the timeout is defined not by a category — GET, read-only, stateless; a stateless `POST` may write — but by an explicit, named list of tools, decided tool by tool by the user, e.g. where-used, `GetWhereUsed`, and the like). The implementer drafts the candidate list from the code (the tools whose call can run long, with what each sends), and **the user approves the list before any code**; no tool gets the timeout without being on the approved list. Activation and the debugger are not on it unless the user puts them there. SAP finishes a timed-out request and closes the session; nothing else is affected. The tool description advises a timeout below the MCP client's own request limit (the TS SDK client cancels at 60 s by default; a cancel does nothing to SAP). (6) **All of this ships in 19.0.0** (no release per small change). The scope of 19.0.0 as the user states it: the major; the low set removed (compact is its analogue); a guaranteed logoff on every connector close; the timeout for listed long tools; the auth stack update; the per-transport package split (A0–A7). Where this spec is read: §3.1 (the removal chain), §3.3, §3.9 (low), §4.3, §5 (§5.7 stateful, §5.8 long tools), §6.4, §7, §10, §12, §14.9, §15 |
 
 **Settled by the registry, not a decision** (2026-10-10, `npm view`): the version numbers §3.1, §3.3
 and §13 assumed for two prerequisites were taken by other releases the same day —

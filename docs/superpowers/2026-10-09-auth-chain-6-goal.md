@@ -12,7 +12,7 @@ The server `mcp-abap-adt` stands on the auth chain as it is published now:
 | auth-broker | 5.0.x |
 | auth-providers | 6.0.x |
 | auth-stores | 5.0.x |
-| connection | 15.x on interfaces-adt-connection 2, with a per-request signal (below) |
+| connection | 16.x on interfaces-adt-connection 3 — no per-request signal anywhere in the chain (below) |
 | interfaces-auth | 7.5.x |
 | auth-errors | 2.2.x |
 
@@ -115,21 +115,33 @@ never hides one and never guesses one.
     nothing back across ADT requests, so a tool cut between its requests
     would leave a half-made object. Once a tool has started, a cancel changes
     nothing it sends to the SAP system; its answer is produced.
+  - **A cancel does nothing to SAP.** There is no real cancellation against
+    ABAP: the most the server can do is a logoff and closing a connector. A
+    cancelled call causes no logoff and no reopen while the instance lives; a
+    session is reopened only when SAP already lost it.
+  - **Stateful only where SAP needs it.** A tool's session is stateful only
+    for lock → write → unlock and for activation; everything else runs
+    stateless.
+  - **Long tools named in a list take a `timeout`.** The list is explicit
+    and decided tool by tool by the user — not a category. A listed tool
+    takes an optional `timeout`, with no default, and runs on its own
+    stateless connection; when the call ends or the timeout fires, that
+    connection is closed with a logoff, and nothing else is affected.
   - **Every ADT session the server owns is closed with a logoff** — when the
     consumer closes its transport, when an instance is disposed, at shutdown,
-    on every path. A logoff releases the session's locks; nothing else is
-    relied on to release one. A connection the consumer injects is the
+    when a connection made for one operation is done with, on every path. A
+    logoff releases the session's locks; nothing else is relied on to release
+    one. A connection the consumer injects is the
     consumer's to close.
-  - **On a connection the consumer's fresh-connection factory returns**, the
-    server passes each request's signal to the factory. That is all it does
-    there: honouring the signal is the consumer's contract, stated in the
-    embedding docs and the migration note.
-  - **Tests:** the consumer's factory receives the signal; a cancelled
-    request never reaches the tool; a started tool runs to the end; a session
-    holding a lock is closed with a logoff.
+  - **A connection the consumer's fresh-connection factory returns** is the
+    server's from then on, closed with a logoff like its own; the factory
+    receives no signal.
+  - **Tests:** a cancelled request never reaches the tool; a started tool
+    runs to the end; a session holding a lock is closed with a logoff; a listed
+    long tool's timeout closes its own connection and no other.
   - **Its waits end.** Every wait of the server's own the request started
     ends when it is cancelled — a broker call, a login, a renewal the server
-    waits for, a fresh connection — and
+    waits for — and
     only that request's wait ends: another request's wait on the same work
     goes on.
   - **stdio's interactive login** ends when the request that needs it is
@@ -176,6 +188,9 @@ never hides one and never guesses one.
     `rw`) on every transport, with its held state, its pool over Streamable
     HTTP, `--state-idle-minutes` and its ids (`x-sap-debug-*` headers,
     `SAP_DEBUG_*`).
+  - The low tool set leaves `mcp-abap-adt`, `mcp-abap-adt-http` and
+    `mcp-abap-adt-sse`: everyone who needs it has compact. The migration note
+    says so and maps each low tool to the compact handler that does the same.
   - Embedded consumers: the migration note names every change they meet.
 - **The Docker images and the release artifacts follow the split.**
   - **`docker/Dockerfile`** (today: HTTP with `--allow-destination-header`,
@@ -274,11 +289,11 @@ never hides one and never guesses one.
    credential the server holds of any kind — and they, and compact over
    them, depend on neither auth-broker nor auth-stores. An embedding
    consumer's credentials and connections stay the consumer's: the server
-   hands its fresh-connection factory each request's signal and does not wrap
-   them.
+   does not wrap them.
 5. **No built-in timeouts of the chain's making.** A wait ends with a result,
    an explicit error, a cancellation, or a bound the server states as its own
-   choice.
+   choice. One exception is written: a listed long tool's optional
+   `timeout` parameter, with no default.
 6. **One implementation of each rule.** What the chain already ships, the
    server uses rather than re-implements:
    - reading a failure;
@@ -295,17 +310,15 @@ never hides one and never guesses one.
 
 - The proxy (`mcp-abap-adt-proxy`) and the calm server. Each migrates in its
   own change afterwards.
-- Changes to the chain's packages, beyond those the server needs and waits for,
-  each released on the current line after the debugger releases
-  (interfaces-adt 15.1.0, adt-clients 29.1.0, connection 15.0.x):
-  - `@mcp-abap-adt/interfaces-adt-connection` 2.1.0 — a per-request signal in
-    the request options, and the code of an aborted request;
-  - `@mcp-abap-adt/interfaces-adt`, the next minor on the 15 line — the signal in the client's options,
-    and the authentication refusal kept on a failure;
-  - `@mcp-abap-adt/connection`, the next minor on the 15 line — the signal
-    honoured at every send boundary, HTTP and RFC;
-  - `@mcp-abap-adt/adt-clients`, the next minor on the 29 line — the signal on every request, releases
-    never cancelled, the refusal kept.
+- Changes to the chain's packages, beyond those the server needs and waits for
+  — the majors that remove the per-request signal from the chain:
+  - `@mcp-abap-adt/interfaces-adt-connection` 3.0.0 — no signal in the request
+    options, no code of an aborted request;
+  - `@mcp-abap-adt/interfaces-adt` 16.0.0 — no signal in the client's options,
+    no authentication refusal on a failure;
+  - `@mcp-abap-adt/connection` 16.0.0 — no signal checks; `disconnect()`
+    resolves once the logoff is written;
+  - `@mcp-abap-adt/adt-clients` 31.0.0 — on those contracts.
 
   Any other defect found there goes to its own repository, and the server waits
   for the fix to be published.

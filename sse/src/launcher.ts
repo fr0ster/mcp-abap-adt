@@ -6,7 +6,13 @@
  */
 
 import type { EventEmitter } from 'node:events';
-import { generateHelp, readStartupConfig } from '@mcp-abap-adt/lib/config';
+import {
+  answerVersionOrHelp,
+  generateHelp,
+  type LauncherEdges,
+  processEdges,
+  readStartupConfig,
+} from '@mcp-abap-adt/lib/config';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
@@ -46,25 +52,6 @@ export interface SseLauncherDeps {
   processLike: EventEmitter;
 }
 
-/** The process as `main` meets it; a test passes its own. */
-export interface SseLauncherEdges extends SseLauncherDeps {
-  /** The arguments, without node's and the script's. */
-  argv: readonly string[];
-  /** `--version`'s one line. */
-  stdout: (line: string) => void;
-}
-
-/** The edges of the program: `process`. */
-export function processEdges(): SseLauncherEdges {
-  return {
-    argv: process.argv.slice(2),
-    stdout: (line) => console.log(line),
-    stderr: (line) => process.stderr.write(`${line}\n`),
-    exit: (code) => process.exit(code),
-    processLike: process,
-  };
-}
-
 const HELP_SECTIONS = `
 CREDENTIALS (the headers of the GET that opens each SSE connection; a POST is
 routed by its sessionId alone, and its own x-sap-* headers are not read):
@@ -96,26 +83,29 @@ export function sseHelp(
   options: { toolSet?: ToolSet; program?: string } = {},
 ): string {
   const toolSet = options.toolSet ?? fullToolSet;
-  return generateHelp(sseParameters(toolSet, options.program), {
+  const program = options.program ?? 'mcp-abap-adt-sse';
+  return generateHelp(sseParameters(toolSet, program), {
     description:
       '  MCP server for SAP ABAP systems via ADT, over HTTP+SSE: credentials only from the\n  x-sap-* headers of the GET that opens each SSE connection. stdio (destinations,\n  logins) is mcp-abap-adt, Streamable HTTP mcp-abap-adt-http; a binary is its transport.',
-    sections: [toolSet.expositionHelp, HELP_SECTIONS],
+    sections: [
+      toolSet.expositionHelp('sse'),
+      HELP_SECTIONS,
+      `\nEXAMPLES:\n${toolSet.expositionExamples(program)}`,
+    ],
   });
 }
 
 export async function main(
   options: SseLauncherOptions,
-  edges: SseLauncherEdges = processEdges(),
+  edges: LauncherEdges = processEdges(),
 ): Promise<SseServer | undefined> {
   const { argv, stderr, exit } = edges;
-  if (argv.includes('--version') || argv.includes('-v')) {
-    edges.stdout(options.version);
-    exit(0);
-    return undefined;
-  }
-  if (argv.includes('--help') || argv.includes('-h')) {
-    stderr(sseHelp(options));
-    exit(0);
+  if (
+    answerVersionOrHelp(edges, {
+      version: options.version,
+      help: () => sseHelp(options),
+    })
+  ) {
     return undefined;
   }
   // sse's own table with the set's exposition row: an option of another
@@ -148,7 +138,11 @@ export async function launch(
   // without one: the set's default).
   const exposition =
     config.exposition ??
-    options.toolSet.exposition(options.toolSet.expositionRow.default, []);
+    options.toolSet.exposition(
+      options.toolSet.expositionRow.default,
+      [],
+      'sse',
+    );
   const server = new SseServer(registryOf(options.toolSet, exposition), {
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,

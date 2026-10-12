@@ -10,12 +10,9 @@
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
+import { type LauncherEdges, processEdges } from '@mcp-abap-adt/lib/config';
 import { compactToolSetOf, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
-import {
-  processEdges,
-  type SseLauncherEdges,
-  main as sseMain,
-} from '@mcp-abap-adt/sse/launcher';
+import { main as sseMain } from '@mcp-abap-adt/sse/launcher';
 
 /** The compact tool set: `ro` / `rw` (default), `debug` beside either. */
 export const compactToolSet: ToolSet = compactToolSetOf({
@@ -32,7 +29,7 @@ export const COMPACT_SSE_VERSION: string = (
 ).version;
 
 export function main(
-  edges: SseLauncherEdges = processEdges(),
+  edges: LauncherEdges = processEdges(),
 ): ReturnType<typeof sseMain> {
   return sseMain(
     {

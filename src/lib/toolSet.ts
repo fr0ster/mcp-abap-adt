@@ -27,11 +27,21 @@ import {
   ParameterRefusal,
   type ParameterValue,
 } from './config/authParameters';
-import { expositionHelp, toHandlerSets } from './config/exposition';
+import {
+  expositionHelp,
+  type ServedTransport,
+  toHandlerSets,
+} from './config/exposition';
 import { expositionProblem } from './config/validateExposition';
 import type { HandlerContext, IHandlerGroup } from './handlers/interfaces';
+
+export type { ServedTransport } from './config/exposition';
+
 import { CompositeHandlersRegistry } from './handlers/registry/CompositeHandlersRegistry';
-import { expositionGroups } from './handlers/registry/expositionRegistry';
+import {
+  expositionGroups,
+  noConnectionContext,
+} from './handlers/registry/expositionRegistry';
 
 /**
  * The groups a server serves, given the base context and the exposition; and
@@ -43,17 +53,22 @@ export interface ToolSet {
    * (also the `--conf` template's value) and the config file's validation.
    */
   readonly expositionRow: Parameter;
-  /** The HANDLER EXPOSITION section of the binary's `--help`. */
-  readonly expositionHelp: string;
+  /** The HANDLER EXPOSITION section of the `--help` of a binary serving `transport`. */
+  expositionHelp(transport: ServedTransport): string;
+  /** The `--exposition` lines of the EXAMPLES section of `program`'s help. */
+  expositionExamples(program: string): string;
   /**
    * The exposition a run serves. `read` is what the binary's table read for
-   * the row — the CLI form, else the config file's, else the row's default;
-   * `argv` the arguments as given, for a set that reads its flag itself. A
-   * value the set does not serve throws a `ParameterRefusal` in fixed words.
+   * the row — the CLI form (unless the row leaves it to the set), else the
+   * config file's, else the row's default; `argv` the arguments as given, for
+   * a set that reads its flag itself; `transport` the binary's, for words
+   * that name another binary. A value the set does not serve throws a
+   * `ParameterRefusal` in fixed words.
    */
   exposition(
     read: ParameterValue | undefined,
     argv: readonly string[],
+    transport: ServedTransport,
   ): readonly string[];
   /** The groups for an exposition `exposition()` answered, built against `context`, in registration order. */
   groups(
@@ -67,11 +82,9 @@ export function registryOf(
   toolSet: ToolSet,
   exposition: readonly string[],
 ): CompositeHandlersRegistry {
-  const baseContext = {
-    connection: undefined as never,
-    logger: undefined,
-  } satisfies HandlerContext;
-  return new CompositeHandlersRegistry(toolSet.groups(baseContext, exposition));
+  return new CompositeHandlersRegistry(
+    toolSet.groups(noConnectionContext(), exposition),
+  );
 }
 
 const listOf = (value: ParameterValue | undefined): string[] | undefined =>
@@ -84,12 +97,16 @@ const listOf = (value: ParameterValue | undefined): string[] | undefined =>
  */
 export const fullToolSet: ToolSet = {
   expositionRow: EXPOSITION_ROW,
-  expositionHelp: expositionHelp(),
-  exposition(read) {
-    const sets = toHandlerSets(listOf(read));
-    const problem = expositionProblem(sets);
+  expositionHelp: (transport) => expositionHelp(transport),
+  expositionExamples: (program) =>
+    `  # Readonly tools only (with search and system)\n  ${program} --exposition=readonly\n\n` +
+    `  # The debugger beside the default sets\n  ${program} --exposition=readonly,high,debug\n`,
+  exposition(read, _argv, transport) {
+    // Every word is checked before any is dropped: an unknown one is refused.
+    const words = listOf(read) ?? [];
+    const problem = expositionProblem(words, transport);
     if (problem !== undefined) throw new ParameterRefusal(problem);
-    return sets;
+    return toHandlerSets(words);
   },
   groups(context, exposition) {
     return expositionGroups(exposition, context);
@@ -119,11 +136,14 @@ export interface CompactHalves {
 export function compactToolSetOf(halves: CompactHalves): ToolSet {
   return {
     expositionRow: COMPACT_EXPOSITION_ROW,
-    expositionHelp: COMPACT_EXPOSITION_HELP,
+    expositionHelp: () => COMPACT_EXPOSITION_HELP,
+    expositionExamples: (program) =>
+      `  # The 16 tools that change nothing\n  ${program} --exposition=ro\n\n` +
+      `  # All 25, and the four debugger verbs\n  ${program} --exposition=rw,debug\n`,
     exposition(read, argv) {
-      // The flag is read here, the last one winning and an empty one refused;
-      // without it, the config file's value (already read by the row's
-      // parser), else the default.
+      // The flag is read here alone (the row leaves its CLI form to the set),
+      // the last one winning and an empty one refused; without it, the config
+      // file's value (already read by the row's parser), else the default.
       const flagged = compactExpositionValues(argv);
       if (flagged !== undefined) return compactExpositionOf(flagged);
       return compactExpositionOf(listOf(read) ?? ['rw']);

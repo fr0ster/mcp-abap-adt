@@ -82,6 +82,13 @@ export interface Parameter {
   readonly section: string;
   /** The help sentence(s). */
   readonly help: string;
+  /**
+   * The CLI form is read by the row's owner, not by the table: a tool set's
+   * `--exposition`, whose own reader keeps its rules (the last flag wins, an
+   * empty one refused in its words). The table reads the environment and
+   * YAML forms only; the help and the template still show the row.
+   */
+  readonly cliReadByOwner?: true;
 }
 
 /**
@@ -328,7 +335,7 @@ function readRow(
   env: NodeJS.ProcessEnv,
   yaml?: Record<string, unknown> | null,
 ): { value: ParameterValue; source: string } | undefined {
-  const cli = readCli(p, argv);
+  const cli = p.cliReadByOwner ? undefined : readCli(p, argv);
   const sources: [Source, unknown, string | undefined][] = [
     ['cli', cli?.raw, cli?.name],
     ['env', p.env === undefined ? undefined : env[p.env], undefined],

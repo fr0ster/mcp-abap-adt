@@ -80,7 +80,7 @@ function todaysFullGroups(exposition: readonly string[]): IHandlerGroup[] {
 
 /** The exposition a set reads from `argv` alone (no config file). */
 const exposed = (set: ToolSet, argv: string[]) =>
-  set.exposition(undefined, argv);
+  set.exposition(undefined, argv, 'stdio');
 
 describe('fullToolSet', () => {
   it.each([
@@ -111,23 +111,64 @@ describe('fullToolSet', () => {
 
   it('defaults to readonly,high, as today', () => {
     expect(fullToolSet.expositionRow.default).toEqual(['readonly', 'high']);
-    expect(fullToolSet.exposition(['readonly', 'high'], [])).toEqual([
+    expect(fullToolSet.exposition(['readonly', 'high'], [], 'stdio')).toEqual([
       'readonly',
       'high',
     ]);
   });
 
-  it('refuses compact, and high beside low, in today’s words', () => {
-    expect(() => fullToolSet.exposition(['compact'], [])).toThrow(
-      new ParameterRefusal(
-        "Invalid exposition: 'compact' is served by @mcp-abap-adt/compact, which is its own command with the compact tool list as its default. Install it and run `mcp-abap-adt-compact`, or drop `compact` from this exposition.",
-      ),
-    );
-    expect(() => fullToolSet.exposition(['high', 'low'], [])).toThrow(
+  it('refuses high beside low in today’s words', () => {
+    expect(() => fullToolSet.exposition(['high', 'low'], [], 'stdio')).toThrow(
       new ParameterRefusal(
         "Invalid exposition: 'high' and 'low' are mutually exclusive",
       ),
     );
+  });
+
+  // Each transport's compact binary (D49): never the stdio one for HTTP or SSE.
+  it.each([
+    ['stdio', 'mcp-abap-adt-compact', '@mcp-abap-adt/compact'],
+    ['http', 'mcp-abap-adt-compact-http', '@mcp-abap-adt/compact-http'],
+    ['sse', 'mcp-abap-adt-compact-sse', '@mcp-abap-adt/compact-sse'],
+  ] as const)(
+    '%s: compact, ro and rw name %s; the help names it too',
+    (transport, bin, pkg) => {
+      expect(() => fullToolSet.exposition(['compact'], [], transport)).toThrow(
+        new ParameterRefusal(
+          `Invalid exposition: 'compact' is served by ${pkg}, which is its own command with the compact tool list as its default. Install it and run \`${bin}\`, or drop \`compact\` from this exposition.`,
+        ),
+      );
+      for (const word of ['ro', 'rw']) {
+        expect(() =>
+          fullToolSet.exposition(['readonly', word], [], transport),
+        ).toThrow(
+          new ParameterRefusal(
+            `Invalid exposition: '${word}' is not a set of this command, which takes readonly, high, low and debug, comma-separated. 'ro' and 'rw' are the sets of \`${bin}\` (${pkg}).`,
+          ),
+        );
+      }
+      const help = fullToolSet.expositionHelp(transport);
+      expect(help).toContain(`npm i -g ${pkg}\n`);
+      expect(help).toContain(`  ${bin}\n`);
+    },
+  );
+
+  // 17.x dropped an unknown word silently: `--exposition=ro` served readonly,high.
+  it.each(['search', 'system', 'all', 'readonly-x'])(
+    'refuses an unknown word (%s) instead of dropping it',
+    (word) => {
+      expect(() => fullToolSet.exposition([word], [], 'http')).toThrow(
+        new ParameterRefusal(
+          `Invalid exposition: '${word}' is not a set of this command, which takes readonly, high, low and debug, comma-separated.`,
+        ),
+      );
+    },
+  );
+
+  it('its examples name the binary and its sets', () => {
+    const examples = fullToolSet.expositionExamples('mcp-abap-adt-http');
+    expect(examples).toContain('mcp-abap-adt-http --exposition=readonly\n');
+    expect(examples).not.toContain('--exposition=ro\n');
   });
 });
 
@@ -180,7 +221,7 @@ describe('compactToolSetOf, with the two halves', () => {
 
   it('defaults to rw', () => {
     expect(compact.expositionRow.default).toEqual(['rw']);
-    expect(compact.exposition(undefined, [])).toEqual(['rw']);
+    expect(compact.exposition(undefined, [], 'stdio')).toEqual(['rw']);
   });
 
   it.each([
@@ -216,12 +257,26 @@ describe('compactToolSetOf, with the two halves', () => {
   });
 
   it('reads the config file’s value with the same parser when no flag is given', () => {
-    expect(compact.exposition(['ro', 'debug'], [])).toEqual(['ro', 'debug']);
-    expect(() => compact.exposition(['readonly', 'high'], [])).toThrow(
+    expect(compact.exposition(['ro', 'debug'], [], 'stdio')).toEqual([
+      'ro',
+      'debug',
+    ]);
+    expect(() => compact.exposition(['readonly', 'high'], [], 'stdio')).toThrow(
       /--exposition=readonly is not a compact set/,
     );
     // The flag, when given, wins over the file.
-    expect(compact.exposition(['ro'], ['--exposition=rw'])).toEqual(['rw']);
+    expect(compact.exposition(['ro'], ['--exposition=rw'], 'stdio')).toEqual([
+      'rw',
+    ]);
+  });
+
+  it('its examples name the binary and its sets, never the full ones', () => {
+    const examples = compact.expositionExamples('mcp-abap-adt-compact-sse');
+    expect(examples).toContain('mcp-abap-adt-compact-sse --exposition=ro\n');
+    expect(examples).toContain(
+      'mcp-abap-adt-compact-sse --exposition=rw,debug\n',
+    );
+    expect(examples).not.toContain('readonly');
   });
 
   it('its row validates a config file’s value with the same parser', () => {

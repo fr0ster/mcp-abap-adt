@@ -49,7 +49,7 @@ describe('mcp-abap-adt-compact-http', () => {
   });
 
   it('serves the compact tool set: rw by default, 25 tools', () => {
-    const exposition = compactToolSet.exposition(undefined, []);
+    const exposition = compactToolSet.exposition(undefined, [], 'stdio');
     expect(exposition).toEqual(['rw']);
     const tools = compactToolSet
       .groups({ connection: undefined as never, logger: undefined }, exposition)

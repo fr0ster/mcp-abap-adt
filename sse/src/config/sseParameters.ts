@@ -162,7 +162,7 @@ export function readSseConfig(
   const table = sseParameters(toolSet);
   const values = readParameters(table, argv, env, yaml);
   return {
-    exposition: toolSet.exposition(values.exposition, argv),
+    exposition: toolSet.exposition(values.exposition, argv, 'sse'),
     configFile: values.configFile as string | undefined,
     systemType: values.systemType as SseConfig['systemType'],
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),

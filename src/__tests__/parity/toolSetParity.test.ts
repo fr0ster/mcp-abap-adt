@@ -142,16 +142,54 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
 };
 
 /** A read of one class on each set: the tool that sends it differs, nothing else. */
-const READ_CALL: Record<
-  SetName,
-  { name: string; arguments: Record<string, unknown> }
-> = {
-  full: { name: 'GetClass', arguments: { class_name: 'ZCL_PARITY' } },
-  compact: {
-    name: 'HandlerGet',
-    arguments: { object_type: 'CLASS', class_name: 'ZCL_PARITY' },
-  },
+const readCall = (
+  set: SetName,
+  className = 'ZCL_PARITY',
+): { name: string; arguments: Record<string, unknown> } =>
+  set === 'full'
+    ? { name: 'GetClass', arguments: { class_name: className } }
+    : {
+        name: 'HandlerGet',
+        arguments: { object_type: 'CLASS', class_name: className },
+      };
+const READ_CALL: Record<SetName, ReturnType<typeof readCall>> = {
+  full: readCall('full'),
+  compact: readCall('compact'),
 };
+
+/** The `Authorization` headers of the stand-in's requests naming `className`. */
+const presentedFor = (className: string) => [
+  ...new Set(
+    standIn.requests
+      .filter((r) => r.url.includes(className.toLowerCase()))
+      .map((r) => r.authorization),
+  ),
+];
+
+/** The data of the next `event: <name>` of an SSE stream, read by plain string search. */
+function eventReader(body: ReadableStream<Uint8Array>) {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  return async (name: string): Promise<string> => {
+    const marker = `event: ${name}\n`;
+    for (;;) {
+      const at = buffer.indexOf(marker);
+      if (at >= 0) {
+        const dataAt = buffer.indexOf('data: ', at + marker.length);
+        const end = dataAt >= 0 ? buffer.indexOf('\n', dataAt) : -1;
+        if (end >= 0) {
+          const data = buffer.slice(dataAt + 'data: '.length, end).trim();
+          buffer = buffer.slice(end + 1);
+          return data;
+        }
+      }
+      const { value, done } = await reader.read();
+      if (done) throw new Error('stream ended');
+      buffer += decoder.decode(value, { stream: true }).split('\r').join('');
+    }
+  };
+}
 
 /** The exposition with the debugger, in each set's words. */
 const DEBUG_EXPOSITION: Record<SetName, string> = {
@@ -283,17 +321,27 @@ function rowHelpOf(toolSet: ToolSet): string {
   return section.slice('OPTIONS:\n'.length);
 }
 
-/** The help, with what is the binary's own — its name, its exposition — set aside. */
-async function helpOf(launcher: Launcher): Promise<string> {
+/**
+ * The help, with what is the binary's own — its name, its exposition's row,
+ * section and examples — set aside.
+ */
+async function helpOf(
+  launcher: Launcher,
+  transportName: TransportName,
+): Promise<string> {
   const { stderr, exits } = await run(launcher, ['--help']);
   expect(exits).toEqual([0]);
   return stderr
     .join('\n')
+    .split(launcher.toolSet.expositionExamples(launcher.program))
+    .join('<exposition examples>')
     .split(`USAGE:\n  ${launcher.program} [options]`)
     .join('USAGE:\n  <program> [options]')
+    .split(`\n  ${launcher.program} `)
+    .join('\n  <program> ')
     .split(rowHelpOf(launcher.toolSet))
     .join('<exposition row>')
-    .split(launcher.toolSet.expositionHelp)
+    .split(launcher.toolSet.expositionHelp(transportName))
     .join('<exposition section>');
 }
 
@@ -415,6 +463,12 @@ async function serveStdio(launcher: Launcher, set: SetName) {
   };
 }
 
+const userHeaders = (user: string, password: string) => ({
+  'x-sap-url': standIn.url,
+  'x-sap-client': '100',
+  'x-sap-login': user,
+  'x-sap-password': password,
+});
 const basicHeaders = () => ({
   'x-sap-url': standIn.url,
   'x-sap-client': '100',
@@ -504,6 +558,25 @@ async function serveHttpLike(
     ...basicHeaders(),
     'x-mcp-destination': 'TRIAL',
   });
+
+  // Two clients at once, each with its own user: neither sees the other's.
+  const [clientA, clientB] = await Promise.all([
+    clientWith(userHeaders('USER_A', 'pass-a')),
+    clientWith(userHeaders('USER_B', 'pass-b')),
+  ]);
+  await Promise.all([
+    clientA.callTool(readCall(set, 'ZCL_PARITY_A')),
+    clientB.callTool(readCall(set, 'ZCL_PARITY_B')),
+  ]);
+  const concurrent = {
+    a: presentedFor('ZCL_PARITY_A'),
+    b: presentedFor('ZCL_PARITY_B'),
+  };
+  await Promise.all([clientA.close(), clientB.close()]);
+
+  // SSE: a POST is routed by its sessionId alone (ruling 14).
+  const sseOnly =
+    transportName === 'sse' ? await ssePosts(endpoint, set) : undefined;
   const exit = await started.stop();
 
   const debugStart = await run(launcher, [
@@ -524,9 +597,54 @@ async function serveHttpLike(
       token,
       noCredentials,
       destinationHeader,
+      concurrent,
+      sseOnly,
       exit,
     },
   };
+}
+
+/**
+ * SSE: a connection opened by user A; a POST carrying user B's `x-sap-*`
+ * headers still runs as A, and a POST carrying `x-mcp-destination` is
+ * answered `400`.
+ */
+async function ssePosts(endpoint: string, set: SetName) {
+  const controller = new AbortController();
+  try {
+    const response = await fetch(endpoint, {
+      headers: userHeaders('USER_A', 'pass-a'),
+      signal: controller.signal,
+    });
+    const next = eventReader(response.body as ReadableStream<Uint8Array>);
+    const postUrl = new URL(await next('endpoint'), endpoint);
+    const post = (headers: Record<string, string>, body: object) =>
+      fetch(postUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...headers },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 7, ...body }),
+      });
+    const call = readCall(set, 'ZCL_PARITY_POST');
+    const accepted = await post(userHeaders('USER_B', 'pass-b'), {
+      method: 'tools/call',
+      params: call,
+    });
+    await next('message');
+    const destination = await post(
+      { ...userHeaders('USER_A', 'pass-a'), 'x-mcp-destination': 'TRIAL' },
+      { method: 'tools/call', params: call },
+    );
+    return {
+      postStatus: accepted.status,
+      postPresented: presentedFor('ZCL_PARITY_POST'),
+      destinationPost: {
+        status: destination.status,
+        body: await destination.text(),
+      },
+    };
+  } finally {
+    controller.abort();
+  }
 }
 
 async function observe(transportName: TransportName, set: SetName) {
@@ -539,7 +657,7 @@ async function observe(transportName: TransportName, set: SetName) {
     tools: served.tools,
     debugTools: served.debugTools,
     observed: {
-      help: await helpOf(launcher),
+      help: await helpOf(launcher, transportName),
       template: await templateOf(launcher),
       transportGone: await refusalOf(launcher, ['--transport=stdio']),
       otherBinary: await refusalOf(launcher, [OTHER_OPTION[transportName]]),
@@ -548,11 +666,12 @@ async function observe(transportName: TransportName, set: SetName) {
   };
 }
 
-/** What a tool answers when the system refuses the user (`401`), on either set. */
-const USER_REFUSED = {
-  ok: false,
-  message: expect.stringContaining('the user or password was refused'),
-};
+/**
+ * A `401` inside a handler is a failure on either set; which answer it gets
+ * (§7.3's `authentication_failed`) is C6's, so only its being a failure is
+ * pinned here — full and compact are compared whole above.
+ */
+const USER_REFUSED = { ok: false };
 
 const COMPACT_RW = [
   'HandlerActivate',
@@ -613,6 +732,20 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           status: 400,
           body: expect.stringContaining(DESTINATIONS_ONLY_STDIO_WORDS),
         });
+        expect(served.concurrent).toEqual({
+          a: [basicOf('USER_A', 'pass-a')],
+          b: [basicOf('USER_B', 'pass-b')],
+        });
+        if (transportName === 'sse') {
+          expect(served.sseOnly).toEqual({
+            postStatus: 202,
+            postPresented: [basicOf('USER_A', 'pass-a')],
+            destinationPost: {
+              status: 400,
+              body: expect.stringContaining(DESTINATIONS_ONLY_STDIO_WORDS),
+            },
+          });
+        }
       }
       expect(full.observed.transportGone.exits).toEqual([1]);
       expect(full.observed.transportGone.stderr.join('\n')).toContain(
@@ -641,7 +774,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
 );
 
 describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s compact: the config file’s exposition is compact’s, honoured',
+  '%s compact: --exposition and the config file’s exposition are compact’s',
   (transportName) => {
     jest.setTimeout(60_000);
     const launcher = LAUNCHERS[transportName].compact;
@@ -661,28 +794,26 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       return `--conf=${file}`;
     };
 
-    it('exposition: ro serves the 16 that change nothing', async () => {
-      const argv = [...(await listen()), conf('ro')];
-      let tools: string[];
+    /** The tools a start with `argv` serves (a listener of its own for HTTP and SSE). */
+    const servedTools = async (argv: string[]): Promise<string[]> => {
+      const at = await listen();
+      const client = new Client({ name: 'parity', version: '1.0.0' });
+      open.clients.push(client);
+      let started: Run;
       if (transportName === 'stdio') {
         const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-        const client = new Client({ name: 'parity', version: '1.0.0' });
-        open.clients.push(client);
-        const started = await run(launcher, argv, serverSide);
+        started = await run(launcher, [...at, ...argv], serverSide);
+        expect(started.exits).toEqual([]);
         await client.connect(clientSide);
-        tools = await names(client);
-        await client.close();
-        await started.stop();
       } else {
-        const started = await run(launcher, argv);
-        const port = argv[1].slice(argv[1].indexOf('=') + 1);
+        started = await run(launcher, [...at, ...argv]);
+        expect(started.exits).toEqual([]);
+        const port = at[1].slice(at[1].indexOf('=') + 1);
         const url =
           transportName === 'http'
             ? `http://127.0.0.1:${port}/mcp/stream/http`
             : `http://127.0.0.1:${port}/sse`;
         const headers = basicHeaders();
-        const client = new Client({ name: 'parity', version: '1.0.0' });
-        open.clients.push(client);
         await client.connect(
           transportName === 'http'
             ? new StreamableHTTPClientTransport(new URL(url), {
@@ -692,13 +823,49 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
                 requestInit: { headers },
               }),
         );
-        tools = await names(client);
-        await client.close();
-        await started.stop();
       }
+      const tools = await names(client);
+      await client.close();
+      await started.stop();
+      return tools;
+    };
+
+    it('exposition: ro serves the 16 that change nothing', async () => {
+      const tools = await servedTools([conf('ro')]);
       expect(tools).toHaveLength(16);
       expect(tools).toContain('HandlerGet');
       expect(tools).not.toContain('HandlerCreate');
+    });
+
+    // 17.x's rule (PR #247): the last --exposition flag wins, and an empty
+    // one is refused in compact's words — through the binary, not only the parser.
+    it('the last flag wins: --exposition=readonly --exposition=ro serves ro', async () => {
+      const tools = await servedTools([
+        '--exposition=readonly',
+        '--exposition=ro',
+      ]);
+      expect(tools).toHaveLength(16);
+      expect(tools).not.toContain('HandlerCreate');
+    });
+
+    it('the last flag wins: --exposition=debug --exposition=ro,debug serves ro,debug', async () => {
+      const tools = await servedTools([
+        '--exposition=debug',
+        '--exposition=ro,debug',
+      ]);
+      expect(tools).toHaveLength(16 + 4);
+      expect(tools).toEqual(expect.arrayContaining(COMPACT_DEBUG));
+    });
+
+    it('a bare --exposition is refused in compact’s empty-value words', async () => {
+      const { stderr, exits } = await run(launcher, [
+        ...(await listen()),
+        '--exposition',
+      ]);
+      expect(exits).toEqual([1]);
+      expect(stderr).toEqual([
+        "[MCP] --exposition was given no value. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 25), and 'debug' beside either. An empty value is refused rather than defaulted: an unset shell variable must not silently open the write tools.",
+      ]);
     });
 
     it('a set of the full binaries is refused in compact’s words, naming the file', async () => {
@@ -723,6 +890,67 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       expect(template).not.toContain('readonly,high');
       const { stderr } = await run(launcher, ['--help']);
       expect(stderr.join('\n')).toContain('--exposition=<ro|rw>[,debug]');
+    });
+  },
+);
+
+/** Each transport's compact binary, as the full binary of that transport names it (D49). */
+const COMPACT_OF: Record<TransportName, { bin: string; pkg: string }> = {
+  stdio: { bin: 'mcp-abap-adt-compact', pkg: '@mcp-abap-adt/compact' },
+  http: { bin: 'mcp-abap-adt-compact-http', pkg: '@mcp-abap-adt/compact-http' },
+  sse: { bin: 'mcp-abap-adt-compact-sse', pkg: '@mcp-abap-adt/compact-sse' },
+};
+
+describe.each<TransportName>(['stdio', 'http', 'sse'])(
+  '%s: each binary’s exposition words and examples are its own',
+  (transportName) => {
+    const full = LAUNCHERS[transportName].full;
+    const compact = LAUNCHERS[transportName].compact;
+    const { bin, pkg } = COMPACT_OF[transportName];
+
+    it('the full binary refuses compact naming its transport’s compact binary', async () => {
+      expect(await refusalOf(full, ['--exposition=compact'])).toEqual({
+        stderr: [
+          `[MCP] Invalid exposition: 'compact' is served by ${pkg}, which is its own command with the compact tool list as its default. Install it and run \`${bin}\`, or drop \`compact\` from this exposition.`,
+        ],
+        exits: [1],
+      });
+    });
+
+    it('the full binary refuses ro (and any unknown word), never dropping it', async () => {
+      expect(await refusalOf(full, ['--exposition=ro'])).toEqual({
+        stderr: [
+          `[MCP] Invalid exposition: 'ro' is not a set of this command, which takes readonly, high, low and debug, comma-separated. 'ro' and 'rw' are the sets of \`${bin}\` (${pkg}).`,
+        ],
+        exits: [1],
+      });
+      expect(await refusalOf(full, ['--exposition=readonly,search'])).toEqual({
+        stderr: [
+          "[MCP] Invalid exposition: 'search' is not a set of this command, which takes readonly, high, low and debug, comma-separated.",
+        ],
+        exits: [1],
+      });
+    });
+
+    it('the full help names its transport’s compact binary and shows the full sets', async () => {
+      const help = (await run(full, ['--help'])).stderr.join('\n');
+      expect(help).toContain(`npm i -g ${pkg}\n`);
+      expect(help).toContain(`\n                                     ${bin}\n`);
+      expect(help).toContain(`  ${full.program} --exposition=readonly\n`);
+      for (const other of Object.values(COMPACT_OF)) {
+        if (other.pkg !== pkg) {
+          expect(help).not.toContain(`npm i -g ${other.pkg}\n`);
+          expect(help).not.toContain(`${other.bin}\n`);
+        }
+      }
+    });
+
+    it('the compact help shows its own examples, never the full binary’s', async () => {
+      const help = (await run(compact, ['--help'])).stderr.join('\n');
+      expect(help).toContain(`  ${compact.program} --exposition=ro\n`);
+      expect(help).toContain(`  ${compact.program} --exposition=rw,debug\n`);
+      expect(help).not.toContain('--exposition=readonly');
+      expect(help).not.toContain(`  ${full.program} --`);
     });
   },
 );

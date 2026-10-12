@@ -165,7 +165,7 @@ export function readHttpConfig(
   const table = httpParameters(toolSet);
   const values = readParameters(table, argv, env, yaml);
   return {
-    exposition: toolSet.exposition(values.exposition, argv),
+    exposition: toolSet.exposition(values.exposition, argv, 'http'),
     configFile: values.configFile as string | undefined,
     systemType: values.systemType as HttpConfig['systemType'],
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),

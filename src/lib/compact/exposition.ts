@@ -155,13 +155,16 @@ function wordsOf(raw: unknown): string[] {
  * The compact binaries' `--exposition` row (spec §10.1): the help line, the
  * template's `rw`, and the config file's value read and refused by the same
  * parser as the flag — so a compact config file's `exposition` is honoured,
- * never ignored.
+ * never ignored. The flag itself is read by the set alone
+ * (`compactExpositionValues`: the last one wins, an empty one is refused), so
+ * one reader decides it.
  */
 export const COMPACT_EXPOSITION_ROW: Parameter = {
   key: 'exposition',
   cli: '--exposition',
   yaml: 'exposition',
   kind: 'custom',
+  cliReadByOwner: true,
   parse: (raw: unknown): ParameterValue => compactExpositionOf(wordsOf(raw)),
   default: ['rw'],
   valueHint: '=<ro|rw>[,debug]',

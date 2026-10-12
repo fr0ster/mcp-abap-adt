@@ -39,9 +39,20 @@ export {
   transportRemoved,
   validateYamlParameters,
 } from './authParameters.js';
-export { expositionHelp, toHandlerSets } from './exposition.js';
+export {
+  COMPACT_BINARIES,
+  expositionHelp,
+  type ServedTransport,
+  toHandlerSets,
+} from './exposition.js';
 export type { HandlerSet, IServerConfig, TlsConfig } from './IServerConfig.js';
-export { readStartupConfig, type StartupEdges } from './startup.js';
+export {
+  answerVersionOrHelp,
+  type LauncherEdges,
+  processEdges,
+  readStartupConfig,
+  type StartupEdges,
+} from './startup.js';
 export { readStateIdleMinutes } from './stateIdleMinutes.js';
 export {
   expositionProblem,

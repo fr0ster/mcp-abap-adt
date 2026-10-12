@@ -262,24 +262,23 @@ the compact tool set of `@mcp-abap-adt/lib/tool-set` on every transport.
 
 ## Implementation
 
-Handler sets are registered in [src/server/v2/launcher.ts](../src/server/v2/launcher.ts):
+Handler sets are a `ToolSet` (`@mcp-abap-adt/lib/tool-set`, [src/lib/toolSet.ts](../../src/lib/toolSet.ts)),
+the one input of each binary's launcher (`main({ toolSet, program, version })`):
+
+- `fullToolSet` — `mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse`. Its groups
+  (`expositionGroups`, [src/lib/handlers/registry/expositionRegistry.ts](../../src/lib/handlers/registry/expositionRegistry.ts)):
+  the non-readonly groups first (`high`, `low`, `debug`), so their tool names feed the readonly
+  dedup; then `readonly` with `SystemHandlersGroup`; then search, always. A word outside
+  `readonly`, `high`, `low`, `debug`, and `high` beside `low`, stop the start in fixed words.
+- `compactToolSetOf({ readOnly, modify })` — `mcp-abap-adt-compact`, `-compact-http`,
+  `-compact-sse`, with the two halves' entry builders: `ro` the read-only half, `rw` both (the
+  default), `debug` beside either the four `HandlerDebug*` verbs; no search.
 
 ```typescript
-const handlerGroups: any[] = [];
-if (config.exposition.includes('readonly')) {
-  handlerGroups.push(new ReadOnlyHandlersGroup(baseContext));
-}
-if (config.exposition.includes('high')) {
-  handlerGroups.push(new HighLevelHandlersGroup(baseContext));
-}
-if (config.exposition.includes('compact')) {
-  handlerGroups.push(new CompactHandlersGroup(baseContext));
-}
-if (config.exposition.includes('low')) {
-  handlerGroups.push(new LowLevelHandlersGroup(baseContext));
-}
-// SearchHandlersGroup is always included
-handlerGroups.push(new SearchHandlersGroup(baseContext));
+import { fullToolSet, registryOf } from '@mcp-abap-adt/lib/tool-set';
+
+const exposition = fullToolSet.exposition(['readonly', 'high'], [], 'stdio');
+const registry = registryOf(fullToolSet, exposition); // a CompositeHandlersRegistry
 ```
 
 ## Adding New Handlers

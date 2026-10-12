@@ -15,23 +15,23 @@ import { ReadVsGetDedupStrategy } from '../groups/strategies/index.js';
 import type { HandlerContext, IHandlerGroup } from '../interfaces.js';
 import { CompositeHandlersRegistry } from './CompositeHandlersRegistry.js';
 
-export interface ExpositionRegistryOptions {
-  /** Groups a command adds to the list (compact's halves), built against the base context. */
-  extraGroups?: (context: HandlerContext) => IHandlerGroup[];
-  /** Whether the search tools join the list; default yes. */
-  includeSearch?: boolean;
+/** The context a registry is built against before any connection exists. */
+export function noConnectionContext(): HandlerContext {
+  return {
+    connection: undefined as never,
+    logger: undefined,
+  } satisfies HandlerContext;
 }
 
 /**
  * The groups for `exposition`, built against `baseContext`: the non-readonly
  * groups first, so their tool names feed the readonly dedup
  * (`ReadVsGetDedupStrategy`), then the readonly and system groups, the
- * others, and search unless refused — in registration order.
+ * others, and search — in registration order.
  */
 export function expositionGroups(
   exposition: readonly string[],
   baseContext: HandlerContext,
-  options: ExpositionRegistryOptions = {},
 ): IHandlerGroup[] {
   const overridingGroups: IHandlerGroup[] = [];
   if (exposition.includes('high')) {
@@ -42,9 +42,6 @@ export function expositionGroups(
   }
   if (exposition.includes('debug')) {
     overridingGroups.push(new DebugHandlersGroup(baseContext));
-  }
-  for (const group of options.extraGroups?.(baseContext) ?? []) {
-    overridingGroups.push(group);
   }
 
   const overridingToolNames = new Set<string>();
@@ -66,22 +63,15 @@ export function expositionGroups(
     handlerGroups.push(new SystemHandlersGroup(baseContext));
   }
   handlerGroups.push(...overridingGroups);
-  if (options.includeSearch !== false) {
-    handlerGroups.push(new SearchHandlersGroup(baseContext));
-  }
+  handlerGroups.push(new SearchHandlersGroup(baseContext));
   return handlerGroups;
 }
 
 /** The registry of {@link expositionGroups}, against a context with no connection. */
 export function registryForExposition(
   exposition: readonly HandlerSet[],
-  options: ExpositionRegistryOptions = {},
 ): CompositeHandlersRegistry {
-  const baseContext = {
-    connection: undefined as never,
-    logger: undefined,
-  } satisfies HandlerContext;
   return new CompositeHandlersRegistry(
-    expositionGroups(exposition, baseContext, options),
+    expositionGroups(exposition, noConnectionContext()),
   );
 }

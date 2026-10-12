@@ -15,9 +15,9 @@ import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
 import {
   main as coreMain,
-  type LauncherEdges,
-  processEdges,
+  type StdioLauncherEdges,
 } from '@mcp-abap-adt/core/launcher';
+import { processEdges } from '@mcp-abap-adt/lib/config';
 import { compactToolSetOf, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 
 /** The compact tool set: `ro` / `rw` (default), `debug` beside either. */
@@ -36,7 +36,9 @@ export const COMPACT_VERSION: string = (
   require('../package.json') as { version: string }
 ).version;
 
-export function main(edges: LauncherEdges = processEdges()): Promise<void> {
+export function main(
+  edges: StdioLauncherEdges = processEdges(),
+): Promise<void> {
   return coreMain(
     {
       toolSet: compactToolSet,

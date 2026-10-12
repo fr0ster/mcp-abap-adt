@@ -5,7 +5,13 @@ import {
   assertDestinationName,
   browserCallbackStrategy,
 } from '@mcp-abap-adt/lib/auth';
-import { generateHelp, readStartupConfig } from '@mcp-abap-adt/lib/config';
+import {
+  answerVersionOrHelp,
+  generateHelp,
+  type LauncherEdges,
+  processEdges,
+  readStartupConfig,
+} from '@mcp-abap-adt/lib/config';
 import { type StateLogger, stderrStateLogger } from '@mcp-abap-adt/lib/state';
 import {
   fullToolSet,
@@ -169,30 +175,31 @@ GENERATING A .ENV:
 `;
 
 /** The examples of core's help: stdio only. */
-const EXAMPLES = `
+/** The examples of core's help: stdio only, under the command's own name and its set's words. */
+function examples(program: string, toolSet: ToolSet): string {
+  return `
 EXAMPLES:
   # A named destination (for MCP clients)
-  mcp-abap-adt --mcp=TRIAL
+  ${program} --mcp=TRIAL
 
   # An env file by destination name, from the sessions store
-  mcp-abap-adt --env=trial
+  ${program} --env=trial
 
   # An explicit env file (a .env in the working directory is read only when named)
-  mcp-abap-adt --env-path=./.env
+  ${program} --env-path=./.env
 
   # RFC connection (any system with SAP NW RFC SDK)
   # (or SAP_CONNECTION_TYPE=rfc in the .env file)
-  mcp-abap-adt --env-path=my-system.env --connection-type=rfc
+  ${program} --env-path=my-system.env --connection-type=rfc
 
   # Explicit system type (tools default to cloud; the connector to cloud for a jwt, else onprem)
-  mcp-abap-adt --env-path=<system>.env --system-type=onprem
+  ${program} --env-path=<system>.env --system-type=onprem
 
-  # Readonly operations only
-  mcp-abap-adt --mcp=TRIAL --exposition=readonly
-
+${toolSet.expositionExamples(program)}
   # A YAML config file (a template is written when it does not exist)
-  mcp-abap-adt --conf=my-config.yaml
+  ${program} --conf=my-config.yaml
 `;
+}
 
 /**
  * core's help: its own table (no HTTP or SSE option) with the tool set's
@@ -203,12 +210,17 @@ export function coreHelp(
   options: { toolSet?: ToolSet; program?: string } = {},
 ): string {
   const toolSet = options.toolSet ?? fullToolSet;
-  return generateHelp(coreParameters(toolSet, options.program), {
+  const program = options.program ?? 'mcp-abap-adt';
+  return generateHelp(coreParameters(toolSet, program), {
     description:
       '  MCP server for SAP ABAP systems via ADT (ABAP Development Tools), over stdio:\n' +
       '  one destination through the auth broker. Streamable HTTP is mcp-abap-adt-http,\n' +
       '  SSE mcp-abap-adt-sse; a binary is its transport.',
-    sections: [toolSet.expositionHelp, V2_HELP_SECTIONS, EXAMPLES],
+    sections: [
+      toolSet.expositionHelp('stdio'),
+      V2_HELP_SECTIONS,
+      examples(program, toolSet),
+    ],
   });
 }
 
@@ -228,45 +240,23 @@ export interface LauncherOptions {
   version: string;
 }
 
-/** The process as the launcher meets it; a test passes its own. */
-export interface LauncherEdges {
-  /** The arguments, without node's and the script's. */
-  argv: readonly string[];
-  /** `--version`'s one line; nothing else is written to stdout (H3). */
-  stdout: (line: string) => void;
-  /** One line to stderr. */
-  stderr: (line: string) => void;
-  exit: (code: number) => void;
-  /** Where the shutdown listens. */
-  processLike: ShutdownProcess;
-  /** The MCP transport; stdio unless a host passes its own. */
+/** The process as core's `main` meets it: lib's edges, and the MCP transport. */
+export interface StdioLauncherEdges extends LauncherEdges {
+  /** The MCP transport; stdio unless a host passes its own (a test's). */
   transport?: Transport;
-}
-
-/** The edges of the program: `process`. */
-export function processEdges(): LauncherEdges {
-  return {
-    argv: process.argv.slice(2),
-    stdout: (line) => console.log(line),
-    stderr: (line) => process.stderr.write(`${line}\n`),
-    exit: (code) => process.exit(code),
-    processLike: process,
-  };
 }
 
 export async function main(
   options: LauncherOptions,
-  edges: LauncherEdges = processEdges(),
+  edges: StdioLauncherEdges = processEdges(),
 ): Promise<void> {
   const { argv, stderr, exit } = edges;
-  if (argv.includes('--version') || argv.includes('-v')) {
-    edges.stdout(options.version);
-    exit(0);
-    return;
-  }
-  if (argv.includes('--help') || argv.includes('-h')) {
-    stderr(coreHelp(options));
-    exit(0);
+  if (
+    answerVersionOrHelp(edges, {
+      version: options.version,
+      help: () => coreHelp(options),
+    })
+  ) {
     return;
   }
 
@@ -550,7 +540,11 @@ export async function launch(
   const handlersRegistry = registryOf(
     options.toolSet,
     config.exposition ??
-      options.toolSet.exposition(options.toolSet.expositionRow.default, []),
+      options.toolSet.exposition(
+        options.toolSet.expositionRow.default,
+        [],
+        'stdio',
+      ),
   );
 
   // The browser of a login, mapped by the platform (D9); a choice that

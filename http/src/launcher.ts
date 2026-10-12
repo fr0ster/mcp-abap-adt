@@ -5,7 +5,13 @@
  */
 
 import type { EventEmitter } from 'node:events';
-import { generateHelp, readStartupConfig } from '@mcp-abap-adt/lib/config';
+import {
+  answerVersionOrHelp,
+  generateHelp,
+  type LauncherEdges,
+  processEdges,
+  readStartupConfig,
+} from '@mcp-abap-adt/lib/config';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
@@ -45,25 +51,6 @@ export interface HttpLauncherDeps {
   processLike: EventEmitter;
 }
 
-/** The process as `main` meets it; a test passes its own. */
-export interface HttpLauncherEdges extends HttpLauncherDeps {
-  /** The arguments, without node's and the script's. */
-  argv: readonly string[];
-  /** `--version`'s one line. */
-  stdout: (line: string) => void;
-}
-
-/** The edges of the program: `process`. */
-export function processEdges(): HttpLauncherEdges {
-  return {
-    argv: process.argv.slice(2),
-    stdout: (line) => console.log(line),
-    stderr: (line) => process.stderr.write(`${line}\n`),
-    exit: (code) => process.exit(code),
-    processLike: process,
-  };
-}
-
 const HELP_SECTIONS = `
 CREDENTIALS (each request's headers; nothing is stored, shared or cached):
     x-sap-url                      The system's URL (required)
@@ -93,26 +80,29 @@ export function httpHelp(
   options: { toolSet?: ToolSet; program?: string } = {},
 ): string {
   const toolSet = options.toolSet ?? fullToolSet;
-  return generateHelp(httpParameters(toolSet, options.program), {
+  const program = options.program ?? 'mcp-abap-adt-http';
+  return generateHelp(httpParameters(toolSet, program), {
     description:
       "  MCP server for SAP ABAP systems via ADT, over Streamable HTTP: credentials only from\n  each request's x-sap-* headers. stdio (destinations, logins) is mcp-abap-adt, SSE\n  mcp-abap-adt-sse; a binary is its transport.",
-    sections: [toolSet.expositionHelp, HELP_SECTIONS],
+    sections: [
+      toolSet.expositionHelp('http'),
+      HELP_SECTIONS,
+      `\nEXAMPLES:\n${toolSet.expositionExamples(program)}`,
+    ],
   });
 }
 
 export async function main(
   options: HttpLauncherOptions,
-  edges: HttpLauncherEdges = processEdges(),
+  edges: LauncherEdges = processEdges(),
 ): Promise<StreamableHttpServer | undefined> {
   const { argv, stderr, exit } = edges;
-  if (argv.includes('--version') || argv.includes('-v')) {
-    edges.stdout(options.version);
-    exit(0);
-    return undefined;
-  }
-  if (argv.includes('--help') || argv.includes('-h')) {
-    stderr(httpHelp(options));
-    exit(0);
+  if (
+    answerVersionOrHelp(edges, {
+      version: options.version,
+      help: () => httpHelp(options),
+    })
+  ) {
     return undefined;
   }
   // http's own table with the set's exposition row: an option of another
@@ -145,7 +135,11 @@ export async function launch(
   // without one: the set's default).
   const exposition =
     config.exposition ??
-    options.toolSet.exposition(options.toolSet.expositionRow.default, []);
+    options.toolSet.exposition(
+      options.toolSet.expositionRow.default,
+      [],
+      'http',
+    );
   const server = new StreamableHttpServer(
     registryOf(options.toolSet, exposition),
     {

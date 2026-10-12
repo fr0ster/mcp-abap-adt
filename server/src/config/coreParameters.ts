@@ -247,7 +247,7 @@ export function readCoreConfig(
   });
 
   return {
-    exposition: toolSet.exposition(values.exposition, argv),
+    exposition: toolSet.exposition(values.exposition, argv, 'stdio'),
     configFile: str(values.configFile),
     systemType: values.systemType as CoreConfig['systemType'],
     // Not written to process.env here: the env file's SAP_SYSTEM_TYPE joins

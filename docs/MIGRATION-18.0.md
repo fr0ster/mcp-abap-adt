@@ -46,6 +46,15 @@ The packages, all at **18.0.0**:
   TLS needs `--tls-cert` and `--tls-key` together (17.x served plain HTTP when one was missing).
 - `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, `--exposition` (with
   `debug`), `--system-type` and `--conf` are in every binary's table, unchanged.
+- **An unknown `--exposition` word stops the full binaries** (`mcp-abap-adt`, `mcp-abap-adt-http`,
+  `mcp-abap-adt-sse`), in the CLI and the YAML form: they take `readonly`, `high`, `low` and
+  `debug`. 17.x dropped any other word silently — `mcp-abap-adt --exposition=ro` served
+  `readonly,high`. Now: *Invalid exposition: 'ro' is not a set of this command, which takes
+  readonly, high, low and debug, comma-separated. 'ro' and 'rw' are the sets of
+  \`mcp-abap-adt-compact\` (@mcp-abap-adt/compact).* — the compact binary named is the one of the
+  binary's own transport (`mcp-abap-adt-compact-http` / `-compact-sse`), and so is the one
+  `--exposition=compact` names. Remove `search` or `system` from an exposition (they come with
+  every set and with `readonly`).
 
 ## HTTP users
 
@@ -267,12 +276,17 @@ packages, each with one binary and its transport's options only:
   compact debugger verbs moved into lib with it; `registryOf(toolSet, exposition)` builds the
   registry. core's, http's and sse's `main({ toolSet, program, version })` take nothing else of the
   tools: `LauncherOptions`' `extraGroups`, `exposition`, `helpExposition` and `includeSearch` are
-  gone, and `main()` without options is a type error. Each binary's table is a function of the set
+  gone, and `main()` without options is a type error; a second, optional argument gives the
+  process's edges (`processEdges()` of `@mcp-abap-adt/lib/config` by default). A `ToolSet`'s
+  `expositionHelp(transport)`, `expositionExamples(program)` and `exposition(read, argv,
+  transport)` take the binary's transport (`ServedTransport`: `stdio` / `http` / `sse`). Each binary's table is a function of the set
   (`coreParameters(toolSet)`, `httpParameters(toolSet)`, `sseParameters(toolSet)`; the constants are
   the full set's), and `readCoreConfig` / `readHttpConfig` / `readSseConfig` take the set as a
   fourth argument (default `fullToolSet`). `@mcp-abap-adt/compact` no longer exports
   `CompactHandlersGroup` or `compactExtraGroups`: it exports `compactToolSet` and `main`.
-  `registryForExposition` (`@mcp-abap-adt/lib/handlers`) stays, building the full set's registry.
+  `registryForExposition(exposition)` (`@mcp-abap-adt/lib/handlers`) stays, building the full
+  set's registry; its `extraGroups` / `includeSearch` options are gone (a command passes a
+  `ToolSet`).
 - **An exposition the set does not serve stops the start in its words** (`--exposition=high,low`,
   `compact` on a full binary): `[MCP] Invalid exposition: …`, exit 1 — 17.x failed the launcher with
   no words.

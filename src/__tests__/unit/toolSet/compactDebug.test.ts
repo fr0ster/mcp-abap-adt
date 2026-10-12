@@ -69,7 +69,7 @@ describe('compact debug', () => {
       compactToolSet
         .groups(
           { connection: undefined } as never,
-          compactToolSet.exposition(undefined, argv),
+          compactToolSet.exposition(undefined, argv, 'stdio'),
         )
         .map((g) => g.getName());
     expect(names(['--exposition=ro,debug'])).toEqual([

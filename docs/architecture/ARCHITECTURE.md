@@ -270,13 +270,18 @@ never reach each other.
 #### Composition Roots
 
 `server/src/launcher.ts` (core), `http/src/launcher.ts` and `sse/src/launcher.ts` wire each
-binary:
+binary. Each `main({ toolSet, program, version })` takes the tools as a `ToolSet`
+(`@mcp-abap-adt/lib/tool-set`) and nothing else of them: the full bins pass `fullToolSet`, the
+compact packages (`compact/`, `compact-http/`, `compact-sse/`) pass `compactToolSetOf` with the two
+halves' entry builders, so full and compact share every transport's behaviour:
 
 ```
-launcher main()
-  ├── readStartupConfig(<binary>_PARAMETERS)    // its own table: CLI args, YAML, env vars
-  ├── registryForExposition(exposition)         // ReadOnly, HighLevel, LowLevel, Debug, Search, System
-  ├── core only: AuthBrokerFactory              // the destination, the startup check (D18)
+main({ toolSet, program, version })
+  ├── readStartupConfig(<binary>Parameters(toolSet))  // its own table + the set's --exposition row
+  ├── toolSet.exposition(...)                         // the set's words; an unserved one stops the start
+  ├── registryOf(toolSet, exposition)                 // full: ReadOnly, HighLevel, LowLevel, Debug,
+  │                                                   //   Search, System; compact: its half (+ debug verbs)
+  ├── core only: AuthBrokerFactory                    // the destination, the startup check (D18)
   └── StdioServer | StreamableHttpServer | SseServer
 ```
 
@@ -482,11 +487,13 @@ The system has three distinct IoC boundaries:
 2. Chooses the stores of a destination (`server/src/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
 3. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
 4. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`, on first use
-5. Assembles the registry (`registryForExposition`)
+5. Assembles the registry of the tool set it is given (`registryOf(toolSet, exposition)`)
 6. Starts `StdioServer` with `destinationSource`
 
-`http/src/launcher.ts` and `sse/src/launcher.ts` read their configuration, assemble the same
-registry and start their server; neither has a broker, a store or a login.
+`http/src/launcher.ts` and `sse/src/launcher.ts` read their configuration, assemble the
+registry of the tool set they are given and start their server; neither has a broker, a store
+or a login. `compact/`, `compact-http/` and `compact-sse/` are each one call of their transport's
+`main` with the compact tool set.
 
 No other file in the system creates concrete cross-package dependencies.
 

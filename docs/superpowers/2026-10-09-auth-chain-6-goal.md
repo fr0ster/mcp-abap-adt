@@ -62,8 +62,8 @@ server.
   `--state-idle-minutes` (the project owner's stated exception to "no
   timeouts"), or by the host (shutdown, an SSE close). The rules of this
   change hold for pooled instances too: each request's credentials come from
-  its own headers, its cancellation ends its waits, and shutdown aborts,
-  awaits and disposes them.
+  its own headers, its cancellation ends its waits, and shutdown awaits and
+  disposes them.
 
 Some decisions the chain leaves to its consumer: how long an interactive login
 may wait, what cancels it, and what a failure looks like to the user. The
@@ -109,23 +109,27 @@ never hides one and never guesses one.
   - **Tests:** each of those callers on an injected connection, with a
     factory and without one, where the configuration holds no usable
     credential.
-- **A request ends when its client ends it, in every mode.**
+- **A request ends when its client ends it, in every mode — up to its tool.**
   - **A cancelled request does not reach its tool**, in every mode.
-  - **A cancelled request is not sent, on a connection the server builds.**
-    When an MCP request is cancelled, or its client goes away, nothing more of
-    it reaches the SAP system — not a first send, not a resend after a
-    renewal, not after a connection's logon, over HTTP or RFC. A request
-    already sent is not recalled.
-  - **On a connection the consumer gives** — injected, or returned by its
-    fresh-connection factory — the server passes each request's signal: in
-    every request's options, and to the factory. That is all it does there:
-    honouring the signal is the consumer's contract, stated in the embedding
-    docs and the migration note. Nothing more is promised for a consumer's
-    connection that ignores it.
-  - **Tests:** the signal reaches an injected connection's request options
-    and the consumer's factory; a cancelled request never reaches the tool.
-  - **Its waits end.** Every wait the request started ends when it is
-    cancelled — a broker call, a login, a renewal, a fresh connection — and
+  - **A started tool runs to the end.** SAP cancels no request and rolls
+    nothing back across ADT requests, so a tool cut between its requests
+    would leave a half-made object. Once a tool has started, a cancel changes
+    nothing it sends to the SAP system; its answer is produced.
+  - **Every ADT session the server owns is closed with a logoff** — when the
+    consumer closes its transport, when an instance is disposed, at shutdown,
+    on every path. A logoff releases the session's locks; nothing else is
+    relied on to release one. A connection the consumer injects is the
+    consumer's to close.
+  - **On a connection the consumer's fresh-connection factory returns**, the
+    server passes each request's signal to the factory. That is all it does
+    there: honouring the signal is the consumer's contract, stated in the
+    embedding docs and the migration note.
+  - **Tests:** the consumer's factory receives the signal; a cancelled
+    request never reaches the tool; a started tool runs to the end; a session
+    holding a lock is closed with a logoff.
+  - **Its waits end.** Every wait of the server's own the request started
+    ends when it is cancelled — a broker call, a login, a renewal the server
+    waits for, a fresh connection — and
     only that request's wait ends: another request's wait on the same work
     goes on.
   - **stdio's interactive login** ends when the request that needs it is
@@ -270,7 +274,8 @@ never hides one and never guesses one.
    credential the server holds of any kind — and they, and compact over
    them, depend on neither auth-broker nor auth-stores. An embedding
    consumer's credentials and connections stay the consumer's: the server
-   hands them each request's signal and does not wrap them.
+   hands its fresh-connection factory each request's signal and does not wrap
+   them.
 5. **No built-in timeouts of the chain's making.** A wait ends with a result,
    an explicit error, a cancellation, or a bound the server states as its own
    choice.
@@ -279,8 +284,7 @@ never hides one and never guesses one.
    - reading a failure;
    - sharing a build;
    - the refresh state;
-   - the browsers;
-   - cancelling a request at the connection's boundaries.
+   - the browsers.
 7. **Registry only.** Released packages declare only semver ranges that
    resolve on npm. A change the server needs in a chain package is released
    there first, and the server waits for it.

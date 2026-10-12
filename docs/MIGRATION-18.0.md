@@ -4,7 +4,7 @@ All five packages (`lib`, `core`, `compact`, `compact-readonly`, `compact-modify
 **18.0.0**. The debugger moved to `@mcp-abap-adt/adt-clients` 29, `@mcp-abap-adt/interfaces-adt`
 15 and `@mcp-abap-adt/adt-strategies` 0.10. The authentication stack moved to
 `@mcp-abap-adt/interfaces-auth` 7, `auth-providers` 6, `auth-broker` 5, `auth-stores` 5 and
-`@mcp-abap-adt/connection` 14.1 — see [Authentication](#authentication) below.
+`@mcp-abap-adt/connection` 15 — see [Authentication](#authentication) below.
 
 ## A model, an MCP client, a configuration
 
@@ -115,7 +115,7 @@ What a user of the server meets:
   must match the new ones.
 - **Stdio inspection-only mode** (no `--mcp`, no `--env`): a tool call is refused with `this
   connection has no credential to renew`; how to connect is printed on stderr at startup.
-- **`disconnect()` ends the SAP session** (connection 14.1): the logoff is sent as Eclipse sends it,
+- **`disconnect()` ends the SAP session** (connection 14.1 and later): the logoff is sent as Eclipse sends it,
   with the session's cookie and no credential, and on ABAP Cloud a closed connection no longer
   leaves its security session open until the server's timeout.
 
@@ -124,8 +124,11 @@ What an embedder of `@mcp-abap-adt/lib` meets:
 1. **Dependencies.** One copy of each contract: `@mcp-abap-adt/interfaces-auth` `^7.5.0`,
    `@mcp-abap-adt/auth-errors` `^2.2.0`, `@mcp-abap-adt/auth-providers` `^6.0.1`,
    `@mcp-abap-adt/auth-broker` `^5.0.4`, `@mcp-abap-adt/auth-stores` `^5.0.0`,
-   `@mcp-abap-adt/connection` `^14.1.0`. Check with
-   `npm ls @mcp-abap-adt/interfaces-auth @mcp-abap-adt/auth-errors`.
+   `@mcp-abap-adt/connection` `^15.0.0` (on `@mcp-abap-adt/interfaces-adt-connection` 2, so
+   one copy of the connection contract is installed too). Check with
+   `npm ls @mcp-abap-adt/interfaces-auth @mcp-abap-adt/auth-errors @mcp-abap-adt/interfaces-adt-connection`.
+   An answer of `makeAdtRequest` whose type is not named is `unknown` (connection 15): name
+   the type, or narrow it, before reading a field.
 2. **`IAuthBrokerFactoryConfig.browserStrategy`** takes `{ browser?: IBrowser; port? }` — the
    browser is an `IBrowser` (interfaces-auth 7), not a name. `browser` in the config stays the
    name `--browser` gives; the factory turns it into an `IBrowser` with the new export

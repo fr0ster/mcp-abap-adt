@@ -1413,6 +1413,10 @@ export class DebugSession<O = unknown> {
           // stays: a tag is never reused in this instance. `changed` stays until settle()
           // finds the cleanup complete, so a stop that keeps anything owes the stopListener again.
           this.forgetAll();
+          // The listener's stop is done: a later stop that retries what else was kept
+          // must not send it again — under user mode it would end a listener another
+          // IDE of the same user started in between.
+          this.changed = false;
           // Measured on premise (2026-10-12): a poll sent just before the stop (the loop
           // polls again at once after a run ends) can reach the system after the
           // stopListener; nothing then wakes it, and it holds its full hold. So while
@@ -1442,6 +1446,8 @@ export class DebugSession<O = unknown> {
               : `listener: ${messageOf(stopped)}`,
           );
           this.forgetAll();
+          // Final: no later stop retries it.
+          this.changed = false;
           // Unlike after a stopListener that succeeded, the system's listener was not
           // stopped, so nothing wakes an open poll: the wait for its answer can last
           // the poll's full hold — the system's clock, not ours.
@@ -1488,9 +1494,10 @@ export class DebugSession<O = unknown> {
 
   /**
    * What the cleanup could not undo stays named for the next stop. The
-   * identity — the request user, the mode — the owed stopListener and the
-   * settings go only with a complete cleanup: while anything is kept, a retry
-   * addresses the same key.
+   * identity — the request user, the mode — and the settings go only with a
+   * complete cleanup: while anything is kept, a retry addresses the same key. The
+   * owed stopListener goes as soon as the listener's stop succeeded or was refused
+   * for the user (cleanupLocked), never sent twice.
    */
   private settle(failures: string[]): void {
     this.cleanupFailures = failures;

@@ -9,6 +9,7 @@ import {
   CONFLICT_409,
   fakeWorld,
   IDS,
+  INVALID_USER,
   LISTEN_NOTHING,
   rowsXml,
   START,
@@ -238,7 +239,7 @@ describe('the cleanup', () => {
     expect(session.holdsState()).toBe(false);
   });
 
-  it('a stop whose stopListener succeeded but kept a connection still owes the stopListener', async () => {
+  it('a stop whose stopListener succeeded but kept a connection owes only the close: the retry sends no second stopListener', async () => {
     const world = fakeWorld();
     const { session } = await armed(world);
     const realClose = world.ports.closeConnection;
@@ -257,10 +258,39 @@ describe('the cleanup', () => {
     await expect(session.start('refuse', START)).rejects.toThrow(NOT_COMPLETE);
     world.calls.length = 0;
     await session.stop();
-    expect(world.calls).toContain('stopListener');
+    expect(world.calls).not.toContain('stopListener');
     expect(session.currentIdentity()).toBeUndefined();
     expect(session.holdsState()).toBe(false);
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
+  it('a stopListener refused for the user is final even when a close failed: the retry sends no second stopListener', async () => {
+    const world = fakeWorld();
+    const { session } = await armed(world);
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      return INVALID_USER();
+    };
+    const realClose = world.ports.closeConnection;
+    let once = true;
+    world.ports.closeConnection = async (c) => {
+      if (once) {
+        once = false;
+        throw new Error('close refused');
+      }
+      return realClose(c);
+    };
+    const first = session.stop();
+    // Refused, the system's listener was not stopped: its open poll answers on its own.
+    await until(() => world.calls.includes('stopListener'));
+    world.polls[world.polls.length - 1].resolve(LISTEN_NOTHING());
+    await expect(first).rejects.toThrow(/close refused/);
+    expect(session.holdsState()).toBe(true);
+    delete world.override.stopListener;
+    world.calls.length = 0;
+    await session.stop();
+    expect(world.calls).not.toContain('stopListener');
+    expect(session.holdsState()).toBe(false);
   });
 
   // Review Focus 3.

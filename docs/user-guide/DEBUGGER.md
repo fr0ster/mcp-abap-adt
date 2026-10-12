@@ -342,8 +342,9 @@ instance — is the system's to report and yours to resolve:
   listen's `409` ends its listener. That race is accepted and documented, not
   handled.
 - **take over** (`DebugTakeOverListener`; compact `take_over: true`): the start
-  displaces the other debugger. The displaced listener's poll is answered with a
-  conflict notification; if that listener is ours, its next `DebugWait` fails with
+  displaces the other debugger (measured in user mode; in terminal mode whether
+  the other listener keeps listening is not measured). The displaced listener's
+  poll is answered with a conflict notification; if that listener is ours, its next `DebugWait` fails with
   that message and the listener is not restarted. With
   `SAP_DEBUG_BREAKPOINT_CONFLICT=refuse-if-held` a take-over asks first too, and is
   refused if another debugger listens (see

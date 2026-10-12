@@ -45,7 +45,9 @@ export class DebuggerInstance implements StatePart {
 
   /**
    * Stops both; what either could not undo is reported, named, and stays for
-   * another stop. Answers the notes that are no debt.
+   * another stop. Answers the notes that are no debt. When one side fails, the
+   * notes the other answered go with the error: they are answered once, and a
+   * later stop has nothing to answer them again.
    */
   async stop(): Promise<string[]> {
     const results = await Promise.allSettled([
@@ -55,10 +57,22 @@ export class DebuggerInstance implements StatePart {
     const failures = results.flatMap((r) =>
       r.status === 'rejected' ? [messageOf(r.reason)] : [],
     );
-    if (failures.length) throw new DebugCleanupError(failures.join('; '));
-    return results.flatMap((r) =>
+    const notes = results.flatMap((r) =>
       r.status === 'fulfilled' && Array.isArray(r.value) ? r.value : [],
     );
+    if (failures.length) {
+      // A failing side's own notes are already in its message; only the field gathers them.
+      const failedNotes = results.flatMap((r) =>
+        r.status === 'rejected' && r.reason instanceof DebugCleanupError
+          ? [...r.reason.notes]
+          : [],
+      );
+      throw new DebugCleanupError([...failures, ...notes].join('; '), [
+        ...failedNotes,
+        ...notes,
+      ]);
+    }
+    return notes;
   }
 
   async dispose(): Promise<void> {

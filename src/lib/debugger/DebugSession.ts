@@ -154,7 +154,19 @@ export interface DebugSessionOptions {
 export class DebugListenerError extends Error {}
 export class DebugStateError extends Error {}
 export class DebugRequestError extends Error {}
-export class DebugCleanupError extends Error {}
+/**
+ * What a stop could not undo, named in the message. `notes`: what the stop
+ * answered beside the failure and that is no debt (SAP's final refusal, the
+ * breakpoints it leaves on the system) — also in the message, since a later stop
+ * has nothing left to answer them again.
+ */
+export class DebugCleanupError extends Error {
+  readonly notes: readonly string[];
+  constructor(message: string, notes: readonly string[] = []) {
+    super(message);
+    this.notes = notes;
+  }
+}
 /**
  * Refused before anything was sent, or refused by the system before anything
  * of ours was left to undo. `placed`: breakpoints the system keeps, when a
@@ -1519,7 +1531,7 @@ export class DebugSession<O = unknown> {
       this.settle(failures);
       this.notify(); // also tells the instance state (observe) that this part may hold nothing now
       if (failures.length)
-        throw new DebugCleanupError([...failures, ...notes].join('; '));
+        throw new DebugCleanupError([...failures, ...notes].join('; '), notes);
       return notes;
     });
   }

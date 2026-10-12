@@ -353,8 +353,9 @@ server takes them there (checked with `npm view`), and waits for nothing if they
 
 **Order**: 0 (debugger releases) → 1 → 2 → 3 (on 1) and 4 (on 1, 2 and 26.0.0) → this server's
 19.0.0. Each is published before the next is built against it (H7). **The
-server's own move to interfaces-adt 13 / interfaces-adt-connection 2 comes with it**: lib's ranges
-become `^13.2.0` / `^2.1.0` and connection `^15.0.0`. In the move the server fixes what that costs it:
+server's own move to interfaces-adt 15 / interfaces-adt-connection 2 comes with it** (main's
+18.0.0 and the merge of main took interfaces-adt `^15.1.0`, adt-clients `^29.1.0`, connection
+`^15.0.1`): lib's ranges become B3's / `^2.1.0` and connection B4's (§18, 2026-10-12). In the move the server fixes what that costs it:
 the test helper's `makeAdtRequest` stub interfaces-adt-connection 2.0.0's notes measured, and every
 read of an answer's `data` through `AbapConnection` in the 8 files of `src` that import the alias
 (`BaseMcpServer.ts`, `EmbeddableMcpServer.ts`, `clients.ts`, …) — typed or narrowed, never cast to
@@ -409,17 +410,17 @@ make compact-http depend on `@mcp-abap-adt/compact` → red (it reaches core).
 
 ### 3.3 Dependency ranges (D1)
 
-| Dependency | 17.2.2 (lib, after A0) | 19.0.0 | Where |
+| Dependency | 17.2.2 (lib, after A0) | 19.0.0 (never below main's 18.0.0) | Where |
 |---|---|---|---|
-| `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.0.1`, or the range of the auth-broker release on auth-stores 5 when one is published before C2 (§3.1) | core only |
-| `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^5.0.0` (D54) | core only |
-| `@mcp-abap-adt/auth-providers` | `^5.4.0` | `^6.0.1` | lib, core |
-| `@mcp-abap-adt/connection` | `^11.0.0` | `^15.0.0` (prerequisite, a major) | lib, core |
-| `@mcp-abap-adt/adt-clients` | `~27.0.0` (#288) | the prerequisite release, the next free minor on the 27 line (§18) | lib |
+| `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.0.6` (on auth-stores 5 and connection 15), or a later release found at C2 (§3.1) | core only |
+| `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^5.0.1` (D54) | core only |
+| `@mcp-abap-adt/auth-providers` | `^5.4.0` | `^6.0.2` | lib, core |
+| `@mcp-abap-adt/connection` | `^11.0.0` | the prerequisite release, the next minor on the 15 line (B4; §18, 2026-10-12) | lib, core |
+| `@mcp-abap-adt/adt-clients` | `~27.0.0` (#288; main's 18.0.0: `^29.1.0`) | the prerequisite release, the next minor on the 29 line (B5; §18, 2026-10-12) | lib |
 | `@mcp-abap-adt/interfaces-adt-connection` | `^2.0.0` (#288) | `^2.1.0` (prerequisite) | lib |
-| `@mcp-abap-adt/interfaces-adt` | `^13.2.0` (#288) | the prerequisite release, the next free minor on the 13 line (§18) | lib |
+| `@mcp-abap-adt/interfaces-adt` | `^13.2.0` (#288; main's 18.0.0: `^15.1.0`) | the prerequisite release, the next minor on the 15 line (B3; §18, 2026-10-12) | lib |
 | `@mcp-abap-adt/interfaces-auth` | `^3.2.0` | `^7.5.0` | lib, core |
-| `@mcp-abap-adt/auth-errors` | — | `^2.2.0` | lib, core, http, sse |
+| `@mcp-abap-adt/auth-errors` | — | `^2.2.1` | lib, core, http, sse |
 | `@mcp-abap-adt/interfaces-auth-broker` | `^1.2.0` | `^1.3.0` | core only |
 | `@mcp-abap-adt/interfaces-auth-sap` | `^2.0.0` | `^3.3.0` | lib (`SapAuthType`) |
 | `adt-strategies`, `interfaces-network`, `interfaces-utils` | unchanged | unchanged | as today |
@@ -1371,8 +1372,9 @@ launcher's help.
 - **(D29) Nine packages at 19.0.0**, the four new ones (http, sse, compact-http, compact-sse)
   included, from PR #287 — **decided by the user: one PR, one major release**.
 - **The server waits for its prerequisites** (§3.1) — the user's debugger releases first
-  (interfaces-adt 13.1.0, adt-clients 26.0.0), then interfaces-adt-connection 2.1.0,
-  interfaces-adt 13.2.0, connection 15.0.0 and adt-clients 26.1.0 — then
+  (main's 18.0.0: interfaces-adt 15.1.0, adt-clients 29.1.0), then interfaces-adt-connection
+  2.1.0, and the next minors of interfaces-adt (15 line), connection (15 line) and adt-clients
+  (29 line) — B3–B5, §18, 2026-10-12 — then
   releases per `RELEASE.md`: manifests and
   sibling ranges, metadata, CHANGELOG and docs, `npm ci`, build, `test:check`, `npm test`
   (binSmoke), each package's own tests, `release:dry` ending `Published: 9  Skipped: 0`; the
@@ -1502,13 +1504,13 @@ connection, which is disconnected, and no provider is constructed; without it,
    lookup and succeeds; a failed lookup is not memoised either. *Breaks:* run the lookup under the
    first caller's signal (the second is refused); memoise the attempt before it settles (the later
    request inherits the abort).
-3. **A cancelled mutation is never sent** (M1, M6; with connection 15.0.0 and adt-clients 26.1.0):
+3. **A cancelled mutation is never sent** (M1, M6; with B4's connection and B5's adt-clients):
    a server-built connection against the stand-in; R1 and R2 `POST`; R1 cancelled while both wait in
    `rejected()`, and separately in `authorize()`: no `POST` of R1 after its abort, R1 answered
    `request_aborted`, R2 `200`. Over HTTP in core, in the HTTP package and in the SSE package (two
    `POST`s on one SSE connection); RFC's boundaries are connection's tests (§3.1).
-4. **Releases are not cancelled (D40)**, through real handlers against the stand-in (adt-clients
-   26.1.0, connection 15.0.0): `UpdateServiceDefinition` (its `withLock` release is
+4. **Releases are not cancelled (D40)**, through real handlers against the stand-in (B5's
+   adt-clients, B4's connection): `UpdateServiceDefinition` (its `withLock` release is
    `obj.unlock` of the signalled client) cancelled after the lock answered and before the update —
    the stand-in's log holds the `LOCK`, then the `UNLOCK`, and no update; the same for one handler
    per listed release site and for an adt-clients-internal release (`withLock` of a high-level
@@ -1710,7 +1712,7 @@ and §13 assumed for two prerequisites were taken by other releases the same day
 26.0.0, 26.1.0 and 27.0.0 (the debugger line, then a major). The prerequisites keep their contracts
 and take **the next free minor on the current line** when each is released — today
 interfaces-adt 13.3.0 and adt-clients 27.1.0; interfaces-adt-connection 2.1.0 and connection 15.0.0
-are still free. Wherever this spec names interfaces-adt 13.2.0, adt-clients 25.1.0, 26.0.0 or 26.1.0
+are still free. *(Superseded by the 2026-10-12 note below.)* Wherever this spec names interfaces-adt 13.2.0, adt-clients 25.1.0, 26.0.0 or 26.1.0
 as a prerequisite, read that release; the plan checks each number with `npm view` before it is
 used.
 

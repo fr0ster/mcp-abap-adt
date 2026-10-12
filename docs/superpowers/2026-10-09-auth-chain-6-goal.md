@@ -12,7 +12,7 @@ The server `mcp-abap-adt` stands on the auth chain as it is published now:
 | auth-broker | 5.0.x |
 | auth-providers | 6.0.x |
 | auth-stores | 5.0.x |
-| connection | 15.0.x — a major on interfaces-adt-connection 2, with a per-request signal (below) |
+| connection | 15.x on interfaces-adt-connection 2, with a per-request signal (below) |
 | interfaces-auth | 7.5.x |
 | auth-errors | 2.2.x |
 
@@ -190,7 +190,7 @@ never hides one and never guesses one.
     `server.json`, `server-compact.json`, `glama.json` and the registry
     metadata say which package serves which transport.
 - **One release.** Every package, the new ones included, is released as one
-  major, 18, from one pull request.
+  major, 19, from one pull request (18.0.0 is the debugger's).
 - **Measured on real systems before release.** These are run against real
   systems, each recorded with its date:
   - stdio, `jwt` / `authorization_code` on the BTP trial, the browser login
@@ -293,14 +293,14 @@ never hides one and never guesses one.
   own change afterwards.
 - Changes to the chain's packages, beyond those the server needs and waits for,
   each released on the current line after the debugger releases
-  (interfaces-adt 13.1.0, adt-clients with the debugger):
+  (interfaces-adt 15.1.0, adt-clients 29.1.0, connection 15.0.x):
   - `@mcp-abap-adt/interfaces-adt-connection` 2.1.0 — a per-request signal in
     the request options, and the code of an aborted request;
-  - `@mcp-abap-adt/interfaces-adt` 13.2.0 — the signal in the client's options,
+  - `@mcp-abap-adt/interfaces-adt`, the next minor on the 15 line — the signal in the client's options,
     and the authentication refusal kept on a failure;
-  - `@mcp-abap-adt/connection` 15.0.0 — a major on interfaces-adt-connection 2,
-    with the signal honoured at every send boundary, HTTP and RFC;
-  - `@mcp-abap-adt/adt-clients` 26.1.0 — the signal on every request, releases
+  - `@mcp-abap-adt/connection`, the next minor on the 15 line — the signal
+    honoured at every send boundary, HTTP and RFC;
+  - `@mcp-abap-adt/adt-clients`, the next minor on the 29 line — the signal on every request, releases
     never cancelled, the refusal kept.
 
   Any other defect found there goes to its own repository, and the server waits

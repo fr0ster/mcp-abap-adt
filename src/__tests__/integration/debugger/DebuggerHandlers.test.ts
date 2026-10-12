@@ -75,6 +75,7 @@ import {
 } from '../../../lib/state/InstanceState';
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
 import {
+  getSystemType,
   getTimeout,
   loadTestConfig,
   testAuthBrokerPath,
@@ -1558,9 +1559,14 @@ describe('Debugger handlers (integration)', () => {
             'after the attach: system_debugging, create_exception_object',
             stopped.json?.settings ?? stopped.json?.settings_error,
           );
+          // ABAP Cloud does not apply create_exception_object: asked for `true`,
+          // its answer — the settings in force — says `false`, at the start and
+          // through DebugSetSettings alike (measured on the trial, 2026-10-12).
+          // On premise it is applied.
+          const exceptionObject = getSystemType() !== 'cloud';
           expect(stopped.json.settings).toMatchObject({
             system_debugging: true,
-            create_exception_object: true,
+            create_exception_object: exceptionObject,
           });
           const off = await call(inst, 'DebugSetSettings', {
             ...h,
@@ -1574,7 +1580,7 @@ describe('Debugger handlers (integration)', () => {
           expect(off.isError).toBe(false);
           expect(off.json).toMatchObject({
             system_debugging: false,
-            create_exception_object: true,
+            create_exception_object: exceptionObject,
           });
           const update = await call(inst, 'DebugSetSettings', {
             ...h,

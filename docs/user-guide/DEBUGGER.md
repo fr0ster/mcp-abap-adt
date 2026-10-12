@@ -317,6 +317,13 @@ stop answers them under `settings` (and a failure to apply them under
 answer cannot show it, so the server sends a `false` there twice. The display of
 data aging is not offered: left out, it stays off, the system's default.
 
+ABAP Cloud does not apply `create_exception_object`: asked for `true`, at a start
+or through `DebugSetSettings`, it answers the settings in force with
+`create_exception_object: false`, and the call is not refused (measured on the
+ABAP Cloud trial, 2026-10-12). The settings a stop and `DebugSetSettings` answer
+are what is in force, so read the field there rather than assume it applied. On
+premise it is applied (BASIS 816).
+
 ## What ADT cannot do
 
 It cannot attach to a process or a request that is already running. A request is

@@ -1403,12 +1403,13 @@ describe('Debugger handlers (integration)', () => {
   );
 
   it(
-    'detach: the run is caught again at the next pass of an armed line in a loop, then continued to its end',
+    'detach: the run goes on to its end, the listener and the breakpoints stay and catch the next run',
     async () => {
       await tester.run(async () => {
         if (!abapReady) throw new Error('the probe is not ready');
         const inst = newInstance();
         const session = caseSession(inst);
+        let next: RunInFlight | undefined;
         try {
           const start = await call(inst, 'DebugStartListener', {
             breakpoints: [line('loop')],
@@ -1432,29 +1433,32 @@ describe('Debugger handlers (integration)', () => {
           );
           expect(detached.isError).toBe(false);
           expect(detached.json.state).toBe('listening');
-          const pass2 = await waitFor(inst, h.state_handle, [
-            'stopped',
-            'ended',
-          ]);
-          measure(
-            'detach',
-            'the next pass of the armed line',
-            pass2.last.json?.state,
-          );
-          expect(pass2.last.json?.state).toBe('stopped');
-          expect(pass2.last.json.at.address.line).toBe(LINE.loop);
-          expect(
-            (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
-              .isError,
-          ).toBe(false);
+          // Measured on premise (2026-10-12): the same run is not caught again at the
+          // loop's next pass — the system answers the detach as the run ends.
           const finished = await untilRunFinished(inst, h.state_handle);
+          measure('detach', 'the run after the detach', finished.json?.run);
           expect(finished.json?.run).toMatchObject({
             ok: true,
             output: expect.stringContaining(ABAP_OUTPUT),
           });
+          // The listener and the breakpoints stay: the next run is caught (soft only:
+          // a hard run has no connection of its own to start it).
+          if (!tester.isHardMode()) {
+            next = inFlight(runProbe(probe));
+            const caught = await waitFor(inst, h.state_handle, ['stopped']);
+            expect(caught.last.json?.state).toBe('stopped');
+            expect(caught.last.json.at.address.line).toBe(LINE.loop);
+            // Detached again, the loop's second pass is not caught either.
+            expect(
+              (await call(inst, 'DebugStep', { ...h, action: 'detach' }))
+                .isError,
+            ).toBe(false);
+            expect((await next.run).ok).toBe(true);
+          }
           expect((await session.stop()).isError).toBe(false);
         } finally {
           await session.cleanup();
+          await next?.settled();
         }
       });
     },
@@ -1491,8 +1495,13 @@ describe('Debugger handlers (integration)', () => {
             released.isError ? released.text.slice(0, 400) : released.json,
           );
           expect(released.isError).toBe(false);
-          expect(released.json.state).toBe('listening');
-          const finished = await untilRunFinished(inst, h.state_handle);
+          // Listening, or the run's end when the program finished before the answer
+          // (measured on premise, 2026-10-12).
+          const finished =
+            released.json.reason === 'run_finished'
+              ? released
+              : (expect(released.json.state).toBe('listening'),
+                await untilRunFinished(inst, h.state_handle));
           expect(finished.json?.run).toMatchObject({
             ok: true,
             output: expect.stringContaining(ABAP_OUTPUT),

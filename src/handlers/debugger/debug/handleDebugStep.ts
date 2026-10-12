@@ -26,7 +26,7 @@ export const TOOL_DEFINITION = {
           'release_debugger',
         ],
         description:
-          'into enters the call, over runs it, return leaves the current one, continue runs to the next stop; detach lets the program run on, where an armed breakpoint can catch it again; release_debugger frees the debugger and the program runs on. detach and release_debugger apply to ABAP only.',
+          'into enters the call, over runs it, return leaves the current one, continue runs to the next stop; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on. detach and release_debugger apply to ABAP only.',
       },
       ...DETAIL_PROPERTY,
     },

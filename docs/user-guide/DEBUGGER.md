@@ -289,8 +289,10 @@ At a stop, `DebugStep` (compact `HandlerDebugStep`) takes two more actions, ABAP
 only:
 
 - **`detach`**: the debugger leaves and the program runs on. The listener and the
-  breakpoints stay, so an armed breakpoint can catch the same run again at its next
-  pass.
+  breakpoints stay for the next requests. The same run was not caught again
+  (measured on premise (2026-10-12), BASIS 816: a run detached at an armed line
+  in a loop finished without stopping at that line's next pass; the system
+  answered the detach as the run ended, before the listener polled again).
 - **`release_debugger`**: frees the debugger; the program runs on and returns its
   output. The system answers this with a plain `500` that is the request having
   worked (adt-clients' errata, "The debugger freeing its session is answered as an
@@ -299,7 +301,7 @@ only:
   `DebugStop`. The freed ABAP session takes no further request, so the server sends
   it none, not even a logoff.
 
-Both answer the listening state. `DebugTerminate` (compact `terminate`) ends the
+Both answer the listening state, or the run's end when the program finished before the answer (measured on premise (2026-10-12) for `release_debugger`). `DebugTerminate` (compact `terminate`) ends the
 program where it stands.
 
 ## Debugger settings

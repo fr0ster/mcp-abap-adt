@@ -5642,7 +5642,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/debugger/debug/handleDebugStep.ts`
 
 **Parameters:**
-- `action` (string, required) - into enters the call, over runs it, return leaves the current one, continue runs to the next stop; detach lets the program run on, where an armed breakpoint can catch it again; release_debugger frees the debugger and the program runs on. detach and release_debugger apply to ABAP only.
+- `action` (string, required) - into enters the call, over runs it, return leaves the current one, continue runs to the next stop; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on. detach and release_debugger apply to ABAP only.
 - `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 

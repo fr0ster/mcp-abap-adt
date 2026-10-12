@@ -568,7 +568,7 @@ per request.
 **Parameters:**
 
 - `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
-- `action` (required) — into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; detach lets the program run on, where an armed breakpoint can catch it again; release_debugger frees the debugger and the program runs on; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.
+- `action` (required) — into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.
 - `object_type` — For a line: CLAS, PROG, INCL or FUNC.
 - `object_name` — For a line: the object holding it.
 - `line` — For a line: the line in the object source.

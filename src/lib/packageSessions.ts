@@ -23,59 +23,86 @@
  *   releases it and closes it. The handle belongs to the session that took
  *   it, so the whole lock → update → unlock chain has to share that session.
  */
-import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { ServerRefusal } from './auth/serverRefusal';
 import { createAbapConnection, siblingRecordOf } from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
-import { credentialFromSapConfig } from './credentialSources';
 import type { HandlerContext } from './handlers/interfaces';
+import { currentRequestSignal } from './requestSignal';
 
 type Logger = HandlerContext['logger'];
 
 /**
- * A connection of its own, connected: from the record the factory kept when it
- * built `connection` — the same settings and the same credential object — or,
- * for a connection it did not build, from the connection's own configuration.
+ * The host's factory of fresh connections (spec §4.3, D20): a connection of
+ * its own, built by the host with its credential, honouring `signal`. Once
+ * returned it is the server's (D22): held for the operation or under a
+ * package lock's handle, then closed with `disconnect()`.
+ */
+export type FreshConnectionFactory = (options: {
+  signal?: AbortSignal;
+}) => Promise<IAbapConnection>;
+
+/** Injected connections whose host gave a fresh-connection factory. */
+const hostFactories = new WeakMap<object, FreshConnectionFactory>();
+
+/**
+ * Records the factory the host gave beside the connection it injected
+ * (`EmbeddableMcpServer`'s `freshConnection`). A connection set without one
+ * is not recorded, and a fresh connection on it is refused.
+ */
+export function registerFreshConnectionFactory(
+  connection: object,
+  factory: FreshConnectionFactory,
+): void {
+  hostFactories.set(connection, factory);
+}
+
+/**
+ * A connection of its own, ready for requests, decided from a registry keyed
+ * by the connection object — never from the connection's configuration
+ * (spec §4.3, D20):
+ *
+ * - built by the server (`createAbapConnection`) → the factory's record: the
+ *   same settings and the same credential object, connected here;
+ * - injected with the host's `freshConnection` → that factory, called with
+ *   the current request's signal;
+ * - anything else → refused `fresh_connection_unavailable`, nothing sent.
  */
 export async function openFreshConnection(
   connection: IAbapConnection,
   logger: Logger,
 ): Promise<IAbapConnection> {
   const record = siblingRecordOf(connection);
-  const settings = (record?.settings ??
-    (connection as { getConfig?: () => unknown }).getConfig?.() ??
-    (connection as { config?: unknown }).config) as SapConfig | undefined;
-  if (!settings) {
-    throw new Error(
-      'A fresh connection was needed, but the connection carries no configuration to open one from',
-    );
+  if (record) {
+    const fresh = createAbapConnection(
+      record.settings,
+      record.credential,
+      logger ?? null,
+    ) as IAbapConnection & { connect?: () => Promise<void> };
+    // RFC connections need an explicit connect(); createAbapConnection does not.
+    if (typeof fresh.connect === 'function') await fresh.connect();
+    return fresh;
   }
-  const fresh = createAbapConnection(
-    settings,
-    record?.credential ?? credentialFromSapConfig(settings),
-    logger ?? null,
-  ) as IAbapConnection & { connect?: () => Promise<void> };
-  // RFC connections need an explicit connect(); createAbapConnection does not.
-  if (typeof fresh.connect === 'function') await fresh.connect();
-  return fresh;
+  const factory = hostFactories.get(connection);
+  if (factory) return factory({ signal: currentRequestSignal() });
+  throw new ServerRefusal('fresh_connection_unavailable');
 }
 
-/** Closes a connection this process opened; a failure to close is only logged. */
+/**
+ * Closes a connection this process holds as its own; a failure to close is
+ * only logged, in fixed words (D22).
+ */
 export async function closeQuietly(
   opened: IAbapConnection,
   logger: Logger,
   what: string,
 ): Promise<void> {
   const closable = opened as { disconnect?: () => Promise<void> };
-  if (typeof closable.disconnect !== 'function') return;
   try {
+    if (typeof closable.disconnect !== 'function') return;
     await closable.disconnect();
-  } catch (error) {
-    logger?.warn(
-      `${what}: could not close its own connection: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
+  } catch {
+    logger?.warn(`${what}: could not close its own connection`);
   }
 }
 

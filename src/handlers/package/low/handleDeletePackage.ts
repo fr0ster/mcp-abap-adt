@@ -88,24 +88,19 @@ export async function handleDeletePackage(
   // (docs/installation/RFC_SETUP.md). A fresh connection is a fresh ABAP
   // session and the one way around it; that choice belongs here, not inside
   // the strategy call. The connection opened here is closed here: over RFC it
-  // is an ABAP session that would otherwise stay open.
+  // is an ABAP session that would otherwise stay open. A fresh connection
+  // that cannot be had is the answer (D21): never a delete on the session the
+  // caller asked to avoid.
   let deleteConnection = connection;
   if (force_new_connection) {
     try {
       deleteConnection = await openFreshConnection(connection, logger);
-      logger?.info(
-        `DeletePackage using fresh connection for ${packageName} (force_new_connection=true)`,
-      );
-    } catch (createError) {
-      logger?.warn(
-        `DeletePackage failed to create fresh connection for ${packageName}, falling back to existing connection: ${
-          createError instanceof Error
-            ? createError.message
-            : String(createError)
-        }`,
-      );
-      deleteConnection = connection;
+    } catch (error) {
+      return return_error(error);
     }
+    logger?.info(
+      `DeletePackage using fresh connection for ${packageName} (force_new_connection=true)`,
+    );
   }
 
   try {

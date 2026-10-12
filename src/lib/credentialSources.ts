@@ -26,23 +26,42 @@ function refuseKerberos(): never {
   );
 }
 
+/** A field the `SapConfig` must hold for its `authType`: a non-empty string. */
+function required(
+  config: SapConfig,
+  authType: string,
+  field: 'username' | 'password' | 'jwtToken' | 'sessionCookies',
+): string {
+  const value: unknown = config[field];
+  if (typeof value !== 'string' || value === '') {
+    throw new Error(
+      `The SapConfig for ${authType} authentication has no \`${field}\``,
+    );
+  }
+  return value;
+}
+
 /**
  * The credential a caller's `SapConfig` describes: `basic`, `jwt`, `saml`,
- * `certificate`; `kerberos` is refused.
+ * `certificate`. Nothing is guessed (D19): any other `authType` is refused
+ * naming the field — `snc` is served through a destination of mcp-abap-adt
+ * (stdio), `kerberos` has no provider — and so is a missing user, password,
+ * token or cookies. A refusal names the field, never a value.
  */
 export function credentialFromSapConfig(config: SapConfig): IAuthProvider {
-  switch (config.authType) {
+  const authType: unknown = config.authType;
+  switch (authType) {
     case 'basic':
       return new BasicAuthProvider(
-        config.username ?? '',
-        config.password ?? '',
+        required(config, 'basic', 'username'),
+        required(config, 'basic', 'password'),
       );
     case 'jwt':
       // A token against an on-premise system is ordinary; the system kind is
       // stated separately.
-      return TokenAuthProvider.fixed(config.jwtToken ?? '');
+      return TokenAuthProvider.fixed(required(config, 'jwt', 'jwtToken'));
     case 'saml':
-      return new SamlAuthProvider(config.sessionCookies ?? '');
+      return new SamlAuthProvider(required(config, 'saml', 'sessionCookies'));
     case 'certificate':
       return new CertificateAuthProvider(
         new FileCertificateMaterialLoader(),
@@ -50,10 +69,13 @@ export function credentialFromSapConfig(config: SapConfig): IAuthProvider {
       );
     case 'kerberos':
       return refuseKerberos();
+    case 'snc':
+      throw new Error(
+        'The SapConfig `authType` snc is served through a destination of mcp-abap-adt (stdio)',
+      );
     default:
-      return new BasicAuthProvider(
-        config.username ?? '',
-        config.password ?? '',
+      throw new Error(
+        'The SapConfig `authType` must be basic, jwt, saml or certificate',
       );
   }
 }

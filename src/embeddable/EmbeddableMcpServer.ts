@@ -1,4 +1,5 @@
 import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
 import { noopLogger } from '../lib/handlerLogger.js';
@@ -17,6 +18,7 @@ import type {
   SapEnvironment,
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
+import { registerFreshConnectionFactory } from '../lib/packageSessions.js';
 import type { SystemContextResolver } from '../lib/requestSystemResolution.js';
 import type { StateLogger } from '../lib/state/InstanceState.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
@@ -34,6 +36,22 @@ export interface EmbeddableMcpServerOptions {
    * Injected from consumer (e.g., CloudSdkAbapConnection in cloud-llm-hub)
    */
   connection: AbapConnection;
+
+  /**
+   * A connection of its own for an operation that needs a new ABAP session:
+   * RFC CreatePackage / LockPackage, DeletePackage with force_new_connection
+   * (and a debug session's own connections). The connection is built by you,
+   * with its credential, ready for requests (connected, for RFC); honour
+   * `signal` — the request's — and the signal in each request's options.
+   * Once returned it is the server's: the server holds it for the operation
+   * (or under the package lock's handle), and closes it with `disconnect()`
+   * like its own. Without it those operations are refused
+   * (`fresh_connection_unavailable`); the server never builds one from the
+   * injected connection's configuration.
+   */
+  freshConnection?: (options: {
+    signal?: AbortSignal;
+  }) => Promise<IAbapConnection>;
 
   /**
    * Logger instance
@@ -182,6 +200,13 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       connection: options.connection,
       sessionId: 'embedded',
     });
+
+    if (options.freshConnection) {
+      registerFreshConnectionFactory(
+        options.connection,
+        options.freshConnection,
+      );
+    }
 
     if (options.systemContext) {
       setSystemContext(options.systemContext);

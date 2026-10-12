@@ -188,7 +188,7 @@ function buildTools() {
 async function bundle(work, stageDir, server, esbuild) {
   const entry = path.join(work, `${server.name}-entry.cjs`);
   // The package's own bin: it calls `main` with the tool set, name and
-  // version that command serves (18.0.0: `main({ toolSet, program, version })`).
+  // version that command serves (19.0.0: `main({ toolSet, program, version })`).
   const bin = path.join(stageDir, 'node_modules', server.pkg, 'bin', `${server.name}.js`);
   fs.writeFileSync(entry, `require(${JSON.stringify(bin)});\n`);
   const outfile = path.join(work, `${server.name}.bundle.cjs`);

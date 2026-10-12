@@ -1,7 +1,7 @@
 # Configuration
 
 How a binary reads its parameters: CLI, then environment, then YAML — each binary from its
-**own table** (18.0.0, D38). An option of another binary is in none of its forms; its CLI and YAML
+**own table** (19.0.0, D38). An option of another binary is in none of its forms; its CLI and YAML
 forms stop the start, naming the binary that serves it (D39). Its environment variable is not read
 (an environment is inherited); `MCP_TRANSPORT` is the one environment variable refused.
 

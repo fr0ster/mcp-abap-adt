@@ -1,9 +1,9 @@
-# Migrating to 18.0.0
+# Migrating to 19.0.0
 
-18.0.0 splits the server by transport into packages, one mode each, and moves it onto the 6.0.0
+19.0.0 splits the server by transport into packages, one mode each, and moves it onto the 6.0.0
 auth chain. Go through the section that fits how you run the server.
 
-The packages, all at **18.0.0**:
+The packages, all at **19.0.0**:
 
 | Package | Directory | Binary | Serves |
 |---|---|---|---|
@@ -25,7 +25,7 @@ The packages, all at **18.0.0**:
   `mcp-abap-adt-sse` (compact: `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse`)". For
   Streamable HTTP run `mcp-abap-adt-http`, for SSE `mcp-abap-adt-sse`.
 - **An option of another binary stops the start** in its CLI and YAML forms, naming the binary that
-  serves it — 17.x ignored it. Its **environment variable is not read** — ignored, no refusal, no
+  serves it — 18.x ignored it. Its **environment variable is not read** — ignored, no refusal, no
   warning — so one shell profile or one `EnvironmentFile` can serve several binaries; only
   `MCP_TRANSPORT` is refused everywhere. Per binary:
 
@@ -37,18 +37,18 @@ The packages, all at **18.0.0**:
 
   Each refusal names the form you used first: `--sse-port: SSE is served by …`.
 - **Each binary's `--help`, `--conf` template and YAML validation come from its own table.** A
-  config file written for 17.x that mixes `transport`, `mcp`, `http:` and `sse:` keys is refused by
+  config file written for 18.x that mixes `transport`, `mcp`, `http:` and `sse:` keys is refused by
   every binary: keep one file per binary, or regenerate it with `--conf=<new file>` (the binary
-  writes its template there). The `http:` / `sse:` keys keep their 17.x shape (`http.port`,
+  writes its template there). The `http:` / `sse:` keys keep their 18.x shape (`http.port`,
   `sse.tls.cert`, …).
 - **Values are checked in every form**: a port outside 1-65535, a flag that is not `true` /
-  `false`, is refused at start (17.x fell back to the default for `--http-port` / `--sse-port`).
-  TLS needs `--tls-cert` and `--tls-key` together (17.x served plain HTTP when one was missing).
+  `false`, is refused at start (18.x fell back to the default for `--http-port` / `--sse-port`).
+  TLS needs `--tls-cert` and `--tls-key` together (18.x served plain HTTP when one was missing).
 - `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, `--exposition` (with
   `debug`), `--system-type` and `--conf` are in every binary's table, unchanged.
 - **An unknown `--exposition` word stops the full binaries** (`mcp-abap-adt`, `mcp-abap-adt-http`,
   `mcp-abap-adt-sse`), in the CLI and the YAML form: they take `readonly`, `high`, `low` and
-  `debug`. 17.x dropped any other word silently — `mcp-abap-adt --exposition=ro` served
+  `debug`. 18.x dropped any other word silently — `mcp-abap-adt --exposition=ro` served
   `readonly,high`. Now: *Invalid exposition: 'ro' is not a set of this command, which takes
   readonly, high, low and debug, comma-separated. 'ro' and 'rw' are the sets of
   \`mcp-abap-adt-compact\` (@mcp-abap-adt/compact).* — the compact binary named is the one of the
@@ -77,7 +77,7 @@ The packages, all at **18.0.0**:
   the `service-keys` / `sessions` mounts (`AUTH_BROKER_PATH`) of a container or service running
   HTTP are no longer read: send the credential in the headers instead. A token you hold goes in
   `x-sap-jwt-token`.
-- **The debugger works as in 17.2**: `--exposition=...,debug`, the `state_handle` routes a call back
+- **The debugger works as in 18.0**: `--exposition=...,debug`, the `state_handle` routes a call back
   to the pooled instance that holds the state, the idle bound is `--state-idle-minutes`. Each
   request's own headers give its credential, also on a pooled instance. The debugger's ids come from
   `x-sap-debug-terminal-id` / `x-sap-debug-ide-id`, then `SAP_DEBUG_TERMINAL_ID` /
@@ -91,7 +91,7 @@ The packages, all at **18.0.0**:
   `--sse-port` / `MCP_SSE_PORT`, `--sse-path`, `--post-path`, `--sse-allowed-hosts`,
   `--sse-allowed-origins`, `--sse-enable-dns-protection` (and their `MCP_SSE_*`), `--tls-*`
   (`MCP_TLS_*`), `--system-type`, `--exposition`, `--state-idle-minutes`, `--conf`. **`--host`
-  and `--port` no longer apply to SSE** (17.x: they beat the SSE ones): they are Streamable HTTP's
+  and `--port` no longer apply to SSE** (18.x: they beat the SSE ones): they are Streamable HTTP's
   and stop the SSE start; use `--sse-host` / `--sse-port`.
 - **Credentials come only from the `x-sap-*` headers of the `GET` that opens each SSE
   connection** (`x-sap-url`, `x-sap-client`, and `x-sap-jwt-token`, or `x-sap-login` with
@@ -102,7 +102,7 @@ The packages, all at **18.0.0**:
 - **No destination is served over SSE**: the default destination, `x-mcp-destination` (a `GET` or a
   `POST` carrying it is answered `400`), `--allow-destination-header` and the `service-keys` /
   `sessions` mounts are gone, as for HTTP.
-- **The debugger works as in 17.2**: the debug session lives in the connection's instance until the
+- **The debugger works as in 18.0**: the debug session lives in the connection's instance until the
   connection closes, its stop tool runs or the idle bound ends it. Its ids come from the opening
   `GET`'s `x-sap-debug-*` headers, then `SAP_DEBUG_*` of the environment; a destination's `.env` is
   read only by `mcp-abap-adt` (stdio).
@@ -126,8 +126,8 @@ packages, each with one binary and its transport's options only:
 - **`--exposition` is compact's on each**: `rw` (all 25 tools, the default) or `ro` (the 16 that
   change nothing), and `debug` beside either for the four debugger verbs (`HandlerDebugStart`,
   `…Wait`, `…View`, `…Step`) — on stdio, Streamable HTTP and SSE alike. `debug` alone, an empty
-  value and a set of the full binaries (`readonly`, `high`, `low`) stop the start, as in 17.x.
-- **A config file's `exposition` is honoured now.** 17.x read compact's exposition from the command
+  value and a set of the full binaries (`readonly`, `high`, `low`) stop the start, as in 18.x.
+- **A config file's `exposition` is honoured now.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Each compact binary's template now writes `exposition: rw`, its help lists `ro` / `rw`
   / `debug`, and a config file's `exposition` is read by the same parser as the flag (the flag
@@ -182,11 +182,11 @@ packages, each with one binary and its transport's options only:
   callback. A browser that is not in the table: `--browser-program=<program>` (`MCP_BROWSER_PROGRAM`,
   YAML `browser-program`), which excludes `--browser`.
 - **`--renewal=refresh-then-login|refresh-only`** (`MCP_RENEWAL`, YAML `renewal`) is new. The
-  default, `refresh-then-login`, is what 17.x did. `refresh-only` never logs in: a destination that
+  default, `refresh-then-login`, is what 18.x did. `refresh-only` never logs in: a destination that
   would need a login answers `renewal-declined` with "Logins are off (`--renewal=refresh-only`):
   log in with `mcp-auth`, or start without it."
 - **A failed write to your `--env` / `--env-path` file fails the request** and refuses the
-  destination until a write lands (17.x logged it and went on). A named destination's failed write
+  destination until a write lands (18.x logged it and went on). A named destination's failed write
   is still only logged (on stderr only with `DEBUG_AUTH_LOG=true`).
 - **The startup check builds the credential.** A destination the broker refuses (a missing client
   field, say) now stops the start, exit `1`, instead of failing the first tool call.
@@ -210,7 +210,7 @@ packages, each with one binary and its transport's options only:
   them; the diagnostics go to stderr as auth-errors' `logFields`. See
   [What an MCP client sees](user-guide/AUTHENTICATION.md#what-an-mcp-client-sees-when-a-tool-call-fails-on-authentication).
 - **A destination refused for its fields reads `Destination "X" cannot be used: <fields>`**
-  (17.x: `lacks: <fields>`); a browser login on a platform with no known browser reads
+  (18.x: `lacks: <fields>`); a browser login on a platform with no known browser reads
   `Destination "X" logs in through a browser, and none is known on this platform (<platform>)`.
 
 ## Embedders
@@ -251,7 +251,7 @@ packages, each with one binary and its transport's options only:
 - **`ConnectionContext` is the instance's source** (`@mcp-abap-adt/lib/embeddable`):
   `{ kind: 'built', source: ConnectionSource } | { kind: 'injected', connection }`, plus
   `sessionId` and `metadata?`. A `ConnectionSource` answers `resolve(signal)` with `{ settings,
-  credential, systemContext? }`. `BaseMcpServer.setConnectionContext(context)` takes it (17.x:
+  credential, systemContext? }`. `BaseMcpServer.setConnectionContext(context)` takes it (18.x:
   `(destination, destinations)`); `setConnectionContextFromHeaders` is gone — pass
   `headerContext(headers)` from `@mcp-abap-adt/lib/http-transport`; `getConnection(signal)` takes
   the request's signal. A built connection is kept while the source answers the same credential
@@ -288,7 +288,7 @@ packages, each with one binary and its transport's options only:
   set's registry; its `extraGroups` / `includeSearch` options are gone (a command passes a
   `ToolSet`).
 - **An exposition the set does not serve stops the start in its words** (`--exposition=high,low`,
-  `compact` on a full binary): `[MCP] Invalid exposition: …`, exit 1 — 17.x failed the launcher with
+  `compact` on a full binary): `[MCP] Invalid exposition: …`, exit 1 — 18.x failed the launcher with
   no words.
 - **Each binary reads its own parameter table** (`@mcp-abap-adt/lib/config` keeps the machinery
   and the shared rows). `ServerConfigManager`, `ArgumentsParser` and `applyYamlConfigToArgs` are
@@ -311,5 +311,5 @@ packages, each with one binary and its transport's options only:
   `ENV_FILE_CONTEXT_KEYS`.
 - **Gone from `@mcp-abap-adt/lib/utils`:** `showHelp`, `parseTransportConfig`, `TransportConfig`
   (and `ServerOptions.transportConfig`), `getArgValue`, `hasFlag`, `parseBoolean`,
-  `resolvePortOption`, `resolveBooleanOption`, `resolveListOption` — the 17.x help and transport
+  `resolvePortOption`, `resolveBooleanOption`, `resolveListOption` — the 18.x help and transport
   parsing nothing read.

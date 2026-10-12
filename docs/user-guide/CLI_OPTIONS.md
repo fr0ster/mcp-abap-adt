@@ -4,7 +4,7 @@ Complete reference for the MCP ABAP ADT Server's command line options, per binar
 
 ## The binaries
 
-A binary is its transport; there is no `--transport` option (18.0.0). Each binary reads
+A binary is its transport; there is no `--transport` option (19.0.0). Each binary reads
 **only its own parameters**: an option of another binary, in its CLI or YAML form, stops the start,
 naming the binary that serves it.
 

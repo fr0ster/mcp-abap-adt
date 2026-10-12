@@ -42,7 +42,7 @@ and the debugger's `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` (then `SAP_R
 
 ## Options
 
-As before 18.0.0, under the same names: `--host` / `--http-host` / `MCP_HTTP_HOST`, `--port` /
+As before 19.0.0, under the same names: `--host` / `--http-host` / `MCP_HTTP_HOST`, `--port` /
 `--http-port` / `MCP_HTTP_PORT` (default `3000`), `--path` / `--http-path` (default
 `/mcp/stream/http`), `--http-json-response` / `MCP_HTTP_ENABLE_JSON_RESPONSE`,
 `--http-allowed-hosts` / `MCP_HTTP_ALLOWED_HOSTS`, `--http-allowed-origins` /

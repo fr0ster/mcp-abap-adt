@@ -4,7 +4,7 @@ Each binary of the MCP ABAP ADT server reads a YAML configuration file of its ow
 `mcp-abap-adt` (stdio), `mcp-abap-adt-http` (Streamable HTTP) and `mcp-abap-adt-sse` (SSE). The
 file holds only that binary's parameters — its template is written from the binary's table, and
 its validation is the table's: a key of another binary is refused naming the binary that serves
-it (18.0.0). A binary never reads another binary's environment variables.
+it (19.0.0). A binary never reads another binary's environment variables.
 
 ## Quick Start
 

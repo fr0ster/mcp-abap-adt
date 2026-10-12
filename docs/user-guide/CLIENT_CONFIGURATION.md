@@ -220,7 +220,7 @@ It takes no destination and no `.env`: each request carries its credential in `x
 
 The connection lives in a `.env` file the server is told about (`--env-path`, `--env` or `--mcp`). Of that file only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE` and `SAP_LANGUAGE` reach the process environment; process-level settings (`NODE_EXTRA_CA_CERTS`, `SAP_SYSNR`, `PATH` for the RFC SDK on Windows) belong in the shell or the MCP client's `env` block.
 
-**A JWT you hold** is not served over stdio (18.0.0): send it in the `x-sap-jwt-token` header to
+**A JWT you hold** is not served over stdio (19.0.0): send it in the `x-sap-jwt-token` header to
 `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or create the session with `mcp-auth`. A `.env` stating
 `SAP_GRANT_TYPE=none` is refused at startup, saying so.
 

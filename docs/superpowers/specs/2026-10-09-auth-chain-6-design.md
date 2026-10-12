@@ -352,7 +352,7 @@ session. auth-broker 5.0.1 passes that error unchanged to the caller of `getProv
 server takes them there (checked with `npm view`), and waits for nothing if they are not.
 
 **Order**: 0 (debugger releases) → 1 → 2 → 3 (on 1) and 4 (on 1, 2 and 26.0.0) → this server's
-18.0.0. Each is published before the next is built against it (H7). **The
+19.0.0. Each is published before the next is built against it (H7). **The
 server's own move to interfaces-adt 13 / interfaces-adt-connection 2 comes with it**: lib's ranges
 become `^13.2.0` / `^2.1.0` and connection `^15.0.0`. In the move the server fixes what that costs it:
 the test helper's `makeAdtRequest` stub interfaces-adt-connection 2.0.0's notes measured, and every
@@ -367,13 +367,13 @@ read of an answer's `data` through `AbapConnection` in the 8 files of `src` that
 | auth-broker 5.0.1 | `devDependencies` `^14.0.0`; tests only (`src/__tests__/broker/connection14.test.ts`, `live/adtProbe.ts`, `live/getProvider.live.test.ts`); README examples name connection 14 | nothing to release; its tests and README move to 15 in its own next change |
 | auth-providers 6.0.1, auth-stores 5.0.0, auth-errors 2.2.0 | no import of connection | nothing |
 | adt-clients | `devDependencies` `^10.0.2`, test harness and scripts; its source types come from interfaces-adt-connection | its interfaces-adt-connection 2 move (26.0.0) already meets the `unknown` default; its dev range moves to `^15` with 26.1.0 |
-| cloud-llm-hub | runtime `^10.0.3`, `lib ^16`, interfaces-adt-connection `^1.0.1`; `AbapConnection` and `SapConfig` types (`srv/mcp-manager.ts`), connectors and CSRF constants (`srv/connections/*`), its own `CloudSdkAbapConnection` with `makeAdtRequest<T = any>` | when it takes lib 18: connection `^15`, interfaces-adt-connection `^2.1`; reads through `AbapConnection` typed or narrowed; its own `makeAdtRequest<T = any>` still satisfies the interface; honour the request signal (§5.2) — its own change |
+| cloud-llm-hub | runtime `^10.0.3`, `lib ^16`, interfaces-adt-connection `^1.0.1`; `AbapConnection` and `SapConfig` types (`srv/mcp-manager.ts`), connectors and CSRF constants (`srv/connections/*`), its own `CloudSdkAbapConnection` with `makeAdtRequest<T = any>` | when it takes lib 19: connection `^15`, interfaces-adt-connection `^2.1`; reads through `AbapConnection` typed or narrowed; its own `makeAdtRequest<T = any>` still satisfies the interface; honour the request signal (§5.2) — its own change |
 | mcp-abap-adt-proxy, calm server | proxy on connection `^9.4`; calm none | out of scope (goal); each migrates in its own change |
 | this server's embedders | `EmbeddableMcpServerOptions.connection: AbapConnection` | the migration note (§12): the alias's `unknown` default |
 
 ### 3.2 The packages
 
-**(D35) The packages, names and directories** — nine, all at 18.0.0 (amended by D48, D49):
+**(D35) The packages, names and directories** — nine, all at 19.0.0 (amended by D48, D49):
 
 | Package | Directory | Bin | Serves | Depends on (`@mcp-abap-adt/*`) |
 |---|---|---|---|---|
@@ -409,7 +409,7 @@ make compact-http depend on `@mcp-abap-adt/compact` → red (it reaches core).
 
 ### 3.3 Dependency ranges (D1)
 
-| Dependency | 17.2.2 (lib, after A0) | 18.0.0 | Where |
+| Dependency | 17.2.2 (lib, after A0) | 19.0.0 | Where |
 |---|---|---|---|
 | `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.0.1`, or the range of the auth-broker release on auth-stores 5 when one is published before C2 (§3.1) | core only |
 | `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^5.0.0` (D54) | core only |
@@ -1227,7 +1227,7 @@ everywhere is `MCP_TRANSPORT`: it stated the transport, and a binary now is one.
 
 ### 10.2 Each current call site → its new form
 
-| Site | Today | 18.0.0 |
+| Site | Today | 19.0.0 |
 |---|---|---|
 | `brokerFactory.ts:251-258` (→ core) | `new AuthBroker({ serviceKeyStore, sessionStore, ...handler.brokerOptions(ctx) }, logger)` | `+ renewal, onWriteFailure (by store, D12), authDebug` |
 | `brokerFactory.ts:184-198` | provider cached by the factory | `getProvider(d, { signal })` per request, counted wrapper memoised |
@@ -1307,7 +1307,7 @@ everywhere is `MCP_TRANSPORT`: it stated the transport, and a binary now is one.
 
 ## 12. Documentation and migration notes
 
-**`docs/MIGRATION-18.0.md`**, row by row:
+**`docs/MIGRATION-19.0.md`**, row by row:
 
 - **HTTP users**: install `@mcp-abap-adt/http`, run `mcp-abap-adt-http`; credentials only from
   `x-sap-*` headers per request; the default destination, `x-mcp-destination`,
@@ -1355,7 +1355,7 @@ everywhere is `MCP_TRANSPORT`: it stated the transport, and a binary now is one.
   connection 12–15, auth-stores 5).
 
 **Updated**: `README.md`, `server/README.md`, a new `http/README.md`, `sse/README.md`,
-`compact-http/README.md` and `compact-sse/README.md`, `compact/README.md`, `CHANGELOG.md` (18.0.0, with
+`compact-http/README.md` and `compact-sse/README.md`, `compact/README.md`, `CHANGELOG.md` (19.0.0, with
 §15's measurements), `docs/user-guide/AUTHENTICATION.md` (stdio only; HTTP headers; the
 read-once sentence), `CLI_OPTIONS.md` (per binary), `CLIENT_CONFIGURATION.md`, `TERMINOLOGY.md`,
 `docs/configuration/YAML_CONFIG.md` (per binary), `docs/installation/INSTALLATION.md` and
@@ -1368,7 +1368,7 @@ launcher's help.
 
 ## 13. Version, release and how the change is committed
 
-- **(D29) Nine packages at 18.0.0**, the four new ones (http, sse, compact-http, compact-sse)
+- **(D29) Nine packages at 19.0.0**, the four new ones (http, sse, compact-http, compact-sse)
   included, from PR #287 — **decided by the user: one PR, one major release**.
 - **The server waits for its prerequisites** (§3.1) — the user's debugger releases first
   (interfaces-adt 13.1.0, adt-clients 26.0.0), then interfaces-adt-connection 2.1.0,
@@ -1380,7 +1380,7 @@ launcher's help.
   dependency order `.`, `./compact-readonly`, `./compact-modify`, `./server`, `./http`, `./sse`,
   `./compact`, `./compact-http`, `./compact-sse` (each package after every sibling it depends on);
   after publishing, a clean install of `@mcp-abap-adt/core`, `http`, `sse`, `compact`,
-  `compact-http` and `compact-sse` at 18.0.0 outside the repository runs each of the six bins'
+  `compact-http` and `compact-sse` at 19.0.0 outside the repository runs each of the six bins'
   `--version` and `--help`. The publish is the user's.
 - **(D42) How the change is committed** — so the debugger branch rebases cheaply:
   1. **the move, alone**: one commit that moves files between packages (`git mv`) and fixes only
@@ -1678,7 +1678,7 @@ bound and ended by its stop, the host or the system — never by a request's end
 | — | HTTP serves only per-request header credentials; the default destination exists only for stdio |
 | — | the package split (core stdio, a new HTTP package, lib without broker and stores) |
 | — | ~~SSE removed~~ — **cancelled**: SSE stays (D48) |
-| D29 | one PR (#287), one major 18 for every package |
+| D29 | one PR (#287), one major for every package — 19 (the 2026-10-12 registry note below) |
 | D12 (`--env` file) | `'fail'`, fixed; a session write happens only in stdio and only for token destinations |
 | D35 | `@mcp-abap-adt/http`, bin `mcp-abap-adt-http`, directory `http/` |
 | D37 | compact over HTTP wanted; behaviour identical, only the tool set differs |
@@ -1697,7 +1697,7 @@ bound and ended by its stop, the host or the system — never by a request's end
 | D52 | ~~the pool of MCP instances for the HTTP package is not in this PR~~ — **superseded by main**: the pool shipped with the debugger (#290–#292); this PR carries it into `@mcp-abap-adt/http` as it is, its rules applied to pooled instances (§3.8) |
 | — | the idle bound on held state (`--state-idle-minutes`, default 30) is the project owner's one exception to "no timeouts" (`DEBUGGER.md`) |
 | D39 (amended) | `--transport` stays removed; each of the six bins is flag-free about its transport |
-| D29 (amended) | one PR, one major 18 for all nine packages |
+| D29 (amended) | one PR, one major 19 for all nine packages |
 | — , 2026-10-11 | **roles**: a session store encapsulates storing a secret (a file, a database, anything) and is the only one with access to the stored record, so it validates the record against its own format; a provider obtains, renews and presents; the broker composes; only the target system or the identity provider decides whether a credential is valid |
 | D54, 2026-10-11 | **only the chain's own session format**: records come from `mcp-auth` (auth-broker-cli 3.x) or the broker; older formats and hand-written records are not supported; auth-stores **5.0.0** (published) refuses a record not of its format with `StorageError` `reason: 'record-format'` and composes no legacy binding, a record with no token or cookies is no session; auth-broker 5.0.1 passes that error to the caller; the server answers it with fixed words and the hint to regenerate with `mcp-auth` (§7.3) |
 | — , 2026-10-11 | the binding fields per row are auth-broker 5.0.x's, unchanged: a token to ABAP needs both `issuedFor` and `issuedBy`; XSUAA has no system URL, so `issuedBy` only; basic none |
@@ -1713,6 +1713,20 @@ interfaces-adt 13.3.0 and adt-clients 27.1.0; interfaces-adt-connection 2.1.0 an
 are still free. Wherever this spec names interfaces-adt 13.2.0, adt-clients 25.1.0, 26.0.0 or 26.1.0
 as a prerequisite, read that release; the plan checks each number with `npm view` before it is
 used.
+
+**Settled by the registry, again** (2026-10-12, `npm view`, `git tag`): **18.0.0 is the debugger
+release** (main's `v18.0.0`: lib, core and the compact packages, on adt-clients 29.1.0,
+interfaces-adt 15.1.0, adt-strategies 0.10.1; its auth-stack move was reverted and left to this
+PR). This work releases as **19.0.0**: wherever this spec says 18.0.0 for this release, read
+19.0.0, and its migration note is `docs/MIGRATION-19.0.md` (`docs/MIGRATION-18.0.md` is the
+debugger's). connection 15.0.0 / 15.0.1 were released the same way (on interfaces-adt-connection
+2, so the `AbapConnection` alias's `unknown` default and its MIGRATION-15.0 are done), and carry
+no request signal. So the prerequisites become: interfaces-adt-connection **2.1.0** (unchanged);
+interfaces-adt **the next free minor on the 15 line** (today 15.2.0); connection **the next free
+minor on the 15 line** (today 15.1.0) — §3.1 item 3's signal requirements unchanged, the major and
+the alias change already shipped; adt-clients **the next free minor on the 29 line** (today
+29.2.0). The server takes connection `^15.0.1` at the merge of main (adt-clients 29 is on
+interfaces-adt-connection 2, connection 14 on 1) and the signal releases in C2.
 
 **Questions for the user**:
 

@@ -46,7 +46,7 @@ environment's `SAP_*`).
 
 ## Options
 
-As before 18.0.0, under the same names: `--sse-host` / `MCP_SSE_HOST`, `--sse-port` /
+As before 19.0.0, under the same names: `--sse-host` / `MCP_SSE_HOST`, `--sse-port` /
 `MCP_SSE_PORT` (default `3001`), `--sse-path` (default `/sse`), `--post-path` (default
 `/messages`), `--sse-allowed-hosts` / `MCP_SSE_ALLOWED_HOSTS`, `--sse-allowed-origins` /
 `MCP_SSE_ALLOWED_ORIGINS`, `--sse-enable-dns-protection` / `MCP_SSE_ENABLE_DNS_PROTECTION`,

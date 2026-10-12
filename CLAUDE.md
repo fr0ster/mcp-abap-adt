@@ -358,7 +358,11 @@ holding its full hold (60 s), which the stop awaits. 17.2 deleted breakpoints by
 id first, which happened to delay the stopListener enough. So while the open
 poll has not answered, the stop sends stopListener once more; in the clean
 integration run the second one woke the poll and the stop took 0.4 s, but in an
-earlier run it took 60 s anyway. One retry narrows the race, it does not close
+earlier run it took 60 s anyway, and in a terminal-mode run (2026-10-12) the
+second one, sent 0.44 s after the first, did not wake the poll either. A
+stopListener does wake our own registered poll in both modes (probe, same day:
+answered 0.1–0.3 s after the stop, user and terminal mode alike), so the poll
+was not registered yet. One retry narrows the race, it does not close
 it; that is accepted and documented, not handled further (stated by the user
 2026-10-12).
 

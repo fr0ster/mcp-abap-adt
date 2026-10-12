@@ -197,10 +197,10 @@
   "dependencies": {
     "@mcp-abap-adt/adt-clients": "^29.1.0",
     "@mcp-abap-adt/adt-strategies": "^0.10.1",
-    "@mcp-abap-adt/auth-broker": "^5.0.5",
-    "@mcp-abap-adt/auth-errors": "^2.2.0",
-    "@mcp-abap-adt/auth-providers": "^6.0.1",
-    "@mcp-abap-adt/auth-stores": "^5.0.0",
+    "@mcp-abap-adt/auth-broker": "^5.0.6",
+    "@mcp-abap-adt/auth-errors": "^2.2.1",
+    "@mcp-abap-adt/auth-providers": "^6.0.2",
+    "@mcp-abap-adt/auth-stores": "^5.0.1",
     "@mcp-abap-adt/connection": "^15.0.0",
     "@mcp-abap-adt/interfaces-adt": "^15.1.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^2.0.0",
@@ -222,7 +222,7 @@
     "zod": "^4.6.5"
   },
   "optionalDependencies": {
-    "@mcp-abap-adt/sap-rfc-lite": "^0.2.1"
+    "@mcp-abap-adt/sap-rfc-lite": "^0.2.2"
   },
   "engines": {
     "node": ">=22.0.0",

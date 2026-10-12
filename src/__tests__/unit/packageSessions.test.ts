@@ -175,6 +175,53 @@ describe('openFreshConnection', () => {
     connect.mockRestore();
   });
 
+  it('closes a sibling whose connect fails, and answers the failure', async () => {
+    const { createAbapConnection } = jest.requireActual(
+      '../../lib/connectionFactory',
+    ) as typeof import('../../lib/connectionFactory');
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    useRealFactory = true;
+    const original = createAbapConnection(
+      {
+        url: 'https://sap.example.invalid',
+        client: '000',
+        authType: 'basic' as const,
+      },
+      new BasicAuthProvider('user', 'secret'),
+    ) as any;
+    /** The prototype that owns `name`, on the connection's chain. */
+    const ownerOf = (name: string) => {
+      let proto = Object.getPrototypeOf(original);
+      while (proto && !Object.hasOwn(proto, name)) {
+        proto = Object.getPrototypeOf(proto);
+      }
+      return proto;
+    };
+    const refusal = new Error('the logon failed');
+    const connect = jest
+      .spyOn(ownerOf('connect'), 'connect')
+      .mockRejectedValue(refusal);
+    const closed: unknown[] = [];
+    const disconnect = jest
+      .spyOn(ownerOf('disconnect'), 'disconnect')
+      .mockImplementation(async function (this: unknown) {
+        closed.push(this);
+      });
+
+    try {
+      const failed = expect(
+        openFreshConnection(original, undefined),
+      ).rejects.toBe(refusal);
+      await failed;
+      expect(connect).toHaveBeenCalledTimes(1);
+      expect(closed).toHaveLength(1);
+      expect(closed[0]).not.toBe(original);
+    } finally {
+      connect.mockRestore();
+      disconnect.mockRestore();
+    }
+  });
+
   it('never opens one from the configuration of a connection the factory did not build', async () => {
     opened.length = 0;
     const config = {

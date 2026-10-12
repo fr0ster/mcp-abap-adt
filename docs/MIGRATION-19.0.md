@@ -284,8 +284,11 @@ packages, each with one binary and its transport's options only:
   - **Once your factory returns a connection, it is the server's.** The server calls `connect()` on
     it, holds it for the operation (or under the package lock's handle until the unlock), and closes
     it with `disconnect()`. Build the connection with its own credential.
-  - **Honour `signal`.** It is the request's signal, so end your factory's waits when it aborts. The
-    returned connection should honour the signal in each request's options.
+  - **Honour `signal`.** It is the request's signal, so end your factory's waits when it aborts. It
+    bounds the factory call only, not the life of the connection you return: a package lock's
+    connection and a debug session's connection outlive the request that opened them, so do not
+    tie the connection to it. The returned connection should honour the signal in each request's
+    options.
   - **The latest injection of a connection object decides.** Injecting the same object again
     without `freshConnection` clears the earlier factory.
 - **`credentialFromSapConfig` refuses instead of guessing** (`setSapConfigOverride`,

@@ -67,6 +67,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { FRESH_CONNECTION_UNAVAILABLE_WORDS } from '../../lib/auth/serverRefusal';
+import { liveDebugPorts } from '../../lib/debugger/ports';
+import { runWithRequestSignal } from '../../lib/requestSignal';
 import {
   type RecordingConnection,
   recordingConnection,
@@ -79,10 +81,12 @@ import {
 function rfcConnection(): RecordingConnection & {
   getConfig(): Record<string, unknown>;
   connect: jest.Mock;
+  setSessionType: jest.Mock;
   disconnect: jest.Mock;
 } {
   return Object.assign(recordingConnection(), {
     connect: jest.fn(async () => {}),
+    setSessionType: jest.fn(),
     getConfig: () => ({
       url: 'https://sap.example.invalid',
       client: '100',
@@ -364,4 +368,62 @@ describe('without freshConnection', () => {
       await client.close();
     },
   );
+});
+
+/**
+ * The debugger is the fourth caller (`src/lib/debugger/ports.ts`): a debug
+ * session opens a stateful connection of its own through `openFreshConnection`
+ * — on an injected connection, the host's factory, else the refusal.
+ */
+describe('a debug session’s own connection', () => {
+  /** The debug ports' `openConnection`, called as a tool call would: in its request's scope. */
+  async function openForDebugSession(
+    injected: ReturnType<typeof rfcConnection>,
+    signal: AbortSignal,
+  ) {
+    return runWithRequestSignal(signal, () =>
+      liveDebugPorts().openConnection({
+        connection: injected as unknown as AbapConnection,
+        logger: undefined as never,
+      }),
+    );
+  }
+
+  it('comes from the host’s factory, with the request’s signal, stateful and connected', async () => {
+    const injected = rfcConnection();
+    const factory = hostFactory();
+    const client = await served(injected, factory);
+    const request = new AbortController();
+
+    const own = await openForDebugSession(injected, request.signal);
+
+    expect(own).toBe(factory.made[0]);
+    expect(factory.signals).toEqual([request.signal]);
+    expect(factory.made[0].connect).toHaveBeenCalledTimes(1);
+    expect(factory.made[0].setSessionType).toHaveBeenCalledWith('stateful');
+    expect(injected.requests).toHaveLength(0);
+    expect(injected.setSessionType).not.toHaveBeenCalled();
+    expect(constructedProviders).toEqual([]);
+    expect(builtConnections).toEqual([]);
+    await client.close();
+  });
+
+  it('is refused fresh_connection_unavailable without one, nothing sent', async () => {
+    const injected = rfcConnection();
+    const client = await served(injected);
+
+    const refused = expect(
+      openForDebugSession(injected, new AbortController().signal),
+    ).rejects.toMatchObject({
+      serverRefusal: 'fresh_connection_unavailable',
+      message: FRESH_CONNECTION_UNAVAILABLE_WORDS,
+    });
+    await refused;
+
+    expect(injected.requests).toHaveLength(0);
+    expect(injected.connect).not.toHaveBeenCalled();
+    expect(constructedProviders).toEqual([]);
+    expect(builtConnections).toEqual([]);
+    await client.close();
+  });
 });

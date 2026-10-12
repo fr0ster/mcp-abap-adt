@@ -71,7 +71,8 @@ export function registerFreshConnectionFactory(
  * (spec §4.3, D20):
  *
  * - built by the server (`createAbapConnection`) → the factory's record: the
- *   same settings and the same credential object, connected here;
+ *   same settings and the same credential object, connected here (closed if
+ *   that fails);
  * - injected with the host's `freshConnection` → that factory, called with
  *   the current request's signal; what it returns is the server's (D22),
  *   connected here like the server's own;
@@ -83,29 +84,39 @@ export async function openFreshConnection(
 ): Promise<IAbapConnection> {
   const record = siblingRecordOf(connection);
   if (record) {
-    const fresh = createAbapConnection(
-      record.settings,
-      record.credential,
-      logger ?? null,
-    ) as IAbapConnection & { connect?: () => Promise<void> };
-    // RFC connections need an explicit connect(); createAbapConnection does not.
-    if (typeof fresh.connect === 'function') await fresh.connect();
-    return fresh;
+    return connectedOrClosed(
+      createAbapConnection(record.settings, record.credential, logger ?? null),
+      logger,
+    );
   }
   const factory = hostFactories.get(connection);
   if (!factory) throw new ServerRefusal('fresh_connection_unavailable');
-  const handed = (await factory({
-    signal: currentRequestSignal(),
-  })) as IAbapConnection & { connect?: () => Promise<void> };
   // Once handed over it is the server's (D22), treated exactly like a
-  // connection the server built: connected before use, closed if that fails.
+  // connection the server built.
+  return connectedOrClosed(
+    await factory({ signal: currentRequestSignal() }),
+    logger,
+  );
+}
+
+/**
+ * A fresh connection the server now holds, connected (RFC needs an explicit
+ * `connect()`; `createAbapConnection` does not connect). If the connect
+ * fails, the connection is closed and the failure is the answer: nothing
+ * half-opened is left behind, on either path.
+ */
+async function connectedOrClosed(
+  fresh: IAbapConnection,
+  logger: Logger,
+): Promise<IAbapConnection> {
+  const connectable = fresh as { connect?: () => Promise<void> };
   try {
-    if (typeof handed.connect === 'function') await handed.connect();
+    if (typeof connectable.connect === 'function') await connectable.connect();
   } catch (error) {
-    await closeQuietly(handed, logger, 'A fresh connection');
+    await closeQuietly(fresh, logger, 'A fresh connection');
     throw error;
   }
-  return handed;
+  return fresh;
 }
 
 /**

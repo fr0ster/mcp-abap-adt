@@ -42,7 +42,10 @@ export interface EmbeddableMcpServerOptions {
    * RFC CreatePackage / LockPackage, DeletePackage with force_new_connection
    * (and a debug session's own connections). The connection is built by you,
    * with its credential; honour `signal` — the request's — and the signal
-   * in each request's options. Once returned it is the server's: the server
+   * in each request's options. `signal` bounds the factory call only, not
+   * the life of the connection it returns: a package lock's and a debug
+   * session's connection outlive the request that opened them, so do not tie
+   * the connection to it. Once returned it is the server's: the server
    * connects it (`connect()`), holds it for the operation (or under the
    * package lock's handle), and closes it with `disconnect()` like its own.
    * Without it those operations are refused (`fresh_connection_unavailable`);

@@ -16,7 +16,6 @@
 
 import {
   classDocuments,
-  functionGroupDocuments,
   functionIncludeDocuments,
   includeDocuments,
   programDocuments,
@@ -28,10 +27,19 @@ import {
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type ActivationRunSource,
+  awaitActivationRun,
+  isRefusal,
+} from '../../../lib/strategies/activationRun';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
-import { sequence } from '../../../lib/strategies/sequence';
+import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
+import {
+  failedWith,
+  sequence,
+  succeededWith,
+} from '../../../lib/strategies/sequence';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 
 type Answer = IAdtResponse<AdtReading<unknown>, IAdtError>;
@@ -192,7 +200,8 @@ export async function writeProgramTests(
 
 /**
  * Write a function group's test classes into its test include and activate
- * the include and the group. With `create`, the include is created first;
+ * the include, the group and its main program together. With `create`, the
+ * include is created first;
  * ADT adds its `INCLUDE` to the group's main program by itself.
  */
 export async function writeFunctionGroupTests(
@@ -205,7 +214,6 @@ export async function writeFunctionGroupTests(
   const include = client.getFunctionInclude(
     resultsFor(functionIncludeDocuments),
   );
-  const group = client.getFunctionGroup(resultsFor(functionGroupDocuments));
   const groupName = functionGroupName.toUpperCase();
   const includeName = functionGroupTestInclude(groupName);
   const target = { functionGroupName: groupName, includeName };
@@ -235,18 +243,72 @@ export async function writeFunctionGroupTests(
   );
   if (!written.ok) return written as Answer;
 
-  // Writing an include regenerates the group's main program inactive; the
-  // group has to be activated after it (see the FunctionInclude suite).
-  return carryCleanup(
-    written,
-    () =>
-      sequence(
-        () => include.activate(target, { analyse: analyseActivation }),
-        () =>
-          group.activate(
-            { functionGroupName: groupName },
-            { analyse: analyseActivation },
-          ),
-      ) as Promise<Answer>,
+  return carryCleanup(written, () =>
+    activateWithMainProgram(client, groupName, includeName),
   );
+}
+
+/**
+ * The group's main program, `SAPL<group>` — a namespace stays in front:
+ * `/NS/GROUP` has `/NS/SAPLGROUP`.
+ */
+export function functionGroupMainProgram(functionGroupName: string): string {
+  const name = functionGroupName.toUpperCase();
+  const namespaced = /^(\/[^/]+\/)(.+)$/.exec(name);
+  return namespaced ? `${namespaced[1]}SAPL${namespaced[2]}` : `SAPL${name}`;
+}
+
+/**
+ * Activate the test include, the group and its main program in one run.
+ *
+ * Writing the test include regenerates the main program with the `INCLUDE`
+ * added, inactive. Activating the group alone, with the pre-audit, is
+ * answered `200` with the inactive list instead of an activation — a
+ * document `analyseActivation` does not read, so it passed as a success —
+ * and the main program stayed inactive: ABAP Unit then found no test class
+ * (measured on premise, BASIS 816, 2026-10-12). The three go in one run
+ * without the pre-audit, as Eclipse activates the list it was shown; the run
+ * is accepted, not done, so its results are read before answering.
+ */
+async function activateWithMainProgram(
+  client: ReturnType<typeof createAdtClient>,
+  groupName: string,
+  includeName: string,
+): Promise<Answer> {
+  const utils = client.getUtils(ourUtils);
+  const started = await utils.activateObjectsGroup(
+    [
+      { type: 'FUGR/I', name: includeName, parentName: groupName },
+      { type: 'FUGR/F', name: groupName },
+      {
+        type: 'FUGR/I',
+        name: functionGroupMainProgram(groupName),
+        parentName: groupName,
+      },
+    ],
+    false,
+    { analyse: analyseException },
+  );
+  if (!started.ok) return started as unknown as Answer;
+  const outcome = await awaitActivationRun(
+    utils as unknown as ActivationRunSource,
+    started.getResult().value,
+    analyseException,
+  );
+  const refusals = outcome.messages.filter(isRefusal);
+  if (!outcome.settled || refusals.length > 0 || outcome.status === 'failed') {
+    return failedWith({
+      origin: 'refusal',
+      message: refusals.length
+        ? `Activation failed: ${refusals.map((m) => m.text).join('; ')}`
+        : `Activation run ${outcome.runId} did not finish (status ${outcome.status || 'unknown'})`,
+    });
+  }
+  // The run's results as the reading: a write's terse answer reads the
+  // status, and `raw` shows what SAP said about the activation.
+  return succeededWith({
+    value: { run_id: outcome.runId, status: outcome.status },
+    raw: outcome.results ?? '',
+    status: 200,
+  }) as unknown as Answer;
 }

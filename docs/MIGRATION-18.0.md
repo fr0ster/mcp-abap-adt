@@ -53,14 +53,18 @@ A host that wants a take-over to ask first sets `SAP_DEBUG_BREAKPOINT_CONFLICT=r
    `BreakpointReading` carries the echoed `clientId`. The session tags each definition it keeps
    with a `clientId` of its own (`bp` and a counter, never reused in the instance) and pairs the
    answer by it; a `clientId` on a definition you hand it is replaced on the wire.
-   `requestedBreakpoints()` answers the definitions as you gave them.
+   It keeps only the definitions the system placed: a refused or lost one is dropped
+   and not sent again. `requestedBreakpoints()` answers the kept definitions as you
+   gave them.
 6. **Errors.** `DebugRefusedError` (refused before anything was sent, or by the system before
    anything of ours was left to undo) and `DebugConflictError` (a `409`, with `conflictText` and
    `ideUser`; it extends `DebugListenerError`) are new.
 7. **Behaviour you may rely on.** A start under `refuse` asks the system whether another debugger
    listens for the user before it changes anything, and so does every later `setBreakpoints` of
    that session. A stop releases a held stop, then stops the listener, which deletes the key's
-   breakpoints — every IDE's under that key; it deletes by id only when the listener's stop fails.
+   breakpoints — every IDE's under that key (measured in user mode; in terminal mode the session
+   treats the set as gone after its stop, not measured); it deletes by id only when the
+   listener's stop fails.
    The identity and the settings stay until a stop undid everything, and a new start is refused
    until then; `holdsState()` stays true while a listener's stop is owed.
 8. **The host's breakpoint conflict.** `createDebuggerInstance(ids?, { breakpointConflict? })`;
@@ -68,4 +72,6 @@ A host that wants a take-over to ask first sets `SAP_DEBUG_BREAKPOINT_CONFLICT=r
    which is when terminal mode reconciles with a predecessor); `resolveBreakpointConflict()` is
    new; the request scope carries `debugBreakpointConflict` (header
    `x-sap-debug-breakpoint-conflict`, `SAP_DEBUG_BREAKPOINT_CONFLICT` in a destination's `.env` or
-   the environment). A host overriding `BaseMcpServer.debuggerFor()` passes the option there.
+   the environment). The order is the request scope, then the environment, then your
+   `breakpointConflict` — a fallback, which the environment overrides. A host overriding
+   `BaseMcpServer.debuggerFor()` passes the option there.

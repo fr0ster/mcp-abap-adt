@@ -2,9 +2,9 @@ import { requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import {
   AMDP_BREAKPOINTS_PROPERTY,
+  AMDP_CATCH_SENTENCE,
   amdpBreakpointsFromArgs,
   STATE_HANDLE_PROPERTY,
-  USER_MODE_SENTENCE,
 } from '../../../lib/debugger/schemas';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
@@ -13,7 +13,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugSetBreakpoints',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Replaces the AMDP breakpoints of a debug session, as confirmed by the system. ${USER_MODE_SENTENCE}`,
+  description: `[debug] Replaces the AMDP breakpoints of a debug session, as confirmed by the system. ${AMDP_CATCH_SENTENCE}`,
   inputSchema: {
     type: 'object',
     properties: {

@@ -325,6 +325,12 @@ id is the consumer's explicit choice. The idle bound on waiting for the user
 (not under 30 minutes, the user's exception to "no timeouts") ends a forgotten
 session.
 
+In user mode the debugger catches the requests of the connected user or of
+another named by `request_user` (measured end to end on premise, 2026-10-11,
+BASIS 816; it needs the debug authorization on that user). ADT cannot attach to
+a request or a process that is already running: a request is enabled for
+catching when it starts.
+
 Terminal mode works for the runs this server starts, measured on premise
 (2026-10-12, BASIS 816):
 

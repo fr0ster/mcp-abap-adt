@@ -2,10 +2,10 @@ import { heldStateHandle, requireDebugger } from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import {
   AMDP_BREAKPOINTS_PROPERTY,
+  AMDP_CATCH_SENTENCE,
   amdpBreakpointsFromArgs,
   RUN_PROPERTY,
   runFromArgs,
-  USER_MODE_SENTENCE,
 } from '../../../lib/debugger/schemas';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
@@ -14,7 +14,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'AmdpDebugStart',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. ${USER_MODE_SENTENCE}`,
+  description: `[debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. ${AMDP_CATCH_SENTENCE}`,
   inputSchema: {
     type: 'object',
     properties: {

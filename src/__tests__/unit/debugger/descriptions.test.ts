@@ -101,6 +101,36 @@ describe('the debugger descriptions', () => {
     }
   });
 
+  // The AMDP session takes no mode and no request user: it is the connected user's.
+  it('the AMDP tools name no request user and no mode', () => {
+    const amdp = coreDebugTools().filter((t) => t.name.startsWith('Amdp'));
+    expect(amdp.length).toBeGreaterThan(0);
+    for (const tool of amdp)
+      for (const text of textsOf(tool))
+        expect({ tool: tool.name, text }).not.toEqual({
+          tool: tool.name,
+          text: expect.stringMatching(
+            /request user|request_user|user mode|terminal mode|debugging mode/i,
+          ),
+        });
+    for (const name of ['AmdpDebugStart', 'AmdpDebugSetBreakpoints'])
+      expect(amdp.find((t) => t.name === name)!.description).toMatch(
+        /every request of the connected SAP user/,
+      );
+  });
+
+  it('the compact start scopes the request user to abap and gives amdp its own', () => {
+    const start = compactDebugEntries().find(
+      (e) => e.toolDefinition.name === 'HandlerDebugStart',
+    )!.toolDefinition.description as string;
+    expect(start).toMatch(
+      /abap: in user mode it catches every request of the request user/,
+    );
+    expect(start).toMatch(
+      /amdp: catches every request of the connected SAP user/,
+    );
+  });
+
   // The user's decision (2026-10-11): a start without breakpoints is refused, so a
   // model that forgets them learns it at once instead of waiting on a listener
   // that can catch nothing of its own.

@@ -194,10 +194,11 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    x-sap-debug-ide-id; the destination's .env; the environment.
                                    Else random per instance. A shared IDE id shares the user's
                                    catches without the system's listener conflict
-    SAP_DEBUG_BREAKPOINT_CONFLICT  replace (default) or refuse-if-held: whether a change of the
-                                   debugger's breakpoints first asks if another IDE of the same
-                                   SAP user holds them, and refuses if so. First found:
-                                   x-sap-debug-breakpoint-conflict; the destination's .env;
+    SAP_DEBUG_BREAKPOINT_CONFLICT  replace (default) or refuse-if-held: whether a take-over of
+                                   the debugger, and every later change of its breakpoints, first
+                                   asks if another debugger listens for the same SAP user, and
+                                   refuses if so (a start without take-over always asks). First
+                                   found: x-sap-debug-breakpoint-conflict; the destination's .env;
                                    the environment
 
   HTTP/SSE Headers (System Context; SSE: the session's opening request):

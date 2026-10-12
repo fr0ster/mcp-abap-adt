@@ -229,6 +229,14 @@ user there.
   requests (`DEBUG_HTTP_WIRE=true`).
 - **The breakpoint set is still the SAP user's**: terminal mode separates the
   listeners and the catches, not the breakpoints (next section).
+- **A second terminal-mode session of the same SAP user is refused under
+  refuse.** The system would accept both listeners, but the start's listener
+  check answers `409` while the other one listens (measured on premise
+  (2026-10-12), BASIS 816), so `DebugStartListener` (compact `HandlerDebugStart`
+  without `take_over`) is refused before anything is changed. A take-over
+  (`DebugTakeOverListener`, compact `take_over: true`) does not ask under the
+  default `replace`, and both listen — but its arming replaces the other
+  session's breakpoints, since the set is the SAP user's.
 
 ## The breakpoint set and its key
 
@@ -243,20 +251,23 @@ the key:
   other terminal and IDE ids replaced each other's set (measured on premise
   (2026-10-12), BASIS 816).
 
-Each change replaces that set as a whole, and a listener's stop deletes it,
-whether or not a listener ran (measured on premise (2026-10-11), BASIS 816). A
-listener's stop under another IDE id of the same user also ends that IDE's
-listener in user mode, not in terminal mode (measured on premise (2026-10-12),
-BASIS 816). The server keeps the definitions it was given and sends them all with
-every change, so a second `DebugSetBreakpoints` keeps the first.
+Each change replaces that set as a whole. A listener's stop deletes it, whether
+or not a listener ran — measured in user mode (on premise (2026-10-11), BASIS
+816); in terminal mode it is not measured, and the session treats the set as gone
+after its stop all the same. A listener's stop under another IDE id of the same
+user also ends that IDE's listener in user mode, not in terminal mode (measured
+on premise (2026-10-12), BASIS 816). The server keeps the definitions the system
+placed and sends them all with every change, so a second `DebugSetBreakpoints`
+keeps the first; a refused or lost one is dropped and not sent again.
 
 Before it changes anything, a start under refuse (`DebugStartListener`, compact
 `HandlerDebugStart` without `take_over`) asks the system whether another debugger
 listens for the user, and every later `DebugSetBreakpoints` of that session asks
 again — see [Conflicts are errors](#conflicts-are-errors). The host chooses
 whether a take-over asks too, `SAP_DEBUG_BREAKPOINT_CONFLICT` — the header
-`x-sap-debug-breakpoint-conflict`, the destination's `.env`, the environment, in
-that order; an embedder passes `breakpointConflict` to `createDebuggerInstance`:
+`x-sap-debug-breakpoint-conflict`, the destination's `.env`, the environment,
+then an embedder's `breakpointConflict` passed to `createDebuggerInstance` (the
+fallback), in that order:
 
 - **`replace`** (the default): a take-over (`DebugTakeOverListener`, compact
   `take_over: true`) asks nothing; it sends the set whole and replaces another
@@ -347,7 +358,8 @@ ends by:
 
 - **`DebugStop`** (compact `stop`): releases a stopped debuggee, then stops the
   listener — which deletes the key's breakpoints, those of every IDE sharing the
-  key included — and closes the connections, ABAP and AMDP alike. Only when the
+  key included (measured in user mode; in terminal mode the session takes the
+  set as gone after the stop, not measured) — and closes the connections, ABAP and AMDP alike. Only when the
   listener's stop fails are this session's breakpoints deleted one by one; when the
   system refuses it for the user (`403`, `404`), nothing is deleted, the answer
   names the breakpoints left on the system, and the session ends. It returns only

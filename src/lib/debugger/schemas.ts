@@ -11,6 +11,12 @@ import { lineUriOf } from './objectUri';
 
 export const USER_MODE_SENTENCE =
   'In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server.';
+/** The AMDP session has no mode and no request user: it is the connected user's. */
+export const AMDP_CATCH_SENTENCE =
+  'Catches every request of the connected SAP user, not only programs run by this server.';
+/** The same, as a fragment the compact start scopes with `amdp:`. */
+export const AMDP_CATCH_FACT =
+  'catches every request of the connected SAP user, not only programs run by this server.';
 export const TAKE_OVER_SENTENCE =
   'Displaces another debugger listening for the same user.';
 const SHARED_SET_PREDICATE =

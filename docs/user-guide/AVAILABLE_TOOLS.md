@@ -5385,7 +5385,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="amdpdebugsetbreakpoints-debug-debugger"></a>
 #### AmdpDebugSetBreakpoints (Debug / Debugger)
-**Description:** [debug] Replaces the AMDP breakpoints of a debug session, as confirmed by the system. In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server.
+**Description:** [debug] Replaces the AMDP breakpoints of a debug session, as confirmed by the system. Catches every request of the connected SAP user, not only programs run by this server.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugSetBreakpoints.ts`
 
@@ -5398,7 +5398,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="amdpdebugstart-debug-debugger"></a>
 #### AmdpDebugStart (Debug / Debugger)
-**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server.
+**Description:** [debug] Opens an AMDP debug session of the connected SAP user with breakpoints on lines in SQLScript methods; a background run, when given, starts once the system confirmed the breakpoints. Catches every request of the connected SAP user, not only programs run by this server.
 
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStart.ts`
 

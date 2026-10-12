@@ -1,5 +1,6 @@
 import { DETAIL_PROPERTY } from '@mcp-abap-adt/lib/compact-shared';
 import {
+  AMDP_CATCH_FACT,
   amdpBreakpointsFromArgs,
   BREAKPOINTS_PROPERTY,
   breakpointsFromArgs,
@@ -22,7 +23,7 @@ import { refuseOtherKind } from './shared';
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugStart',
   available_in: ['onprem', 'cloud'] as const,
-  description: `Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. request_user, debugging_mode and settings apply to abap only. take_over: abap — ${TAKE_OVER_SENTENCE.replace(/\.$/, '')}; amdp — ends an AMDP session of this user left behind. Without take_over, abap is refused before anything is placed while another debugger listens for that user. ${USER_MODE_SENTENCE} abap: ${SHARED_SET_FACT}`,
+  description: `Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. request_user, debugging_mode and settings apply to abap only. take_over: abap — ${TAKE_OVER_SENTENCE.replace(/\.$/, '')}; amdp — ends an AMDP session of this user left behind. Without take_over, abap is refused before anything is placed while another debugger listens for that user. abap: ${USER_MODE_SENTENCE.replace(/^In/, 'in')} abap: ${SHARED_SET_FACT} amdp: ${AMDP_CATCH_FACT}`,
   inputSchema: {
     type: 'object',
     properties: {

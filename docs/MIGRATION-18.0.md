@@ -124,7 +124,7 @@ What an embedder of `@mcp-abap-adt/lib` meets:
 1. **Dependencies.** One copy of each contract: `@mcp-abap-adt/interfaces-auth` `^7.5.0`,
    `@mcp-abap-adt/auth-errors` `^2.2.1`, `@mcp-abap-adt/auth-providers` `^6.0.2`,
    `@mcp-abap-adt/auth-broker` `^5.0.6`, `@mcp-abap-adt/auth-stores` `^5.0.1`,
-   `@mcp-abap-adt/connection` `^15.0.0` (on `@mcp-abap-adt/interfaces-adt-connection` 2, so
+   `@mcp-abap-adt/connection` `^15.0.1` (on `@mcp-abap-adt/interfaces-adt-connection` 2, so
    one copy of the connection contract is installed too). Check with
    `npm ls @mcp-abap-adt/interfaces-auth @mcp-abap-adt/auth-errors @mcp-abap-adt/interfaces-adt-connection`.
    An answer of `makeAdtRequest` whose type is not named is `unknown` (connection 15): name

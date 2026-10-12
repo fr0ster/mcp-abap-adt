@@ -110,7 +110,7 @@ jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
  *    runtime-profiling tools, because a reading genuinely is behind each of
  *    the two fields this answer combines.
  *
- * The thirty debugger tools (`src/handlers/debugger/debug/`) joined with the
+ * The debugger tools (`src/handlers/debugger/debug/`) joined with the
  * debugger: each answers a parsed reading (a stop, variables, breakpoints, a
  * memory snapshot view) with SAP's document beside it, through
  * `debugAnswer`/`debugStateAnswer`, so terse, full and raw genuinely differ.
@@ -219,6 +219,7 @@ const JSON_ANSWERING: readonly string[] = [
   'DebugListBreakpoints',
   'DebugListWatchpoints',
   'DebugSetBreakpoints',
+  'DebugSetSettings',
   'DebugSetStackPosition',
   'DebugSetVariable',
   'DebugStartListener',

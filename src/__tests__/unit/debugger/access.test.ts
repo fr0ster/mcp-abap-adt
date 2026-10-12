@@ -1,5 +1,6 @@
 import { requireDebugger } from '../../../lib/debugger/access';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
+import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
 import {
   InstanceState,
   StateUnavailableError,
@@ -90,5 +91,28 @@ describe('DebuggerInstance', () => {
     await expect(dbg.stop()).rejects.toThrow(
       'abap: close refused; amdp: release refused',
     );
+  });
+
+  it('a side that fails does not lose the notes the other side answered', async () => {
+    const note =
+      'listener: notAuthorized; the breakpoints placed stay on the system: a line';
+    const dbg = new DebuggerInstance({
+      abap: { ...fake(true), stop: async () => [note] },
+      amdp: {
+        ...fake(true),
+        stop: async () => {
+          throw new DebugCleanupError('amdp: release refused');
+        },
+      },
+    });
+    const error = await dbg.stop().then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(DebugCleanupError);
+    expect((error as DebugCleanupError).message).toBe(
+      `amdp: release refused; ${note}`,
+    );
+    expect((error as DebugCleanupError).notes).toEqual([note]);
   });
 });

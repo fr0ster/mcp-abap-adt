@@ -67,6 +67,10 @@ import {
   handleDebugSetBreakpoints,
 } from '../../../handlers/debugger/debug/handleDebugSetBreakpoints';
 import {
+  TOOL_DEFINITION as DebugSetSettings_Tool,
+  handleDebugSetSettings,
+} from '../../../handlers/debugger/debug/handleDebugSetSettings';
+import {
   TOOL_DEFINITION as DebugSetStackPosition_Tool,
   handleDebugSetStackPosition,
 } from '../../../handlers/debugger/debug/handleDebugSetStackPosition';
@@ -119,7 +123,7 @@ import { defineTool, type HandlerEntry } from '../interfaces.js';
 
 /**
  * The debugger tools — opt-in (`--exposition=…,debug`): a breakpoint catches
- * every request of the connected SAP user. Their state lives in the server
+ * every request of the request user. Their state lives in the server
  * instance (`HandlerContext.debugger`).
  */
 export class DebugHandlersGroup extends BaseHandlerGroup {
@@ -140,6 +144,7 @@ export class DebugHandlersGroup extends BaseHandlerGroup {
       defineTool(DebugStep_Tool, handleDebugStep),
       defineTool(DebugStepToLine_Tool, handleDebugStepToLine),
       defineTool(DebugTerminate_Tool, handleDebugTerminate),
+      defineTool(DebugSetSettings_Tool, handleDebugSetSettings),
       defineTool(DebugCreateWatchpoint_Tool, handleDebugCreateWatchpoint),
       defineTool(DebugListWatchpoints_Tool, handleDebugListWatchpoints),
       defineTool(DebugDeleteWatchpoint_Tool, handleDebugDeleteWatchpoint),

@@ -152,7 +152,7 @@
   {
     "group": "compact",
     "name": "HandlerDebugStart",
-    "inputs": "kind*, breakpoints*, take_over, run, detail",
+    "inputs": "kind*, breakpoints*, take_over, request_user, debugging_mode, settings, run, detail",
     "available_in": "cloud, onprem"
   },
   {

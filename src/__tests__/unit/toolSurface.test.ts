@@ -141,10 +141,24 @@ describe('the MCP tool surface', () => {
         'low/CheckPackageLow': 'super_package',
       };
       const relaxed = MAY_RELAX_REQUIRED[tool];
+      // **One tightening, decided by the user (2026-10-11).** The two ABAP
+      // debugger starts require at least one breakpoint (`minItems: 1`), as the
+      // compact start already did: a model may start a run and forget the
+      // breakpoints, and a listener with none of its own catches nothing it
+      // asked for. `breakpoints` leaves and `breakpoints*` arrives, which is this
+      // one pair per tool and nothing else. It lands in the 18.0.0 major.
+      const MAY_TIGHTEN_REQUIRED: Record<string, string> = {
+        'debug/DebugStartListener': 'breakpoints',
+        'debug/DebugTakeOverListener': 'breakpoints',
+      };
+      const tightened = MAY_TIGHTEN_REQUIRED[tool];
       expect({
         tool,
         lost: had.filter(
-          (p) => !has.includes(p) && p !== `${relaxed ?? '\u0000'}*`,
+          (p) =>
+            !has.includes(p) &&
+            p !== `${relaxed ?? '\u0000'}*` &&
+            p !== tightened,
         ),
       }).toEqual({
         tool,
@@ -193,10 +207,25 @@ describe('the MCP tool surface', () => {
         // schema never offered one — so a transportable package could not be
         // updated through this tool at all.
         'low/UpdatePackageLow': ['transport_request'],
+        // adt-clients 29 (fr0ster/mcp-abap-adt-clients#217): the two ABAP debugger
+        // starts take whose requests are caught, the debugging mode and the
+        // debugger settings. All three optional.
+        'debug/DebugStartListener': [
+          'request_user',
+          'debugging_mode',
+          'settings',
+        ],
+        'debug/DebugTakeOverListener': [
+          'request_user',
+          'debugging_mode',
+          'settings',
+        ],
       };
       expect({
         tool,
-        added: has.filter((p) => !had.includes(p) && p !== relaxed),
+        added: has.filter(
+          (p) => !had.includes(p) && p !== relaxed && p !== `${tightened}*`,
+        ),
       }).toEqual({
         tool,
         added: MAY_GAIN_VERSION.has(tool)
@@ -232,6 +261,11 @@ describe('the MCP tool surface', () => {
    * the old snapshot exactly, in `inputs` and in `available_in`, and the only
    * difference allowed was these three names appearing. A tool that had
    * quietly gained or lost anything else would have stopped it.
+   */
+  /**
+   * **The third deliberate move: `DebugSetSettings` arrived** with the debugger
+   * on adt-clients 29 — the settings at the current stop. Every other row was
+   * checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

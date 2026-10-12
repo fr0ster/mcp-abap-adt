@@ -44,3 +44,18 @@ export function heldStateHandle(
     ? { state_handle: context.state.handle }
     : {};
 }
+
+/** What a start answers beside its state: the handle, the SAP ids, and the identity in force. */
+export function startedExtra(context: HandlerContext): Record<string, unknown> {
+  const abap = context.debugger!().abap;
+  const identity = abap.currentIdentity();
+  return {
+    state_handle: context.state!.handle,
+    terminal_id: identity?.terminalId ?? abap.ids.terminalId,
+    ide_id: abap.ids.ideId,
+    ...(identity ? { debugging_mode: identity.debuggingMode } : {}),
+    ...(identity?.debuggingMode === 'user'
+      ? { request_user: identity.requestUser }
+      : {}),
+  };
+}

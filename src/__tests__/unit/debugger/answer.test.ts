@@ -128,4 +128,21 @@ describe('debug answers', () => {
     expect(full.stop.debuggee.attachImpossible).toBe(true);
     expect(full.stop.attach.isPostMortem).toBe(true);
   });
+
+  it('a terse stop names the settings in force and a settings failure', async () => {
+    const r = await debugStateAnswer({}, async () => ({
+      state: 'stopped' as const,
+      stop: {
+        debuggee: readDebuggee(corpusBody('debugger-run-to-line--02-listen'))!,
+        attach: readAttach(corpusBody('debugger-run-to-line--03-attach')),
+        stack: readStack(corpusBody('debugger-run-to-line--04-stack')),
+        raw: { debuggee: '', attach: '', stack: '' },
+        settings: { systemDebugging: true },
+        settingsError: 'Settings not allowed',
+      },
+    }));
+    const json = JSON.parse((r.content[0] as { text: string }).text);
+    expect(json.settings).toEqual({ system_debugging: true });
+    expect(json.settings_error).toBe('Settings not allowed');
+  });
 });

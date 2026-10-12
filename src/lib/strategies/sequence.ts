@@ -122,6 +122,17 @@ export function succeededWith<T>(value: T): IAdtResponse<T, IAdtError> {
   } as unknown as IAdtResponse<T, IAdtError>;
 }
 
+/** `succeededWith`'s twin, for a composite that reads a refusal out of a later request. */
+export function failedWith<T>(error: IAdtError): IAdtResponse<T, IAdtError> {
+  return {
+    ok: false,
+    getResult: () => {
+      throw new Error('failedWith: asked for the result of a failure');
+    },
+    getError: () => error,
+  } as unknown as IAdtResponse<T, IAdtError>;
+}
+
 /**
  * Two calls whose BOTH answers are the result.
  *

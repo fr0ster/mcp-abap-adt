@@ -1,5 +1,6 @@
 import { DETAIL_PROPERTY } from '@mcp-abap-adt/lib/compact-shared';
 import {
+  AMDP_CATCH_FACT,
   amdpBreakpointsFromArgs,
   BREAKPOINTS_PROPERTY,
   breakpointsFromArgs,
@@ -9,6 +10,10 @@ import {
   RUN_PROPERTY,
   requireDebugger,
   runFromArgs,
+  SHARED_SET_FACT,
+  START_PROPERTIES,
+  startedExtra,
+  startOptionsFromArgs,
   TAKE_OVER_SENTENCE,
   USER_MODE_SENTENCE,
 } from '@mcp-abap-adt/lib/debugger';
@@ -18,7 +23,7 @@ import { refuseOtherKind } from './shared';
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugStart',
   available_in: ['onprem', 'cloud'] as const,
-  description: `Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. take_over: abap — ${TAKE_OVER_SENTENCE.replace(/\.$/, '')}; amdp — ends an AMDP session of this user left behind. ${USER_MODE_SENTENCE}`,
+  description: `Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. request_user, debugging_mode and settings apply to abap only. take_over: abap — ${TAKE_OVER_SENTENCE.replace(/\.$/, '')}; amdp — ends an AMDP session of this user left behind. Without take_over, abap is refused before anything is placed while another debugger listens for that user. abap: ${USER_MODE_SENTENCE.replace(/^In/, 'in')} abap: ${SHARED_SET_FACT} amdp: ${AMDP_CATCH_FACT}`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -32,14 +37,15 @@ export const TOOL_DEFINITION = {
         ...BREAKPOINTS_PROPERTY.breakpoints,
         minItems: 1,
         description:
-          'abap: a line, an exception class, an ABAP statement or a message, each with an optional condition. amdp: object_name (the class) and line of each.',
+          'abap: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. amdp: object_name (the class) and line of each.',
       },
       take_over: {
         type: 'boolean',
         default: false,
         description:
-          'Takes over from an existing debugger of this user instead of refusing.',
+          'abap: takes over from another debugger listening for this user instead of refusing; the breakpoints of this SAP user (in user mode, for the same request user) are replaced. amdp: ends an AMDP session of this user left behind instead of refusing.',
       },
+      ...START_PROPERTIES,
       ...RUN_PROPERTY,
       ...DETAIL_PROPERTY,
     },
@@ -55,6 +61,15 @@ export async function handleHandlerDebugStart(
     return debugAnswer(
       args,
       async () => {
+        // The identity and the settings are the ABAP debugger's; the AMDP session takes none.
+        if (
+          args.request_user !== undefined ||
+          args.debugging_mode !== undefined ||
+          args.settings !== undefined
+        )
+          throw new Error(
+            'request_user, debugging_mode and settings apply to kind abap only',
+          );
         refuseOtherKind(context, 'amdp');
         const d = requireDebugger(context, args, { create: 'amdp' });
         // The compact items name the class `object_name`; the session takes
@@ -86,13 +101,10 @@ export async function handleHandlerDebugStart(
       return d.abap.start(args.take_over ? 'takeOver' : 'refuse', {
         breakpoints: breakpointsFromArgs(args.breakpoints),
         run: runFromArgs(args.run),
+        ...startOptionsFromArgs(args),
       });
     },
-    () => ({
-      state_handle: context.state!.handle,
-      terminal_id: context.debugger!().abap.ids.terminalId,
-      ide_id: context.debugger!().abap.ids.ideId,
-    }),
+    () => startedExtra(context),
     () => heldStateHandle(context),
   );
 }

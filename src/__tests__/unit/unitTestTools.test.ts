@@ -17,6 +17,7 @@ import { handleRunProgramUnitTest } from '../../handlers/unit_test/high/handleRu
 import { handleRunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
 import { handleUpdateProgramUnitTest } from '../../handlers/unit_test/high/handleUpdateProgramUnitTest';
 import {
+  functionGroupMainProgram,
   functionGroupTestInclude,
   programTestInclude,
 } from '../../handlers/unit_test/shared/writeTests';
@@ -290,8 +291,25 @@ describe('test include names', () => {
 });
 
 describe('CreateFunctionGroupUnitTest: the group test include', () => {
-  it('creates it under the group, writes it, activates it and the group', async () => {
-    const connection = recordingConnection();
+  it('creates it under the group, writes it, then activates it, the group and its main program in one run', async () => {
+    // create, LOCK, PUT, UNLOCK — then the run: its start answers the id in
+    // `Location`, its status says finished, its results say activated.
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        status: 202,
+        headers: { location: '/sap/bc/adt/activation/runs/RUN-1' },
+      },
+      {
+        data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>',
+      },
+      {
+        data: '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><chkl:properties checkExecuted="true" activationExecuted="true" generationExecuted="true"/></chkl:messages>',
+      },
+    ]);
 
     const result: any = await handleCreateFunctionGroupUnitTest(
       ctx(connection) as any,
@@ -312,8 +330,122 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
     expect(puts[0].url.toLowerCase()).toContain(
       `/includes/${include}/source/main`,
     );
+    // One run, without the pre-audit: activating the group alone with it is
+    // answered by the inactive list, and the main program stays inactive.
+    const runs = connection.requests.filter(
+      (r) => r.method === 'POST' && r.url.includes('/activation'),
+    );
+    expect(runs).toHaveLength(1);
+    expect(runs[0].url).toContain('/activation/runs');
+    expect(runs[0].url).toContain('preauditRequested=false');
+    const body = String(runs[0].data);
+    expect(body).toContain(`adtcore:name="${include.toUpperCase()}"`);
+    expect(body).toContain('adtcore:type="FUGR/F" adtcore:name="ZFG_X"');
+    expect(body).toContain('adtcore:name="SAPLZFG_X"');
+    // Then the run's status and its results: accepted is not done.
     expect(
-      connection.requests.filter((r) => r.url.includes('/activation')),
-    ).toHaveLength(2);
+      connection.requests.some((r) => r.url.includes('/activation/runs/RUN-1')),
+    ).toBe(true);
+  });
+
+  it('an activation the run refused is a failure, not a success', async () => {
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        status: 202,
+        headers: { location: '/sap/bc/adt/activation/runs/RUN-2' },
+      },
+      {
+        data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>',
+      },
+      {
+        data: '<?xml version="1.0" encoding="utf-8"?><chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist"><msg objDescr="Function group ZFG_X" type="E" line="1"><shortText><txt>Syntax error</txt></shortText></msg><chkl:properties checkExecuted="true" activationExecuted="false" generationExecuted="false"/></chkl:messages>',
+      },
+    ]);
+
+    const result: any = await handleCreateFunctionGroupUnitTest(
+      ctx(connection) as any,
+      { function_group_name: 'zfg_x', test_class_source: 'x' },
+    );
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Syntax error');
+  });
+
+  it('a run that ended in error is a failure, even with no error message', async () => {
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      {
+        status: 202,
+        headers: { location: '/sap/bc/adt/activation/runs/RUN-3' },
+      },
+      {
+        data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="error"/>',
+      },
+      { data: '' },
+    ]);
+
+    const result: any = await handleCreateFunctionGroupUnitTest(
+      ctx(connection) as any,
+      { function_group_name: 'zfg_x', test_class_source: 'x' },
+    );
+
+    expect(result.isError).toBe(true);
+  });
+
+  it('waits on the run with long polls and no timer of its own', async () => {
+    const timer = jest.spyOn(global, 'setTimeout');
+    try {
+      // A run that never settles: six long polls, back to back, then a failure.
+      const running = {
+        data: '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="running"/>',
+      };
+      const connection = recordingConnection([
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        {
+          status: 202,
+          headers: { location: '/sap/bc/adt/activation/runs/RUN-4' },
+        },
+        running,
+        running,
+        running,
+        running,
+        running,
+        running,
+        { data: '' },
+      ]);
+
+      const result: any = await handleCreateFunctionGroupUnitTest(
+        ctx(connection) as any,
+        { function_group_name: 'zfg_x', test_class_source: 'x' },
+      );
+
+      expect(result.isError).toBe(true);
+      const polls = connection.requests.filter((r) =>
+        r.url.includes('/activation/runs/RUN-4?'),
+      );
+      expect(polls).toHaveLength(6);
+      expect(polls.every((r) => r.url.includes('withLongPolling=true'))).toBe(
+        true,
+      );
+      const ours = timer.mock.calls.filter(([, ms]) => ms === 1000);
+      expect(ours).toHaveLength(0);
+    } finally {
+      timer.mockRestore();
+    }
+  });
+
+  it("a function group's main program: SAPL<group>, namespace in front", () => {
+    expect(functionGroupMainProgram('zfg_x')).toBe('SAPLZFG_X');
+    expect(functionGroupMainProgram('/ns/group')).toBe('/NS/SAPLGROUP');
   });
 });

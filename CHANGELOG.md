@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [18.1.0] - 2026-10-12
+
+Two transport organizer actions on `@mcp-abap-adt/adt-clients` 30.
+
+### Added
+
+- `SortAndCompressTransportTask` (`transport_number`, the task): the organizer's *Sort and compress* — sorts a task's object list and merges its duplicate entries. A task holding the same entry twice refuses `RemoveTransportObject` with `SCTS_ADT_MSG 009` (long text TR292) until it has run. Measured on premise (BASIS 816, 2026-10-12): `200` with an empty body; a task of 161 entries with four held twice re-read as 157.
+- `MoveTransportObjects` (`transport_number`, the source task; `target_number`; `objects`, at least one, each `object_name`, `object_type`, `position` in the source and an optional `pgmid`): the organizer's *Move Objects*. Measured on premise (same day): one and two entries per call answered `200` echoing them, and both tasks read back with them moved.
+- Neither answer is evidence of the change, so neither says `success` (as `RemoveTransportObject`): the terse answer is `accepted: true`, what was asked, and `confirm_with` naming `ReadTransportObjects` on the task — both tasks for a move. A missing argument or an empty `objects` is refused in fixed words naming the field before anything is sent. Both run under the critical section the other transport object writes have. 159 high-level tools.
+
+### Changed
+
+- `@mcp-abap-adt/adt-clients` `^30.0.0`, `@mcp-abap-adt/adt-strategies` `^0.10.2`, `@mcp-abap-adt/interfaces-adt` `^15.3.0` (root and `compact-modify`). adt-clients 30's two new result slots, `sortedAndCompressed` and `movedObjects`, are read `statusOnly` and `structured`. `@mcp-abap-adt/core`, `@mcp-abap-adt/compact` and the two compact halves require `@mcp-abap-adt/lib` `^18.1.0`.
+
 ## [18.0.0] - 2026-10-12
 
 The debugger on `@mcp-abap-adt/adt-clients` 29 (`interfaces-adt` 15, `adt-strategies` 0.10): another user's runs, terminal mode, leaving a debuggee running, the debugger settings — and breakpoints armed as one set. Migration: [`docs/MIGRATION-18.0.md`](docs/MIGRATION-18.0.md).

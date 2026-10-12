@@ -62,7 +62,22 @@ export function withCriticalSection<H extends (...args: any[]) => any>(
  * object's lock orphaned exactly the way this file's own header describes for
  * an unprotected mutating call. `CreateTransportTask` already matched
  * (`Create`); these two did not.
+ *
+ * `MoveTransportObjects` and `SortAndCompressTransportTask` (adt-clients 30)
+ * write the same object list, so they get the same protection — named one by
+ * one rather than by a new prefix, which would quietly cover whatever tool
+ * next starts with `Move` or `Sort`. Whether their backends take the ENQUEUE
+ * lock `addobject`/`removeobject` do is not measured; the critical section
+ * costs nothing when they do not.
  */
+const MUTATING_TRANSPORT_TOOLS: ReadonlySet<string> = new Set([
+  'MoveTransportObjects',
+  'SortAndCompressTransportTask',
+]);
+
 export function isMutatingToolName(name: string): boolean {
-  return /^(Create|Update|Delete|Add|Remove)/.test(name);
+  return (
+    /^(Create|Update|Delete|Add|Remove)/.test(name) ||
+    MUTATING_TRANSPORT_TOOLS.has(name)
+  );
 }

@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 157
+- Total tools: 159
 
 ## Navigation
 
@@ -167,7 +167,9 @@ Generated from code in `src/handlers/**` (not from docs).
     - [AddTransportObject](#addtransportobject-high-level-transport)
     - [CreateTransport](#createtransport-high-level-transport)
     - [CreateTransportTask](#createtransporttask-high-level-transport)
+    - [MoveTransportObjects](#movetransportobjects-high-level-transport)
     - [RemoveTransportObject](#removetransportobject-high-level-transport)
+    - [SortAndCompressTransportTask](#sortandcompresstransporttask-high-level-transport)
   - [Unit Test](#high-level-unit-test)
     - [CreateCdsUnitTest](#createcdsunittest-high-level-unit-test)
     - [CreateFunctionGroupUnitTest](#createfunctiongroupunittest-high-level-unit-test)
@@ -2062,6 +2064,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="movetransportobjects-high-level-transport"></a>
+#### MoveTransportObjects (High-Level / Transport)
+**Description:** Move object entries from one transport task to another. Each entry is named by its position in the source task's object list.
+
+**Source:** `src/handlers/transport/high/handleMoveTransportObjects.ts`
+
+**Parameters:**
+- `objects` (array, required) - The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.
+- `target_number` (string, required) - Number of the transport task the entries move to.
+- `transport_number` (string, required) - Number of the transport task that holds the entries.
+
+---
+
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
 **Description:** Remove an object's entry from the transport task that holds it.
@@ -2074,6 +2089,17 @@ Generated from code in `src/handlers/**` (not from docs).
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
 - `position` (string, required) - Position of the object's entry in the task's object list.
 - `transport_number` (string, required) - Number of the transport task that holds the entry.
+
+---
+
+<a id="sortandcompresstransporttask-high-level-transport"></a>
+#### SortAndCompressTransportTask (High-Level / Transport)
+**Description:** Sort a transport task's object list and merge its duplicate entries. A task holding the same entry twice refuses RemoveTransportObject until this has run.
+
+**Source:** `src/handlers/transport/high/handleSortAndCompressTransportTask.ts`
+
+**Parameters:**
+- `transport_number` (string, required) - Number of the transport task to sort and compress.
 
 ---
 

@@ -24,6 +24,13 @@
  *      RemoveTransportObject, which leaves the object in no request at all")
  *   7. ReadTransportObjects again — confirm it is back
  *   8. ReadTransportActionLog — confirm the task's log recorded activity
+ *   9. SortAndCompressTransportTask on the task — accepted, and a re-read
+ *      still holds the entry once (an empty `200` is not proof either)
+ *  10. CreateTransportTask — a second task under the same request
+ *  11. MoveTransportObjects — the entry from the first task to the second,
+ *      by its position; re-read both: gone from the first, on the second
+ *  12. MoveTransportObjects — back again, by its position on the second, so
+ *      the program's cleanup finds it where it was created
  *
  * **Which number goes where is not documented here.** It was, as a table of
  * one line per call — and a table in a test file is read by whoever is
@@ -108,7 +115,9 @@ import { handleDeleteProgram } from '../../../../handlers/program/high/handleDel
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
 import { handleAddTransportObject } from '../../../../handlers/transport/high/handleAddTransportObject';
 import { handleCreateTransportTask } from '../../../../handlers/transport/high/handleCreateTransportTask';
+import { handleMoveTransportObjects } from '../../../../handlers/transport/high/handleMoveTransportObjects';
 import { handleRemoveTransportObject } from '../../../../handlers/transport/high/handleRemoveTransportObject';
+import { handleSortAndCompressTransportTask } from '../../../../handlers/transport/high/handleSortAndCompressTransportTask';
 import { handleReadTransportActionLog } from '../../../../handlers/transport/readonly/handleReadTransportActionLog';
 import { handleReadTransportObjects } from '../../../../handlers/transport/readonly/handleReadTransportObjects';
 import { createAdtClient } from '../../../../lib/clients';
@@ -162,6 +171,9 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
   // colliding with that history instead of relying on cleanup being perfect.
   const programName = `ZMCP_BLD_TR${Date.now().toString(36).toUpperCase().slice(-6)}`;
   let taskNumber = '';
+  // The target of the move (steps 10–12). Emptied and deleted in `afterAll`
+  // like the first task.
+  let secondTaskNumber = '';
   let testEnabled = false;
   let skipReason = '';
 
@@ -274,7 +286,8 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       }
     }
 
-    if (taskNumber) {
+    for (const task of [secondTaskNumber, taskNumber]) {
+      if (!task) continue;
       try {
         // **Detaching comes before deleting, and this suite of all suites
         // should know it.** Deleting the program does not empty the task: the
@@ -292,7 +305,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         const readCtx = createHandlerContext({ connection, logger });
         const held = parseHandlerResponse(
           await handleReadTransportObjects(readCtx, {
-            transport_number: taskNumber,
+            transport_number: task,
           }),
         );
         for (const entry of held?.objects ?? []) {
@@ -305,7 +318,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
           await handleRemoveTransportObject(
             createHandlerContext({ connection, logger }),
             {
-              transport_number: taskNumber,
+              transport_number: task,
               object_name: entry.name,
               object_type: entry.type,
               position: entry.position,
@@ -318,26 +331,26 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         const left = parseHandlerResponse(
           await handleReadTransportObjects(
             createHandlerContext({ connection, logger }),
-            { transport_number: taskNumber },
+            { transport_number: task },
           ),
         );
         if ((left?.count ?? 0) > 0) {
           logger?.warn(
-            `Cleanup: task ${taskNumber} still holds ${left.count} entr(y|ies) — not deleting it, left for manual review`,
+            `Cleanup: task ${task} still holds ${left.count} entr(y|ies) — not deleting it, left for manual review`,
           );
-          return;
+          continue;
         }
 
         const deleted = await createAdtClient(connection, logger)
           .getRequest()
-          .delete({ transportNumber: taskNumber } as any, {
+          .delete({ transportNumber: task } as any, {
             analyse: analyseDeletion,
           });
         if (deleted.ok) {
-          logger?.success(`Cleanup: task ${taskNumber} deleted`);
+          logger?.success(`Cleanup: task ${task} deleted`);
         } else {
           logger?.warn(
-            `Cleanup: task ${taskNumber} is empty but was not deleted — ${deleted.getError().message}`,
+            `Cleanup: task ${task} is empty but was not deleted — ${deleted.getError().message}`,
           );
         }
       } catch (e: any) {
@@ -548,6 +561,117 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         logger?.success(
           `Step 8: action log has ${logData.count} entr${logData.count === 1 ? 'y' : 'ies'}`,
         );
+
+        // Step 9: SortAndCompressTransportTask — accepted, and the entry is
+        // still there, once. The answer is an empty `200` (measured on
+        // premise, BASIS 816, 2026-10-12), so the re-read is the evidence.
+        logger?.info(`Step 9: SortAndCompressTransportTask on ${taskNumber}`);
+        const sortResponse = await handleSortAndCompressTransportTask(
+          createHandlerContext({ connection, logger }),
+          { transport_number: taskNumber },
+        );
+        expectOk(sortResponse, 'Step 9 SortAndCompressTransportTask', logger);
+        const sortData = parseHandlerResponse(sortResponse);
+        expect(sortData.accepted).toBe(true);
+        expect('success' in sortData).toBe(false);
+
+        await delay(getOperationDelay('update'));
+
+        const sortedData = parseHandlerResponse(
+          await handleReadTransportObjects(
+            createHandlerContext({ connection, logger }),
+            { transport_number: taskNumber },
+          ),
+        );
+        const afterSort = sortedData.objects.filter(
+          (o: any) => o.name === programName && o.type === 'PROG',
+        );
+        expect(afterSort).toHaveLength(1);
+        logger?.success('Step 9: entry still on the task, once');
+
+        // Step 10: a second task, the target of the move
+        logger?.info(
+          `Step 10: CreateTransportTask — a second task under ${parentTransport}`,
+        );
+        const secondTaskResponse = await handleCreateTransportTask(
+          createHandlerContext({ connection, logger }),
+          { transport_number: parentTransport, target_user: targetUser },
+        );
+        expectOk(secondTaskResponse, 'Step 10 CreateTransportTask', logger);
+        secondTaskNumber = parseHandlerResponse(secondTaskResponse).task_number;
+        expect(secondTaskNumber).toBeTruthy();
+        logger?.success(`Step 10: task ${secondTaskNumber} created`);
+
+        await delay(getOperationDelay('create'));
+
+        // Step 11: move the entry to the second task, by its position
+        const moving = afterSort[0];
+        logger?.info(
+          `Step 11: MoveTransportObjects ${taskNumber} → ${secondTaskNumber} at position ${moving.position}`,
+        );
+        const moveResponse = await handleMoveTransportObjects(
+          createHandlerContext({ connection, logger }),
+          {
+            transport_number: taskNumber,
+            target_number: secondTaskNumber,
+            objects: [
+              {
+                object_name: programName,
+                object_type: 'PROG',
+                position: moving.position,
+              },
+            ],
+          },
+        );
+        expectOk(moveResponse, 'Step 11 MoveTransportObjects', logger);
+        const moveData = parseHandlerResponse(moveResponse);
+        expect(moveData.accepted).toBe(true);
+        expect('success' in moveData).toBe(false);
+
+        await delay(getOperationDelay('update'));
+
+        // The echo is not proof: re-read both tasks.
+        const holds = async (task: string) =>
+          parseHandlerResponse(
+            await handleReadTransportObjects(
+              createHandlerContext({ connection, logger }),
+              { transport_number: task },
+            ),
+          ).objects.filter(
+            (o: any) => o.name === programName && o.type === 'PROG',
+          );
+        expect(await holds(taskNumber)).toHaveLength(0);
+        const onSecond = await holds(secondTaskNumber);
+        expect(onSecond).toHaveLength(1);
+        logger?.success(
+          'Step 11: entry moved — off the first task, on the second',
+        );
+
+        // Step 12: move it back, by its position on the second task
+        logger?.info(
+          `Step 12: MoveTransportObjects ${secondTaskNumber} → ${taskNumber}`,
+        );
+        const backResponse = await handleMoveTransportObjects(
+          createHandlerContext({ connection, logger }),
+          {
+            transport_number: secondTaskNumber,
+            target_number: taskNumber,
+            objects: [
+              {
+                object_name: programName,
+                object_type: 'PROG',
+                position: onSecond[0].position,
+              },
+            ],
+          },
+        );
+        expectOk(backResponse, 'Step 12 MoveTransportObjects', logger);
+
+        await delay(getOperationDelay('update'));
+
+        expect(await holds(secondTaskNumber)).toHaveLength(0);
+        expect(await holds(taskNumber)).toHaveLength(1);
+        logger?.success('Step 12: entry back on the first task');
       } finally {
         // The suite locks and unlocks its own object, so a lock here means
         // something went wrong earlier — name the holder rather than pretend it

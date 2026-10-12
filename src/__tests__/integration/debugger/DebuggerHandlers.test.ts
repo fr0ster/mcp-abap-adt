@@ -434,7 +434,7 @@ describe('Debugger handlers (integration)', () => {
     };
   };
 
-  /** DebugWait until the background run reports its end. */
+  /** DebugWait until the background run reports its end; an error answer is no end. */
   const untilRunFinished = async (inst: Instance, handle: string) => {
     const seen: unknown[] = [];
     for (let i = 0; i < 8; i++) {
@@ -442,8 +442,12 @@ describe('Debugger handlers (integration)', () => {
         state_handle: handle,
         hold_seconds: 30,
       });
-      seen.push(a.isError ? a.text.slice(0, 300) : a.json);
-      if (a.isError || a.json?.reason === 'run_finished') return a;
+      if (a.isError)
+        throw new Error(
+          `DebugWait failed before the run's end: ${withoutHandles(a.text.slice(0, 600))}`,
+        );
+      seen.push(a.json);
+      if (a.json?.reason === 'run_finished') return a;
     }
     throw new Error(
       `the run did not report its end: ${withoutHandles(JSON.stringify(seen))}`,
@@ -459,6 +463,14 @@ describe('Debugger handlers (integration)', () => {
     if (!file || !fs.existsSync(file))
       throw new Error(`second_user_env: no session .env named ${envName}`);
     const env = dotenv.parse(fs.readFileSync(file, 'utf8'));
+    // Names only: the values never reach a message or a log.
+    const missing = ['SAP_URL', 'SAP_USERNAME', 'SAP_PASSWORD'].filter(
+      (key) => !env[key]?.trim(),
+    );
+    if (missing.length)
+      throw new Error(
+        `second_user_env: ${envName} lacks ${missing.join(', ')} (basic authentication is required)`,
+      );
     const settings: SapConfig = {
       url: String(env.SAP_URL).replace(/\/$/, ''),
       authType: 'basic',
@@ -489,6 +501,54 @@ describe('Debugger handlers (integration)', () => {
       ? { ok: true, output: String(answer.getResult().value ?? '') }
       : { ok: false, output: answer.getError().message };
   };
+
+  /**
+   * The session a case started, stopped whatever happens: the case's own stop
+   * clears it, and `cleanup` (in the case's finally) stops what is still held,
+   * so a failed case leaves no listener or breakpoints at the system, in hard
+   * mode too. The cleanup never throws: the case's own failure stays the one reported.
+   */
+  const caseSession = (inst: Instance) => {
+    let handle: string | undefined;
+    return {
+      hold(answer: Answer) {
+        const h = answer.json?.state_handle;
+        if (typeof h === 'string' && h) handle = h;
+        return { state_handle: String(h ?? '') };
+      },
+      async stop(): Promise<Answer> {
+        const a = await call(inst, 'DebugStop', { state_handle: handle });
+        if (!a.isError) handle = undefined;
+        return a;
+      },
+      async cleanup(): Promise<void> {
+        if (!handle) return;
+        const h = handle;
+        handle = undefined;
+        try {
+          const a = await call(inst, 'DebugStop', { state_handle: h });
+          if (a.isError)
+            measure(
+              'cleanup',
+              'DebugStop after a failed case',
+              a.text.slice(0, 300),
+            );
+        } catch (e) {
+          measure('cleanup', 'DebugStop after a failed case threw', String(e));
+        }
+      },
+    };
+  };
+
+  /** A run in flight whose rejection is always handled; `settled` waits for it without throwing. */
+  const inFlight = <T>(run: Promise<T>) => {
+    run.catch(() => undefined);
+    return { run, settled: () => Promise.allSettled([run]) };
+  };
+
+  type RunInFlight = ReturnType<
+    typeof inFlight<{ ok: boolean; output: string }>
+  >;
 
   // --- lifecycle -----------------------------------------------------------------
 
@@ -1203,72 +1263,86 @@ describe('Debugger handlers (integration)', () => {
         if (!abapReady) throw new Error('the probe is not ready');
         softOnly('the run is the test’s own');
         const inst = newInstance();
-        const start = await call(inst, 'DebugStartListener', {
-          breakpoints: [line('mark')],
-        });
-        expect(start.isError).toBe(false);
-        const h = { state_handle: start.json.state_handle };
-        /** What the session paired: placed lines, refused lines with reasons, lost, unexpected. */
-        const paired = (a: { json: any }) => ({
-          placed: a.json.placed.map((r: any) => String(r.uri).split('#')[1]),
-          refused: a.json.refused.map(
-            (r: any) =>
-              `${String(r.requested.uri).split('#')[1]}: ${r.error ?? ''}`,
-          ),
-          lost: a.json.lost.length,
-          unexpected: a.json.unexpected,
-        });
-        const second = await call(inst, 'DebugSetBreakpoints', {
-          ...h,
-          breakpoints: [line('second')],
-        });
-        expect(second.isError).toBe(false);
-        measure(
-          'breakpoint answer',
-          'held: mark; sent: second (both placeable)',
-          paired(second),
-        );
-        expect(second.json.placed).toHaveLength(2);
-        expect(second.json.refused).toEqual([]);
-        expect(second.json.lost).toEqual([]);
-        expect(second.json.unexpected).toEqual([]);
-        // A refusal among the rows: a class's first line takes no breakpoint. The system
-        // answers it first (measured on premise (2026-10-11), BASIS 816); the tag pairs it.
-        const withRefusal = await call(inst, 'DebugSetBreakpoints', {
-          ...h,
-          breakpoints: [{ object_type: 'CLAS', object_name: probe, line: 1 }],
-        });
-        expect(withRefusal.isError).toBe(false);
-        measure(
-          'breakpoint answer',
-          'held: mark, second; sent: line 1',
-          paired(withRefusal),
-        );
-        expect(withRefusal.json.placed).toHaveLength(2);
-        expect(withRefusal.json.refused).toHaveLength(1);
-        expect(withRefusal.json.refused[0].requested.uri).toMatch(/#start=1$/);
-        expect(withRefusal.json.lost).toEqual([]);
-        expect(withRefusal.json.unexpected).toEqual([]);
-        const ran = runProbe(probe);
-        const atMark = await waitFor(inst, h.state_handle, ['stopped']);
-        expect(atMark.last.json?.state).toBe('stopped');
-        expect(atMark.last.json.at.address.line).toBe(LINE.mark);
-        expect(
-          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
-        ).toBe(false);
-        const atSecond = await waitFor(inst, h.state_handle, ['stopped']);
-        measure(
-          'breakpoint set',
-          'the second stop',
-          atSecond.last.json?.at?.address,
-        );
-        expect(atSecond.last.json?.state).toBe('stopped');
-        expect(atSecond.last.json.at.address.line).toBe(LINE.second);
-        expect(
-          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
-        ).toBe(false);
-        expect(await ran).toMatchObject({ ok: true, output: ABAP_OUTPUT });
-        expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
+        const session = caseSession(inst);
+        let ran: RunInFlight | undefined;
+        try {
+          const start = await call(inst, 'DebugStartListener', {
+            breakpoints: [line('mark')],
+          });
+          const h = session.hold(start);
+          expect(start.isError).toBe(false);
+          /** What the session paired: placed lines, refused lines with reasons, lost, unexpected. */
+          const paired = (a: { json: any }) => ({
+            placed: a.json.placed.map((r: any) => String(r.uri).split('#')[1]),
+            refused: a.json.refused.map(
+              (r: any) =>
+                `${String(r.requested.uri).split('#')[1]}: ${r.error ?? ''}`,
+            ),
+            lost: a.json.lost.length,
+            unexpected: a.json.unexpected,
+          });
+          const second = await call(inst, 'DebugSetBreakpoints', {
+            ...h,
+            breakpoints: [line('second')],
+          });
+          expect(second.isError).toBe(false);
+          measure(
+            'breakpoint answer',
+            'held: mark; sent: second (both placeable)',
+            paired(second),
+          );
+          expect(second.json.placed).toHaveLength(2);
+          expect(second.json.refused).toEqual([]);
+          expect(second.json.lost).toEqual([]);
+          expect(second.json.unexpected).toEqual([]);
+          // A refusal among the rows: a class's first line takes no breakpoint. The system
+          // answers it first (measured on premise (2026-10-11), BASIS 816); the tag pairs it.
+          const withRefusal = await call(inst, 'DebugSetBreakpoints', {
+            ...h,
+            breakpoints: [{ object_type: 'CLAS', object_name: probe, line: 1 }],
+          });
+          expect(withRefusal.isError).toBe(false);
+          measure(
+            'breakpoint answer',
+            'held: mark, second; sent: line 1',
+            paired(withRefusal),
+          );
+          expect(withRefusal.json.placed).toHaveLength(2);
+          expect(withRefusal.json.refused).toHaveLength(1);
+          expect(withRefusal.json.refused[0].requested.uri).toMatch(
+            /#start=1$/,
+          );
+          expect(withRefusal.json.lost).toEqual([]);
+          expect(withRefusal.json.unexpected).toEqual([]);
+          ran = inFlight(runProbe(probe));
+          const atMark = await waitFor(inst, h.state_handle, ['stopped']);
+          expect(atMark.last.json?.state).toBe('stopped');
+          expect(atMark.last.json.at.address.line).toBe(LINE.mark);
+          expect(
+            (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
+              .isError,
+          ).toBe(false);
+          const atSecond = await waitFor(inst, h.state_handle, ['stopped']);
+          measure(
+            'breakpoint set',
+            'the second stop',
+            atSecond.last.json?.at?.address,
+          );
+          expect(atSecond.last.json?.state).toBe('stopped');
+          expect(atSecond.last.json.at.address.line).toBe(LINE.second);
+          expect(
+            (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
+              .isError,
+          ).toBe(false);
+          expect(await ran.run).toMatchObject({
+            ok: true,
+            output: expect.stringContaining(ABAP_OUTPUT),
+          });
+          expect((await session.stop()).isError).toBe(false);
+        } finally {
+          await session.cleanup();
+          await ran?.settled();
+        }
       });
     },
     getTimeout('long'),
@@ -1282,15 +1356,18 @@ describe('Debugger handlers (integration)', () => {
         if (!secondUserEnv)
           throw new Error('SKIP: no second user configured (second_user_env)');
         const other = await connectionAs(secondUserEnv);
+        const inst = newInstance();
+        const session = caseSession(inst);
+        let ran: RunInFlight | undefined;
         try {
           const otherUser = (
             await requestUserOf(other.connection)
           ).toUpperCase();
-          const inst = newInstance();
           const start = await call(inst, 'DebugStartListener', {
             request_user: otherUser,
             breakpoints: [line('mark')],
           });
+          const h = session.hold(start);
           measure(
             'another user',
             'start',
@@ -1298,8 +1375,7 @@ describe('Debugger handlers (integration)', () => {
           );
           expect(start.isError).toBe(false);
           expect(start.json.request_user).toBe(otherUser);
-          const h = { state_handle: start.json.state_handle };
-          const ran = runOn(other.connection, probe);
+          ran = inFlight(runOn(other.connection, probe));
           const caught = await waitFor(inst, h.state_handle, ['stopped']);
           expect(caught.last.json?.state).toBe('stopped');
           expect(caught.last.json.at.address.line).toBe(LINE.mark);
@@ -1310,9 +1386,15 @@ describe('Debugger handlers (integration)', () => {
             (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
               .isError,
           ).toBe(false);
-          expect(await ran).toMatchObject({ ok: true, output: ABAP_OUTPUT });
-          expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
+          expect(await ran.run).toMatchObject({
+            ok: true,
+            output: expect.stringContaining(ABAP_OUTPUT),
+          });
+          expect((await session.stop()).isError).toBe(false);
         } finally {
+          // The stop releases a held run first; the run settles before its connection closes.
+          await session.cleanup();
+          await ran?.settled();
           await other.close();
         }
       });
@@ -1326,45 +1408,54 @@ describe('Debugger handlers (integration)', () => {
       await tester.run(async () => {
         if (!abapReady) throw new Error('the probe is not ready');
         const inst = newInstance();
-        const start = await call(inst, 'DebugStartListener', {
-          breakpoints: [line('loop')],
-          run: { kind: 'class', name: probe },
-        });
-        expect(start.isError).toBe(false);
-        const h = { state_handle: start.json.state_handle };
-        const pass1 =
-          start.json.state === 'stopped'
-            ? start
-            : (await waitFor(inst, h.state_handle, ['stopped'])).last;
-        expect(pass1.json.at.address.line).toBe(LINE.loop);
-        const detached = await call(inst, 'DebugStep', {
-          ...h,
-          action: 'detach',
-        });
-        measure(
-          'detach',
-          'answer',
-          detached.isError ? detached.text.slice(0, 400) : detached.json,
-        );
-        expect(detached.isError).toBe(false);
-        expect(detached.json.state).toBe('listening');
-        const pass2 = await waitFor(inst, h.state_handle, ['stopped', 'ended']);
-        measure(
-          'detach',
-          'the next pass of the armed line',
-          pass2.last.json?.state,
-        );
-        expect(pass2.last.json?.state).toBe('stopped');
-        expect(pass2.last.json.at.address.line).toBe(LINE.loop);
-        expect(
-          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
-        ).toBe(false);
-        const finished = await untilRunFinished(inst, h.state_handle);
-        expect(finished.json?.run).toMatchObject({
-          ok: true,
-          output: ABAP_OUTPUT,
-        });
-        expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
+        const session = caseSession(inst);
+        try {
+          const start = await call(inst, 'DebugStartListener', {
+            breakpoints: [line('loop')],
+            run: { kind: 'class', name: probe },
+          });
+          const h = session.hold(start);
+          expect(start.isError).toBe(false);
+          const pass1 =
+            start.json.state === 'stopped'
+              ? start
+              : (await waitFor(inst, h.state_handle, ['stopped'])).last;
+          expect(pass1.json.at.address.line).toBe(LINE.loop);
+          const detached = await call(inst, 'DebugStep', {
+            ...h,
+            action: 'detach',
+          });
+          measure(
+            'detach',
+            'answer',
+            detached.isError ? detached.text.slice(0, 400) : detached.json,
+          );
+          expect(detached.isError).toBe(false);
+          expect(detached.json.state).toBe('listening');
+          const pass2 = await waitFor(inst, h.state_handle, [
+            'stopped',
+            'ended',
+          ]);
+          measure(
+            'detach',
+            'the next pass of the armed line',
+            pass2.last.json?.state,
+          );
+          expect(pass2.last.json?.state).toBe('stopped');
+          expect(pass2.last.json.at.address.line).toBe(LINE.loop);
+          expect(
+            (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
+              .isError,
+          ).toBe(false);
+          const finished = await untilRunFinished(inst, h.state_handle);
+          expect(finished.json?.run).toMatchObject({
+            ok: true,
+            output: expect.stringContaining(ABAP_OUTPUT),
+          });
+          expect((await session.stop()).isError).toBe(false);
+        } finally {
+          await session.cleanup();
+        }
       });
     },
     getTimeout('long'),
@@ -1376,44 +1467,52 @@ describe('Debugger handlers (integration)', () => {
       await tester.run(async () => {
         if (!abapReady) throw new Error('the probe is not ready');
         const inst = newInstance();
-        const start = await call(inst, 'DebugStartListener', {
-          breakpoints: [line('mark')],
-          run: { kind: 'class', name: probe },
-        });
-        expect(start.isError).toBe(false);
-        const h = { state_handle: start.json.state_handle };
-        if (start.json.state !== 'stopped')
-          expect(
-            (await waitFor(inst, h.state_handle, ['stopped'])).last.json?.state,
-          ).toBe('stopped');
-        const released = await call(inst, 'DebugStep', {
-          ...h,
-          action: 'release_debugger',
-        });
-        measure(
-          'release_debugger',
-          'answer',
-          released.isError ? released.text.slice(0, 400) : released.json,
-        );
-        expect(released.isError).toBe(false);
-        expect(released.json.state).toBe('listening');
-        const finished = await untilRunFinished(inst, h.state_handle);
-        expect(finished.json?.run).toMatchObject({
-          ok: true,
-          output: ABAP_OUTPUT,
-        });
-        // The next run is the test's own: a hard run has no connection of its own to start it.
-        if (!tester.isHardMode()) {
-          const next = runProbe(probe);
-          const caught = await waitFor(inst, h.state_handle, ['stopped']);
-          expect(caught.last.json?.state).toBe('stopped');
-          expect(
-            (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
-              .isError,
-          ).toBe(false);
-          expect((await next).ok).toBe(true);
+        const session = caseSession(inst);
+        let next: RunInFlight | undefined;
+        try {
+          const start = await call(inst, 'DebugStartListener', {
+            breakpoints: [line('mark')],
+            run: { kind: 'class', name: probe },
+          });
+          const h = session.hold(start);
+          expect(start.isError).toBe(false);
+          if (start.json.state !== 'stopped')
+            expect(
+              (await waitFor(inst, h.state_handle, ['stopped'])).last.json
+                ?.state,
+            ).toBe('stopped');
+          const released = await call(inst, 'DebugStep', {
+            ...h,
+            action: 'release_debugger',
+          });
+          measure(
+            'release_debugger',
+            'answer',
+            released.isError ? released.text.slice(0, 400) : released.json,
+          );
+          expect(released.isError).toBe(false);
+          expect(released.json.state).toBe('listening');
+          const finished = await untilRunFinished(inst, h.state_handle);
+          expect(finished.json?.run).toMatchObject({
+            ok: true,
+            output: expect.stringContaining(ABAP_OUTPUT),
+          });
+          // The next run is the test's own: a hard run has no connection of its own to start it.
+          if (!tester.isHardMode()) {
+            next = inFlight(runProbe(probe));
+            const caught = await waitFor(inst, h.state_handle, ['stopped']);
+            expect(caught.last.json?.state).toBe('stopped');
+            expect(
+              (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
+                .isError,
+            ).toBe(false);
+            expect((await next.run).ok).toBe(true);
+          }
+          expect((await session.stop()).isError).toBe(false);
+        } finally {
+          await session.cleanup();
+          await next?.settled();
         }
-        expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
       });
     },
     getTimeout('long'),
@@ -1425,59 +1524,69 @@ describe('Debugger handlers (integration)', () => {
       await tester.run(async () => {
         if (!abapReady) throw new Error('the probe is not ready');
         const inst = newInstance();
-        const start = await call(inst, 'DebugStartListener', {
-          breakpoints: [line('mark')],
-          settings: { system_debugging: true, create_exception_object: true },
-          run: { kind: 'class', name: probe },
-        });
-        expect(start.isError).toBe(false);
-        const h = { state_handle: start.json.state_handle };
-        const stopped =
-          start.json.state === 'stopped'
-            ? start
-            : (await waitFor(inst, h.state_handle, ['stopped'])).last;
-        measure(
-          'settings',
-          'after the attach: system_debugging, create_exception_object',
-          stopped.json?.settings ?? stopped.json?.settings_error,
-        );
-        expect(stopped.json.settings).toMatchObject({
-          system_debugging: true,
-          create_exception_object: true,
-        });
-        const off = await call(inst, 'DebugSetSettings', {
-          ...h,
-          system_debugging: false,
-        });
-        measure(
-          'settings',
-          'DebugSetSettings system_debugging false',
-          off.isError ? off.text.slice(0, 300) : off.json,
-        );
-        expect(off.isError).toBe(false);
-        expect(off.json).toMatchObject({
-          system_debugging: false,
-          create_exception_object: true,
-        });
-        const update = await call(inst, 'DebugSetSettings', {
-          ...h,
-          update_debugging: true,
-        });
-        measure(
-          'settings',
-          'DebugSetSettings update_debugging true',
-          update.isError ? update.text.slice(0, 300) : update.json,
-        );
-        expect(update.isError).toBe(false);
-        expect(update.json).toMatchObject({
-          update_debugging: true,
-          system_debugging: false,
-        });
-        expect(
-          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
-        ).toBe(false);
-        await untilRunFinished(inst, h.state_handle);
-        expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
+        const session = caseSession(inst);
+        try {
+          const start = await call(inst, 'DebugStartListener', {
+            breakpoints: [line('mark')],
+            settings: { system_debugging: true, create_exception_object: true },
+            run: { kind: 'class', name: probe },
+          });
+          const h = session.hold(start);
+          expect(start.isError).toBe(false);
+          const stopped =
+            start.json.state === 'stopped'
+              ? start
+              : (await waitFor(inst, h.state_handle, ['stopped'])).last;
+          measure(
+            'settings',
+            'after the attach: system_debugging, create_exception_object',
+            stopped.json?.settings ?? stopped.json?.settings_error,
+          );
+          expect(stopped.json.settings).toMatchObject({
+            system_debugging: true,
+            create_exception_object: true,
+          });
+          const off = await call(inst, 'DebugSetSettings', {
+            ...h,
+            system_debugging: false,
+          });
+          measure(
+            'settings',
+            'DebugSetSettings system_debugging false',
+            off.isError ? off.text.slice(0, 300) : off.json,
+          );
+          expect(off.isError).toBe(false);
+          expect(off.json).toMatchObject({
+            system_debugging: false,
+            create_exception_object: true,
+          });
+          const update = await call(inst, 'DebugSetSettings', {
+            ...h,
+            update_debugging: true,
+          });
+          measure(
+            'settings',
+            'DebugSetSettings update_debugging true',
+            update.isError ? update.text.slice(0, 300) : update.json,
+          );
+          expect(update.isError).toBe(false);
+          expect(update.json).toMatchObject({
+            update_debugging: true,
+            system_debugging: false,
+          });
+          expect(
+            (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
+              .isError,
+          ).toBe(false);
+          const finished = await untilRunFinished(inst, h.state_handle);
+          expect(finished.json?.run).toMatchObject({
+            ok: true,
+            output: expect.stringContaining(ABAP_OUTPUT),
+          });
+          expect((await session.stop()).isError).toBe(false);
+        } finally {
+          await session.cleanup();
+        }
       });
     },
     getTimeout('long'),
@@ -1490,49 +1599,58 @@ describe('Debugger handlers (integration)', () => {
         if (!abapReady) throw new Error('the probe is not ready');
         // Random ids, none configured: the run carries them in its SAP-PASSPORT.
         const inst = newInstance();
-        const start = await call(inst, 'DebugStartListener', {
-          debugging_mode: 'terminal',
-          breakpoints: [line('mark')],
-          run: { kind: 'class', name: probe },
-        });
-        measure(
-          'terminal',
-          'start',
-          start.isError ? start.text.slice(0, 400) : start.json?.state,
-        );
-        expect(start.isError).toBe(false);
-        expect(start.json.debugging_mode).toBe('terminal');
-        const h = { state_handle: start.json.state_handle };
-        const caught =
-          start.json.state === 'stopped'
-            ? start
-            : (await waitFor(inst, h.state_handle, ['stopped', 'ended'])).last;
-        measure(
-          'terminal',
-          'the catch',
-          caught.json?.at?.address ?? caught.json ?? caught.text.slice(0, 400),
-        );
-        expect(caught.json?.state).toBe('stopped');
-        expect(caught.json.at.address.line).toBe(LINE.mark);
-        expect(caught.json.at.address.object_name).toBe(probe);
-        expect(
-          (await call(inst, 'DebugStep', { ...h, action: 'over' })).isError,
-        ).toBe(false);
-        expect(
-          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
-        ).toBe(false);
-        const finished = await untilRunFinished(inst, h.state_handle);
-        expect(finished.json?.run).toMatchObject({
-          ok: true,
-          output: ABAP_OUTPUT,
-        });
-        const stop = await call(inst, 'DebugStop', h);
-        measure(
-          'terminal',
-          'stop',
-          stop.isError ? stop.text.slice(0, 400) : 'stopped',
-        );
-        expect(stop.isError).toBe(false);
+        const session = caseSession(inst);
+        try {
+          const start = await call(inst, 'DebugStartListener', {
+            debugging_mode: 'terminal',
+            breakpoints: [line('mark')],
+            run: { kind: 'class', name: probe },
+          });
+          const h = session.hold(start);
+          measure(
+            'terminal',
+            'start',
+            start.isError ? start.text.slice(0, 400) : start.json?.state,
+          );
+          expect(start.isError).toBe(false);
+          expect(start.json.debugging_mode).toBe('terminal');
+          const caught =
+            start.json.state === 'stopped'
+              ? start
+              : (await waitFor(inst, h.state_handle, ['stopped', 'ended']))
+                  .last;
+          measure(
+            'terminal',
+            'the catch',
+            caught.json?.at?.address ??
+              caught.json ??
+              caught.text.slice(0, 400),
+          );
+          expect(caught.json?.state).toBe('stopped');
+          expect(caught.json.at.address.line).toBe(LINE.mark);
+          expect(caught.json.at.address.object_name).toBe(probe);
+          expect(
+            (await call(inst, 'DebugStep', { ...h, action: 'over' })).isError,
+          ).toBe(false);
+          expect(
+            (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
+              .isError,
+          ).toBe(false);
+          const finished = await untilRunFinished(inst, h.state_handle);
+          expect(finished.json?.run).toMatchObject({
+            ok: true,
+            output: expect.stringContaining(ABAP_OUTPUT),
+          });
+          const stop = await session.stop();
+          measure(
+            'terminal',
+            'stop',
+            stop.isError ? stop.text.slice(0, 400) : 'stopped',
+          );
+          expect(stop.isError).toBe(false);
+        } finally {
+          await session.cleanup();
+        }
       });
     },
     getTimeout('long'),

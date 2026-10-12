@@ -21,7 +21,10 @@ import { handleDebugWait } from '../../../handlers/debugger/debug/handleDebugWai
 import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
-import { DebugSession } from '../../../lib/debugger/DebugSession';
+import {
+  DebugCleanupError,
+  DebugSession,
+} from '../../../lib/debugger/DebugSession';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { InstanceState } from '../../../lib/state/InstanceState';
 import { okResponse } from '../../helpers/fakeClient';
@@ -308,6 +311,47 @@ describe('debugger handlers', () => {
     expect(r.content[0].text).toMatch(/User SAPUSER03 does not exist/);
     expect(world.log.some((c) => c.call === 'deleteBreakpoint')).toBe(false);
     expect(context.state.holdsState()).toBe(false);
+  });
+
+  it("DebugStop: when the AMDP side fails, the error still carries the ABAP side's note", async () => {
+    const world = fakeWorld();
+    const state = new InstanceState();
+    const failingAmdp = {
+      holdsState: () => false,
+      pending: () => false,
+      failures: () => [],
+      observe: () => {},
+      bind() {
+        return this;
+      },
+      stop: async () => {
+        throw new DebugCleanupError('amdp: release refused');
+      },
+    };
+    const dbg = new DebuggerInstance({
+      abap: new DebugSession(world.ports as any, IDS),
+      amdp: failingAmdp as any,
+    });
+    state.attach(dbg);
+    const context = {
+      connection: {} as any,
+      logger: undefined,
+      state,
+      debugger: () => dbg,
+    };
+    await startedListening(world, context);
+    await until(() => world.polls.length === 2);
+    world.override.stopListener = async () => INVALID_USER();
+    const stopping = handleDebugStop(context as any, {
+      state_handle: state.handle,
+    });
+    await until(() => world.log.some((c) => c.call === 'stopListener'));
+    world.polls[1].resolve(LISTEN_NOTHING());
+    const r: any = await stopping;
+    expect(r.isError).toBe(true);
+    const text = r.content.map((c: any) => c.text).join('\n');
+    expect(text).toContain('amdp: release refused');
+    expect(text).toMatch(/User SAPUSER03 does not exist/);
   });
 
   it('a refused start that left nothing answers no handle', async () => {

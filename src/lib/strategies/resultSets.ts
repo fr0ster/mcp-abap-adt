@@ -172,6 +172,15 @@ export const READING_BY_SLOT = {
   // `tm:type` on the creating call is ignored, and CTS also assigns a type on
   // its own when the first object lands.
   taskTypeChanged: structured,
+  // Arrived with adt-clients 30.0.0, on `sortAndCompress` and `moveObjects`
+  // (the shipped reading of both is `rawDocument`). Measured on premise
+  // (BASIS 816, 2026-10-12): *Sort and compress* answers `200` with an empty
+  // body — `statusOnly`, like the other writes that answer nothing — and
+  // *Move Objects* echoes the entries it was sent under the source's number —
+  // `structured`, like the echoes above. Neither answer is evidence of the
+  // change: a re-read through `objects` is what settles it.
+  sortedAndCompressed: statusOnly,
+  movedObjects: structured,
 
   // Arrived with adt-clients 23.0.0 in every versionable type's set. The
   // library stopped reading them (MIGRATION-23 §4): `versions` is the feed as

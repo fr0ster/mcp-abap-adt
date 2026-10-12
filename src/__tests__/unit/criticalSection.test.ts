@@ -30,6 +30,11 @@ describe('isMutatingToolName', () => {
       expect(isMutatingToolName(n)).toBe(true);
     }
   });
+  it('matches MoveTransportObjects/SortAndCompressTransportTask, which write the same object list', () => {
+    for (const n of ['MoveTransportObjects', 'SortAndCompressTransportTask']) {
+      expect(isMutatingToolName(n)).toBe(true);
+    }
+  });
   it('does not match read/activate tools', () => {
     for (const n of ['GetDomain', 'ReadTable', 'ActivateClass', 'GetSession']) {
       expect(isMutatingToolName(n)).toBe(false);

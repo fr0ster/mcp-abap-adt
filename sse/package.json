@@ -64,7 +64,7 @@
   },
   "dependencies": {
     "@mcp-abap-adt/auth-errors": "^2.2.1",
-    "@mcp-abap-adt/lib": "^18.0.0",
+    "@mcp-abap-adt/lib": "^18.1.0",
     "@mcp-abap-adt/logger": "^0.4.1",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "express": "^5.2.1"

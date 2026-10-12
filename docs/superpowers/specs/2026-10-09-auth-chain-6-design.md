@@ -897,15 +897,23 @@ connection, connector or client of the chain takes one any more.
 
 - **(D32) The server's own waits for a request race its signal**: `connect()` (shared by stdio's
   callers), `getProvider`'s build, the system-context lookup. A cancelled caller settles at once;
-  the shared work runs on; a late rejection is handled; a late success that belonged to it alone is
-  disconnected (`disconnect()`, D55's rule). A started tool's requests race nothing: they run to the
-  end (D55), a renewal or a logon inside a send included.
+  the shared work runs on; a late rejection is handled; **a late success is the instance's
+  connection** — kept by the instance like any connection it built, used by the next call, and
+  closed only by the instance's terminal close (§6.4), even when every caller that waited for it
+  cancelled (D56: a cancel causes no logoff and no reopen; amended from "a late success that
+  belonged to it alone is disconnected", which A8 built and C2 removes). A started tool's requests
+  race nothing: they run to the end (D55), a renewal or a logon inside a send included.
+- **A cancel causes no logoff anywhere** (D56): not of a late connection (D32), not of a fresh
+  connection (it is made inside a started tool, which runs to its end; its end is the operation's,
+  §4.3), not by a rebuild of the provider (D13: no reopen while the instance lives). D7's retry
+  follows a `connect()` that failed before any session existed, so it closes nothing.
 - **(D5) A cancelled request does not reach its tool**, in every package: after the connection is
   ready an aborted signal answers `aborted` and the handler is not called. Once the handler is
   called, the tool runs to the end and its answer is produced (D55).
 - **(D7) One retry after another caller's abort** (stdio): `connect()` failing `interactive-login`
   `aborted` while this request's signal is live is retried once — a later request inside the abort
-  window of another's starts afresh. Read by `kind`, once.
+  window of another's starts afresh. Read by `kind`, once. Nothing is logged off: the failed
+  `connect()` opened no session.
 - **(D13) The connection a request uses**: HTTP builds one per request, on its new or pooled
   instance (§3.8); SSE one per SSE connection, kept by that connection's instance until it closes
   (D51); stdio keeps its connection for the instance's life — **no reopen while the instance
@@ -1061,8 +1069,6 @@ documented limit.
   - stdio's kept connection (`BaseMcpServer.getConnection`), at exit (the instance's `dispose()`);
   - a connection replaced — only when SAP already lost its session (D56; D13) — when it is
     replaced;
-  - a connection built for a caller who cancelled, that was its alone (D32, RF1), when the
-    `connect()` settles;
   - the fresh connections — `openFreshConnection`, `inOwnSessionOverRfc`, and the consumer's
     `freshConnection` ones once returned (the server owns them, D22) — when the operation ends;
   - package lock sessions (`connectionForPackageLock`), at `releasePackageLockSession` — the
@@ -1852,8 +1858,9 @@ connection, which is disconnected, and no provider is constructed; without it,
   instance's connections left open.
 - **Every connection the server owns ends with a logoff (D55's rule, §6.4)**: one test per listed
   end, on a recording connection, asserting its `disconnect()` was called once — stdio's kept
-  connection at exit; a connection replaced by a reconnect or a new provider; a connection built
-  for a caller who cancelled (RF1); each fresh connection (`openFreshConnection`,
+  connection at exit — also one whose `connect()` completed after every waiting caller cancelled
+  (D32, RF1: kept, used by the next call, closed only then); a connection replaced because SAP lost
+  its session; each fresh connection (`openFreshConnection`,
   `inOwnSessionOverRfc`, a consumer's `freshConnection` one) on success and on failure; a package
   lock session at its release and at the instance's close; the debugger's own connections at its
   stop, the idle bound's stop, the host's stop and `dispose()`; an instance's connections at the

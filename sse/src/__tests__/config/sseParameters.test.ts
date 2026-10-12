@@ -11,6 +11,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   generateYamlConfigTemplate,
+  readStartupConfig,
   validateExposition,
   validateYamlConfig,
 } from '@mcp-abap-adt/lib/config';
@@ -304,19 +305,49 @@ describe('every removed parameter stops sse with its words (§10.1)', () => {
   });
 
   it.each([
-    ['MCP_ENV_PATH', DESTINATION_WORDS],
-    ['MCP_UNSAFE', DESTINATION_WORDS],
-    ['MCP_BROWSER', DESTINATION_WORDS],
-    ['MCP_RENEWAL', DESTINATION_WORDS],
-    ['MCP_LOGIN_TIMEOUT', DESTINATION_WORDS],
-    ['MCP_HTTP_PORT', HTTP_WORDS],
-    ['MCP_HTTP_HOST', HTTP_WORDS],
-    ['MCP_HTTP_ENABLE_JSON_RESPONSE', HTTP_WORDS],
-  ])('%s', (name, words) => {
-    expect(() => readSseConfig([], { [name]: 'x' })).toThrow(
-      `${name}: ${words}`,
-    );
-  });
+    [
+      'MCP_HTTP_*',
+      {
+        MCP_HTTP_PORT: '8080',
+        MCP_HTTP_HOST: '0.0.0.0',
+        MCP_HTTP_ALLOWED_ORIGINS: 'https://a',
+        MCP_HTTP_ENABLE_JSON_RESPONSE: 'true',
+      },
+    ],
+    ['MCP_ENV_PATH', { MCP_ENV_PATH: './.env' }],
+    ['MCP_UNSAFE', { MCP_UNSAFE: 'true' }],
+    [
+      'MCP_BROWSER*',
+      {
+        MCP_BROWSER: 'none',
+        MCP_BROWSER_PROGRAM: '/x',
+        MCP_BROWSER_AUTH_PORT: '61005',
+      },
+    ],
+    ['MCP_LOGIN_TIMEOUT', { MCP_LOGIN_TIMEOUT: '60' }],
+    ['MCP_RENEWAL', { MCP_RENEWAL: 'refresh-only' }],
+    ['AUTH_BROKER_PATH', { AUTH_BROKER_PATH: '/x' }],
+    ['SAP_CONNECTION_TYPE', { SAP_CONNECTION_TYPE: 'rfc' }],
+  ] as const)(
+    "another binary's %s is not read: the start proceeds and the value is not used",
+    (_family, env) => {
+      const lines: string[] = [];
+      const exits: number[] = [];
+      const config = readStartupConfig(
+        SSE_PARAMETERS,
+        [],
+        { ...env },
+        {
+          stderr: (line) => lines.push(line),
+          exit: (code) => exits.push(code),
+        },
+        readSseConfig,
+      );
+      expect(lines).toEqual([]);
+      expect(exits).toEqual([]);
+      expect(config).toEqual(readSseConfig([], {}));
+    },
+  );
 
   it.each([
     ['mcp', DESTINATION_WORDS],

@@ -12,11 +12,14 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   EXPOSITION_ROW,
+  ParameterRefusal,
   type ParameterTable,
   tlsRows,
   transportRemoved,
 } from '../../lib/config/authParameters';
+import { readStartupConfig } from '../../lib/config/startup';
 import {
+  generateConfigTemplateIfNeeded,
   loadYamlConfig,
   validateYamlConfig,
 } from '../../lib/config/yamlConfig';
@@ -113,5 +116,52 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
     expect(result.errors).toEqual([
       'Invalid http.port (config file): "70000". Must be a port between 1 and 65535',
     ]);
+  });
+
+  describe('file I/O faults are refused in fixed words naming the path', () => {
+    let dir: string;
+    beforeEach(() => {
+      dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-yaml-io-'));
+    });
+    afterEach(() => {
+      fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('a --conf that names a directory cannot be read (not "not valid YAML")', () => {
+      expect(() => loadYamlConfig(TABLE, dir)).toThrow(
+        new ParameterRefusal(`The config file ${dir} cannot be read`),
+      );
+    });
+
+    it('a template in a directory that does not exist cannot be written', () => {
+      const file = path.join(dir, 'missing', 'conf.yaml');
+      expect(() => generateConfigTemplateIfNeeded(TABLE, file)).toThrow(
+        new ParameterRefusal(`The config file ${file} cannot be written`),
+      );
+    });
+
+    it('the start reports either as one [MCP] line and exit 1', () => {
+      const missing = path.join(dir, 'missing', 'conf.yaml');
+      for (const [conf, words] of [
+        [dir, `The config file ${dir} cannot be read`],
+        [missing, `The config file ${missing} cannot be written`],
+      ]) {
+        const lines: string[] = [];
+        const exits: number[] = [];
+        const read = readStartupConfig(
+          TABLE,
+          [`--conf=${conf}`],
+          {},
+          {
+            stderr: (line) => lines.push(line),
+            exit: (code) => exits.push(code),
+          },
+          () => 'read',
+        );
+        expect(read).toBeUndefined();
+        expect(lines).toEqual([`[MCP] ${words}`]);
+        expect(exits).toEqual([1]);
+      }
+    });
   });
 });

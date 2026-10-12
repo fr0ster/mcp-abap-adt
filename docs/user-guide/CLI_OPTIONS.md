@@ -4,9 +4,13 @@ Complete reference for the MCP ABAP ADT Server's command line options, per binar
 
 ## The binaries
 
-A binary is its transport; there is no `--transport` option (18.0.0, D39). Each binary reads
-**only its own parameters**: an option of another binary — in any form, CLI, environment or YAML —
-stops the start, naming the binary that serves it.
+A binary is its transport; there is no `--transport` option (18.0.0). Each binary reads
+**only its own parameters**: an option of another binary, in its CLI or YAML form, stops the start,
+naming the binary that serves it.
+
+Another binary's **environment variables are not read** — ignored, with no refusal and no warning:
+an environment is inherited, so one shell profile or one `EnvironmentFile` can serve several binaries.
+`MCP_TRANSPORT` is the one variable every binary refuses.
 
 | Binary | Package | Transport | Credentials |
 |---|---|---|---|
@@ -91,10 +95,12 @@ The environment forms `MCP_DESTINATION` and `MCP_ENV` do **not** exist; use `--m
 | Parameter | Words |
 |---|---|
 | `--transport`, `MCP_TRANSPORT`, YAML `transport` | the stdio sentence above |
-| `--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, `MCP_SSE_*`, YAML `sse` | `<form>: SSE is served by mcp-abap-adt-sse (@mcp-abap-adt/sse)` |
-| `--host`, `--port`, `--path`, `--http-*`, `MCP_HTTP_*`, YAML `http` | `<form>: Streamable HTTP is served by mcp-abap-adt-http (@mcp-abap-adt/http)` |
-| `--tls-*`, `MCP_TLS_*` | `<form>: TLS is an option of mcp-abap-adt-http and mcp-abap-adt-sse` |
-| `--allow-destination-header`, YAML `allow-destination-header` | `<form> is gone: mcp-abap-adt serves the destination it is started with (--mcp, --env, --env-path); the HTTP and SSE binaries take credentials only from x-sap-* headers` |
+| `--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, YAML `sse` | ``<form>: SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)`` |
+| `--host`, `--port`, `--path`, `--http-*`, YAML `http` | ``<form>: Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)`` |
+| `--tls-*` | ``<form>: TLS is an option of `mcp-abap-adt-http` and `mcp-abap-adt-sse` `` |
+| `--allow-destination-header`, YAML `allow-destination-header` | ``<form> is gone: `mcp-abap-adt` serves the destination it is started with (--mcp, --env, --env-path); the HTTP and SSE binaries take credentials only from `x-sap-*` headers`` |
+
+`MCP_SSE_*`, `MCP_HTTP_*` and `MCP_TLS_*` are not read by `mcp-abap-adt`.
 | `--auth-broker`, `MCP_USE_AUTH_BROKER`, YAML `auth-broker` (16.0.0) | `<form> was removed in 16.0.0 — remove it from the configuration` |
 
 ### Environment file
@@ -193,6 +199,11 @@ mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
 
 See [Authentication & Destinations](AUTHENTICATION.md) for the supported authentications.
 
+### Held state
+
+`--state-idle-minutes` bounds the stdio instance's held state (a debug session); see
+[Held State](#held-state).
+
 ### The debugger's ids
 
 `SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` (with `--exposition=...,debug`): first found, the
@@ -230,11 +241,19 @@ the instance that holds it.
 | Parameter | Words |
 |---|---|
 | `--transport`, `MCP_TRANSPORT`, YAML `transport` | the http sentence above |
-| `--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`; `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_RENEWAL`, `MCP_LOGIN_TIMEOUT`; their YAML keys | `<form>: destinations and logins are served only by mcp-abap-adt (stdio); send x-sap-* headers` |
-| `--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, `MCP_SSE_*`, YAML `sse` | `<form>: SSE is served by mcp-abap-adt-sse (@mcp-abap-adt/sse)` |
+| `--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
+| `--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, YAML `sse` | ``<form>: SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)`` |
+
+`MCP_SSE_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`,
+`AUTH_BROKER_PATH` and `SAP_CONNECTION_TYPE` are not read by `mcp-abap-adt-http`.
 
 TLS needs `--tls-cert` and `--tls-key` together; one without the other (or `--tls-ca` alone) is
 refused at start.
+
+### Held state
+
+`--state-idle-minutes` bounds each pooled instance's held state, reached again by its
+`state_handle`; see [Held State](#held-state).
 
 ### DNS-rebinding protection
 
@@ -278,13 +297,19 @@ The opening `GET`'s `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` (and the ot
 context headers) come first, then `SAP_DEBUG_*` of the environment. Held state lives in the
 connection's instance until the connection closes.
 
+**Held state**: `--state-idle-minutes` bounds each SSE connection's instance, which holds its state
+until the connection closes; see [Held State](#held-state).
+
 **What `mcp-abap-adt-sse` refuses** (each stops the start, naming the form you used):
 
 | Parameter | Words |
 |---|---|
 | `--transport`, `MCP_TRANSPORT`, YAML `transport` | the sse sentence above |
-| the destination and login options, as for `mcp-abap-adt-http` | `<form>: destinations and logins are served only by mcp-abap-adt (stdio); send x-sap-* headers` |
-| `--host`, `--port`, `--path`, `--http-*`, `MCP_HTTP_*`, YAML `http` | `<form>: Streamable HTTP is served by mcp-abap-adt-http (@mcp-abap-adt/http)` |
+| the destination and login options, as for `mcp-abap-adt-http` (`--auth-broker-path` and `--connection-type` included), and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
+| `--host`, `--port`, `--path`, `--http-*`, YAML `http` | ``<form>: Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)`` |
+
+`MCP_HTTP_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`,
+`AUTH_BROKER_PATH` and `SAP_CONNECTION_TYPE` are not read by `mcp-abap-adt-sse`.
 
 `--host` and `--port` are Streamable HTTP's: the SSE binary listens on `--sse-host` /
 `--sse-port`.

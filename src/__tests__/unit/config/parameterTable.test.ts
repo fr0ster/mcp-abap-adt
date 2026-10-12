@@ -43,7 +43,6 @@ const TABLE: ParameterTable = {
       cli: ['--gone'],
       cliPrefixes: ['--old-'],
       env: ['GONE'],
-      envPrefixes: ['OLD_'],
       yaml: ['gone'],
       words: (form) => `${form}: gone`,
     },
@@ -89,7 +88,6 @@ describe('removed parameters', () => {
     [['--gone=1'], {}, undefined, '--gone: gone'],
     [['--old-anything=1'], {}, undefined, '--old-anything: gone'],
     [[], { GONE: '' }, undefined, 'GONE: gone'],
-    [[], { OLD_THING: 'x' }, undefined, 'OLD_THING: gone'],
     [[], {}, { gone: true }, 'gone (config file): gone'],
   ] as const)(
     'refused in the form used (%j %j %j)',
@@ -100,6 +98,12 @@ describe('removed parameters', () => {
     },
   );
 
+  it('an environment variable the table does not list is not read', () => {
+    expect(readParameters(TABLE, [], { OLD_THING: 'x', X_PORTS: '1' })).toEqual(
+      { port: 4000 },
+    );
+  });
+
   it('a value that only looks like a removed name is not one', () => {
     expect(() =>
       readParameters(TABLE, ['--x-hosts', '--gone-not'], {}),
@@ -107,6 +111,44 @@ describe('removed parameters', () => {
     expect(readParameters(TABLE, ['--x-hosts=--gone'], {}).hosts).toEqual([
       '--gone',
     ]);
+  });
+});
+
+describe("a row's own reader", () => {
+  const throwing = (thrown: unknown): ParameterTable => ({
+    program: 'test-binary',
+    rows: [
+      {
+        key: 'x',
+        cli: '--x',
+        kind: 'custom',
+        parse: () => {
+          throw thrown;
+        },
+        section: 'X',
+        help: 'X',
+      },
+    ],
+    removed: [],
+  });
+
+  it('a ParameterRefusal keeps its words', () => {
+    expect(() =>
+      readParameters(
+        throwing(new ParameterRefusal('its words')),
+        ['--x=1'],
+        {},
+      ),
+    ).toThrow(new ParameterRefusal('its words'));
+  });
+
+  it.each([
+    new Error('foreign text that must not reach the refusal'),
+    'a thrown string',
+  ])('any other throw gets fixed words, never its message (%p)', (thrown) => {
+    expect(() => readParameters(throwing(thrown), ['--x=1'], {})).toThrow(
+      new ParameterRefusal('Invalid --x'),
+    );
   });
 });
 

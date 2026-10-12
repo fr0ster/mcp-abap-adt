@@ -1,8 +1,9 @@
 # Configuration
 
 How a binary reads its parameters: CLI, then environment, then YAML — each binary from its
-**own table** (18.0.0, D38). An option of another binary is in none of its forms; any form of it
-stops the start, naming the binary that serves it (D39).
+**own table** (18.0.0, D38). An option of another binary is in none of its forms; its CLI and YAML
+forms stop the start, naming the binary that serves it (D39). Its environment variable is not read
+(an environment is inherited); `MCP_TRANSPORT` is the one environment variable refused.
 
 ## Components
 
@@ -12,10 +13,13 @@ A `ParameterTable` is `{ program, rows, removed }`. Each `Parameter` row names a
 its forms — `cli` (and `cliAliases`), `env`, `yaml` (a dotted key for a nested one, `http.port`)
 — with its `kind` (`string`, `flag`, `port`, `enum`, `list`, `custom`), its `default`, its help
 `section` and sentence. Each `RemovedParameter` names forms that are not this binary's (exact CLI
-names, CLI prefixes, env names and prefixes, top-level YAML keys) and the words that refuse them.
+names, CLI prefixes, top-level YAML keys, and the env names of a parameter that is gone) and the words that refuse them.
 
 - `readParameters(table, argv, env, yaml)` — every row, CLI beating env beating YAML; a removed
-  parameter in any form is refused first. A refusal is a `ParameterRefusal` carrying its `words`.
+  parameter's CLI or YAML form (or a gone parameter's env name) is refused first. A refusal is a
+  `ParameterRefusal` carrying its `words`; a row reader's throw that is not one gets fixed words,
+  never its message. Config file faults are refused naming the path and the kind: "cannot be
+  read", "cannot be written", "is not valid YAML" (a parse failure, with its line).
 - `parameterSource(table, key, …)` — the form a value came from, as a refusal names it.
 - `validateYamlParameters(table, yaml)` — the config file's refusals: removed keys, secret-looking
   keys, invalid values.

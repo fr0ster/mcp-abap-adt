@@ -24,14 +24,16 @@ The packages, all at **18.0.0**:
   is gone: `mcp-abap-adt` serves stdio; for Streamable HTTP run `mcp-abap-adt-http`, for SSE
   `mcp-abap-adt-sse` (compact: `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse`)". For
   Streamable HTTP run `mcp-abap-adt-http`, for SSE `mcp-abap-adt-sse`.
-- **An option of another binary stops the start**, in any form (CLI, environment, YAML), naming the
-  binary that serves it — 17.x ignored it. Per binary:
+- **An option of another binary stops the start** in its CLI and YAML forms, naming the binary that
+  serves it — 17.x ignored it. Its **environment variable is not read** — ignored, no refusal, no
+  warning — so one shell profile or one `EnvironmentFile` can serve several binaries; only
+  `MCP_TRANSPORT` is refused everywhere. Per binary:
 
   | Binary | Refused, with the words |
   |---|---|
-  | `mcp-abap-adt` | the SSE options (`--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, `MCP_SSE_*`, YAML `sse`): "SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)"; the Streamable HTTP ones (`--host`, `--port`, `--path`, `--http-*`, `MCP_HTTP_*`, YAML `http`): "Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)"; `--tls-*` / `MCP_TLS_*`: "TLS is an option of `mcp-abap-adt-http` and `mcp-abap-adt-sse`"; `--allow-destination-header` (gone) |
-  | `mcp-abap-adt-http` | the destination and login options (`--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_RENEWAL`, `MCP_LOGIN_TIMEOUT`, their YAML keys): "destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers"; the SSE options, with the SSE words |
-  | `mcp-abap-adt-sse` | the destination and login options, as for http; the Streamable HTTP options — `--host`, `--port` and `--path` included — with the Streamable HTTP words |
+  | `mcp-abap-adt` | the SSE options (`--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, YAML `sse`): "SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)"; the Streamable HTTP ones (`--host`, `--port`, `--path`, `--http-*`, YAML `http`): "Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)"; `--tls-*`: "TLS is an option of `mcp-abap-adt-http` and `mcp-abap-adt-sse`"; `--allow-destination-header` (gone). Not read: `MCP_SSE_*`, `MCP_HTTP_*`, `MCP_TLS_*` |
+  | `mcp-abap-adt-http` | the destination and login options (`--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, their YAML keys): "destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers"; the SSE options, with the SSE words. Not read: `MCP_SSE_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`, `AUTH_BROKER_PATH`, `SAP_CONNECTION_TYPE` |
+  | `mcp-abap-adt-sse` | the destination and login options, as for http; the Streamable HTTP options — `--host`, `--port` and `--path` included — with the Streamable HTTP words. Not read: `MCP_HTTP_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`, `AUTH_BROKER_PATH`, `SAP_CONNECTION_TYPE` |
 
   Each refusal names the form you used first: `--sse-port: SSE is served by …`.
 - **Each binary's `--help`, `--conf` template and YAML validation come from its own table.** A

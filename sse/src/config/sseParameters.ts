@@ -1,9 +1,10 @@
 /**
  * `mcp-abap-adt-sse`'s parameter table (D38, D48, spec §10.1): every SSE
  * option of today under its name, beside lib's shared rows and the TLS rows
- * (D50). No destination, login or Streamable HTTP option is here; any form of
- * one — or of `--transport`, which is gone — stops the start naming the
- * binary that serves it (D39).
+ * (D50). No destination, login or Streamable HTTP option is here; the CLI or
+ * YAML form of one — or any form of `--transport`, which is gone — stops the
+ * start naming the binary that serves it (D39). Their environment variables
+ * are not read.
  */
 
 import {

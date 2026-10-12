@@ -1,8 +1,9 @@
 /**
  * `mcp-abap-adt`'s parameter table (D38, spec §10.1): the destination, the
  * browser and the login, beside lib's shared rows. Nothing of the HTTP or SSE
- * binaries is here; any form of one of their options — or of `--transport`,
- * which is gone — stops the start naming the binary that serves it (D39).
+ * binaries is here; the CLI or YAML form of one of their options — or any
+ * form of `--transport`, which is gone — stops the start naming the binary
+ * that serves it (D39). Their environment variables are not read.
  */
 
 import {

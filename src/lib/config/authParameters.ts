@@ -10,7 +10,9 @@
  * another binary is in none of them. Precedence: CLI, then env, then YAML.
  *
  * A parameter of another binary, or one that is gone, is a removed parameter
- * of the table: any form of it stops the start, naming where it went (D39).
+ * of the table: its CLI and YAML forms stop the start, naming where it went
+ * (D39). Its environment variable is not read (an environment is inherited);
+ * only `MCP_TRANSPORT`, which stated the transport, is refused there.
  *
  * A refusal names the parameter in the form the user used. It may quote the
  * user's own value (a port, an enum word): those are not secrets.
@@ -84,7 +86,8 @@ export interface Parameter {
 
 /**
  * A parameter that is not this binary's: gone (`--transport`), or another
- * binary's (`--sse-port` in core). Any of its forms stops the start with
+ * binary's (`--sse-port` in core). Its CLI and YAML forms — and, for a
+ * parameter that is gone, its environment names — stop the start with
  * `words(form)`.
  */
 export interface RemovedParameter {
@@ -92,9 +95,12 @@ export interface RemovedParameter {
   readonly cli?: readonly string[];
   /** CLI name prefixes (`--http-`): every name that starts with one. */
   readonly cliPrefixes?: readonly string[];
+  /**
+   * Environment names of a parameter that is gone (`MCP_TRANSPORT`). Another
+   * binary's environment variables are not listed: an environment is
+   * inherited, so they are not read at all (§10.1, the user's ruling).
+   */
   readonly env?: readonly string[];
-  /** Environment name prefixes (`MCP_HTTP_`). */
-  readonly envPrefixes?: readonly string[];
   /** Top-level YAML keys. */
   readonly yaml?: readonly string[];
   /** The refusal, given the form the user used (`--sse-port`, `MCP_SSE_PORT`, `sse (config file)`). */
@@ -179,15 +185,6 @@ function removedHit(
       if (env[name] !== undefined) return { form: name, removed };
     }
   }
-  const names = Object.keys(env).sort();
-  for (const removed of table.removed) {
-    for (const prefix of removed.envPrefixes ?? []) {
-      const name = names.find(
-        (key) => key.startsWith(prefix) && env[key] !== undefined,
-      );
-      if (name !== undefined) return { form: name, removed };
-    }
-  }
   return removedYamlHits(table, yaml)[0];
 }
 
@@ -246,13 +243,10 @@ function convert(
     try {
       return p.parse?.(raw, name);
     } catch (error) {
-      // A row's own reader words its refusal; no foreign text reaches here.
+      // A row's reader words its refusal as a ParameterRefusal; any other
+      // throw gets fixed words — its message never reaches the refusal.
       throw new ParameterRefusal(
-        error instanceof ParameterRefusal
-          ? error.words
-          : error instanceof Error
-            ? error.message
-            : `Invalid ${name}`,
+        error instanceof ParameterRefusal ? error.words : `Invalid ${name}`,
       );
     }
   }
@@ -350,8 +344,8 @@ function readRow(
 
 /**
  * Read every row of the table: CLI beats env beats YAML; a row set nowhere
- * takes its default, or is absent. A removed parameter in any form is refused
- * first.
+ * takes its default, or is absent. A removed parameter's CLI or YAML form (or
+ * the env name of one that is gone) is refused first.
  */
 export function readParameters(
   table: ParameterTable,
@@ -663,7 +657,17 @@ export const STATE_IDLE_ROW: Parameter = {
   env: STATE_IDLE_ENV,
   yaml: STATE_IDLE_YAML,
   kind: 'custom',
-  parse: (raw, name) => parseStateIdleMinutes(raw, name),
+  parse: (raw, name) => {
+    try {
+      return parseStateIdleMinutes(raw, name);
+    } catch (error) {
+      // main's own reader words the refusal (it quotes only the user's value);
+      // the row hands those words on as its refusal, as main prints them.
+      throw new ParameterRefusal(
+        error instanceof Error ? error.message : `Invalid ${name}`,
+      );
+    }
+  },
   default: DEFAULT_STATE_IDLE_MINUTES,
   valueHint: '=<minutes>',
   section: 'HELD STATE',
@@ -771,7 +775,6 @@ export const SSE_OPTIONS_REMOVED: RemovedParameter = {
     '--sse-enable-dns-protection',
   ],
   cliPrefixes: ['--sse-allowed-'],
-  envPrefixes: ['MCP_SSE_'],
   yaml: ['sse'],
   words: (form) => `${form}: ${SSE_ELSEWHERE}`,
 };
@@ -780,7 +783,6 @@ export const SSE_OPTIONS_REMOVED: RemovedParameter = {
 export const HTTP_OPTIONS_REMOVED: RemovedParameter = {
   cli: ['--host', '--port', '--path'],
   cliPrefixes: ['--http-'],
-  envPrefixes: ['MCP_HTTP_'],
   yaml: ['http'],
   words: (form) => `${form}: ${HTTP_ELSEWHERE}`,
 };
@@ -788,7 +790,6 @@ export const HTTP_OPTIONS_REMOVED: RemovedParameter = {
 /** The TLS options, in the stdio binary. */
 export const TLS_OPTIONS_REMOVED: RemovedParameter = {
   cliPrefixes: ['--tls-'],
-  envPrefixes: ['MCP_TLS_'],
   words: (form) => `${form}: ${TLS_ELSEWHERE}`,
 };
 
@@ -810,8 +811,6 @@ export const DESTINATION_OPTIONS_REMOVED: RemovedParameter = {
     '--auth-debug',
   ],
   cliPrefixes: ['--browser'],
-  env: ['MCP_ENV_PATH', 'MCP_UNSAFE', 'MCP_RENEWAL', 'MCP_LOGIN_TIMEOUT'],
-  envPrefixes: ['MCP_BROWSER'],
   yaml: [
     'mcp',
     'env',

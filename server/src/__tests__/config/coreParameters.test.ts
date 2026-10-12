@@ -10,6 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   generateYamlConfigTemplate,
+  readStartupConfig,
   validateExposition,
   validateYamlConfig,
 } from '@mcp-abap-adt/lib/config';
@@ -215,21 +216,48 @@ describe('every removed parameter stops core with its words (§10.1)', () => {
   });
 
   it.each([
-    ['MCP_SSE_PORT', SSE_WORDS],
-    ['MCP_SSE_HOST', SSE_WORDS],
-    ['MCP_SSE_ALLOWED_HOSTS', SSE_WORDS],
-    ['MCP_SSE_ENABLE_DNS_PROTECTION', SSE_WORDS],
-    ['MCP_HTTP_PORT', HTTP_WORDS],
-    ['MCP_HTTP_HOST', HTTP_WORDS],
-    ['MCP_HTTP_ENABLE_JSON_RESPONSE', HTTP_WORDS],
-    ['MCP_HTTP_ALLOWED_ORIGINS', HTTP_WORDS],
-    ['MCP_TLS_CERT', TLS_WORDS],
-    ['MCP_TLS_KEY', TLS_WORDS],
-  ])('%s', (name, words) => {
-    expect(() => readCoreConfig([], { [name]: 'x' })).toThrow(
-      `${name}: ${words}`,
-    );
-  });
+    [
+      'MCP_SSE_*',
+      {
+        MCP_SSE_PORT: '3005',
+        MCP_SSE_HOST: '0.0.0.0',
+        MCP_SSE_ALLOWED_HOSTS: 'a:1',
+        MCP_SSE_ENABLE_DNS_PROTECTION: 'true',
+      },
+    ],
+    [
+      'MCP_HTTP_*',
+      {
+        MCP_HTTP_PORT: '8080',
+        MCP_HTTP_HOST: '0.0.0.0',
+        MCP_HTTP_ALLOWED_ORIGINS: 'https://a',
+        MCP_HTTP_ENABLE_JSON_RESPONSE: 'true',
+      },
+    ],
+    [
+      'MCP_TLS_*',
+      { MCP_TLS_CERT: '/c.pem', MCP_TLS_KEY: '/k.pem', MCP_TLS_CA: '/ca.pem' },
+    ],
+  ] as const)(
+    "another binary's %s is not read: the start proceeds and the value is not used",
+    (_family, env) => {
+      const lines: string[] = [];
+      const exits: number[] = [];
+      const config = readStartupConfig(
+        CORE_PARAMETERS,
+        [],
+        { ...env },
+        {
+          stderr: (line) => lines.push(line),
+          exit: (code) => exits.push(code),
+        },
+        readCoreConfig,
+      );
+      expect(lines).toEqual([]);
+      expect(exits).toEqual([]);
+      expect(config).toEqual(readCoreConfig([], {}));
+    },
+  );
 
   it.each([
     ['sse', SSE_WORDS],

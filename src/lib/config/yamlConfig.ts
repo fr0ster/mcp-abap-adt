@@ -58,10 +58,11 @@ function resolved(configPath: string): string {
 }
 
 /**
- * The config file, validated by the table; null when it does not exist. An
- * unreadable file, one that is not YAML, or one the table refuses stops the
- * start: the words name the file and the line (never its text) or each
- * refused key.
+ * The config file, validated by the table; null when it does not exist. A
+ * file that cannot be read, one that is not YAML, or one the table refuses
+ * stops the start: the words name the file and the kind of failure, the line
+ * of a parse failure (never its text), or each refused key — never an error's
+ * message.
  */
 export function loadYamlConfig(
   table: ParameterTable,
@@ -70,9 +71,16 @@ export function loadYamlConfig(
   const file = resolved(configPath);
   if (!fs.existsSync(file)) return null;
 
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf-8');
+  } catch {
+    // A directory, a file without read permission: fixed words, no message.
+    throw new ParameterRefusal(`The config file ${configPath} cannot be read`);
+  }
   let parsed: unknown;
   try {
-    parsed = parseYaml(fs.readFileSync(file, 'utf-8'));
+    parsed = parseYaml(text);
   } catch (error) {
     // js-yaml's message quotes the file; only the position is passed on.
     const mark = (error as { mark?: { line?: unknown; column?: unknown } })
@@ -116,7 +124,14 @@ export function generateConfigTemplateIfNeeded(
 ): boolean {
   const file = resolved(configPath);
   if (fs.existsSync(file)) return false;
-  fs.writeFileSync(file, generateYamlConfigTemplate(table), 'utf-8');
+  try {
+    fs.writeFileSync(file, generateYamlConfigTemplate(table), 'utf-8');
+  } catch {
+    // A missing directory, no write permission: fixed words, no message.
+    throw new ParameterRefusal(
+      `The config file ${configPath} cannot be written`,
+    );
+  }
   process.stderr.write(
     `[MCP-CONFIG] Generated YAML config template: ${file}\n`,
   );

@@ -82,7 +82,8 @@ objects for each package. Each object includes:
 ## Command Reference
 
 A binary is its transport; there is no `--transport` option. Each binary reads only its own options
-(`<binary> --help`); an option of another binary stops the start, naming the binary that serves it.
+(`<binary> --help`); an option of another binary, on the command line or in the config file, stops the
+start, naming the binary that serves it. Another binary's environment variables are not read.
 
 ### `mcp-abap-adt` - stdio (`@mcp-abap-adt/core`)
 ```bash

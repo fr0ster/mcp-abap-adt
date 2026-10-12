@@ -94,7 +94,8 @@ through the auth broker. A binary is its transport: `npm install -g @mcp-abap-ad
 (HTTP+SSE); both take credentials only from each request's `x-sap-*` headers. There is no
 `--transport` option. `@mcp-abap-adt/compact` gives `mcp-abap-adt-compact`, which takes
 `mcp-abap-adt`'s options. Each binary reads only its own options (`<binary> --help`); another
-binary's stops the start, naming the binary that serves it.
+binary's, on the command line or in the config file, stops the start, naming the binary that serves
+it. Another binary's environment variables are not read, so one shell can serve several binaries.
 
 **To write a `.env` for JWT authentication**, install the CLI separately (`mcp-auth` ships in `@mcp-abap-adt/auth-broker-cli`, not in `@mcp-abap-adt/auth-broker`):
 ```bash

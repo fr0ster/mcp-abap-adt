@@ -4,7 +4,7 @@ Each binary of the MCP ABAP ADT server reads a YAML configuration file of its ow
 `mcp-abap-adt` (stdio), `mcp-abap-adt-http` (Streamable HTTP) and `mcp-abap-adt-sse` (SSE). The
 file holds only that binary's parameters — its template is written from the binary's table, and
 its validation is the table's: a key of another binary is refused naming the binary that serves
-it (18.0.0, D38, D39).
+it (18.0.0). A binary never reads another binary's environment variables.
 
 ## Quick Start
 
@@ -76,6 +76,8 @@ state-idle-minutes: 30
 | `renewal` | string | `refresh-then-login` | `refresh-then-login` or `refresh-only` (never a login) |
 | `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |
 
+`state-idle-minutes` here bounds the stdio instance's held state.
+
 Refused in `mcp-abap-adt`'s file: `http` (Streamable HTTP is `mcp-abap-adt-http`'s), `sse`
 (`mcp-abap-adt-sse`'s), `allow-destination-header` (gone: there is no destination header),
 `transport`, and 16.0.0's `auth-broker`.
@@ -108,10 +110,14 @@ state-idle-minutes: 30
 | `http.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation (needs at least one list set); a non-allowlisted Host/Origin gets HTTP 403 |
 | `http.tls.cert`, `http.tls.key`, `http.tls.ca` | string | - | TLS files (PEM); cert and key together, the CA optional beside them |
 
+`state-idle-minutes` here bounds each pooled instance's held state, reached again by its
+`state_handle`.
+
 Refused in `mcp-abap-adt-http`'s file: the destination and login keys (`mcp`, `env`, `env-path`,
 `auth-broker-path`, `allow-destination-header`, `unsafe`, `connection-type`, `browser`,
-`browser-program`, `browser-auth-port`, `login-timeout`, `renewal`, `auth-debug`: "destinations
-and logins are served only by mcp-abap-adt (stdio); send x-sap-* headers"), `sse`, and
+`browser-program`, `browser-auth-port`, `login-timeout`, `renewal`, `auth-debug`:
+``<key> (config file): destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers``),
+`sse`, and
 `transport`.
 
 ## `mcp-abap-adt-sse` (HTTP + SSE)
@@ -138,6 +144,9 @@ state-idle-minutes: 30
 | `sse.allowed-origins` | string[] | - | DNS-rebinding protection: exact Origin header values to allow, including scheme |
 | `sse.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation (needs at least one list set) |
 | `sse.tls.cert`, `sse.tls.key`, `sse.tls.ca` | string | - | TLS files (PEM); cert and key together, the CA optional beside them |
+
+`state-idle-minutes` here bounds each SSE connection's instance, which holds its state until the
+connection closes.
 
 The SSE and `POST` paths have no YAML key: `--sse-path`, `--post-path`. Refused in
 `mcp-abap-adt-sse`'s file: the destination and login keys (as for `mcp-abap-adt-http`), `http`,

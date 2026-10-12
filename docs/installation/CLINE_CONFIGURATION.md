@@ -311,8 +311,8 @@ Instead of arguments the server takes environment variables:
 | `MCP_SSE_PORT` | SSE server port (`mcp-abap-adt-sse`) | `3001` |
 
 There is no `MCP_TRANSPORT`: a binary is its transport, and the variable stops every binary at start.
-Each binary refuses another binary's variables (`MCP_HTTP_*` in `mcp-abap-adt`, say), naming the binary
-that reads them.
+A binary does not read another binary's variables (`MCP_HTTP_*` in `mcp-abap-adt`, say): one shell or
+`EnvironmentFile` can serve several binaries.
 
 Every option with its environment and YAML forms: [CLI_OPTIONS.md](../user-guide/CLI_OPTIONS.md).
 

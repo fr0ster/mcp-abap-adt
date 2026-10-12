@@ -1236,8 +1236,9 @@ export class DebugSession<O = unknown> {
   protected async beforeFirstListen(
     identity: IDebuggerIdentity,
   ): Promise<void> {
-    // Only a stated id can have a predecessor; in terminal mode the terminal id
-    // itself must be stated, since the listener there is keyed by it.
+    // Only a stated id can have a predecessor; in terminal mode it takes a stated
+    // terminal id. Whether a stop under a stated terminal id and a random IDE id
+    // reaches a predecessor's terminal-mode listener is not measured.
     const stated =
       identity.debuggingMode === 'terminal'
         ? this.ids.terminalStated

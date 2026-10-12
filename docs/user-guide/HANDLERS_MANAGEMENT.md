@@ -71,12 +71,13 @@ V2 server supports flexible handler set configuration through the `--exposition`
 
 5. **debug** - The debugger (opt-in, never part of the default)
    - ABAP: `DebugStartListener`, `DebugTakeOverListener`, `DebugWait`, `DebugStop`,
-     breakpoints, stack, variables, watchpoints, steps, termination, memory
+     breakpoints, stack, variables, watchpoints, steps, termination, settings, memory
    - AMDP: `AmdpDebugStart`, `AmdpDebugWait`, `AmdpDebugStep`, `AmdpDebugGetTable`,
      `AmdpDebugSetBreakpoints`, `AmdpDebugCancel`, `AmdpDebugStop`
    - Memory snapshots: `MemorySnapshotList`, `MemorySnapshotGet`, `MemorySnapshotDelta`
-   - A breakpoint or a listener catches **every request of the connected SAP user**,
-     which is why no default carries the set. Beside any other set, or alone.
+   - In user mode a breakpoint or a listener catches **every request of the request
+     user** (the connected SAP user unless another is named), which is why no default
+     carries the set. Beside any other set, or alone.
    - Sessions, handles, the SAP ids and what ends a session: [Debugger](DEBUGGER.md)
 
 6. **search** - Always included automatically
@@ -253,8 +254,7 @@ They are thin over `src/lib/debugger/` (the debug sessions) and `src/lib/state/`
 3. **Testing/Admin**: Use `readonly,high,low` with caution
 4. **Never expose low-level handlers to untrusted users**
 5. **Debugging**: add `debug` only while you debug. A breakpoint catches every request of
-   the connected SAP user, and a `state_handle` gives whoever holds it that user's debug
-   session — see [Debugger](DEBUGGER.md) and [Security](../../SECURITY.md)
+   the request user, and a `state_handle` gives whoever holds it that debug session — see [Debugger](DEBUGGER.md) and [Security](../../SECURITY.md)
 
 ## Implementation
 

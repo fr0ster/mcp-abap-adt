@@ -2,8 +2,8 @@
  * The debugger's SAP ids, as measured: the same `ideId` never conflicts — two
  * listeners under it both stay, and the newer one catches; another `ideId` of
  * the same SAP user meets SAP's listener conflict (409 under refuse,
- * displacement under take-over). Breakpoints belong to the SAP user, not to an
- * id: whichever listener of that user is active catches them. Both ids are
+ * displacement under take-over). Breakpoints belong to the SAP user (in user
+ * mode with the request user), not to an IDE id. Both ids are
  * random per instance by default, so a second instance of the same SAP user
  * meets that conflict. A shared id
  * is the consumer's explicit choice — a header, the destination, the

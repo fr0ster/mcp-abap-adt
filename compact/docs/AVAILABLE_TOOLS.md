@@ -513,15 +513,18 @@ per request.
 
 **Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
 
-**Description:** Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. take_over: abap — Displaces another debugger listening for the same user; amdp — ends an AMDP session of this user left behind. Catches every request of the connected SAP user, not only programs run by this server.
+**Description:** Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. request_user, debugging_mode and settings apply to abap only. take_over: abap — Displaces another debugger listening for the same user; amdp — ends an AMDP session of this user left behind. Without take_over, abap is refused before anything is placed while another debugger listens for that user. In user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server. abap: the breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `kind` (required) — abap debugs ABAP code; amdp debugs SQLScript methods of a class.
-- `breakpoints` (required) — abap: a line, an exception class, an ABAP statement or a message, each with an optional condition. amdp: object_name (the class) and line of each.
-- `take_over` — Takes over from an existing debugger of this user instead of refusing.
+- `breakpoints` (required) — abap: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. amdp: object_name (the class) and line of each.
+- `take_over` — abap: takes over from another debugger listening for this user instead of refusing; the breakpoints of this SAP user (in user mode, for the same request user) are replaced. amdp: ends an AMDP session of this user left behind instead of refusing.
+- `request_user` — User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
+- `debugging_mode` — user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
+- `settings` — Debugger settings, applied after each attach; a field left out keeps its value.
 - `run` — A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 
@@ -558,14 +561,14 @@ per request.
 
 **Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
 
-**Description:** Moves the stopped debuggee (into, over, return, continue, run or jump to a line), ends it where it stands, or ends the debug session.
+**Description:** Moves the stopped debuggee (into, over, return, continue, run or jump to a line), leaves it running (detach, release_debugger), ends it where it stands, or ends the debug session.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
-- `action` (required) — into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.
+- `action` (required) — into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; detach lets the program run on, where an armed breakpoint can catch it again; release_debugger frees the debugger and the program runs on; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.
 - `object_type` — For a line: CLAS, PROG, INCL or FUNC.
 - `object_name` — For a line: the object holding it.
 - `line` — For a line: the line in the object source.

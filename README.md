@@ -94,7 +94,7 @@ comes from `x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, the
 takes it as an argument — else from a cloud system itself; otherwise it is left out and the system
 applies itself — never refused. Reads are unaffected. The process environment is read once: a change
 made to it while the server runs is not picked up. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-Coming from 16.x? See the [17.0 migration note](docs/MIGRATION-17.0.md) — the HTTPS certificate is now verified. From 15.x, the [16.0 note](docs/MIGRATION-16.0.md) first.
+Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, and a debugger start needs at least one breakpoint. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
@@ -214,7 +214,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🌐 Service Binding Preview**: `GetServiceBindingPreviewUrl` - The browser URL that opens a published service binding's Fiori preview, beside its OData service and `$metadata` URLs. Composed from the binding, its service definition and the exposed root view — no document carries it. OData V2 and V4; a Web API binding has no preview and says so. On SAP BTP the preview URL carries the browser host (`abap-web`), where the BTP logon answers, while the service URLs keep the ADT host
 - **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
 - **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader (dumps — filtered by user, runtime error, exception, object, package or component, and read past SAP's 100 entries per request — system messages, gateway errors), SM02 system messages, Gateway error log
-- **🐞 Debugger** (opt-in, `--exposition=…,debug`): ABAP and AMDP — breakpoints (line, exception, statement, message, with a condition), a background run of a class or report caught at them, stack, variables, watchpoints, steps, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. A breakpoint catches every request of the connected SAP user, so the set is never on by default. See [Debugger](docs/user-guide/DEBUGGER.md)
+- **🐞 Debugger** (opt-in, `--exposition=…,debug`): ABAP and AMDP — breakpoints (line, exception, statement, message; a line breakpoint may carry a condition), a background run of a class or report caught at them, another user's requests and terminal mode, stack, variables, watchpoints, steps, leaving a debuggee running, the debugger settings, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. A breakpoint catches every request of the request user (the connected SAP user unless another is named), so the set is never on by default. See [Debugger](docs/user-guide/DEBUGGER.md)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
@@ -246,6 +246,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-18.0.md](docs/MIGRATION-18.0.md)** - The debugger on adt-clients 29: what an embedder of lib/debugger changes; a start needs a breakpoint
 - **[docs/MIGRATION-17.0.md](docs/MIGRATION-17.0.md)** - The HTTPS certificate is verified; a message class needs a responsible
 - **[docs/MIGRATION-16.0.md](docs/MIGRATION-16.0.md)** - Authentication on auth-broker 4: four authentications, destinations
 - **[docs/MIGRATION-14.0.md](docs/MIGRATION-14.0.md)** - The compact facade moved to its own

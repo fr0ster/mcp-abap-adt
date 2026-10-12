@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [18.0.0] - 2026-10-12
+
+The debugger on `@mcp-abap-adt/adt-clients` 29 (`interfaces-adt` 15, `adt-strategies` 0.10): another user's runs, terminal mode, leaving a debuggee running, the debugger settings — and breakpoints armed as one set. Migration: [`docs/MIGRATION-18.0.md`](docs/MIGRATION-18.0.md).
+
+### Added
+
+- `DebugStartListener` and `DebugTakeOverListener` (compact `HandlerDebugStart`, `kind: abap`) take `request_user` (whose requests are caught; needs the debug authorization on that user), `debugging_mode` (`user` | `terminal`) and `settings` (applied after each attach). Terminal mode catches the requests that carry the session's terminal id and IDE id; the run the server starts carries them in its `SAP-PASSPORT`, so it needs no configured id (measured on premise, 2026-10-12). The start answers the identity in force.
+- `DebugStep` (compact `HandlerDebugStep`): `detach` and `release_debugger`, ABAP only — the program runs on, the session listens on.
+- `DebugSetSettings`: the debugger settings at the current stop; answers the settings in force. 30 debugger tools.
+- `SAP_DEBUG_BREAKPOINT_CONFLICT` (`replace` | `refuse-if-held`): whether a take-over and every later breakpoint change first ask if another debugger listens for the user. The header `x-sap-debug-breakpoint-conflict`, a destination's `.env`, the environment, `createDebuggerInstance`'s `breakpointConflict`.
+
+### Fixed
+
+- A second `DebugSetBreakpoints` removed the breakpoints of the first, and an ambiguous refusal re-asked with `validationOnly` removed the whole set: the system replaces the key's set on every request (measured on premise (2026-10-11), BASIS 816). The session sends its whole set every time, each breakpoint tagged with a `clientId` the system echoes, and pairs the answer rows by that tag without re-asking.
+- A refuse start (`DebugStartListener`, compact without `take_over`) meeting another IDE's listener of the same SAP user replaced that IDE's breakpoints before its listen was refused `409`: the user-mode set is the SAP user's with the request user, whatever the IDE id (measured on premise, 2026-10-12). It now asks the system first (`checkListener`) and is refused before anything is changed; every later `DebugSetBreakpoints` of that session asks the same way. The check is not atomic; the remaining race is documented.
+
+### Changed
+
+- **`DebugStartListener` and `DebugTakeOverListener` require `breakpoints`, at least one**; a start without them is refused by the schema, and by the session before anything is sent.
+- The breakpoints answer is the whole set: `placed`, `refused` (this call's, each with its definition), `lost`, `unexpected`. A delete by an id the session does not hold is refused before the wire.
+- A condition on a non-line breakpoint is refused, naming it.
+- `DebugStop` stops the listener first, which deletes the key's breakpoints, and deletes by id only when that fails; a start that failed after a change does the same. While the listener's open poll has not answered, the stop sends one more stop, which narrows a race of the system's without closing it (documented in `DEBUGGER.md`). The identity and the settings stay until a stop undid everything, and a new start is refused until then.
+- A listener conflict (`409`) names the holder: the system's conflict text and the IDE user.
+- `@mcp-abap-adt/adt-clients` `^29.1.0`, `@mcp-abap-adt/adt-strategies` `^0.10.1`, `@mcp-abap-adt/interfaces-adt` `^15.1.0` (the breakpoint types lose `skipCount` and gain `clientId`; a run takes the debuggee's ids); `@mcp-abap-adt/compact-modify` declares `interfaces-adt`, which it imports. `@mcp-abap-adt/core`, `@mcp-abap-adt/compact` and the two compact halves require `@mcp-abap-adt/lib` `^18.0.0`.
+- `DEBUGGER.md`: another user, terminal mode, the breakpoint set and its key, leaving a debuggee running, the settings, what ADT cannot do.
+
 ## [17.2.2] - 2026-10-11
 
 ### Changed

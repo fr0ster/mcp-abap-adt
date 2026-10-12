@@ -12,11 +12,12 @@ of the full server, and the four debugger verbs of the
 ## Turning it on
 
 The debugger tools are an **opt-in** set. No default exposition carries them,
-because a breakpoint catches every request of the connected SAP user (see
+because in user mode a breakpoint catches every request of the request user — the
+connected SAP user unless another is named (see
 [What a breakpoint catches](#what-a-breakpoint-catches)).
 
 ```bash
-mcp-abap-adt --exposition=readonly,high,debug      # the full server, 29 debugger tools beside the rest
+mcp-abap-adt --exposition=readonly,high,debug      # the full server, 30 debugger tools beside the rest
 mcp-abap-adt-compact --exposition=rw,debug         # compact: four verbs beside the 25
 ```
 
@@ -26,18 +27,25 @@ facade. An embedder passes `includeDebug: true` to `HandlerExporter`, or adds
 
 ## Scope: what it debugs
 
-The debugger debugs **what it starts itself**, in the system's user mode
-(`debuggingMode=user`): the model names a class (run as a console application) or
-a report, and the server runs it in the background once it is listening.
-Request-based (terminal) debugging, other users' requests, and attaching to a
-process the server did not start are **not offered**.
+The debugger catches **requests that start after it listens**. In user mode (the
+default) those are the requests of one SAP user — the connected one, or another
+named by `request_user`; in terminal mode (`debugging_mode: terminal`) those that
+carry this debug session's terminal id and IDE id. The model can have the server
+run a class (as a console application) or a report in the background once it
+listens; in user mode it can also catch what that user runs elsewhere. It cannot
+attach to a process or a request that is already running (see
+[What ADT cannot do](#what-adt-cannot-do)).
 
 ## The debug session and its handle
 
 A starting tool — `DebugStartListener`, `DebugTakeOverListener`, `AmdpDebugStart`,
 or compact `HandlerDebugStart` — takes its parameters when it creates the session
-(the breakpoints, an optional background run) and answers a **`state_handle`**.
-Every other session tool requires that handle.
+(the breakpoints, an optional background run; for ABAP also `request_user`,
+`debugging_mode` and `settings`) and answers a **`state_handle`**. Every other
+session tool requires that handle. A start needs **at least one breakpoint**: the
+tool's schema requires it, and the session refuses an empty list before anything
+is sent. An ABAP start answers the ids and the identity in force beside the handle
+(`terminal_id`, `ide_id`, `debugging_mode`, and `request_user` in user mode).
 
 - The handle is opaque: 128 random bits, minted by the server instance that holds
   the session. It names the state of an LLM conversation, not a user and not an
@@ -81,15 +89,19 @@ What the system does with them, measured on premise and on the cloud
 - The listener conflict is keyed by the **IDE id** only. The same IDE id never
   conflicts: both listeners stay, and the newer one catches. Another IDE id of the
   same SAP user conflicts — see [Conflicts are errors](#conflicts-are-errors).
-- The terminal id changes nothing in user mode.
+- The terminal id changes nothing in user mode; terminal mode catches by it and
+  the IDE id (next bullet).
 - In **terminal mode** (`debugging_mode: terminal`) a listener catches only the
   requests that carry its terminal id and IDE id, and the runs this server
   starts for the debug session carry them (measured on premise, 2026-10-12), so
   terminal mode needs neither id configured: a stated id only replaces the random
   one. Any other request is caught only if it carries the same ids, so a
   terminal start without a run catches only those.
-- **Breakpoints belong to the SAP user, not to an id**: whichever listener of that
-  user is active catches them.
+- **Breakpoints belong to the SAP user, not to an IDE id**: in user mode the set
+  is the SAP user's with the request user, in terminal mode the SAP user's whatever
+  the ids (measured on premise (2026-10-12), BASIS 816). In user mode whichever
+  listener of that user is active catches them. See
+  [The breakpoint set and its key](#the-breakpoint-set-and-its-key).
 
 So two server instances of the same SAP user, with the default random ids, meet as
 the system's conflict. Sharing an IDE id is **your choice and your
@@ -137,7 +149,7 @@ is cut and `stack_depth` says how deep it was — `detail: full` answers all of 
 
 One debuggee at a time. While one is stopped, the listener does not poll; it
 resumes once that one is released (a step that runs it to its end, `continue`
-past the last breakpoint, a termination). A program that hits a breakpoint
+past the last breakpoint, a termination, `detach`, `release_debugger`). A program that hits a breakpoint
 meanwhile is not caught.
 
 A background run reports its outcome — its output, or its failure — as the end of
@@ -150,31 +162,180 @@ field, the whole stack) or `raw` (the system's document as it came).
 
 ## What a breakpoint catches
 
-In user mode a breakpoint catches **every request of the connected SAP user**, not
+In user mode a breakpoint catches **every request of the request user**, not
 only the program this server started: a report the same user runs in SAP GUI, an
 OData request of a Fiori app under that user, a request of an IDE logged on as
 that user. Measured: a breakpoint catches again on the next run without being
-armed again.
+armed again. In terminal mode it catches only a request that carries this debug
+session's ids — the run the server starts for it.
 
 Breakpoints are a line (`object_type`, `object_name`, `line`; a class's include
 and a function module's group where needed), an exception class, an ABAP statement
-or a message, each with an optional condition. `DebugSetBreakpoints` adds to the
-set and answers which the system placed and which it refused, with its reason.
-`DebugDeleteBreakpoint` removes one; `DebugListBreakpoints` lists the set this
-session armed.
+or a message; a line breakpoint may carry a condition, and a condition on another
+kind is refused before anything is sent, naming the breakpoint (the system does
+not evaluate one there).
+
+`DebugSetBreakpoints` adds to the set. The server sends the whole set every time
+and answers it whole:
+
+- `placed` — every breakpoint in force, the earlier ones included;
+- `refused` — this call's breakpoints the system did not place, each with its
+  definition and the system's reason (`error`, missing when no row gave one);
+- `lost` — earlier breakpoints no longer placed;
+- `unexpected` — an answer row the server could not pair with a breakpoint it
+  sent; a conforming system answers none.
+
+The server tags every breakpoint it sends with an id of its own (`clientId`), and
+the system echoes that tag on each row, placed or refused, whatever order it
+answers them in (measured on premise (2026-10-11), BASIS 816: refused rows first,
+ids renumbered) — so each row pairs exactly with its breakpoint.
+`DebugDeleteBreakpoint` removes one by id, and is refused before anything is sent
+for an id the session does not hold; `DebugListBreakpoints` lists the placed set.
+
+## Another user
+
+`request_user` (on `DebugStartListener`, `DebugTakeOverListener`, compact
+`HandlerDebugStart` with `kind: abap`) names whose requests are caught; omitted,
+it is the connected user. The catching user needs `S_DEVELOP` with `DEBUG` and
+activity `90` on the user named; without it the system answers `403`, and the
+answer reaches the model as the system gave it. A request user that does not exist
+is refused the same way (`403`, measured on premise (2026-10-11), BASIS 816). Both
+refusals come before anything is placed, so the start changes nothing. Measured end
+to end on premise (2026-10-11), BASIS 816: the other user's run was caught within
+about a second, attached, stepped and finished. Only a request that starts after
+the breakpoint and the listener are in place is caught.
+
+The identity — the mode and the request user — is fixed for the life of the
+state handle: another user is another start, with another handle.
+
+## Terminal mode
+
+`debugging_mode: terminal` catches the requests that carry this debug session's
+terminal id and IDE id instead of those of a user. It needs no configuration: the
+ids are random per instance unless stated (see
+[The SAP ids](#the-sap-ids-and-when-to-share-one)), and a stated id only replaces
+the random one. `request_user` is refused in this mode: the system reads no request
+user there.
+
+- **The run the server starts carries the ids** (in its `SAP-PASSPORT`; a run's
+  URL has no place for them), so this session's listener catches it and no other
+  terminal-mode listener does, not even one of the same SAP user under other ids
+  (measured on premise (2026-10-12), BASIS 816).
+- **Any other request is caught only if it carries the same ids**, so a terminal
+  start without `run` catches only such requests. A request from SAP GUI was not
+  tested. If you try one and it is not caught, open an issue with: the mode;
+  whether the stated terminal id is the one SAP GUI shows; how the program was
+  started (SAP GUI, browser, RFC, background job); and the wire log of the
+  requests (`DEBUG_HTTP_WIRE=true`).
+- **The breakpoint set is still the SAP user's**: terminal mode separates the
+  listeners and the catches, not the breakpoints (next section).
+
+## The breakpoint set and its key
+
+The system keeps the breakpoints as one set per key, and the IDE id is not part of
+the key:
+
+- **user mode**: the SAP user the server logs on as, with the request user. So
+  **every IDE of the same SAP user debugging the same request user shares one
+  set** — an Eclipse, another server instance, this one. Sets of different request
+  users were not measured.
+- **terminal mode**: the SAP user, whatever the ids. Two IDEs of one SAP user under
+  other terminal and IDE ids replaced each other's set (measured on premise
+  (2026-10-12), BASIS 816).
+
+Each change replaces that set as a whole, and a listener's stop deletes it,
+whether or not a listener ran (measured on premise (2026-10-11), BASIS 816). A
+listener's stop under another IDE id of the same user also ends that IDE's
+listener in user mode, not in terminal mode (measured on premise (2026-10-12),
+BASIS 816). The server keeps the definitions it was given and sends them all with
+every change, so a second `DebugSetBreakpoints` keeps the first.
+
+Before it changes anything, a start under refuse (`DebugStartListener`, compact
+`HandlerDebugStart` without `take_over`) asks the system whether another debugger
+listens for the user, and every later `DebugSetBreakpoints` of that session asks
+again — see [Conflicts are errors](#conflicts-are-errors). The host chooses
+whether a take-over asks too, `SAP_DEBUG_BREAKPOINT_CONFLICT` — the header
+`x-sap-debug-breakpoint-conflict`, the destination's `.env`, the environment, in
+that order; an embedder passes `breakpointConflict` to `createDebuggerInstance`:
+
+- **`replace`** (the default): a take-over (`DebugTakeOverListener`, compact
+  `take_over: true`) asks nothing; it sends the set whole and replaces another
+  IDE's breakpoints under the key.
+- **`refuse-if-held`**: the same check runs in every mode, before a take-over and
+  before every later `DebugSetBreakpoints`; it refuses if another debugger
+  listens, so a take-over is refused then.
+
+The check sees a **listener**, not breakpoints: another IDE that armed breakpoints
+and does not listen is not seen, and its set is replaced. An unknown value of
+`SAP_DEBUG_BREAKPOINT_CONFLICT` is refused when the instance's debugger is first
+used.
+
+## Leaving a debuggee running
+
+At a stop, `DebugStep` (compact `HandlerDebugStep`) takes two more actions, ABAP
+only:
+
+- **`detach`**: the debugger leaves and the program runs on. The listener and the
+  breakpoints stay, so an armed breakpoint can catch the same run again at its next
+  pass.
+- **`release_debugger`**: frees the debugger; the program runs on and returns its
+  output. The system answers this with a plain `500` that is the request having
+  worked (adt-clients' errata, "The debugger freeing its session is answered as an
+  ICF 500"); the server reads exactly that as no failure, and anything else — an
+  ADT document, an HTML page, a `400` — as a failure that keeps the stop for
+  `DebugStop`. The freed ABAP session takes no further request, so the server sends
+  it none, not even a logoff.
+
+Both answer the listening state. `DebugTerminate` (compact `terminate`) ends the
+program where it stands.
+
+## Debugger settings
+
+`settings` at a start (compact: at the start only) — `system_debugging`,
+`update_debugging`, `create_exception_object`, `background_rfc`,
+`shared_object_debugging`, each a boolean — are kept and applied after each
+attach; a field left out keeps its value. `DebugSetSettings` changes them at the
+current stop, merges them into those kept and answers the settings in force; a
+stop answers them under `settings` (and a failure to apply them under
+`settings_error`, the stop standing). The first change after an attach ignores
+`system_debugging: false` (server source, BASIS 816, read 2026-10-11) and its
+answer cannot show it, so the server sends a `false` there twice. The display of
+data aging is not offered: left out, it stays off, the system's default.
+
+## What ADT cannot do
+
+It cannot attach to a process or a request that is already running. A request is
+enabled for catching when it starts: a loop already running when the breakpoint
+and the listener were armed is never caught (measured on premise (2026-10-11),
+BASIS 816, for 45 s). Attaching a work process from the process overview opens
+the debugger in the requester's SAP GUI, and nothing routes that stop to an ADT
+listener (server source, BASIS 816, read 2026-10-11); SAP GUI is the route there.
 
 ## Conflicts are errors
 
 A listener of another IDE id of the same SAP user — an IDE, another server
 instance — is the system's to report and yours to resolve:
 
-- **refuse** (`DebugStartListener`; compact `take_over: false`, the default): the
-  start fails with the system's message (`409`), nothing is armed and nothing is
-  run; the other listener keeps listening.
+- **refuse** (`DebugStartListener`; compact `take_over: false`, the default):
+  before anything is changed, the start asks the system whether another debugger
+  listens for the user. If one does (`409`), the start is refused: nothing is
+  placed, nothing is run, and the other listener keeps listening with its
+  breakpoints. A listener of this session's own answers no conflict, so every later
+  `DebugSetBreakpoints` of the session asks the same way. The check is not atomic:
+  a listener another IDE starts between the check and our listen has its
+  breakpoints replaced by our arming, and in user mode our rollback after the
+  listen's `409` ends its listener. That race is accepted and documented, not
+  handled.
 - **take over** (`DebugTakeOverListener`; compact `take_over: true`): the start
   displaces the other debugger. The displaced listener's poll is answered with a
   conflict notification; if that listener is ours, its next `DebugWait` fails with
-  that message and the listener is not restarted.
+  that message and the listener is not restarted. With
+  `SAP_DEBUG_BREAKPOINT_CONFLICT=refuse-if-held` a take-over asks first too, and is
+  refused if another debugger listens (see
+  [The breakpoint set and its key](#the-breakpoint-set-and-its-key)).
+
+The error names who holds the user's debugging: the system's conflict text and,
+where it gives one, the IDE user.
 
 Taking over is for a case you mean, such as an IDE left holding the user's
 debugging. Close the IDE's debugger otherwise.
@@ -184,20 +345,24 @@ debugging. Close the IDE's debugger otherwise.
 Nothing ends on a timer of the server's, with one exception (below). A session
 ends by:
 
-- **`DebugStop`** (compact `stop`): releases a stopped debuggee, deletes the
-  breakpoints this session armed, stops the listener and closes the connections,
-  ABAP and AMDP alike. It returns only after the system has answered the
-  listener's open poll — so a conflict right after a stop means a real other
-  listener, not our own still letting go. A stop right after a run ended can
+- **`DebugStop`** (compact `stop`): releases a stopped debuggee, then stops the
+  listener — which deletes the key's breakpoints, those of every IDE sharing the
+  key included — and closes the connections, ABAP and AMDP alike. Only when the
+  listener's stop fails are this session's breakpoints deleted one by one; when the
+  system refuses it for the user (`403`, `404`), nothing is deleted, the answer
+  names the breakpoints left on the system, and the session ends. It returns only
+  after the system has answered the listener's open poll — so a conflict right
+  after a stop means a real other listener, not our own still letting go. A stop right after a run ended can
   take up to the listener's hold (60 s) instead of under a second: the listener
   polls again at once when a run ends, and if that poll reaches the system after
   the stop, nothing wakes it. The stop then stops the listener once more, which
   in our runs answered it at once; when even that one arrives first, the stop
   waits for the poll's hold. The race is the system's and is documented, not
   closed (measured on premise, 2026-10-12). A part that could not be undone is
-  reported, kept, and retried by the next stop; the handle stays valid until
-  nothing is held. A debuggee the listener caught as the stop began is attached
-  and released by the stop; measured on premise (2026-10-11), an attach after
+  reported, kept, and retried by the next stop; the handle stays valid, the
+  identity (mode, request user) and the settings stay, and a new start is
+  refused, until nothing is held. A debuggee the listener caught as the stop
+  began is attached and released by the stop; measured on premise (2026-10-11), an attach after
   the listener was stopped still succeeds, and a caught debuggee nobody attaches
   is held by the system for about 30 seconds and then runs on.
 - **`AmdpDebugStop`**: the AMDP part only (below).
@@ -205,7 +370,9 @@ ends by:
   — each does the same complete stop and reports what it could not undo.
 - **the SAP system**, when it answers the listener with an error or a conflict
   notification (another IDE took the user's debugging over): the listener ends.
-  A debuggee that ends on its own ends only that debuggee; the session listens on.
+  The listener's stop is still owed then: the state stays held until `DebugStop`,
+  the host or the idle bound. A debuggee that ends on its own ends only that
+  debuggee; the session listens on.
 - **the idle bound** — the project owner's one exception to "no timeouts": held
   state ends when **no tool call** has reached its instance for
   `--state-idle-minutes` (env `MCP_STATE_IDLE_MINUTES`, YAML `state-idle-minutes`;
@@ -222,20 +389,20 @@ ends by:
 
 A process that restarts loses its live state; the system may still hold what the
 previous one left. With **stated** ids (above), the first start of a new instance
-first asks the system to stop a listener under those ids. Measured: a successor
-started under the same stated ids ends the predecessor's listener poll. Under an
-IDE id shared with an IDE, that stop may stop the IDE's listener too — sharing it
-is the choice described above.
+first asks the system to stop a listener under those ids — in terminal mode only
+when the terminal id is stated. Measured: a successor started under the same
+stated ids ends the predecessor's listener poll. Under refuse, the listener check
+runs before it (see [Conflicts are errors](#conflicts-are-errors)); our own IDE id
+is no conflict. Under an IDE id shared with an IDE, that stop may stop the IDE's
+listener too — sharing it is the choice described above.
 
-Breakpoints are different: they belong to the SAP user and stay armed after the
-instance that set them is gone, and they catch again on the next run. The server
-does not try to find or remove a predecessor's breakpoints. The ones a session set
-itself are deleted by `DebugStop`, by `DebugDeleteBreakpoint` one at a time, and by
-the host's or the idle bound's complete stop — which is why a clean stop matters.
-Breakpoints an earlier process left behind are not removed by the server: it does
-not know them (the system answers no listing of them), and sending an empty set
-under the same ids was measured to remove nothing. Remove them where they are
-visible, for example in an IDE's debugging of the same SAP user.
+The reconciliation's stop also deletes the key's breakpoints, a predecessor's
+included (measured on premise (2026-10-11), BASIS 816: a listener's stop deletes
+them whether or not a listener ran); the start's own breakpoints are armed after
+it. Every IDE sharing the key loses its breakpoints with them (see
+[The breakpoint set and its key](#the-breakpoint-set-and-its-key)). Without stated
+ids nothing is reconciled: a predecessor's breakpoints under the key are replaced
+by the start's arming all the same, since every change replaces the set.
 
 ## Memory and memory snapshots
 
@@ -319,6 +486,8 @@ baseline rows were measured directly.
 ## Before you debug
 
 - Close an IDE's debugger of the same SAP user, or decide to take it over.
-- Remember that a breakpoint catches every request of that user while it is armed;
-  stop the session when you are done.
+- Remember that another IDE of the same SAP user shares the breakpoint set: a
+  change here replaces its breakpoints, and a stop deletes them.
+- Remember that in user mode a breakpoint catches every request of the request
+  user while it is armed; stop the session when you are done.
 - On a shared machine, treat the `state_handle` like a password.

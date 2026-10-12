@@ -603,6 +603,53 @@ export async function handleCreateClass(
 }
 ```
 
+## EmbeddableMcpServer: the consumer's connection
+
+`EmbeddableMcpServer` uses the connection it is given exactly as it is. It does not build a
+credential, wrap the connection or call `connect()` on it, and every tool call works on it.
+
+Some operations need an ABAP session of their own: `CreatePackage` (high and low) and `LockPackage`
+over RFC, `DeletePackage` with `force_new_connection`, and a debug session's own connections. A
+package can be saved only once per ABAP session (PAK/058), which is why they cannot share one. Such
+a fresh connection never comes from the injected connection's configuration. It comes from the
+consumer's factory:
+
+```typescript
+const server = new EmbeddableMcpServer({
+  connection,
+  // Build a new connection with its own credential; honour the signal.
+  freshConnection: async ({ signal }) => buildMyConnection({ signal }),
+});
+```
+
+- **Where a fresh connection comes from** (`openFreshConnection`, `src/lib/packageSessions.ts`) is
+  decided from a registry keyed by the connection object:
+
+  | The connection | A fresh one comes from |
+  |---|---|
+  | built by the server (`createAbapConnection`: a destination, `x-sap-*` headers, a `SapConfig`) | the factory's record: the same settings and the same credential object |
+  | injected, with `freshConnection` | `await freshConnection({ signal })`: the consumer's factory, given the current request's signal |
+  | injected without it, or set through `setAbapConnectionOverride` | refused with `fresh_connection_unavailable`: "This operation needs an ABAP session of its own; the connection was given by the host, which supplied no fresh-connection factory (`freshConnection`)". Nothing is sent. |
+
+  The registry is a `WeakMap`, so a connection the host drops is not kept. The latest injection of
+  a connection object decides: a second `EmbeddableMcpServer` given the same object without
+  `freshConnection` clears the earlier factory.
+- **Ownership passes to the server** (D22). Once the factory returns a connection, the server
+  treats it exactly like one it built:
+  - it calls `connect()` on it, and if that fails it closes it and answers the failure;
+  - it holds it for the operation, or under the package lock's handle until the unlock;
+  - it closes it with `disconnect()` when the operation or the lock ends, and a failed close is
+    logged in fixed words.
+
+  What the consumer keeps is what it built into the connection: its credential, and its honouring
+  of the signal.
+- **Honour the signal.** `signal` is the signal of the MCP request the operation serves. It aborts
+  when the client cancels the request or the call ends. A factory that waits (a token, a pool)
+  should end that wait when the signal aborts. The returned connection should honour the signal
+  in each request's options.
+- **`DeletePackage` no longer falls back** to the caller's connection when no fresh connection can
+  be had (D21). The refusal is the answer, never a delete on the session the caller asked to avoid.
+
 ## Key Points
 
 1. **BaseMcpServer Class**: Extends `McpServer` from SDK and provides `connectionContext` property

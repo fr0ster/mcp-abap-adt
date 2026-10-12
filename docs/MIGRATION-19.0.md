@@ -205,6 +205,9 @@ packages, each with one binary and its transport's options only:
   `mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap` (`--type xsuaa` for an
   XSUAA key), or `mcp-auth --destination <name> --type abap|xsuaa` for a destination of the
   destination folder (`mcp-auth --help` lists the rest).
+- **`DeletePackage` with `force_new_connection` no longer falls back** to the session you asked
+  it to avoid. If no fresh connection can be had, the call answers that failure, and nothing is
+  deleted. 18.x logged the failure and deleted on the current session.
 - **Editing a destination's files while the server runs is not supported**: it may combine old and
   new values until the next start. Restart after any change.
 - **Inspection-only mode** (stdio without a destination) answers a tool call with the server's own
@@ -268,6 +271,35 @@ packages, each with one binary and its transport's options only:
   throws `ServerRefusal('destination_refused', …)`. `ServerRefusal` takes
   `destination_refused` with its words, and `fresh_connection_unavailable` /
   `credentials_required` with fixed ones.
+- **`EmbeddableMcpServer` takes `freshConnection?: (options: { signal?: AbortSignal }) =>
+  Promise<IAbapConnection>`.** Some operations need an ABAP session of their own: `CreatePackage`
+  (high and low) and `LockPackage` over RFC, `DeletePackage` with `force_new_connection`, and a
+  debug session's own connections. On an injected connection, these now take that session from
+  your factory, and from nowhere else. 18.x rebuilt one from the injected connection's
+  `getConfig()` / `config`.
+  - **Without the factory, these operations are refused** with `fresh_connection_unavailable`
+    ("This operation needs an ABAP session of its own; the connection was given by the host, which
+    supplied no fresh-connection factory (`freshConnection`)"). Nothing is sent. A connection set
+    through `setAbapConnectionOverride` gets the same refusal.
+  - **Once your factory returns a connection, it is the server's.** The server calls `connect()` on
+    it, holds it for the operation (or under the package lock's handle until the unlock), and closes
+    it with `disconnect()`. Build the connection with its own credential.
+  - **Honour `signal`.** It is the request's signal, so end your factory's waits when it aborts. The
+    returned connection should honour the signal in each request's options.
+  - **The latest injection of a connection object decides.** Injecting the same object again
+    without `freshConnection` clears the earlier factory.
+- **`credentialFromSapConfig` refuses instead of guessing** (`setSapConfigOverride`,
+  `getManagedConnection`, `@mcp-abap-adt/lib/auth`):
+  - an `authType` other than `basic`, `jwt`, `saml` or `certificate`, or none at all, is refused
+    with "The SapConfig `authType` must be basic, jwt, saml or certificate". 18.x built a basic
+    credential with an empty user;
+  - `snc` is refused with "The SapConfig `authType` snc is served through a destination of
+    mcp-abap-adt (stdio)";
+  - `kerberos` stays refused;
+  - a missing or empty `username`, `password`, `jwtToken` or `sessionCookies` is refused with "The
+    SapConfig for <authType> authentication has no `<field>`". 18.x used `''`.
+
+  A refusal names the field, never a value.
 - **`ConnectionContext` is the instance's source** (`@mcp-abap-adt/lib/embeddable`):
   `{ kind: 'built', source: ConnectionSource } | { kind: 'injected', connection }`, plus
   `sessionId` and `metadata?`. A `ConnectionSource` answers `resolve(signal)` with `{ settings,

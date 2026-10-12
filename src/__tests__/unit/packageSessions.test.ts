@@ -41,15 +41,32 @@ import {
   connectionHoldingPackageLock,
   inOwnSessionOverRfc,
   openFreshConnection,
+  registerFreshConnectionFactory,
   releasePackageLockSession,
 } from '../../lib/packageSessions';
 
-const connectionOf = (connectionType: string) =>
-  ({ getConfig: () => ({ connectionType }) }) as any;
+/** A connection whose host hands fresh ones over through a factory. */
+const handedOver: typeof opened = [];
+const connectionOf = (connectionType: string) => {
+  const connection = { getConfig: () => ({ connectionType }) } as any;
+  registerFreshConnectionFactory(connection, async () => {
+    const fresh = {
+      connect: jest.fn(async () => {}),
+      disconnect: jest.fn(async () => {}),
+      getConfig: () => ({ connectionType }),
+      credential: undefined,
+      settings: undefined,
+    };
+    handedOver.push(fresh);
+    return fresh as any;
+  });
+  return connection;
+};
 
 describe('package sessions', () => {
   beforeEach(() => {
     opened.length = 0;
+    handedOver.length = 0;
   });
 
   it('runs a create on the caller connection over HTTP', async () => {
@@ -61,7 +78,7 @@ describe('package sessions', () => {
       async (c) => c,
     );
     expect(used).toBe(caller);
-    expect(opened).toHaveLength(0);
+    expect(handedOver).toHaveLength(0);
   });
 
   it('runs a create in a session of its own over RFC, and closes it', async () => {
@@ -72,10 +89,10 @@ describe('package sessions', () => {
       'x',
       async (c) => c,
     );
-    expect(opened).toHaveLength(1);
-    expect(used).toBe(opened[0]);
-    expect(opened[0].connect).toHaveBeenCalled();
-    expect(opened[0].disconnect).toHaveBeenCalled();
+    expect(handedOver).toHaveLength(1);
+    expect(used).toBe(handedOver[0]);
+    expect(handedOver[0].connect).toHaveBeenCalled();
+    expect(handedOver[0].disconnect).toHaveBeenCalled();
   });
 
   it('closes its own session over RFC when the work throws', async () => {
@@ -84,20 +101,20 @@ describe('package sessions', () => {
         throw new Error('boom');
       }),
     ).rejects.toThrow('boom');
-    expect(opened[0].disconnect).toHaveBeenCalled();
+    expect(handedOver[0].disconnect).toHaveBeenCalled();
   });
 
   it('keeps an RFC lock session under its handle until the unlock', async () => {
     const caller = connectionOf('rfc');
     const lockOn = await connectionForPackageLock(caller, undefined);
-    expect(lockOn.connection).toBe(opened[0]);
+    expect(lockOn.connection).toBe(handedOver[0]);
     lockOn.keep('HANDLE1');
 
-    expect(connectionHoldingPackageLock(caller, 'HANDLE1')).toBe(opened[0]);
-    expect(opened[0].disconnect).not.toHaveBeenCalled();
+    expect(connectionHoldingPackageLock(caller, 'HANDLE1')).toBe(handedOver[0]);
+    expect(handedOver[0].disconnect).not.toHaveBeenCalled();
 
     await releasePackageLockSession('HANDLE1', undefined);
-    expect(opened[0].disconnect).toHaveBeenCalled();
+    expect(handedOver[0].disconnect).toHaveBeenCalled();
     expect(connectionHoldingPackageLock(caller, 'HANDLE1')).toBe(caller);
   });
 
@@ -107,7 +124,7 @@ describe('package sessions', () => {
       undefined,
     );
     await lockOn.drop();
-    expect(opened[0].disconnect).toHaveBeenCalled();
+    expect(handedOver[0].disconnect).toHaveBeenCalled();
   });
 
   it('locks on the caller connection over HTTP', async () => {
@@ -118,7 +135,7 @@ describe('package sessions', () => {
     expect(lockOn.connection).toBe(caller);
     lockOn.keep('HANDLE2');
     expect(connectionHoldingPackageLock(caller, 'HANDLE2')).toBe(caller);
-    expect(opened).toHaveLength(0);
+    expect(handedOver).toHaveLength(0);
   });
 });
 
@@ -158,7 +175,7 @@ describe('openFreshConnection', () => {
     connect.mockRestore();
   });
 
-  it('falls back to getConfig() through credentialFromSapConfig for a connection the factory did not build', async () => {
+  it('never opens one from the configuration of a connection the factory did not build', async () => {
     opened.length = 0;
     const config = {
       url: 'https://sap.example.invalid',
@@ -167,12 +184,48 @@ describe('openFreshConnection', () => {
       username: 'u',
       password: 'p',
     };
-    const foreign = { getConfig: () => config } as any;
+    const foreign = { getConfig: () => config, config } as any;
 
-    await openFreshConnection(foreign, undefined);
+    const refused = expect(
+      openFreshConnection(foreign, undefined),
+    ).rejects.toMatchObject({
+      serverRefusal: 'fresh_connection_unavailable',
+    });
+    await refused;
 
-    expect(opened).toHaveLength(1);
-    expect(opened[0].settings).toBe(config);
-    expect(opened[0].credential).toBeInstanceOf(BasicAuthProvider);
+    expect(opened).toHaveLength(0);
+  });
+
+  it('takes a host’s connection from its factory, connects it, and builds nothing', async () => {
+    opened.length = 0;
+    const foreign = { getConfig: () => ({ connectionType: 'rfc' }) } as any;
+    const handed = {
+      connect: jest.fn(async () => {}),
+      disconnect: jest.fn(async () => {}),
+    };
+    const factory = jest.fn(async () => handed as any);
+    registerFreshConnectionFactory(foreign, factory);
+
+    const fresh = await openFreshConnection(foreign, undefined);
+
+    expect(fresh).toBe(handed);
+    expect(handed.connect).toHaveBeenCalledTimes(1);
+    expect(factory).toHaveBeenCalledWith({ signal: undefined });
+    expect(opened).toHaveLength(0);
+  });
+
+  it('forgets a host’s factory when the connection is registered again without one', async () => {
+    const foreign = {} as any;
+    const factory = jest.fn(async () => ({}) as any);
+    registerFreshConnectionFactory(foreign, factory);
+    registerFreshConnectionFactory(foreign, undefined);
+
+    const refused = expect(
+      openFreshConnection(foreign, undefined),
+    ).rejects.toMatchObject({
+      serverRefusal: 'fresh_connection_unavailable',
+    });
+    await refused;
+    expect(factory).not.toHaveBeenCalled();
   });
 });

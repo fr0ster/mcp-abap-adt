@@ -6,7 +6,10 @@
  * A `ConnectionSource`'s answer (`(await source.resolve(signal)).credential`,
  * spec §4) counts as a source because each source's own `credential`
  * binding is checked here like every other: core's `destinationSource`
- * (`getProvider`), lib's `headerSource` (`credentialFromHeaders`).
+ * (`getProvider`), lib's `headerSource` (`credentialFromHeaders`). A fresh
+ * sibling (`openFreshConnection`) holds the credential of the factory's
+ * record of the connection it is opened from — never one built from that
+ * connection's configuration (D20).
  *
  * Read from the source tree with the TypeScript parser: every call of
  * `createAbapConnection` outside `connectionFactory.ts` is checked for where
@@ -262,23 +265,15 @@ function judge(
   if (isSource(expr, resolvedAnswers(file))) return undefined;
 
   // A sibling of a connection the factory built: that connection's own
-  // credential, else the SapConfig source.
+  // credential, from the factory's record — and nothing else (D20: no
+  // fallback to a source read from the connection's configuration).
   if (
-    ts.isBinaryExpression(expr) &&
-    expr.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken
+    ts.isPropertyAccessExpression(expr) &&
+    expr.name.text === 'credential' &&
+    ts.isIdentifier(expr.expression) &&
+    siblingRecords(file).has(expr.expression.text)
   ) {
-    const left = strip(expr.left);
-    const records = siblingRecords(file);
-    if (
-      ts.isPropertyAccessExpression(left) &&
-      left.name.text === 'credential' &&
-      ts.isIdentifier(left.expression) &&
-      records.has(left.expression.text) &&
-      isSource(expr.right)
-    ) {
-      return undefined;
-    }
-    return `not a source: ${expr.getText()}`;
+    return undefined;
   }
 
   // A reference to a credential bound elsewhere in the file.

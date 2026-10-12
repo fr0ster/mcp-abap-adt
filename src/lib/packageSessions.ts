@@ -22,6 +22,11 @@
  *   its lock handle; the update with that handle runs on it; the unlock
  *   releases it and closes it. The handle belongs to the session that took
  *   it, so the whole lock → update → unlock chain has to share that session.
+ *
+ * Where a fresh connection comes from is `openFreshConnection` (spec §4.3,
+ * D20): the factory's record of a connection the server built, or the host's
+ * `freshConnection` for one it injected — never the connection's own
+ * configuration. Without either the operation is refused.
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ServerRefusal } from './auth/serverRefusal';
@@ -46,15 +51,18 @@ export type FreshConnectionFactory = (options: {
 const hostFactories = new WeakMap<object, FreshConnectionFactory>();
 
 /**
- * Records the factory the host gave beside the connection it injected
- * (`EmbeddableMcpServer`'s `freshConnection`). A connection set without one
- * is not recorded, and a fresh connection on it is refused.
+ * Records what the host gave beside the connection it injected
+ * (`EmbeddableMcpServer`'s `freshConnection`): its factory, or none. The
+ * latest injection of a connection object decides — one injected again
+ * without a factory forgets the earlier one, and a fresh connection on it is
+ * refused. Keyed weakly: a connection the host drops is not kept.
  */
 export function registerFreshConnectionFactory(
   connection: object,
-  factory: FreshConnectionFactory,
+  factory: FreshConnectionFactory | undefined,
 ): void {
-  hostFactories.set(connection, factory);
+  if (factory) hostFactories.set(connection, factory);
+  else hostFactories.delete(connection);
 }
 
 /**
@@ -65,7 +73,8 @@ export function registerFreshConnectionFactory(
  * - built by the server (`createAbapConnection`) → the factory's record: the
  *   same settings and the same credential object, connected here;
  * - injected with the host's `freshConnection` → that factory, called with
- *   the current request's signal;
+ *   the current request's signal; what it returns is the server's (D22),
+ *   connected here like the server's own;
  * - anything else → refused `fresh_connection_unavailable`, nothing sent.
  */
 export async function openFreshConnection(
@@ -84,8 +93,19 @@ export async function openFreshConnection(
     return fresh;
   }
   const factory = hostFactories.get(connection);
-  if (factory) return factory({ signal: currentRequestSignal() });
-  throw new ServerRefusal('fresh_connection_unavailable');
+  if (!factory) throw new ServerRefusal('fresh_connection_unavailable');
+  const handed = (await factory({
+    signal: currentRequestSignal(),
+  })) as IAbapConnection & { connect?: () => Promise<void> };
+  // Once handed over it is the server's (D22), treated exactly like a
+  // connection the server built: connected before use, closed if that fails.
+  try {
+    if (typeof handed.connect === 'function') await handed.connect();
+  } catch (error) {
+    await closeQuietly(handed, logger, 'A fresh connection');
+    throw error;
+  }
+  return handed;
 }
 
 /**

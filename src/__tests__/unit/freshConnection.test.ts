@@ -78,9 +78,11 @@ import {
  */
 function rfcConnection(): RecordingConnection & {
   getConfig(): Record<string, unknown>;
+  connect: jest.Mock;
   disconnect: jest.Mock;
 } {
   return Object.assign(recordingConnection(), {
+    connect: jest.fn(async () => {}),
     getConfig: () => ({
       url: 'https://sap.example.invalid',
       client: '100',
@@ -100,15 +102,15 @@ interface Factory {
 function hostFactory(): Factory {
   const signals: Array<AbortSignal | undefined> = [];
   const made: ReturnType<typeof rfcConnection>[] = [];
-  const factory = (async (options: { signal?: AbortSignal }) => {
+  const factory = async (options: {
+    signal?: AbortSignal;
+  }): Promise<IAbapConnection> => {
     signals.push(options.signal);
     const fresh = rfcConnection();
     made.push(fresh);
     return fresh;
-  }) as Factory;
-  factory.signals = signals;
-  factory.made = made;
-  return factory;
+  };
+  return Object.assign(factory, { signals, made });
 }
 
 let previousType: string | undefined;
@@ -190,8 +192,10 @@ describe('with the host’s freshConnection', () => {
       expect(factory.signals[0]).toBeInstanceOf(AbortSignal);
       expect(factory.made).toHaveLength(1);
       const fresh = factory.made[0];
+      expect(fresh.connect).toHaveBeenCalledTimes(1);
       expect(fresh.requests.length).toBeGreaterThan(0);
       expect(injected.requests).toHaveLength(0);
+      expect(injected.connect).not.toHaveBeenCalled();
       expect(constructedProviders).toEqual([]);
       expect(builtConnections).toEqual([]);
       await client.close();
@@ -280,6 +284,64 @@ describe('with the host’s freshConnection', () => {
     expect(received?.aborted).toBe(true);
     expect(fresh.requests).toHaveLength(0);
     await client.close();
+  });
+});
+
+describe('a handed-over connection that cannot connect', () => {
+  it('is closed, the failure answered, nothing sent', async () => {
+    const fresh = rfcConnection();
+    fresh.connect.mockRejectedValue(new Error('the system said no'));
+    const client = await served(rfcConnection(), async () => fresh);
+
+    const result = await client.callTool({
+      name: 'CreatePackageLow',
+      arguments: OPERATIONS[1][2],
+    });
+
+    expect(result.isError).toBe(true);
+    expect(fresh.disconnect).toHaveBeenCalledTimes(1);
+    expect(fresh.requests).toHaveLength(0);
+    await client.close();
+  });
+});
+
+describe('the same connection injected again', () => {
+  it('without freshConnection: the later injection wins, the call is refused', async () => {
+    const injected = rfcConnection();
+    const factory = hostFactory();
+    const first = await served(injected, factory);
+    const second = await served(injected);
+
+    const result = await second.callTool({
+      name: 'CreatePackageLow',
+      arguments: OPERATIONS[1][2],
+    });
+
+    expect(JSON.parse(textOf(result)).error).toBe(
+      'fresh_connection_unavailable',
+    );
+    expect(factory.signals).toHaveLength(0);
+    expect(injected.requests).toHaveLength(0);
+    await first.close();
+    await second.close();
+  });
+
+  it('with another freshConnection: the later factory is the one called', async () => {
+    const injected = rfcConnection();
+    const earlier = hostFactory();
+    const later = hostFactory();
+    const first = await served(injected, earlier);
+    const second = await served(injected, later);
+
+    await first.callTool({
+      name: 'CreatePackageLow',
+      arguments: OPERATIONS[1][2],
+    });
+
+    expect(earlier.signals).toHaveLength(0);
+    expect(later.signals).toHaveLength(1);
+    await first.close();
+    await second.close();
   });
 });
 

@@ -104,8 +104,8 @@ What a user of the server meets:
   [Authentication → A token you hold](user-guide/AUTHENTICATION.md#a-token-you-hold).
 - **`--browser` keeps its names** (`system`, `auto`, `chrome`, `edge`, `firefox`, `none`,
   `headless`); any other name opens the platform's default browser. The login URL is printed on
-  stderr in every case, also when a browser could not be opened — the login then keeps waiting
-  for the same callback. A login is no longer ended after 30 s: it waits until it completes, is
+  stderr with `none` / `headless`, and when a browser could not be opened — the login then keeps
+  waiting for the same callback; a browser that opens prints nothing. A login is no longer ended after 30 s: it waits until it completes, is
   refused, or the server shuts down.
 - **Renewal** is unchanged in effect: the refresh token first, a new login when it is refused. A
   session write that does not land is logged and the call goes on; the shutdown's flush reports

@@ -94,7 +94,7 @@ comes from `x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, the
 takes it as an argument — else from a cloud system itself; otherwise it is left out and the system
 applies itself — never refused. Reads are unaffected. The process environment is read once: a change
 made to it while the server runs is not picked up. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, a debugger start needs at least one breakpoint, and a stored session (or a token you hold in a `.env`) must state `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`: regenerate a session with `mcp-auth`. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
+Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, a debugger start needs at least one breakpoint, and session files are read through auth-stores 5 and auth-broker 5, which refuse one not in their format or not bound to its destination in their own words: regenerate a session with `mcp-auth`. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
@@ -399,7 +399,7 @@ Inline comments are not parsed, so keep comments on separate lines.
 **Authentication:**
 - `--mcp=<destination>` - Named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, field by field
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
-- `--browser=<name>` - Browser for a login: `chrome`, `edge`, `firefox`, `system` / `auto` (default: the platform's default browser), `headless`, `none`; any other name opens the default browser. The login URL is always printed on stderr
+- `--browser=<name>` - Browser for a login: `chrome`, `edge`, `firefox`, `system` / `auto` (default: the platform's default browser), `headless`, `none`; any other name opens the default browser. With `none` / `headless`, or a browser that cannot be opened, the login URL is printed on stderr
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
 - `--allow-destination-header` - Honour the `x-mcp-destination` header (HTTP/SSE only, off by default)
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`

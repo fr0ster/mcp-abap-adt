@@ -131,9 +131,9 @@ redirect on a local callback port.
 - `--browser=<name>` (or `MCP_BROWSER`, YAML `browser`): `chrome`, `edge`, `firefox`,
   `system` / `auto` (the platform's default browser; `system` is the default), `headless`,
   `none`. Any other name opens the default browser. With `none` or `headless` no browser is
-  opened. The URL to open is printed on stderr (never stdout) whatever `DEBUG_AUTH_LOG` says —
-  also when a browser was asked to open it, and when one could not be opened: the login then
-  keeps waiting for the same callback, so the printed URL still works.
+  opened and the URL to open is printed on stderr (never stdout), whatever `DEBUG_AUTH_LOG`
+  says. A browser that cannot be opened prints the URL there too, and the login keeps waiting
+  for the same callback, so the printed URL still works. A browser that opens prints nothing.
 - `--browser-auth-port=<port>` (or `MCP_BROWSER_AUTH_PORT`, YAML `browser-auth-port`):
   the callback port, **default `61001`** for every transport. A value that is not an integer
   from 1 to 65535 is refused at startup.

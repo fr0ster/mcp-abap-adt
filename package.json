@@ -129,7 +129,6 @@
     "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json && npx tsc -p server/tsconfig.json && npx tsc -p compact-readonly/tsconfig.json && npx tsc -p compact-modify/tsconfig.json && npx tsc -p compact/tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "check-todos": "node tools/check-todos.js",
-    "auth": "npx sap-abap-auth auth",
     "clean": "make clean",
     "chrono": "./tools/version-stats.sh",
     "docs:tools": "npm run build && node ./tools/generate-tools-docs.js",

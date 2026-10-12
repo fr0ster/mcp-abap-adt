@@ -270,6 +270,8 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=your-jwt-token
+# The rest of the token's session record is auth-stores' and auth-broker's:
+# see ../user-guide/AUTHENTICATION.md#a-token-you-hold
 # System type: cloud (default), onprem, or legacy
 SAP_SYSTEM_TYPE=cloud
 EOF

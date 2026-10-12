@@ -457,6 +457,18 @@
   },
   {
     "group": "high",
+    "name": "SortAndCompressTransportTask",
+    "inputs": "transport_number*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "MoveTransportObjects",
+    "inputs": "transport_number*, target_number*, objects*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "AddTransportObject",
     "inputs": "transport_number*, object_name*, object_type*, pgmid, detail",
     "available_in": "cloud, onprem"

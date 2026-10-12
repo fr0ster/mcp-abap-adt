@@ -487,9 +487,17 @@ import {
   handleCreateTransportTask,
 } from '../../../handlers/transport/high/handleCreateTransportTask';
 import {
+  handleMoveTransportObjects,
+  TOOL_DEFINITION as MoveTransportObjects_Tool,
+} from '../../../handlers/transport/high/handleMoveTransportObjects';
+import {
   handleRemoveTransportObject,
   TOOL_DEFINITION as RemoveTransportObject_Tool,
 } from '../../../handlers/transport/high/handleRemoveTransportObject';
+import {
+  handleSortAndCompressTransportTask,
+  TOOL_DEFINITION as SortAndCompressTransportTask_Tool,
+} from '../../../handlers/transport/high/handleSortAndCompressTransportTask';
 import {
   TOOL_DEFINITION as CreateCdsUnitTest_Tool,
   handleCreateCdsUnitTest,
@@ -809,6 +817,14 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: RemoveTransportObject_Tool,
         handler: withContext(handleRemoveTransportObject),
+      },
+      {
+        toolDefinition: SortAndCompressTransportTask_Tool,
+        handler: withContext(handleSortAndCompressTransportTask),
+      },
+      {
+        toolDefinition: MoveTransportObjects_Tool,
+        handler: withContext(handleMoveTransportObjects),
       },
       {
         toolDefinition: AddTransportObject_Tool,

@@ -195,13 +195,13 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^29.1.0",
-    "@mcp-abap-adt/adt-strategies": "^0.10.1",
+    "@mcp-abap-adt/adt-clients": "^30.0.0",
+    "@mcp-abap-adt/adt-strategies": "^0.10.2",
     "@mcp-abap-adt/auth-broker": "^4.1.0",
     "@mcp-abap-adt/auth-providers": "^5.4.0",
     "@mcp-abap-adt/auth-stores": "^3.3.0",
     "@mcp-abap-adt/connection": "^11.0.0",
-    "@mcp-abap-adt/interfaces-adt": "^15.1.0",
+    "@mcp-abap-adt/interfaces-adt": "^15.3.0",
     "@mcp-abap-adt/interfaces-adt-connection": "^2.0.0",
     "@mcp-abap-adt/interfaces-auth": "^3.2.0",
     "@mcp-abap-adt/interfaces-auth-broker": "^1.2.0",

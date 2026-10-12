@@ -51,7 +51,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-adt": "^15.1.0",
+    "@mcp-abap-adt/interfaces-adt": "^15.3.0",
     "@mcp-abap-adt/lib": "^18.0.0"
   },
   "devDependencies": {

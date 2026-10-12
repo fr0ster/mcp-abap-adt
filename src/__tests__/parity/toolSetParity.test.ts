@@ -21,7 +21,10 @@
  * - and, with `debug` in the exposition (full: `readonly,debug`, compact:
  *   `ro,debug`), the debugger's tools on each.
  *
- * A8 and A10 add their cancellation and shutdown cases here. Every case runs
+ * A8's cancellation case (D5): a call cancelled after its connection is
+ * ready — while the system lookup an ABAP Cloud call makes first is held at
+ * the stand-in — never reaches its tool, the same on both sets. A10 adds its
+ * shutdown cases here. Every case runs
  * in this process against real sockets (HTTP, SSE) or an in-memory MCP
  * transport (stdio), with the process's edges given to `main`.
  */
@@ -46,6 +49,7 @@ import { CORE_VERSION } from '../../../server/src/coreVersion';
 import { main as coreMain } from '../../../server/src/launcher';
 import { main as sseMain } from '../../../sse/src/launcher';
 import { SSE_VERSION } from '../../../sse/src/sseVersion';
+import { activeTools } from '../../lib/activeTools';
 import { parametersHelp } from '../../lib/config/authParameters';
 import {
   CREDENTIALS_REQUIRED_WORDS,
@@ -951,6 +955,133 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       expect(help).toContain(`  ${compact.program} --exposition=rw,debug\n`);
       expect(help).not.toContain('--exposition=readonly');
       expect(help).not.toContain(`  ${full.program} --`);
+    });
+  },
+);
+
+/** Turns of the event loop on short real waits until `done()` holds. */
+async function until(done: () => boolean, limitMs = 10_000): Promise<void> {
+  const end = Date.now() + limitMs;
+  while (!done()) {
+    if (Date.now() > end) throw new Error('the condition never held');
+    await new Promise((resolve) => setTimeout(resolve, 2));
+  }
+}
+
+/**
+ * One read on a cloud system, its system lookup held at the stand-in, the
+ * call cancelled the transport's way while it is held — an MCP cancel over
+ * stdio and SSE; over Streamable HTTP, whose requests are each their own,
+ * the client closing its request — then the lookup answered: whether the
+ * read reached the stand-in, and how the server exited.
+ */
+async function cancelledRead(transportName: TransportName, set: SetName) {
+  const launcher = LAUNCHERS[transportName][set];
+  const className = 'ZCL_PARITY_CANCEL';
+  const call = readCall(set, className);
+  const hold = standIn.hold((r) => r.url.includes('systeminformation'));
+  const controller = new AbortController();
+  let started: Run;
+  let client: Client | undefined;
+  let done: Promise<unknown>;
+
+  if (transportName === 'stdio') {
+    const envFile = path.join(workdir, 'cancel.env');
+    fs.writeFileSync(
+      envFile,
+      [
+        `SAP_URL=${standIn.url}`,
+        'SAP_CLIENT=100',
+        'SAP_AUTH_TYPE=basic',
+        'SAP_USERNAME=PARITY_USER',
+        'SAP_PASSWORD=parity-password',
+        '',
+      ].join('\n'),
+    );
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    client = new Client({ name: 'parity', version: '1.0.0' });
+    open.clients.push(client);
+    started = await run(
+      launcher,
+      [`--env-path=${envFile}`, '--system-type=cloud'],
+      serverSide,
+    );
+    await client.connect(clientSide);
+    done = client
+      .callTool(call, undefined, { signal: controller.signal })
+      .catch(() => 'cancelled');
+  } else if (transportName === 'sse') {
+    const port = await freePort();
+    started = await run(launcher, [
+      '--sse-host=127.0.0.1',
+      `--sse-port=${port}`,
+      '--system-type=cloud',
+    ]);
+    client = new Client({ name: 'parity', version: '1.0.0' });
+    open.clients.push(client);
+    await client.connect(
+      new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`), {
+        requestInit: { headers: basicHeaders() },
+      }),
+    );
+    done = client
+      .callTool(call, undefined, { signal: controller.signal })
+      .catch(() => 'cancelled');
+  } else {
+    const port = await freePort();
+    started = await run(launcher, [
+      '--host=127.0.0.1',
+      `--port=${port}`,
+      '--system-type=cloud',
+    ]);
+    done = fetch(`http://127.0.0.1:${port}/mcp/stream/http`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        accept: 'application/json, text/event-stream',
+        ...basicHeaders(),
+      },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: call,
+      }),
+      signal: controller.signal,
+    })
+      .then((response) => response.text())
+      .catch(() => 'cancelled');
+  }
+
+  await hold.arrived;
+  controller.abort();
+  // The server has seen the cancel: the call's signal is aborted.
+  await until(
+    () =>
+      activeTools().length === 1 &&
+      activeTools().every((tool) => tool.signal.aborted),
+  );
+  hold.release();
+  await until(() => activeTools().length === 0);
+  await done;
+  const reached = standIn.requests.some((r) =>
+    r.url.includes(className.toLowerCase()),
+  );
+  await client?.close();
+  const exit = await started.stop();
+  return { reached, exit };
+}
+
+describe.each<TransportName>(['stdio', 'http', 'sse'])(
+  '%s: a cancelled call never reaches its tool, on both sets (D5)',
+  (transportName) => {
+    jest.setTimeout(60_000);
+
+    it('cancelled after its connection is ready: no read reaches the system', async () => {
+      const full = await cancelledRead(transportName, 'full');
+      const compact = await cancelledRead(transportName, 'compact');
+      expect(full).toEqual({ reached: false, exit: 0 });
+      expect(compact).toEqual(full);
     });
   },
 );

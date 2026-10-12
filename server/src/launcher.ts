@@ -429,6 +429,9 @@ export function factoryConfigFrom(
     }),
     ...(config.connectionType && { connectionType: config.connectionType }),
     ...(config.renewal && { renewal: config.renewal }),
+    ...(config.loginTimeout !== undefined && {
+      loginTimeoutMs: config.loginTimeout * 1000,
+    }),
     browserStrategy: collaborators.browserStrategy,
     promptLogger: collaborators.promptLogger,
     ...(collaborators.logger && { logger: collaborators.logger }),
@@ -629,6 +632,7 @@ export async function launch(
       stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,
       sentenceFor: (error) => factory.sentenceFor(error),
+      abortedByServer: (error) => factory.abortedByServer(error),
     },
   );
   activeServer = server;

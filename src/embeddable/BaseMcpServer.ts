@@ -3,6 +3,7 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import { registerActiveTool } from '../lib/activeTools.js';
 import { answerRead } from '../lib/auth/answerFailure.js';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
 import {
@@ -21,6 +22,11 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
+import {
+  raceRequestSignal,
+  runWithRequestSignal,
+  throwIfRequestAborted,
+} from '../lib/requestSignal.js';
 import {
   defaultSystemContextResolver,
   type SystemContextResolver,
@@ -41,11 +47,21 @@ import {
 import { return_error } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
+/** What the SDK hands a tool callback beside its arguments: the request's signal. */
+interface ToolCallExtra {
+  readonly signal?: AbortSignal;
+}
+
 /**
- * The signal a tool call's connection is acquired with until the request's own
- * reaches here (A8 supplies it): never aborted.
+ * A connection being built, shared by every call that asks for it while it
+ * is (D13, D32): `waiting` counts the calls still waiting for it, so a
+ * connect that completes after all of them left is known to be nobody's.
  */
-const NO_REQUEST_SIGNAL: AbortSignal = new AbortController().signal;
+interface BuiltConnection {
+  credential: IAuthProvider;
+  connection: Promise<AbapConnection>;
+  waiting: number;
+}
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -70,9 +86,7 @@ export abstract class BaseMcpServer extends McpServer {
    * headers. A new credential — the broker built a new provider, a new HTTP
    * request — builds a new connection.
    */
-  private built:
-    | { credential: IAuthProvider; connection: Promise<AbapConnection> }
-    | undefined;
+  private built: BuiltConnection | undefined;
 
   /** What each built connection's source stated about who creates objects. */
   private readonly systemContexts = new WeakMap<
@@ -198,11 +212,17 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * The connection a tool call works on. Injected: the connection as given —
    * no `resolve`, no `connect()`, no wrap. Built: the source resolves the
-   * settings and the credential with `signal` (the request's, from A8), and
-   * the connection is built and connected once per credential object — kept
-   * while the source answers the same one (D13). The credential renews
-   * itself (a 401 reaches its `rejected()`), so nothing is looked up here for
-   * refreshing.
+   * settings and the credential with the request's `signal` (its own waits
+   * race it), and the connection is built and connected once per credential
+   * object — kept while the source answers the same one (D13). The credential
+   * renews itself (a 401 reaches its `rejected()`), so nothing is looked up
+   * here for refreshing.
+   *
+   * The connect is shared by every call that asks while it runs, and each
+   * caller's wait races its own signal (D32): a cancelled caller settles at
+   * once with `request_aborted`, the connect runs on for the others, its late
+   * rejection is handled, and a late success that no caller is left waiting
+   * for is disconnected and not kept.
    */
   protected async getConnection(signal: AbortSignal): Promise<AbapConnection> {
     const context = this.connectionContext;
@@ -213,32 +233,65 @@ export abstract class BaseMcpServer extends McpServer {
     }
     if (context.kind === 'injected') return context.connection;
 
+    throwIfRequestAborted(signal);
     const resolved = await context.source.resolve(signal);
     let held = this.built;
     if (!held || held.credential !== resolved.credential) {
-      const connecting = (async () => {
-        const connection = createAbapConnection(
-          resolved.settings,
-          resolved.credential,
-        );
-        // Establish session (CSRF token + cookies) before first request.
-        // RFC needs this for the stateful session; HTTP needs it because some
-        // SAP systems reject the very first request (403) when no session
-        // cookie is present.
-        await connection.connect();
-        return connection;
-      })();
-      const entry = { credential: resolved.credential, connection: connecting };
-      held = entry;
-      this.built = entry;
-      // A failed connect is not kept: the next call connects again.
-      connecting.catch(() => {
-        if (this.built === entry) this.built = undefined;
-      });
+      held = this.buildConnection(resolved.credential, () =>
+        createAbapConnection(resolved.settings, resolved.credential),
+      );
     }
-    const connection = await held.connection;
+    held.waiting += 1;
+    let connection: AbapConnection;
+    try {
+      connection = await raceRequestSignal(held.connection, signal);
+    } finally {
+      held.waiting -= 1;
+    }
     this.systemContexts.set(connection, resolved.systemContext);
     return connection;
+  }
+
+  /** Connects what `create` builds for `credential`, kept as `built`. */
+  private buildConnection(
+    credential: IAuthProvider,
+    create: () => AbapConnection,
+  ): BuiltConnection {
+    const connecting = (async () => {
+      const connection = create();
+      // Establish session (CSRF token + cookies) before first request.
+      // RFC needs this for the stateful session; HTTP needs it because some
+      // SAP systems reject the very first request (403) when no session
+      // cookie is present.
+      await connection.connect();
+      return connection;
+    })();
+    const entry: BuiltConnection = {
+      credential,
+      connection: connecting,
+      waiting: 0,
+    };
+    this.built = entry;
+    // Settled before any caller's own continuation runs: these reactions are
+    // registered first.
+    connecting.then(
+      (connection) => {
+        // Every caller left before it was connected: it is nobody's (RF1).
+        if (entry.waiting > 0) return;
+        if (this.built === entry) this.built = undefined;
+        // Its logoff is dispatched; a disconnect never throws, and nothing
+        // waits for it.
+        const closable = connection as { disconnect?: () => Promise<void> };
+        if (typeof closable.disconnect === 'function') {
+          closable.disconnect().catch(() => undefined);
+        }
+      },
+      () => {
+        // A failed connect is not kept: the next call connects again.
+        if (this.built === entry) this.built = undefined;
+      },
+    );
+    return entry;
   }
 
   /**
@@ -266,12 +319,12 @@ export abstract class BaseMcpServer extends McpServer {
           ) => Promise<unknown>;
           type HandlerFnArgsOnly = (args: unknown) => Promise<unknown>;
 
-          const runCall = async (args: unknown) => {
+          const runCall = async (args: unknown, signal: AbortSignal) => {
             try {
-              // Get connection from context (this.connectionContext)
-              // Token will be automatically refreshed via AuthBroker if needed
+              // Get connection from context (this.connectionContext), with
+              // the request's signal: a cancelled call settles at once.
               const context: HandlerContext = {
-                connection: await this.getConnection(NO_REQUEST_SIGNAL),
+                connection: await this.getConnection(signal),
                 logger: this.logger,
                 state: this.state,
                 debugger: () => this.debuggerFor(),
@@ -286,15 +339,24 @@ export abstract class BaseMcpServer extends McpServer {
               // The destination's own .env enters the scope first, below the
               // request's headers, so the cloud lookup fills only what neither
               // states.
+              // The whole call runs in the request signal scope (§5.2), and
+              // a call whose signal aborted before its tool starts — after
+              // the connection is ready, after the system lookup — never
+              // reaches the tool (D5).
               const resolved = <T>(fn: () => Promise<T>) =>
-                withDestinationSystemContext(
-                  this.systemContexts.get(context.connection),
-                  () =>
-                    withResolvedSystemContext(
-                      context.connection,
-                      fn,
-                      this.systemContextResolver,
-                    ),
+                runWithRequestSignal(signal, () =>
+                  withDestinationSystemContext(
+                    this.systemContexts.get(context.connection),
+                    () =>
+                      withResolvedSystemContext(
+                        context.connection,
+                        () => {
+                          throwIfRequestAborted(signal);
+                          return fn();
+                        },
+                        this.systemContextResolver,
+                      ),
+                  ),
                 );
               let handlerPromise: Promise<unknown>;
               if ((entry.handler as HandlerFnWithContext).length >= 2) {
@@ -355,12 +417,28 @@ export abstract class BaseMcpServer extends McpServer {
           // idle() cannot miss a call still acquiring its connection. The same
           // entry and end are the user activity the state's idle bound counts:
           // it pauses while the call runs and counts from its end.
-          const wrappedHandler = (args: unknown) => {
+          //
+          // Each call has a request signal of its own (§5.1): aborted when
+          // the request's `extra.signal` aborts (the client cancelled, its
+          // transport closed), when the call ends whatever its outcome (D4:
+          // the broker releases the party it attached only then), and by
+          // the process's shutdown through the registry of live calls, where
+          // the call is registered here, before anything else.
+          const wrappedHandler = (args: unknown, extra?: ToolCallExtra) => {
+            const controller = new AbortController();
+            const unregister = registerActiveTool(controller);
+            const requestSignal = extra?.signal;
+            const onRequestAbort = () => controller.abort();
+            if (requestSignal?.aborted) controller.abort();
+            else requestSignal?.addEventListener('abort', onRequestAbort);
             this.state.callStarted();
-            const call = runCall(args);
+            const call = runCall(args, controller.signal);
             this.inFlight.add(call);
             call
               .finally(() => {
+                requestSignal?.removeEventListener('abort', onRequestAbort);
+                controller.abort();
+                unregister();
                 this.inFlight.delete(call);
                 this.state.callEnded();
               })

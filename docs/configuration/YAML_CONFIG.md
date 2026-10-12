@@ -59,6 +59,7 @@ browser: system                # system | auto | chrome | edge | firefox | none 
 # browser-program: /opt/browsers/my-browser   (excludes browser)
 renewal: refresh-then-login    # refresh-then-login | refresh-only
 browser-auth-port: 61001
+# login-timeout: 300           # seconds, 1-86400; no default (a login has no bound)
 exposition: readonly,high
 state-idle-minutes: 30
 ```
@@ -75,6 +76,7 @@ state-idle-minutes: 30
 | `browser-program` | string | — | The program that opens the login URL (excludes `browser`) |
 | `renewal` | string | `refresh-then-login` | `refresh-then-login` or `refresh-only` (never a login) |
 | `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |
+| `login-timeout` | number | — | Seconds after which a browser login is ended, 1-86400; no default (no bound) |
 
 `state-idle-minutes` here bounds the stdio instance's held state.
 

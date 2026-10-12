@@ -191,7 +191,14 @@ packages, each with one binary and its transport's options only:
 - **The startup check builds the credential.** A destination the broker refuses (a missing client
   field, say) now stops the start, exit `1`, instead of failing the first tool call.
 - **There is no 30-second login timeout.** A login waits until the browser answers, the identity
-  provider refuses, or the request is cancelled.
+  provider refuses, or the request is cancelled — a cancelled request (or a client that closed
+  its connection) ends the login it started once no other request waits for it. To bound a login,
+  set **`--login-timeout=<seconds>`** (`MCP_LOGIN_TIMEOUT`, YAML `login-timeout`; a whole number
+  from 1 to 86400, no default): a login still waiting then ends `aborted`, answered with "The
+  login was ended by the server's login timeout (`--login-timeout=<n>`)".
+- **A cancelled request does not reach its tool**, on every transport: once its client cancels
+  it (or closes its connection), its waits end — a shared connect or login goes on for the other
+  requests waiting for it — and the call is answered `request_aborted`.
 - **`npm run auth` is gone.** Write a `.env` with `mcp-auth` from
   `@mcp-abap-adt/auth-broker-cli`: `npm install -g @mcp-abap-adt/auth-broker-cli`, then
   `mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap` (`--type xsuaa` for an
@@ -221,7 +228,15 @@ packages, each with one binary and its transport's options only:
   { browser, program }, process.platform))` from `@mcp-abap-adt/core/auth`, or pass your own) in
   place of `browser: string`, a `browserStrategy` taking `{ browser?: IBrowser; port?: number }`
   (auth-providers 6's `browserCallbackStrategy` fits), a required `promptLogger`
-  (`promptLogger(stderr, diagnostics)`), and `renewal?: 'refresh-then-login' | 'refresh-only'`.
+  (`promptLogger(stderr, diagnostics)`), `renewal?: 'refresh-then-login' | 'refresh-only'`, and
+  `loginTimeoutMs?` (`--login-timeout` in milliseconds; absent: no bound).
+- **Each tool call has a request signal** (`BaseMcpServer`): aborted when the MCP request's
+  `extra.signal` aborts, when the call ends, and at shutdown. The handler runs inside the request
+  signal scope — `currentRequestSignal()` from `@mcp-abap-adt/lib/embeddable` reads it — and a
+  call cancelled before its tool starts is answered `request_aborted` without reaching it. A
+  `ConnectionSource.resolve(signal)` gets it and should race its own waits against it
+  (`raceRequestSignal(work, signal)` from `@mcp-abap-adt/lib/auth`). Live calls are listed by
+  `activeTools()` and aborted by `abortActiveTools()` (`@mcp-abap-adt/lib/embeddable`).
 - **`IDestinations.getProvider(destination, { signal })`** takes the request's signal, and
   `settle(deadlineMs, { signal })` hands it to the broker's `flush`. `SettleReport.notStored` lines
   are `"<destination>": <reason>`, the reason auth-errors' classification.

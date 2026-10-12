@@ -51,7 +51,13 @@ import {
 } from './handlers';
 import type { IAuthBrokerFactory, SettleReport } from './IAuthBrokerFactory.js';
 import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
-import { type RenewalMode, serverSentence } from './serverSentences';
+import { type LoginBound, loginBound } from './serverLogin';
+import {
+  type RenewalMode,
+  type ServerState,
+  serverEndedLogin,
+  serverSentence,
+} from './serverSentences';
 import { type VettedAuthentication, vetMeans } from './vocabulary';
 
 /** The destination an `--env` file is served as. */
@@ -108,6 +114,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   private readonly context: AuthHandlerContext;
   private readonly gate = new ProviderGate();
   private readonly renewal: RenewalMode;
+  /** `--login-timeout` (D10): the bound every composed login runs under. */
+  private readonly bound: LoginBound | undefined;
   /** The build of each destination, set before its first await. */
   private readonly built = new Map<string, Promise<Built>>();
   /** One counted wrapper per inner provider the brokers answered. */
@@ -126,6 +134,10 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       config.mcpDestination ??
       (config.envFile ? ENV_FILE_DESTINATION : undefined);
     this.renewal = config.renewal ?? 'refresh-then-login';
+    this.bound =
+      config.loginTimeoutMs === undefined
+        ? undefined
+        : loginBound(config.loginTimeoutMs);
     this.context = {
       ...(config.browser !== undefined && { browser: config.browser }),
       ...(config.browserUnavailable !== undefined && {
@@ -140,6 +152,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         record: (strategy) => {
           this.logins.add(strategy);
         },
+        ...(this.bound !== undefined && { bound: this.bound }),
       },
     };
   }
@@ -150,10 +163,27 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
    * whether the shutdown closed its gate.
    */
   sentenceFor(error: IAuthProviderError): string | undefined {
-    return serverSentence(error, {
+    return serverSentence(error, this.state());
+  }
+
+  /** The server's own state a sentence is keyed on (§7.4). */
+  private state(): ServerState {
+    return {
       renewal: this.renewal,
       shuttingDown: this.gate.closed,
-    });
+      ...(this.bound?.fired === true && {
+        loginTimeoutFired: this.bound.ms / 1000,
+      }),
+    };
+  }
+
+  /**
+   * Whether the server itself ended the login `error` reports — the login
+   * bound fired (D10) or the shutdown began — so that it is answered as it
+   * is, never retried as another caller's abort (D7).
+   */
+  abortedByServer(error: IAuthProviderError): boolean {
+    return serverEndedLogin(error, this.state());
   }
 
   /**

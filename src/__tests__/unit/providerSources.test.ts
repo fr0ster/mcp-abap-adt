@@ -127,9 +127,18 @@ function isSource(
   ) {
     return true;
   }
-  // 1. a destination: await <destinations>.getProvider(destination)
+  // 1. a destination: await <destinations>.getProvider(destination) — also
+  // raced against the request's signal, which answers the same value:
+  // await raceRequestSignal(<destinations>.getProvider(destination), signal)
   if (ts.isAwaitExpression(expr)) {
-    const inner = strip(expr.expression);
+    let inner = strip(expr.expression);
+    if (
+      ts.isCallExpression(inner) &&
+      calleeName(inner) === 'raceRequestSignal' &&
+      inner.arguments[0] !== undefined
+    ) {
+      inner = strip(inner.arguments[0]);
+    }
     return (
       ts.isCallExpression(inner) &&
       ts.isPropertyAccessExpression(inner.expression) &&

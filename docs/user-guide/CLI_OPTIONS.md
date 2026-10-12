@@ -91,6 +91,7 @@ that serves it. See [YAML Configuration](../configuration/YAML_CONFIG.md).
 | `--browser-program=<program>` | `MCP_BROWSER_PROGRAM` | `browser-program` | a program | The program that opens the login URL; excludes `--browser` |
 | `--renewal=<mode>` | `MCP_RENEWAL` | `renewal` | `refresh-then-login`, `refresh-only` | How an expired session is renewed (default `refresh-then-login`); `refresh-only` never logs in |
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
+| `--login-timeout=<seconds>` | `MCP_LOGIN_TIMEOUT` | `login-timeout` | 1-86400 | Ends a browser login not finished after this many seconds (default: none) |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
 
 The environment forms `MCP_DESTINATION` and `MCP_ENV` do **not** exist; use `--mcp` and `--env`
@@ -201,6 +202,20 @@ is registered elsewhere.
 
 ```bash
 mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
+```
+
+### --login-timeout=\<seconds\>
+
+A bound on each browser login, opt-in: a login that has not finished after this many seconds is
+ended `aborted`, and the tool call answers the chain's words with the server's sentence "The login
+was ended by the server's login timeout (`--login-timeout=<n>`)". A whole number from 1 to
+86400; `0`, `86401`, `1.5` or `abc` are refused at startup. **There is no default**: without it a
+login ends when the browser answers, the identity provider refuses, or the request that waits for
+it ends — a client that cancels its request, or closes its connection, ends the login it started
+when no other request waits for it.
+
+```bash
+mcp-abap-adt --mcp=TRIAL --login-timeout=300
 ```
 
 See [Authentication & Destinations](AUTHENTICATION.md) for the supported authentications.

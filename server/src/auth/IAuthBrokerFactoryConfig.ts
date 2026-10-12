@@ -52,6 +52,12 @@ export interface IAuthBrokerFactoryConfig {
   /** `--renewal` (D11); absent: `refresh-then-login`. */
   renewal?: RenewalMode;
   /**
+   * `--login-timeout` in milliseconds (D10): each browser login is ended
+   * `aborted` once it has run this long. Absent: no bound — a login ends on
+   * its result, the user's refusal or its request's end.
+   */
+  loginTimeoutMs?: number;
+  /**
    * Builds the login strategy of the `authorization_code` handler. The
    * launcher passes auth-providers' `browserCallbackStrategy`; there is no
    * default here. The factory wraps it in `serverLogin`.

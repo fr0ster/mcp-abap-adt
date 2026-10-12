@@ -10,6 +10,16 @@
  * server would take on its section 13 obligations; one that embeds this package
  * does not.
  */
+
+export {
+  type ActiveTool,
+  abortActiveTools,
+  activeTools,
+} from '../lib/activeTools.js';
+export {
+  currentRequestSignal,
+  runWithRequestSignal,
+} from '../lib/requestSignal.js';
 export * from './BaseMcpServer.js';
 export * from './ConnectionContext.js';
 export * from './EmbeddableMcpServer.js';

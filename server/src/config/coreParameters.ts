@@ -11,6 +11,7 @@ import {
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
   type Parameter,
+  ParameterRefusal,
   type ParameterTable,
   type ParameterValue,
   parameterSource,
@@ -121,6 +122,60 @@ export const CORE_ROWS: readonly Parameter[] = [
   },
 ];
 
+/** The longest login bound: a day. */
+export const MAX_LOGIN_TIMEOUT_SECONDS = 86_400;
+
+/** Whether `text` is one or more ASCII digits. Plain code (D26). */
+function isDigits(text: string): boolean {
+  if (text.length === 0) return false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    if (c < 48 || c > 57) return false;
+  }
+  return true;
+}
+
+/**
+ * `--login-timeout`'s value: a whole number of seconds from 1 to 86 400,
+ * read by plain code — digits only, as a string or a YAML number.
+ */
+export function parseLoginTimeout(raw: unknown, name: string): number {
+  const text = typeof raw === 'string' ? raw.trim() : String(raw);
+  const value =
+    typeof raw === 'number'
+      ? raw
+      : isDigits(text)
+        ? Number.parseInt(text, 10)
+        : Number.NaN;
+  if (
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > MAX_LOGIN_TIMEOUT_SECONDS
+  ) {
+    throw new ParameterRefusal(
+      `Invalid ${name}: "${text}". Must be a whole number of seconds from 1 to ${MAX_LOGIN_TIMEOUT_SECONDS}`,
+    );
+  }
+  return value;
+}
+
+/**
+ * `--login-timeout` / `MCP_LOGIN_TIMEOUT` / `login-timeout` (D10): the bound
+ * on each login, opt-in. No default: without it a login ends on its result,
+ * the user's refusal or its request's end.
+ */
+export const LOGIN_TIMEOUT_ROW: Parameter = {
+  key: 'loginTimeout',
+  cli: '--login-timeout',
+  env: 'MCP_LOGIN_TIMEOUT',
+  yaml: 'login-timeout',
+  kind: 'custom',
+  parse: parseLoginTimeout,
+  valueHint: '=<seconds>',
+  section: DESTINATION,
+  help: `Ends a browser login that has not finished after this many seconds (1-${MAX_LOGIN_TIMEOUT_SECONDS}). Default: none — a login ends when it finishes, the user refuses it, or its request ends`,
+};
+
 /** `--allow-destination-header`: there is no header to allow any more. */
 const ALLOW_DESTINATION_HEADER_REMOVED = {
   cli: ['--allow-destination-header'],
@@ -154,6 +209,7 @@ export function coreParameters(
       toolSet.expositionRow,
       SYSTEM_TYPE_ROW,
       ...CORE_ROWS,
+      LOGIN_TIMEOUT_ROW,
       STATE_IDLE_ROW,
     ],
     removed: [
@@ -204,6 +260,8 @@ export interface CoreConfig extends IServerConfig {
   renewal?: 'refresh-then-login' | 'refresh-only';
   /** Port for the login's callback (`--browser-auth-port`) */
   browserAuthPort?: number;
+  /** `--login-timeout` in seconds (D10): the bound on each login; absent: none. */
+  loginTimeout?: number;
   /** SAP connection type: http (default) or rfc */
   connectionType?: 'http' | 'rfc';
   /**
@@ -273,6 +331,7 @@ export function readCoreConfig(
     browserProgram: str(values.browserProgram),
     renewal: values.renewal as CoreConfig['renewal'],
     browserAuthPort: values.browserAuthPort as number | undefined,
+    loginTimeout: values.loginTimeout as number | undefined,
     connectionType: values.connectionType as CoreConfig['connectionType'],
     connectionTypeSource: source('connectionType'),
   };

@@ -1,6 +1,10 @@
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
-import { type ReadFailure, ServerRefusal } from '@mcp-abap-adt/lib/auth';
+import {
+  failureOf,
+  type ReadFailure,
+  ServerRefusal,
+} from '@mcp-abap-adt/lib/auth';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
@@ -23,6 +27,11 @@ export interface StdioServerOptions {
   stateLogger?: StateLogger;
   /** The server's own sentence beside a chain failure (§7.4): the factory's `sentenceFor`. */
   sentenceFor?: (error: IAuthProviderError) => string | undefined;
+  /**
+   * Whether the server itself ended a login (the bound, the shutdown): the
+   * factory's `abortedByServer`. Such a login is not retried (D7).
+   */
+  abortedByServer?: (error: IAuthProviderError) => boolean;
 }
 
 /**
@@ -36,6 +45,9 @@ export interface StdioServerOptions {
 export class StdioServer extends BaseMcpServer {
   private readonly sentenceFor:
     | ((error: IAuthProviderError) => string | undefined)
+    | undefined;
+  private readonly abortedByServer:
+    | ((error: IAuthProviderError) => boolean)
     | undefined;
   /** The destination served, named by a refusal whose error does not carry it. */
   private destination: string | undefined;
@@ -54,6 +66,7 @@ export class StdioServer extends BaseMcpServer {
       stateLogger: stateLoggerOf(opts ?? {}),
     });
     this.sentenceFor = opts?.sentenceFor;
+    this.abortedByServer = opts?.abortedByServer;
   }
 
   /** The destination layer's failures first, then lib's reader (§7.1). */
@@ -85,11 +98,34 @@ export class StdioServer extends BaseMcpServer {
     await this.connect(transport);
   }
 
-  /** Inspection-only mode refuses here, before any connection is built. */
+  /**
+   * Inspection-only mode refuses here, before any connection is built.
+   *
+   * One retry after another caller's abort (D7): a request that joined a
+   * connect whose login another request's cancel ended — inside that abort
+   * window — fails `interactive-login` `aborted` although its own signal is
+   * live; it starts afresh, once. Read by `kind`, never by words; a login the
+   * server itself ended (the bound, the shutdown) is answered as it is.
+   */
   protected override async getConnection(
     signal: AbortSignal,
   ): Promise<AbapConnection> {
     if (!this.destinations) throw new ServerRefusal('inspection_only');
-    return super.getConnection(signal);
+    try {
+      return await super.getConnection(signal);
+    } catch (error) {
+      if (signal.aborted || !this.loginAbortedByAnother(error)) throw error;
+      return super.getConnection(signal);
+    }
+  }
+
+  /** Whether `thrown` is a login another caller's abort ended. */
+  private loginAbortedByAnother(thrown: unknown): boolean {
+    const chain = failureOf(thrown)?.authError;
+    if (chain?.kind !== 'interactive-login') return false;
+    if ((chain.facts as { outcome?: unknown }).outcome !== 'aborted') {
+      return false;
+    }
+    return !(this.abortedByServer?.(chain) ?? false);
   }
 }

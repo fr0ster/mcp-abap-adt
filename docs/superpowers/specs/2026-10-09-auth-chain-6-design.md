@@ -42,7 +42,7 @@ from this branch after main (#288, the debugger #290–#292) was merged into it 
 |---|---|
 | The server is split by transport into packages, one mode each; SSE stays in its own package; compact one package per transport | §3; D35, D36, D37, D48, D49, D50 |
 | Success: each package has only its own options and its own credentials | §3, §4, §10; D35, D38, D39, D48 |
-| Success: failures reach the user as the chain made them | §7; D14, D15, D17, D28, D45, D46 |
+| Success: failures reach the user as the chain made them | §7; D14, D15, D17, D28, D56 (D45, D46 withdrawn) |
 | Success: a connection derived from an injected one stays the consumer's | §4.3; D20–D22 |
 | Success: a request ends when its client ends it, in every mode | §3.1, §5, §6.4; D4, D5, D7, D8, D10, D32, D55, D56 (D31, D34, D40 withdrawn) |
 | No cancellation against ABAP; stateful only for lock, unlock and activation; listed long tools take a `timeout` on their own connection (D56) | §5.1, §5.7, §5.8, §6.4, §15; D56 |
@@ -573,8 +573,8 @@ nothing of either transport; `credentialFromHeaders` is already lib's (`lib/auth
   `ConnectionSource` (§4), with the two `400` sentences of §4.2 — http builds one per request,
   sse one per SSE connection;
 - the TLS parameter rows (`--tls-cert`, `--tls-key`, `--tls-ca`, `MCP_TLS_*`), read by both;
-- **the HTTP-transport shutdown sequence** (§6.4): latch, stop listening, abort, await settlement,
-  then the transport's own last step (http: the pool's shutdown, §3.8; sse: close its connections' instances, D51) — one
+- **the HTTP-transport shutdown sequence** (§6.4): latch, stop listening, await settlement (no tool
+  aborted, D55), then the transport's own last step (http: the pool's shutdown, §3.8; sse: close its connections' instances, D51) — one
   implementation, each transport passing its listener and its last step.
 
 What stays in each package is only its transport: `StreamableHttpServer`, its instance pool
@@ -612,12 +612,15 @@ only what its own rules require:
   as it refuses any; the pool's own admission refusal (`503`) stays in front of it.
 - **Shutdown (D33, D55).** http's sequence awaits the pooled instances' tools with every other,
   aborting none; its last step is the pool's own shutdown (main's `InstancePool.shutdown()`), which
-  disposes every instance — its ADT sessions closed with a logoff (D55) — and whose leftovers make
-  the exit `1` (§6.4).
+  disposes every instance — its ADT sessions closed with a logoff (D55), **also when its state
+  undo failed** (the terminal close, §6.4) — and whose leftovers make the exit `1` (§6.4).
 - **Eviction (D51).** Every way an instance leaves the pool — nothing held after its request, the
-  idle bound's stop, a stop tool, shutdown — goes through the same awaited `BaseMcpServer.dispose()`,
-  which D51 extends to close the connections the instance built once nothing is held — each with
-  a logoff (`disconnect()`), which releases the SAP locks its session held (D55). The pool
+  idle bound's stop, a stop tool, shutdown — goes through the same awaited `BaseMcpServer.dispose()`
+  (the retryable state undo) and then **the terminal close** (§6.4): every connection the instance
+  owns closed with a logoff (`disconnect()`), which releases the SAP locks its sessions held
+  (D55) — **whether or not the undo succeeded**; a failed undo is reported, never a reason to keep
+  a session open. An instance the pool keeps for a retry of a failed undo has not left the pool;
+  when it leaves (the retry done, the idle bound, shutdown), the terminal close runs. The pool
   disposes an instance only when no request works on it (its lease, after `idle()`) and never routes
   a request to an instance it is disposing (it revalidates), so pool eviction needs no instance
   latch; the instance latch is the SSE close's and shutdown's (D51).
@@ -884,7 +887,7 @@ connection, connector or client of the chain takes one any more.
 - ~~**Releases are never cancelled (D40).**~~ — **withdrawn by D55.** With no request signal on a
   tool's requests there is nothing to keep a release out of: `runWithoutRequestSignal`, the
   release-site list and its source test are not built. A lock a tool leaves held — a failed step,
-  an unlock SAP refused (D46), a lock tool's own lock — is released by its session's logoff
+  an unlock SAP refused, a lock tool's own lock — is released by its session's logoff
   (§6.4, D55); an unlock tool is its own request, like any.
 - **Injected connections are not wrapped** and receive no request signal in their requests'
   options (D55); the consumer's `freshConnection` factory receives none either (D56, §4.3).
@@ -1072,6 +1075,30 @@ documented limit.
 
   A connection the consumer injects (not one its factory returned) is the consumer's to close; the
   server never closes it (§4.3).
+- **The state undo is retryable; the terminal close is not conditional (D55's rule).** Ending an
+  instance has two parts, kept apart: **the state undo** — `BaseMcpServer.dispose()`'s and
+  `shutdownState()`'s undo of held state (a debugger stop, …), callable again, each call retrying
+  what was left (main's contract, which the pool's retry relies on) — and **the terminal close** —
+  `disconnect()` of every connection the instance owns (those it built, held state's own, package
+  lock sessions, fresh connections still open), each once, a failure of the close logged in fixed
+  words. The terminal close runs at every **terminal disposal** — shutdown (core, http, sse), an SSE
+  close, the pool's eviction (§3.8), the idle bound's stop, an instance's stop — **after the undo
+  was tried, whatever its outcome**: an undo that failed (once, or after its retry) is reported (a
+  stderr / state-logger line in fixed words, exit `1` at shutdown) and the logoffs are still
+  written. A failed undo never keeps a session, or a lock, open. Only a disposal that is not
+  terminal (the pool keeping an instance for a retry) leaves the connections open, until the
+  instance's terminal close.
+- **The forced close (the escapes).** A `SIGTERM` / `SIGINT` after the shutdown started, or
+  `--shutdown-timeout`, switches to **the forced close**, one lib implementation used by core, http
+  and sse: it **awaits nothing that waits on a tool or a request** — not `settled()`, not
+  `settled(instance)`, not an instance close already running, not the pool's drain of running
+  requests and disposals, not a state undo — and writes the logoff of **every connection the
+  server owns** (a process-wide view of the owned connections, kept by the connection-ends
+  registry, §14.5), each `disconnect()` joined if one is already under way; on connection 16
+  `disconnect()` resolves once the logoff is **written** to the socket, so nothing it awaits
+  depends on SAP answering. No SAP request is aborted: SAP finishes what runs and then runs the
+  queued logoff (§15). Then exit `1`, naming what was pending (tools still running, a state undo
+  not done, a write not flushed). A tool that never settles cannot hold the forced close.
 - **One registry of live tools, every transport.** lib's tool wrapper (`BaseMcpServer`, the one
   wrapper every package uses) registers each tool call — its settlement and the server instance it
   runs in — in one process-wide registry in lib (`src/lib/activeTools.ts`),
@@ -1108,8 +1135,9 @@ documented limit.
 - **What starts and what forces it**: the first trigger — `SIGTERM`, `SIGINT`, the end of stdin —
   starts the one sequence; **every stdin `end` / `close` is part of that start** (M7). Only a
   `SIGTERM` / `SIGINT` after the start, or `--shutdown-timeout=<seconds>` (`MCP_SHUTDOWN_TIMEOUT`,
-  YAML `shutdown-timeout`, **no default**), ends the waiting early — exit `1`, naming what was
-  pending; the instance close and its logoffs are still run (D55).
+  YAML `shutdown-timeout`, **no default**), ends the waiting early — **the forced close** (above):
+  no further wait on a tool, an instance close or a state undo; every owned connection's logoff
+  written; exit `1`, naming what was pending (D55).
   What that costs is documented with the option: a pending write is lost, and a discarded refresh
   token can come back.
 - **http**: set the latch, and stop the pool's admission in the same tick (main's `503`); stop
@@ -1123,8 +1151,8 @@ documented limit.
   listener and runs that pool shutdown, and its running requests await their instance's `idle()`;
   what this change adds is the latch, the escapes, the logoffs and the exit lines. The same escapes
   as core and no others: a `SIGTERM` / `SIGINT` after the start, or `--shutdown-timeout`, ends the
-  wait early — exit `1`, naming the requests still running; the instances are still disposed, their
-  logoffs sent (D55); **no deadline by default**. Nothing is
+  wait early — **the forced close**: the pool's drain is not awaited, every owned connection's
+  logoff is written, exit `1` naming the requests still running (D55); **no deadline by default**. Nothing is
   persisted, so nothing is flushed.
 - **sse**, exactly as http (the one sequence of lib's `http-transport`, D50): set the latch; stop
   listening — no new SSE connection, no `POST` admitted —; **await the settlement of every
@@ -1134,8 +1162,8 @@ documented limit.
   leftover. Main's `stop()` already shuts down every open session's state and awaits the closing
   ones; it awaits no tool, sends no logoff and ends no stream — this change adds those. The same
   escapes and no others: a `SIGTERM` / `SIGINT` after the start, or `--shutdown-timeout`, ends the
-  wait early — exit `1`, naming the requests still running; the instance close and its logoffs
-  still run (D55); no deadline by default. Nothing is
+  wait early — **the forced close**: no instance close is awaited, every owned connection's logoff
+  is written, exit `1` naming the requests still running (D55); no deadline by default. Nothing is
   flushed.
 - **(D51) An SSE connection that closes disposes its instance — decided by the user; this change
   completes what main already does.** By the ownership rule (the server owns the instances and the
@@ -1150,15 +1178,17 @@ documented limit.
     tools' settlement** (`settled(instance)`; the server aborts none — the SDK's transport close
     aborts their `extra.signal`, which ends only their waits and keeps a tool not yet started from
     starting, D5, D55; today nothing awaits them, so the state's stop can race a running tool); then
-    `shutdownState()` (main's); then **every connection the instance owns closed with a logoff**
-    (`dispose()`'s close, D55); then close the instance's MCP server and transport, awaited (today
+    `shutdownState()` (main's, the state undo); then **the terminal close** — every connection the
+    instance owns closed with a logoff, whatever the undo answered (its leftovers reported); then close the instance's MCP server and transport, awaited (today
     unawaited). This sequence is **the instance close**, one lib implementation, one promise per
     instance (a second caller joins it): the SSE close, SSE's and core's shutdowns use it.
   - **`BaseMcpServer.dispose()` is main's, extended — not new.** It stays awaited and callable again
     (each call retries what the state could not undo — the pool's retry and `shutdownState()` rely
-    on it); this change adds that, once nothing is held, it closes the connections the instance
-    built (`disconnect()` — the logoff that releases the session's locks, D55 —, each once, a
-    failure logged in fixed words); an injected connection is the consumer's and is never closed. The pool's eviction uses it as it is (§3.8).
+    on it); it stays the **state undo** only. The connections are closed by **the terminal close**
+    beside it (one lib function, `closeOwnedConnections(instance)`: `disconnect()` — the logoff that
+    releases the session's locks, D55 —, each once, a failure logged in fixed words), which every
+    terminal disposal runs after the undo whatever the undo answered; an injected connection is the
+    consumer's and is never closed. The pool's eviction runs both (§3.8).
   - **The setup window** (missing on main): the session enters the map before `await
     server.connect(transport)`, the response's `close` listener is installed only after it, and a
     failed `connect` deletes the entry without shutting the state down. So the close tracking is
@@ -1209,7 +1239,7 @@ lib depends on no broker (D38), and auth-errors decides what a value is (H6).
   (connection mints them); a release that fails is reported in `cleanup` as today, and a lock it
   left is released by the session's logoff at the instance's end (§6.4). The text is kept as
   history.
-- **(D45) An auth failure ends the tool call before any conversion.** A failure that carries a
+- *(History, withdrawn by D56.)* **(D45) An auth failure ends the tool call before any conversion.** A failure that carries a
   refusal — readable by `failureOf` — is recognised **before** a handler or wrapper turns an error
   into text, a partial result or a new `Error`, and ends the tool call as that failure (§7.3); a
   rethrow keeps the original as `cause` and carries its `refusal`. lib gives the sites one helper:
@@ -1237,7 +1267,7 @@ lib depends on no broker (D38), and auth-errors decides what a value is (H6).
   `endIfAuthFailure` before converting. Reason: the goal's *Failures reach the user as the chain
   made them* holds in every mode only if no handler turns a refusal into text or a partial
   success first; a new handler meets the test.
-- **(D46) A release that fails on the credential** (`withLock`, P8). The cleanup carrier keeps the
+- *(History, withdrawn by D56.)* **(D46) A release that fails on the credential** (`withLock`, P8). The cleanup carrier keeps the
   structured failure (`refusal`, rendered as `kind`, `message`, `hint` by `safeCleanup` and
   `answer()`), and:
   - **after a body that succeeded**: the tool call ends as that auth failure —
@@ -1426,12 +1456,12 @@ everywhere is `MCP_TRANSPORT`: it stated the transport, and a binary now is one.
 | `stateClose.ts` (core, main's `closeInstanceState`) | the stdio instance's held state shut down before the factory's settle | D51's instance close, in D33's core order |
 | `StdioServer.ts:34-35`, `:51-67` | context set once; fake refusing provider | destination source; `inspection_only` |
 | `StreamableHttpServer.ts` (→ http) | destinations, `FirstConnectLock`, headers; the instance pool by `state_handle` (`InstancePool.ts`), `stop()` draining it | headers only (D39), through lib's `headerSource` (D50), on new and pooled instances alike; no `IDestinations` in its constructor; the pool carried as it is (§3.8, D52); `stop()` in D33's http order |
-| `SseServer.ts` (→ sse) | destinations, `FirstConnectLock`, headers; a close removes the session, closes unawaited and shuts the state down (`shutdownState()`); `stop()` shuts down every session's state | headers of the opening `GET` only (D48), through `headerSource`; no `IDestinations`; a close runs D51's instance close (latch, abort, settle, state, MCP server), the setup window included; `stop()` in D33's sse order |
+| `SseServer.ts` (→ sse) | destinations, `FirstConnectLock`, headers; a close removes the session, closes unawaited and shuts the state down (`shutdownState()`); `stop()` shuts down every session's state | headers of the opening `GET` only (D48), through `headerSource`; no `IDestinations`; a close runs D51's instance close (latch, settle — no tool aborted —, state undo, the terminal close with its logoffs, MCP server), the setup window included; `stop()` in D33's sse order |
 | `dnsRebindingProtection.ts`, `tlsUtils.ts` (→ lib) | in core, then http | `@mcp-abap-adt/lib/http-transport` (D50) |
 | `destinationRequest.ts` | destination header, first-connect lock, failure answer | the destination part deleted; the failure answer is lib's §7.3 |
 | `BaseMcpServer.ts` (context setters, `getConnection()`, the tool wrapper) | context setters; `getConnection()`; `(args)`; held state: `dispose()`, `shutdownState()`, `idle()` (main) | the source (§4); `getConnection(signal)`; `(args, extra)`, the signal scope, D5, D7, §7.2; `dispose()` extended and the instance close with its latch (D51) |
 | `clients.ts:34-51` | `new GuardedAdtClient(connection, logger, options)` | unchanged: no signal (D55; D31's server side withdrawn) |
-| `withLock.ts:26-40`, `:107` | `runRelease(release, handle)` | D46's reading of a refused release (§7.2); ~~the release inside `runWithoutRequestSignal` (D40)~~ — withdrawn by D55 |
+| `withLock.ts:26-40`, `:107` | `runRelease(release, handle)` | unchanged: a failed release is reported in `cleanup` as today; a lock it left is released by the session's logoff at the instance's end (§6.4). (D46's reading withdrawn by D56; D40's `runWithoutRequestSignal` withdrawn by D55) |
 | `credentialSources.ts:33-59` | default branch → basic | D19 |
 | `packageSessions.ts:40-61`, `handleDeletePackage.ts:93-108` | record, else configuration; fallback | D20, D21 |
 | `requestSystemResolution.ts:104-125` | memo; lookup on the caller's connection | unsignalled shared lookup, raced per caller |
@@ -1572,7 +1602,7 @@ read-once sentence), `CLI_OPTIONS.md` (per binary), `CLIENT_CONFIGURATION.md`, `
 `docs/architecture/ARCHITECTURE.md`, `CONNECTION_ISOLATION.md`,
 `docs/development/tests/TESTING_AUTH.md`, `DEBUGGING.md`, `docs/user-guide/DEBUGGER.md` (the
 packages that keep the instance, §3.8), `src/embeddable/docs/ARCHITECTURE.md`
-(the signal contract), `src/lib/config/README.md`, the moved `UNIFIED_BROKER_LOGIC.md`, each
+(no signal in the chain, D56; the terminal and forced close), `src/lib/config/README.md`, the moved `UNIFIED_BROKER_LOGIC.md`, each
 launcher's help.
 
 ## 13. Version, release and how the change is committed
@@ -1797,9 +1827,22 @@ connection, which is disconnected, and no provider is constructed; without it,
   with no latch or settle) → the `UNLOCK` is cut off and the late call runs; await the process-wide
   `settled()` → the close waits for the other connection's tool.
 - **`BaseMcpServer.dispose()` (D51)**: callable again — a second call after a failed state undo
-  retries it (main's contract, which the pool relies on); the connections the instance built are
-  disconnected once nothing is held, each once; an injected connection is never disconnected.
+  retries it (main's contract, which the pool relies on); the terminal close disconnects every
+  connection the instance owns, each once; an injected connection is never disconnected.
   *Break:* make `dispose()` a no-op after its first call → the pool's retry test red.
+- **A failed undo does not keep a session open (§6.4)**: a state whose undo fails every time (a
+  debugger stop the stand-in refuses) — at shutdown (core, http, sse), at an SSE close, at the
+  pool's eviction and at the idle bound's stop: the undo's failure is reported (exit `1` at
+  shutdown, a state-logger line otherwise) **and** the stand-in received the logoff of every
+  connection the instance owned, the state's own included. *Break:* close the connections only
+  once nothing is held → no logoff, red.
+- **The forced close (§6.4)**: a tool that never settles (its request held at the stand-in for
+  ever) when `SIGTERM` arrives; a second `SIGTERM`, and separately `--shutdown-timeout=1`: the
+  process writes the logoff of every owned connection (the stand-in received them) and exits `1`
+  naming the request — core, http (a per-request and a pooled instance, the pool's drain still
+  waiting) and sse (an instance close already running for a closed connection). *Breaks:* run the
+  instance close (awaiting `settled(instance)`) in the forced path → the process never exits, red
+  (bounded by the test's own timer); await the pool's drain → the same.
 - **The pool at shutdown and eviction (§3.8)**: a pooled instance's tool holding a lock when
   `SIGTERM` arrives runs to the end with every other, its `UNLOCK` lands, then the pool's shutdown
   disposes the held instance and its sessions are closed with a logoff; a state that cannot be undone makes the exit `1` with a line naming
@@ -1927,8 +1970,7 @@ meets it:
 | `x-sap-debug-*`, `SAP_DEBUG_*` (`requestContext.ts`, `ids.ts`, core's `destinationStores.ts`) | lib; the `.env` reader in core | unchanged; over http and sse no destination `.env` exists (§12) |
 | `src/embeddable/BaseMcpServer.ts` held-state methods | lib | `dispose()` extended (D51); the source, `getConnection(signal)`, the wrapper's `extra`, the signal scope, D5 |
 
-The other shared files this change touches: `src/lib/strategies/withLock.ts` (D46's reading of a
-refused release), `src/lib/utils.ts` (`return_error`'s first lines, two regexes),
+The other shared files this change touches: `src/lib/utils.ts` (`return_error`'s first lines, two regexes),
 `src/lib/packageSessions.ts`, `handleDeletePackage.ts`, `requestSystemResolution.ts` (D20, D21,
 D44); `src/lib/handlers/interfaces.ts`, handler signatures and `tools/` stay untouched.
 
@@ -1944,9 +1986,9 @@ bound and ended by its stop, the host or the system — never by a request's end
 | H1 The consumer composes; nobody guesses | renewal, write failures, bounds, the browser, `authDebug` stated (D9–D12, D24); no default collaborator in the factory; refusals instead of guesses (D9, D19, D21, D39) |
 | H2 Nothing goes out that should not | §7.3, §9; the URL only on stderr from the providers; nothing on stdout; §14.6 |
 | H3 A credential stays bound | providers only from the broker in core, the destination read once per process and its edit documented (D3); header credentials per request (http, on new and pooled instances alike) or per SSE connection (sse), never stored or shared, an SSE connection's disposed with it (D39, D48, D51); the one exception the goal states — held state keeps the connections it opened until it ends (§3.8, D52); injected connections never re-authenticated (§4.3); each party keeps its role — the store judges its record, the broker the binding, the system the credential; the server judges none (D54) |
-| H4 The modes are separated by package | D35, D36, D38, D48, D49: broker, stores, destinations, session files and logins only in core (and compact over stdio, through core); http and sse work only with header credentials, no server-held credential, and never depend on each other — what they share is lib's (D50); compact over HTTP and SSE never reaches core; embedded keeps none, consumer connections unwrapped, the consumer's factory given the signal (§4.3, §5.2) |
+| H4 The modes are separated by package | D35, D36, D38, D48, D49: broker, stores, destinations, session files and logins only in core (and compact over stdio, through core); http and sse work only with header credentials, no server-held credential, and never depend on each other — what they share is lib's (D50); compact over HTTP and SSE never reaches core; embedded keeps none, consumer connections unwrapped, the consumer's factory called with no argument — `freshConnection()`, no signal (§4.3, §5.2, D56) |
 | H5 No built-in timeouts | no login bound and no shutdown deadline by default (D10, D33); an SSE connection's dispose waits on no timer (D51); the 30 s deadline and the drain timer removed; the idle bound on held state (`--state-idle-minutes`) is the project owner's stated exception, main's, carried (§3.8); **the listed long tools' optional `timeout` parameter, no default, is the one written exception to the no-timeouts rule** (D56, §5.8) |
-| H6 One implementation of each rule | the shared transport helpers and the HTTP-transport shutdown once, in lib (D50); the compact tool set once, `compactToolSetOf` (D49); one registry of live tools for every shutdown and every SSE close, pooled instances included (D33, D51, §3.8); one instance close (D51); main's pool, not a second one (D52); failures read by auth-errors (§7.1); the broker's shared build; the broker's refresh state; auth-providers' browsers (D9); the server cancels no request a tool sent (D55), and nothing in the chain can (D56); a lock released by the session's logoff, `disconnect()`, not by a release machinery of the server's (D55); the shared lookup on auth-errors' `sharedAttempt` |
+| H6 One implementation of each rule | the shared transport helpers and the HTTP-transport shutdown once, in lib (D50); the compact tool set once, `compactToolSetOf` (D49); one registry of live tools for every shutdown and every SSE close, pooled instances included (D33, D51, §3.8); one instance close (D51); main's pool, not a second one (D52); failures read by auth-errors (§7.1); the broker's shared build; the broker's refresh state; auth-providers' browsers (D9); the server cancels no request a tool sent (D55), and nothing in the chain can (D56); a lock released by the session's logoff, `disconnect()`, not by a release machinery of the server's (D55); one shared system-context lookup, unsignalled, each caller's wait raced (D44 as amended by D56); one terminal close and one forced close for every transport (§6.4) |
 | H7 Registry only | every range published; the removal chain of §3.1 (D56) first; §13 |
 | H8 No regular expressions over untrusted input | D26; a source test |
 

@@ -22,13 +22,16 @@
  * Nothing else may debug for the same SAP user while this runs.
  */
 
+import * as fs from 'node:fs';
 import {
   AbapDebugger,
   AdtExecutor,
   type IDebuggerListenerConflict,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import * as dotenv from 'dotenv';
 import { handleCreateClass } from '../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../handlers/class/high/handleDeleteClass';
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
@@ -46,6 +49,7 @@ import { handleDebugGetMemorySizes } from '../../../handlers/debugger/debug/hand
 import { handleDebugGetStack } from '../../../handlers/debugger/debug/handleDebugGetStack';
 import { handleDebugGetVariables } from '../../../handlers/debugger/debug/handleDebugGetVariables';
 import { handleDebugSetBreakpoints } from '../../../handlers/debugger/debug/handleDebugSetBreakpoints';
+import { handleDebugSetSettings } from '../../../handlers/debugger/debug/handleDebugSetSettings';
 import { handleDebugStartListener } from '../../../handlers/debugger/debug/handleDebugStartListener';
 import { handleDebugStep } from '../../../handlers/debugger/debug/handleDebugStep';
 import { handleDebugStepToLine } from '../../../handlers/debugger/debug/handleDebugStepToLine';
@@ -54,6 +58,9 @@ import { handleDebugTakeOverListener } from '../../../handlers/debugger/debug/ha
 import { handleDebugWait } from '../../../handlers/debugger/debug/handleDebugWait';
 import { handleMemorySnapshotList } from '../../../handlers/debugger/debug/handleMemorySnapshotList';
 import type { HandlerContext } from '../../../handlers/interfaces';
+import { resolveEnvFilePath } from '../../../lib/config/envResolver';
+import { createAbapConnection } from '../../../lib/connectionFactory';
+import { credentialFromSapConfig } from '../../../lib/credentialSources';
 import {
   createDebuggerInstance,
   type DebuggerInstance,
@@ -67,7 +74,11 @@ import {
   stderrStateLogger,
 } from '../../../lib/state/InstanceState';
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
-import { getTimeout } from '../helpers/configHelpers';
+import {
+  getTimeout,
+  loadTestConfig,
+  testAuthBrokerPath,
+} from '../helpers/configHelpers';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { LambdaTester } from '../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../helpers/testers/types';
@@ -97,6 +108,7 @@ ENDCLASS.
 CLASS ${n} IMPLEMENTATION.
   METHOD if_oo_adt_classrun~main.
     DATA lv_counter TYPE i.
+    DATA lv_pass TYPE i.
     lv_counter = 1. "BP:mark
     lv_counter = lv_counter + 1.
     lv_counter = lv_counter + 1.
@@ -113,6 +125,9 @@ CLASS ${n} IMPLEMENTATION.
     lv_counter = lv_counter + 1. "BP:second
     lv_counter = lv_counter + 1.
     out->write( |counter { lv_counter }| ).
+    DO 2 TIMES.
+      lv_pass = lv_pass + 1. "BP:loop
+    ENDDO.
   ENDMETHOD.
 
   METHOD add.
@@ -219,6 +234,7 @@ const HANDLERS: Record<string, (ctx: HandlerContext, args: any) => any> = {
   DebugStep: handleDebugStep,
   DebugStepToLine: handleDebugStepToLine,
   DebugSetBreakpoints: handleDebugSetBreakpoints,
+  DebugSetSettings: handleDebugSetSettings,
   DebugStop: handleDebugStop,
   DebugGetMemorySizes: handleDebugGetMemorySizes,
   DebugCreateMemorySnapshot: handleDebugCreateMemorySnapshot,
@@ -259,6 +275,7 @@ describe('Debugger handlers (integration)', () => {
   let abapReady = false;
   let amdpReady: string | undefined;
   let connection: IAbapConnection;
+  let secondUserEnv = '';
 
   const call = async (
     inst: Instance,
@@ -417,6 +434,62 @@ describe('Debugger handlers (integration)', () => {
     };
   };
 
+  /** DebugWait until the background run reports its end. */
+  const untilRunFinished = async (inst: Instance, handle: string) => {
+    const seen: unknown[] = [];
+    for (let i = 0; i < 8; i++) {
+      const a = await call(inst, 'DebugWait', {
+        state_handle: handle,
+        hold_seconds: 30,
+      });
+      seen.push(a.isError ? a.text.slice(0, 300) : a.json);
+      if (a.isError || a.json?.reason === 'run_finished') return a;
+    }
+    throw new Error(
+      `the run did not report its end: ${withoutHandles(JSON.stringify(seen))}`,
+    );
+  };
+
+  /** A connection as the user a session .env names (basic authentication). */
+  const connectionAs = async (envName: string) => {
+    const file = resolveEnvFilePath({
+      envDestination: envName,
+      authBrokerPath: testAuthBrokerPath(loadTestConfig()),
+    });
+    if (!file || !fs.existsSync(file))
+      throw new Error(`second_user_env: no session .env named ${envName}`);
+    const env = dotenv.parse(fs.readFileSync(file, 'utf8'));
+    const settings: SapConfig = {
+      url: String(env.SAP_URL).replace(/\/$/, ''),
+      authType: 'basic',
+      username: env.SAP_USERNAME,
+      password: env.SAP_PASSWORD,
+      ...(env.SAP_CLIENT ? { client: env.SAP_CLIENT.trim() } : {}),
+    };
+    const conn = createAbapConnection(
+      settings,
+      credentialFromSapConfig(settings),
+      null,
+    ) as IAbapConnection & { connect?: () => Promise<void> };
+    if (typeof conn.connect === 'function') await conn.connect();
+    return {
+      connection: conn as IAbapConnection,
+      close: async () => {
+        await (conn as { disconnect?: () => Promise<void> }).disconnect?.();
+      },
+    };
+  };
+
+  /** Runs the probe on the connection given (another user's), with no debugger of ours. */
+  const runOn = async (conn: IAbapConnection, name: string) => {
+    const answer = await new AdtExecutor(conn)
+      .getClassExecutor(ourClassExecutor)
+      .run({ className: name }, { analyse: analyseException });
+    return answer.ok
+      ? { ok: true, output: String(answer.getResult().value ?? '') }
+      : { ok: false, output: answer.getError().message };
+  };
+
   // --- lifecycle -----------------------------------------------------------------
 
   beforeAll(async () => {
@@ -436,6 +509,7 @@ describe('Debugger handlers (integration)', () => {
         pkg = String(p.package ?? '');
         transport = p.transport ? String(p.transport) : undefined;
         repeats = Number(p.timing_repeats) > 0 ? Number(p.timing_repeats) : 5;
+        secondUserEnv = String(p.second_user_env ?? '');
         if (!probe || !pkg)
           throw new Error('probe_class and package are required');
         const abapSource = abapProbeSource(probe);
@@ -1113,6 +1187,351 @@ describe('Debugger handlers (integration)', () => {
         measure('5', 'snapshot list', list.isError ? list.text : list.json);
         expect(list.isError).toBe(false);
         const stop = await call(inst, 'DebugStop', { state_handle: handle });
+        expect(stop.isError).toBe(false);
+      });
+    },
+    getTimeout('long'),
+  );
+
+  // --- 5b. the breakpoint set across changes, another user, leaving a debuggee running,
+  // the settings, terminal mode -------------------------------------------------------------
+
+  it(
+    'the breakpoint set: two DebugSetBreakpoints in a row, and the run stops at both; every answer row pairs by its clientId',
+    async () => {
+      await tester.run(async () => {
+        if (!abapReady) throw new Error('the probe is not ready');
+        softOnly('the run is the test’s own');
+        const inst = newInstance();
+        const start = await call(inst, 'DebugStartListener', {
+          breakpoints: [line('mark')],
+        });
+        expect(start.isError).toBe(false);
+        const h = { state_handle: start.json.state_handle };
+        /** What the session paired: placed lines, refused lines with reasons, lost, unexpected. */
+        const paired = (a: { json: any }) => ({
+          placed: a.json.placed.map((r: any) => String(r.uri).split('#')[1]),
+          refused: a.json.refused.map(
+            (r: any) =>
+              `${String(r.requested.uri).split('#')[1]}: ${r.error ?? ''}`,
+          ),
+          lost: a.json.lost.length,
+          unexpected: a.json.unexpected,
+        });
+        const second = await call(inst, 'DebugSetBreakpoints', {
+          ...h,
+          breakpoints: [line('second')],
+        });
+        expect(second.isError).toBe(false);
+        measure(
+          'breakpoint answer',
+          'held: mark; sent: second (both placeable)',
+          paired(second),
+        );
+        expect(second.json.placed).toHaveLength(2);
+        expect(second.json.refused).toEqual([]);
+        expect(second.json.lost).toEqual([]);
+        expect(second.json.unexpected).toEqual([]);
+        // A refusal among the rows: a class's first line takes no breakpoint. The system
+        // answers it first (measured on premise (2026-10-11), BASIS 816); the tag pairs it.
+        const withRefusal = await call(inst, 'DebugSetBreakpoints', {
+          ...h,
+          breakpoints: [{ object_type: 'CLAS', object_name: probe, line: 1 }],
+        });
+        expect(withRefusal.isError).toBe(false);
+        measure(
+          'breakpoint answer',
+          'held: mark, second; sent: line 1',
+          paired(withRefusal),
+        );
+        expect(withRefusal.json.placed).toHaveLength(2);
+        expect(withRefusal.json.refused).toHaveLength(1);
+        expect(withRefusal.json.refused[0].requested.uri).toMatch(/#start=1$/);
+        expect(withRefusal.json.lost).toEqual([]);
+        expect(withRefusal.json.unexpected).toEqual([]);
+        const ran = runProbe(probe);
+        const atMark = await waitFor(inst, h.state_handle, ['stopped']);
+        expect(atMark.last.json?.state).toBe('stopped');
+        expect(atMark.last.json.at.address.line).toBe(LINE.mark);
+        expect(
+          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
+        ).toBe(false);
+        const atSecond = await waitFor(inst, h.state_handle, ['stopped']);
+        measure(
+          'breakpoint set',
+          'the second stop',
+          atSecond.last.json?.at?.address,
+        );
+        expect(atSecond.last.json?.state).toBe('stopped');
+        expect(atSecond.last.json.at.address.line).toBe(LINE.second);
+        expect(
+          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
+        ).toBe(false);
+        expect(await ran).toMatchObject({ ok: true, output: ABAP_OUTPUT });
+        expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'another user: a listener for a second configured user catches that user’s run; stepped and continued',
+    async () => {
+      await tester.run(async () => {
+        if (!abapReady) throw new Error('the probe is not ready');
+        if (!secondUserEnv)
+          throw new Error('SKIP: no second user configured (second_user_env)');
+        const other = await connectionAs(secondUserEnv);
+        try {
+          const otherUser = (
+            await requestUserOf(other.connection)
+          ).toUpperCase();
+          const inst = newInstance();
+          const start = await call(inst, 'DebugStartListener', {
+            request_user: otherUser,
+            breakpoints: [line('mark')],
+          });
+          measure(
+            'another user',
+            'start',
+            start.isError ? start.text.slice(0, 400) : start.json?.state,
+          );
+          expect(start.isError).toBe(false);
+          expect(start.json.request_user).toBe(otherUser);
+          const h = { state_handle: start.json.state_handle };
+          const ran = runOn(other.connection, probe);
+          const caught = await waitFor(inst, h.state_handle, ['stopped']);
+          expect(caught.last.json?.state).toBe('stopped');
+          expect(caught.last.json.at.address.line).toBe(LINE.mark);
+          expect(
+            (await call(inst, 'DebugStep', { ...h, action: 'over' })).isError,
+          ).toBe(false);
+          expect(
+            (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
+              .isError,
+          ).toBe(false);
+          expect(await ran).toMatchObject({ ok: true, output: ABAP_OUTPUT });
+          expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
+        } finally {
+          await other.close();
+        }
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'detach: the run is caught again at the next pass of an armed line in a loop, then continued to its end',
+    async () => {
+      await tester.run(async () => {
+        if (!abapReady) throw new Error('the probe is not ready');
+        const inst = newInstance();
+        const start = await call(inst, 'DebugStartListener', {
+          breakpoints: [line('loop')],
+          run: { kind: 'class', name: probe },
+        });
+        expect(start.isError).toBe(false);
+        const h = { state_handle: start.json.state_handle };
+        const pass1 =
+          start.json.state === 'stopped'
+            ? start
+            : (await waitFor(inst, h.state_handle, ['stopped'])).last;
+        expect(pass1.json.at.address.line).toBe(LINE.loop);
+        const detached = await call(inst, 'DebugStep', {
+          ...h,
+          action: 'detach',
+        });
+        measure(
+          'detach',
+          'answer',
+          detached.isError ? detached.text.slice(0, 400) : detached.json,
+        );
+        expect(detached.isError).toBe(false);
+        expect(detached.json.state).toBe('listening');
+        const pass2 = await waitFor(inst, h.state_handle, ['stopped', 'ended']);
+        measure(
+          'detach',
+          'the next pass of the armed line',
+          pass2.last.json?.state,
+        );
+        expect(pass2.last.json?.state).toBe('stopped');
+        expect(pass2.last.json.at.address.line).toBe(LINE.loop);
+        expect(
+          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
+        ).toBe(false);
+        const finished = await untilRunFinished(inst, h.state_handle);
+        expect(finished.json?.run).toMatchObject({
+          ok: true,
+          output: ABAP_OUTPUT,
+        });
+        expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'release_debugger: the run finishes, the answer is no failure, and the listener catches the next run',
+    async () => {
+      await tester.run(async () => {
+        if (!abapReady) throw new Error('the probe is not ready');
+        const inst = newInstance();
+        const start = await call(inst, 'DebugStartListener', {
+          breakpoints: [line('mark')],
+          run: { kind: 'class', name: probe },
+        });
+        expect(start.isError).toBe(false);
+        const h = { state_handle: start.json.state_handle };
+        if (start.json.state !== 'stopped')
+          expect(
+            (await waitFor(inst, h.state_handle, ['stopped'])).last.json?.state,
+          ).toBe('stopped');
+        const released = await call(inst, 'DebugStep', {
+          ...h,
+          action: 'release_debugger',
+        });
+        measure(
+          'release_debugger',
+          'answer',
+          released.isError ? released.text.slice(0, 400) : released.json,
+        );
+        expect(released.isError).toBe(false);
+        expect(released.json.state).toBe('listening');
+        const finished = await untilRunFinished(inst, h.state_handle);
+        expect(finished.json?.run).toMatchObject({
+          ok: true,
+          output: ABAP_OUTPUT,
+        });
+        // The next run is the test's own: a hard run has no connection of its own to start it.
+        if (!tester.isHardMode()) {
+          const next = runProbe(probe);
+          const caught = await waitFor(inst, h.state_handle, ['stopped']);
+          expect(caught.last.json?.state).toBe('stopped');
+          expect(
+            (await call(inst, 'DebugStep', { ...h, action: 'continue' }))
+              .isError,
+          ).toBe(false);
+          expect((await next).ok).toBe(true);
+        }
+        expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'settings: at the start and through DebugSetSettings, the settings in force recorded after each',
+    async () => {
+      await tester.run(async () => {
+        if (!abapReady) throw new Error('the probe is not ready');
+        const inst = newInstance();
+        const start = await call(inst, 'DebugStartListener', {
+          breakpoints: [line('mark')],
+          settings: { system_debugging: true, create_exception_object: true },
+          run: { kind: 'class', name: probe },
+        });
+        expect(start.isError).toBe(false);
+        const h = { state_handle: start.json.state_handle };
+        const stopped =
+          start.json.state === 'stopped'
+            ? start
+            : (await waitFor(inst, h.state_handle, ['stopped'])).last;
+        measure(
+          'settings',
+          'after the attach: system_debugging, create_exception_object',
+          stopped.json?.settings ?? stopped.json?.settings_error,
+        );
+        expect(stopped.json.settings).toMatchObject({
+          system_debugging: true,
+          create_exception_object: true,
+        });
+        const off = await call(inst, 'DebugSetSettings', {
+          ...h,
+          system_debugging: false,
+        });
+        measure(
+          'settings',
+          'DebugSetSettings system_debugging false',
+          off.isError ? off.text.slice(0, 300) : off.json,
+        );
+        expect(off.isError).toBe(false);
+        expect(off.json).toMatchObject({
+          system_debugging: false,
+          create_exception_object: true,
+        });
+        const update = await call(inst, 'DebugSetSettings', {
+          ...h,
+          update_debugging: true,
+        });
+        measure(
+          'settings',
+          'DebugSetSettings update_debugging true',
+          update.isError ? update.text.slice(0, 300) : update.json,
+        );
+        expect(update.isError).toBe(false);
+        expect(update.json).toMatchObject({
+          update_debugging: true,
+          system_debugging: false,
+        });
+        expect(
+          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
+        ).toBe(false);
+        await untilRunFinished(inst, h.state_handle);
+        expect((await call(inst, 'DebugStop', h)).isError).toBe(false);
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'terminal mode: our own run carries the session’s ids and is caught',
+    async () => {
+      await tester.run(async () => {
+        if (!abapReady) throw new Error('the probe is not ready');
+        // Random ids, none configured: the run carries them in its SAP-PASSPORT.
+        const inst = newInstance();
+        const start = await call(inst, 'DebugStartListener', {
+          debugging_mode: 'terminal',
+          breakpoints: [line('mark')],
+          run: { kind: 'class', name: probe },
+        });
+        measure(
+          'terminal',
+          'start',
+          start.isError ? start.text.slice(0, 400) : start.json?.state,
+        );
+        expect(start.isError).toBe(false);
+        expect(start.json.debugging_mode).toBe('terminal');
+        const h = { state_handle: start.json.state_handle };
+        const caught =
+          start.json.state === 'stopped'
+            ? start
+            : (await waitFor(inst, h.state_handle, ['stopped', 'ended'])).last;
+        measure(
+          'terminal',
+          'the catch',
+          caught.json?.at?.address ?? caught.json ?? caught.text.slice(0, 400),
+        );
+        expect(caught.json?.state).toBe('stopped');
+        expect(caught.json.at.address.line).toBe(LINE.mark);
+        expect(caught.json.at.address.object_name).toBe(probe);
+        expect(
+          (await call(inst, 'DebugStep', { ...h, action: 'over' })).isError,
+        ).toBe(false);
+        expect(
+          (await call(inst, 'DebugStep', { ...h, action: 'continue' })).isError,
+        ).toBe(false);
+        const finished = await untilRunFinished(inst, h.state_handle);
+        expect(finished.json?.run).toMatchObject({
+          ok: true,
+          output: ABAP_OUTPUT,
+        });
+        const stop = await call(inst, 'DebugStop', h);
+        measure(
+          'terminal',
+          'stop',
+          stop.isError ? stop.text.slice(0, 400) : 'stopped',
+        );
         expect(stop.isError).toBe(false);
       });
     },

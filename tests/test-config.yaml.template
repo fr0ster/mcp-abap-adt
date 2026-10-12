@@ -2135,6 +2135,10 @@ debugger_handlers:
         # Repetitions of each single step and of each baseline run, for the timings
         timing_repeats: 5
         keep_probe: false
+        # A session .env name (in the standard sessions folder) of a second SAP user
+        # with basic authentication; the connected user needs the debug authorization
+        # on that user. Empty: the another-user case is skipped.
+        second_user_env: ""
 
 # Runtime Feed Handlers (Feeds, System Messages, Gateway Error Log)
 runtime_feed_handlers:

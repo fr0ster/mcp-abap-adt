@@ -101,7 +101,7 @@ SAP_RESPONSIBLE=<your ABAP user>
 - **The Secure Login Client need not be running.** The library starts it when the first RFC connection opens, and that call can wait on its logon window until you answer it. Logged out and the window closed, the call is refused with `A2200019`.
 - `SAP_RESPONSIBLE` — every create needs a responsible person; over SNC the server knows no login to fall back to, so without it creates are refused with `system_context_missing`. Reads do not need it.
 - SNC needs `SAP_CONNECTION_TYPE=rfc` (see above). With `http` the destination is refused at startup, naming `connection-type`.
-- A destination that states `snc` without `SAP_SNC_PARTNERNAME` is refused with `Destination "X": … (sncPartnerName)`.
+- A destination that states `snc` without `SAP_SNC_PARTNERNAME` is refused with `Destination "X" lacks: sncPartnerName`.
 - Prerequisites on the system side: SNC enabled on the application server, and the client's SNC name mapped to an ABAP user (user maintenance, SNC tab). If SAP GUI logs on to this system through SNC without a password, both are in place.
 
 ## How It Works

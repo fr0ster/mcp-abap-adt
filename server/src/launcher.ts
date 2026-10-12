@@ -384,15 +384,17 @@ export function effectiveSystemType(
 }
 
 /**
- * The login strategy, with its progress lines on stderr. auth-providers 6
- * prompts the authorization URL on stderr itself, never through a logger;
- * what reaches the request's logger are fixed lines — at `info` "the
- * authorization URL was shown", a browser that failed to open — and that
- * logger is the broker's, silent unless DEBUG_AUTH_LOG is set.
+ * The login strategy, with prompts that reach the user. auth-providers'
+ * strategy speaks to the user through the request's logger — the URL to open
+ * under `--browser=none`/`headless`, or `auto` when it could not open one — and
+ * that logger is the broker's, silent unless DEBUG_AUTH_LOG is set. A prompt
+ * the user cannot see makes the login impassable: it times out.
  *
- * So the strategy gets its own logger: `info` is a line on stderr always, so
- * the user sees what the login is doing; `warn`, `error` and `debug` stay the
- * broker's — diagnostics, gated (H4). Never stdout (H3).
+ * So the strategy gets its own logger: `info`, the level the strategy prompts
+ * at, is a line on stderr always; `warn`, `error` and `debug` stay the
+ * broker's — diagnostics, gated, and they may quote an error's message (H4).
+ * Not "no logger" (auth-providers then writes prompts to stderr itself): that
+ * would also drop those diagnostics under DEBUG_AUTH_LOG. Never stdout (H3).
  */
 export function promptsOnStderr(
   browserStrategy: IAuthBrokerFactoryConfig['browserStrategy'],

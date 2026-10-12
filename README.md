@@ -94,7 +94,7 @@ comes from `x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, the
 takes it as an argument — else from a cloud system itself; otherwise it is left out and the system
 applies itself — never refused. Reads are unaffected. The process environment is read once: a change
 made to it while the server runs is not picked up. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, a debugger start needs at least one breakpoint, and a stored session (or a token you hold in a `.env`) must state `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`: regenerate a session with `mcp-auth`. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
+Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, and a debugger start needs at least one breakpoint. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
@@ -246,7 +246,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
-- **[docs/MIGRATION-18.0.md](docs/MIGRATION-18.0.md)** - The debugger on adt-clients 29: what an embedder of lib/debugger changes; a start needs a breakpoint. Authentication on auth-broker 5: sessions state whom they were issued for
+- **[docs/MIGRATION-18.0.md](docs/MIGRATION-18.0.md)** - The debugger on adt-clients 29: what an embedder of lib/debugger changes; a start needs a breakpoint
 - **[docs/MIGRATION-17.0.md](docs/MIGRATION-17.0.md)** - The HTTPS certificate is verified; a message class needs a responsible
 - **[docs/MIGRATION-16.0.md](docs/MIGRATION-16.0.md)** - Authentication on auth-broker 4: four authentications, destinations
 - **[docs/MIGRATION-14.0.md](docs/MIGRATION-14.0.md)** - The compact facade moved to its own
@@ -347,8 +347,6 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=your-jwt-token
-# The rest of the session record is auth-stores' and auth-broker's:
-# see docs/user-guide/AUTHENTICATION.md#a-token-you-hold
 ```
 
 For RFC connection:
@@ -399,7 +397,7 @@ Inline comments are not parsed, so keep comments on separate lines.
 **Authentication:**
 - `--mcp=<destination>` - Named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, field by field
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
-- `--browser=<name>` - Browser for a login: `chrome`, `edge`, `firefox`, `system` / `auto` (default: the platform's default browser), `headless`, `none`; any other name opens the default browser. The login URL is always printed on stderr
+- `--browser=<name>` - Browser for a login: `chrome`, `edge`, `firefox`, `system` (default), `headless`, `none`
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
 - `--allow-destination-header` - Honour the `x-mcp-destination` header (HTTP/SSE only, off by default)
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`

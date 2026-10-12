@@ -1,9 +1,6 @@
 import type { AuthBrokerConfig } from '@mcp-abap-adt/auth-broker';
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import type {
-  IAuthorizationStrategy,
-  IBrowser,
-} from '@mcp-abap-adt/interfaces-auth';
+import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
 import type { DestinationGrant } from '@mcp-abap-adt/interfaces-auth-broker';
 import type { LoginLock } from '../loginLock.js';
 import type { AuthType } from '../vocabulary.js';
@@ -13,14 +10,13 @@ import type { AuthType } from '../vocabulary.js';
  * that name is the tool handlers' context.)
  */
 export interface AuthHandlerContext {
-  /** The name `--browser` gives; the handler turns it into an `IBrowser`. */
   browser: string;
   browserAuthPort?: number;
   loginLock: LoginLock;
   /** The launcher passes auth-providers' `browserCallbackStrategy`; no default here. */
   browserStrategy: (options: {
-    browser?: IBrowser | undefined;
-    port?: number | undefined;
+    browser: string;
+    port?: number;
   }) => IAuthorizationStrategy<string>;
 }
 

@@ -63,8 +63,7 @@ SAP_PASSWORD=<your password>
 SAP_SYSTEM_TYPE=onprem
 ```
 
-For a JWT you hold: `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN=<token>`; the rest of
-its session record is auth-stores' and auth-broker's ([A token you hold](../../user-guide/AUTHENTICATION.md#a-token-you-hold)). All
+For a JWT you hold: `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN=<token>`. All
 authentications: [Authentication & Destinations](../../user-guide/AUTHENTICATION.md).
 
 ## 2. Compact server

@@ -102,8 +102,7 @@ describe('destination stores', () => {
       const file = path.join(root, 'conn.env');
       fs.writeFileSync(
         file,
-        // Both binding keys beside the credential, as mcp-auth writes them.
-        `SAP_URL=${URL_}\nSAP_AUTH_TYPE=jwt\nSAP_JWT_TOKEN=tok-1\nSAP_ISSUED_FOR=\nSAP_ISSUED_BY=\n`,
+        `SAP_URL=${URL_}\nSAP_AUTH_TYPE=jwt\nSAP_JWT_TOKEN=tok-1\n`,
       );
       const s = storesFor(mode(file));
       const session = await s.sessionStore.loadSession('default');

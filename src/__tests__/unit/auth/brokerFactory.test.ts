@@ -18,18 +18,14 @@ jest.mock('@mcp-abap-adt/auth-broker', () => {
 import {
   type AuthBroker,
   AuthBroker as AuthBrokerCtor,
-  bindingOf,
   DestinationConfigError,
-  SessionWriteFailure,
 } from '@mcp-abap-adt/auth-broker';
-import { StorageError } from '@mcp-abap-adt/auth-stores';
 import type {
   AuthOutcome,
   AuthorizationRequest,
   IAuthorizationStrategy,
   IAuthProvider,
   IAuthRejection,
-  IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import { AuthBrokerFactory } from '../../../lib/auth/brokerFactory';
 import { SHUTDOWN_REFUSAL } from '../../../lib/auth/countedProvider';
@@ -65,13 +61,10 @@ function deferred<T>() {
 const tick = () => new Promise((r) => setImmediate(r));
 
 function strategyFactory() {
-  const calls: Array<{
-    browser?: IBrowser | undefined;
-    port?: number | undefined;
-  }> = [];
+  const calls: Array<{ browser: string; port?: number }> = [];
   const browserStrategy = (options: {
-    browser?: IBrowser | undefined;
-    port?: number | undefined;
+    browser: string;
+    port?: number;
   }): IAuthorizationStrategy<string> => {
     calls.push(options);
     return {
@@ -354,25 +347,17 @@ describe('AuthBrokerFactory', () => {
         'dest',
       );
       const config = constructed.mock.calls[0][0];
-      // auth-broker 5 requires both for a token row: broker 4's behaviour.
       expect(Object.keys(config).sort()).toEqual([
         'authorization',
-        'onWriteFailure',
-        'renewal',
         'serviceKeyStore',
         'sessionStore',
       ]);
-      expect(config.onWriteFailure).toBe('continue');
-      expect(typeof config.renewal).toBe('function');
       const strategy = config.authorization('dest', 'authorization_code');
       const outcome = await strategy.authorize({
         buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
       });
       expect(outcome.payload).toBe('code-1');
-      // The name became a shipped browser (an `IBrowser`), and the port is kept.
-      expect(strategies.calls).toHaveLength(1);
-      expect(typeof strategies.calls[0].browser?.open).toBe('function');
-      expect(strategies.calls[0].port).toBe(61005);
+      expect(strategies.calls).toEqual([{ browser: 'firefox', port: 61005 }]);
       expect(
         (await config.serviceKeyStore.getConnectionConfig('dest'))?.grantType,
       ).toBe('authorization_code');
@@ -402,10 +387,6 @@ describe('AuthBrokerFactory', () => {
           'SAP_GRANT_TYPE=none',
           'SAP_JWT_TOKEN=placeholder-token',
           'SAP_REFRESH_TOKEN=placeholder-refresh',
-          // auth-stores 5 reads a credential only beside both binding keys
-          // (empty: no binding); without them the record is refused whole.
-          'SAP_ISSUED_FOR=',
-          'SAP_ISSUED_BY=',
         ].join('\n'),
       );
       const settings = await factory({
@@ -597,68 +578,7 @@ describe('AuthBrokerFactory', () => {
   });
 
   describe('getProvider', () => {
-    /**
-     * A token you hold, in an --env file: auth-broker 5 uses it only beside
-     * the exact binding of the destination's means (`bindingOf`), and
-     * auth-stores 5 reads the file only with both binding keys present.
-     */
-    const heldToken = (binding: string[]) => {
-      const file = path.join(root, 'held.env');
-      fs.writeFileSync(
-        file,
-        [
-          `SAP_URL=${SYSTEM_URL}`,
-          'SAP_CLIENT=100',
-          'SAP_AUTH_TYPE=jwt',
-          'SAP_GRANT_TYPE=none',
-          'SAP_JWT_TOKEN=placeholder-token',
-          ...binding,
-        ].join('\n'),
-      );
-      return factory({ envFile: { path: file, source: '--env' } });
-    };
-
-    it('a held token beside its binding is presented', async () => {
-      const { issuedFor, issuedBy } = bindingOf({
-        serviceUrl: SYSTEM_URL,
-        sapClient: '100',
-        authType: 'jwt',
-        grantType: 'none',
-      });
-      const provider = await heldToken([
-        `SAP_ISSUED_FOR=${issuedFor}`,
-        `SAP_ISSUED_BY=${issuedBy}`,
-      ]).getProvider('default');
-      const headers: Record<string, string> = {};
-      await expect(
-        provider.authorize({
-          header: (name: string, value: string) => {
-            headers[name] = value;
-          },
-          cookies: () => {},
-        }),
-      ).resolves.toEqual({ ok: true });
-      expect(headers.Authorization).toBe('Bearer placeholder-token');
-    });
-
-    it("a held token with empty binding keys: the broker's refusal, in its words", async () => {
-      const err = await caught(
-        heldToken(['SAP_ISSUED_FOR=', 'SAP_ISSUED_BY=']).getProvider('default'),
-      );
-      // The binding is the broker's rule: the server adds no words of its own.
-      expect(describeAuthError(err)).toBe(
-        'Destination "default": the credential in the session is not bound to this destination’s means (issuedFor, issuedBy)',
-      );
-      expect(describeAuthError(err)).not.toContain('placeholder-token');
-    });
-
-    it('a held token without binding keys: the store refuses the record', async () => {
-      const err = await caught(heldToken([]).getProvider('default'));
-      expect(err).toBeInstanceOf(StorageError);
-      expect(describeAuthError(err)).toContain('regenerate it with mcp-auth');
-    });
-
-    it('a named jwt / none destination without --unsafe: the broker names authorizationToken, and the hint is ours', async () => {
+    it('a named jwt / none destination without --unsafe: lacks authorizationToken, with the hint', async () => {
       writeSession('dest', [
         `SAP_URL=${SYSTEM_URL}`,
         'SAP_AUTH_TYPE=jwt',
@@ -668,9 +588,7 @@ describe('AuthBrokerFactory', () => {
       const err = await caught(factory({ unsafe: false }).getProvider('dest'));
       expect(err).toBeInstanceOf(DestinationConfigError);
       const text = describeAuthError(err);
-      expect(text).toContain(
-        'Destination "dest": a jwt destination with grantType none needs the token in its session (authorizationToken)',
-      );
+      expect(text).toContain('Destination "dest" lacks: authorizationToken');
       expect(text).toContain('is read only with --unsafe');
       expect(text).not.toContain('placeholder-token');
     });
@@ -765,7 +683,7 @@ describe('AuthBrokerFactory', () => {
       await running;
     });
 
-    it('reports a rejecting flush() as destination and minted words, or class only', async () => {
+    it('reports a rejecting flush() as destination and class only', async () => {
       basic('dest');
       basic('other');
       const f = factory();
@@ -775,8 +693,8 @@ describe('AuthBrokerFactory', () => {
         .spyOn(a, 'flush')
         .mockRejectedValue(
           new AggregateError(
-            [new SessionWriteFailure('dest', new Error('placeholder-secret'))],
-            'Session writes still failing for "dest"',
+            [new Error('"dest": StorageError')],
+            'Session writes still failing for "dest" placeholder-secret',
           ),
         );
       class OddStoreFailure extends Error {}
@@ -785,10 +703,8 @@ describe('AuthBrokerFactory', () => {
         .mockRejectedValue(new OddStoreFailure('placeholder-secret'));
       const report = await f.settle(1_000);
       expect(report.abandoned).toBe(0);
-      // A SessionWriteFailure (broker 5) by its minted words; anything else
-      // by its class. Neither carries what the store said.
       expect(report.notStored.sort()).toEqual([
-        '"dest": persisting the tokens failed (unknown error)',
+        '"dest": StorageError',
         '"other": OddStoreFailure',
       ]);
       expect(JSON.stringify(report)).not.toContain('placeholder-secret');
@@ -1011,46 +927,6 @@ describe('describeAuthError', () => {
     authorizationToken:
       'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
   } as const;
-  it("a field whose remedy is the broker's or a store's gets their words alone", () => {
-    expect(
-      describeAuthError(
-        new DestinationConfigError(
-          'dest',
-          ['issuedFor', 'issuedBy'],
-          'fixed reason',
-        ),
-      ),
-    ).toBe('Destination "dest": fixed reason (issuedFor, issuedBy)');
-  });
-
-  it('a structural copy is read by its fields alone, never by its message', () => {
-    const copy = {
-      name: 'DestinationConfigError',
-      code: 'DESTINATION_CONFIG',
-      destination: 'dest',
-      missingFields: ['grantType'],
-      message: 'forged words with a placeholder-secret',
-    };
-    const text = describeAuthError(copy);
-    expect(text).toBe(
-      `Destination "dest" was refused (grantType)\n${HINTS.grantType}`,
-    );
-    expect(text).not.toContain('placeholder-secret');
-  });
-
-  it("a session store's refusal of a record not in its format: its own fixed words", () => {
-    const refused = new StorageError(
-      'loadSession',
-      'EnvFileSessionStore: the stored session for "dest" is not in this store\'s format; regenerate it with mcp-auth',
-      undefined,
-      'record-format',
-    );
-    expect(describeAuthError(refused)).toBe(refused.message);
-    // An I/O failure names no reason: not words the server answers with.
-    expect(
-      describeAuthError(new StorageError('loadSession', 'disk said x')),
-    ).toBeUndefined();
-  });
 
   it.each(Object.keys(HINTS) as Array<keyof typeof HINTS>)(
     'names %s with its own hint and no other',
@@ -1058,21 +934,19 @@ describe('describeAuthError', () => {
       const text = describeAuthError(
         new DestinationConfigError('dest', [field], 'fixed reason'),
       );
-      expect(text).toBe(
-        `Destination "dest": fixed reason (${field})\n${HINTS[field]}`,
-      );
+      expect(text).toBe(`Destination "dest" lacks: ${field}\n${HINTS[field]}`);
       for (const [other, hint] of Object.entries(HINTS)) {
         if (other !== field) expect(text).not.toContain(hint);
       }
     },
   );
 
-  it("a field without a known remedy gets the broker's line alone", () => {
+  it('a field without a known remedy gets the bare lacks line', () => {
     expect(
       describeAuthError(
         new DestinationConfigError('dest', ['uaaClientId'], 'fixed reason'),
       ),
-    ).toBe('Destination "dest": fixed reason (uaaClientId)');
+    ).toBe('Destination "dest" lacks: uaaClientId');
   });
 
   it('several fields: one line naming them, then a hint per known field', () => {
@@ -1084,9 +958,7 @@ describe('describeAuthError', () => {
           'fixed reason',
         ),
       ),
-    ).toBe(
-      `Destination "dest": fixed reason (uaaUrl, grantType)\n${HINTS.grantType}`,
-    );
+    ).toBe(`Destination "dest" lacks: uaaUrl, grantType\n${HINTS.grantType}`);
   });
 
   it('carries no value read from a store', () => {
@@ -1100,17 +972,14 @@ describe('describeAuthError', () => {
       err = e;
     }
     const text = describeAuthError(err);
-    expect(text).toContain('(grantType)');
+    expect(text).toContain('Destination "dest" lacks: grantType');
     expect(text).not.toContain('made-up-grant-z9');
     try {
       vetMeans('dest', { authType: 'made-up-type-z9' as never });
     } catch (e) {
       err = e;
     }
-    expect(describeAuthError(err)).toMatch(
-      /^Destination "dest": .*\(authType\)$/,
-    );
-    expect(describeAuthError(err)).not.toContain('made-up-type-z9');
+    expect(describeAuthError(err)).toBe('Destination "dest" lacks: authType');
   });
 
   it('an unsupported authentication', () => {

@@ -2,7 +2,6 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
-  IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import {
   SettingsError,
@@ -15,8 +14,7 @@ import {
 import { LoginLock } from '../../../lib/auth/loginLock';
 
 function context(over: Partial<AuthHandlerContext> = {}) {
-  const calls: { browser?: IBrowser | undefined; port?: number | undefined }[] =
-    [];
+  const calls: { browser: string; port?: number }[] = [];
   const ctx: AuthHandlerContext = {
     browser: 'headless',
     loginLock: new LoginLock(),
@@ -95,21 +93,15 @@ describe('brokerOptions', () => {
     expect(handlerFor('d', vetted).brokerOptions(context().ctx)).toEqual({});
   });
 
-  it('jwt / authorization_code returns `authorization`, locked, with the context browser and port, and how it renews', async () => {
+  it('jwt / authorization_code returns exactly `authorization`, locked, with the context browser and port', async () => {
     const { ctx, calls } = context({ browserAuthPort: 4242 });
     const options = handlerFor('d', {
       authType: 'jwt',
       grantType: 'authorization_code',
     }).brokerOptions(ctx);
-    expect(Object.keys(options).sort()).toEqual([
-      'authorization',
-      'onWriteFailure',
-      'renewal',
-    ]);
-    expect(options.onWriteFailure).toBe('continue');
+    expect(Object.keys(options)).toEqual(['authorization']);
     const strategy = options.authorization?.('d', 'authorization_code');
-    // `headless` is no browser: the URL is prompted on stderr.
-    expect(calls).toEqual([{ port: 4242 }]);
+    expect(calls).toEqual([{ browser: 'headless', port: 4242 }]);
 
     // Observed through the lock: while the lock is held, authorize waits.
     let release!: () => void;
@@ -138,8 +130,7 @@ describe('brokerOptions', () => {
     })
       .brokerOptions(ctx)
       .authorization?.('d', 'authorization_code');
-    // `headless` is no browser, and no port was given: nothing is passed.
-    expect(calls).toEqual([{}]);
+    expect(calls).toEqual([{ browser: 'headless' }]);
   });
 });
 

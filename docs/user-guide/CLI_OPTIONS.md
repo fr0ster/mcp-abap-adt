@@ -160,7 +160,7 @@ ignored.
 | `--env-path=<path>` | `MCP_ENV_PATH` | `env-path` | path | One env file by path or file name (relative to the working directory) |
 | `--auth-broker-path=<dir>` | `AUTH_BROKER_PATH` | `auth-broker-path` | path | Base directory of `service-keys/` and `sessions/` (default: the platform paths) |
 | `--unsafe` | `MCP_UNSAFE` | `unsafe` | flag | Write named destinations' sessions to disk instead of keeping them in memory |
-| `--browser=<name>` | `MCP_BROWSER` | `browser` | `chrome`, `edge`, `firefox`, `system`, `auto`, `headless`, `none` | Browser for a login (default `system`, the platform's default browser; any other name opens it too). The login URL is printed on stderr in every case |
+| `--browser=<name>` | `MCP_BROWSER` | `browser` | `chrome`, `edge`, `firefox`, `system`, `headless`, `none` | Browser for a login (default `system`) |
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
 | `--allow-destination-header` | — | `allow-destination-header` | flag | Honour `x-mcp-destination` (HTTP/SSE, off by default) |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
@@ -449,7 +449,7 @@ These are typically set in `.env` file:
 **Basic Authentication:**
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
-- `SAP_AUTH_TYPE` - Authentication type: `basic`, `snc` or `jwt` (**required**: a `.env` without it is refused with `Destination "X": … (authType)`). `saml`, `certificate` and `kerberos` are not supported
+- `SAP_AUTH_TYPE` - Authentication type: `basic`, `snc` or `jwt` (**required**: a `.env` without it is refused with `Destination "X" lacks: authType`). `saml`, `certificate` and `kerberos` are not supported
 - `SAP_SYSTEM_TYPE` - SAP system type: `cloud` or `onprem` (same as `--system-type`). The tools offered default to `cloud` — e.g., Programs require `onprem`; the connector and whether the responsible / master system are asked of the system default to `cloud` for a `jwt` destination, else `onprem` (never guessed from the URL). **Set it explicitly for on-premise systems.** It may be set in the process environment or in the `--env` / `--env-path` `.env` (which joins the environment, never over a value already set), as `--system-type` or as YAML `system-type`. Precedence: the CLI flag, then the environment, then YAML. `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
 - `SAP_USERNAME` - SAP username (for basic auth). On-premise, also the login the responsible of created objects falls back to when no `SAP_RESPONSIBLE` / `x-sap-responsible` is stated (the destination's own first, then the `x-sap-login` of an `x-sap-url` connection, then the process environment's); not on a cloud system, whose login is the system's user. The environment is read once: a change while the server runs is not picked up
 - `SAP_PASSWORD` - SAP password (for basic auth)
@@ -469,7 +469,6 @@ These are typically set in `.env` file:
 **JWT/OAuth2 Authentication:**
 - `SAP_GRANT_TYPE` - `authorization_code` or `none` (**required** with `SAP_AUTH_TYPE=jwt`)
 - `SAP_JWT_TOKEN` - The token (with `SAP_GRANT_TYPE=none`; otherwise the server stores the one it obtained)
-- `SAP_ISSUED_FOR`, `SAP_ISSUED_BY` - Part of the session record the stores write beside a token; what they must hold is auth-stores' and auth-broker's — see [Authentication & Destinations](AUTHENTICATION.md#a-token-you-hold)
 - `SAP_REFRESH_TOKEN` - Refresh token for automatic token renewal
 - `SAP_UAA_URL` - UAA URL for OAuth2 (alternative: `UAA_URL`)
 - `SAP_UAA_CLIENT_ID` - UAA Client ID (alternative: `UAA_CLIENT_ID`)
@@ -586,7 +585,6 @@ SAP_CLIENT=200
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=production-jwt-token
-# the rest of its session record: AUTHENTICATION.md#a-token-you-hold
 EOF
 
 # Run with explicit config

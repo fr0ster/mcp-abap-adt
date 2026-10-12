@@ -1,7 +1,4 @@
-import {
-  type IDestinations,
-  NO_CREDENTIAL_REFUSAL,
-} from '@mcp-abap-adt/lib/auth';
+import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
@@ -51,16 +48,19 @@ export class StdioServer extends BaseMcpServer {
   }
 }
 
+const INSPECTION_ONLY =
+  'inspection-only mode: no connection parameters. To connect to an SAP system, use --mcp=<destination> or --env-path=<path>.';
+
 /**
  * The destinations of inspection-only mode (stdio with neither `--mcp` nor an
  * `--env` file): the tools can be listed, and a tool call answers with the
  * refusal of a provider that has no credential, instead of dialling anywhere.
- * The refusal is minted (interfaces-auth 7), so its words are auth-errors'
- * own — "this connection has no credential to renew"; how to connect is said
- * on stderr at startup.
  */
 export function inspectionOnlyDestinations(): IDestinations {
-  const refused = async () => NO_CREDENTIAL_REFUSAL;
+  const refused = async () => ({
+    ok: false as const,
+    refusal: { reason: INSPECTION_ONLY },
+  });
   const provider: Awaited<ReturnType<IDestinations['getProvider']>> = {
     kind: 'inspection-only',
     prepare: refused,

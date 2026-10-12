@@ -10,23 +10,6 @@ import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-// The shipped browsers, labelled: `--browser` reaches the login as an
-// `IBrowser` (auth-providers 6), opaque, so the label says which name chose
-// which browser. Opening one records nothing and launches nothing.
-jest.mock('@mcp-abap-adt/auth-providers', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/auth-providers');
-  const labelled = (label: string) => ({ label, open: async () => {} });
-  return {
-    ...actual,
-    linuxDefaultBrowser: () => labelled('default'),
-    macDefaultBrowser: () => labelled('default'),
-    windowsDefaultBrowser: () => labelled('default'),
-    linuxBrowser: (name: string) => labelled(name),
-    macBrowser: (name: string) => labelled(name),
-    windowsBrowser: (name: string) => labelled(name),
-  };
-});
-
 // Every broker the factory builds is counted; nothing else changes.
 jest.mock('@mcp-abap-adt/auth-broker', () => {
   const actual = jest.requireActual('@mcp-abap-adt/auth-broker');
@@ -42,7 +25,6 @@ jest.mock('@mcp-abap-adt/auth-broker', () => {
 import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
-  IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import {
   AuthBrokerFactory,
@@ -115,13 +97,10 @@ afterEach(() => {
 });
 
 function recordingStrategy() {
-  const calls: Array<{
-    browser?: IBrowser | undefined;
-    port?: number | undefined;
-  }> = [];
+  const calls: Array<{ browser: string; port?: number }> = [];
   const browserStrategy = (options: {
-    browser?: IBrowser | undefined;
-    port?: number | undefined;
+    browser: string;
+    port?: number;
   }): IAuthorizationStrategy<string> => {
     calls.push(options);
     return {
@@ -202,31 +181,8 @@ async function browserOfTheLogin(
     buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
   });
   expect(strategy.calls).toHaveLength(1);
-  const { browser, port } = strategy.calls[0];
-  // The label of the mocked shipped browser; none for `none` / `headless`.
-  const label = (browser as { label?: string } | undefined)?.label;
-  return {
-    ...(label !== undefined && { browser: label }),
-    ...(port !== undefined && { port }),
-  };
+  return strategy.calls[0];
 }
-
-/** The shipped browser each named `--browser` opens, per platform (auth-providers 6's table). */
-const NAMED: Partial<
-  Record<NodeJS.Platform, Record<'chrome' | 'edge' | 'firefox', string>>
-> = {
-  linux: {
-    chrome: 'google-chrome',
-    edge: 'microsoft-edge',
-    firefox: 'firefox',
-  },
-  darwin: {
-    chrome: 'Google Chrome',
-    edge: 'Microsoft Edge',
-    firefox: 'Firefox',
-  },
-  win32: { chrome: 'chrome', edge: 'msedge', firefox: 'firefox' },
-};
 
 describe('the browser reaches the login strategy', () => {
   const stdio = ['--transport=stdio', '--mcp=dest'];
@@ -238,18 +194,14 @@ describe('the browser reaches the login strategy', () => {
       `--auth-broker-path=${root}`,
       '--browser=firefox',
     ]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe(
-      NAMED[process.platform as 'linux']?.firefox ?? 'firefox',
-    );
+    expect((await browserOfTheLogin(strategy)).browser).toBe('firefox');
   });
 
   it('MCP_BROWSER', async () => {
     writeKey('dest', abapKey);
     process.env.MCP_BROWSER = 'edge';
     const { strategy } = await run([...stdio, `--auth-broker-path=${root}`]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe(
-      NAMED[process.platform as 'linux']?.edge ?? 'microsoft-edge',
-    );
+    expect((await browserOfTheLogin(strategy)).browser).toBe('edge');
   });
 
   it('YAML browser', async () => {
@@ -260,15 +212,13 @@ describe('the browser reaches the login strategy', () => {
       `browser: chrome\nauth-broker-path: ${JSON.stringify(root)}\n`,
     );
     const { strategy } = await run([...stdio, `--config=${yamlFile}`]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe(
-      NAMED[process.platform as 'linux']?.chrome ?? 'google-chrome',
-    );
+    expect((await browserOfTheLogin(strategy)).browser).toBe('chrome');
   });
 
-  it('none given: system — the default browser — and no port, the strategy keeps its own 61001', async () => {
+  it('none given: system, and no port — the strategy keeps its own 61001', async () => {
     writeKey('dest', abapKey);
     const { strategy } = await run([...stdio, `--auth-broker-path=${root}`]);
-    expect(await browserOfTheLogin(strategy)).toEqual({ browser: 'default' });
+    expect(await browserOfTheLogin(strategy)).toEqual({ browser: 'system' });
   });
 
   it('--browser-auth-port reaches it beside the browser', async () => {
@@ -279,8 +229,10 @@ describe('the browser reaches the login strategy', () => {
       '--browser=none',
       '--browser-auth-port=61005',
     ]);
-    // `none` is no browser: the URL is prompted on stderr.
-    expect(await browserOfTheLogin(strategy)).toEqual({ port: 61005 });
+    expect(await browserOfTheLogin(strategy)).toEqual({
+      browser: 'none',
+      port: 61005,
+    });
   });
 });
 
@@ -318,43 +270,26 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
         browserCallbackStrategy,
       );
       const stdout = jest.spyOn(process.stdout, 'write');
-      // auth-providers 6 prompts the URL on stderr itself, never through a
-      // logger: the process's stderr, beside the launcher's own lines.
-      const prompted: string[] = [];
-      const stderrWrite = jest
-        .spyOn(process.stderr, 'write')
-        .mockImplementation((chunk: string | Uint8Array) => {
-          prompted.push(String(chunk));
-          return true;
-        });
       const broker = constructed.mock.results[0].value;
       const login = broker.getToken('dest');
       const failed = expect(login).rejects.toThrow();
       const redirect = `http://localhost:${port}/callback`;
-      const said = () => [...stderr, ...prompted].join('\n');
-      const urlOf = () =>
-        said().match(/https:\/\/uaa\.example\.test\/oauth\/authorize\S*/)?.[0];
-      for (let i = 0; i < 100 && !urlOf(); i++) {
+      const url =
+        'https://uaa.example.test/oauth/authorize?client_id=client-id' +
+        `&redirect_uri=${encodeURIComponent(redirect)}&response_type=code`;
+      for (let i = 0; i < 100 && !stderr.join('\n').includes(url); i++) {
         await new Promise((r) => setTimeout(r, 20));
       }
-      const url = new URL(urlOf() ?? 'https://unseen.invalid/');
       try {
-        expect(said()).toContain(
-          'Open this URL in your browser to authenticate',
-        );
-        expect(url.searchParams.get('client_id')).toBe('client-id');
-        expect(url.searchParams.get('redirect_uri')).toBe(redirect);
-        expect(url.searchParams.get('response_type')).toBe('code');
-        expect(said()).toContain(`Waiting for callback on ${redirect}`);
-        expect(said()).not.toContain('client-secret');
+        const said = stderr.join('\n');
+        expect(said).toContain('Open this URL in your browser to authenticate');
+        expect(said).toContain(url);
+        expect(said).toContain(`Waiting for callback on ${redirect}`);
+        expect(said).not.toContain('client-secret');
       } finally {
-        // End the login: the identity provider says no, for this attempt.
-        const state = url.searchParams.get('state') ?? '';
-        await fetch(`${redirect}?error=access_denied&state=${state}`).catch(
-          () => undefined,
-        );
+        // End the login: the identity provider says no.
+        await fetch(`${redirect}?error=access_denied`).catch(() => undefined);
         await failed;
-        stderrWrite.mockRestore();
         expect(stdout).not.toHaveBeenCalled();
         stdout.mockRestore();
       }
@@ -421,9 +356,7 @@ describe('a destination that cannot be served stops the start', () => {
         `--auth-broker-path=${root}`,
       ]);
       expect(exits).toEqual([1]);
-      expect(stderr.join('\n')).toContain(
-        'Destination "dest": the destination states no system URL (SAP_URL)',
-      );
+      expect(stderr.join('\n')).toContain('Destination "dest" lacks: SAP_URL');
       expect(stderr.join('\n')).not.toContain(PASSWORD);
       expect(started()).not.toHaveBeenCalled();
     },

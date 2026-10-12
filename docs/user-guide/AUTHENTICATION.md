@@ -11,18 +11,18 @@ not support`).
 | **Basic** | `basic` | — | HTTP or RFC | `SAP_USERNAME`, `SAP_PASSWORD` |
 | **SNC** (passwordless) | `snc` | — | **RFC only** | `SAP_SNC_PARTNERNAME`; optional `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME`. **No user, no password** |
 | **JWT, browser login** | `jwt` | `authorization_code` | HTTP | A service key (ABAP or XSUAA), or `SAP_UAA_URL`, `SAP_UAA_CLIENT_ID`, `SAP_UAA_CLIENT_SECRET`; the token is obtained and renewed by the server |
-| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (used as it is, never renewed; its session record as auth-stores and auth-broker read it, [below](#a-token-you-hold)), or the `x-sap-jwt-token` header |
+| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (used as it is, never renewed), or the `x-sap-jwt-token` header |
 
 A `.env` that is a destination by itself **must state `SAP_AUTH_TYPE`** (there is no default: a `.env` with a
-user and a password but no type is refused with `Destination "X": … (authType)`; an ABAP service key
+user and a password but no type is refused with `Destination "X" lacks: authType`; an ABAP service key
 states `jwt` / `authorization_code` itself). A `jwt` destination **must state `SAP_GRANT_TYPE`** too. A `.env` that states `jwt` without a grant
-is refused with `Destination "X": … (grantType)` and a hint to regenerate it with
+is refused with `Destination "X" lacks: grantType` and a hint to regenerate it with
 `mcp-auth generate-env --grant <grant>` (see [Generate a `.env`](#generate-a-env)).
 
 Other grants (`client_credentials`, `passcode`, the OIDC and SAML grants) and other types
 (`saml`, `certificate`, `kerberos`) are **not supported** by this server, even though the
 libraries know some of them. A destination that states one is refused, naming it; it is never
-silently run as something else. (A `saml` destination that states no grant is refused naming `grantType`,
+silently run as something else. (A `saml` destination that states no grant gets `lacks: grantType`,
 like a `jwt` one.)
 
 ### SNC
@@ -86,36 +86,11 @@ The session — the token and its refresh token — is the server's to keep curr
   Without it the session is kept in memory: one browser login per process, lost on exit.
   The session is also *read* from `sessions/X.env` only with `--unsafe`: a `jwt` / `none`
   destination whose token (`SAP_JWT_TOKEN`) is in that file is refused without it, as
-  `Destination "X": … (authorizationToken)`. Start with `--unsafe`, or serve the file with
+  `Destination "X" lacks: authorizationToken`. Start with `--unsafe`, or serve the file with
   `--env=X` or `--env-path`, which read it whatever `--unsafe` says.
 
 A destination is **read once per process**. Nothing watches the files: a change you make to a
 `.env` from outside (a new password, a token handed over again) takes effect on **restart**.
-
-**The session record is the stores' and the broker's.** What a session file must hold, and
-whether the credential in it is bound to the destination, are decided by
-[`@mcp-abap-adt/auth-stores`](https://www.npmjs.com/package/@mcp-abap-adt/auth-stores) (the
-store validates its record) and [`@mcp-abap-adt/auth-broker`](https://www.npmjs.com/package/@mcp-abap-adt/auth-broker)
-5 (the binding of a session to its destination). The server reads the file through them and
-answers their refusal in their own words — such as `… the stored session for "X" is not in this
-store's format; regenerate it with mcp-auth`. `mcp-auth` (from `@mcp-abap-adt/auth-broker-cli`
-3.1 or later) writes sessions in their format: `mcp-auth --env <file>` or
-`mcp-auth --destination <name>`. A session written before 18.0.0 reads as unbound: its token is
-not used, and the first renewal is a new login.
-
-### A token you hold
-
-A token you write into a `.env` yourself (`SAP_GRANT_TYPE=none`) is a credential handed over:
-the server never obtains or renews it. Its session record — the token and what auth-stores
-reads beside it — and the binding auth-broker checks it against are theirs: see auth-broker's
-README (`bindingOf`, the `none` rows) and auth-stores' (the store validates its record). A record
-they refuse is refused in their words. The `x-sap-jwt-token` header is not a stored session, so
-neither applies to it.
-
-**Renewal.** A JWT `authorization_code` token is renewed with its refresh token; when the
-refresh is refused, the server logs in again. A session write that does not land is logged and
-the call goes on; the write stays pending until the destination's next write or the shutdown's
-flush (see [Shutdown](#shutdown)).
 
 ### Secrets live in `.env`, configuration in YAML
 
@@ -129,17 +104,13 @@ When there is no valid token, the server opens the system's login page and waits
 redirect on a local callback port.
 
 - `--browser=<name>` (or `MCP_BROWSER`, YAML `browser`): `chrome`, `edge`, `firefox`,
-  `system` / `auto` (the platform's default browser; `system` is the default), `headless`,
-  `none`. Any other name opens the default browser. With `none` or `headless` no browser is
-  opened. The URL to open is printed on stderr (never stdout) whatever `DEBUG_AUTH_LOG` says —
-  also when a browser was asked to open it, and when one could not be opened: the login then
-  keeps waiting for the same callback, so the printed URL still works.
+  `system` (the default), `headless`, `none`. With `none` or `headless` the URL to open is printed
+  on stderr (never stdout), whatever `DEBUG_AUTH_LOG` says.
 - `--browser-auth-port=<port>` (or `MCP_BROWSER_AUTH_PORT`, YAML `browser-auth-port`):
   the callback port, **default `61001`** for every transport. A value that is not an integer
   from 1 to 65535 is refused at startup.
-- The login waits until it is completed or refused, or the server shuts down: nothing ends it
-  on a timer. Several destinations logging in at once take turns: one login at a time per
-  process.
+- The login waits up to 30 s. Several destinations logging in at once take turns: one login
+  at a time per process.
 
 ```bash
 mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=61005
@@ -221,10 +192,9 @@ destination. A request with none of them is answered `400`.
 
 ## Errors you may meet at startup
 
-- `Destination "X": <reason> (<fields>)` — the destination was refused by the authentication
-  libraries (auth-broker, auth-stores) or by the server, in the refuser's words, naming the
-  fields; followed by one hint where the remedy is the server's (`grantType`, `SAP_URL`,
-  `XSUAA_MCP_URL`, `connection-type`, `--unsafe`).
+- `Destination "X" lacks: <fields>` — the destination states less than its authentication
+  needs, followed by one hint where the server knows the remedy (`grantType`, `SAP_URL`,
+  `XSUAA_MCP_URL`, `connection-type`).
 - `Destination "X" uses <type> / <grant>, which this server does not support` — an
   authentication outside the four above (`certificate` and `kerberos` have no grant: `uses certificate`).
 - `--env-path: the file does not exist: <path>` — an env file you named is missing; the server
@@ -232,10 +202,6 @@ destination. A request with none of them is answered `400`.
 - `--auth-broker was removed in 16.0.0 — remove it from the configuration` (likewise
   `MCP_USE_AUTH_BROKER` and `auth-broker (config file)`) — a parameter 16.0.0 removed is still
   set; the start stops, naming the form you used.
-
-- A refused credential is answered in the authentication layer's fixed words (`reason — hint`),
-  such as `the user or password was refused — check the user and password`; they name the kind
-  of failure, never a value.
 
 The server names fields and the words above only; it never prints a value read from a file.
 
@@ -246,9 +212,7 @@ connections, waits up to **30 s** for logins and refreshes in flight, and flushe
 session. It exits `0` when everything is stored. It exits `1`, with one stderr line per fact
 (never a secret, an error's message or anything read from a file), when:
 
-- a secret could not be stored (`Session secrets not stored: "<destination>": <words>` — the
-  fixed words of the failure, such as `persisting the tokens failed (unknown error)`, never
-  what the store said);
+- a secret could not be stored (`Session secrets not stored: "<destination>": <ErrorClass>`);
 - a login or refresh was still running at the 30 s deadline (`N authorizations still running at
   shutdown, their results are lost`);
 - a server did not close (`A server did not close at shutdown: <ErrorClass>`);

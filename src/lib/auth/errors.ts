@@ -3,11 +3,7 @@
  * only — never a value read from a file (H4).
  */
 
-import {
-  DestinationConfigError,
-  isDestinationConfigError,
-} from '@mcp-abap-adt/auth-broker';
-import { StorageError } from '@mcp-abap-adt/auth-stores';
+import { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { DestinationGrant } from '@mcp-abap-adt/interfaces-auth-broker';
 import type { AuthType } from './vocabulary.js';
@@ -90,29 +86,18 @@ const HINTS: Readonly<Record<string, string>> = {
 
 /**
  * The words a user reads for an authentication error the server knows:
- * a `DestinationConfigError` (the broker's own words, then one fixed hint per
- * field whose remedy is this server's — a parameter, a flag; what the broker
- * or a store requires of a record is theirs to say), an
- * `UnsupportedAuthenticationError`, or a
- * `DestinationRefusal` (its own vetted words), the connector's
- * `AuthRefusedError` (the provider's fixed wording), or a session store's
- * refusal of a record not in its format (auth-stores 5: fixed words naming
- * the store and the destination, and how to regenerate it).
+ * a `DestinationConfigError` (the fields it lacks, then one fixed hint per
+ * field with a known remedy), an `UnsupportedAuthenticationError`, or a
+ * `DestinationRefusal` (its own vetted words), or the connector's
+ * `AuthRefusedError` (the provider's fixed wording).
  * `undefined` for anything else — the caller reports it as before. Built from
  * field names and vetted vocabulary only, never a message or a stored value.
  */
 export function describeAuthError(error: unknown): string | undefined {
-  // Structural, as auth-broker 5 says: no `instanceof` across copies.
-  if (isDestinationConfigError(error)) {
+  if (error instanceof DestinationConfigError) {
     const fields = error.missingFields;
-    // The validation is the broker's (or the store's it read), and so are its
-    // words: fixed wording, the destination and field names, never a value —
-    // when its constructor built them. A structural copy (another installed
-    // copy, a JSON round trip) is read by its fields alone.
     const lines = [
-      error instanceof DestinationConfigError
-        ? error.message
-        : `Destination "${error.destination}" was refused (${fields.join(', ')})`,
+      `Destination "${error.destination}" lacks: ${fields.join(', ')}`,
     ];
     for (const field of fields) {
       const hint = Object.hasOwn(HINTS, field) ? HINTS[field] : undefined;
@@ -121,9 +106,6 @@ export function describeAuthError(error: unknown): string | undefined {
     return lines.join('\n');
   }
   if (error instanceof DestinationRefusal) return error.message;
-  if (error instanceof StorageError && error.reason === 'record-format') {
-    return error.message;
-  }
   // The connector's refusal: its wording is fixed by the provider (spec §8).
   if (error instanceof AuthRefusedError) return error.message;
   if (error instanceof UnsupportedAuthenticationError) {

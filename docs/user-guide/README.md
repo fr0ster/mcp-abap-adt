@@ -30,7 +30,6 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=<token>
-# The rest of the session record is auth-stores' and auth-broker's: see AUTHENTICATION.md#a-token-you-hold
 EOF
 
 # stdio (for MCP clients)

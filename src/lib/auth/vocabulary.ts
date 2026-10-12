@@ -1,5 +1,5 @@
 /**
- * The vocabulary of authentication auth-broker 5 accepts, held in code.
+ * The vocabulary of authentication broker 4 accepts, held in code.
  *
  * A key store answers `authType` and `grantType` as the strings its file
  * holds, unchecked. `vetMeans` checks them before anything is built; an

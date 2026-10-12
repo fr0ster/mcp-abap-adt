@@ -1210,10 +1210,20 @@ its table**. The help, the YAML template and the validation come from it.
   `mcp-abap-adt-http` (`@mcp-abap-adt/http`)"); `MCP_TLS_*` / `--tls-*` ("TLS is an option of
   `mcp-abap-adt-http` and `mcp-abap-adt-sse`");
 - in the HTTP and SSE binaries, `--mcp`, `--env`, `--env-path`, `--allow-destination-header`,
-  `--unsafe`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug` ("destinations and
+  `--unsafe`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, `--auth-broker-path`,
+  `--connection-type` ("destinations and
   logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers"); in the HTTP binaries
   the SSE options, and in the SSE binaries the Streamable HTTP ones, each with the sentence above
   naming the binary that serves it.
+
+**Which forms are refused — decided by the user.** Another binary's option stops the start in its
+CLI and YAML forms, which are stated for this run. Its environment variable is not read: an
+environment is inherited (a shell profile, one `EnvironmentFile` for several binaries), and 17.x
+ignored these variables in a working configuration. So `MCP_SSE_*`, `MCP_HTTP_*` and `MCP_TLS_*`
+are ignored by core and compact, `MCP_SSE_*` by the HTTP binaries, `MCP_HTTP_*` by the SSE ones, and
+`MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`, `AUTH_BROKER_PATH`
+and `SAP_CONNECTION_TYPE` by the HTTP and SSE binaries. The one environment variable refused
+everywhere is `MCP_TRANSPORT`: it stated the transport, and a binary now is one.
 
 ### 10.2 Each current call site → its new form
 

@@ -1,7 +1,7 @@
 /**
- * The tool list a standalone binary serves for an exposition: the group
- * building every launcher shares (core, http, sse), so none copies it and
- * none imports another's. A7 turns it into the `ToolSet` contract.
+ * The groups of the full tool set for an exposition: the group building every
+ * launcher shares (core, http, sse) through `fullToolSet`
+ * (`@mcp-abap-adt/lib/tool-set`), so none copies it and none imports another's.
  */
 
 import type { HandlerSet } from '../../config/IServerConfig.js';
@@ -23,19 +23,16 @@ export interface ExpositionRegistryOptions {
 }
 
 /**
- * The registry for `exposition`: the non-readonly groups first, so their
- * tool names feed the readonly dedup (`ReadVsGetDedupStrategy`), then the
- * readonly and system groups, the others, and search unless refused.
+ * The groups for `exposition`, built against `baseContext`: the non-readonly
+ * groups first, so their tool names feed the readonly dedup
+ * (`ReadVsGetDedupStrategy`), then the readonly and system groups, the
+ * others, and search unless refused — in registration order.
  */
-export function registryForExposition(
-  exposition: readonly HandlerSet[],
+export function expositionGroups(
+  exposition: readonly string[],
+  baseContext: HandlerContext,
   options: ExpositionRegistryOptions = {},
-): CompositeHandlersRegistry {
-  const baseContext = {
-    connection: undefined as never,
-    logger: undefined,
-  } satisfies HandlerContext;
-
+): IHandlerGroup[] {
   const overridingGroups: IHandlerGroup[] = [];
   if (exposition.includes('high')) {
     overridingGroups.push(new HighLevelHandlersGroup(baseContext));
@@ -72,5 +69,19 @@ export function registryForExposition(
   if (options.includeSearch !== false) {
     handlerGroups.push(new SearchHandlersGroup(baseContext));
   }
-  return new CompositeHandlersRegistry(handlerGroups);
+  return handlerGroups;
+}
+
+/** The registry of {@link expositionGroups}, against a context with no connection. */
+export function registryForExposition(
+  exposition: readonly HandlerSet[],
+  options: ExpositionRegistryOptions = {},
+): CompositeHandlersRegistry {
+  const baseContext = {
+    connection: undefined as never,
+    logger: undefined,
+  } satisfies HandlerContext;
+  return new CompositeHandlersRegistry(
+    expositionGroups(exposition, baseContext, options),
+  );
 }

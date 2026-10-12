@@ -18,6 +18,12 @@ an environment is inherited, so one shell profile or one `EnvironmentFile` can s
 | `mcp-abap-adt-http` | `@mcp-abap-adt/http` | Streamable HTTP | each request's `x-sap-*` headers only |
 | `mcp-abap-adt-sse` | `@mcp-abap-adt/sse` | HTTP + SSE | the `x-sap-*` headers of the `GET` that opens each SSE connection |
 | `mcp-abap-adt-compact` | `@mcp-abap-adt/compact` | stdio | as `mcp-abap-adt`, with the compact tool set |
+| `mcp-abap-adt-compact-http` | `@mcp-abap-adt/compact-http` | Streamable HTTP | as `mcp-abap-adt-http`, with the compact tool set |
+| `mcp-abap-adt-compact-sse` | `@mcp-abap-adt/compact-sse` | HTTP + SSE | as `mcp-abap-adt-sse`, with the compact tool set |
+
+A compact binary's table is its full counterpart's with compact's `--exposition` row (`ro` /
+`rw`, `debug` beside either), nothing else: its help, `--conf` template and config-file validation
+show compact's values, and a config file's `exposition` is read by compact's parser.
 
 Each binary's `--help` lists exactly its own table; `--version` prints its version.
 
@@ -54,9 +60,9 @@ its sentence:
 - `mcp-abap-adt` (and `mcp-abap-adt-compact`): "`--transport` is gone: `mcp-abap-adt` serves
   stdio; for Streamable HTTP run `mcp-abap-adt-http`, for SSE `mcp-abap-adt-sse` (compact:
   `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse`)"
-- `mcp-abap-adt-http`: "`--transport` is gone: `mcp-abap-adt-http` serves Streamable HTTP; for
+- `mcp-abap-adt-http` (and `mcp-abap-adt-compact-http`): "`--transport` is gone: `mcp-abap-adt-http` serves Streamable HTTP; for
   stdio run `mcp-abap-adt`, for SSE `mcp-abap-adt-sse`"
-- `mcp-abap-adt-sse`: "`--transport` is gone: `mcp-abap-adt-sse` serves SSE; for stdio run
+- `mcp-abap-adt-sse` (and `mcp-abap-adt-compact-sse`): "`--transport` is gone: `mcp-abap-adt-sse` serves SSE; for stdio run
   `mcp-abap-adt`, for Streamable HTTP `mcp-abap-adt-http`"
 
 ### YAML configuration file
@@ -330,8 +336,9 @@ mcp-abap-adt-sse \
 
 A comma list of the tool sets to serve: `readonly`, `high`, `low`, `debug`. Default
 `readonly,high`. `high` and `low` are mutually exclusive; `compact` is refused (the
-compact facade is its own command, `mcp-abap-adt-compact`, whose `--exposition` takes `ro` / `rw`
-and `debug` beside either). The search tools are always served, the system tools with `readonly`.
+compact facade is its own binaries, `mcp-abap-adt-compact`, `-compact-http` and `-compact-sse`,
+whose `--exposition` takes `ro` / `rw` and `debug` beside either). A set the binary does not serve
+stops the start in its words. The search tools are always served, the system tools with `readonly`.
 
 `debug` is the debugger — opt-in, never part of the default, because a breakpoint or a
 listener catches every request of the connected SAP user. It goes beside any other set,

@@ -50,6 +50,9 @@
       ],
       "@mcp-abap-adt/lib/state": [
         "../dist/lib/state/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/tool-set": [
+        "../dist/lib/toolSet.d.ts"
       ]
     }
   },

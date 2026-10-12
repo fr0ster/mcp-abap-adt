@@ -247,7 +247,8 @@ src/handlers/
 They are thin over `src/lib/debugger/` (the debug sessions) and `src/lib/state/`
 (the instance state that holds them between tool calls and mints the
 `state_handle`), published as `@mcp-abap-adt/lib/debugger` and
-`@mcp-abap-adt/lib/state`. The compact verbs live in `compact/src/debug/`.
+`@mcp-abap-adt/lib/state`. The compact verbs live in `src/lib/compact/debug/`, served by
+the compact tool set of `@mcp-abap-adt/lib/tool-set` on every transport.
 
 ## Security Recommendations
 

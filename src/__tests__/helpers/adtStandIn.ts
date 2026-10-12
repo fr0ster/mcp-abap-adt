@@ -1,6 +1,7 @@
 /**
  * An ADT stand-in on 127.0.0.1 for the transports' credential suites: it
- * answers every request `200` with a CSRF token and a session cookie, and records each request's
+ * answers every request `200` with a CSRF token and a session cookie — or
+ * `401` while it is told to refuse — and records each request's
  * method, path and `Authorization` header — what a credential put on the
  * wire. A probe tool that sends `GET /sap/bc/adt/probe/<id>` lets a suite
  * tell which call presented which credential.
@@ -24,6 +25,8 @@ export interface AdtStandIn {
   requests: StandInRequest[];
   /** The `Authorization` of the probe request `id` sent, if it came. */
   authorizationOf(id: string): string | undefined;
+  /** While on, every request is answered `401`: the system refuses the credential. */
+  refuse(on: boolean): void;
   close(): Promise<void>;
 }
 
@@ -31,6 +34,7 @@ export const PROBE_PATH = '/sap/bc/adt/probe/';
 
 export async function adtStandIn(): Promise<AdtStandIn> {
   const requests: StandInRequest[] = [];
+  let refusing = false;
   const server = http.createServer((req, res) => {
     requests.push({
       method: req.method ?? '',
@@ -39,6 +43,11 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     });
     req.resume();
     req.on('end', () => {
+      if (refusing) {
+        res.writeHead(401, { 'content-type': 'text/plain' });
+        res.end('');
+        return;
+      }
       res.writeHead(200, {
         'content-type': 'text/plain',
         'x-csrf-token': 'csrf-placeholder',
@@ -57,6 +66,9 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     requests,
     authorizationOf: (id) =>
       requests.find((r) => r.url === `${PROBE_PATH}${id}`)?.authorization,
+    refuse: (on) => {
+      refusing = on;
+    },
     close: () =>
       new Promise<void>((resolve) => {
         server.closeAllConnections();

@@ -16,6 +16,7 @@ import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
@@ -33,6 +34,13 @@ import {
   factoryConfig,
   recordingLogins,
 } from '../helpers/factoryFixture';
+
+/** The launcher's options as `mcp-abap-adt` passes them. */
+const TEST_OPTIONS = {
+  toolSet: fullToolSet,
+  program: 'mcp-abap-adt',
+  version: '0.0.0-test',
+};
 
 const TOKEN = 'record-token-PLACEHOLDER.payload.signature';
 const REFRESH = 'record-refresh-PLACEHOLDER';
@@ -165,19 +173,15 @@ async function start(argv: string[]) {
   const stdioStart = jest
     .spyOn(StdioServer.prototype, 'start')
     .mockResolvedValue(undefined);
-  await launch(
-    config,
-    { exposition: ['readonly'], includeSearch: false },
-    {
-      browserStrategy: logins.browserStrategy,
-      stderr: (line) => stderr.push(line),
-      exit: (code) => exits.push(code),
-      processLike: Object.assign(new EventEmitter(), {
-        stdin: new EventEmitter(),
-      }),
-      platform: 'linux',
-    },
-  );
+  await launch(config, TEST_OPTIONS, {
+    browserStrategy: logins.browserStrategy,
+    stderr: (line) => stderr.push(line),
+    exit: (code) => exits.push(code),
+    processLike: Object.assign(new EventEmitter(), {
+      stdin: new EventEmitter(),
+    }),
+    platform: 'linux',
+  });
   const started = stdioStart.mock.calls.length;
   stdioStart.mockRestore();
   return { stderr, exits, logins, started };

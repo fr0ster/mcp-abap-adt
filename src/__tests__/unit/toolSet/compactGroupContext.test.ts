@@ -16,10 +16,23 @@
  * and the halves are what a consumer imports directly.
  */
 
-import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
-import { CompactReadOnlyHandlersGroup } from '@mcp-abap-adt/compact-readonly';
+import {
+  CompactModifyHandlersGroup,
+  compactModifyEntries,
+} from '@mcp-abap-adt/compact-modify';
+import {
+  CompactReadOnlyHandlersGroup,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { CompactHandlersGroup } from '../group';
+import { CompactHandlersGroup } from '../../../lib/compact/group';
+
+/** lib's composition of the two halves, as `compactToolSetOf` builds it for `rw`. */
+class BothHalvesGroup extends CompactHandlersGroup {
+  constructor(context: HandlerContext) {
+    super(context, [compactReadOnlyEntries, compactModifyEntries]);
+  }
+}
 
 /** A context that is recognisable when a handler reports what it received. */
 const contextNamed = (name: string): HandlerContext =>
@@ -30,7 +43,7 @@ const contextNamed = (name: string): HandlerContext =>
 
 describe('compact groups read the context of the current request', () => {
   const groups = [
-    ['CompactHandlersGroup', CompactHandlersGroup],
+    ['CompactHandlersGroup', BothHalvesGroup],
     ['CompactReadOnlyHandlersGroup', CompactReadOnlyHandlersGroup],
     ['CompactModifyHandlersGroup', CompactModifyHandlersGroup],
   ] as const;

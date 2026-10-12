@@ -1,12 +1,12 @@
-import { DETAIL_PROPERTY } from '@mcp-abap-adt/lib/compact-shared';
 import {
   debugAnswer,
   debugStateAnswer,
   HOLD_SECONDS_PROPERTY,
   STATE_HANDLE_PROPERTY,
   terseAmdpEvent,
-} from '@mcp-abap-adt/lib/debugger';
-import type { ArgsOf, HandlerContext } from '@mcp-abap-adt/lib/handlers';
+} from '../../debugger/index';
+import type { ArgsOf, HandlerContext } from '../../handlers/index';
+import { DETAIL_PROPERTY } from '../index';
 import { branchByKind, failedAnswer } from './shared';
 
 export const TOOL_DEFINITION = {

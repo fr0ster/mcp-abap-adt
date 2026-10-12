@@ -43,7 +43,10 @@ export { expositionHelp, toHandlerSets } from './exposition.js';
 export type { HandlerSet, IServerConfig, TlsConfig } from './IServerConfig.js';
 export { readStartupConfig, type StartupEdges } from './startup.js';
 export { readStateIdleMinutes } from './stateIdleMinutes.js';
-export { validateExposition } from './validateExposition.js';
+export {
+  expositionProblem,
+  validateExposition,
+} from './validateExposition.js';
 export {
   type ConfigurationRead,
   generateConfigTemplateIfNeeded,

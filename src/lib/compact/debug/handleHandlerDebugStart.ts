@@ -1,4 +1,3 @@
-import { DETAIL_PROPERTY } from '@mcp-abap-adt/lib/compact-shared';
 import {
   amdpBreakpointsFromArgs,
   BREAKPOINTS_PROPERTY,
@@ -11,8 +10,9 @@ import {
   runFromArgs,
   TAKE_OVER_SENTENCE,
   USER_MODE_SENTENCE,
-} from '@mcp-abap-adt/lib/debugger';
-import type { ArgsOf, HandlerContext } from '@mcp-abap-adt/lib/handlers';
+} from '../../debugger/index';
+import type { ArgsOf, HandlerContext } from '../../handlers/index';
+import { DETAIL_PROPERTY } from '../index';
 import { refuseOtherKind } from './shared';
 
 export const TOOL_DEFINITION = {

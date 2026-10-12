@@ -35,6 +35,7 @@
       "@mcp-abap-adt/lib/request-context": ["./src/lib/requestContext.ts"],
       "@mcp-abap-adt/lib/auth": ["./src/lib/auth/index.ts"],
       "@mcp-abap-adt/lib/http-transport": ["./src/lib/httpTransport/index.ts"],
+      "@mcp-abap-adt/lib/tool-set": ["./src/lib/toolSet.ts"],
       "@mcp-abap-adt/compact-readonly": ["./compact-readonly/src/index.ts"],
       "@mcp-abap-adt/compact-readonly/routes": ["./compact-readonly/src/handlers/compactReadRoutes.ts"],
       "@mcp-abap-adt/compact-modify": ["./compact-modify/src/index.ts"],
@@ -42,7 +43,12 @@
       "@mcp-abap-adt/core/launcher": ["./server/src/launcher.ts"],
       "@mcp-abap-adt/core/auth": ["./server/src/auth/index.ts"],
       "@mcp-abap-adt/http": ["./http/src/index.ts"],
-      "@mcp-abap-adt/sse": ["./sse/src/index.ts"]
+      "@mcp-abap-adt/sse": ["./sse/src/index.ts"],
+      "@mcp-abap-adt/http/launcher": ["./http/src/launcher.ts"],
+      "@mcp-abap-adt/sse/launcher": ["./sse/src/launcher.ts"],
+      "@mcp-abap-adt/compact/launcher": ["./compact/src/launcher.ts"],
+      "@mcp-abap-adt/compact-http/launcher": ["./compact-http/src/launcher.ts"],
+      "@mcp-abap-adt/compact-sse/launcher": ["./compact-sse/src/launcher.ts"]
     }
   },
   "include": [
@@ -50,6 +56,8 @@
     "compact-readonly/src/**/*",
     "compact-modify/src/**/*",
     "compact/src/**/*",
+    "compact-http/src/**/*",
+    "compact-sse/src/**/*",
     "src/__tests__/**/*",
     "src/lib/servers/v2/__tests__/**/*",
     "scripts/lib/**/*",

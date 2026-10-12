@@ -14,6 +14,7 @@ import {
   validateExposition,
   validateYamlConfig,
 } from '@mcp-abap-adt/lib/config';
+import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { load } from 'js-yaml';
 import { HTTP_PARAMETERS, readHttpConfig } from '../../config/httpParameters';
 import { httpHelp, main } from '../../launcher';
@@ -67,7 +68,11 @@ async function start(argv: string[], env: NodeJS.ProcessEnv = {}) {
   const served = jest
     .spyOn(StreamableHttpServer.prototype, 'start')
     .mockResolvedValue(undefined);
-  await main();
+  await main({
+    toolSet: fullToolSet,
+    program: 'mcp-abap-adt-http',
+    version: '0.0.0-test',
+  });
   return {
     stderr: written.join(''),
     exits,

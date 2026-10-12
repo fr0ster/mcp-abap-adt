@@ -100,11 +100,32 @@ The packages, all at **18.0.0**:
 
 ## compact users
 
-### Over stdio
+**A package per transport, and the same tools on each.** The compact tool set is served by three
+packages, each with one binary and its transport's options only:
 
-### Over Streamable HTTP
+| You ran | Install | Run |
+|---|---|---|
+| `mcp-abap-adt-compact` (stdio) | `@mcp-abap-adt/compact` | `mcp-abap-adt-compact` |
+| `mcp-abap-adt-compact --transport=http` | `@mcp-abap-adt/compact-http` | `mcp-abap-adt-compact-http` |
+| `mcp-abap-adt-compact --transport=sse` | `@mcp-abap-adt/compact-sse` | `mcp-abap-adt-compact-sse` |
 
-### Over SSE
+- Each binary is its full counterpart's launcher with the compact tool set, nothing else:
+  `mcp-abap-adt-compact` takes `mcp-abap-adt`'s options (the destination, the login),
+  `mcp-abap-adt-compact-http` `mcp-abap-adt-http`'s (credentials from each request's `x-sap-*`
+  headers), `mcp-abap-adt-compact-sse` `mcp-abap-adt-sse`'s. The sections above apply to each as
+  to its counterpart; only the tool list and `--exposition` differ.
+- **`--exposition` is compact's on each**: `rw` (all 25 tools, the default) or `ro` (the 16 that
+  change nothing), and `debug` beside either for the four debugger verbs (`HandlerDebugStart`,
+  `…Wait`, `…View`, `…Step`) — on stdio, Streamable HTTP and SSE alike. `debug` alone, an empty
+  value and a set of the full binaries (`readonly`, `high`, `low`) stop the start, as in 17.x.
+- **A config file's `exposition` is honoured now.** 17.x read compact's exposition from the command
+  line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
+  ignored. Each compact binary's template now writes `exposition: rw`, its help lists `ro` / `rw`
+  / `debug`, and a config file's `exposition` is read by the same parser as the flag (the flag
+  wins): `exposition: ro` serves the 16 tools, `exposition: readonly,high` stops the start —
+  replace it with `ro` or `rw`.
+- `@mcp-abap-adt/compact-http` and `@mcp-abap-adt/compact-sse` do not depend on
+  `@mcp-abap-adt/core`: neither the auth broker nor the stores are installed with them.
 
 ## stdio users
 
@@ -239,8 +260,22 @@ The packages, all at **18.0.0**:
   `installTransportShutdown`, `CREDENTIALS_REQUIRED_WORDS`, `DESTINATIONS_ONLY_STDIO_WORDS`,
   besides the DNS-rebinding protection and the TLS listener. `destinationFromHeader`,
   `FirstConnectLock`, `destinationFailureAnswer` and `DestinationHeaderError` are gone.
-- **`registryForExposition(exposition, { extraGroups?, includeSearch? })`**
-  (`@mcp-abap-adt/lib/handlers`) builds the tool list every binary serves.
+- **The tools a binary serves are its `ToolSet`** (`@mcp-abap-adt/lib/tool-set`): the groups for
+  an exposition, and the exposition's row, default and help. `fullToolSet` is the full binaries'
+  (readonly, high, low, debug, search, system); `compactToolSetOf({ readOnly, modify })` composes
+  the compact halves' entry builders (`compactReadOnlyEntries`, `compactModifyEntries`) — the
+  compact debugger verbs moved into lib with it; `registryOf(toolSet, exposition)` builds the
+  registry. core's, http's and sse's `main({ toolSet, program, version })` take nothing else of the
+  tools: `LauncherOptions`' `extraGroups`, `exposition`, `helpExposition` and `includeSearch` are
+  gone, and `main()` without options is a type error. Each binary's table is a function of the set
+  (`coreParameters(toolSet)`, `httpParameters(toolSet)`, `sseParameters(toolSet)`; the constants are
+  the full set's), and `readCoreConfig` / `readHttpConfig` / `readSseConfig` take the set as a
+  fourth argument (default `fullToolSet`). `@mcp-abap-adt/compact` no longer exports
+  `CompactHandlersGroup` or `compactExtraGroups`: it exports `compactToolSet` and `main`.
+  `registryForExposition` (`@mcp-abap-adt/lib/handlers`) stays, building the full set's registry.
+- **An exposition the set does not serve stops the start in its words** (`--exposition=high,low`,
+  `compact` on a full binary): `[MCP] Invalid exposition: …`, exit 1 — 17.x failed the launcher with
+  no words.
 - **Each binary reads its own parameter table** (`@mcp-abap-adt/lib/config` keeps the machinery
   and the shared rows). `ServerConfigManager`, `ArgumentsParser` and `applyYamlConfigToArgs` are
   gone: read a binary's configuration with `readCoreConfig(argv, env, yaml)` / `CORE_PARAMETERS`

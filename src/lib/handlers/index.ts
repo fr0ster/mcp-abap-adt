@@ -27,5 +27,6 @@ export * from './interfaces.js';
 export { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
 export {
   type ExpositionRegistryOptions,
+  expositionGroups,
   registryForExposition,
 } from './registry/expositionRegistry.js';

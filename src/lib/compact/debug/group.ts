@@ -11,7 +11,7 @@ import {
   BaseHandlerGroup,
   defineTool,
   type HandlerEntry,
-} from '@mcp-abap-adt/lib/handlers';
+} from '../../handlers/index';
 import {
   TOOL_DEFINITION as HandlerDebugStart_Tool,
   handleHandlerDebugStart,

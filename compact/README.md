@@ -1,6 +1,9 @@
 # @mcp-abap-adt/compact
 
-The compact MCP server — the command that serves all 25, and the four debugger verbs on request.
+The compact MCP server over **stdio** — the command that serves all 25, and the four debugger verbs on
+request. Streamable HTTP is [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)
+(`mcp-abap-adt-compact-http`), SSE [`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse)
+(`mcp-abap-adt-compact-sse`): the same tools, a package per transport.
 
 ## What compact is
 
@@ -31,7 +34,7 @@ smaller install, and it is not a sandbox — code that deliberately reaches into
 
 ```bash
 npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact                    # stdio, all 25 compact tools
+mcp-abap-adt-compact                    # stdio, all 25 compact tools (no --transport: a binary is its transport)
 mcp-abap-adt-compact --exposition=ro    # the 16 that change nothing
 mcp-abap-adt-compact --exposition=rw,debug   # all 25 and the four debugger verbs
 mcp-abap-adt-compact --version
@@ -41,7 +44,8 @@ mcp-abap-adt-compact --version
 what a local server gives) or **`ro`** (the 16 tools that change nothing: no create,
 update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool
 list at all, so a client cannot call one). The object-oriented sets
-`readonly`/`high`/`low` belong to `mcp-abap-adt` and are refused here by name.
+`readonly`/`high`/`low` belong to `mcp-abap-adt` and are refused here by name. A config file's
+`exposition` (`--conf`) is read the same way, the flag winning; the template writes `exposition: rw`.
 
 **The debugger is opt-in.** `debug` beside `ro` or `rw` (`--exposition=ro,debug`)
 adds four verbs: `HandlerDebugStart` (`kind: abap|amdp`, the breakpoints, `take_over`,
@@ -53,9 +57,10 @@ tools unasked. A breakpoint catches every request of the connected SAP user, whi
 is why the verbs are never served by default. What a debug session is, what keeps it
 alive on each transport and what ends it: [Debugger](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 
-Configuration — connection, authentication, transports — is the same as
-`mcp-abap-adt`'s, because the launcher is the same one: this command passes its own
-tool list to `@mcp-abap-adt/core`'s launcher rather than reimplementing it. The
+Configuration — the destination, authentication, the login — is the same as
+`mcp-abap-adt`'s, because the launcher is the same one: this command passes the
+compact tool set (`compactToolSetOf` of `@mcp-abap-adt/lib/tool-set`, with the two
+halves' entry builders) to `@mcp-abap-adt/core`'s `main`, and nothing else. The
 object-oriented command no longer accepts `--exposition=compact`; it refuses the
 value and names this package.
 

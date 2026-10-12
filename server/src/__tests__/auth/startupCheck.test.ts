@@ -8,6 +8,7 @@
 
 import { EventEmitter } from 'node:events';
 import type { BrokerCallOptions } from '@mcp-abap-adt/auth-broker';
+import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { readCoreConfig } from '../../config/coreParameters';
 import { launch } from '../../launcher';
@@ -20,6 +21,13 @@ import {
   recordingLogins,
   SYSTEM_URL,
 } from '../helpers/factoryFixture';
+
+/** The launcher's options as `mcp-abap-adt` passes them. */
+const TEST_OPTIONS = {
+  toolSet: fullToolSet,
+  program: 'mcp-abap-adt',
+  version: '0.0.0-test',
+};
 
 const savedArgv = process.argv;
 const savedEnv = { ...process.env };
@@ -67,17 +75,13 @@ async function run(argv: string[], platform = 'linux') {
   const processLike = Object.assign(new EventEmitter(), {
     stdin: new EventEmitter(),
   });
-  await launch(
-    config,
-    { exposition: ['readonly'], includeSearch: false },
-    {
-      browserStrategy: recordingLogins().browserStrategy,
-      stderr: (line) => stderr.push(line),
-      exit: (code) => exits.push(code),
-      processLike,
-      platform,
-    },
-  );
+  await launch(config, TEST_OPTIONS, {
+    browserStrategy: recordingLogins().browserStrategy,
+    stderr: (line) => stderr.push(line),
+    exit: (code) => exits.push(code),
+    processLike,
+    platform,
+  });
   return { stderr, exits };
 }
 

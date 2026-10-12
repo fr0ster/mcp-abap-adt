@@ -1,33 +1,40 @@
 /**
  * `mcp-abap-adt-http` — the Streamable HTTP binary (D35, D39). Credentials
  * come only from each request's `x-sap-*` headers; no destination, no
- * broker, no store, no login. A7 adds the `ToolSet`.
+ * broker, no store, no login. The tools are the `ToolSet` the command passes.
  */
 
 import type { EventEmitter } from 'node:events';
-import {
-  expositionHelp,
-  generateHelp,
-  readStartupConfig,
-  validateExposition,
-} from '@mcp-abap-adt/lib/config';
-import { registryForExposition } from '@mcp-abap-adt/lib/handlers';
+import { generateHelp, readStartupConfig } from '@mcp-abap-adt/lib/config';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
 import {
-  HTTP_PARAMETERS,
+  fullToolSet,
+  registryOf,
+  type ToolSet,
+} from '@mcp-abap-adt/lib/tool-set';
+import {
   type HttpConfig,
+  httpParameters,
   readHttpConfig,
 } from './config/httpParameters.js';
-import { HTTP_VERSION } from './httpVersion.js';
 import { StreamableHttpServer } from './StreamableHttpServer.js';
 
+/**
+ * What a command passes http's launcher (spec §3.5, D37, D49): the tools it
+ * serves, and its own name and version — nothing else. Everything the
+ * launcher does is http's, the same for any tool set:
+ * `mcp-abap-adt-http` passes `fullToolSet`, `mcp-abap-adt-compact-http` the
+ * compact set.
+ */
 export interface HttpLauncherOptions {
-  /** The command's own name, for USAGE in `--help`. */
-  program?: string;
-  /** The version `--version` and `initialize` report; default http's own. */
-  version?: string;
+  /** The tools served, and the `--exposition` they are chosen by. */
+  toolSet: ToolSet;
+  /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
+  program: string;
+  /** The version `--version` and `initialize` report: the command's own package's. */
+  version: string;
 }
 
 /** What the launcher takes from the program: the process's edges. */
@@ -36,6 +43,25 @@ export interface HttpLauncherDeps {
   exit: (code: number) => void;
   /** Where the shutdown listens: `process` in the program. */
   processLike: EventEmitter;
+}
+
+/** The process as `main` meets it; a test passes its own. */
+export interface HttpLauncherEdges extends HttpLauncherDeps {
+  /** The arguments, without node's and the script's. */
+  argv: readonly string[];
+  /** `--version`'s one line. */
+  stdout: (line: string) => void;
+}
+
+/** The edges of the program: `process`. */
+export function processEdges(): HttpLauncherEdges {
+  return {
+    argv: process.argv.slice(2),
+    stdout: (line) => console.log(line),
+    stderr: (line) => process.stderr.write(`${line}\n`),
+    exit: (code) => process.exit(code),
+    processLike: process,
+  };
 }
 
 const HELP_SECTIONS = `
@@ -62,43 +88,47 @@ CREDENTIALS (each request's headers; nothing is stored, shared or cached):
   A health check answers GET /mcp/health.
 `;
 
-/** http's help: its own table, the exposition, the headers. */
-export function httpHelp(options: HttpLauncherOptions = {}): string {
-  return generateHelp(
-    { ...HTTP_PARAMETERS, program: options.program ?? HTTP_PARAMETERS.program },
-    {
-      description:
-        "  MCP server for SAP ABAP systems via ADT, over Streamable HTTP: credentials only from\n  each request's x-sap-* headers. stdio (destinations, logins) is mcp-abap-adt, SSE\n  mcp-abap-adt-sse; a binary is its transport.",
-      sections: [expositionHelp(), HELP_SECTIONS],
-    },
-  );
+/** http's help: its own table with the tool set's exposition row, the set's exposition, the headers. */
+export function httpHelp(
+  options: { toolSet?: ToolSet; program?: string } = {},
+): string {
+  const toolSet = options.toolSet ?? fullToolSet;
+  return generateHelp(httpParameters(toolSet, options.program), {
+    description:
+      "  MCP server for SAP ABAP systems via ADT, over Streamable HTTP: credentials only from\n  each request's x-sap-* headers. stdio (destinations, logins) is mcp-abap-adt, SSE\n  mcp-abap-adt-sse; a binary is its transport.",
+    sections: [toolSet.expositionHelp, HELP_SECTIONS],
+  });
 }
 
-export async function main(options: HttpLauncherOptions = {}): Promise<void> {
-  const version = options.version ?? HTTP_VERSION;
-  if (process.argv.includes('--version') || process.argv.includes('-v')) {
-    console.log(version);
-    process.exit(0);
+export async function main(
+  options: HttpLauncherOptions,
+  edges: HttpLauncherEdges = processEdges(),
+): Promise<StreamableHttpServer | undefined> {
+  const { argv, stderr, exit } = edges;
+  if (argv.includes('--version') || argv.includes('-v')) {
+    edges.stdout(options.version);
+    exit(0);
+    return undefined;
   }
-  if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.error(httpHelp(options));
-    process.exit(0);
+  if (argv.includes('--help') || argv.includes('-h')) {
+    stderr(httpHelp(options));
+    exit(0);
+    return undefined;
   }
-  const stderr = (line: string) => process.stderr.write(`${line}\n`);
-  const exit = (code: number) => process.exit(code);
-  // http's own table: an option of another binary, or --transport, stops here.
+  // http's own table with the set's exposition row: an option of another
+  // binary, --transport, or an exposition the set does not serve stops here.
   const config = readStartupConfig(
-    HTTP_PARAMETERS,
-    process.argv.slice(2),
+    httpParameters(options.toolSet, options.program),
+    argv,
     process.env,
     { stderr, exit },
-    readHttpConfig,
+    (args, env, yaml) => readHttpConfig(args, env, yaml, options.toolSet),
   );
-  if (config === undefined) return;
-  await launch(config, options, {
+  if (config === undefined) return undefined;
+  return launch(config, options, {
     stderr,
     exit,
-    processLike: process,
+    processLike: edges.processLike,
   });
 }
 
@@ -111,23 +141,29 @@ export async function launch(
   // The connector and the tool filter read the system kind from the
   // environment (`resolveSystemKind`).
   if (config.systemType) process.env.SAP_SYSTEM_TYPE = config.systemType;
-  const exposition = config.exposition ?? ['readonly', 'high'];
-  validateExposition(exposition);
-  const server = new StreamableHttpServer(registryForExposition(exposition), {
-    version: options.version ?? HTTP_VERSION,
-    stateIdleMinutes: config.stateIdleMinutes,
-    // The state's lines go to stderr whatever the transport logger says.
-    stateLogger: stderrStateLogger,
-    host: config.host,
-    port: config.port,
-    enableJsonResponse: config.httpJsonResponse || undefined,
-    path: config.httpPath,
-    logger: noopLogger,
-    tls: config.tls,
-    allowedHosts: config.allowedHosts,
-    allowedOrigins: config.allowedOrigins,
-    enableDnsRebindingProtection: config.enableDnsRebindingProtection,
-  });
+  // The tool set's groups for the exposition read (a config made by hand
+  // without one: the set's default).
+  const exposition =
+    config.exposition ??
+    options.toolSet.exposition(options.toolSet.expositionRow.default, []);
+  const server = new StreamableHttpServer(
+    registryOf(options.toolSet, exposition),
+    {
+      version: options.version,
+      stateIdleMinutes: config.stateIdleMinutes,
+      // The state's lines go to stderr whatever the transport logger says.
+      stateLogger: stderrStateLogger,
+      host: config.host,
+      port: config.port,
+      enableJsonResponse: config.httpJsonResponse || undefined,
+      path: config.httpPath,
+      logger: noopLogger,
+      tls: config.tls,
+      allowedHosts: config.allowedHosts,
+      allowedOrigins: config.allowedOrigins,
+      enableDnsRebindingProtection: config.enableDnsRebindingProtection,
+    },
+  );
   installTransportShutdown({
     stop: () => server.stop(),
     exit: deps.exit,

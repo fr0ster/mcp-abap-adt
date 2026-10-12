@@ -1,4 +1,3 @@
-import { DETAIL_PROPERTY } from '@mcp-abap-adt/lib/compact-shared';
 import {
   addressOf,
   type BreakpointTarget,
@@ -8,8 +7,9 @@ import {
   LINE_TARGET_PROPERTIES,
   lineUriOf,
   STATE_HANDLE_PROPERTY,
-} from '@mcp-abap-adt/lib/debugger';
-import type { ArgsOf, HandlerContext } from '@mcp-abap-adt/lib/handlers';
+} from '../../debugger/index';
+import type { ArgsOf, HandlerContext } from '../../handlers/index';
+import { DETAIL_PROPERTY } from '../index';
 import { branchByKind, failedAnswer } from './shared';
 
 export const TOOL_DEFINITION = {

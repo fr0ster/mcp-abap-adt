@@ -8,7 +8,6 @@
 
 import {
   CONF_ROW,
-  EXPOSITION_ROW,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
   type Parameter,
@@ -20,10 +19,10 @@ import {
   STATE_IDLE_ROW,
   SYSTEM_TYPE_ROW,
   TLS_OPTIONS_REMOVED,
-  toHandlerSets,
   transportRemoved,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
+import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { resolveEnvFilePath } from './envResolver';
 
 const DESTINATION = 'DESTINATION AND LOGIN';
@@ -139,25 +138,37 @@ const AUTH_BROKER_REMOVED = {
     `${form} was removed in 16.0.0 — remove it from the configuration`,
 };
 
-/** `mcp-abap-adt`'s table: its rows, the shared rows, and what it refuses. */
-export const CORE_PARAMETERS: ParameterTable = {
-  program: 'mcp-abap-adt',
-  rows: [
-    CONF_ROW,
-    EXPOSITION_ROW,
-    SYSTEM_TYPE_ROW,
-    ...CORE_ROWS,
-    STATE_IDLE_ROW,
-  ],
-  removed: [
-    transportRemoved('stdio'),
-    ALLOW_DESTINATION_HEADER_REMOVED,
-    AUTH_BROKER_REMOVED,
-    SSE_OPTIONS_REMOVED,
-    HTTP_OPTIONS_REMOVED,
-    TLS_OPTIONS_REMOVED,
-  ],
-};
+/**
+ * core's table for a tool set: its rows, the shared rows with the set's
+ * `--exposition` row, and what it refuses. `mcp-abap-adt-compact` is this
+ * table with the compact set's row, nothing else (spec §10.1).
+ */
+export function coreParameters(
+  toolSet: ToolSet,
+  program = 'mcp-abap-adt',
+): ParameterTable {
+  return {
+    program,
+    rows: [
+      CONF_ROW,
+      toolSet.expositionRow,
+      SYSTEM_TYPE_ROW,
+      ...CORE_ROWS,
+      STATE_IDLE_ROW,
+    ],
+    removed: [
+      transportRemoved('stdio'),
+      ALLOW_DESTINATION_HEADER_REMOVED,
+      AUTH_BROKER_REMOVED,
+      SSE_OPTIONS_REMOVED,
+      HTTP_OPTIONS_REMOVED,
+      TLS_OPTIONS_REMOVED,
+    ],
+  };
+}
+
+/** `mcp-abap-adt`'s table: core's, with the full tool set. */
+export const CORE_PARAMETERS: ParameterTable = coreParameters(fullToolSet);
 
 /** What `mcp-abap-adt` reads: the shared values and the destination's. */
 export interface CoreConfig extends IServerConfig {
@@ -207,18 +218,21 @@ const str = (v: ParameterValue | undefined): string | undefined =>
   typeof v === 'string' ? v : undefined;
 
 /**
- * `mcp-abap-adt`'s configuration from the arguments (without the program's
- * own two), the environment and the loaded config file. A removed parameter,
- * or an invalid value, throws a `ParameterRefusal` in its words.
+ * core's configuration from the arguments (without the program's own two),
+ * the environment and the loaded config file, read by core's table for
+ * `toolSet` (the full set unless a sibling command passes its own). A removed
+ * parameter, an invalid value or an exposition the set does not serve throws
+ * a `ParameterRefusal` in its words.
  */
 export function readCoreConfig(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
   yaml: YamlConfig | null = null,
+  toolSet: ToolSet = fullToolSet,
 ): CoreConfig {
-  const values = readParameters(CORE_PARAMETERS, argv, env, yaml);
-  const source = (key: string) =>
-    parameterSource(CORE_PARAMETERS, key, argv, env, yaml);
+  const table = coreParameters(toolSet);
+  const values = readParameters(table, argv, env, yaml);
+  const source = (key: string) => parameterSource(table, key, argv, env, yaml);
 
   const envDestination = str(values.envDestination);
   const envPath = str(values.envPath);
@@ -233,7 +247,7 @@ export function readCoreConfig(
   });
 
   return {
-    exposition: toHandlerSets(values.exposition as readonly string[]),
+    exposition: toolSet.exposition(values.exposition, argv),
     configFile: str(values.configFile),
     systemType: values.systemType as CoreConfig['systemType'],
     // Not written to process.env here: the env file's SAP_SYSTEM_TYPE joins

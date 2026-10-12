@@ -100,7 +100,7 @@ For full details (paths, `.env`, direct headers), see [Authentication & Destinat
 
 ## Architecture
 
-The project ships as **two packages** — and a compact variant of each — because the two usage patterns want
+The project ships a **library and the servers** — and a compact variant of each server — because the two usage patterns want
 different licences. Embedding the tools in a network service should not drag in
 the obligations of a server that service never runs.
 
@@ -110,11 +110,15 @@ the obligations of a server that service never runs.
 | [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | AGPL-3.0-only | The standalone stdio server, `mcp-abap-adt`: one destination through the auth broker. Depends on the library. |
 | [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http) | AGPL-3.0-only | The Streamable HTTP server, `mcp-abap-adt-http`: credentials from each request's `x-sap-*` headers. |
 | [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse) | AGPL-3.0-only | The HTTP+SSE server, `mcp-abap-adt-sse`: credentials from the `x-sap-*` headers of each SSE connection's `GET`. |
-| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | AGPL-3.0-only | The compact standalone server, `mcp-abap-adt-compact`: one tool per operation, the object type in the arguments. Same launcher and configuration as `core`. |
+| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | AGPL-3.0-only | The compact server over stdio, `mcp-abap-adt-compact`: one tool per operation, the object type in the arguments. `core`'s launcher and configuration with the compact tool set. |
+| [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http) | AGPL-3.0-only | The compact server over Streamable HTTP, `mcp-abap-adt-compact-http`: `http`'s launcher and configuration with the compact tool set. |
+| [`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse) | AGPL-3.0-only | The compact server over HTTP+SSE, `mcp-abap-adt-compact-sse`: `sse`'s launcher and configuration with the compact tool set. |
 | [`@mcp-abap-adt/compact-readonly`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes. |
 
-Install `@mcp-abap-adt/core` (or `@mcp-abap-adt/compact`) to run a server. Install `@mcp-abap-adt/lib` to
-embed the tools in your own application.
+Nine packages, six binaries: one full and one compact binary per transport. Install the one for
+your transport to run a server — `@mcp-abap-adt/core`, `http` or `sse` (or `compact`,
+`compact-http`, `compact-sse`). Install `@mcp-abap-adt/lib` to embed the tools in your own
+application.
 
 ### 1. Standalone MCP Server (Default)
 Run as a standalone MCP server; a binary is its transport (there is no `--transport` option):
@@ -122,6 +126,9 @@ Run as a standalone MCP server; a binary is its transport (there is no `--transp
 mcp-abap-adt --mcp=TRIAL               # stdio (@mcp-abap-adt/core): one destination
 mcp-abap-adt-http                      # Streamable HTTP (@mcp-abap-adt/http): x-sap-* headers per request
 mcp-abap-adt-sse                       # SSE (@mcp-abap-adt/sse): x-sap-* headers per SSE connection
+mcp-abap-adt-compact --mcp=TRIAL       # the compact tool set over stdio (@mcp-abap-adt/compact)
+mcp-abap-adt-compact-http              # ... over Streamable HTTP (@mcp-abap-adt/compact-http)
+mcp-abap-adt-compact-sse               # ... over SSE (@mcp-abap-adt/compact-sse)
 ```
 
 ### 2. Embeddable Server (For Integration)
@@ -298,8 +305,10 @@ mcp-abap-adt --env-path=/path/to/my.env
 # SSE (@mcp-abap-adt/sse; credentials from the opening GET's x-sap-* headers)
 mcp-abap-adt-sse --sse-port=3001
 
-# The compact server takes the same options (npm install -g @mcp-abap-adt/compact)
-mcp-abap-adt-compact --env-path=/path/to/my.env
+# The compact servers take their full counterpart's options, with --exposition=ro|rw[,debug]
+mcp-abap-adt-compact --env-path=/path/to/my.env       # npm install -g @mcp-abap-adt/compact
+mcp-abap-adt-compact-http --exposition=ro             # npm install -g @mcp-abap-adt/compact-http
+mcp-abap-adt-compact-sse --sse-port=3001              # npm install -g @mcp-abap-adt/compact-sse
 ```
 
 ### Development Mode

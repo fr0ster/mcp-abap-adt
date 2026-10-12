@@ -1,24 +1,31 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
 import { type AmdpSession, DebuggerInstance } from '@mcp-abap-adt/lib/debugger';
 import type { ArgsOf } from '@mcp-abap-adt/lib/handlers';
 import { InstanceState } from '@mcp-abap-adt/lib/state';
-import { compactDebugEntries } from '../debug/group';
-import type { TOOL_DEFINITION as Start } from '../debug/handleHandlerDebugStart';
-import type { TOOL_DEFINITION as Step } from '../debug/handleHandlerDebugStep';
-import type { TOOL_DEFINITION as View } from '../debug/handleHandlerDebugView';
-import type { TOOL_DEFINITION as Wait } from '../debug/handleHandlerDebugWait';
+import { compactDebugEntries } from '../../../lib/compact/debug/group';
+import type { TOOL_DEFINITION as Start } from '../../../lib/compact/debug/handleHandlerDebugStart';
+import type { TOOL_DEFINITION as Step } from '../../../lib/compact/debug/handleHandlerDebugStep';
+import type { TOOL_DEFINITION as View } from '../../../lib/compact/debug/handleHandlerDebugView';
+import type { TOOL_DEFINITION as Wait } from '../../../lib/compact/debug/handleHandlerDebugWait';
 import {
-  compactExtraGroups,
+  compactToolSetOf,
   parseCompactDebug,
   parseCompactExposition,
-} from '../launcher';
+} from '../../../lib/toolSet';
+
+const compactToolSet = compactToolSetOf({
+  readOnly: compactReadOnlyEntries,
+  modify: compactModifyEntries,
+});
 
 /** The memory sizes as recorded on premise (2026-10-11). */
 const MEMORY_SIZES = readFileSync(
   join(
     __dirname,
-    '../../../tests/fixtures/adt/debugger-memory--01-memory-sizes.body.xml',
+    '../../../../tests/fixtures/adt/debugger-memory--01-memory-sizes.body.xml',
   ),
   'utf8',
 );
@@ -57,17 +64,20 @@ describe('compact debug', () => {
     expect(() => parseCompactExposition(['--exposition=ro,high'])).toThrow();
     expect(() => parseCompactDebug(['--exposition='])).toThrow(/no value/);
   });
-  it('the debug group reaches the core launcher through extraGroups, beside its half of the facade', () => {
+  it('the debug group is in the compact tool set, beside its half of the facade', () => {
     const names = (argv: string[]) =>
-      compactExtraGroups(argv)({ connection: undefined } as never).map(
-        (g) => g.constructor.name,
-      );
+      compactToolSet
+        .groups(
+          { connection: undefined } as never,
+          compactToolSet.exposition(undefined, argv),
+        )
+        .map((g) => g.getName());
     expect(names(['--exposition=ro,debug'])).toEqual([
-      'CompactReadOnlyHandlersGroup',
-      'CompactDebugHandlersGroup',
+      'CompactReadOnlyHandlers',
+      'CompactDebugHandlers',
     ]);
-    expect(names(['--exposition=rw'])).toEqual(['CompactHandlersGroup']);
-    expect(names([])).toEqual(['CompactHandlersGroup']);
+    expect(names(['--exposition=rw'])).toEqual(['CompactHandlers']);
+    expect(names([])).toEqual(['CompactHandlers']);
   });
   it('the start describes user mode and taking over as facts', () => {
     const start = entries.find(

@@ -17,7 +17,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
-import { compactDebugEntries } from '../debug/group';
+import { compactDebugEntries } from '../../../lib/compact/debug/group';
 
 interface Row {
   group: string;
@@ -41,7 +41,10 @@ function inputsOf(schema: unknown): string {
 
 describe('the compact tool surface', () => {
   const frozen: Row[] = JSON.parse(
-    readFileSync(join(__dirname, '../../tests/fixtures/surface.json'), 'utf8'),
+    readFileSync(
+      join(__dirname, '../../../../compact/tests/fixtures/surface.json'),
+      'utf8',
+    ),
   );
 
   const context = () => ({}) as never;

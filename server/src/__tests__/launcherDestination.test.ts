@@ -43,10 +43,18 @@ import type {
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
 import { readConfigFile } from '@mcp-abap-adt/lib/config';
+import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { AuthBrokerFactory, type LoginStrategyOptions } from '../auth';
 import { CORE_PARAMETERS, readCoreConfig } from '../config/coreParameters';
 import { factoryConfigFrom, launch } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
+
+/** The launcher's options as `mcp-abap-adt` passes them. */
+const TEST_OPTIONS = {
+  toolSet: fullToolSet,
+  program: 'mcp-abap-adt',
+  version: '0.0.0-test',
+};
 
 const constructed = (
   jest.requireMock('@mcp-abap-adt/auth-broker') as { AuthBroker: jest.Mock }
@@ -145,17 +153,13 @@ async function run(
   });
   const stdout = jest.spyOn(process.stdout, 'write');
   try {
-    await launch(
-      config,
-      { exposition: ['readonly'], includeSearch: false },
-      {
-        browserStrategy: browserStrategy ?? strategy.browserStrategy,
-        stderr: (line) => stderr.push(line),
-        exit: (code) => exits.push(code),
-        processLike,
-        platform,
-      },
-    );
+    await launch(config, TEST_OPTIONS, {
+      browserStrategy: browserStrategy ?? strategy.browserStrategy,
+      stderr: (line) => stderr.push(line),
+      exit: (code) => exits.push(code),
+      processLike,
+      platform,
+    });
   } finally {
     // The launcher writes nothing to stdout (H3).
     expect(stdout).not.toHaveBeenCalled();
@@ -572,18 +576,14 @@ describe('factoryConfigFrom: the env file', () => {
     const file = path.join(root, 'conn.env');
     fs.writeFileSync(file, `${basicLines().join('\n')}\n`);
     const exits: number[] = [];
-    await launch(
-      { envFilePath: file },
-      { exposition: ['readonly'], includeSearch: false },
-      {
-        browserStrategy,
-        stderr: () => {},
-        exit: (code) => exits.push(code),
-        processLike: Object.assign(new EventEmitter(), {
-          stdin: new EventEmitter(),
-        }),
-      },
-    );
+    await launch({ envFilePath: file }, TEST_OPTIONS, {
+      browserStrategy,
+      stderr: () => {},
+      exit: (code) => exits.push(code),
+      processLike: Object.assign(new EventEmitter(), {
+        stdin: new EventEmitter(),
+      }),
+    });
     expect(exits).toEqual([]);
     expect(stdioStart).toHaveBeenCalledWith('default');
   });

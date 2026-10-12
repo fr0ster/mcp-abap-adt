@@ -12,9 +12,12 @@
  * carries them — following a sibling package of this repository through its
  * own `exports`:
  *
- * - lib, http and sse declare and reach no auth-broker, auth-stores or
- *   interfaces-auth-broker; core declares them and reaches them;
+ * - lib, http, sse, compact-http and compact-sse declare and reach no
+ *   auth-broker, auth-stores or interfaces-auth-broker; core declares them
+ *   and reaches them; compact reaches them only through core, declaring none;
  * - http reaches no sse and sse no http; neither reaches core;
+ * - compact-http and compact-sse reach no core (nor compact), and each
+ *   reaches exactly its own transport package (D49);
  * - every package a file of a package imports is declared in that package's
  *   own published dependencies, so a packed install resolves it — and, for
  *   core, http and sse, present in the root manifest, so the root install
@@ -22,8 +25,7 @@
  * - no source of core, http or sse (tests included) reaches into another
  *   transport's directory by a relative path.
  *
- * The packages come from one table, which A7 extends with compact-http and
- * compact-sse.
+ * The packages come from one table.
  */
 
 import * as fs from 'node:fs';
@@ -45,11 +47,43 @@ interface Row {
   dir: string;
   /** Neither declared in its published fields nor reached by its graph. */
   forbidden: string[];
+  /** Not declared in its published fields — reached only through a sibling. */
+  undeclared?: string[];
   /** Declared in its published `dependencies` and reached by its graph. */
   required?: string[];
 }
 
-/** The packages the rule covers; A7 adds compact-http and compact-sse. */
+const TRANSPORTS = [
+  '@mcp-abap-adt/core',
+  '@mcp-abap-adt/http',
+  '@mcp-abap-adt/sse',
+  '@mcp-abap-adt/compact',
+  '@mcp-abap-adt/compact-http',
+  '@mcp-abap-adt/compact-sse',
+];
+const HALVES = [
+  '@mcp-abap-adt/compact-readonly',
+  '@mcp-abap-adt/compact-modify',
+];
+
+/** A compact package: lib, the two halves and `transport`, and no other transport. */
+const compactOver = (
+  name: string,
+  dir: string,
+  transport: string,
+  chainState: 'forbidden' | 'through core',
+): Row => ({
+  name,
+  dir,
+  forbidden: [
+    ...(chainState === 'forbidden' ? CHAIN_STATE : []),
+    ...TRANSPORTS.filter((t) => t !== transport && t !== name),
+  ],
+  ...(chainState === 'through core' && { undeclared: CHAIN_STATE }),
+  required: ['@mcp-abap-adt/lib', transport, ...HALVES],
+});
+
+/** The packages the rule covers. */
 const PACKAGES: Row[] = [
   {
     name: '@mcp-abap-adt/lib',
@@ -72,6 +106,25 @@ const PACKAGES: Row[] = [
     forbidden: ['@mcp-abap-adt/http', '@mcp-abap-adt/sse'],
     required: ['@mcp-abap-adt/auth-broker', '@mcp-abap-adt/auth-stores'],
   },
+  // stdio: the broker and the stores only through core.
+  compactOver(
+    '@mcp-abap-adt/compact',
+    'compact',
+    '@mcp-abap-adt/core',
+    'through core',
+  ),
+  compactOver(
+    '@mcp-abap-adt/compact-http',
+    'compact-http',
+    '@mcp-abap-adt/http',
+    'forbidden',
+  ),
+  compactOver(
+    '@mcp-abap-adt/compact-sse',
+    'compact-sse',
+    '@mcp-abap-adt/sse',
+    'forbidden',
+  ),
 ];
 
 /** Every package of this repository, by name: how a sibling import is followed. */
@@ -81,6 +134,8 @@ const SIBLING_DIRS = [
   'http',
   'sse',
   'compact',
+  'compact-http',
+  'compact-sse',
   'compact-readonly',
   'compact-modify',
 ];
@@ -312,7 +367,8 @@ describe.each(PACKAGES)('$name: published manifest', (row) => {
 
   it('its published dependency fields name nothing forbidden', () => {
     const declared = Object.keys(published(manifest));
-    expect(declared.filter((name) => row.forbidden.includes(name))).toEqual([]);
+    const refused = [...row.forbidden, ...(row.undeclared ?? [])];
+    expect(declared.filter((name) => refused.includes(name))).toEqual([]);
   });
 
   if (row.required) {
@@ -403,6 +459,9 @@ describe('no transport reaches another by a relative path, tests included', () =
     ['server/src', ['http', 'sse']],
     ['http/src', ['server', 'sse']],
     ['sse/src', ['server', 'http']],
+    ['compact/src', ['http', 'sse', 'compact-http', 'compact-sse']],
+    ['compact-http/src', ['server', 'sse', 'compact', 'compact-sse']],
+    ['compact-sse/src', ['server', 'http', 'compact', 'compact-http']],
   ])('%s', (dir, others) => {
     const crossings: string[] = [];
     for (const file of sources(dir)) {

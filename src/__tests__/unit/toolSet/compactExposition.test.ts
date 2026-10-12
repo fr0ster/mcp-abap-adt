@@ -12,7 +12,7 @@
  * reasoning that makes `mcp-abap-adt` refuse `--exposition=compact` instead of
  * ignoring it.
  */
-import { parseCompactExposition } from '../launcher';
+import { parseCompactExposition } from '../../../lib/toolSet';
 
 describe('the compact command reads its own exposition', () => {
   it('defaults to rw — locally the server gives every access', () => {

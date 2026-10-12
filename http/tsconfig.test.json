@@ -51,6 +51,9 @@
       ],
       "@mcp-abap-adt/lib/state": [
         "../src/lib/state/index.ts"
+      ],
+      "@mcp-abap-adt/lib/tool-set": [
+        "../src/lib/toolSet.ts"
       ]
     },
     "noEmit": true

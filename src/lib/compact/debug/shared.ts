@@ -2,8 +2,8 @@ import {
   type DebuggerInstance,
   debugAnswer,
   requireDebugger,
-} from '@mcp-abap-adt/lib/debugger';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+} from '../../debugger/index';
+import type { HandlerContext } from '../../handlers/index';
 
 /**
  * The kind a compact debug session holds. One instance holds ABAP or AMDP, never

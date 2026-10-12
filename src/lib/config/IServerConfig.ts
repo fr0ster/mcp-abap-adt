@@ -29,8 +29,12 @@ export interface TlsConfig {
 export type HandlerSet = 'readonly' | 'high' | 'low' | 'compact' | 'debug';
 
 export interface IServerConfig {
-  /** Handler sets to expose (`--exposition`); default readonly,high. */
-  exposition?: HandlerSet[];
+  /**
+   * The exposition served (`--exposition`), in the words of the binary's tool
+   * set (`ToolSet.exposition`): `readonly,high` by default for the full set,
+   * `rw` for the compact one.
+   */
+  exposition?: readonly string[];
 
   /** Path to YAML config file (`--conf`). */
   configFile?: string;

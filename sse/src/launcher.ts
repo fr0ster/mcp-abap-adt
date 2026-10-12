@@ -1,33 +1,41 @@
 /**
  * `mcp-abap-adt-sse` — the HTTP+SSE binary (D48). Credentials come only
  * from the `x-sap-*` headers of the `GET` that opens each SSE connection; no
- * destination, no broker, no store, no login. A7 adds the `ToolSet`.
+ * destination, no broker, no store, no login. The tools are the `ToolSet`
+ * the command passes.
  */
 
 import type { EventEmitter } from 'node:events';
-import {
-  expositionHelp,
-  generateHelp,
-  readStartupConfig,
-  validateExposition,
-} from '@mcp-abap-adt/lib/config';
-import { registryForExposition } from '@mcp-abap-adt/lib/handlers';
+import { generateHelp, readStartupConfig } from '@mcp-abap-adt/lib/config';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
 import {
+  fullToolSet,
+  registryOf,
+  type ToolSet,
+} from '@mcp-abap-adt/lib/tool-set';
+import {
   readSseConfig,
-  SSE_PARAMETERS,
   type SseConfig,
+  sseParameters,
 } from './config/sseParameters.js';
 import { SseServer } from './SseServer.js';
-import { SSE_VERSION } from './sseVersion.js';
 
+/**
+ * What a command passes sse's launcher (spec §3.5, D37, D49): the tools it
+ * serves, and its own name and version — nothing else. Everything the
+ * launcher does is sse's, the same for any tool set:
+ * `mcp-abap-adt-sse` passes `fullToolSet`, `mcp-abap-adt-compact-sse` the
+ * compact set.
+ */
 export interface SseLauncherOptions {
-  /** The command's own name, for USAGE in `--help`. */
-  program?: string;
-  /** The version `--version` and `initialize` report; default sse's own. */
-  version?: string;
+  /** The tools served, and the `--exposition` they are chosen by. */
+  toolSet: ToolSet;
+  /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
+  program: string;
+  /** The version `--version` and `initialize` report: the command's own package's. */
+  version: string;
 }
 
 /** What the launcher takes from the program: the process's edges. */
@@ -36,6 +44,25 @@ export interface SseLauncherDeps {
   exit: (code: number) => void;
   /** Where the shutdown listens: `process` in the program. */
   processLike: EventEmitter;
+}
+
+/** The process as `main` meets it; a test passes its own. */
+export interface SseLauncherEdges extends SseLauncherDeps {
+  /** The arguments, without node's and the script's. */
+  argv: readonly string[];
+  /** `--version`'s one line. */
+  stdout: (line: string) => void;
+}
+
+/** The edges of the program: `process`. */
+export function processEdges(): SseLauncherEdges {
+  return {
+    argv: process.argv.slice(2),
+    stdout: (line) => console.log(line),
+    stderr: (line) => process.stderr.write(`${line}\n`),
+    exit: (code) => process.exit(code),
+    processLike: process,
+  };
 }
 
 const HELP_SECTIONS = `
@@ -64,43 +91,47 @@ routed by its sessionId alone, and its own x-sap-* headers are not read):
   A health check answers GET /mcp/health.
 `;
 
-/** sse's help: its own table, the exposition, the headers. */
-export function sseHelp(options: SseLauncherOptions = {}): string {
-  return generateHelp(
-    { ...SSE_PARAMETERS, program: options.program ?? SSE_PARAMETERS.program },
-    {
-      description:
-        '  MCP server for SAP ABAP systems via ADT, over HTTP+SSE: credentials only from the\n  x-sap-* headers of the GET that opens each SSE connection. stdio (destinations,\n  logins) is mcp-abap-adt, Streamable HTTP mcp-abap-adt-http; a binary is its transport.',
-      sections: [expositionHelp(), HELP_SECTIONS],
-    },
-  );
+/** sse's help: its own table with the tool set's exposition row, the set's exposition, the headers. */
+export function sseHelp(
+  options: { toolSet?: ToolSet; program?: string } = {},
+): string {
+  const toolSet = options.toolSet ?? fullToolSet;
+  return generateHelp(sseParameters(toolSet, options.program), {
+    description:
+      '  MCP server for SAP ABAP systems via ADT, over HTTP+SSE: credentials only from the\n  x-sap-* headers of the GET that opens each SSE connection. stdio (destinations,\n  logins) is mcp-abap-adt, Streamable HTTP mcp-abap-adt-http; a binary is its transport.',
+    sections: [toolSet.expositionHelp, HELP_SECTIONS],
+  });
 }
 
-export async function main(options: SseLauncherOptions = {}): Promise<void> {
-  const version = options.version ?? SSE_VERSION;
-  if (process.argv.includes('--version') || process.argv.includes('-v')) {
-    console.log(version);
-    process.exit(0);
+export async function main(
+  options: SseLauncherOptions,
+  edges: SseLauncherEdges = processEdges(),
+): Promise<SseServer | undefined> {
+  const { argv, stderr, exit } = edges;
+  if (argv.includes('--version') || argv.includes('-v')) {
+    edges.stdout(options.version);
+    exit(0);
+    return undefined;
   }
-  if (process.argv.includes('--help') || process.argv.includes('-h')) {
-    console.error(sseHelp(options));
-    process.exit(0);
+  if (argv.includes('--help') || argv.includes('-h')) {
+    stderr(sseHelp(options));
+    exit(0);
+    return undefined;
   }
-  const stderr = (line: string) => process.stderr.write(`${line}\n`);
-  const exit = (code: number) => process.exit(code);
-  // sse's own table: an option of another binary, or --transport, stops here.
+  // sse's own table with the set's exposition row: an option of another
+  // binary, --transport, or an exposition the set does not serve stops here.
   const config = readStartupConfig(
-    SSE_PARAMETERS,
-    process.argv.slice(2),
+    sseParameters(options.toolSet, options.program),
+    argv,
     process.env,
     { stderr, exit },
-    readSseConfig,
+    (args, env, yaml) => readSseConfig(args, env, yaml, options.toolSet),
   );
-  if (config === undefined) return;
-  await launch(config, options, {
+  if (config === undefined) return undefined;
+  return launch(config, options, {
     stderr,
     exit,
-    processLike: process,
+    processLike: edges.processLike,
   });
 }
 
@@ -113,10 +144,13 @@ export async function launch(
   // The connector and the tool filter read the system kind from the
   // environment (`resolveSystemKind`).
   if (config.systemType) process.env.SAP_SYSTEM_TYPE = config.systemType;
-  const exposition = config.exposition ?? ['readonly', 'high'];
-  validateExposition(exposition);
-  const server = new SseServer(registryForExposition(exposition), {
-    version: options.version ?? SSE_VERSION,
+  // The tool set's groups for the exposition read (a config made by hand
+  // without one: the set's default).
+  const exposition =
+    config.exposition ??
+    options.toolSet.exposition(options.toolSet.expositionRow.default, []);
+  const server = new SseServer(registryOf(options.toolSet, exposition), {
+    version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,
     // The state's lines go to stderr whatever the transport logger says.
     stateLogger: stderrStateLogger,

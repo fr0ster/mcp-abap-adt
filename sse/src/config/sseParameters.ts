@@ -10,7 +10,6 @@
 import {
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
-  EXPOSITION_ROW,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
   type Parameter,
@@ -23,10 +22,10 @@ import {
   type TlsConfig,
   tlsConfigOf,
   tlsRows,
-  toHandlerSets,
   transportRemoved,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
+import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 
 const SSE = 'SSE';
 
@@ -98,23 +97,35 @@ export const SSE_ROWS: readonly Parameter[] = [
   },
 ];
 
-/** `mcp-abap-adt-sse`'s table: its rows, the shared rows, and what it refuses. */
-export const SSE_PARAMETERS: ParameterTable = {
-  program: 'mcp-abap-adt-sse',
-  rows: [
-    CONF_ROW,
-    EXPOSITION_ROW,
-    SYSTEM_TYPE_ROW,
-    ...SSE_ROWS,
-    ...tlsRows('sse'),
-    STATE_IDLE_ROW,
-  ],
-  removed: [
-    transportRemoved('sse'),
-    DESTINATION_OPTIONS_REMOVED,
-    HTTP_OPTIONS_REMOVED,
-  ],
-};
+/**
+ * sse's table for a tool set: its rows, the shared rows with the set's
+ * `--exposition` row, and what it refuses. `mcp-abap-adt-compact-sse` is
+ * this table with the compact set's row, nothing else (spec §10.1).
+ */
+export function sseParameters(
+  toolSet: ToolSet,
+  program = 'mcp-abap-adt-sse',
+): ParameterTable {
+  return {
+    program,
+    rows: [
+      CONF_ROW,
+      toolSet.expositionRow,
+      SYSTEM_TYPE_ROW,
+      ...SSE_ROWS,
+      ...tlsRows('sse'),
+      STATE_IDLE_ROW,
+    ],
+    removed: [
+      transportRemoved('sse'),
+      DESTINATION_OPTIONS_REMOVED,
+      HTTP_OPTIONS_REMOVED,
+    ],
+  };
+}
+
+/** `mcp-abap-adt-sse`'s table: sse's, with the full tool set. */
+export const SSE_PARAMETERS: ParameterTable = sseParameters(fullToolSet);
 
 /** What `mcp-abap-adt-sse` reads. */
 export interface SseConfig extends IServerConfig {
@@ -146,19 +157,15 @@ export function readSseConfig(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
   yaml: YamlConfig | null = null,
+  toolSet: ToolSet = fullToolSet,
 ): SseConfig {
-  const values = readParameters(SSE_PARAMETERS, argv, env, yaml);
+  const table = sseParameters(toolSet);
+  const values = readParameters(table, argv, env, yaml);
   return {
-    exposition: toHandlerSets(values.exposition as readonly string[]),
+    exposition: toolSet.exposition(values.exposition, argv),
     configFile: values.configFile as string | undefined,
     systemType: values.systemType as SseConfig['systemType'],
-    systemTypeSource: parameterSource(
-      SSE_PARAMETERS,
-      'systemType',
-      argv,
-      env,
-      yaml,
-    ),
+    systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
     stateIdleMinutes: values.stateIdleMinutes as number,
     host: values.host as string,
     port: values.port as number,

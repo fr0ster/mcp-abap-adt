@@ -32,7 +32,8 @@ jobs:
       - name: Run Biome lint
         run: npx biome check src --diagnostic-level=error
 
-      # The root step covers `src` only; core, http and sse lint their own sources.
+      # The root step covers `src` only; core, http, sse and the two compact
+      # packages over HTTP lint their own sources.
       - name: Run Biome lint (server)
         run: npm --prefix server run lint:check
 
@@ -41,6 +42,13 @@ jobs:
 
       - name: Run Biome lint (sse)
         run: npm --prefix sse run lint:check
+
+      # Their suites run in the root `npm test` (its Jest roots name them).
+      - name: Run Biome lint (compact-http)
+        run: npm --prefix compact-http run lint:check
+
+      - name: Run Biome lint (compact-sse)
+        run: npm --prefix compact-sse run lint:check
 
       - name: Build project
         run: npm run build

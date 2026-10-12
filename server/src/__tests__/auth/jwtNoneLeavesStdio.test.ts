@@ -24,6 +24,7 @@ jest.mock('@mcp-abap-adt/auth-broker', () => {
 });
 
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
+import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -41,6 +42,13 @@ import {
   brokerBase,
   recordingLogins,
 } from '../helpers/factoryFixture';
+
+/** The launcher's options as `mcp-abap-adt` passes them. */
+const TEST_OPTIONS = {
+  toolSet: fullToolSet,
+  program: 'mcp-abap-adt',
+  version: '0.0.0-test',
+};
 
 const TOKEN = 'held-token-PLACEHOLDER.payload.signature';
 const constructed = AuthBroker as unknown as jest.Mock;
@@ -104,19 +112,15 @@ it('a jwt / none --env file stops the start: destination_refused, its words and 
   const stderr: string[] = [];
   const exits: number[] = [];
   const stdout = jest.spyOn(process.stdout, 'write');
-  await launch(
-    config,
-    { exposition: ['readonly'], includeSearch: false },
-    {
-      browserStrategy: recordingLogins().browserStrategy,
-      stderr: (line) => stderr.push(line),
-      exit: (code) => exits.push(code),
-      processLike: Object.assign(new EventEmitter(), {
-        stdin: new EventEmitter(),
-      }),
-      platform: 'linux',
-    },
-  );
+  await launch(config, TEST_OPTIONS, {
+    browserStrategy: recordingLogins().browserStrategy,
+    stderr: (line) => stderr.push(line),
+    exit: (code) => exits.push(code),
+    processLike: Object.assign(new EventEmitter(), {
+      stdin: new EventEmitter(),
+    }),
+    platform: 'linux',
+  });
 
   expect(exits).toEqual([1]);
   expect(stdioStart).not.toHaveBeenCalled();

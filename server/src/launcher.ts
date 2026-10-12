@@ -5,23 +5,18 @@ import {
   assertDestinationName,
   browserCallbackStrategy,
 } from '@mcp-abap-adt/lib/auth';
-import {
-  expositionHelp,
-  generateHelp,
-  type HandlerSet,
-  readStartupConfig,
-  validateExposition,
-} from '@mcp-abap-adt/lib/config';
-import {
-  type HandlerContext,
-  type IHandlerGroup,
-  registryForExposition,
-} from '@mcp-abap-adt/lib/handlers';
+import { generateHelp, readStartupConfig } from '@mcp-abap-adt/lib/config';
 import { type StateLogger, stderrStateLogger } from '@mcp-abap-adt/lib/state';
+import {
+  fullToolSet,
+  registryOf,
+  type ToolSet,
+} from '@mcp-abap-adt/lib/tool-set';
 import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import {
   AuthBrokerFactory,
   BrowserChoiceError,
@@ -32,12 +27,11 @@ import {
   promptLogger,
 } from './auth';
 import {
-  CORE_PARAMETERS,
   type CoreConfig,
+  coreParameters,
   readCoreConfig,
 } from './config/coreParameters';
 import { hydrateSystemContextFromEnvFile } from './config/envFileContext';
-import { CORE_VERSION } from './coreVersion.js';
 import { StdioServer } from './StdioServer.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
 import { closeInstanceState } from './stateClose.js';
@@ -67,34 +61,6 @@ export const stateLoggerForTransport: StateLogger = stderrStateLogger;
 
 // Keep strong reference to running server instance to avoid premature GC/exit
 let activeServer: StdioServer | undefined;
-
-function hasArg(name: string): boolean {
-  return process.argv.includes(name);
-}
-
-/**
- * This package's own version, read from this package's own manifest.
- *
- * **It was two levels up, and that only works inside the repository.** From
- * `server/dist/` two steps reach the repo root, whose `package.json` is
- * `@mcp-abap-adt/lib` — so `--version` printed the LIBRARY's version, and only
- * because a checkout happens to have a manifest there. From an installed
- * package the same two steps land on `node_modules/@mcp-abap-adt/`, which is the
- * scope DIRECTORY and never has a `package.json`: every `mcp-abap-adt --version`
- * from npm died with `ENOENT … node_modules/@mcp-abap-adt/package.json`.
- * Measured on 13.0.0 by installing the published tarball into an empty directory
- * — the check `bin-smoke.test.ts` now performs, because the three other bins in
- * this family were fixed for the same class of defect one release earlier and
- * nothing here would have caught ours.
- *
- * One step up is `server/` in a checkout and the package root when installed,
- * and in both it is `@mcp-abap-adt/core`'s manifest — which is what this CLI
- * should answer with.
- */
-function showVersion(): void {
-  console.log(CORE_VERSION);
-  process.exit(0);
-}
 
 /**
  * Additional help sections specific to v2 server
@@ -229,97 +195,97 @@ EXAMPLES:
 `;
 
 /**
- * core's help: its own table (no HTTP or SSE option), the exposition, the
- * environment. `program` and `helpExposition` exist for a sibling command:
- * `mcp-abap-adt-compact` shares this launcher, but must not print
- * `mcp-abap-adt` in USAGE, and its exposition is another vocabulary.
+ * core's help: its own table (no HTTP or SSE option) with the tool set's
+ * `--exposition` row, the set's exposition section, the environment. A
+ * sibling command (`mcp-abap-adt-compact`) passes its own set and name.
  */
-export function coreHelp(options: LauncherOptions = {}): string {
-  return generateHelp(
-    { ...CORE_PARAMETERS, program: options.program ?? CORE_PARAMETERS.program },
-    {
-      description:
-        '  MCP server for SAP ABAP systems via ADT (ABAP Development Tools), over stdio:\n' +
-        '  one destination through the auth broker. Streamable HTTP is mcp-abap-adt-http,\n' +
-        '  SSE mcp-abap-adt-sse; a binary is its transport.',
-      sections: [
-        options.helpExposition ?? expositionHelp(),
-        V2_HELP_SECTIONS,
-        EXAMPLES,
-      ],
-    },
-  );
-}
-
-function showHelp(options: LauncherOptions = {}): void {
-  console.error(coreHelp(options));
+export function coreHelp(
+  options: { toolSet?: ToolSet; program?: string } = {},
+): string {
+  const toolSet = options.toolSet ?? fullToolSet;
+  return generateHelp(coreParameters(toolSet, options.program), {
+    description:
+      '  MCP server for SAP ABAP systems via ADT (ABAP Development Tools), over stdio:\n' +
+      '  one destination through the auth broker. Streamable HTTP is mcp-abap-adt-http,\n' +
+      '  SSE mcp-abap-adt-sse; a binary is its transport.',
+    sections: [toolSet.expositionHelp, V2_HELP_SECTIONS, EXAMPLES],
+  });
 }
 
 /**
- * What a command may add to the tool list this launcher serves.
- *
- * `@mcp-abap-adt/compact` is a second command over the same server: same config,
- * same transports, same auth, a different DECOMPOSITION of the tool list. Rather
- * than copy four hundred lines of launcher into it, it calls `main` with its own
- * groups. `exposition` decides the sets this package knows (`readonly`, `high`,
- * `low`), and `extraGroups` adds what it does not — so the compact command passes
- * an exposition of its own and its two halves, and nothing about the flags changes
- * here.
+ * What a command passes core's launcher (spec §3.5, D37, D49): the tools it
+ * serves, and its own name and version — nothing else. Everything the
+ * launcher does — options, the destination, credentials, cancellation,
+ * failures, shutdown — is stdio's, the same for any tool set:
+ * `mcp-abap-adt` passes `fullToolSet`, `mcp-abap-adt-compact` the compact set.
  */
 export interface LauncherOptions {
-  /** Built against the launcher's own base context, once, at startup. */
-  extraGroups?: (context: HandlerContext) => IHandlerGroup[];
-  /** Overrides the configured exposition, for a command with a fixed tool list. */
-  exposition?: readonly HandlerSet[];
-  /** The command's own name, for USAGE in `--help`. */
-  program?: string;
-  /**
-   * Replaces the HANDLER EXPOSITION section of `--help`.
-   *
-   * A sibling command has its own sets — `mcp-abap-adt-compact` takes `ro` and
-   * `rw` over the compact facade — and parses them itself before calling here.
-   */
-  helpExposition?: string;
-  /**
-   * Whether the search tools join the list. They always do for `mcp-abap-adt`;
-   * a command whose whole point is a tool list of a known size says `false`.
-   */
-  includeSearch?: boolean;
-  /**
-   * The version `initialize` reports in `serverInfo`. Defaults to core's own; a
-   * sibling command passes ITS version, as it does for `--version`.
-   */
-  version?: string;
+  /** The tools served, and the `--exposition` they are chosen by. */
+  toolSet: ToolSet;
+  /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
+  program: string;
+  /** The version `--version` and `initialize` report: the command's own package's. */
+  version: string;
 }
 
-export async function main(options: LauncherOptions = {}) {
-  // Check for --version first
-  if (hasArg('--version') || hasArg('-v')) {
-    showVersion();
+/** The process as the launcher meets it; a test passes its own. */
+export interface LauncherEdges {
+  /** The arguments, without node's and the script's. */
+  argv: readonly string[];
+  /** `--version`'s one line; nothing else is written to stdout (H3). */
+  stdout: (line: string) => void;
+  /** One line to stderr. */
+  stderr: (line: string) => void;
+  exit: (code: number) => void;
+  /** Where the shutdown listens. */
+  processLike: ShutdownProcess;
+  /** The MCP transport; stdio unless a host passes its own. */
+  transport?: Transport;
+}
+
+/** The edges of the program: `process`. */
+export function processEdges(): LauncherEdges {
+  return {
+    argv: process.argv.slice(2),
+    stdout: (line) => console.log(line),
+    stderr: (line) => process.stderr.write(`${line}\n`),
+    exit: (code) => process.exit(code),
+    processLike: process,
+  };
+}
+
+export async function main(
+  options: LauncherOptions,
+  edges: LauncherEdges = processEdges(),
+): Promise<void> {
+  const { argv, stderr, exit } = edges;
+  if (argv.includes('--version') || argv.includes('-v')) {
+    edges.stdout(options.version);
+    exit(0);
+    return;
+  }
+  if (argv.includes('--help') || argv.includes('-h')) {
+    stderr(coreHelp(options));
+    exit(0);
+    return;
   }
 
-  // Check for --help
-  if (hasArg('--help') || hasArg('-h')) {
-    showHelp(options);
-    process.exit(0);
-  }
-
-  const stderr = (line: string) => process.stderr.write(`${line}\n`);
-  const exit = (code: number) => process.exit(code);
-  // core's own table: an option of another binary, or --transport, stops here.
+  // core's own table with the set's exposition row: an option of another
+  // binary, --transport, or an exposition the set does not serve stops here.
   const config = readStartupConfig(
-    CORE_PARAMETERS,
-    process.argv.slice(2),
+    coreParameters(options.toolSet, options.program),
+    argv,
     process.env,
     { stderr, exit },
-    readCoreConfig,
+    (args, env, yaml) => readCoreConfig(args, env, yaml, options.toolSet),
   );
   if (config === undefined) return;
   await launch(config, options, {
     browserStrategy: browserCallbackStrategy,
     stderr,
     exit,
-    processLike: process,
+    processLike: edges.processLike,
+    ...(edges.transport !== undefined && { transport: edges.transport }),
   });
 }
 
@@ -334,6 +300,8 @@ export interface LauncherDeps {
   processLike: ShutdownProcess;
   /** The platform `--browser` is mapped for; `process.platform` when absent. */
   platform?: string;
+  /** The MCP transport; stdio when absent. */
+  transport?: Transport;
 }
 
 /**
@@ -577,14 +545,13 @@ export async function launch(
   if (systemType) process.env.SAP_SYSTEM_TYPE = systemType;
   config = { ...config, connectionType, systemType };
 
-  // Build handlers based on exposition config (default to readonly,high)
-  const exposition = options.exposition ??
-    config.exposition ?? ['readonly', 'high'];
-  validateExposition(exposition);
-  const handlersRegistry = registryForExposition(exposition, {
-    extraGroups: options.extraGroups,
-    includeSearch: options.includeSearch,
-  });
+  // The tool set's groups for the exposition read (a config made by hand
+  // without one: the set's default).
+  const handlersRegistry = registryOf(
+    options.toolSet,
+    config.exposition ??
+      options.toolSet.exposition(options.toolSet.expositionRow.default, []),
+  );
 
   // The browser of a login, mapped by the platform (D9); a choice that
   // cannot be served stops the start before anything is read.
@@ -681,7 +648,10 @@ export async function launch(
     stderr: deps.stderr,
     processLike: deps.processLike,
   });
-  await server.start(destination);
+  // stdio unless the edges carry a transport of their own (a test's).
+  await (deps.transport === undefined
+    ? server.start(destination)
+    : server.start(destination, deps.transport));
 }
 
 /**
@@ -692,12 +662,5 @@ export function launcherFailedLine(thrown: unknown): string {
   return `[MCP] launcher failed: ${JSON.stringify(logFields(classify(thrown, 'unfamiliar-error')))}`;
 }
 
-// Run only when this module is the program. The bin calls `main()` itself, and a
-// sibling command imports it — neither wants a server started by an import.
-if (require.main === module) {
-  void main().catch((err) => {
-    // eslint-disable-next-line no-console
-    console.error(launcherFailedLine(err));
-    process.exit(1);
-  });
-}
+// The bin calls `main({ toolSet: fullToolSet, … })` itself, and a sibling
+// command imports it with its own set — nothing starts a server on import.

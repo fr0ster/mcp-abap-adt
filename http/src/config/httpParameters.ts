@@ -9,7 +9,6 @@
 import {
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
-  EXPOSITION_ROW,
   type IServerConfig,
   type Parameter,
   type ParameterTable,
@@ -22,10 +21,10 @@ import {
   type TlsConfig,
   tlsConfigOf,
   tlsRows,
-  toHandlerSets,
   transportRemoved,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
+import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 
 const HTTP = 'STREAMABLE HTTP';
 
@@ -101,23 +100,35 @@ export const HTTP_ROWS: readonly Parameter[] = [
   },
 ];
 
-/** `mcp-abap-adt-http`'s table: its rows, the shared rows, and what it refuses. */
-export const HTTP_PARAMETERS: ParameterTable = {
-  program: 'mcp-abap-adt-http',
-  rows: [
-    CONF_ROW,
-    EXPOSITION_ROW,
-    SYSTEM_TYPE_ROW,
-    ...HTTP_ROWS,
-    ...tlsRows('http'),
-    STATE_IDLE_ROW,
-  ],
-  removed: [
-    transportRemoved('http'),
-    DESTINATION_OPTIONS_REMOVED,
-    SSE_OPTIONS_REMOVED,
-  ],
-};
+/**
+ * http's table for a tool set: its rows, the shared rows with the set's
+ * `--exposition` row, and what it refuses. `mcp-abap-adt-compact-http` is
+ * this table with the compact set's row, nothing else (spec §10.1).
+ */
+export function httpParameters(
+  toolSet: ToolSet,
+  program = 'mcp-abap-adt-http',
+): ParameterTable {
+  return {
+    program,
+    rows: [
+      CONF_ROW,
+      toolSet.expositionRow,
+      SYSTEM_TYPE_ROW,
+      ...HTTP_ROWS,
+      ...tlsRows('http'),
+      STATE_IDLE_ROW,
+    ],
+    removed: [
+      transportRemoved('http'),
+      DESTINATION_OPTIONS_REMOVED,
+      SSE_OPTIONS_REMOVED,
+    ],
+  };
+}
+
+/** `mcp-abap-adt-http`'s table: http's, with the full tool set. */
+export const HTTP_PARAMETERS: ParameterTable = httpParameters(fullToolSet);
 
 /** What `mcp-abap-adt-http` reads. */
 export interface HttpConfig extends IServerConfig {
@@ -149,19 +160,15 @@ export function readHttpConfig(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
   yaml: YamlConfig | null = null,
+  toolSet: ToolSet = fullToolSet,
 ): HttpConfig {
-  const values = readParameters(HTTP_PARAMETERS, argv, env, yaml);
+  const table = httpParameters(toolSet);
+  const values = readParameters(table, argv, env, yaml);
   return {
-    exposition: toHandlerSets(values.exposition as readonly string[]),
+    exposition: toolSet.exposition(values.exposition, argv),
     configFile: values.configFile as string | undefined,
     systemType: values.systemType as HttpConfig['systemType'],
-    systemTypeSource: parameterSource(
-      HTTP_PARAMETERS,
-      'systemType',
-      argv,
-      env,
-      yaml,
-    ),
+    systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
     stateIdleMinutes: values.stateIdleMinutes as number,
     host: values.host as string,
     port: values.port as number,

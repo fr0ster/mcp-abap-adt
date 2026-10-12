@@ -41,7 +41,8 @@ jobs:
       - name: Run Biome lint
         run: npx biome check src --diagnostic-level=error
 
-      # The root step covers `src` only; core, http and sse lint their own sources.
+      # The root step covers `src` only; core, http, sse and the two compact
+      # packages over HTTP lint their own sources.
       - name: Run Biome lint (server)
         run: npm --prefix server run lint:check
 
@@ -50,6 +51,13 @@ jobs:
 
       - name: Run Biome lint (sse)
         run: npm --prefix sse run lint:check
+
+      # Their suites run in the root `npm test` (its Jest roots name them).
+      - name: Run Biome lint (compact-http)
+        run: npm --prefix compact-http run lint:check
+
+      - name: Run Biome lint (compact-sse)
+        run: npm --prefix compact-sse run lint:check
 
       - name: Build project
         run: npm run build
@@ -129,7 +137,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high
 
-      # All seven packages. 10.0.0 split them: the repository root is
+      # All nine packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
       # one carrying the `mcp-abap-adt` binary. `npm pack` at the root produces
       # `mcp-abap-adt-lib-*.tgz`, so the install step below looked for a file
@@ -143,7 +151,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
           npm pack
-          npm pack ./compact-readonly ./compact-modify ./http ./sse ./server ./compact
+          npm pack ./compact-readonly ./compact-modify ./http ./sse ./server ./compact ./compact-http ./compact-sse
 
       # **Both tarballs in one install, or this step cannot pass a release.**
       # `core` depends on `lib` by range, so installing the core tarball alone
@@ -186,7 +194,7 @@ jobs:
           node -e "const {readFileSync,existsSync}=require('node:fs');
             const nm='node_modules/@mcp-abap-adt/';
             const pkg=n=>JSON.parse(readFileSync(nm+n+'/package.json','utf8'));
-            const ours=['lib','http','sse','core','compact','compact-readonly','compact-modify'];
+            const ours=['lib','http','sse','core','compact','compact-http','compact-sse','compact-readonly','compact-modify'];
             let bad=0;
             for (const p of ours) for (const d of Object.keys(pkg(p).dependencies||{})) {
               const n=d.replace('@mcp-abap-adt/','');
@@ -198,8 +206,12 @@ jobs:
             }
             if (bad) process.exit(1);
             console.log(ours.map(p=>p+' '+pkg(p).version).join(', ')+': every sibling is the one built here');"
-          ./node_modules/.bin/mcp-abap-adt --help
-          ./node_modules/.bin/mcp-abap-adt-compact --version
+          # The six bins: each answers its version and its help.
+          for bin in mcp-abap-adt mcp-abap-adt-http mcp-abap-adt-sse \
+            mcp-abap-adt-compact mcp-abap-adt-compact-http mcp-abap-adt-compact-sse; do
+            ./node_modules/.bin/$bin --version
+            ./node_modules/.bin/$bin --help
+          done
 
       # The image installs the published packages from npm (nothing of this
       # checkout goes into it); this keeps the Dockerfile itself working — it

@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [18.0.0] - 2026-10-12
 
-The debugger on `@mcp-abap-adt/adt-clients` 29 (`interfaces-adt` 15, `adt-strategies` 0.10): another user's runs, terminal mode, leaving a debuggee running, the debugger settings — and breakpoints armed as one set. Migration: [`docs/MIGRATION-18.0.md`](docs/MIGRATION-18.0.md).
+The debugger on `@mcp-abap-adt/adt-clients` 29 (`interfaces-adt` 15, `adt-strategies` 0.10): another user's runs, terminal mode, leaving a debuggee running, the debugger settings — and breakpoints armed as one set. The authentication stack on its new contracts (`interfaces-auth` 7, `auth-broker` 5, `auth-stores` 5, `connection` 14.1). Migration: [`docs/MIGRATION-18.0.md`](docs/MIGRATION-18.0.md).
 
 ### Added
 
@@ -30,6 +30,14 @@ The debugger on `@mcp-abap-adt/adt-clients` 29 (`interfaces-adt` 15, `adt-strate
 - A listener conflict (`409`) names the holder: the system's conflict text and the IDE user.
 - `@mcp-abap-adt/adt-clients` `^29.1.0`, `@mcp-abap-adt/adt-strategies` `^0.10.1`, `@mcp-abap-adt/interfaces-adt` `^15.1.0` (the breakpoint types lose `skipCount` and gain `clientId`; a run takes the debuggee's ids); `@mcp-abap-adt/compact-modify` declares `interfaces-adt`, which it imports. `@mcp-abap-adt/core`, `@mcp-abap-adt/compact` and the two compact halves require `@mcp-abap-adt/lib` `^18.0.0`.
 - `DEBUGGER.md`: another user, terminal mode, the breakpoint set and its key, leaving a debuggee running, the settings, what ADT cannot do.
+- **The authentication stack moved** to `@mcp-abap-adt/interfaces-auth` `^7.5.0`, `@mcp-abap-adt/auth-providers` `^6.0.1`, `@mcp-abap-adt/auth-broker` `^5.0.4`, `@mcp-abap-adt/auth-stores` `^5.0.0`, `@mcp-abap-adt/interfaces-auth-sap` `^3.3.0`, `@mcp-abap-adt/interfaces-auth-broker` `^1.3.0` and `@mcp-abap-adt/connection` `^14.1.0`, with `@mcp-abap-adt/auth-errors` `^2.2.0` as a direct dependency. For a user:
+  - a stored session must carry `SAP_ISSUED_FOR` and `SAP_ISSUED_BY` (or the `XSUAA_*` pair) beside its token or cookies, or it is refused in fixed words naming the store and the destination — regenerate it with `mcp-auth` (`@mcp-abap-adt/auth-broker-cli` 3.1+: `--env <file>` or `--destination <name>`); a session written before 18.0.0 reads as unbound, so the first renewal is a login;
+  - a token you hold in a `.env` (`SAP_GRANT_TYPE=none`) needs its exact binding in those two keys; `describeAuthError` names `issuedFor` / `issuedBy` with one hint;
+  - `--browser` keeps its names (`system`, `auto`, `chrome`, `edge`, `firefox`, `none`, `headless`; any other opens the default browser); the login URL is printed on stderr in every case, and a login has no 30 s limit any more;
+  - renewal stays refresh-then-login, and a session write that does not land is logged and the call goes on (auth-broker 4's behaviour, now stated: `renewal: refreshThenLogin()`, `onWriteFailure: 'continue'`);
+  - refusals read in the authentication layer's fixed words; the inspection-only refusal is `this connection has no credential to renew`;
+  - `disconnect()` ends the SAP session: the logoff is sent as Eclipse sends it, and an ABAP Cloud session is no longer left open until its timeout (connection 14.1).
+  For an embedder: `browserStrategy` takes `{ browser?: IBrowser; port? }`; new exports `browserFor` and `NO_CREDENTIAL_REFUSAL`; a custom provider answers refusals minted by `@mcp-abap-adt/auth-errors`; `settle()`'s `notStored` lines carry a failed write's fixed words.
 
 ## [17.2.2] - 2026-10-11
 

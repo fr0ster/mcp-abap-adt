@@ -11,7 +11,7 @@ not support`).
 | **Basic** | `basic` | — | HTTP or RFC | `SAP_USERNAME`, `SAP_PASSWORD` |
 | **SNC** (passwordless) | `snc` | — | **RFC only** | `SAP_SNC_PARTNERNAME`; optional `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME`. **No user, no password** |
 | **JWT, browser login** | `jwt` | `authorization_code` | HTTP | A service key (ABAP or XSUAA), or `SAP_UAA_URL`, `SAP_UAA_CLIENT_ID`, `SAP_UAA_CLIENT_SECRET`; the token is obtained and renewed by the server |
-| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (used as it is, never renewed), or the `x-sap-jwt-token` header |
+| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (used as it is, never renewed) with `SAP_ISSUED_FOR` / `SAP_ISSUED_BY` ([below](#a-token-you-hold)), or the `x-sap-jwt-token` header |
 
 A `.env` that is a destination by itself **must state `SAP_AUTH_TYPE`** (there is no default: a `.env` with a
 user and a password but no type is refused with `Destination "X" lacks: authType`; an ABAP service key
@@ -92,6 +92,36 @@ The session — the token and its refresh token — is the server's to keep curr
 A destination is **read once per process**. Nothing watches the files: a change you make to a
 `.env` from outside (a new password, a token handed over again) takes effect on **restart**.
 
+**A stored session states whom it was issued for.** Beside a token or cookies, a session holds
+both binding keys, `SAP_ISSUED_FOR` and `SAP_ISSUED_BY` (`XSUAA_ISSUED_FOR` / `XSUAA_ISSUED_BY`
+for XSUAA), present even when empty. A session without them — written by hand, or by an older
+`mcp-auth` — is refused as a whole, in fixed words naming the store and the destination:
+`… the stored session for "X" is not in this store's format; regenerate it with mcp-auth`.
+Regenerate it with `mcp-auth` (from `@mcp-abap-adt/auth-broker-cli` 3.1 or later):
+`mcp-auth --env <file>` or `mcp-auth --destination <name>` discards the old session and logs in
+anew, keeping the destination's other lines. A session written before 18.0.0 reads as unbound:
+its token is not used, and the first renewal is a new login.
+
+### A token you hold
+
+A token you write into a `.env` yourself (`SAP_GRANT_TYPE=none`) is used only beside the
+binding of the destination's means — the two lines a server-obtained session carries too:
+
+- `SAP_ISSUED_FOR` — the system, as `SAP_URL` with its port, and `?sap-client=<client>` when the
+  destination states `SAP_CLIENT`: `https://<host>:443?sap-client=<client>`.
+- `SAP_ISSUED_BY` — `mcp-abap-adt-binding/2;jwt/none;;;;;;;;;;;;` for a destination that states no UAA or OIDC
+  settings. When it states them, take the value from `bindingOf(means)` of
+  `@mcp-abap-adt/auth-broker`; never compose it by hand.
+
+Without the two lines the file is refused (`not in this store's format`); with other values,
+`Destination "X" lacks: issuedFor, issuedBy` and a hint. The `x-sap-jwt-token` header needs
+neither.
+
+**Renewal.** A JWT `authorization_code` token is renewed with its refresh token; when the
+refresh is refused, the server logs in again. A session write that does not land is logged and
+the call goes on; the write stays pending until the destination's next write or the shutdown's
+flush (see [Shutdown](#shutdown)).
+
 ### Secrets live in `.env`, configuration in YAML
 
 `.env` files and environment variables hold secrets and the session. A YAML config file holds
@@ -104,13 +134,17 @@ When there is no valid token, the server opens the system's login page and waits
 redirect on a local callback port.
 
 - `--browser=<name>` (or `MCP_BROWSER`, YAML `browser`): `chrome`, `edge`, `firefox`,
-  `system` (the default), `headless`, `none`. With `none` or `headless` the URL to open is printed
-  on stderr (never stdout), whatever `DEBUG_AUTH_LOG` says.
+  `system` / `auto` (the platform's default browser; `system` is the default), `headless`,
+  `none`. Any other name opens the default browser. With `none` or `headless` no browser is
+  opened. The URL to open is printed on stderr (never stdout) whatever `DEBUG_AUTH_LOG` says —
+  also when a browser was asked to open it, and when one could not be opened: the login then
+  keeps waiting for the same callback, so the printed URL still works.
 - `--browser-auth-port=<port>` (or `MCP_BROWSER_AUTH_PORT`, YAML `browser-auth-port`):
   the callback port, **default `61001`** for every transport. A value that is not an integer
   from 1 to 65535 is refused at startup.
-- The login waits up to 30 s. Several destinations logging in at once take turns: one login
-  at a time per process.
+- The login waits until it is completed or refused, or the server shuts down: nothing ends it
+  on a timer. Several destinations logging in at once take turns: one login at a time per
+  process.
 
 ```bash
 mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=61005
@@ -203,6 +237,10 @@ destination. A request with none of them is answered `400`.
   `MCP_USE_AUTH_BROKER` and `auth-broker (config file)`) — a parameter 16.0.0 removed is still
   set; the start stops, naming the form you used.
 
+- A refused credential is answered in the authentication layer's fixed words (`reason — hint`),
+  such as `the user or password was refused — check the user and password`; they name the kind
+  of failure, never a value.
+
 The server names fields and the words above only; it never prints a value read from a file.
 
 ## Shutdown
@@ -212,7 +250,9 @@ connections, waits up to **30 s** for logins and refreshes in flight, and flushe
 session. It exits `0` when everything is stored. It exits `1`, with one stderr line per fact
 (never a secret, an error's message or anything read from a file), when:
 
-- a secret could not be stored (`Session secrets not stored: "<destination>": <ErrorClass>`);
+- a secret could not be stored (`Session secrets not stored: "<destination>": <words>` — the
+  fixed words of the failure, such as `persisting the tokens failed (unknown error)`, never
+  what the store said);
 - a login or refresh was still running at the 30 s deadline (`N authorizations still running at
   shutdown, their results are lost`);
 - a server did not close (`A server did not close at shutdown: <ErrorClass>`);

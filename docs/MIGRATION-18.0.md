@@ -2,7 +2,9 @@
 
 All five packages (`lib`, `core`, `compact`, `compact-readonly`, `compact-modify`) are
 **18.0.0**. The debugger moved to `@mcp-abap-adt/adt-clients` 29, `@mcp-abap-adt/interfaces-adt`
-15 and `@mcp-abap-adt/adt-strategies` 0.10. Nothing outside the debugger changed.
+15 and `@mcp-abap-adt/adt-strategies` 0.10. The authentication stack moved to
+`@mcp-abap-adt/interfaces-auth` 7, `auth-providers` 6, `auth-broker` 5, `auth-stores` 5 and
+`@mcp-abap-adt/connection` 14.1 — see [Authentication](#authentication) below.
 
 ## A model, an MCP client, a configuration
 
@@ -79,3 +81,60 @@ A host that wants a take-over to ask first sets `SAP_DEBUG_BREAKPOINT_CONFLICT=r
    the environment). The order is the request scope, then the environment, then your
    `breakpointConflict` — a fallback, which the environment overrides. A host overriding
    `BaseMcpServer.debuggerFor()` passes the option there.
+
+## Authentication
+
+What a user of the server meets:
+
+- **A stored session must say whom it was issued for.** Beside a token or cookies a session file
+  holds `SAP_ISSUED_FOR` and `SAP_ISSUED_BY` (`XSUAA_ISSUED_FOR` / `XSUAA_ISSUED_BY` for XSUAA),
+  present even when empty. A session without them — written by hand or by an older `mcp-auth` —
+  is refused as a whole: `… the stored session for "X" is not in this store's format; regenerate
+  it with mcp-auth`. Regenerate it with `mcp-auth` from `@mcp-abap-adt/auth-broker-cli` 3.1 or
+  later: `mcp-auth --env <file>` or `mcp-auth --destination <name>` discards the old session and
+  logs in anew, keeping the destination's other lines.
+- **The first renewal after the upgrade is a login.** A session written before 18.0.0 reads as
+  unbound: its token and refresh token are not used, and a browser login (`authorization_code`)
+  runs once per destination.
+- **A token you hold (`SAP_GRANT_TYPE=none`) in a `.env` needs its binding beside it**:
+  `SAP_ISSUED_FOR` — `SAP_URL` with its port, plus `?sap-client=<client>` when `SAP_CLIENT` is set
+  — and `SAP_ISSUED_BY` — `mcp-abap-adt-binding/2;jwt/none;;;;;;;;;;;;` when no UAA or OIDC settings are stated. Without
+  them the file is refused; with other values the destination is refused naming `issuedFor` and
+  `issuedBy`. The `x-sap-jwt-token` header is unchanged. See
+  [Authentication → A token you hold](user-guide/AUTHENTICATION.md#a-token-you-hold).
+- **`--browser` keeps its names** (`system`, `auto`, `chrome`, `edge`, `firefox`, `none`,
+  `headless`); any other name opens the platform's default browser. The login URL is printed on
+  stderr in every case, also when a browser could not be opened — the login then keeps waiting
+  for the same callback. A login is no longer ended after 30 s: it waits until it completes, is
+  refused, or the server shuts down.
+- **Renewal** is unchanged in effect: the refresh token first, a new login when it is refused. A
+  session write that does not land is logged and the call goes on; the shutdown's flush reports
+  it (`Session secrets not stored: "<destination>": <words>`).
+- **Refusals read in fixed words** of the authentication layer (`reason — hint`), such as `the
+  user or password was refused — check the user and password`. Code that matched the old words
+  must match the new ones.
+- **Stdio inspection-only mode** (no `--mcp`, no `--env`): a tool call is refused with `this
+  connection has no credential to renew`; how to connect is printed on stderr at startup.
+- **`disconnect()` ends the SAP session** (connection 14.1): the logoff is sent as Eclipse sends it,
+  with the session's cookie and no credential, and on ABAP Cloud a closed connection no longer
+  leaves its security session open until the server's timeout.
+
+What an embedder of `@mcp-abap-adt/lib` meets:
+
+1. **Dependencies.** One copy of each contract: `@mcp-abap-adt/interfaces-auth` `^7.5.0`,
+   `@mcp-abap-adt/auth-errors` `^2.2.0`, `@mcp-abap-adt/auth-providers` `^6.0.1`,
+   `@mcp-abap-adt/auth-broker` `^5.0.4`, `@mcp-abap-adt/auth-stores` `^5.0.0`,
+   `@mcp-abap-adt/connection` `^14.1.0`. Check with
+   `npm ls @mcp-abap-adt/interfaces-auth @mcp-abap-adt/auth-errors`.
+2. **`IAuthBrokerFactoryConfig.browserStrategy`** takes `{ browser?: IBrowser; port? }` — the
+   browser is an `IBrowser` (interfaces-auth 7), not a name. `browser` in the config stays the
+   name `--browser` gives; the factory turns it into an `IBrowser` with the new export
+   `browserFor(name, platform?)`. auth-providers' `browserCallbackStrategy` fits as it is.
+3. **A provider of your own answers minted refusals.** An `AuthOutcome` refusal is an
+   `IAuthProviderError` built by `@mcp-abap-adt/auth-errors` (`authError[kind](facts)`); an
+   object literal does not compile. `NO_CREDENTIAL_REFUSAL` (new export) is the outcome of a
+   provider that has no credential.
+4. **`describeAuthError`** reads a `DestinationConfigError` structurally
+   (`isDestinationConfigError`), answers a session store's `record-format` refusal in its own
+   words, and gives one hint for `issuedFor` / `issuedBy`. `settle()`'s `notStored` lines carry a
+   failed write's fixed words (`"<destination>": <words>`) instead of an error class.

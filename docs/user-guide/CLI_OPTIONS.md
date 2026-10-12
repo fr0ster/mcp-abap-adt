@@ -160,7 +160,7 @@ ignored.
 | `--env-path=<path>` | `MCP_ENV_PATH` | `env-path` | path | One env file by path or file name (relative to the working directory) |
 | `--auth-broker-path=<dir>` | `AUTH_BROKER_PATH` | `auth-broker-path` | path | Base directory of `service-keys/` and `sessions/` (default: the platform paths) |
 | `--unsafe` | `MCP_UNSAFE` | `unsafe` | flag | Write named destinations' sessions to disk instead of keeping them in memory |
-| `--browser=<name>` | `MCP_BROWSER` | `browser` | `chrome`, `edge`, `firefox`, `system`, `headless`, `none` | Browser for a login (default `system`) |
+| `--browser=<name>` | `MCP_BROWSER` | `browser` | `chrome`, `edge`, `firefox`, `system`, `auto`, `headless`, `none` | Browser for a login (default `system`, the platform's default browser; any other name opens it too). The login URL is printed on stderr in every case |
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
 | `--allow-destination-header` | — | `allow-destination-header` | flag | Honour `x-mcp-destination` (HTTP/SSE, off by default) |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
@@ -469,6 +469,7 @@ These are typically set in `.env` file:
 **JWT/OAuth2 Authentication:**
 - `SAP_GRANT_TYPE` - `authorization_code` or `none` (**required** with `SAP_AUTH_TYPE=jwt`)
 - `SAP_JWT_TOKEN` - The token (with `SAP_GRANT_TYPE=none`; otherwise the server stores the one it obtained)
+- `SAP_ISSUED_FOR`, `SAP_ISSUED_BY` - Whom the stored token was issued for. Both are present beside a token (empty when unknown); a token you hold (`none`) needs their exact values — see [Authentication & Destinations](AUTHENTICATION.md#a-token-you-hold)
 - `SAP_REFRESH_TOKEN` - Refresh token for automatic token renewal
 - `SAP_UAA_URL` - UAA URL for OAuth2 (alternative: `UAA_URL`)
 - `SAP_UAA_CLIENT_ID` - UAA Client ID (alternative: `UAA_CLIENT_ID`)
@@ -585,6 +586,8 @@ SAP_CLIENT=200
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=production-jwt-token
+SAP_ISSUED_FOR=https://prod.sap.company.example:443?sap-client=200
+SAP_ISSUED_BY=mcp-abap-adt-binding/2;jwt/none;;;;;;;;;;;;
 EOF
 
 # Run with explicit config

@@ -233,7 +233,12 @@ SAP_URL=https://your-sap-system.example
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=your_jwt_token_here
+SAP_ISSUED_FOR=https://your-sap-system.example:443
+SAP_ISSUED_BY=mcp-abap-adt-binding/2;jwt/none;;;;;;;;;;;;
 ```
+
+The two `SAP_ISSUED_*` lines say whom the token was issued for; the server uses the token only
+beside them. Their values: [A token you hold](AUTHENTICATION.md#a-token-you-hold).
 
 **For JWT with browser login** (the server obtains and renews the token; no token in the file at first):
 ```env

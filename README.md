@@ -347,9 +347,8 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=your-jwt-token
-# Whom the token was issued for — required beside it (see the authentication guide):
-SAP_ISSUED_FOR=https://your-btp-system.example:443?sap-client=100
-SAP_ISSUED_BY=mcp-abap-adt-binding/2;jwt/none;;;;;;;;;;;;
+# The rest of the session record is auth-stores' and auth-broker's:
+# see docs/user-guide/AUTHENTICATION.md#a-token-you-hold
 ```
 
 For RFC connection:

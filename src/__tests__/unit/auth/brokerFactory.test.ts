@@ -641,13 +641,15 @@ describe('AuthBrokerFactory', () => {
       expect(headers.Authorization).toBe('Bearer placeholder-token');
     });
 
-    it('a held token with empty binding keys: refused naming them, with the hint', async () => {
+    it("a held token with empty binding keys: the broker's refusal, in its words", async () => {
       const err = await caught(
         heldToken(['SAP_ISSUED_FOR=', 'SAP_ISSUED_BY=']).getProvider('default'),
       );
-      const text = describeAuthError(err);
-      expect(text).toContain('SAP_ISSUED_FOR and SAP_ISSUED_BY');
-      expect(text).not.toContain('placeholder-token');
+      // The binding is the broker's rule: the server adds no words of its own.
+      expect(describeAuthError(err)).toBe(
+        'Destination "default": the credential in the session is not bound to this destination’s means (issuedFor, issuedBy)',
+      );
+      expect(describeAuthError(err)).not.toContain('placeholder-token');
     });
 
     it('a held token without binding keys: the store refuses the record', async () => {
@@ -656,7 +658,7 @@ describe('AuthBrokerFactory', () => {
       expect(describeAuthError(err)).toContain('regenerate it with mcp-auth');
     });
 
-    it('a named jwt / none destination without --unsafe: lacks authorizationToken, with the hint', async () => {
+    it('a named jwt / none destination without --unsafe: the broker names authorizationToken, and the hint is ours', async () => {
       writeSession('dest', [
         `SAP_URL=${SYSTEM_URL}`,
         'SAP_AUTH_TYPE=jwt',
@@ -666,7 +668,9 @@ describe('AuthBrokerFactory', () => {
       const err = await caught(factory({ unsafe: false }).getProvider('dest'));
       expect(err).toBeInstanceOf(DestinationConfigError);
       const text = describeAuthError(err);
-      expect(text).toContain('Destination "dest" lacks: authorizationToken');
+      expect(text).toContain(
+        'Destination "dest": a jwt destination with grantType none needs the token in its session (authorizationToken)',
+      );
       expect(text).toContain('is read only with --unsafe');
       expect(text).not.toContain('placeholder-token');
     });
@@ -1007,10 +1011,7 @@ describe('describeAuthError', () => {
     authorizationToken:
       'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
   } as const;
-  const BINDING =
-    'A token or cookies you hold need SAP_ISSUED_FOR and SAP_ISSUED_BY beside them, stating whom they were issued for: see the authentication guide.';
-
-  it('issuedFor and issuedBy share one hint, said once', () => {
+  it("a field whose remedy is the broker's or a store's gets their words alone", () => {
     expect(
       describeAuthError(
         new DestinationConfigError(
@@ -1019,7 +1020,22 @@ describe('describeAuthError', () => {
           'fixed reason',
         ),
       ),
-    ).toBe(`Destination "dest" lacks: issuedFor, issuedBy\n${BINDING}`);
+    ).toBe('Destination "dest": fixed reason (issuedFor, issuedBy)');
+  });
+
+  it('a structural copy is read by its fields alone, never by its message', () => {
+    const copy = {
+      name: 'DestinationConfigError',
+      code: 'DESTINATION_CONFIG',
+      destination: 'dest',
+      missingFields: ['grantType'],
+      message: 'forged words with a placeholder-secret',
+    };
+    const text = describeAuthError(copy);
+    expect(text).toBe(
+      `Destination "dest" was refused (grantType)\n${HINTS.grantType}`,
+    );
+    expect(text).not.toContain('placeholder-secret');
   });
 
   it("a session store's refusal of a record not in its format: its own fixed words", () => {
@@ -1042,19 +1058,21 @@ describe('describeAuthError', () => {
       const text = describeAuthError(
         new DestinationConfigError('dest', [field], 'fixed reason'),
       );
-      expect(text).toBe(`Destination "dest" lacks: ${field}\n${HINTS[field]}`);
+      expect(text).toBe(
+        `Destination "dest": fixed reason (${field})\n${HINTS[field]}`,
+      );
       for (const [other, hint] of Object.entries(HINTS)) {
         if (other !== field) expect(text).not.toContain(hint);
       }
     },
   );
 
-  it('a field without a known remedy gets the bare lacks line', () => {
+  it("a field without a known remedy gets the broker's line alone", () => {
     expect(
       describeAuthError(
         new DestinationConfigError('dest', ['uaaClientId'], 'fixed reason'),
       ),
-    ).toBe('Destination "dest" lacks: uaaClientId');
+    ).toBe('Destination "dest": fixed reason (uaaClientId)');
   });
 
   it('several fields: one line naming them, then a hint per known field', () => {
@@ -1066,7 +1084,9 @@ describe('describeAuthError', () => {
           'fixed reason',
         ),
       ),
-    ).toBe(`Destination "dest" lacks: uaaUrl, grantType\n${HINTS.grantType}`);
+    ).toBe(
+      `Destination "dest": fixed reason (uaaUrl, grantType)\n${HINTS.grantType}`,
+    );
   });
 
   it('carries no value read from a store', () => {
@@ -1080,14 +1100,17 @@ describe('describeAuthError', () => {
       err = e;
     }
     const text = describeAuthError(err);
-    expect(text).toContain('Destination "dest" lacks: grantType');
+    expect(text).toContain('(grantType)');
     expect(text).not.toContain('made-up-grant-z9');
     try {
       vetMeans('dest', { authType: 'made-up-type-z9' as never });
     } catch (e) {
       err = e;
     }
-    expect(describeAuthError(err)).toBe('Destination "dest" lacks: authType');
+    expect(describeAuthError(err)).toMatch(
+      /^Destination "dest": .*\(authType\)$/,
+    );
+    expect(describeAuthError(err)).not.toContain('made-up-type-z9');
   });
 
   it('an unsupported authentication', () => {

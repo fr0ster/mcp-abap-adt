@@ -3,7 +3,10 @@
  * only — never a value read from a file (H4).
  */
 
-import { isDestinationConfigError } from '@mcp-abap-adt/auth-broker';
+import {
+  DestinationConfigError,
+  isDestinationConfigError,
+} from '@mcp-abap-adt/auth-broker';
 import { StorageError } from '@mcp-abap-adt/auth-stores';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { DestinationGrant } from '@mcp-abap-adt/interfaces-auth-broker';
@@ -83,18 +86,14 @@ const HINTS: Readonly<Record<string, string>> = {
   'connection-type': 'SNC logs on over RFC: set --connection-type=rfc.',
   authorizationToken:
     'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
-  // auth-broker 5: a handed-over credential (`none`) is used only beside the
-  // exact binding of the destination's means.
-  issuedFor:
-    'A token or cookies you hold need SAP_ISSUED_FOR and SAP_ISSUED_BY beside them, stating whom they were issued for: see the authentication guide.',
-  issuedBy:
-    'A token or cookies you hold need SAP_ISSUED_FOR and SAP_ISSUED_BY beside them, stating whom they were issued for: see the authentication guide.',
 };
 
 /**
  * The words a user reads for an authentication error the server knows:
- * a `DestinationConfigError` (the fields it lacks, then one fixed hint per
- * field with a known remedy), an `UnsupportedAuthenticationError`, or a
+ * a `DestinationConfigError` (the broker's own words, then one fixed hint per
+ * field whose remedy is this server's — a parameter, a flag; what the broker
+ * or a store requires of a record is theirs to say), an
+ * `UnsupportedAuthenticationError`, or a
  * `DestinationRefusal` (its own vetted words), the connector's
  * `AuthRefusedError` (the provider's fixed wording), or a session store's
  * refusal of a record not in its format (auth-stores 5: fixed words naming
@@ -106,8 +105,14 @@ export function describeAuthError(error: unknown): string | undefined {
   // Structural, as auth-broker 5 says: no `instanceof` across copies.
   if (isDestinationConfigError(error)) {
     const fields = error.missingFields;
+    // The validation is the broker's (or the store's it read), and so are its
+    // words: fixed wording, the destination and field names, never a value —
+    // when its constructor built them. A structural copy (another installed
+    // copy, a JSON round trip) is read by its fields alone.
     const lines = [
-      `Destination "${error.destination}" lacks: ${fields.join(', ')}`,
+      error instanceof DestinationConfigError
+        ? error.message
+        : `Destination "${error.destination}" was refused (${fields.join(', ')})`,
     ];
     for (const field of fields) {
       const hint = Object.hasOwn(HINTS, field) ? HINTS[field] : undefined;

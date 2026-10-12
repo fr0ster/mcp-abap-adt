@@ -157,7 +157,6 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
   JWT/OAuth2 Authentication (SAP_GRANT_TYPE is required with jwt):
     SAP_GRANT_TYPE                 authorization_code (browser login) | none (a token you hold)
     SAP_JWT_TOKEN                  JWT token (with SAP_GRANT_TYPE=none)
-    SAP_ISSUED_FOR, SAP_ISSUED_BY  Whom the token was issued for (required beside it)
     SAP_REFRESH_TOKEN              Refresh token (the server stores the one it obtains)
     SAP_UAA_URL                    UAA URL for OAuth2
     SAP_UAA_CLIENT_ID              UAA Client ID

@@ -11,18 +11,18 @@ not support`).
 | **Basic** | `basic` | — | HTTP or RFC | `SAP_USERNAME`, `SAP_PASSWORD` |
 | **SNC** (passwordless) | `snc` | — | **RFC only** | `SAP_SNC_PARTNERNAME`; optional `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME`. **No user, no password** |
 | **JWT, browser login** | `jwt` | `authorization_code` | HTTP | A service key (ABAP or XSUAA), or `SAP_UAA_URL`, `SAP_UAA_CLIENT_ID`, `SAP_UAA_CLIENT_SECRET`; the token is obtained and renewed by the server |
-| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (used as it is, never renewed) with `SAP_ISSUED_FOR` / `SAP_ISSUED_BY` ([below](#a-token-you-hold)), or the `x-sap-jwt-token` header |
+| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (used as it is, never renewed; its session record as auth-stores and auth-broker read it, [below](#a-token-you-hold)), or the `x-sap-jwt-token` header |
 
 A `.env` that is a destination by itself **must state `SAP_AUTH_TYPE`** (there is no default: a `.env` with a
-user and a password but no type is refused with `Destination "X" lacks: authType`; an ABAP service key
+user and a password but no type is refused with `Destination "X": … (authType)`; an ABAP service key
 states `jwt` / `authorization_code` itself). A `jwt` destination **must state `SAP_GRANT_TYPE`** too. A `.env` that states `jwt` without a grant
-is refused with `Destination "X" lacks: grantType` and a hint to regenerate it with
+is refused with `Destination "X": … (grantType)` and a hint to regenerate it with
 `mcp-auth generate-env --grant <grant>` (see [Generate a `.env`](#generate-a-env)).
 
 Other grants (`client_credentials`, `passcode`, the OIDC and SAML grants) and other types
 (`saml`, `certificate`, `kerberos`) are **not supported** by this server, even though the
 libraries know some of them. A destination that states one is refused, naming it; it is never
-silently run as something else. (A `saml` destination that states no grant gets `lacks: grantType`,
+silently run as something else. (A `saml` destination that states no grant is refused naming `grantType`,
 like a `jwt` one.)
 
 ### SNC
@@ -86,36 +86,31 @@ The session — the token and its refresh token — is the server's to keep curr
   Without it the session is kept in memory: one browser login per process, lost on exit.
   The session is also *read* from `sessions/X.env` only with `--unsafe`: a `jwt` / `none`
   destination whose token (`SAP_JWT_TOKEN`) is in that file is refused without it, as
-  `Destination "X" lacks: authorizationToken`. Start with `--unsafe`, or serve the file with
+  `Destination "X": … (authorizationToken)`. Start with `--unsafe`, or serve the file with
   `--env=X` or `--env-path`, which read it whatever `--unsafe` says.
 
 A destination is **read once per process**. Nothing watches the files: a change you make to a
 `.env` from outside (a new password, a token handed over again) takes effect on **restart**.
 
-**A stored session states whom it was issued for.** Beside a token or cookies, a session holds
-both binding keys, `SAP_ISSUED_FOR` and `SAP_ISSUED_BY` (`XSUAA_ISSUED_FOR` / `XSUAA_ISSUED_BY`
-for XSUAA), present even when empty. A session without them — written by hand, or by an older
-`mcp-auth` — is refused as a whole, in fixed words naming the store and the destination:
-`… the stored session for "X" is not in this store's format; regenerate it with mcp-auth`.
-Regenerate it with `mcp-auth` (from `@mcp-abap-adt/auth-broker-cli` 3.1 or later):
-`mcp-auth --env <file>` or `mcp-auth --destination <name>` discards the old session and logs in
-anew, keeping the destination's other lines. A session written before 18.0.0 reads as unbound:
-its token is not used, and the first renewal is a new login.
+**The session record is the stores' and the broker's.** What a session file must hold, and
+whether the credential in it is bound to the destination, are decided by
+[`@mcp-abap-adt/auth-stores`](https://www.npmjs.com/package/@mcp-abap-adt/auth-stores) (the
+store validates its record) and [`@mcp-abap-adt/auth-broker`](https://www.npmjs.com/package/@mcp-abap-adt/auth-broker)
+5 (the binding of a session to its destination). The server reads the file through them and
+answers their refusal in their own words — such as `… the stored session for "X" is not in this
+store's format; regenerate it with mcp-auth`. `mcp-auth` (from `@mcp-abap-adt/auth-broker-cli`
+3.1 or later) writes sessions in their format: `mcp-auth --env <file>` or
+`mcp-auth --destination <name>`. A session written before 18.0.0 reads as unbound: its token is
+not used, and the first renewal is a new login.
 
 ### A token you hold
 
-A token you write into a `.env` yourself (`SAP_GRANT_TYPE=none`) is used only beside the
-binding of the destination's means — the two lines a server-obtained session carries too:
-
-- `SAP_ISSUED_FOR` — the system, as `SAP_URL` with its port, and `?sap-client=<client>` when the
-  destination states `SAP_CLIENT`: `https://<host>:443?sap-client=<client>`.
-- `SAP_ISSUED_BY` — `mcp-abap-adt-binding/2;jwt/none;;;;;;;;;;;;` for a destination that states no UAA or OIDC
-  settings. When it states them, take the value from `bindingOf(means)` of
-  `@mcp-abap-adt/auth-broker`; never compose it by hand.
-
-Without the two lines the file is refused (`not in this store's format`); with other values,
-`Destination "X" lacks: issuedFor, issuedBy` and a hint. The `x-sap-jwt-token` header needs
-neither.
+A token you write into a `.env` yourself (`SAP_GRANT_TYPE=none`) is a credential handed over:
+the server never obtains or renews it. Its session record — the token and what auth-stores
+reads beside it — and the binding auth-broker checks it against are theirs: see auth-broker's
+README (`bindingOf`, the `none` rows) and auth-stores' (the store validates its record). A record
+they refuse is refused in their words. The `x-sap-jwt-token` header is not a stored session, so
+neither applies to it.
 
 **Renewal.** A JWT `authorization_code` token is renewed with its refresh token; when the
 refresh is refused, the server logs in again. A session write that does not land is logged and
@@ -226,9 +221,10 @@ destination. A request with none of them is answered `400`.
 
 ## Errors you may meet at startup
 
-- `Destination "X" lacks: <fields>` — the destination states less than its authentication
-  needs, followed by one hint where the server knows the remedy (`grantType`, `SAP_URL`,
-  `XSUAA_MCP_URL`, `connection-type`).
+- `Destination "X": <reason> (<fields>)` — the destination was refused by the authentication
+  libraries (auth-broker, auth-stores) or by the server, in the refuser's words, naming the
+  fields; followed by one hint where the remedy is the server's (`grantType`, `SAP_URL`,
+  `XSUAA_MCP_URL`, `connection-type`, `--unsafe`).
 - `Destination "X" uses <type> / <grant>, which this server does not support` — an
   authentication outside the four above (`certificate` and `kerberos` have no grant: `uses certificate`).
 - `--env-path: the file does not exist: <path>` — an env file you named is missing; the server

@@ -35,8 +35,7 @@ to choose: [Installation variants](INSTALLATION.md#installation-variants). Ready
    # SAP_AUTH_TYPE=jwt
    # SAP_GRANT_TYPE=none
    # SAP_JWT_TOKEN=<token>
-   # SAP_ISSUED_FOR=<SAP_URL with its port>[?sap-client=<client>]
-   # SAP_ISSUED_BY=mcp-abap-adt-binding/2;jwt/none;;;;;;;;;;;;
+   # (the rest of its session record: ../user-guide/AUTHENTICATION.md#a-token-you-hold)
    ```
 
    All authentications: [Authentication & Destinations](../user-guide/AUTHENTICATION.md).

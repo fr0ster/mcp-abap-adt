@@ -233,12 +233,10 @@ SAP_URL=https://your-sap-system.example
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=your_jwt_token_here
-SAP_ISSUED_FOR=https://your-sap-system.example:443
-SAP_ISSUED_BY=mcp-abap-adt-binding/2;jwt/none;;;;;;;;;;;;
 ```
 
-The two `SAP_ISSUED_*` lines say whom the token was issued for; the server uses the token only
-beside them. Their values: [A token you hold](AUTHENTICATION.md#a-token-you-hold).
+The rest of the token's session record is auth-stores' and auth-broker's, and so is a refusal of
+it: [A token you hold](AUTHENTICATION.md#a-token-you-hold).
 
 **For JWT with browser login** (the server obtains and renews the token; no token in the file at first):
 ```env
@@ -477,7 +475,7 @@ For Server-Sent Events transport, the configuration is similar:
 ### Authentication Issues
 
 - Ensure JWT token is not expired
-- A destination refused at startup names the fields it lacks (`Destination "X" lacks: <fields>`) and one hint
+- A destination refused at startup is answered in the refuser's words, naming the fields (`Destination "X": <reason> (<fields>)`), and one hint
 - A `jwt` `.env` must state `SAP_GRANT_TYPE`; regenerate it with `mcp-auth generate-env --grant <grant>` (`@mcp-abap-adt/auth-broker-cli`)
 
 ### Token Refresh

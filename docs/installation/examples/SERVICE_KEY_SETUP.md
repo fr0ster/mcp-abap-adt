@@ -123,9 +123,9 @@ When you make the first request:
 
 ## Troubleshooting
 
-### Error: `Destination "TRIAL" lacks: <fields>`
+### Error: `Destination "TRIAL": <reason> (<fields>)`
 
-**Cause**: The destination states less than its authentication needs. The message names the fields and, where the server knows the remedy, one hint.
+**Cause**: The destination was refused — by the authentication libraries or the server, in the refuser's words — naming the fields; where the remedy is the server's, one hint follows.
 
 **Solution**:
 - `grantType`: the `.env` is a `jwt` one without `SAP_GRANT_TYPE`. Add it, or regenerate with `mcp-auth generate-env --grant <grant>` (`@mcp-abap-adt/auth-broker-cli`)

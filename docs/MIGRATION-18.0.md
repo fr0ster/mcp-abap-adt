@@ -86,21 +86,21 @@ A host that wants a take-over to ask first sets `SAP_DEBUG_BREAKPOINT_CONFLICT=r
 
 What a user of the server meets:
 
-- **A stored session must say whom it was issued for.** Beside a token or cookies a session file
-  holds `SAP_ISSUED_FOR` and `SAP_ISSUED_BY` (`XSUAA_ISSUED_FOR` / `XSUAA_ISSUED_BY` for XSUAA),
-  present even when empty. A session without them — written by hand or by an older `mcp-auth` —
-  is refused as a whole: `… the stored session for "X" is not in this store's format; regenerate
-  it with mcp-auth`. Regenerate it with `mcp-auth` from `@mcp-abap-adt/auth-broker-cli` 3.1 or
-  later: `mcp-auth --env <file>` or `mcp-auth --destination <name>` discards the old session and
-  logs in anew, keeping the destination's other lines.
+- **Session files are read by auth-stores 5 and auth-broker 5, and refused in their words.**
+  auth-stores validates its record and refuses one not of its format as a whole (`… the stored
+  session for "X" is not in this store's format; regenerate it with mcp-auth`) — above all a
+  session written by hand or by an older `mcp-auth`. Regenerate it with `mcp-auth` from
+  `@mcp-abap-adt/auth-broker-cli` 3.1 or later: `mcp-auth --env <file>` or
+  `mcp-auth --destination <name>`. What the record must hold is auth-stores' to say (its README:
+  *The store validates its record*); the server adds nothing to it.
 - **The first renewal after the upgrade is a login.** A session written before 18.0.0 reads as
   unbound: its token and refresh token are not used, and a browser login (`authorization_code`)
   runs once per destination.
-- **A token you hold (`SAP_GRANT_TYPE=none`) in a `.env` needs its binding beside it**:
-  `SAP_ISSUED_FOR` — `SAP_URL` with its port, plus `?sap-client=<client>` when `SAP_CLIENT` is set
-  — and `SAP_ISSUED_BY` — `mcp-abap-adt-binding/2;jwt/none;;;;;;;;;;;;` when no UAA or OIDC settings are stated. Without
-  them the file is refused; with other values the destination is refused naming `issuedFor` and
-  `issuedBy`. The `x-sap-jwt-token` header is unchanged. See
+- **A token you hold (`SAP_GRANT_TYPE=none`) in a `.env`** is a credential handed over:
+  auth-broker 5 presents it only beside the binding it computes for the destination, and refuses
+  it otherwise in its words (`… the credential in the session is not bound to this destination's
+  means (issuedFor, issuedBy)`). The binding is auth-broker's (its README: `bindingOf`). The
+  `x-sap-jwt-token` header is unchanged. See
   [Authentication → A token you hold](user-guide/AUTHENTICATION.md#a-token-you-hold).
 - **`--browser` keeps its names** (`system`, `auto`, `chrome`, `edge`, `firefox`, `none`,
   `headless`); any other name opens the platform's default browser. The login URL is printed on
@@ -139,5 +139,7 @@ What an embedder of `@mcp-abap-adt/lib` meets:
    provider that has no credential.
 4. **`describeAuthError`** reads a `DestinationConfigError` structurally
    (`isDestinationConfigError`), answers a session store's `record-format` refusal in its own
-   words, and gives one hint for `issuedFor` / `issuedBy`. `settle()`'s `notStored` lines carry a
+   words, and answers a `DestinationConfigError` in the broker's own words (`Destination "X":
+   <reason> (<fields>)`, which replaced `Destination "X" lacks: <fields>`), with a hint only for a
+   field whose remedy is this server's (a parameter or a flag). `settle()`'s `notStored` lines carry a
    failed write's fixed words (`"<destination>": <words>`) instead of an error class.

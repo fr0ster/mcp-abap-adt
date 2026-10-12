@@ -122,7 +122,7 @@ describe('compact debug', () => {
 });
 
 const json = (r: any) => JSON.parse(r.content[0].text);
-const URI = '/sap/bc/adt/oo/classes/zcl_a/source/main#start=7';
+const URI = '/sap/bc/adt/oo/classes/class_a/source/main#start=7';
 const frame = {
   uri: URI,
   event: 'METHOD M',
@@ -239,7 +239,7 @@ function fakeAmdp(held: { on: boolean }) {
       held.on = true;
       return {
         mainId: 'M1',
-        breakpoints: [{ class_name: 'ZCL_A', line: 14, state: 'PENDING' }],
+        breakpoints: [{ class_name: 'CLASS_A', line: 14, state: 'PENDING' }],
       };
     },
     wait: async (s: unknown): ReturnType<AmdpSession['wait']> => {
@@ -429,15 +429,15 @@ describe('compact debug verbs on the fake sessions', () => {
     const t = install();
     const r = await t.call('HandlerDebugStart', {
       kind: 'abap',
-      breakpoints: [{ object_type: 'CLAS', object_name: 'zcl_a', line: 7 }],
-      run: { kind: 'class', name: 'zcl_a' },
+      breakpoints: [{ object_type: 'CLAS', object_name: 'class_a', line: 7 }],
+      run: { kind: 'class', name: 'class_a' },
     });
     expect(t.abap[0]).toEqual([
       'start',
       'refuse',
       {
         breakpoints: [{ kind: 'line', uri: URI }],
-        run: { kind: 'class', name: 'ZCL_A' },
+        run: { kind: 'class', name: 'CLASS_A' },
       },
     ]);
     expect(json(r)).toEqual({
@@ -460,19 +460,19 @@ describe('compact debug verbs on the fake sessions', () => {
     const r = await t.call('HandlerDebugStart', {
       kind: 'amdp',
       take_over: true,
-      breakpoints: [{ object_name: 'zcl_a', line: 14 }],
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
     });
     expect(t.amdp[0]).toEqual([
       'start',
       {
         stopExisting: true,
-        breakpoints: [{ class_name: 'zcl_a', line: 14 }],
+        breakpoints: [{ class_name: 'class_a', line: 14 }],
         run: undefined,
       },
     ]);
     expect(json(r)).toEqual({
       mainId: 'M1',
-      breakpoints: [{ class_name: 'ZCL_A', line: 14, state: 'PENDING' }],
+      breakpoints: [{ class_name: 'CLASS_A', line: 14, state: 'PENDING' }],
       state_handle: t.state.handle,
     });
   });
@@ -500,7 +500,7 @@ describe('compact debug verbs on the fake sessions', () => {
     };
     const r2 = await t2.call('HandlerDebugStart', {
       kind: 'amdp',
-      breakpoints: [{ object_name: 'zcl_a', line: 14 }],
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
     });
     expect(r2.isError).toBe(true);
     expect(r2.content.map((c: any) => c.text).join('\n')).toContain(
@@ -512,7 +512,7 @@ describe('compact debug verbs on the fake sessions', () => {
     const t = install();
     await t.call('HandlerDebugStart', {
       kind: 'amdp',
-      breakpoints: [{ object_name: 'zcl_a', line: 14 }],
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
     });
     const r = await t.call('HandlerDebugStart', {
       kind: 'abap',
@@ -527,7 +527,7 @@ describe('compact debug verbs on the fake sessions', () => {
     });
     const r2 = await t2.call('HandlerDebugStart', {
       kind: 'amdp',
-      breakpoints: [{ object_name: 'zcl_a', line: 14 }],
+      breakpoints: [{ object_name: 'class_a', line: 14 }],
     });
     expect(r2.isError).toBe(true);
     expect(t2.amdp).toEqual([]);
@@ -546,7 +546,7 @@ describe('compact debug verbs on the fake sessions', () => {
     expect(a.state).toBe('stopped');
     expect(a.at.address).toEqual({
       object_type: 'CLAS',
-      object_name: 'ZCL_A',
+      object_name: 'CLASS_A',
       line: 7,
     });
     expect(a.at.include_line).toBe(9);
@@ -664,13 +664,13 @@ describe('compact debug verbs on the fake sessions', () => {
       state_handle: h,
       action: 'run_to_line',
       object_type: 'CLAS',
-      object_name: 'zcl_b',
+      object_name: 'class_b',
       line: 20,
     });
     expect(t.abap[0]).toEqual([
       'stepToLine',
       'stepRunToLine',
-      '/sap/bc/adt/oo/classes/zcl_b/source/main#start=20',
+      '/sap/bc/adt/oo/classes/class_b/source/main#start=20',
     ]);
     // No object given: the object of the top frame.
     await t.call('HandlerDebugStep', {
@@ -683,7 +683,7 @@ describe('compact debug verbs on the fake sessions', () => {
       [
         'stepToLine',
         'stepJumpToLine',
-        '/sap/bc/adt/oo/classes/zcl_a/source/main#start=12',
+        '/sap/bc/adt/oo/classes/class_a/source/main#start=12',
       ],
     ]);
     const ended = json(

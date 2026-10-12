@@ -216,14 +216,14 @@ describe('debugger handlers', () => {
     };
     await handleDebugSetBreakpoints(context as any, {
       state_handle: state.handle,
-      breakpoints: [{ object_type: 'CLAS', object_name: 'ZCL_A', line: 7 }],
+      breakpoints: [{ object_type: 'CLAS', object_name: 'CLASS_A', line: 7 }],
     });
     // The start's breakpoint travels with the new one.
     expect(seen[0]).toEqual([
       { kind: 'statement', statement: 'WRITE', clientId: 'bp1' },
       {
         kind: 'line',
-        uri: '/sap/bc/adt/oo/classes/zcl_a/source/main#start=7',
+        uri: '/sap/bc/adt/oo/classes/class_a/source/main#start=7',
         clientId: 'bp2',
       },
     ]);
@@ -592,14 +592,14 @@ describe('debugger handlers', () => {
 
     it('StepToLine runs or jumps to the line URI', async () => {
       const { world, call } = await stopped();
-      const target = { object_type: 'CLAS', object_name: 'ZCL_A', line: 9 };
+      const target = { object_type: 'CLAS', object_name: 'CLASS_A', line: 9 };
       await call(handleDebugStepToLine, { mode: 'run', ...target });
       await call(handleDebugStepToLine, { mode: 'jump', ...target });
       expect(world.calls).toContain(
-        'stepToLine:stepRunToLine:/sap/bc/adt/oo/classes/zcl_a/source/main#start=9',
+        'stepToLine:stepRunToLine:/sap/bc/adt/oo/classes/class_a/source/main#start=9',
       );
       expect(world.calls).toContain(
-        'stepToLine:stepJumpToLine:/sap/bc/adt/oo/classes/zcl_a/source/main#start=9',
+        'stepToLine:stepJumpToLine:/sap/bc/adt/oo/classes/class_a/source/main#start=9',
       );
     });
 

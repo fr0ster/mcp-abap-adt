@@ -38,7 +38,10 @@ describe('DebugSession lifecycle', () => {
   }
 
   it('a background run starts only after the first poll, and ends as ended with its output', async () => {
-    const { session, world } = await started({ kind: 'class', name: 'ZCL_X' });
+    const { session, world } = await started({
+      kind: 'class',
+      name: 'CLASS_X',
+    });
     world.run.resolve({ ok: true, output: 'total 6' });
     await until(() => session.holdsState() && world.closed.length === 1);
     expect(await session.wait(0)).toEqual({
@@ -217,7 +220,10 @@ describe('DebugSession lifecycle', () => {
   });
 
   it('a run finishing after stop reports nothing and its connection closes once', async () => {
-    const { session, world } = await started({ kind: 'class', name: 'ZCL_X' });
+    const { session, world } = await started({
+      kind: 'class',
+      name: 'CLASS_X',
+    });
     await session.stop();
     world.run.resolve({ ok: true, output: 'late' });
     await jest.advanceTimersByTimeAsync(0);
@@ -392,7 +398,7 @@ describe('DebugSession lifecycle', () => {
     it("the run's connection is fenced, kept and named; a late run reports nothing", async () => {
       const world = fakeWorld();
       const { session } = await started(
-        { kind: 'class', name: 'ZCL_X' },
+        { kind: 'class', name: 'CLASS_X' },
         IDS,
         world,
       );
@@ -443,7 +449,7 @@ describe('DebugSession lifecycle', () => {
       try {
         const world = fakeWorld();
         const { session } = await started(
-          { kind: 'class', name: 'ZCL_X' },
+          { kind: 'class', name: 'CLASS_X' },
           IDS,
           world,
         );
@@ -630,7 +636,7 @@ describe('DebugSession lifecycle', () => {
       const session = new RunRefused(world.ports, IDS).bind('origin');
       const s = session.start('refuse', {
         ...START,
-        run: { kind: 'class', name: 'ZCL_X' },
+        run: { kind: 'class', name: 'CLASS_X' },
       });
       await until(() => world.polls.length === 1);
       world.polls[0].resolve(LISTEN_CATCH());

@@ -65,7 +65,7 @@ describe('DebugSession', () => {
     const session = new DebugSession(world.ports, IDS).bind('origin');
     const started = session.start('refuse', {
       ...START,
-      run: { kind: 'class', name: 'ZCL_X' },
+      run: { kind: 'class', name: 'CLASS_X' },
     });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT());

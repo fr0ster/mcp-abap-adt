@@ -159,8 +159,10 @@ the connection that call holds, else in turn, on the connection `getConnection` 
 flow (a session the call ahead lost already replaced), given back when the send is done. `send` is
 handed that connection and must capture none of its own (`context.connection` may be the spent
 one). A caller already known is answered without entering the flow: the backend user SAP named is
-kept per credential object (a host's injected connection for its own), not per connection, and
-forgotten when that credential's connection is replaced; the leftover tools read the identity the
+kept per credential object (a host's injected connection for its own) and valid only for the
+connection it was asked on: the whole cache is forgotten whenever the instance's connection is
+replaced or resumed (`forgetCallers`), and an answer asked on a connection replaced meanwhile is not
+kept; the leftover tools read the identity the
 owner keeps for the current connection only when it was built for the caller's own credential (a
 pooled HTTP instance reached with another request's credential answers for that request, never for
 the previous one). The wait has no timeout; a call whose signal aborts while it waits leaves at once and never

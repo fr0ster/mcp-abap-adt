@@ -302,8 +302,10 @@ is already replaced); the send is handed its connection and captures none. A cal
 already known — the user SAP named for the credential, or the identity the owner keeps
 for the current connection when that connection was built for this caller's credential —
 is answered at once, without entering the flow, so a background run or a leftover-session
-tool never waits for a lookup it does not send. The credential's user is forgotten when its
-connection is replaced (a renewable credential may log on as another user). Outside the order,
+tool never waits for a lookup it does not send. A cached user is valid only for the
+connection it was asked on: whenever the instance's connection is replaced or resumed,
+the whole cache is forgotten, every credential's entry (a renewable credential, or a new
+provider on a kept session, may log on as another user). Outside the order,
 because they work on a connection of their own: a background run, a listed long read
 (its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one

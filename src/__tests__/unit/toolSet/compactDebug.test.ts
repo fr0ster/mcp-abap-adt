@@ -79,10 +79,12 @@ describe('compact debug', () => {
     ]);
     expect(names(['--exposition=rw'])).toEqual([
       'CompactHandlers',
+      'CompactBackgroundRunHandlers',
       'CompactLeftoverSessionHandlers',
     ]);
     expect(names([])).toEqual([
       'CompactHandlers',
+      'CompactBackgroundRunHandlers',
       'CompactLeftoverSessionHandlers',
     ]);
   });

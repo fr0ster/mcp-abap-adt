@@ -13,6 +13,26 @@
 
 export { type ActiveTool, activeTools } from '../lib/activeTools.js';
 /**
+ * Background runs of the code-running tools: the strategy's contract
+ * (`IBackgroundRuns`) — where runs and their answers are kept, checked
+ * against the caller — and the servers' in-memory store, which only a host
+ * creates and hands to its instances (`backgroundRuns`). Without one,
+ * `background: true` is refused.
+ */
+export {
+  BACKGROUND_RUNS_PER_CALLER,
+  type BackgroundRunAnswer,
+  type BackgroundRunCaller,
+  type BackgroundRunDiscarded,
+  type BackgroundRunListing,
+  type BackgroundRunRecord,
+  type BackgroundRunStart,
+  type BackgroundRunStarted,
+  type IBackgroundRuns,
+  InMemoryBackgroundRuns,
+  type InMemoryBackgroundRunsOptions,
+} from '../lib/backgroundRuns/index.js';
+/**
  * Closing an embedder's own instance (spec §6.4, D51): the latch of that
  * instance, its calls settled, its state undone, its connections logged off,
  * its MCP server closed. The shutdown machinery itself is the launchers'

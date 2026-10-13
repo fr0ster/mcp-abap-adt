@@ -4,6 +4,7 @@ import { errorClassOf } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   ConnectionContext,
+  IBackgroundRuns,
   IHttpApplication,
   LeftoverSessions,
   RouteRegistrationOptions,
@@ -94,6 +95,12 @@ export interface SseServerOptions {
    * not available.
    */
   leftoverSessions?: LeftoverSessions;
+  /**
+   * Where background runs and their answers are kept, handed to every
+   * instance (the launcher's `InMemoryBackgroundRuns`). Absent:
+   * `background: true` is refused.
+   */
+  backgroundRuns?: IBackgroundRuns;
 }
 
 type SessionEntry = {
@@ -147,6 +154,7 @@ export class SseServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly leftoverSessions: LeftoverSessions | undefined;
+  private readonly backgroundRuns: IBackgroundRuns | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -171,6 +179,7 @@ export class SseServer {
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.leftoverSessions = opts?.leftoverSessions;
+    this.backgroundRuns = opts?.backgroundRuns;
   }
 
   /**
@@ -368,6 +377,7 @@ export class SseServer {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
           leftoverSessions?: LeftoverSessions;
+          backgroundRuns?: IBackgroundRuns;
         },
       ) {
         super({
@@ -393,6 +403,9 @@ export class SseServer {
         stateLogger: this.stateLogger,
         ...(this.leftoverSessions !== undefined && {
           leftoverSessions: this.leftoverSessions,
+        }),
+        ...(this.backgroundRuns !== undefined && {
+          backgroundRuns: this.backgroundRuns,
         }),
       },
     );

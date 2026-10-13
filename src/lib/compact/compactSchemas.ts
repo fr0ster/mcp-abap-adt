@@ -1,3 +1,4 @@
+import { COMPACT_BACKGROUND_PROPERTY } from '../backgroundRuns/tools';
 import { TIMEOUT_PROPERTY } from '../longTools';
 import { COMPACT_OBJECT_TYPES } from './compactObjectTypes';
 
@@ -510,6 +511,7 @@ export const compactProfileRunSchema = {
       type: 'string',
       description: 'Program name for profiling.',
     },
+    background: COMPACT_BACKGROUND_PROPERTY,
     profiling: {
       type: 'boolean',
       default: true,

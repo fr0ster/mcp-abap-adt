@@ -7,6 +7,7 @@ import {
 } from '@mcp-abap-adt/lib/auth';
 import {
   BaseMcpServer,
+  type IBackgroundRuns,
   type LeftoverSessions,
   type ResolvedConnection,
 } from '@mcp-abap-adt/lib/embeddable';
@@ -42,6 +43,11 @@ export interface StdioServerOptions {
    * the leftover-session tools. Absent: none kept, the tools not available.
    */
   leftoverSessions?: LeftoverSessions;
+  /**
+   * Where background runs and their answers are kept (the launcher's
+   * `InMemoryBackgroundRuns`). Absent: `background: true` is refused.
+   */
+  backgroundRuns?: IBackgroundRuns;
 }
 
 /**
@@ -76,6 +82,9 @@ export class StdioServer extends BaseMcpServer {
       stateLogger: stateLoggerOf(opts ?? {}),
       ...(opts?.leftoverSessions !== undefined && {
         leftoverSessions: opts.leftoverSessions,
+      }),
+      ...(opts?.backgroundRuns !== undefined && {
+        backgroundRuns: opts.backgroundRuns,
       }),
     });
     this.sentenceFor = opts?.sentenceFor;

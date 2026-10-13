@@ -6,6 +6,10 @@
  * to use different sets of handlers.
  */
 
+export {
+  BackgroundRunHandlersGroup,
+  backgroundRunEntries,
+} from './BackgroundRunHandlersGroup.js';
 export { DebugHandlersGroup } from './DebugHandlersGroup.js';
 export { HighLevelHandlersGroup } from './HighLevelHandlersGroup.js';
 export {

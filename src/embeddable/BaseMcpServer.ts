@@ -15,6 +15,21 @@ import {
   readGuarded,
 } from '../lib/auth/failures.js';
 import { ServerRefusal } from '../lib/auth/serverRefusal.js';
+import { answerBackgroundStarted } from '../lib/backgroundRuns/answers.js';
+import type {
+  BackgroundRunAnswer,
+  BackgroundRunCaller,
+  IBackgroundRuns,
+} from '../lib/backgroundRuns/contract.js';
+import { backgroundRunTools } from '../lib/backgroundRuns/port.js';
+import { startBackgroundRun } from '../lib/backgroundRuns/run.js';
+import {
+  BACKGROUND_INVALID_WORDS,
+  backgroundObjectOf,
+  isBackgroundTool,
+  readBackground,
+  withoutBackground,
+} from '../lib/backgroundRuns/tools.js';
 import { createAbapConnection } from '../lib/connectionFactory.js';
 import {
   createDebuggerInstance,
@@ -57,6 +72,7 @@ import {
   own,
   runAsOwner,
 } from '../lib/ownedConnections.js';
+import { freshConnectionAvailable } from '../lib/packageSessions.js';
 import {
   raceRequestSignal,
   runWithRequestSignal,
@@ -172,6 +188,16 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly leftoverSessions: LeftoverSessions | undefined;
 
+  /**
+   * Where background runs and their answers are kept — the host's strategy
+   * (`backgroundRuns` option); absent, `background: true` and the
+   * background-run tools answer "not available here".
+   */
+  protected readonly backgroundRuns: IBackgroundRuns | undefined;
+
+  /** The backend user SAP answered for a connection (a token credential names none). */
+  private readonly sapUsers = new WeakMap<object, string>();
+
   constructor(options: {
     name: string;
     version?: string;
@@ -195,10 +221,18 @@ export abstract class BaseMcpServer extends McpServer {
      * answer "not available here".
      */
     leftoverSessions?: LeftoverSessions;
+    /**
+     * Where background runs and their answers are kept: the host's strategy,
+     * shared by its instances (the launchers' `InMemoryBackgroundRuns`, an
+     * embedder's own). Absent: `background: true` and the background-run
+     * tools are refused.
+     */
+    backgroundRuns?: IBackgroundRuns;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
     this.leftoverSessions = options.leftoverSessions;
+    this.backgroundRuns = options.backgroundRuns;
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
       logger: stateLoggerOf(options),
@@ -480,6 +514,15 @@ export abstract class BaseMcpServer extends McpServer {
             }
             let inUse: AbapConnection | undefined;
             try {
+              // A run tool's `background` is the wrapper's: read, refused
+              // when it is not a boolean or when the host gave no strategy —
+              // before any connection — and never handed to the handler.
+              const runsInBackground =
+                isBackgroundTool(entry.toolDefinition.name) &&
+                this.backgroundRequested(args);
+              const handlerArgs = isBackgroundTool(entry.toolDefinition.name)
+                ? withoutBackground(args)
+                : args;
               // Get connection from context (this.connectionContext), with
               // the request's signal: a cancelled call settles at once.
               const connection = await this.getConnection(signal);
@@ -533,7 +576,20 @@ export abstract class BaseMcpServer extends McpServer {
                   content: { type: 'text'; text: string }[];
                 };
               }
-              if (read) {
+              if (runsInBackground) {
+                // A background run: on a connection of its own, answered at
+                // once with its handle; its answer goes to the strategy.
+                handlerPromise = resolved(() =>
+                  this.startBackground(
+                    entry.toolDefinition.name,
+                    entry.handler,
+                    group,
+                    context,
+                    handlerArgs,
+                    signal,
+                  ),
+                );
+              } else if (read) {
                 // A listed long tool (spec §5.8): a read on a connection of
                 // its own, its `timeout` cutting the read.
                 const timeoutSeconds = readTimeout(args);
@@ -560,7 +616,7 @@ export abstract class BaseMcpServer extends McpServer {
                 );
               } else if ((entry.handler as HandlerFnWithContext).length >= 2) {
                 handlerPromise = resolved(() =>
-                  (entry.handler as HandlerFnWithContext)(context, args),
+                  (entry.handler as HandlerFnWithContext)(context, handlerArgs),
                 );
               } else {
                 try {
@@ -577,7 +633,7 @@ export abstract class BaseMcpServer extends McpServer {
                   // ignore if group doesn't expose context setter
                 }
                 handlerPromise = resolved(() =>
-                  (entry.handler as HandlerFnArgsOnly)(args),
+                  (entry.handler as HandlerFnArgsOnly)(handlerArgs),
                 );
               }
 
@@ -694,6 +750,13 @@ export abstract class BaseMcpServer extends McpServer {
               leftoverSessions: this.leftoverPort(signal),
             }
           : {}),
+        ...(this.backgroundRuns !== undefined
+          ? {
+              backgroundRuns: backgroundRunTools(this.backgroundRuns, () =>
+                this.backgroundCaller(signal),
+              ),
+            }
+          : {}),
       };
       const result = await runWithRequestSignal(signal, () => {
         throwIfRequestAborted(signal);
@@ -720,6 +783,159 @@ export abstract class BaseMcpServer extends McpServer {
         content: { type: 'text'; text: string }[];
       };
     }
+  }
+
+  /**
+   * Whether a run tool's call asks for a background run: `background: true`.
+   * Refused in fixed words when the value is not a boolean, and when the
+   * host gave no strategy (`background_runs_unavailable`) — as a
+   * fresh-connection operation is without `freshConnection`, before any
+   * connection.
+   */
+  private backgroundRequested(args: unknown): boolean {
+    const background = readBackground(args);
+    if (background === null) throw new Error(BACKGROUND_INVALID_WORDS);
+    if (background && this.backgroundRuns === undefined) {
+      throw new ServerRefusal('background_runs_unavailable');
+    }
+    return background;
+  }
+
+  /**
+   * Starts a background run of a run tool (lib's `startBackgroundRun`): the
+   * caller resolved, the run's own connection opened from the call's, the
+   * handler run on it without the call waiting, its answer — as this
+   * wrapper would answer it, an error included — handed to the strategy.
+   * Answers the handle at once; the shutdown refusal once the shutdown or
+   * this instance's close began.
+   */
+  private async startBackground(
+    tool: string,
+    handler: unknown,
+    group: unknown,
+    context: HandlerContext,
+    args: unknown,
+    signal: AbortSignal,
+  ): Promise<unknown> {
+    const strategy = this.backgroundRuns;
+    if (strategy === undefined) {
+      throw new ServerRefusal('background_runs_unavailable');
+    }
+    // No connection of its own to be had: D20's refusal, before the caller
+    // is asked of the system or anything is kept.
+    if (!freshConnectionAvailable(context.connection)) {
+      throw new ServerRefusal('fresh_connection_unavailable');
+    }
+    const caller = await this.backgroundCaller(signal, context.connection);
+    const started = await startBackgroundRun({
+      strategy,
+      caller,
+      tool,
+      object: backgroundObjectOf(args),
+      instance: this,
+      connection: context.connection,
+      logger: this.logger,
+      run: (own) =>
+        this.backgroundAnswer(
+          handler,
+          group,
+          { ...context, connection: own },
+          args,
+        ),
+    });
+    if (started === undefined) return shutdownRefusalAnswer();
+    return answerBackgroundStarted(started);
+  }
+
+  /**
+   * The run tool on the run's own connection, answered as this wrapper
+   * answers a tool: its content, `isError` when it failed; a throw read by
+   * the failure reader, else `return_error`. Its own request scope: the
+   * call that started it ends long before, and nothing of it reaches here.
+   */
+  private async backgroundAnswer(
+    handler: unknown,
+    group: unknown,
+    context: HandlerContext,
+    args: unknown,
+  ): Promise<BackgroundRunAnswer> {
+    try {
+      const result = await runWithRequestSignal(
+        new AbortController().signal,
+        () => callHandler(handler, group, context, args),
+      );
+      const content = normalizeToolContent(result) as {
+        type: 'text';
+        text: string;
+      }[];
+      return (result as ToolResultLike | undefined)?.isError
+        ? { content, isError: true }
+        : { content };
+    } catch (error) {
+      const read = readGuarded((t) => this.readFailure(t), error);
+      if (read !== undefined) {
+        return answerRead(read) as BackgroundRunAnswer;
+      }
+      return return_error(error) as BackgroundRunAnswer;
+    }
+  }
+
+  /**
+   * Who calls, for the background runs: the destination (URL, client) and
+   * the backend user the request resolved — the one it names
+   * (`SAP_USERNAME`, `x-sap-login`), else the one SAP answers for the
+   * session (`systemUserOf`, a token credential). An injected connection
+   * names its URL; its user is SAP's. A user that cannot be determined is
+   * refused: a run is kept only for a known caller.
+   */
+  protected async backgroundCaller(
+    signal: AbortSignal,
+    connection?: AbapConnection,
+  ): Promise<BackgroundRunCaller> {
+    const context = this.connectionContext;
+    if (context === null) {
+      throw new ServerRefusal('background_runs_unavailable');
+    }
+    if (context.kind === 'injected') {
+      const url = await context.connection.getBaseUrl();
+      return {
+        url: withoutTrailingSlashes(url.trim()),
+        client: '',
+        user: await this.sapUserOf(context.connection),
+      };
+    }
+    const resolved = await this.resolveCaller(signal);
+    const url = withoutTrailingSlashes((resolved.settings.url ?? '').trim());
+    const client = (resolved.settings.client ?? '').trim();
+    const stated = (
+      resolved.settings.username ??
+      resolved.systemContext?.login ??
+      ''
+    )
+      .trim()
+      .toUpperCase();
+    if (stated !== '') return { url, client, user: stated };
+    if (connection !== undefined) {
+      return { url, client, user: await this.sapUserOf(connection) };
+    }
+    const own = await this.getConnection(signal);
+    try {
+      return { url, client, user: await this.sapUserOf(own) };
+    } finally {
+      this.connectionReleased(own);
+    }
+  }
+
+  /** The backend user SAP answers for `connection`'s session, asked once per connection. */
+  private async sapUserOf(connection: AbapConnection): Promise<string> {
+    const known = this.sapUsers.get(connection);
+    if (known !== undefined) return known;
+    const user = await systemUserOf(connection);
+    if (user === undefined) {
+      throw new ServerRefusal('background_run_caller_unknown');
+    }
+    this.sapUsers.set(connection, user);
+    return user;
   }
 
   /**
@@ -1136,6 +1352,13 @@ export const LEFTOVER_LOGOFF_NOT_WRITTEN_WORDS =
  */
 function sessionGone(status: number): boolean {
   return status === 401 || (status >= 200 && status < 400);
+}
+
+/** `url` without its trailing slashes. Plain code. */
+function withoutTrailingSlashes(url: string): string {
+  let end = url.length;
+  while (end > 0 && url[end - 1] === '/') end -= 1;
+  return url.slice(0, end);
 }
 
 function getDefaultLogger(): Logger {

@@ -13,6 +13,7 @@ import {
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
 import {
+  InMemoryBackgroundRuns,
   LeftoverSessions,
   runtimeDirectory,
 } from '@mcp-abap-adt/lib/embeddable';
@@ -167,6 +168,9 @@ export async function launch(
       // AUTH_BROKER_PATH's first entry) — this binary takes no
       // --auth-broker-path.
       leftoverSessions: new LeftoverSessions({ directory: runtimeDirectory() }),
+      // Background runs of the run tools, kept in this process's memory
+      // and handed to every instance; they end with the process.
+      backgroundRuns: new InMemoryBackgroundRuns(),
     },
   );
   installTransportShutdown({

@@ -10,6 +10,7 @@
  * so full and compact cannot fork on any transport.
  */
 
+import { CompactBackgroundRunHandlersGroup } from './compact/backgroundRuns/group';
 import { CompactDebugHandlersGroup } from './compact/debug/group';
 import {
   COMPACT_EXPOSITION_HELP,
@@ -127,7 +128,8 @@ export interface CompactHalves {
  * read-only half, `rw` (the default) both, `debug` beside either the four
  * debugger verbs — and no search, so the list is short by construction. The
  * leftover-session list and logoff are served beside every exposition, the
- * resume beside `rw` only.
+ * resume beside `rw` only; the background-run tools beside `rw` only, where
+ * the run tool is.
  *
  * Every group is a real `BaseHandlerGroup`, never an object literal wrapping
  * the entries: the launcher sets the per-request context on the group that
@@ -165,9 +167,20 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
       const leftover = new CompactLeftoverSessionHandlersGroup(context, {
         resume: exposition[0] !== 'ro',
       });
+      // Beside the run tool (HandlerProfileRun, rw only): its background
+      // runs, read, listed and discarded.
+      const background =
+        exposition[0] !== 'ro'
+          ? [new CompactBackgroundRunHandlersGroup(context)]
+          : [];
       return exposition.includes('debug')
-        ? [half, new CompactDebugHandlersGroup(context), leftover]
-        : [half, leftover];
+        ? [
+            half,
+            new CompactDebugHandlersGroup(context),
+            ...background,
+            leftover,
+          ]
+        : [half, ...background, leftover];
     },
   };
 }

@@ -70,6 +70,13 @@
     "why": "the ./utils process cache of a caller of the public API; no server instance builds or owns it"
   },
   {
+    "file": "src/lib/backgroundRuns/run.ts",
+    "function": "startBackgroundRun",
+    "site": "openFreshConnection",
+    "end": "once SAP answered the run: closeQuietly (endConnection), then the answer handed to the strategy; a start refused after it opened (the caller's limit, a strategy that threw) ends it at once; owned by the strategy (role background), so no instance's terminal close cuts it \u2014 the orderly shutdown and its instance's close wait for the run (activeTools), the forced close ends it at once",
+    "why": "a background run's own stateless connection, from the call's start until SAP's answer: the run is never cut by the call's end, an HTTP request's instance leaving, or an instance close"
+  },
+  {
     "file": "src/lib/connectionFactory.ts",
     "function": "createAbapConnection",
     "site": "createConnection",

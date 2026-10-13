@@ -40,6 +40,7 @@
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
+import { BACKGROUND_PROPERTY } from '../../../lib/backgroundRuns/tools';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { newTraceAfter } from '../../../lib/strategies/newTrace';
@@ -63,6 +64,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'ABAP class name to execute.',
       },
+      background: BACKGROUND_PROPERTY,
       profile: {
         type: 'boolean',
         description:

@@ -26,6 +26,7 @@ import {
 import { CompactLeftoverSessionHandlersGroup } from '../../lib/compact/session/group';
 import { ParameterRefusal } from '../../lib/config/index';
 import {
+  BackgroundRunHandlersGroup,
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   LeftoverSessionHandlersGroup,
@@ -79,6 +80,8 @@ function todaysFullGroups(exposition: readonly string[]): IHandlerGroup[] {
       new ReadOnlyHandlersGroup(context, names, new ReadVsGetDedupStrategy()),
     );
     groups.push(new SystemHandlersGroup(context));
+    // Beside the run tools: their background runs.
+    groups.push(new BackgroundRunHandlersGroup(context));
   }
   groups.push(
     ...overriding,
@@ -194,6 +197,16 @@ const LEFTOVER = {
   ],
 };
 
+/** The compact background-run group, beside the run tool (rw only). */
+const BACKGROUND = {
+  group: 'CompactBackgroundRunHandlers',
+  tools: [
+    'HandlerBackgroundRunGet',
+    'HandlerBackgroundRunList',
+    'HandlerBackgroundRunDiscard',
+  ],
+};
+
 describe('compactToolSetOf, with the two halves', () => {
   const compact = compactToolSetOf({
     readOnly: compactReadOnlyEntries,
@@ -224,6 +237,7 @@ describe('compactToolSetOf, with the two halves', () => {
     for (const argv of [['--exposition=rw'], []]) {
       expect(shape(groupsFor(argv))).toEqual([
         { group: 'CompactHandlers', tools: both },
+        BACKGROUND,
         LEFTOVER,
       ]);
     }
@@ -236,6 +250,14 @@ describe('compactToolSetOf, with the two halves', () => {
     ).toEqual([
       'CompactReadOnlyHandlers',
       'CompactDebugHandlers',
+      'CompactLeftoverSessionHandlers',
+    ]);
+    expect(
+      shape(groupsFor(['--exposition=rw,debug'])).map((g) => g.group),
+    ).toEqual([
+      'CompactHandlers',
+      'CompactDebugHandlers',
+      'CompactBackgroundRunHandlers',
       'CompactLeftoverSessionHandlers',
     ]);
     expect(shape(groupsFor(['--exposition=rw,debug']))[1]).toEqual({

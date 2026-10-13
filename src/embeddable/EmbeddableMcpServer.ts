@@ -2,7 +2,9 @@ import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
 import { noopLogger } from '../lib/handlerLogger.js';
+import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from '../lib/handlers/groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
@@ -53,6 +55,17 @@ export interface EmbeddableMcpServerOptions {
    * injected again without a factory forgets the earlier one.
    */
   freshConnection?: () => Promise<IAbapConnection>;
+
+  /**
+   * Where background runs and their answers are kept: your strategy
+   * (`IBackgroundRuns` — a store of your choosing, your own routing between
+   * replicas; `InMemoryBackgroundRuns` keeps them in this process's memory).
+   * A run tool called with `background: true` runs on a connection of its
+   * own — from `freshConnection` on an injected connection — and its answer
+   * is handed to the strategy. Without it, `background: true` and the
+   * background-run tools are refused (`background_runs_unavailable`).
+   */
+  backgroundRuns?: IBackgroundRuns;
 
   /**
    * Logger instance
@@ -193,6 +206,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       systemContextResolver: options.systemContextResolver,
       stateIdleMinutes: options.stateIdleMinutes,
       stateLogger: options.stateLogger,
+      ...(options.backgroundRuns !== undefined && {
+        backgroundRuns: options.backgroundRuns,
+      }),
     });
 
     // Used as given (spec §4.3): no credential built, no wrap, no connect().
@@ -273,6 +289,8 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     groups.push(...overridingGroups);
     if (exposition.includes('system')) {
       groups.push(new SystemHandlersGroup(dummyContext));
+      // Beside the run tools: their background runs (`backgroundRuns`).
+      groups.push(new BackgroundRunHandlersGroup(dummyContext));
     }
     if (exposition.includes('search')) {
       groups.push(new SearchHandlersGroup(dummyContext));

@@ -9,6 +9,7 @@ import type {
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   BaseMcpServer,
+  type IBackgroundRuns,
   type LeftoverSessions,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
@@ -99,6 +100,12 @@ export interface StreamableHttpServerOptions {
    * the tools not available.
    */
   leftoverSessions?: LeftoverSessions;
+  /**
+   * Where background runs and their answers are kept, handed to every
+   * instance (the launcher's `InMemoryBackgroundRuns`). Absent:
+   * `background: true` is refused.
+   */
+  backgroundRuns?: IBackgroundRuns;
 }
 
 /** What the pool keeps of a per-request server, and what the request handler drives on it. */
@@ -141,6 +148,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly sessionFilesOwner: LeftoverSessions | undefined;
+  private readonly backgroundRunsStore: IBackgroundRuns | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -158,6 +166,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.stateIdleMinutes = opts?.stateIdleMinutes;
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.sessionFilesOwner = opts?.leftoverSessions;
+    this.backgroundRunsStore = opts?.backgroundRuns;
     this.version = opts?.version ?? HTTP_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
@@ -468,6 +477,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
           leftoverSessions?: LeftoverSessions;
+          backgroundRuns?: IBackgroundRuns;
         },
       ) {
         super({ name: 'mcp-abap-adt', version, logger, ...state });
@@ -496,6 +506,9 @@ export class StreamableHttpServer extends BaseMcpServer {
         stateLogger: this.stateLogger,
         ...(this.sessionFilesOwner !== undefined && {
           leftoverSessions: this.sessionFilesOwner,
+        }),
+        ...(this.backgroundRunsStore !== undefined && {
+          backgroundRuns: this.backgroundRunsStore,
         }),
       },
     );

@@ -13,6 +13,7 @@ import {
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
 import {
+  InMemoryBackgroundRuns,
   LeftoverSessions,
   runtimeDirectory,
 } from '@mcp-abap-adt/lib/embeddable';
@@ -642,6 +643,9 @@ export async function launch(
       leftoverSessions: new LeftoverSessions({
         directory: runtimeDirectory(getPlatformPaths(config.authBrokerPath)[0]),
       }),
+      // Background runs of the run tools, kept in this process's memory;
+      // they end with the process.
+      backgroundRuns: new InMemoryBackgroundRuns(),
       stateIdleMinutes: config.stateIdleMinutes,
       stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,

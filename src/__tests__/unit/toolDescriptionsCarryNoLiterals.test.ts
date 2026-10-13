@@ -126,7 +126,10 @@ const parametersOf = (definition: {
  * silence. This one answers a feed with no argument; `HandlerProfileList` was the
  * other until the compact facade moved into `@mcp-abap-adt/compact-readonly`.
  */
-const TAKES_NO_PARAMETERS = ['RuntimeListProfilerTraceFiles'];
+const TAKES_NO_PARAMETERS = [
+  'ListBackgroundRuns',
+  'RuntimeListProfilerTraceFiles',
+];
 
 describe('descriptions carry no incidental literals', () => {
   const tools = [

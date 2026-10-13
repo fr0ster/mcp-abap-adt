@@ -17,7 +17,12 @@ export type ServerRefusalCode =
   | 'credentials_required'
   | 'leftover_sessions_unavailable'
   | 'leftover_session_not_available'
-  | 'leftover_session_not_resumable';
+  | 'leftover_session_not_resumable'
+  | 'background_runs_unavailable'
+  | 'background_run_not_available'
+  | 'background_run_running'
+  | 'background_run_limit'
+  | 'background_run_caller_unknown';
 
 /** Inspection-only mode: stdio started without a destination (D17). */
 export const INSPECTION_ONLY_WORDS =
@@ -54,8 +59,45 @@ export const LEFTOVER_SESSION_NOT_AVAILABLE_WORDS =
 export const LEFTOVER_SESSION_NOT_RESUMABLE_WORDS =
   "a debugger's session cannot be resumed (its listener, breakpoints and poll lived in the ended process); log it off instead";
 
+/**
+ * `background: true` on an instance whose host gave no store for background
+ * runs (an embedder without `backgroundRuns`), and the background-run tools
+ * there.
+ */
+export const BACKGROUND_RUNS_UNAVAILABLE_WORDS =
+  'background runs are not available here: the host gave this server no store for them';
+
+/**
+ * A `run_handle` that names no background run of the caller's: unknown or
+ * someone else's — the same words for each.
+ */
+export const BACKGROUND_RUN_NOT_AVAILABLE_WORDS =
+  'no background run of yours with this run_handle is available';
+
+/** A discard of a run still running: it cannot be stopped. */
+export const BACKGROUND_RUN_RUNNING_WORDS =
+  'this background run is still running and cannot be discarded: a started run cannot be stopped; discard it once it has finished';
+
+/** A background run whose request names no backend user, and SAP named none either. */
+export const BACKGROUND_RUN_CALLER_UNKNOWN_WORDS =
+  'a background run is kept for the backend user of the request, and none could be determined (the request names none and the system answered none)';
+
+/**
+ * A background run beyond the caller's limit (running plus kept): the
+ * limit, and the tool that removes a finished run's answer.
+ */
+export function backgroundRunLimitWords(
+  limit: number,
+  discardTool: string,
+): string {
+  return `background run refused: you hold ${limit} background runs (running and kept), the limit; discard a finished one with ${discardTool} first`;
+}
+
+/** The refusals whose words are given at construction. */
+type WordedCode = 'destination_refused' | 'background_run_limit';
+
 /** The refusals whose words are fixed. */
-type FixedCode = Exclude<ServerRefusalCode, 'destination_refused'>;
+type FixedCode = Exclude<ServerRefusalCode, WordedCode>;
 
 const WORDS: Readonly<Record<FixedCode, string>> = {
   inspection_only: INSPECTION_ONLY_WORDS,
@@ -64,6 +106,10 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   leftover_sessions_unavailable: LEFTOVER_SESSIONS_UNAVAILABLE_WORDS,
   leftover_session_not_available: LEFTOVER_SESSION_NOT_AVAILABLE_WORDS,
   leftover_session_not_resumable: LEFTOVER_SESSION_NOT_RESUMABLE_WORDS,
+  background_runs_unavailable: BACKGROUND_RUNS_UNAVAILABLE_WORDS,
+  background_run_not_available: BACKGROUND_RUN_NOT_AVAILABLE_WORDS,
+  background_run_running: BACKGROUND_RUN_RUNNING_WORDS,
+  background_run_caller_unknown: BACKGROUND_RUN_CALLER_UNKNOWN_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */
@@ -81,10 +127,14 @@ export class ServerRefusal extends Error {
   /**
    * `destination_refused` in vetted words: a parameter's label and the
    * user's own input (a path they gave) — never a file's content.
+   * `background_run_limit` in `backgroundRunLimitWords`.
    */
-  constructor(code: 'destination_refused', words: string);
+  constructor(code: WordedCode, words: string);
   constructor(code: ServerRefusalCode, words?: string) {
-    const text = code === 'destination_refused' ? (words ?? '') : WORDS[code];
+    const text =
+      code === 'destination_refused' || code === 'background_run_limit'
+        ? (words ?? '')
+        : WORDS[code];
     super(text);
     this.name = 'ServerRefusal';
     this.serverRefusal = code;

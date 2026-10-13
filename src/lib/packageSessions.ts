@@ -106,6 +106,17 @@ export async function openFreshConnection(
 }
 
 /**
+ * Whether `openFreshConnection` has a fresh connection to open for
+ * `connection` — the factory's record or the host's `freshConnection` — so a
+ * caller can refuse before it sends anything else. Nothing is opened.
+ */
+export function freshConnectionAvailable(connection: IAbapConnection): boolean {
+  return (
+    siblingRecordOf(connection) !== undefined || hostFactories.has(connection)
+  );
+}
+
+/**
  * A fresh connection the server now holds, connected (RFC needs an explicit
  * `connect()`; `createAbapConnection` does not connect). If the connect
  * fails, the connection is closed and the failure is the answer: nothing

@@ -5,6 +5,7 @@
  */
 
 import type { HandlerSet } from '../../config/IServerConfig.js';
+import { BackgroundRunHandlersGroup } from '../groups/BackgroundRunHandlersGroup.js';
 import { DebugHandlersGroup } from '../groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../groups/HighLevelHandlersGroup.js';
 import { LeftoverSessionHandlersGroup } from '../groups/LeftoverSessionHandlersGroup.js';
@@ -27,8 +28,9 @@ export function noConnectionContext(): HandlerContext {
 /**
  * The groups for `exposition`, built against `baseContext`: the non-readonly
  * groups first, so their tool names feed the readonly dedup
- * (`ReadVsGetDedupStrategy`), then the readonly and system groups, the
- * others, search, and the leftover-session tools — in registration order.
+ * (`ReadVsGetDedupStrategy`), then the readonly and system groups (with the
+ * background-run tools beside the run tools), the others, search, and the
+ * leftover-session tools — in registration order.
  */
 export function expositionGroups(
   exposition: readonly string[],
@@ -62,6 +64,9 @@ export function expositionGroups(
       ),
     );
     handlerGroups.push(new SystemHandlersGroup(baseContext));
+    // Beside the run tools (RuntimeRunClass, RuntimeRunProgram): their
+    // background runs, read, listed and discarded.
+    handlerGroups.push(new BackgroundRunHandlersGroup(baseContext));
   }
   handlerGroups.push(...overridingGroups);
   handlerGroups.push(new SearchHandlersGroup(baseContext));

@@ -42,7 +42,13 @@ export type ConnectionRole =
   /** Held state's own (the debugger's sessions). */
   | 'state'
   /** A listed long tool's own, for one read (`runLongCall`, spec §5.8). */
-  | 'long';
+  | 'long'
+  /**
+   * A background run's own, until SAP answers (`startBackgroundRun`): owned
+   * by the host's strategy, not an instance — no terminal close cuts it; the
+   * forced close does.
+   */
+  | 'background';
 
 /** A connection, as the registry keeps it: any object with an optional `disconnect()`. */
 type OwnedConnection = object;

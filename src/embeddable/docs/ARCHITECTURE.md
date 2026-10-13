@@ -201,6 +201,54 @@ tools; the server decides nothing by itself (session-resume spec).
   `sap-contextid`, no credential (its `prepare()` is never called) and no CSRF fetch before it;
   resolved once written, its answer not read. Then the claimed file is deleted.
 
+### Background runs: the strategy contract
+
+A run of ABAP code cannot be cut (a running request dies with its socket or its session), so
+`RuntimeRunClass`, `RuntimeRunProgram` and compact `HandlerProfileRun` take `background: true`:
+the call answers at once with a handle and the run goes on (background-runs spec). Where runs and
+their answers are kept is the host's: a strategy.
+
+- **The contract** (`IBackgroundRuns`, `src/lib/backgroundRuns/contract.ts`, exported from
+  `@mcp-abap-adt/lib/embeddable`): `start(caller, { tool, object, started_at })` → `{ handle }`
+  (opaque, at least 128 random bits) or `{ refused: 'limit', limit }`; `finish(handle, answer,
+  finishedAt)`, called once per started run by the library; `get(handle, caller)` → the run or
+  `undefined`; `list(caller)` (no output); `discard(handle, caller)` → `'discarded'` | `'running'` |
+  `'not-available'`. The caller is `{ url, client, user }`; `get` and `discard` answer an unknown
+  handle and someone else's alike. Every method may answer a promise. The strategy decides only
+  where runs are kept and how a handle is found (an embedder: its store, its routing between
+  replicas).
+- **The servers' implementation** (`InMemoryBackgroundRuns({ prefix? })`): the process's memory,
+  16 per caller (running plus kept), no process-wide limit, no TTL; the handle is the host's
+  `prefix` (an instance id) and 128 random bits as hex. Created by each launcher and handed to its
+  instances (`backgroundRuns` on `StdioServer`, `StreamableHttpServer`, `SseServer`,
+  `EmbeddableMcpServer`, `BaseMcpServer`); no module global, and no default: an instance without
+  one answers `background_runs_unavailable` to `background: true` (checked before any connection)
+  and to the three tools.
+- **The run** (`startBackgroundRun`, `src/lib/backgroundRuns/run.ts`), from the tool wrapper:
+  refused at once without a fresh connection to be had (`freshConnectionAvailable`; D20's words);
+  the caller resolved (`backgroundCaller`: the request's stated user — `SAP_USERNAME`,
+  `x-sap-login` — else `systemUserOf` on the call's connection, cached per connection; an injected
+  connection's URL from `getBaseUrl()`, its user SAP's; none at all → `background_run_caller_unknown`);
+  registered in the registry of live tools under the calling instance (`"<tool> (background)"`) —
+  refused there once the shutdown latched; its own connection opened by `openFreshConnection` and
+  re-owned by the **strategy** (role `background`), stateless; `strategy.start` (a limit refusal
+  closes that connection: `background_run_limit`, naming the limit and the discard tool); then the
+  handler runs on that connection without the call waiting, inside its own request-signal scope.
+  When SAP answers, the connection is logged off (`closeQuietly`), the answer — as the wrapper
+  answers a tool, the failure reader's answer included — goes to `finish`, and the run leaves the
+  registry. A group registered on its own `McpServer` (no instance, no strategy) refuses
+  `background: true` instead of running in the foreground.
+- **Its ends.** Owned by the strategy, the connection is not reached by any instance's terminal
+  close (an HTTP request's instance ends with its request; the run goes on). Registered under its
+  instance, the run is awaited by `settled()` (every launcher's orderly shutdown) and
+  `settled(instance)` (`closeInstance`: an SSE close, stdio's shutdown) — as a running tool; the
+  forced close (`forceClose`, process-wide) logs it off at once, which cuts it, and names it.
+- **The tools** (`GetBackgroundRun` / `ListBackgroundRuns` / `DiscardBackgroundRun`; compact
+  `HandlerBackgroundRun{Get,List,Discard}`) are `connectionless` entries beside the run tools —
+  the full set's `readonly` (with the system group, in `HandlerExporter` too), compact's `rw` —
+  and read the instance's port (`HandlerContext.backgroundRuns`: the strategy and the call's
+  caller). A handle that is not a non-empty string of at most 512 characters names no run.
+
 ## The servers
 
 ### StdioServer (`@mcp-abap-adt/core`)

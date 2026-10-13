@@ -187,7 +187,11 @@ describe('the MCP tool surface', () => {
         'low/CheckMetadataExtensionLow',
       ]);
       const EXTRA_ALLOWED_ADDITIONS: Record<string, string[]> = {
-        'compact/HandlerProfileRun': ['profiling'],
+        // Background runs (19.0.0): the run tools take `background`, optional,
+        // no default — without it a run waits as before.
+        'compact/HandlerProfileRun': ['background', 'profiling'],
+        'system/RuntimeRunClass': ['background'],
+        'system/RuntimeRunProgram': ['background'],
         'compact/HandlerProfileView': ['mode', 'top'],
         'compact/HandlerDumpList': ['feed_type'],
         // Issue #261: the dumps feed filters on the attributes its descriptor

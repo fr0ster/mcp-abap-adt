@@ -6,6 +6,7 @@ import {
   type SystemContextResolver,
   withResolvedSystemContext,
 } from '../requestSystemResolution.js';
+import { BackgroundRunHandlersGroup } from './groups/BackgroundRunHandlersGroup.js';
 import { DebugHandlersGroup } from './groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from './groups/LowLevelHandlersGroup.js';
@@ -165,6 +166,9 @@ export class HandlerExporter {
     this.handlerGroups.push(...overridingGroups);
     if (options?.includeSystem !== false) {
       this.handlerGroups.push(new SystemHandlersGroup(dummyContext));
+      // Beside the run tools: their background runs — served by an instance
+      // whose host gave a strategy (`backgroundRuns`), refused otherwise.
+      this.handlerGroups.push(new BackgroundRunHandlersGroup(dummyContext));
     }
     if (options?.includeSearch !== false) {
       this.handlerGroups.push(new SearchHandlersGroup(dummyContext));

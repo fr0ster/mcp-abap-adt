@@ -32,7 +32,12 @@ export type FailureCode =
   | 'credentials_required'
   | 'leftover_sessions_unavailable'
   | 'leftover_session_not_available'
-  | 'leftover_session_not_resumable';
+  | 'leftover_session_not_resumable'
+  | 'background_runs_unavailable'
+  | 'background_run_not_available'
+  | 'background_run_running'
+  | 'background_run_limit'
+  | 'background_run_caller_unknown';
 
 /**
  * A failure as it was read: the fields of the §7.3 answer, and the chain's

@@ -797,8 +797,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // The tools: the object-oriented surface, and the compact facade.
       expect(full.tools).toContain('GetClass');
       expect(full.tools).not.toContain('HandlerGet');
-      // The 27 of rw, and the three leftover-session tools beside them.
-      expect(compact.tools).toHaveLength(27 + 3);
+      // The 27 of rw, the three background-run tools beside the run tool,
+      // and the three leftover-session tools.
+      expect(compact.tools).toHaveLength(27 + 3 + 3);
       expect(compact.tools).toEqual(expect.arrayContaining(COMPACT_RW));
       expect(compact.tools).not.toContain('GetClass');
 

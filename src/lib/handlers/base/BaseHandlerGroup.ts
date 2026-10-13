@@ -1,5 +1,12 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../../handlers/interfaces.js';
+import { ServerRefusal } from '../../auth/serverRefusal.js';
+import {
+  BACKGROUND_INVALID_WORDS,
+  isBackgroundTool,
+  readBackground,
+  withoutBackground,
+} from '../../backgroundRuns/tools.js';
 import { runLongCall } from '../../longCall.js';
 import {
   isLongRead,
@@ -85,8 +92,30 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
         description,
         inputSchema: zodSchema,
       },
-      async (args: any) => {
+      async (given: any) => {
         try {
+          // A run tool's `background` is the server instance's to serve: a
+          // group registered on its own has no strategy, so a background run
+          // is refused here, never run in the foreground instead.
+          let args = given;
+          if (isBackgroundTool(toolName)) {
+            const background = readBackground(given);
+            if (background === null) {
+              return return_error(new Error(BACKGROUND_INVALID_WORDS)) as {
+                isError: true;
+                content: { type: 'text'; text: string }[];
+              };
+            }
+            if (background) {
+              return return_error(
+                new ServerRefusal('background_runs_unavailable'),
+              ) as {
+                isError: true;
+                content: { type: 'text'; text: string }[];
+              };
+            }
+            args = withoutBackground(given);
+          }
           // A request that lacks responsible/master system gets them from an
           // ABAP Cloud connection — see src/lib/requestSystemResolution.ts.
           const context = this.context;

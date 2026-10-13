@@ -10,6 +10,7 @@ import {
 } from '../lib/activeTools.js';
 import { answerRead } from '../lib/auth/answerFailure.js';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
+import { errorClassOf } from '../lib/auth/errors.js';
 import {
   failureOf,
   type ReadFailure,
@@ -82,10 +83,12 @@ import {
 } from '../lib/requestSignal.js';
 import {
   defaultSystemContextResolver,
+  type ResolvedSystemContext,
+  resolveOnce,
   type SystemContextResolver,
   systemContextResolverFor,
   withDestinationSystemContext,
-  withResolvedSystemContext,
+  withKnownSystemContext,
 } from '../lib/requestSystemResolution.js';
 import {
   InstanceState,
@@ -384,7 +387,13 @@ export abstract class BaseMcpServer extends McpServer {
         'Connection context not set. Call setConnectionContext() first.',
       );
     }
-    if (context.kind === 'injected') return context.connection;
+    if (context.kind === 'injected') {
+      // The host's connection: its system looked up once, on first use,
+      // before any tool on it proceeds (a failed lookup fails this call
+      // and is asked again by the next).
+      await raceRequestSignal(this.lookupSystem(context.connection), signal);
+      return context.connection;
+    }
 
     throwIfRequestAborted(signal);
     const resolved = await context.source.resolve(signal);
@@ -420,6 +429,14 @@ export abstract class BaseMcpServer extends McpServer {
       this.release(held);
       throw error;
     }
+    // A connection taken without a connect of ours (a resumed session) is
+    // looked up here, before any tool on it proceeds.
+    try {
+      await raceRequestSignal(this.lookupSystem(connection), signal);
+    } catch (error) {
+      this.release(held);
+      throw error;
+    }
     this.entries.set(connection, held);
     this.systemContexts.set(connection, resolved.systemContext);
     return connection;
@@ -448,6 +465,54 @@ export abstract class BaseMcpServer extends McpServer {
         throw error;
       },
     );
+  }
+
+  /** Each connection's system context, resolved at connect (`lookupSystem`). */
+  private readonly systems = new WeakMap<object, ResolvedSystemContext>();
+  private readonly systemLookups = new WeakMap<object, Promise<void>>();
+
+  /**
+   * Resolves `connection`'s system context once (on-premise: nothing sent,
+   * `null`); concurrent callers share the attempt, and a failed one is not
+   * kept — the next asks again.
+   */
+  private lookupSystem(connection: object): Promise<void> {
+    const resolver = this.systemContextResolver;
+    if (resolver === null || this.systems.has(connection)) {
+      return Promise.resolve();
+    }
+    const running = this.systemLookups.get(connection);
+    if (running) return running;
+    const attempt = (async () => {
+      try {
+        // Shared across instances on one connection (`resolveOnce`): one
+        // lookup per connection; a failure is not kept.
+        this.systems.set(
+          connection,
+          await resolveOnce(resolver, connection as AbapConnection),
+        );
+      } catch (error) {
+        // A chain failure (the credential refused, a connection error) is
+        // answered as it is; anything else in fixed words — a lookup's
+        // message may quote what the system answered (H4).
+        if (readGuarded(failureOf, error) !== undefined) throw error;
+        this.logger?.warn?.(
+          `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
+        );
+        throw new ServerRefusal('system_lookup_failed');
+      } finally {
+        this.systemLookups.delete(connection);
+      }
+    })();
+    this.systemLookups.set(connection, attempt);
+    return attempt;
+  }
+
+  /** What `lookupSystem` resolved for `connection`; `undefined`: nothing to resolve. */
+  private systemOf(connection: object): ResolvedSystemContext | undefined {
+    return this.systemContextResolver === null
+      ? undefined
+      : this.systems.get(connection);
   }
 
   /** Runs `fn` with this instance's flow marked held, when `holds`. */
@@ -543,6 +608,15 @@ export abstract class BaseMcpServer extends McpServer {
         throw error;
       }
       if (session !== undefined) await this.keepSession(connection, session);
+      // The system context (ABAP Cloud: `systeminformation`), part of the
+      // connect: once per connection, before any tool proceeds, never a send
+      // outside the main flow. A failed lookup fails the connect.
+      try {
+        await this.lookupSystem(connection);
+      } catch (error) {
+        await endConnection(connection);
+        throw error;
+      }
       entry.ready = connection;
       return connection;
     })();
@@ -631,7 +705,7 @@ export abstract class BaseMcpServer extends McpServer {
               // If handler expects context+args (preferred), pass both.
               // Otherwise, update group context and call with args only for backward compatibility.
               // NOTE: Always await the handler result to ensure we get the resolved value for normalization
-              // Both branches run inside withResolvedSystemContext: a call that
+              // Both branches run inside withKnownSystemContext: a call that
               // lacks responsible/master system gets them from an ABAP Cloud
               // connection (src/lib/requestSystemResolution.ts).
               // The destination's own .env enters the scope first, below the
@@ -648,13 +722,14 @@ export abstract class BaseMcpServer extends McpServer {
                     withDestinationSystemContext(
                       this.systemContexts.get(context.connection),
                       () =>
-                        withResolvedSystemContext(
-                          context.connection,
+                        // Resolved at connect (`lookupSystem`): nothing is
+                        // sent here, so no call sends outside the flow.
+                        withKnownSystemContext(
+                          this.systemOf(context.connection),
                           () => {
                             throwIfRequestAborted(signal);
                             return fn();
                           },
-                          this.systemContextResolver,
                         ),
                     ),
                   ),

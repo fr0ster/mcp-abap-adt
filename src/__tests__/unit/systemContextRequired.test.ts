@@ -30,6 +30,7 @@ import {
 } from '../../handlers/message_class/high/handleCreateMessageClass';
 import { handleCreateServiceDefinition } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
+import { SYSTEM_LOOKUP_FAILED_WORDS } from '../../lib/auth/serverRefusal';
 import { createAdtClient } from '../../lib/clients';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
@@ -488,7 +489,7 @@ describe('cloud', () => {
     },
   );
 
-  it('a lookup that fails: the create is refused as an unreachable system, not as SAP_RESPONSIBLE missing; nothing sent', async () => {
+  it('a lookup that fails: the connect fails in fixed words (system_lookup_failed), not as SAP_RESPONSIBLE missing; nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
     lookup.mockRejectedValue(new Error('placeholder failure'));
@@ -499,13 +500,15 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(textOf(result)).toContain(RESPONSIBLE_LOOKUP_FAILED);
+    // The lookup is part of the connect (spec §5.7): its failure fails the
+    // call before any tool proceeds, in fixed words.
+    expect(textOf(result)).toContain(SYSTEM_LOOKUP_FAILED_WORDS);
     expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
     expect(textOf(result)).not.toContain('placeholder failure');
     expect(textOf(result)).not.toContain('SAP_RESPONSIBLE');
     expect(textOf(result)).not.toContain('x-sap-responsible');
     expect(JSON.parse(textOf(result))).toMatchObject({
-      error: 'system_context_missing',
+      error: 'system_lookup_failed',
     });
     expect(connection.requests).toEqual([]);
   });

@@ -235,12 +235,10 @@ describe.each(Object.keys(SERVERS))('%s', (name) => {
     await hold.arrived;
     if (cancel) {
       call.cancel();
-      // The server has seen the cancel: the call's signal is aborted.
-      await until(
-        () =>
-          activeTools().length === 1 &&
-          activeTools().every((tool) => tool.signal.aborted),
-      );
+      // The server has seen the cancel: the call's signal is aborted (or the
+      // call already settled — the lookup is part of its connect, which a
+      // cancelled caller leaves at once).
+      await until(() => activeTools().every((tool) => tool.signal.aborted));
     }
     hold.release();
     // The call has settled on the server.

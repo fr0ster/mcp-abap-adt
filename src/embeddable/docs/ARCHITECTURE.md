@@ -147,7 +147,10 @@ unless the user resumes or logs them off from a later process (below).
 **One main flow per instance** (D56): the registered tool wrapper runs the calls that work on
 the instance's connection one after another (`enterMainFlow`), whatever the client sends at once;
 a background run, a listed long read and the debugger tools that work on the debugger's own
-connections (`ownConnectionTools.ts`) take no place in it. A send on the instance's connection made
+connections (`ownConnectionTools.ts`: every `Debug*`, `AmdpDebug*`, `HandlerDebug*` tool) take no
+place in it. The ABAP Cloud system-context lookup is part of the connect (`lookupSystem`, once per
+connection, before any tool; a failure fails the connect with `system_lookup_failed`); the wrapper
+reads it (`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
 outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
 handlers as `HandlerContext.onMainConnection` — directly from a call that holds the flow, else in
 turn. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never

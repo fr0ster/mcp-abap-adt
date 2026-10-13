@@ -979,8 +979,11 @@ while it waits leaves the queue at once and never reaches its tool. Every send o
 connection is inside the order, the identity lookups (`systeminformation`) of the background-run,
 leftover-session and debugger tools included — directly from a call that already holds the flow.
 Only work on a connection of its own — a background run, a listed long read on its fresh
-connection, the debugger tools whose SAP work is on the debugger's own connections (the waits,
-steps, starts and take-over) — is outside that order. A long call on the main connection holds
+connection, the debugger tools whose SAP work is on the debugger's own connections (every
+`Debug*`, `AmdpDebug*` and `HandlerDebug*` tool, audited; the `MemorySnapshot*` tools stay in) — is
+outside that order. The ABAP Cloud system-context lookup is part of the connect (once per
+connection, inside `getConnection`, before any tool proceeds; its failure fails the connect and is
+not kept), so it is never a send outside the flow. A long call on the main connection holds
 the flow by design; `background: true` or a tool on its own connection does not. A queued call
 that meets a session the call ahead found lost gets that error as it is. The server enforces it and does not trust the client
 (`BaseMcpServer.enterMainFlow`), on every transport; the instance's end does not wait behind a

@@ -109,7 +109,7 @@ const memo = new WeakMap<
  * in-flight promise; a `null` answer is kept (on-premise stays on-premise); a
  * rejected lookup is dropped so the next request tries again.
  */
-function resolveOnce(
+export function resolveOnce(
   resolver: SystemContextResolver,
   connection: IAbapConnection,
 ): Promise<ResolvedSystemContext> {
@@ -236,6 +236,38 @@ export async function withResolvedSystemContext<T>(
     // system's user, so the call runs with what is stated.
     resolved = {};
   }
+  return applyResolved(resolved, failed, stated, effective, fn);
+}
+
+/**
+ * Run `fn` with the responsible person and master system the request lacks
+ * filled from a resolution already made — the server's, at connect time
+ * (spec §5.7: no send outside the connection's main flow). Sends nothing.
+ * `undefined`: nothing was resolved (no resolver), and `fn` runs as it is.
+ */
+export async function withKnownSystemContext<T>(
+  resolved: ResolvedSystemContext | undefined,
+  fn: () => Promise<T> | T,
+): Promise<T> {
+  if (resolved === undefined) return fn();
+  const stated = getStatedSystemContext();
+  if (stated.responsible && stated.masterSystem) return fn();
+  return applyResolved(
+    resolved,
+    false,
+    stated,
+    getEffectiveSystemContext(),
+    fn,
+  );
+}
+
+function applyResolved<T>(
+  resolved: ResolvedSystemContext,
+  failed: boolean,
+  stated: ReturnType<typeof getStatedSystemContext>,
+  effective: ReturnType<typeof getEffectiveSystemContext>,
+  fn: () => Promise<T> | T,
+): Promise<T> | T {
   // Not a cloud connection: nothing asked, the login applies as it is.
   if (!resolved) return fn();
 

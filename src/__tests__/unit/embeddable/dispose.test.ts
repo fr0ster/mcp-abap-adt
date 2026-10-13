@@ -17,6 +17,8 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
   siblingRecordOf: jest.fn(() => undefined),
+  // The connect's system lookup asks the kind: on-premise sends nothing.
+  systemKindOf: jest.fn(() => 'onprem'),
 }));
 
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';

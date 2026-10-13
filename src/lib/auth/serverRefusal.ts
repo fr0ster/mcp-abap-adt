@@ -22,7 +22,8 @@ export type ServerRefusalCode =
   | 'background_run_not_available'
   | 'background_run_running'
   | 'background_run_limit'
-  | 'background_run_caller_unknown';
+  | 'background_run_caller_unknown'
+  | 'system_lookup_failed';
 
 /** Inspection-only mode: stdio started without a destination (D17). */
 export const INSPECTION_ONLY_WORDS =
@@ -78,6 +79,13 @@ export const BACKGROUND_RUN_NOT_AVAILABLE_WORDS =
 export const BACKGROUND_RUN_RUNNING_WORDS =
   'this background run is still running and cannot be discarded: a started run cannot be stopped; discard it once it has finished';
 
+/**
+ * The connect's system-context lookup (ABAP Cloud `systeminformation`) failed
+ * for a reason that is not a chain failure: the connection was not used.
+ */
+export const SYSTEM_LOOKUP_FAILED_WORDS =
+  'the ABAP Cloud system could not be asked for the session user and system id (systeminformation) when connecting: nothing else was sent; retry when the system is available';
+
 /** A background run whose request names no backend user, and SAP named none either. */
 export const BACKGROUND_RUN_CALLER_UNKNOWN_WORDS =
   'a background run is kept for the backend user of the request, and none could be determined (the request names none and the system answered none)';
@@ -110,6 +118,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   background_run_not_available: BACKGROUND_RUN_NOT_AVAILABLE_WORDS,
   background_run_running: BACKGROUND_RUN_RUNNING_WORDS,
   background_run_caller_unknown: BACKGROUND_RUN_CALLER_UNKNOWN_WORDS,
+  system_lookup_failed: SYSTEM_LOOKUP_FAILED_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

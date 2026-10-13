@@ -107,6 +107,8 @@ export async function statefulStand(
     credential?: (basic: IAuthProvider) => IAuthProvider;
     /** Groups served beside the shipped tools (a case's own tools). */
     groups?: IHandlerGroup[];
+    /** The system kind the server states; on-premise by default. */
+    systemType?: 'onprem' | 'cloud';
   } = {},
 ): Promise<StatefulStand> {
   const standIn = await adtStandIn();
@@ -127,7 +129,7 @@ export async function statefulStand(
       ...tools.map(oneToolGroup),
       ...(options.groups ?? []),
     ]),
-    systemType: 'onprem',
+    systemType: options.systemType ?? 'onprem',
     logger: silent,
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();

@@ -310,10 +310,16 @@ Every send on the instance's connection is inside the order — also the `system
 lookup a background run, a leftover-session tool or the debugger makes for its caller's user (run
 directly when the call that makes it already holds the flow). Outside the order, because they work
 on a connection of their own: a background run (`background: true`), a listed long read (on its
-fresh connection, `timeout` or not) and the debugger tools whose SAP work is on the debugger's own connections (`DebugWait`, `AmdpDebugWait`, `HandlerDebugWait`, `DebugStep`, `DebugStepToLine`, `AmdpDebugStep`, `HandlerDebugStep`, the start and take-over tools). A call you cancel while it waits leaves the queue at
+fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow). A call you cancel while it waits leaves the queue at
 once and never reaches SAP; a shutdown or an instance's close does not wait behind a queued call. A
 queued call that meets a session the call ahead of it found lost gets that error as it is; the next
 call gets a new connection.
+
+**On ABAP Cloud the system is asked once per connection, when it connects** (`systeminformation`:
+the user as responsible, the system id as master system, for what a create needs and the request
+does not state). Before, the first call asked it and a failure was ignored; now a failed lookup
+fails the connect — the call answers `system_lookup_failed` (or `authentication_failed`, as a
+connect would) and the next call tries again. On-premise nothing is asked.
 
 **A long call on the main connection holds the flow; `background: true` or a tool on its own
 connection does not.** A unit-test run (and `HandlerGet`'s `UNIT_TEST` polling), `RunATC` with
@@ -850,7 +856,10 @@ transport's options only:
   `background: true`. `HandlerContext` has `backgroundRuns?` (the tools' port); `ServerRefusalCode`
   / `FailureCode` add `background_runs_unavailable`, `background_run_not_available`,
   `background_run_running`, `background_run_limit` and `background_run_caller_unknown` (a caller
-  whose backend user neither the request nor SAP names). `ConnectionRole` adds `background`: the
+  whose backend user neither the request nor SAP names); and `system_lookup_failed` (the
+  connect's ABAP Cloud `systeminformation` lookup failed). `withKnownSystemContext` applies a
+  resolution made at connect; `withResolvedSystemContext` (which looks up) is still there for
+  `HandlerExporter` and `BaseHandlerGroup`. `ConnectionRole` adds `background`: the
   run's connection is owned by the strategy, so no instance's terminal close cuts it.
 - **`HandlerEntry.connectionless?: true`** marks a tool that works on no connection of the
   instance: the server calls it without building or connecting one, its context's `connection`

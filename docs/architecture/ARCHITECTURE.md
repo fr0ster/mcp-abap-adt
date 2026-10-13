@@ -297,13 +297,17 @@ Every send on the instance's connection is inside the order: the identity lookup
 debugger's request user go through `onMainConnection` — directly from a call that
 already holds the flow (an `AsyncLocalStorage` mark), else in turn. Outside the order,
 because they work on a connection of their own: a background run, a listed long read
-(its fresh connection) and the debugger tools whose SAP work is on the debugger's own connections (`DebugWait`, `AmdpDebugWait`, `HandlerDebugWait`, `DebugStep`, `DebugStepToLine`, `AmdpDebugStep`, `HandlerDebugStep`, the start and take-over tools) (`src/lib/debugger/ownConnectionTools.ts`). The flow
+(its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one
 `connect()`; a queued call that meets a session the call ahead found lost gets that
 error as it is. The connections that are shared this way are stdio's kept one and an
-SSE connection's; Streamable HTTP builds one per request. Not yet in the flow: the
-ABAP Cloud system-context lookup (`withResolvedSystemContext`, once per connection,
-memoised across callers) made for a call outside the order.
+SSE connection's; Streamable HTTP builds one per request. The ABAP Cloud system-context lookup (`systeminformation`, the
+responsible and master system a create fills) is part of the connect: once per
+connection, inside `getConnection` (`lookupSystem`, shared by every caller of the
+connect), before any tool proceeds; the tool wrapper reads its answer
+(`withKnownSystemContext`) and sends nothing. A lookup that fails fails the connect
+(`system_lookup_failed`, or a chain failure as it is), and the next call asks again;
+on-premise nothing is asked.
 
 - **Compact's `HandlerLock`** keeps the lock across calls until `HandlerUnlock` —
   the consumer's choice — where the connection lives across calls (stdio, SSE): the

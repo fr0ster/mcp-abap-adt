@@ -156,8 +156,7 @@ Test parameters can be modified in the script to test different scenarios:
 ## Known Limitations
 
 1. **Lock Handle**: Currently generates a UUID for lock handle. In production, this should be obtained from an initial GET request to the domain endpoint.
-2. **Headers**: The `makeAdtRequestWithTimeout` function needs to be extended to accept custom headers for session/request IDs.
-3. **Rollback**: Failed activations leave inactive objects in the system. Consider implementing full rollback (delete) on critical failures.
+2. **Rollback**: Failed activations leave inactive objects in the system. Consider implementing full rollback (delete) on critical failures.
 
 ## Future Enhancements
 

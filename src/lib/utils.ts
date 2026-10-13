@@ -1,11 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
-import {
-  getTimeout,
-  getTimeoutConfig,
-  type SapConfig,
-  sapConfigSignature,
-} from '@mcp-abap-adt/connection';
+import { type SapConfig, sapConfigSignature } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { answerRead } from './auth/answerFailure';
@@ -59,7 +54,7 @@ export const sessionContext = new AsyncLocalStorage<{
 // should import these from the SDK directly.
 export { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 export type { AxiosResponse };
-export { getTimeout, getTimeoutConfig, logger };
+export { logger };
 
 /**
  * Encodes SAP object names for use in URLs.
@@ -752,37 +747,6 @@ registerConnectionResetHook(() => {
 
 export async function getBaseUrl() {
   return getManagedConnection().getBaseUrl();
-}
-
-/**
- * Makes an ADT request with specified timeout
- * @param url Request URL
- * @param method HTTP method
- * @param timeoutType Timeout type ('default', 'csrf', 'long') or custom number in ms
- * @param data Optional request data
- * @param params Optional request parameters
- * @param headers Optional custom headers
- * @returns Promise with the response
- */
-export async function makeAdtRequestWithTimeout(
-  connection: IAbapConnection,
-  url: string,
-  method: string,
-  timeoutType: 'default' | 'csrf' | 'long' | number = 'default',
-  data?: any,
-  params?: any,
-  headers?: Record<string, string>,
-): Promise<AxiosResponse> {
-  const timeout = getTimeout(timeoutType);
-  return makeAdtRequest(
-    connection,
-    url,
-    method,
-    timeout,
-    data,
-    params,
-    headers,
-  );
 }
 
 export async function makeAdtRequest(

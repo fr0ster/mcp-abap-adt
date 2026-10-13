@@ -78,11 +78,10 @@
  * unsettled after eleven minutes — and a deadline that fires while the job
  * runs closes the socket under it, which ends the request in SAP (measured
  * 2026-10-13: a logoff or a closed socket kills a running request). So the
- * job is sent with `timeout: 0` — none: adt-clients' `timeout ?? 120 s`
- * default would otherwise apply. What still bounds it is the connection's
- * own critical-section ceiling (`SAP_TIMEOUT_CRITICAL`, default 10 minutes,
- * applied to every request of a lock → write → unlock window), which is
- * connection's, not this server's.
+ * job is sent with `timeout: 0` — none, said explicitly. Since adt-clients
+ * 31.1 and connection 17 neither library adds a deadline of its own either,
+ * and inside the lock → write → unlock window's critical section the
+ * connection applies none at all: the job waits until SAP answers.
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';

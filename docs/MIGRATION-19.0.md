@@ -104,8 +104,17 @@ the debugger. A session is stateful only for lock → write → unlock and activ
   (`RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`).
   Compact's `HandlerProfileRun` answers as those two do.
 - **`UpdateServiceBinding` sends its publication job with no deadline of the server's** (it was
-  11 minutes). The connection's own ceiling inside a lock window (`SAP_TIMEOUT_CRITICAL`, default
-  10 minutes) still applies to it.
+  11 minutes), and none of the libraries' either: inside a lock window the connection applies no
+  deadline at all (its 10-minute ceiling is gone, see below).
+- **No request carries a deadline of the libraries' either, and `SAP_TIMEOUT_*` are not read.**
+  With `@mcp-abap-adt/connection` 17 and `@mcp-abap-adt/adt-clients` 31.1, nothing reads
+  `SAP_TIMEOUT_DEFAULT`, `SAP_TIMEOUT_CSRF`, `SAP_TIMEOUT_LONG` or `SAP_TIMEOUT_CRITICAL`: the CSRF
+  fetch and the cloud session preflight carry no 15 s bound, adt-clients' 120 s default for slow
+  operations is gone, and inside a lock → write → unlock window a request carries no deadline at
+  all. **Remove these variables** from your `.env`, service unit or container environment — setting
+  them changes nothing — and `.env.example` no longer lists them. A `connect()` against a host that
+  does not answer now waits until the network fails; a bound on it is the client's own. The
+  listed long reads' `timeout` above is the one deadline left, and it is the caller's.
 
 ## HTTP users
 
@@ -327,9 +336,9 @@ packages, each with one binary and its transport's options only:
 
 ## Embedders
 
-- **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **16**,
+- **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **17**,
   `@mcp-abap-adt/interfaces-adt-connection` **3**, `@mcp-abap-adt/interfaces-adt` **16**,
-  `@mcp-abap-adt/adt-clients` **31** (and `@mcp-abap-adt/adt-strategies` 0.11). None of them takes a
+  `@mcp-abap-adt/adt-clients` **31.1** (and `@mcp-abap-adt/adt-strategies` 0.11). None of them takes a
   signal: `IAbapRequestOptions.signal` and `IAdtClientOptions.signal` are gone, there is no
   `ADT_REQUEST_ERROR` / `ADT_REQUEST_ABORTED`, and `IAdtError` has no `refusal` — an
   authentication failure inside a tool reaches the model with the connection's own words. A
@@ -337,7 +346,14 @@ packages, each with one binary and its transport's options only:
   one SAP session, so a second `disconnect()`, or a `connect()` after it, rejects. A connection you
   inject, or return from `freshConnection`, is used on these contracts; move your own connection
   to them when you move to lib 19. The server builds its own connections with connection's
-  `createConnection({ system, transport, … })`.
+  `createConnection({ system, transport, … })`. Neither library sets a deadline of its own any
+  more (see connection's `docs/MIGRATION-17.0.md`): a request carries the `timeout` you pass and
+  nothing else, and inside a critical section none at all.
+- **`makeAdtRequestWithTimeout`, `getTimeout` and `getTimeoutConfig` are gone from
+  `@mcp-abap-adt/lib/utils`.** The last two were connection's, re-exported, and connection 17 no
+  longer has them; `makeAdtRequestWithTimeout` turned a name (`'default'`, `'csrf'`, `'long'`) into
+  one of their deadlines, so nothing is left for it to mean. Call `makeAdtRequest(connection, url,
+  method, timeout, data?, params?, headers?)` with a number of your own — `0` for none.
 - **`AuthBrokerFactory` left `@mcp-abap-adt/lib/auth`.** It is now
   `@mcp-abap-adt/core/auth`, with `IAuthBrokerFactoryConfig`: import both from there.
 - **`IAuthBrokerFactoryConfig`** takes `browser?: IBrowser` (build it with `browserOf(browserFor(

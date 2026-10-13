@@ -177,15 +177,14 @@ SAP_PASSWORD=your_password
 mcp-abap-adt --env-path=C:\path\to\your\your-system.env
 ```
 
-> **No `SAP_TIMEOUT_DEFAULT` here on purpose.** The sample used to set it to
-> `45000`, and copying that arms a 45-second deadline on every ADT request the
-> server is still working on. `@mcp-abap-adt/adt-clients` removed that default
-> for a measured reason: an aborted `POST /deletion/delete` was retried into a
-> *new* session, while the ABAP session underneath kept the enqueue locks — the
-> lock handle dead, the lock alive and unreachable, the object left locked and
-> inactive. Leave the variable unset and requests run without a client-side
-> deadline; set it only when you have a specific reason to cut one short, and
-> expect that cost.
+> **No request deadline to set.** From 19.0.0 nothing reads `SAP_TIMEOUT_DEFAULT`,
+> `SAP_TIMEOUT_CSRF`, `SAP_TIMEOUT_LONG` or `SAP_TIMEOUT_CRITICAL`: neither the server
+> nor its libraries put a deadline on an ADT request, so remove them from an older
+> `.env` — setting them changes nothing. A client-side deadline closes the socket
+> under a request SAP is still running, and SAP then ends it: an aborted
+> `POST /deletion/delete` once left the lock alive and unreachable, the object
+> locked and inactive. The long reads that take a `timeout` of their own are listed
+> in [MIGRATION-19.0](../../MIGRATION-19.0.md).
 
 ## 🔌 Step 5: Connect to AI Tools
 

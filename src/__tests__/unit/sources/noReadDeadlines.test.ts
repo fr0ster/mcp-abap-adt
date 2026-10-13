@@ -5,9 +5,9 @@
  *
  * - every `makeAdtRequest(` call in every package's `src` passes `0` — no
  *   deadline — as its timeout;
- * - no package calls `makeAdtRequestWithTimeout(` or `getTimeout(` — the
- *   former is kept only as a public export of `@mcp-abap-adt/lib/utils`, and
- *   its own body is the one exception;
+ * - no package names `makeAdtRequestWithTimeout`, `getTimeout` or
+ *   `getTimeoutConfig` — removed in 19.0.0 with connection 17, which no longer
+ *   exports the latter two — and none reads a `SAP_TIMEOUT_*` variable;
  * - the reads that had a deadline before hold no `setTimeout(`, no
  *   `Promise.race(` and read no `timeout` argument.
  *
@@ -46,8 +46,15 @@ const READS = [
   'src/lib/search-source/sourceReader.ts',
 ];
 
-/** The public export kept for consumers of `@mcp-abap-adt/lib/utils`. */
-const KEPT_EXPORT = 'makeAdtRequestWithTimeout';
+/** The deadline helpers removed in 19.0.0; no package may name them. */
+const REMOVED = new Set([
+  'makeAdtRequestWithTimeout',
+  'getTimeout',
+  'getTimeoutConfig',
+]);
+
+/** The environment variables of the removed deadlines. */
+const TIMEOUT_VARIABLE = 'SAP_TIMEOUT_';
 
 function sourceFiles(dir: string): string[] {
   const root = path.join(REPO, dir);
@@ -78,6 +85,8 @@ interface Scan {
   calls: Call[];
   /** Every `args.timeout` / `args?.timeout` read. */
   timeoutReads: number;
+  /** Every identifier, and every string literal's text, with its line. */
+  names: { text: string; line: number }[];
 }
 
 function scan(text: string): Scan {
@@ -89,9 +98,19 @@ function scan(text: string): Scan {
     ts.ScriptKind.TS,
   );
   const calls: Call[] = [];
+  const names: { text: string; line: number }[] = [];
   let timeoutReads = 0;
+  const lineOf = (node: ts.Node) =>
+    source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
   const visit = (node: ts.Node, inside: string | undefined) => {
     let here = inside;
+    if (
+      ts.isIdentifier(node) ||
+      ts.isStringLiteral(node) ||
+      ts.isNoSubstitutionTemplateLiteral(node)
+    ) {
+      names.push({ text: node.text, line: lineOf(node) });
+    }
     if (ts.isFunctionDeclaration(node) && node.name) here = node.name.text;
     if (ts.isCallExpression(node)) {
       const e = node.expression;
@@ -122,7 +141,7 @@ function scan(text: string): Scan {
     ts.forEachChild(node, (child) => visit(child, here));
   };
   visit(source, undefined);
-  return { calls, timeoutReads };
+  return { calls, timeoutReads, names };
 }
 
 const scanFile = (file: string) =>
@@ -144,27 +163,19 @@ describe('no built-in deadline on the server reads', () => {
     const offending = scans.flatMap(({ file, calls }) =>
       calls
         .filter((c) => c.callee === 'makeAdtRequest')
-        .filter(
-          (c) => !(c.inside === KEPT_EXPORT && file === 'src/lib/utils.ts'),
-        )
         .filter((c) => c.args[3] !== '0')
         .map((c) => `${file}:${c.line} timeout=${c.args[3]}`),
     );
     expect(offending).toEqual([]);
   });
 
-  it('no package calls makeAdtRequestWithTimeout or getTimeout', () => {
-    const offending = scans.flatMap(({ file, calls }) =>
-      calls
+  it('no package names a removed deadline helper or reads SAP_TIMEOUT_*', () => {
+    const offending = scans.flatMap(({ file, names }) =>
+      names
         .filter(
-          (c) =>
-            c.callee === 'makeAdtRequestWithTimeout' ||
-            c.callee === 'getTimeout',
+          (n) => REMOVED.has(n.text) || n.text.startsWith(TIMEOUT_VARIABLE),
         )
-        .filter(
-          (c) => !(c.inside === KEPT_EXPORT && file === 'src/lib/utils.ts'),
-        )
-        .map((c) => `${file}:${c.line} ${c.callee}`),
+        .map((n) => `${file}:${n.line} ${n.text}`),
     );
     expect(offending).toEqual([]);
   });
@@ -185,7 +196,7 @@ describe('no built-in deadline on the server reads', () => {
   });
 
   it('the scan sees what it checks, and nothing in comments or literals (load-bearing)', () => {
-    const { calls, timeoutReads } = scan(
+    const { calls, timeoutReads, names } = scan(
       [
         'const r = /dtcore:name="([^"]*)"[^>]*$/; // makeAdtRequest(a, b, c, 1)',
         'await makeAdtRequest(',
@@ -199,6 +210,7 @@ describe('no built-in deadline on the server reads', () => {
         'function makeAdtRequestWithTimeout() { return getTimeout("default"); }',
         'await Promise.race([p, new Promise((r) => setTimeout(r, 1))]);',
         'const t = args?.timeout ?? args.timeout;',
+        "const v = process.env['SAP_TIMEOUT_LONG'] ?? process.env.SAP_TIMEOUT_CSRF;",
       ].join('\n'),
     );
     const named = (callee: string) => calls.filter((c) => c.callee === callee);
@@ -211,5 +223,15 @@ describe('no built-in deadline on the server reads', () => {
     expect(named('Promise.race')).toHaveLength(1);
     expect(named('setTimeout')).toHaveLength(1);
     expect(timeoutReads).toBe(2);
+    const flagged = names
+      .filter((n) => REMOVED.has(n.text) || n.text.startsWith(TIMEOUT_VARIABLE))
+      .map((n) => n.text);
+    // Comments name `makeAdtRequest(` only; the code names each once.
+    expect(flagged).toEqual([
+      'makeAdtRequestWithTimeout',
+      'getTimeout',
+      'SAP_TIMEOUT_LONG',
+      'SAP_TIMEOUT_CSRF',
+    ]);
   });
 });

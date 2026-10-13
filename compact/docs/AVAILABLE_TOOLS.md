@@ -3,17 +3,18 @@
 Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
-- Tools: 34
+- Tools: 37
 - Read-only half: `@mcp-abap-adt/compact-readonly`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`
 - Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff with every exposition, the resume beside `rw` only
+- Background-run tools: `@mcp-abap-adt/lib`, beside `rw` (where `HandlerProfileRun` is)
 - Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)
 
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 34 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 37 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 
@@ -527,6 +528,7 @@ per request.
 - `target_type` (required) — Profile execution target kind.
 - `class_name` — Class name for profiling.
 - `program_name` — Program name for profiling.
+- `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
 - `profiling` — Whether to capture a profiler trace while running. Default true. Set false for a plain run with no tracing — the profiling flags below are then ignored.
 - `description` — Profiler run description.
 - `all_procedural_units` — Trace all procedural units.
@@ -609,6 +611,40 @@ per request.
 - `include` — For a class: definitions, implementations, macros or testclasses; the main source when omitted.
 - `parent_name` — For a function module: its function group.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+### HandlerBackgroundRunGet
+
+**Half:** background-run tools of `@mcp-abap-adt/lib` (beside `rw`, where `HandlerProfileRun` is)
+
+**Description:** Reads one of your background runs by its run_handle: running, or finished with what HandlerProfileRun answered (the system answer as it is, an error included). Reading does not remove it.
+
+**Available in:** all
+
+**Parameters:**
+
+- `run_handle` (required) — The run_handle a run started with background=true answered.
+
+### HandlerBackgroundRunList
+
+**Half:** background-run tools of `@mcp-abap-adt/lib` (beside `rw`, where `HandlerProfileRun` is)
+
+**Description:** Lists your background runs: run_handle, tool, object, when it started, and running or finished. No output.
+
+**Available in:** all
+
+**Parameters:** none
+
+### HandlerBackgroundRunDiscard
+
+**Half:** background-run tools of `@mcp-abap-adt/lib` (beside `rw`, where `HandlerProfileRun` is)
+
+**Description:** Removes the kept answer of one of your finished background runs. A run still running cannot be discarded: a started run cannot be stopped.
+
+**Available in:** all
+
+**Parameters:**
+
+- `run_handle` (required) — The run_handle a run started with background=true answered.
 
 ### HandlerLeftoverSessionList
 

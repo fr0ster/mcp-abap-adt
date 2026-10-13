@@ -74,6 +74,30 @@ mcp-abap-adt-http --port=3000
    at 60 s — because a cancel does nothing to SAP. No run (unit test, ATC, class, program) takes
    one. The list:
    [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own).
+5. **A class or program run may go on in the background** (`background: true`): it cannot be
+   cut, so instead of waiting the call answers at once with a `run_handle` — see below.
+
+## Background runs of a class or a program
+
+A run of ABAP code (`RuntimeRunClass`, `RuntimeRunProgram`; compact `HandlerProfileRun`, with or
+without profiling) may write and may run long, and it cannot be cut: a running request dies with
+its connection, and its write is lost. With **`background: true`** the call answers at once with
+a `run_handle`; the run goes on in an ABAP session of its own until SAP answers, then that session
+is logged off and the answer is kept for you. No default: without it the call waits, as before.
+
+- `GetBackgroundRun { run_handle }` (compact `HandlerBackgroundRunGet`) — `running`, or `finished`
+  followed by what the run tool would have answered, SAP's error included. Reading keeps it.
+- `ListBackgroundRuns` (compact `HandlerBackgroundRunList`) — your runs: handle, tool, object,
+  start, running or finished; no output.
+- `DiscardBackgroundRun { run_handle }` (compact `HandlerBackgroundRunDiscard`) — removes a
+  finished run's answer. A running run cannot be discarded: it cannot be stopped.
+
+A run is yours when its destination and SAP user equal those of your request (for a token
+credential, the user SAP answers); another user's handle reads as an unknown one. You may hold 16
+runs, running and kept together; discard a finished one to start another. Kept answers live in the
+server's memory and end with the process. A shutdown waits for a running background run; only the
+forced close (a second signal, `--shutdown-timeout`) cuts it. Details:
+[MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-background-runs-of-the-class-and-program-runs).
 
 ## Leftover SAP sessions of a killed process
 

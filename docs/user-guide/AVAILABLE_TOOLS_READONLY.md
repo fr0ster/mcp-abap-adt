@@ -3,11 +3,15 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 66
+- Total tools: 69
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Background Run](#read-only-background-run)
+    - [DiscardBackgroundRun](#discardbackgroundrun-read-only-background-run)
+    - [GetBackgroundRun](#getbackgroundrun-read-only-background-run)
+    - [ListBackgroundRuns](#listbackgroundruns-read-only-background-run)
   - [Behavior Definition](#read-only-behavior-definition)
     - [ReadBehaviorDefinition](#readbehaviordefinition-read-only-behavior-definition)
   - [Behavior Implementation](#read-only-behavior-implementation)
@@ -104,6 +108,42 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="read-only-group"></a>
 ## Read-Only Group
+
+<a id="read-only-background-run"></a>
+### Read-Only / Background Run
+
+<a id="discardbackgroundrun-read-only-background-run"></a>
+#### DiscardBackgroundRun (Read-Only / Background Run)
+**Description:** [runtime] Removes the kept answer of one of your finished background runs. A run still running cannot be discarded: a started run cannot be stopped.
+
+**Source:** `src/handlers/background_run/readonly/handleDiscardBackgroundRun.ts`
+
+**Parameters:**
+- `run_handle` (string, required) - The run_handle a run started with background=true answered.
+
+---
+
+<a id="getbackgroundrun-read-only-background-run"></a>
+#### GetBackgroundRun (Read-Only / Background Run)
+**Description:** [runtime] Reads one of your background runs by its run_handle: running, or finished with what the run tool answered (the system answer as it is, an error included). Reading does not remove it; a finished run is kept until you discard it.
+
+**Source:** `src/handlers/background_run/readonly/handleGetBackgroundRun.ts`
+
+**Parameters:**
+- `run_handle` (string, required) - The run_handle a run started with background=true answered.
+
+---
+
+<a id="listbackgroundruns-read-only-background-run"></a>
+#### ListBackgroundRuns (Read-Only / Background Run)
+**Description:** [runtime] Lists your background runs: run_handle, tool, object, when it started, and running or finished. No output: read a run with its run_handle.
+
+**Source:** `src/handlers/background_run/readonly/handleListBackgroundRuns.ts`
+
+**Parameters:**
+- None
+
+---
 
 <a id="read-only-behavior-definition"></a>
 ### Read-Only / Behavior Definition
@@ -909,6 +949,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `all_procedural_units` (boolean, optional) - 
 - `all_system_kernel_events` (boolean, optional) - 
 - `amdp_trace` (boolean, optional) - 
+- `background` (any, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
 - `class_name` (string, required) - ABAP class name to execute.
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
 - `explicit_on_off` (boolean, optional) - 
@@ -938,6 +979,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `all_procedural_units` (boolean, optional) - 
 - `all_system_kernel_events` (boolean, optional) - 
 - `amdp_trace` (boolean, optional) - 
+- `background` (any, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
 - `description` (string, optional) - Profiler trace description (only used when profile=true).
 - `explicit_on_off` (boolean, optional) - 
 - `max_size_for_trace_file` (number, optional) - 

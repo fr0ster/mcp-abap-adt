@@ -81,7 +81,9 @@ A tool not on the list takes no `timeout` and runs to its end — above all the 
 goes on in SAP whoever waits: the ABAP Unit and ATC runs (`Run*UnitTest`, `RunATC`,
 `GetUnitTestResult`, compact `HandlerUnitTestResult` / `HandlerCdsUnitTestResult`), the class and
 program runs (`RuntimeRunClass`, `RuntimeRunProgram`, compact `HandlerProfileRun`), activation and
-the debugger. A session is stateful only for lock → write → unlock and activation.
+the debugger. A session is stateful only for lock → write → unlock and activation. A class or
+program run that may run long is started **in the background** instead (`background: true`, next
+section but one): it cannot be cut, so it gets no `timeout`.
 
 - `GetIncludesList` and `GetStructuresList` already had a `timeout`, in milliseconds per request
   (`GetIncludesList` defaulted to 30 s per request; `GetStructuresList` ignored it). It is the call's
@@ -189,6 +191,46 @@ is for finishing a write or an unlock:
   has reused for another process hides the dead process's file until that other process ends — the
   safe side: a live process's file is never touched.
 
+## Every transport: background runs of the class and program runs
+
+A run of ABAP code may write and may run long, and **it cannot be cut**: measured on premise
+(2026-10-13), a running synchronous request dies when its socket closes or its session is logged
+off, and its write is lost. So instead of a `timeout`, a run may be started **in the background**.
+
+- **`background: true`** on `RuntimeRunClass`, `RuntimeRunProgram` and compact `HandlerProfileRun`
+  (both its modes). **No default**: without it — or with `false` — the call waits for the run, as
+  before. With it the server opens **an ABAP session of the run's own** (stateless; the session your
+  other calls use is not touched), sends the run on it and answers at once, in fixed words: `state:
+  "running"`, the `run_handle` (128 random bits), `tool`, `object`, `started_at`. The run's session
+  stays open until SAP answers — whoever waits, whatever happens to the call or the request that
+  started it — and is logged off right after the answer, which is then kept under the handle.
+- **The tools** — served beside the run tools: in the full binaries wherever `RuntimeRunClass` is
+  (the `readonly` exposition), in compact beside `rw`:
+
+| Full binaries | Compact binaries | What it does |
+|---|---|---|
+| `GetBackgroundRun` `{ run_handle }` | `HandlerBackgroundRunGet` | `running`, or `finished` (with `finished_at`) followed by what the run tool would have answered — SAP's answer as it is, an error included (`isError` as the run tool's). Reading does not remove it |
+| `ListBackgroundRuns` | `HandlerBackgroundRunList` | your runs: `run_handle`, `tool`, `object`, `started_at`, `running` / `finished` — no output |
+| `DiscardBackgroundRun` `{ run_handle }` | `HandlerBackgroundRunDiscard` | removes a finished run's kept answer. A running one is refused (`background_run_running`): a started run cannot be stopped |
+
+- **Only your own.** A run is its caller's: the destination (URL, client) and the backend user the
+  request resolved — the one it states (`SAP_USERNAME`, `x-sap-login`), else, for a token
+  credential, the one SAP answers for the session (`systeminformation`, as for the leftover
+  sessions). Someone else's handle and an unknown one get the same answer:
+  `background_run_not_available`. Over Streamable HTTP each request's instance is new; a run is
+  found again by any later request with the same caller.
+- **16 runs per caller**, running and kept together; a 17th is refused (`background_run_limit`),
+  naming the limit and `DiscardBackgroundRun` (compact: `HandlerBackgroundRunDiscard`), before
+  anything is sent. No expiry: a kept answer stays until you discard it — or the process ends: the
+  answers live in the server's memory and **end with the process**.
+- **The ends.** The orderly shutdown and an instance's close (an SSE connection's, stdio's at
+  exit) **wait for a running background run** — it may write — as they wait for a running tool; it is
+  logged off after its answer. The forced close (a second `SIGTERM` / `SIGINT`,
+  `--shutdown-timeout`) logs its session off at once, which cuts it, and names it on stderr
+  (`Still running at the forced close: RuntimeRunClass (background)`).
+- **No session of its own to be had** — an embedded server given a connection without
+  `freshConnection` — refuses the start with the fresh-connection words, as the listed long reads.
+
 ## HTTP users
 
 - **Install `@mcp-abap-adt/http` and run `mcp-abap-adt-http`**, without `--transport` (see
@@ -275,7 +317,8 @@ packages, each with one binary and its transport's options only:
   `mcp-abap-adt-compact-http` `mcp-abap-adt-http`'s (credentials from each request's `x-sap-*`
   headers), `mcp-abap-adt-compact-sse` `mcp-abap-adt-sse`'s. The sections above apply to each as
   to its counterpart; only the tool list and `--exposition` differ.
-- **`--exposition` is compact's on each**: `rw` (all 27 tools, the default) or `ro` (the 16 that
+- **`--exposition` is compact's on each**: `rw` (all 27 tools, the default; beside them the three
+  background-run tools and the three leftover-session tools) or `ro` (the 16 that
   change nothing), and `debug` beside either for the four debugger verbs (`HandlerDebugStart`,
   `…Wait`, `…View`, `…Step`) — on stdio, Streamable HTTP and SSE alike. `debug` alone, an empty
   value and a set of the full binaries (`readonly`, `high`, `low`) stop the start, as in 18.x.
@@ -481,6 +524,26 @@ packages, each with one binary and its transport's options only:
   connection you injected. `StdioServer`, `StreamableHttpServer` and `SseServer` take the same
   option; the launchers pass one. The server's `resolveCaller(signal)` (protected) is who the tools
   answer for; core overrides it to refuse in inspection-only mode.
+- **Background runs: give your instances a strategy, or `background: true` is refused.**
+  `EmbeddableMcpServer` and `BaseMcpServer` take `backgroundRuns?: IBackgroundRuns`
+  (`@mcp-abap-adt/lib/embeddable`): where runs and their answers are kept — `start(caller, run)` →
+  `{ handle }` or `{ refused: 'limit', limit }`, `finish(handle, answer, finishedAt)`, `get`,
+  `list`, `discard`, each checked against the caller (`{ url, client, user }`); every method may
+  answer a promise. The library runs the request on the run's own connection (your
+  `freshConnection` on an injected one), waits for SAP's answer, logs that connection off and hands
+  you the answer; your strategy decides only where it is kept and how a handle is found (your store,
+  your routing between replicas). `InMemoryBackgroundRuns({ prefix? })` is the servers' — the
+  process's memory, 16 per caller, a handle of 128 random bits after your `prefix` (an instance id,
+  when you route handles between instances). Nothing is a default: without a strategy,
+  `background: true` and the three background-run tools answer `background_runs_unavailable`.
+  `StdioServer`, `StreamableHttpServer` and `SseServer` take the same option; the launchers pass an
+  `InMemoryBackgroundRuns`. `HandlerExporter` and the default registry's `system` add the three
+  tools beside the system group. A group registered on an `McpServer` of its own refuses
+  `background: true`. `HandlerContext` has `backgroundRuns?` (the tools' port); `ServerRefusalCode`
+  / `FailureCode` add `background_runs_unavailable`, `background_run_not_available`,
+  `background_run_running`, `background_run_limit` and `background_run_caller_unknown` (a caller
+  whose backend user neither the request nor SAP names). `ConnectionRole` adds `background`: the
+  run's connection is owned by the strategy, so no instance's terminal close cuts it.
 - **`HandlerEntry.connectionless?: true`** marks a tool that works on no connection of the
   instance: the server calls it without building or connecting one, its context's `connection`
   absent. The leftover-session tools are such tools (their resume must not log on). `HandlerContext`

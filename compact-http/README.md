@@ -36,7 +36,10 @@ and the full binaries' sets (`readonly`, `high`, `low`) are refused at start. A 
 caller's own): `HandlerLeftoverSessionList` and `HandlerLeftoverSessionLogoff` beside every
 exposition, `ro` included, and `HandlerLeftoverSessionResume` beside `rw` only. Over Streamable HTTP
 a resumed session lives for its one request:
-[Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process). A breakpoint catches every request of the connected SAP user, which is why the
+[Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process). `HandlerProfileRun` takes `background: true`: the call answers at once with a `run_handle` and
+the run goes on in an ABAP session of its own; beside `rw`, `HandlerBackgroundRunGet`,
+`HandlerBackgroundRunList` and `HandlerBackgroundRunDiscard` read, list and remove the caller's
+own runs: [Background runs](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#background-runs-of-a-class-or-a-program). A breakpoint catches every request of the connected SAP user, which is why the
 debugger verbs are never served by default: [Debugger](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 
 ## Licence

@@ -94,6 +94,11 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - SQL queries
    - Inactive objects
    - Transactions
+   - Class and program runs (`RuntimeRunClass`, `RuntimeRunProgram`), and beside them their
+     background runs: `GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`
+     ([Background runs](README.md#background-runs-of-a-class-or-a-program)). Compact serves
+     `HandlerBackgroundRunGet`, `HandlerBackgroundRunList` and `HandlerBackgroundRunDiscard`
+     beside `rw`, where `HandlerProfileRun` is
 
 8. **leftover sessions** - Always included, in every exposition of every binary (compact too)
    - `ListLeftoverSessions` and `LogoffLeftoverSession` with every exposition (`readonly` and

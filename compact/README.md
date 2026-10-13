@@ -54,6 +54,13 @@ server process left open (and the locks in them), listed, resumed or logged off 
 the caller's own:
 [Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process).
 
+**Background runs, beside `rw`.** `HandlerProfileRun` takes `background: true` (no default):
+the call answers at once with a `run_handle`, and the run goes on in an ABAP session of its own
+until SAP answers — it cannot be cut. `HandlerBackgroundRunGet`, `HandlerBackgroundRunList` and
+`HandlerBackgroundRunDiscard` read, list and remove the caller's own runs (16 at most, kept in the
+server's memory until discarded or the process ends):
+[Background runs](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#background-runs-of-a-class-or-a-program).
+
 **The debugger is opt-in.** `debug` beside `ro` or `rw` (`--exposition=ro,debug`)
 adds four verbs: `HandlerDebugStart` (`kind: abap|amdp`, the breakpoints, `take_over`,
 an optional background `run`, and for `abap` `request_user`, `debugging_mode` and

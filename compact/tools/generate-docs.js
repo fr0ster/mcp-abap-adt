@@ -149,6 +149,8 @@ function page(entries) {
     '- Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`\n';
   md +=
     '- Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff with every exposition, the resume beside `rw` only\n';
+  md +=
+    '- Background-run tools: `@mcp-abap-adt/lib`, beside `rw` (where `HandlerProfileRun` is)\n';
   md += '- Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)\n\n';
   md += '## How it works\n\n';
   md +=
@@ -164,7 +166,9 @@ function page(entries) {
     md +=
       half === 'debug'
         ? '**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)\n\n'
-        : half === 'session'
+        : half === 'background'
+          ? '**Half:** background-run tools of `@mcp-abap-adt/lib` (beside `rw`, where `HandlerProfileRun` is)\n\n'
+          : half === 'session'
           ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)\n\n'
           : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
@@ -203,6 +207,14 @@ function main() {
     ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
       .compactDebugEntries()
       .map((entry) => ({ half: 'debug', entry })),
+    // The background-run tools live in lib (`src/lib/compact/backgroundRuns`),
+    // served by the compact binaries beside `rw`.
+    ...requireFresh(
+      '.',
+      path.join('lib', 'compact', 'backgroundRuns', 'group.js'),
+    )
+      .compactBackgroundRunEntries()
+      .map((entry) => ({ half: 'background', entry })),
     // The leftover-session tools live in lib (`src/lib/compact/session`),
     // served by the compact binaries beside every exposition.
     ...requireFresh('.', path.join('lib', 'compact', 'session', 'group.js'))

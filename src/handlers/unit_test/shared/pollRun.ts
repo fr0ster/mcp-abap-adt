@@ -1,5 +1,4 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { longCallWaitEnded, noteLongCallId } from '../../../lib/longTools';
 import type { AdtReading } from '../../../lib/strategies/reading';
 
 /**
@@ -91,14 +90,8 @@ export async function pollUntilFinished<TResult>(
   runId: string,
   fetchResult: () => Promise<IAdtResponse<TResult>>,
 ): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
-  // A listed long call's timed-out answer carries the run it waits for
-  // (spec §5.8), so the model can read its result later.
-  noteLongCallId('run_id', runId);
   let lastStatus: AdtReading<unknown> | undefined;
   for (let attempt = 0; attempt < MAX_STATUS_POLLS; attempt += 1) {
-    // A listed long call whose `timeout` ended its wait polls no more: the
-    // run goes on in SAP, and its answer already named it (spec §5.8).
-    if (longCallWaitEnded()) break;
     const statusResponse = await getStatus(runId, true);
     if (!statusResponse.ok) {
       return statusResponse as unknown as IAdtResponse<

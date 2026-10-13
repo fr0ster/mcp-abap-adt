@@ -1,16 +1,19 @@
 /**
- * The listed long tools (spec §5.8, D56): the approved list with each tool's
- * mode, the `timeout` parameter every listed tool declares, the advice its
- * description carries, and the ids a timed-out answer names. A leaf module — no import of the
- * server's — so every handler's definition can read it; the call itself is
- * `longCall.ts`.
+ * The listed long tools (spec §5.8, D56): the approved list — reads only —,
+ * the `timeout` parameter every listed tool declares, and the advice its
+ * description carries. A leaf module — no import of the server's — so every
+ * handler's definition can read it; the call itself is `longCall.ts`.
+ *
+ * One rule (the owner, 2026-10-13): a listed tool only reads, so when its
+ * `timeout` passes the read is cut — its own connection is logged off at
+ * once — and nothing was changed. A tool that starts a run in SAP or runs
+ * code is not on the list and takes no `timeout`.
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
 import * as z from 'zod';
 
 /**
- * The approved list (the user, 2026-10-13), by tool name: the same names as
+ * The approved list, by tool name: the same names as
  * `tools/long-handlers.json`, which a source test keeps equal to this.
  */
 export const LONG_TOOLS: readonly string[] = [
@@ -22,15 +25,6 @@ export const LONG_TOOLS: readonly string[] = [
   'GetObjectsList',
   'GetStructuresList',
   'GetIncludesList',
-  'RunATC',
-  'RunUnitTest',
-  'RunCdsUnitTest',
-  'RunProgramUnitTest',
-  'RunFunctionGroupUnitTest',
-  'RunFunctionModuleUnitTest',
-  'GetUnitTestResult',
-  'RuntimeRunClass',
-  'RuntimeRunProgram',
   'RuntimeListFeeds',
   'ListTransports',
   'GetSqlQuery',
@@ -43,9 +37,6 @@ export const LONG_TOOLS: readonly string[] = [
   'RuntimeAnalyzeProfilerTrace',
   'HandlerWhereUsed',
   'HandlerSearch',
-  'HandlerUnitTestResult',
-  'HandlerCdsUnitTestResult',
-  'HandlerProfileRun',
   'HandlerDumpList',
   'HandlerGetData',
   'HandlerProfileView',
@@ -60,6 +51,37 @@ export function isLongTool(name: string): boolean {
 }
 
 /**
+ * The modes of a listed tool that are not reads: `HandlerGet` of a
+ * `UNIT_TEST` / `CDS_UNIT_TEST` run polls a run in SAP. Such a call is an
+ * ordinary one — the instance's connection — and a `timeout` on it is
+ * refused (`TIMEOUT_NOT_FOR_RUN_WORDS`), before anything is sent.
+ */
+const NOT_A_READ: Readonly<
+  Record<string, { argument: string; equals: readonly string[] }>
+> = {
+  HandlerGet: {
+    argument: 'object_type',
+    equals: ['UNIT_TEST', 'CDS_UNIT_TEST'],
+  },
+};
+
+/** Whether a call of the listed `tool` with `args` is a read (the long path). */
+export function isLongRead(tool: string, args: unknown): boolean {
+  const rule = NOT_A_READ[tool];
+  if (rule === undefined) return true;
+  const value = (args as Record<string, unknown> | null | undefined)?.[
+    rule.argument
+  ];
+  return !(
+    typeof value === 'string' && rule.equals.includes(value.toUpperCase())
+  );
+}
+
+/** The fixed words of a `timeout` given to a listed tool's run mode. */
+export const TIMEOUT_NOT_FOR_RUN_WORDS =
+  'timeout applies to a read only: a unit test run (UNIT_TEST / CDS_UNIT_TEST) takes none.';
+
+/**
  * The largest `timeout` a timer can hold: Node fires a longer delay at once
  * (`TimeoutOverflowWarning`), so a larger value is refused, not shortened.
  */
@@ -70,10 +92,10 @@ export const MAX_TIMEOUT_SECONDS = 2_147_483;
  * `timeout` does, and why to set it below the client's own limit.
  */
 export const LONG_TOOL_ADVICE =
-  "Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.";
+  "Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.";
 
 const TIMEOUT_DESCRIPTION =
-  "Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.";
+  "Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.";
 
 /** The `timeout` property of a listed tool's JSON Schema. */
 export const TIMEOUT_PROPERTY = {
@@ -94,175 +116,18 @@ export function timeoutField() {
     .describe(TIMEOUT_DESCRIPTION);
 }
 
-/**
- * What a `timeout` does to a listed tool's work depends on where that work
- * runs in SAP — measured on premise (2026-10-13), decided by the owner:
- *
- * - **`sync-write`** — the work runs inside one synchronous request and can
- *   change the system (a class or program run; an ATC run held with
- *   `wait=true`, unmeasured, treated so to be safe). A closed socket or a
- *   logoff kills it and loses its write, so the timeout ends only the wait:
- *   the request runs on on the call's own connection, logged off after SAP's
- *   answer; the orderly shutdown waits for that answer;
- * - **`async`** — the tool starts a run in SAP, or polls one; the run
- *   survives the client's exit and a logoff of the session that started it
- *   (measured with ABAP Unit). The timeout ends the wait: the poll stops, the
- *   answer names the run (`run_id` / `worklist_id`), and the call's own
- *   connection is logged off at once;
- * - **`sync-read`** — the request only reads. The timeout cuts it: the call's
- *   own connection is logged off at once, which frees SAP; nothing was
- *   changed.
- */
-export type LongMode = 'sync-write' | 'async' | 'sync-read';
-
-/**
- * A listed tool's mode: its own, or one an argument decides (`when`, the
- * first rule whose argument has one of the values; `mode` otherwise).
- */
-export interface LongModeRule {
-  mode: LongMode;
-  when?: { argument: string; equals: unknown[]; mode: LongMode }[];
+/** The fixed words of a read its `timeout` cut. */
+export function timedOutWords(seconds: number): string {
+  return `The wait was ended by its timeout (${seconds} s). The request was cancelled; nothing was changed.`;
 }
 
-/**
- * Each listed tool's mode — the same as `tools/long-handlers.json`'s, which
- * a source test keeps equal to this, so a tool's mode is reviewable there.
- */
-export const LONG_TOOL_MODES: Readonly<Record<string, LongModeRule>> = {
-  GetWhereUsed: { mode: 'sync-read' },
-  SearchObject: { mode: 'sync-read' },
-  SearchSource: { mode: 'sync-read' },
-  GetPackageContents: { mode: 'sync-read' },
-  GetPackageTree: { mode: 'sync-read' },
-  GetObjectsList: { mode: 'sync-read' },
-  GetStructuresList: { mode: 'sync-read' },
-  GetIncludesList: { mode: 'sync-read' },
-  RunATC: {
-    mode: 'async',
-    when: [{ argument: 'wait', equals: [true], mode: 'sync-write' }],
-  },
-  RunUnitTest: { mode: 'async' },
-  RunCdsUnitTest: { mode: 'async' },
-  RunProgramUnitTest: { mode: 'async' },
-  RunFunctionGroupUnitTest: { mode: 'async' },
-  RunFunctionModuleUnitTest: { mode: 'async' },
-  GetUnitTestResult: { mode: 'async' },
-  RuntimeRunClass: { mode: 'sync-write' },
-  RuntimeRunProgram: { mode: 'sync-write' },
-  RuntimeListFeeds: { mode: 'sync-read' },
-  ListTransports: { mode: 'sync-read' },
-  GetSqlQuery: { mode: 'sync-read' },
-  GetTableContents: { mode: 'sync-read' },
-  GetObjectInfo: { mode: 'sync-read' },
-  DescribeByList: { mode: 'sync-read' },
-  GetAbapSystemSymbols: { mode: 'sync-read' },
-  GetATCFindings: { mode: 'sync-read' },
-  RuntimeGetProfilerTraceData: { mode: 'sync-read' },
-  RuntimeAnalyzeProfilerTrace: { mode: 'sync-read' },
-  HandlerWhereUsed: { mode: 'sync-read' },
-  HandlerSearch: { mode: 'sync-read' },
-  HandlerUnitTestResult: { mode: 'async' },
-  HandlerCdsUnitTestResult: { mode: 'async' },
-  HandlerProfileRun: { mode: 'sync-write' },
-  HandlerDumpList: { mode: 'sync-read' },
-  HandlerGetData: { mode: 'sync-read' },
-  HandlerProfileView: { mode: 'sync-read' },
-  HandlerGet: {
-    mode: 'sync-read',
-    when: [
-      {
-        argument: 'object_type',
-        equals: ['UNIT_TEST', 'CDS_UNIT_TEST'],
-        mode: 'async',
-      },
-    ],
-  },
-};
-
-/** The mode of a call of `tool` with `args`. */
-export function longToolMode(tool: string, args: unknown): LongMode {
-  const rule = LONG_TOOL_MODES[tool];
-  if (rule === undefined) throw new Error(`${tool} is not a listed long tool`);
-  for (const condition of rule.when ?? []) {
-    const value = (args as Record<string, unknown> | null | undefined)?.[
-      condition.argument
-    ];
-    const read = typeof value === 'string' ? value.toUpperCase() : value;
-    if (condition.equals.includes(read)) return condition.mode;
-  }
-  return rule.mode;
-}
-
-/** What a tool already holds when its wait ends: `run_id`, `worklist_id`. */
-export type LongCallId = 'run_id' | 'worklist_id';
-
-/** A long call's progress, as its handler sees it. */
-export interface LongCallProgress {
-  /** The ids the tool holds so far. */
-  readonly ids: Map<LongCallId, string>;
-  /** Set when the `timeout` ended the wait of an `async` call: stop polling. */
-  waitEnded: boolean;
-}
-
-const progressScope = new AsyncLocalStorage<LongCallProgress>();
-
-/** Runs `fn` with `progress` collecting what its handler records. */
-export function withLongCallProgress<T>(
-  progress: LongCallProgress,
-  fn: () => T,
-): T {
-  return progressScope.run(progress, fn);
-}
-
-/**
- * Records an id the timed-out answer carries (spec §5.8: `worklist_id` /
- * `run_id` where the tool holds one at that moment). Outside a long call it
- * does nothing.
- */
-export function noteLongCallId(key: LongCallId, value: unknown): void {
-  if (typeof value !== 'string' || value === '') return;
-  progressScope.getStore()?.ids.set(key, value);
-}
-
-/**
- * Whether the wait of the long call this code runs for was ended by its
- * `timeout` — a poll loop stops here (an `async` call). Outside a long call:
- * never.
- */
-export function longCallWaitEnded(): boolean {
-  return progressScope.getStore()?.waitEnded === true;
-}
-
-/** The fixed words of a wait its `timeout` ended, per mode. */
-export function timedOutWords(
-  seconds: number,
-  mode: LongMode,
-  ids: ReadonlyMap<LongCallId, string> = new Map(),
-): string {
-  const ended = `The wait was ended by its timeout (${seconds} s).`;
-  if (mode === 'sync-write') {
-    return `${ended} The request is still running in SAP, which finishes it on its own; its answer will not be reported.`;
-  }
-  if (mode === 'sync-read') {
-    return `${ended} The request was cancelled; nothing was changed.`;
-  }
-  const named = [...ids].map(([key, value]) => `${key} ${value}`).join(', ');
-  return named === ''
-    ? `${ended} The run continues in SAP; its id had not been received when the wait ended.`
-    : `${ended} The run continues in SAP; read it later with ${named}.`;
-}
-
-/** The answer of a call whose `timeout` ended its wait. */
+/** The answer of a call whose `timeout` cut its read. */
 export interface TimedOutAnswer {
   isError: true;
   content: { type: 'text'; text: string }[];
 }
 
-export function timedOutAnswer(
-  seconds: number,
-  mode: LongMode,
-  ids: ReadonlyMap<LongCallId, string>,
-): TimedOutAnswer {
+export function timedOutAnswer(seconds: number): TimedOutAnswer {
   return {
     isError: true,
     content: [
@@ -271,8 +136,7 @@ export function timedOutAnswer(
         text: JSON.stringify({
           timed_out: true,
           timeout: seconds,
-          message: timedOutWords(seconds, mode, ids),
-          ...Object.fromEntries(ids),
+          message: timedOutWords(seconds),
         }),
       },
     ],

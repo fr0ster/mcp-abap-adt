@@ -2,11 +2,7 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  noteLongCallId,
-  TIMEOUT_PROPERTY,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { parseAtcWorklist } from '../../../lib/strategies/atcFindings';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { ourAtc } from '../../../lib/strategies/resultSets';
@@ -59,8 +55,6 @@ export async function handleGetATCFindings(
     );
   }
 
-  // A timed-out answer names the worklist it reads (spec §5.8).
-  noteLongCallId('worklist_id', worklistId);
   const atc = new AdtRuntimeClient(connection, logger).getAtc(ourAtc);
   const detail = detailOf(args);
 

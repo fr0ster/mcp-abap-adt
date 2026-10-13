@@ -68,13 +68,12 @@ mcp-abap-adt-http --port=3000
    - [High-level tools](AVAILABLE_TOOLS_HIGH.md)
    - [Low-level tools](AVAILABLE_TOOLS_LOW.md)
    - Compact tools — in the `@mcp-abap-adt/compact` package
-4. **Long tools take a `timeout`** (seconds, no default) — the approved list, each on an ABAP
-   session of its own. When it passes the call answers at once: a read is cancelled (nothing was
-   changed), a started ABAP Unit or ATC run goes on in SAP and the answer names it (`run_id` /
-   `worklist_id`, read it later), a class or program run goes on to its end and its answer is not
-   reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at
-   60 s — because a cancel does nothing to SAP. The list and each tool's mode:
-   [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-the-long-tools-take-a-timeout-each-on-an-abap-session-of-its-own).
+4. **Long reads take a `timeout`** (seconds, no default) — the approved list, each on an ABAP
+   session of its own. When it passes the read is cancelled (its session logged off) and nothing
+   was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels
+   at 60 s — because a cancel does nothing to SAP. No run (unit test, ATC, class, program) takes
+   one. The list:
+   [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own).
 
 ## Package Tree Output
 

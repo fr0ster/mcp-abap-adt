@@ -5,7 +5,6 @@
 
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
 import { projectRun, runAndWait } from '../shared/runTests';
@@ -13,13 +12,11 @@ import { projectRun, runAndWait } from '../shared/runTests';
 export const TOOL_DEFINITION = {
   name: 'RunFunctionGroupUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
+  description:
     'Run all ABAP Unit tests of a function group and return the result.',
-  ),
   inputSchema: {
     type: 'object',
     properties: {
-      timeout: TIMEOUT_PROPERTY,
       function_group_name: {
         type: 'string',
         description: 'Function group whose tests run.',

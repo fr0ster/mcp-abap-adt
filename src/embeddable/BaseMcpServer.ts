@@ -27,10 +27,11 @@ import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHan
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import { runLongCall } from '../lib/longCall.js';
 import {
+  isLongRead,
   isLongTool,
-  longToolMode,
   readTimeout,
   TIMEOUT_INVALID_WORDS,
+  TIMEOUT_NOT_FOR_RUN_WORDS,
   withoutTimeout,
 } from '../lib/longTools.js';
 import {
@@ -469,9 +470,19 @@ export abstract class BaseMcpServer extends McpServer {
                   ),
                 );
               let handlerPromise: Promise<unknown>;
-              if (isLongTool(entry.toolDefinition.name)) {
-                // A listed long tool (spec §5.8): on a connection of its own,
-                // its `timeout` ending only the wait.
+              const listed = isLongTool(entry.toolDefinition.name);
+              const read =
+                listed && isLongRead(entry.toolDefinition.name, args);
+              if (listed && !read && readTimeout(args) !== undefined) {
+                // A listed tool's run mode takes no `timeout` (spec §5.8).
+                return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS)) as {
+                  isError: true;
+                  content: { type: 'text'; text: string }[];
+                };
+              }
+              if (read) {
+                // A listed long tool (spec §5.8): a read on a connection of
+                // its own, its `timeout` cutting the read.
                 const timeoutSeconds = readTimeout(args);
                 if (timeoutSeconds === null) {
                   return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
@@ -485,7 +496,6 @@ export abstract class BaseMcpServer extends McpServer {
                     connection,
                     logger: this.logger,
                     timeoutSeconds,
-                    mode: longToolMode(entry.toolDefinition.name, args),
                     run: (own) =>
                       callHandler(
                         entry.handler,

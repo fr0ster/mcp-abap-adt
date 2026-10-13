@@ -7,15 +7,10 @@
  * connection the host injected without a `freshConnection` the tool is
  * refused with D20's words, and nothing is sent.
  *
- * And the connection is owned (§6.4): the terminal close waits for a
- * sync-write request still running after its `timeout` before the logoff
- * (the other modes' connections were logged off when the timeout fired); the
- * forced close logs it off at once.
  */
 
 import { FRESH_CONNECTION_UNAVAILABLE_WORDS } from '../../../lib/auth/serverRefusal';
 import { LONG_TOOLS } from '../../../lib/longTools';
-import { forceClose } from '../../../lib/ownedConnections';
 import { isLogoff } from '../../helpers/adtStandIn';
 import {
   LONG_TOOL_ARGS,
@@ -77,58 +72,6 @@ describe.each(LONG_TOOLS)('%s', (tool) => {
       );
       expect(stand.standIn.requests.filter(stand.isToolRequest)).toEqual([]);
       expect(stand.standIn.loggedOff()).toEqual([]);
-    } finally {
-      await stand.close();
-    }
-  });
-});
-
-describe('the long call’s own connection is owned (§6.4)', () => {
-  it('the terminal close waits for a sync-write request still running after the timeout, then logs it off', async () => {
-    const stand = await longStand('RuntimeRunClass');
-    try {
-      const hold = stand.standIn.hold(stand.isToolRequest);
-      const call = stand.call('RuntimeRunClass', {
-        ...LONG_TOOL_ARGS.RuntimeRunClass,
-        timeout: 1,
-      });
-      await hold.arrived;
-      expect(payloadOf(await call).timed_out).toBe(true);
-
-      let closed = false;
-      const closing = stand.server.terminalClose().then(() => {
-        closed = true;
-      });
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      expect(closed).toBe(false);
-      expect(stand.standIn.loggedOff()).toEqual([]);
-
-      hold.release();
-      await closing;
-      const held = stand.standIn.requests.find(stand.isToolRequest);
-      await until(() => stand.standIn.loggedOff().length === 1);
-      expect(stand.standIn.loggedOff()).toEqual([held?.session]);
-    } finally {
-      await stand.close();
-    }
-  });
-
-  it('the forced close logs a sync-write request’s session off at once, the request still running', async () => {
-    const stand = await longStand('RuntimeRunClass');
-    try {
-      const hold = stand.standIn.hold(stand.isToolRequest);
-      const call = stand.call('RuntimeRunClass', {
-        ...LONG_TOOL_ARGS.RuntimeRunClass,
-        timeout: 1,
-      });
-      await hold.arrived;
-      expect(payloadOf(await call).timed_out).toBe(true);
-      const held = stand.standIn.requests.find(stand.isToolRequest);
-
-      await forceClose();
-      await until(() => stand.standIn.loggedOff().length === 1);
-      expect(stand.standIn.loggedOff()).toEqual([held?.session]);
-      hold.release();
     } finally {
       await stand.close();
     }

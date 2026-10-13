@@ -3,271 +3,144 @@
     "tool": "GetWhereUsed",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleGetWhereUsed.ts#handleGetWhereUsed",
-    "mode": "sync-read",
     "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=…; with a type filter also POST …/usageReferences/scope?uri=…; read-only RIS queries"
   },
   {
     "tool": "SearchObject",
     "set": "full",
     "handler": "src/handlers/search/readonly/handleSearchObject.ts#handleSearchObject",
-    "mode": "sync-read",
     "sends": "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]"
   },
   {
     "tool": "SearchSource",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleSearchSource.ts#handleSearchSource",
-    "mode": "sync-read",
     "sends": "quickSearch GETs for masks; POST /sap/bc/adt/repository/nodestructure per package and type node; one source GET per unit (program, include, function module, class), up to max_objects; keeps time_budget_ms (partial hits)"
   },
   {
     "tool": "GetPackageContents",
     "set": "full",
     "handler": "src/handlers/package/readonly/handleGetPackageContents.ts#handleGetPackageContents",
-    "mode": "sync-read",
     "sends": "POST /sap/bc/adt/repository/nodestructure for the package and each type node, again per subpackage up to max_depth"
   },
   {
     "tool": "GetPackageTree",
     "set": "full",
     "handler": "src/handlers/system/high/handleGetPackageTree.ts#handleGetPackageTree",
-    "mode": "sync-read",
     "sends": "GET the package metadata, then the nodestructure walk (subpackages by default, max_depth 5)"
   },
   {
     "tool": "GetObjectsList",
     "set": "full",
     "handler": "src/handlers/search/readonly/handleGetObjectsList.ts#handleGetObjectsList",
-    "mode": "sync-read",
     "sends": "POST /sap/bc/adt/repository/nodestructure per node, recursing into every child node"
   },
   {
     "tool": "GetStructuresList",
     "set": "full",
     "handler": "src/handlers/structure/readonly/handleGetStructuresList.ts#handleGetStructuresList",
-    "mode": "sync-read",
     "sends": "1–2 source GETs per node; with include_extensions a where-used POST pair per node and a source GET per candidate; recursive"
   },
   {
     "tool": "GetIncludesList",
     "set": "full",
     "handler": "src/handlers/include/readonly/handleGetIncludesList.ts#handleGetIncludesList",
-    "mode": "sync-read",
     "sends": "one source GET per include, recursive to depth 20; for a function group the nodestructure POST and every include; for a class one metadata GET"
-  },
-  {
-    "tool": "RunATC",
-    "set": "full",
-    "handler": "src/handlers/atc/high/handleRunATC.ts#handleRunATC",
-    "mode": "async",
-    "when": [
-      {
-        "argument": "wait",
-        "equals": [
-          true
-        ],
-        "mode": "sync-write"
-      }
-    ],
-    "sends": "GET /sap/bc/adt/atc/customizing (no check_variant), POST /sap/bc/adt/atc/worklists?checkVariant=…, POST /sap/bc/adt/atc/runs?worklistId=…&clientWait=…; persists a worklist and its findings; a timed-out answer names worklist_id once held"
-  },
-  {
-    "tool": "RunUnitTest",
-    "set": "full",
-    "handler": "src/handlers/unit_test/high/handleRunUnitTest.ts#handleRunUnitTest",
-    "mode": "async",
-    "sends": "POST /sap/bc/adt/abapunit/runs, up to 5 GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true, GET /sap/bc/adt/abapunit/results/{id}; runs the tests, the run persists; a timed-out answer carries run_id once held"
-  },
-  {
-    "tool": "RunCdsUnitTest",
-    "set": "full",
-    "handler": "src/handlers/unit_test/high/handleRunCdsUnitTest.ts#handleRunCdsUnitTest",
-    "mode": "async",
-    "sends": "as RunUnitTest, through the class runner on the CDS test class"
-  },
-  {
-    "tool": "RunProgramUnitTest",
-    "set": "full",
-    "handler": "src/handlers/unit_test/high/handleRunProgramUnitTest.ts#handleRunProgramUnitTest",
-    "mode": "async",
-    "sends": "as RunUnitTest, through the program runner"
-  },
-  {
-    "tool": "RunFunctionGroupUnitTest",
-    "set": "full",
-    "handler": "src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts#handleRunFunctionGroupUnitTest",
-    "mode": "async",
-    "sends": "as RunUnitTest, through the function group runner"
-  },
-  {
-    "tool": "RunFunctionModuleUnitTest",
-    "set": "full",
-    "handler": "src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts#handleRunFunctionModuleUnitTest",
-    "mode": "async",
-    "sends": "as RunUnitTest, through the function module runner"
-  },
-  {
-    "tool": "GetUnitTestResult",
-    "set": "full",
-    "handler": "src/handlers/unit_test/high/handleGetUnitTestResult.ts#handleGetUnitTestResult",
-    "mode": "async",
-    "sends": "up to 5 GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true, then GET /sap/bc/adt/abapunit/results/{id}; a timed-out answer carries run_id"
-  },
-  {
-    "tool": "RuntimeRunClass",
-    "set": "full",
-    "handler": "src/handlers/system/readonly/handleRuntimeRunClass.ts#handleRuntimeRunClass",
-    "mode": "sync-write",
-    "sends": "POST /sap/bc/adt/oo/classrun/{class}; with profile=true also GET …/runtime/traces/abaptraces, POST …/abaptraces/parameters, the run with ?profilerId=…, and up to max_trace_attempts feed GETs; runs arbitrary ABAP, which may write and commit"
-  },
-  {
-    "tool": "RuntimeRunProgram",
-    "set": "full",
-    "handler": "src/handlers/system/readonly/handleRuntimeRunProgram.ts#handleRuntimeRunProgram",
-    "mode": "sync-write",
-    "sends": "POST /sap/bc/adt/programs/programrun/{program}; with profile=true also POST …/abaptraces/parameters and the run with ?profilerId=…; runs arbitrary ABAP"
   },
   {
     "tool": "RuntimeListFeeds",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleRuntimeListFeeds.ts#handleRuntimeListFeeds",
-    "mode": "sync-read",
     "sends": "GET /sap/bc/adt/feeds or /feeds/variants; dumps, system messages and gateway errors paged: up to about 11 GETs of /sap/bc/adt/runtime/dumps (or /runtime/systemmessages, /gw/errorlog)"
   },
   {
     "tool": "ListTransports",
     "set": "full",
     "handler": "src/handlers/transport/readonly/handleListTransports.ts#handleListTransports",
-    "mode": "sync-read",
     "sends": "GET /sap/bc/adt/cts/transportrequests/searchconfiguration/configurations, then GET /sap/bc/adt/cts/transportrequests?configUri=… per saved configuration, up to 5"
   },
   {
     "tool": "GetSqlQuery",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleGetSqlQuery.ts#handleGetSqlQuery",
-    "mode": "sync-read",
     "sends": "POST /sap/bc/adt/datapreview/freestyle?rowNumber=N with the SQL as the body"
   },
   {
     "tool": "GetTableContents",
     "set": "full",
     "handler": "src/handlers/table/readonly/handleGetTableContents.ts#handleGetTableContents",
-    "mode": "sync-read",
     "sends": "POST /sap/bc/adt/datapreview/ddic?rowNumber=N&ddicEntityName=…"
   },
   {
     "tool": "GetObjectInfo",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleGetObjectInfo.ts#handleGetObjectInfo",
-    "mode": "sync-read",
     "sends": "POST /sap/bc/adt/repository/nodestructure for the root and each child node to maxDepth; with enrich=true also one quickSearch GET per node"
   },
   {
     "tool": "DescribeByList",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleDescribeByList.ts#handleDescribeByList",
-    "mode": "sync-read",
     "sends": "one quickSearch GET per object, in sequence, retried without its type when the first answer is empty"
   },
   {
     "tool": "GetAbapSystemSymbols",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleGetAbapSystemSymbols.ts#handleGetAbapSystemSymbols",
-    "mode": "sync-read",
     "sends": "one source or metadata GET per symbol found in the given code, in sequence"
   },
   {
     "tool": "GetATCFindings",
     "set": "full",
     "handler": "src/handlers/atc/high/handleGetATCFindings.ts#handleGetATCFindings",
-    "mode": "sync-read",
-    "sends": "GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false; a timed-out answer carries worklist_id"
+    "sends": "GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false"
   },
   {
     "tool": "RuntimeGetProfilerTraceData",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts#handleRuntimeGetProfilerTraceData",
-    "mode": "sync-read",
     "sends": "GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses"
   },
   {
     "tool": "RuntimeAnalyzeProfilerTrace",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts#handleRuntimeAnalyzeProfilerTrace",
-    "mode": "sync-read",
     "sends": "GET …/abaptraces/{id}/hitlist or /statements, then a local summary"
   },
   {
     "tool": "HandlerWhereUsed",
     "set": "compact",
     "handler": "compact-readonly/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
-    "mode": "sync-read",
     "sends": "as GetWhereUsed"
   },
   {
     "tool": "HandlerSearch",
     "set": "compact",
     "handler": "compact-readonly/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
-    "mode": "sync-read",
     "sends": "as SearchObject"
-  },
-  {
-    "tool": "HandlerUnitTestResult",
-    "set": "compact",
-    "handler": "compact-readonly/src/handlers/handleHandlerUnitTestResult.ts#handleHandlerUnitTestResult",
-    "mode": "async",
-    "sends": "as GetUnitTestResult"
-  },
-  {
-    "tool": "HandlerCdsUnitTestResult",
-    "set": "compact",
-    "handler": "compact-readonly/src/handlers/handleHandlerCdsUnitTestResult.ts#handleHandlerCdsUnitTestResult",
-    "mode": "async",
-    "sends": "as GetUnitTestResult, for a CDS test run"
-  },
-  {
-    "tool": "HandlerProfileRun",
-    "set": "compact",
-    "handler": "compact-modify/src/handlers/handleHandlerProfileRun.ts#handleHandlerProfileRun",
-    "mode": "sync-write",
-    "sends": "as RuntimeRunClass or RuntimeRunProgram, with or without profiling"
   },
   {
     "tool": "HandlerDumpList",
     "set": "compact",
     "handler": "compact-readonly/src/handlers/handleHandlerDumpList.ts#handleHandlerDumpList",
-    "mode": "sync-read",
     "sends": "as RuntimeListFeeds"
   },
   {
     "tool": "HandlerGetData",
     "set": "compact",
     "handler": "compact-readonly/src/handlers/handleHandlerGetData.ts#handleHandlerGetData",
-    "mode": "sync-read",
     "sends": "as GetSqlQuery or GetTableContents"
   },
   {
     "tool": "HandlerProfileView",
     "set": "compact",
     "handler": "compact-readonly/src/handlers/handleHandlerProfileView.ts#handleHandlerProfileView",
-    "mode": "sync-read",
     "sends": "as RuntimeGetProfilerTraceData or RuntimeAnalyzeProfilerTrace"
   },
   {
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "mode": "sync-read",
-    "when": [
-      {
-        "argument": "object_type",
-        "equals": [
-          "UNIT_TEST",
-          "CDS_UNIT_TEST"
-        ],
-        "mode": "async"
-      }
-    ],
-    "sends": "one GET per mode; part 'contents' of a package runs the nodestructure walk; UNIT_TEST / CDS_UNIT_TEST poll a run's status (a timed-out answer names run_id); the timeout applies to every mode"
+    "sends": "one GET per mode; part 'contents' of a package runs the nodestructure walk; the timeout applies to its reads only — UNIT_TEST / CDS_UNIT_TEST poll a run in SAP, run as an ordinary call on the instance's connection, and refuse a timeout"
   }
 ]

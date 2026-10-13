@@ -474,7 +474,6 @@ export const compactUnitTestStatusSchema = {
 export const compactUnitTestResultSchema = {
   type: 'object',
   properties: {
-    timeout: TIMEOUT_PROPERTY,
     run_id: { type: 'string', description: 'Unit test run id.' },
     with_navigation_uris: {
       type: 'boolean',
@@ -496,7 +495,6 @@ export const compactCdsUnitTestResultSchema = compactUnitTestResultSchema;
 export const compactProfileRunSchema = {
   type: 'object',
   properties: {
-    timeout: TIMEOUT_PROPERTY,
     target_type: {
       type: 'string',
       enum: ['CLASS', 'PROGRAM'],

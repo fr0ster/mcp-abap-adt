@@ -1,4 +1,4 @@
-import { compactProfileRunSchema, withLongToolAdvice } from '@mcp-abap-adt/lib/compact-shared';
+import { compactProfileRunSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   handleRuntimeRunClass,
@@ -8,9 +8,8 @@ import {
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
+  description:
     'Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs]. Optional: profiling(default true; set false for a plain run with no trace), profiling flags, description. Response: JSON.',
-  ),
   inputSchema: compactProfileRunSchema,
 } as const;
 

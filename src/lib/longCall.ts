@@ -1,7 +1,7 @@
 /**
  * The listed long tools (spec §5.8, D56): a tool on the user-approved list
- * (`tools/long-handlers.json`) runs on an ABAP session of its own and takes
- * an optional `timeout` that ends its wait.
+ * (`tools/long-handlers.json`) — a read — runs on an ABAP session of its own
+ * and takes an optional `timeout` that cuts the read.
  *
  * One implementation, `runLongCall`, used by every registration path:
  *
@@ -10,17 +10,10 @@
  *   or the host's `freshConnection`; on an injected connection without one the
  *   call is refused with D20's words. Stateless; nothing the instance holds is
  *   touched. It is the server's (role `long`, the connection-ends registry);
- * - **what the timeout does is the call's mode** (`LongMode`, per tool in the
- *   approved list, measured on premise 2026-10-13): the call answers at once
- *   in that mode's fixed words, and then
- *   - `sync-write`: the request goes on — no signal, no socket closed, no
- *     `disconnect()` (a logoff or a closed socket under it kills it and loses
- *     its write); its answer is reported to no one; the logoff follows SAP's
- *     answer, and the terminal close waits for it (`untilAnswered`);
- *   - `async`: the poll stops (`longCallWaitEnded`), the answer names the run
- *     the tool holds, and the connection is logged off at once — the run
- *     survives that logoff;
- *   - `sync-read`: the connection is logged off at once, which cuts the read;
+ * - **the timeout cuts the read**: when it passes, the call's own connection
+ *   is logged off at once (`disconnect()`), and the call answers in fixed
+ *   words that the request was cancelled and nothing was changed. A listed
+ *   tool only reads, so nothing is lost;
  * - **on a normal end** — in time, or without a `timeout` — the logoff comes
  *   after the call's answer, on every path;
  * - **the timer is the call's own**, cleared when the call settles: no timer
@@ -32,14 +25,8 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from './handlers/interfaces';
-import {
-  type LongCallProgress,
-  type LongMode,
-  type TimedOutAnswer,
-  timedOutAnswer,
-  withLongCallProgress,
-} from './longTools';
-import { endConnection, own, untilAnswered } from './ownedConnections';
+import { type TimedOutAnswer, timedOutAnswer } from './longTools';
+import { endConnection, own } from './ownedConnections';
 import { closeQuietly, openFreshConnection } from './packageSessions';
 
 type Logger = HandlerContext['logger'];
@@ -52,20 +39,18 @@ export interface LongCallOptions<R> {
   logger: Logger;
   /** Seconds, already read (`readTimeout`); `undefined`: wait until done. */
   timeoutSeconds: number | undefined;
-  /** What the timeout does to the work (`longToolMode`). */
-  mode: LongMode;
   /** The handler, on the call's own connection. */
   run: (connection: IAbapConnection) => Promise<R>;
 }
 
 /**
  * Runs a listed long call (see the file header): its own connection, the
- * optional `timeout` on the wait only, the logoff after SAP's answer.
+ * optional `timeout` that cuts the read, the logoff.
  */
 export async function runLongCall<R>(
   options: LongCallOptions<R>,
 ): Promise<R | TimedOutAnswer> {
-  const { name, logger, timeoutSeconds, mode } = options;
+  const { name, logger, timeoutSeconds } = options;
   const connection = await openFreshConnection(options.connection, logger);
   own(connection, { role: 'long' });
   // Stateless (§5.7): a fresh connection is, and a host's factory's is made so.
@@ -74,17 +59,12 @@ export async function runLongCall<R>(
     typed.setSessionType('stateless');
   }
 
-  const progress: LongCallProgress = { ids: new Map(), waitEnded: false };
-  const work = withLongCallProgress(progress, () => options.run(connection));
-  const answered = work.then(
-    () => undefined,
-    () => undefined,
+  const work = options.run(connection);
+  // The logoff once the call's work settled — on every path, whoever waits.
+  const ended = work.then(
+    () => closeQuietly(connection, logger, name),
+    () => closeQuietly(connection, logger, name),
   );
-  // Only a sync-write request is waited for by the terminal close: an async
-  // run survives a logoff, and a read may be cut.
-  if (mode === 'sync-write') untilAnswered(connection, answered);
-  // The logoff, once the call's work settled — on every path, whoever waits.
-  const ended = answered.then(() => closeQuietly(connection, logger, name));
 
   if (timeoutSeconds === undefined) {
     try {
@@ -101,16 +81,12 @@ export async function runLongCall<R>(
   try {
     const first = await Promise.race([work, waitEnded]);
     if (first === 'timed-out') {
-      logger?.info(`${name}: the wait was ended by its timeout`);
-      progress.waitEnded = true;
-      const answer = timedOutAnswer(timeoutSeconds, mode, progress.ids);
-      if (mode !== 'sync-write') {
-        // The run survives it (async), the read is cut (sync-read).
-        await endConnection(connection, () => {
-          logger?.warn(`${name}: could not close its own connection`);
-        });
-      }
-      return answer;
+      // The read is cut: its session is logged off now, under the request.
+      logger?.info(`${name}: the read was cut by its timeout`);
+      await endConnection(connection, () => {
+        logger?.warn(`${name}: could not close its own connection`);
+      });
+      return timedOutAnswer(timeoutSeconds);
     }
     await ended;
     return first as R;

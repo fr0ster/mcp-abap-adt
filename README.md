@@ -194,17 +194,16 @@ Key examples of high-value workflows and tools:
 - **Transport and activation support**: `CreateTransport`, `GetTransport`, `ActivateObject`
 - **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (a run waits for its result; `GetUnitTestResult` for one that outlasts the wait) — `CheckClass` and the rest of the `Check*` family
 
-### Long tools take a `timeout`
+### Long reads take a `timeout`
 
-The long tools on an approved list (where-used and search, package walks, data preview, ABAP
-Unit and ATC runs, class and program runs, the dump feed, … — the list and each tool's mode in
-[MIGRATION-19.0](docs/MIGRATION-19.0.md#every-transport-the-long-tools-take-a-timeout-each-on-an-abap-session-of-its-own))
+The long reads on an approved list (where-used and search, package walks, data preview, the
+dump feed, profiler traces, … — the list in
+[MIGRATION-19.0](docs/MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own))
 run on an ABAP session of their own and take an optional `timeout` in seconds, with no default.
-When it passes the call answers at once: a read is cancelled and nothing was changed; a started
-run goes on in SAP and the answer names it (`run_id` / `worklist_id`); a run of code goes on to
-its end and its answer is not reported. Set it below your MCP client's request limit (the
-TypeScript SDK's client cancels at 60 s): **a cancel does nothing to SAP**. No other tool takes a
-`timeout`.
+When it passes the read is cancelled — its session logged off — and nothing was changed. Set it
+below your MCP client's request limit (the TypeScript SDK's client cancels at 60 s): **a cancel
+does nothing to SAP**. No other tool takes a `timeout`: a unit test, ATC, class or program run
+goes on to its end.
 
 ## Registries
 

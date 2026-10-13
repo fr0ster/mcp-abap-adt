@@ -58,18 +58,6 @@ export const LONG_TOOL_ARGS: Record<string, Record<string, unknown>> = {
     object_name: 'PLACEHOLDER_PROGRAM',
     object_type: 'PROG/P',
   },
-  RunATC: {
-    objects: [{ name: 'PLACEHOLDER_CLASS', type: 'class' }],
-    check_variant: 'PLACEHOLDER_VARIANT',
-  },
-  RunUnitTest: { class_name: 'PLACEHOLDER_CLASS' },
-  RunCdsUnitTest: { class_name: 'PLACEHOLDER_CLASS' },
-  RunProgramUnitTest: { program_name: 'PLACEHOLDER_PROGRAM' },
-  RunFunctionGroupUnitTest: { function_group_name: 'PLACEHOLDER_GROUP' },
-  RunFunctionModuleUnitTest: { function_module_name: 'PLACEHOLDER_MODULE' },
-  GetUnitTestResult: { run_id: 'run-placeholder-1' },
-  RuntimeRunClass: { class_name: 'PLACEHOLDER_CLASS' },
-  RuntimeRunProgram: { program_name: 'PLACEHOLDER_PROGRAM' },
   RuntimeListFeeds: { feed_type: 'dumps' },
   ListTransports: {},
   GetSqlQuery: { sql_query: 'SELECT * FROM placeholder_table' },
@@ -87,13 +75,6 @@ export const LONG_TOOL_ARGS: Record<string, Record<string, unknown>> = {
   RuntimeAnalyzeProfilerTrace: { trace_id_or_uri: 'trace-placeholder-1' },
   HandlerWhereUsed: { object_type: 'CLASS', object_name: 'PLACEHOLDER_CLASS' },
   HandlerSearch: { query: 'PLACEHOLDER*' },
-  HandlerUnitTestResult: { run_id: 'run-placeholder-1' },
-  HandlerCdsUnitTestResult: { run_id: 'run-placeholder-1' },
-  HandlerProfileRun: {
-    target_type: 'CLASS',
-    class_name: 'PLACEHOLDER_CLASS',
-    profiling: false,
-  },
   HandlerDumpList: {},
   HandlerGetData: { object_name: 'PLACEHOLDER_TABLE' },
   HandlerProfileView: {
@@ -101,14 +82,6 @@ export const LONG_TOOL_ARGS: Record<string, Record<string, unknown>> = {
     view: 'hitlist',
   },
   HandlerGet: { object_type: 'CLASS', class_name: 'PLACEHOLDER_CLASS' },
-};
-
-/** What a timed-out answer of each tool names, held at its first request. */
-export const IDS_AT_FIRST_REQUEST: Record<string, Record<string, string>> = {
-  GetUnitTestResult: { run_id: 'run-placeholder-1' },
-  HandlerUnitTestResult: { run_id: 'run-placeholder-1' },
-  HandlerCdsUnitTestResult: { run_id: 'run-placeholder-1' },
-  GetATCFindings: { worklist_id: 'worklist-placeholder-1' },
 };
 
 /** The group of the shipped binaries that registers `tool`, and its entry. */

@@ -3,11 +3,6 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AtcNamedObjectType } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  noteLongCallId,
-  TIMEOUT_PROPERTY,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { succeededWith } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
@@ -33,13 +28,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'RunATC',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
+  description:
     'Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings whether or not the run waited. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts.',
-  ),
   inputSchema: {
     type: 'object',
     properties: {
-      timeout: TIMEOUT_PROPERTY,
       objects: {
         type: 'array',
         description:
@@ -178,9 +171,6 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
       });
       if (!worklist.ok) return worklist as never;
       const worklistId = worklist.getResult().value;
-      // From here a timed-out answer carries it (spec §5.8): the findings are
-      // written into this worklist whether or not anyone still waits.
-      noteLongCallId('worklist_id', worklistId);
 
       const run = await atc.startRun(worklistId, target, {
         analyse: analyseException,

@@ -1,7 +1,6 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { return_error } from '../../../lib/utils';
@@ -15,13 +14,11 @@ import { testRunner } from '../shared/runTests';
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
+  description:
     'Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.',
-  ),
   inputSchema: {
     type: 'object',
     properties: {
-      timeout: TIMEOUT_PROPERTY,
       run_id: {
         type: 'string',
         description: 'Run id a unit test run answered.',

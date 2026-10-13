@@ -13,7 +13,12 @@ import { handleGetEnhancementSpot } from '../../handlers/enhancement/readonly/ha
  *   available through ADT.
  */
 
-type Call = { url: string; method?: string };
+type Call = {
+  url: string;
+  method?: string;
+  data?: unknown;
+  headers?: Record<string, string>;
+};
 
 /** Answers by URL; anything unlisted is a 404. */
 function connectionAnswering(
@@ -80,6 +85,11 @@ describe('GetEnhancementSpot', () => {
     expect(json(r).metadata.name).toBe('SADT_REST_RFC_APPLICATION');
     expect(json(r).metadata.type).toBe('ENHS/XSB');
     expect(connection.calls).toHaveLength(1);
+    // The media type is a header, never the body of the GET.
+    expect(connection.calls[0]?.headers?.Accept).toBe(
+      'application/vnd.sap.adt.enhancements.v1+xml',
+    );
+    expect(connection.calls[0]?.data).toBeUndefined();
   });
 
   it('says a plain enhancement spot is not available through ADT', async () => {

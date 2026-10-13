@@ -150,6 +150,8 @@ export async function handleGetEnhancementSpot(
       'GET',
       // No deadline of the server's: the request waits for SAP's answer.
       0,
+      undefined,
+      undefined,
       {
         Accept: 'application/vnd.sap.adt.enhancements.v1+xml',
       },

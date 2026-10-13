@@ -225,6 +225,11 @@ logoff), and a session write lost — a refresh token the token endpoint refused
 the next start. Set it against the time your supervisor waits before it kills the process (a
 container's stop grace, a service manager's `TimeoutStopSec`), a few seconds below it.
 
+A crash outside a tool (an uncaught exception, an unhandled promise rejection) runs the same
+forced close: every ADT session is logged off, one stderr line names the failure by its class,
+exit `1`. A process that is killed (`SIGKILL`, out of memory) cannot log off: SAP's own idle
+timeout ends its sessions and their locks.
+
 ```bash
 mcp-abap-adt-http --shutdown-timeout=25
 ```

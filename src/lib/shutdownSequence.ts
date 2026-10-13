@@ -19,11 +19,17 @@
  * write), and the exit is `1` with one stderr line per fact still pending:
  * each tool still running, and the step the orderly sequence was in.
  *
+ * **A crash outside a tool** (`uncaughtException`, `unhandledRejection`)
+ * runs the same forced close, with one fixed-words line naming the failure
+ * by its class. A killed process (`SIGKILL`, out of memory) cannot log off:
+ * SAP's own idle timeout ends its sessions and their locks.
+ *
  * Nothing is written to stdout, and no line carries an error's message.
  */
 
 import type { EventEmitter } from 'node:events';
 import { latch, pending } from './activeTools';
+import { errorClassOf } from './auth/errors';
 import { forceClose } from './ownedConnections';
 
 /** What the shutdown listens on: the process, or a test's stand-in. */
@@ -59,6 +65,15 @@ export interface ShutdownSequenceOptions {
 /** The forced close's line for a tool still running. */
 export function stillRunningLine(name: string): string {
   return `[MCP] Still running at the forced close: ${name}`;
+}
+
+/**
+ * The line of a crash outside a tool (`uncaughtException`,
+ * `unhandledRejection`): fixed words and the thrown value's class only —
+ * never its message or stack.
+ */
+export function processFailedLine(thrown: unknown): string {
+  return `[MCP] The process failed (${errorClassOf(thrown)}): every ADT session is logged off, exit 1`;
 }
 
 /** The forced close's line for the orderly step it cut short. */
@@ -145,9 +160,29 @@ export function installShutdownSequence(
   const input = () => {
     void start();
   };
+  // A crash outside a tool (a timer, a socket callback, transport code): the
+  // forced close — every owned connection logged off, exit 1. A running
+  // shutdown switches to it, as a second signal would; a second crash joins
+  // the forced close already under way. Nothing keeps the process alive.
+  let crashed = false;
+  const crash = (thrown: unknown) => {
+    if (exited) return;
+    if (!crashed) {
+      crashed = true;
+      try {
+        stderr(processFailedLine(thrown));
+      } catch {
+        // The line is best effort; the logoffs are not.
+      }
+    }
+    latch();
+    void force();
+  };
 
   processLike.on('SIGTERM', signal);
   processLike.on('SIGINT', signal);
+  processLike.on('uncaughtException', crash);
+  processLike.on('unhandledRejection', crash);
   if (options.onStdinEnd) {
     processLike.stdin?.on('end', input);
     processLike.stdin?.on('close', input);

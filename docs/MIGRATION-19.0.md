@@ -221,6 +221,11 @@ packages, each with one binary and its transport's options only:
   logged off; exit `1` with a line per tool still running and the step that was cut short. What it
   costs: a tool cut short mid-write, a session write lost — a discarded refresh token can come
   back on the next start.
+- **A crash outside a tool logs off too** (every binary): an uncaught exception or an unhandled
+  promise rejection runs the forced close — every ADT session logged off, one stderr line
+  `[MCP] The process failed (<ErrorClass>): …`, exit `1` (18.x exited with Node's default and
+  logged nothing off). A killed process (`SIGKILL`, out of memory) cannot log off: SAP's own idle
+  timeout ends its sessions and their locks.
 - **The startup check builds the credential.** A destination the broker refuses (a missing client
   field, say) now stops the start, exit `1`, instead of failing the first tool call.
 - **There is no 30-second login timeout.** A login waits until the browser answers, the identity

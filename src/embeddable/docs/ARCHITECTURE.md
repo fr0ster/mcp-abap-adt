@@ -131,7 +131,11 @@ terminal close when an instance leaves it.
 
 **The forced close** (`forceClose()`): the logoff of every connection the process owns, joined
 where one is under way, awaiting nothing that waits on a tool, a request, an instance close or a
-state undo. The launchers use it for both escapes (a second signal, `--shutdown-timeout`).
+state undo. The launchers use it for both escapes (a second signal, `--shutdown-timeout`) and for
+a crash outside a tool (`uncaughtException`, `unhandledRejection`, registered beside the signals
+in lib's `shutdownSequence.ts`): one fixed-words line naming the failure by its class, exit `1`; a
+crash during a shutdown forces it, and a second crash joins the forced close under way. A killed
+process (`SIGKILL`, out of memory) cannot log off: SAP's idle timeout ends its sessions and locks.
 
 **A connection is replaced only when SAP lost its session** (D56), or when a new credential
 arrives: `getConnection` builds a new instance for the next call, and the replaced one is logged

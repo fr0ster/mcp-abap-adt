@@ -47,6 +47,7 @@ export {
 export {
   cutShortLine,
   installShutdownSequence,
+  processFailedLine,
   type ShutdownProcess,
   type ShutdownRun,
   type ShutdownSequenceOptions,

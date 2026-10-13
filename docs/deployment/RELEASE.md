@@ -12,6 +12,7 @@ How a release of this repository is made. Two things happen, and only one of the
 | Directory | Package | Depends on |
 |---|---|---|
 | `.` | `@mcp-abap-adt/lib` | — |
+| `background-runs-memory/` | `@mcp-abap-adt/background-runs-memory` | `lib` (core, http and sse depend on it) |
 | `compact-readonly/` | `@mcp-abap-adt/compact-readonly` | `lib` |
 | `compact-modify/` | `@mcp-abap-adt/compact-modify` | `lib` |
 | `server/` | `@mcp-abap-adt/core` (bin `mcp-abap-adt`) | `lib` |
@@ -23,7 +24,7 @@ the first failure so that no package goes out on top of a dependency that is mis
 
 ## Steps
 
-1. **Bump every manifest.** `package.json`, `compact-readonly/package.json`,
+1. **Bump every manifest.** `package.json`, `background-runs-memory/package.json`, `compact-readonly/package.json`,
    `compact-modify/package.json`, `server/package.json`, `compact/package.json` — and in each, the
    ranges on sibling packages (`@mcp-abap-adt/lib`, `core`, `compact-readonly`, `compact-modify`)
    so they accept the new versions. A manifest left at an old version is silently skipped by the

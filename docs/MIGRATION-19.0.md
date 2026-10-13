@@ -11,6 +11,7 @@ The packages, all at **19.0.0**:
 | `@mcp-abap-adt/core` | `server/` | `mcp-abap-adt` | stdio |
 | `@mcp-abap-adt/http` | `http/` | `mcp-abap-adt-http` | Streamable HTTP |
 | `@mcp-abap-adt/sse` | `sse/` | `mcp-abap-adt-sse` | HTTP+SSE |
+| `@mcp-abap-adt/background-runs-memory` | `background-runs-memory/` | — | the in-memory store of background runs (new; core, http and sse depend on it) |
 | `@mcp-abap-adt/compact-readonly`, `@mcp-abap-adt/compact-modify` | `compact-readonly/`, `compact-modify/` | — | the compact tool set's halves |
 | `@mcp-abap-adt/compact` | `compact/` | `mcp-abap-adt-compact` | the compact tool set over stdio |
 | `@mcp-abap-adt/compact-http` | `compact-http/` | `mcp-abap-adt-compact-http` | the compact tool set over Streamable HTTP |
@@ -213,6 +214,8 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
 | `ListBackgroundRuns` | `HandlerBackgroundRunList` | your runs: `run_handle`, `tool`, `object`, `started_at`, `running` / `finished` — no output |
 | `DiscardBackgroundRun` `{ run_handle }` | `HandlerBackgroundRunDiscard` | removes a finished run's kept answer. A running one is refused (`background_run_running`): a started run cannot be stopped |
 
+- **Where the answers are kept** is the server's store, `@mcp-abap-adt/background-runs-memory`
+  (a package of its own, installed with `@mcp-abap-adt/core`, `http` and `sse`): the process's memory.
 - **Only your own.** A run is its caller's: the destination (URL, client) and the backend user the
   request resolved — the one it states (`SAP_USERNAME`, `x-sap-login`), else, for a token
   credential, the one SAP answers for the session (`systeminformation`, as for the leftover
@@ -532,12 +535,15 @@ packages, each with one binary and its transport's options only:
   answer a promise. The library runs the request on the run's own connection (your
   `freshConnection` on an injected one), waits for SAP's answer, logs that connection off and hands
   you the answer; your strategy decides only where it is kept and how a handle is found (your store,
-  your routing between replicas). `InMemoryBackgroundRuns({ prefix? })` is the servers' — the
-  process's memory, 16 per caller, a handle of 128 random bits after your `prefix` (an instance id,
-  when you route handles between instances). Nothing is a default: without a strategy,
+  your routing between replicas). Implement it yourself, or take the servers' store:
+  `InMemoryBackgroundRuns({ prefix? })` of the separate package
+  **`@mcp-abap-adt/background-runs-memory`** — the process's memory, 16 per caller, a handle of 128
+  random bits after your `prefix` (an instance id, when you route handles between instances). lib
+  exports no implementation, so a consumer with its own store never installs it. Nothing is a default: without a strategy,
   `background: true` and the three background-run tools answer `background_runs_unavailable`.
   `StdioServer`, `StreamableHttpServer` and `SseServer` take the same option; the launchers pass an
-  `InMemoryBackgroundRuns`. `HandlerExporter` and the default registry's `system` add the three
+  `InMemoryBackgroundRuns` (`@mcp-abap-adt/core`, `http` and `sse` depend on
+  `@mcp-abap-adt/background-runs-memory`). `HandlerExporter` and the default registry's `system` add the three
   tools beside the system group. A group registered on an `McpServer` of its own refuses
   `background: true`. `HandlerContext` has `backgroundRuns?` (the tools' port); `ServerRefusalCode`
   / `FailureCode` add `background_runs_unavailable`, `background_run_not_available`,

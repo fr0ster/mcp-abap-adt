@@ -113,9 +113,10 @@ the obligations of a server that service never runs.
 | [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | AGPL-3.0-only | The compact server over stdio, `mcp-abap-adt-compact`: one tool per operation, the object type in the arguments. `core`'s launcher and configuration with the compact tool set. |
 | [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http) | AGPL-3.0-only | The compact server over Streamable HTTP, `mcp-abap-adt-compact-http`: `http`'s launcher and configuration with the compact tool set. |
 | [`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse) | AGPL-3.0-only | The compact server over HTTP+SSE, `mcp-abap-adt-compact-sse`: `sse`'s launcher and configuration with the compact tool set. |
+| [`@mcp-abap-adt/background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Apache-2.0 | The in-memory store of background runs (`IBackgroundRuns` of the library): the servers' store, for an embedder that keeps runs in its process. `core`, `http` and `sse` depend on it. |
 | [`@mcp-abap-adt/compact-readonly`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes. |
 
-Nine packages, six binaries: one full and one compact binary per transport. Install the one for
+Ten packages, six binaries: one full and one compact binary per transport. Install the one for
 your transport to run a server — `@mcp-abap-adt/core`, `http` or `sse` (or `compact`,
 `compact-http`, `compact-sse`). Install `@mcp-abap-adt/lib` to embed the tools in your own
 application.

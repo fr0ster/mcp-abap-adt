@@ -95,7 +95,9 @@ is logged off and the answer is kept for you. No default: without it the call wa
 A run is yours when its destination and SAP user equal those of your request (for a token
 credential, the user SAP answers); another user's handle reads as an unknown one. You may hold 16
 runs, running and kept together; discard a finished one to start another. Kept answers live in the
-server's memory and end with the process. A shutdown waits for a running background run; only the
+server's memory (`@mcp-abap-adt/background-runs-memory`) and end with the process. An application
+embedding `@mcp-abap-adt/lib` keeps runs in a store of its own (`IBackgroundRuns`), or takes that
+package. A shutdown waits for a running background run; only the
 forced close (a second signal, `--shutdown-timeout`) cuts it. Details:
 [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-background-runs-of-the-class-and-program-runs).
 

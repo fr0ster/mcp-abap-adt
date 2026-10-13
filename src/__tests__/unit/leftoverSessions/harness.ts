@@ -14,7 +14,10 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
+import {
+  BasicAuthProvider,
+  TokenAuthProvider,
+} from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -94,6 +97,12 @@ export async function leftoverStand(
     /** No owner given to the instance: the tools are not available. */
     noOwner?: boolean;
     user?: string;
+    /**
+     * A token credential: settings with no user (`authType: jwt`), the
+     * token on the wire. SAP's `systeminformation` answers `tokenUser` —
+     * none when absent (the endpoint answers 404).
+     */
+    token?: { tokenUser?: string };
     /** Extra tools beside the leftover-session ones and the probe. */
     extra?: Parameters<typeof probeGroup>[0];
   } = {},
@@ -113,10 +122,27 @@ export async function leftoverStand(
     ...(options.noOwner ? {} : { leftoverSessions: owner }),
   });
   const user = options.user ?? 'LEFT_USER';
-  server.use({
-    settings: settingsFor(standIn.url, user),
-    credential: new BasicAuthProvider(user, 'left-password'),
-  });
+  if (options.token !== undefined) {
+    const tokenUser = options.token.tokenUser;
+    const isInfo = (r: { url: string }) =>
+      r.url.startsWith('/sap/bc/adt/core/http/systeminformation');
+    if (tokenUser === undefined) standIn.answer(isInfo, 404);
+    else {
+      standIn.body(
+        isInfo,
+        JSON.stringify({ systemID: 'SID', userName: tokenUser }),
+      );
+    }
+    server.use({
+      settings: { url: standIn.url, client: '100', authType: 'jwt' },
+      credential: TokenAuthProvider.fixed('placeholder.token.sig'),
+    });
+  } else {
+    server.use({
+      settings: settingsFor(standIn.url, user),
+      credential: new BasicAuthProvider(user, 'left-password'),
+    });
+  }
   server.register(
     new CompositeHandlersRegistry([
       new LeftoverSessionHandlersGroup({

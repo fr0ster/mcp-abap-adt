@@ -11,18 +11,37 @@ import {
   TOOL_DEFINITION as ResumeLeftoverSession_Tool,
 } from '../../../handlers/leftover_session/session/handleResumeLeftoverSession';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
-import { defineTool, type HandlerEntry } from '../interfaces.js';
+import {
+  defineTool,
+  type HandlerContext,
+  type HandlerEntry,
+} from '../interfaces.js';
+
+/** Which of the leftover-session tools an exposition serves. */
+export interface LeftoverSessionToolsOptions {
+  /**
+   * The resume, served only with a writing set: a resumed session is for
+   * finishing a write or an unlock. The list and the logoff (a system
+   * action, not a data change) are served with every set. Default: served.
+   */
+  resume?: boolean;
+}
 
 /**
- * The leftover-session tools (served on every exposition, every transport):
- * the SAP sessions an ended process left open, listed, resumed or logged off
- * by the user. Each works on no connection of the instance (`connectionless`):
- * the server calls it without logging on first.
+ * The leftover-session tools (every transport, every exposition — the
+ * resume only with a writing one): the SAP sessions an ended process left
+ * open, listed, resumed or logged off by the user. Each works on no
+ * connection of the instance (`connectionless`): the server calls it
+ * without logging on first.
  */
-export function leftoverSessionEntries(): HandlerEntry[] {
+export function leftoverSessionEntries(
+  options: LeftoverSessionToolsOptions = {},
+): HandlerEntry[] {
   return [
     defineTool(ListLeftoverSessions_Tool, handleListLeftoverSessions),
-    defineTool(ResumeLeftoverSession_Tool, handleResumeLeftoverSession),
+    ...(options.resume === false
+      ? []
+      : [defineTool(ResumeLeftoverSession_Tool, handleResumeLeftoverSession)]),
     defineTool(LogoffLeftoverSession_Tool, handleLogoffLeftoverSession),
   ].map((entry) => ({ ...entry, connectionless: true as const }));
 }
@@ -30,7 +49,14 @@ export function leftoverSessionEntries(): HandlerEntry[] {
 export class LeftoverSessionHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'LeftoverSessionHandlers';
 
+  constructor(
+    context: HandlerContext,
+    private readonly options: LeftoverSessionToolsOptions = {},
+  ) {
+    super(context);
+  }
+
   getHandlers(): HandlerEntry[] {
-    return leftoverSessionEntries();
+    return leftoverSessionEntries(this.options);
   }
 }

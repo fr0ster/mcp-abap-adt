@@ -29,8 +29,11 @@ import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import {
   type ClaimedSession,
   type LeftoverSessions,
+  type SessionDestination,
   type SessionIdentity,
+  sessionDestination,
   sessionIdentity,
+  withUser,
 } from '../lib/leftoverSessions/LeftoverSessions.js';
 import {
   type LeftoverSessionTools,
@@ -72,6 +75,7 @@ import {
   stateLoggerOf,
 } from '../lib/state/InstanceState.js';
 import { systemContextFromConfiguration } from '../lib/systemContext.js';
+import { systemUserOf } from '../lib/systemUser.js';
 import {
   normalizeToolContent,
   type ToolResultLike,
@@ -347,7 +351,7 @@ export abstract class BaseMcpServer extends McpServer {
       held = this.buildConnection(
         resolved.credential,
         () => createAbapConnection(resolved.settings, resolved.credential),
-        this.identityOf(resolved),
+        this.sessionOf(resolved),
       );
     }
     // This call is the entry's user from now on — counted before the await,
@@ -400,12 +404,13 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * Connects what `create` builds for `credential`, kept as `built`; once
    * connected, its session is kept in a runtime file when the host gave an
-   * owner and the request names its backend user (`identity`).
+   * owner (`session`): under the backend user the request names, else the
+   * one SAP answers for the session (a token credential names none).
    */
   private buildConnection(
     credential: IAuthProvider,
     create: () => AbapConnection,
-    identity: SessionIdentity | undefined,
+    session: KnownSession | undefined,
   ): BuiltConnection {
     const entry: BuiltConnection = {
       credential,
@@ -429,10 +434,8 @@ export abstract class BaseMcpServer extends McpServer {
         await endConnection(connection);
         throw error;
       }
+      if (session !== undefined) await this.keepSession(connection, session);
       entry.ready = connection;
-      if (identity !== undefined) {
-        this.leftoverSessions?.track(connection, 'built', identity);
-      }
       return connection;
     })();
     this.built = entry;
@@ -737,15 +740,54 @@ export abstract class BaseMcpServer extends McpServer {
     return context.source.resolve(signal);
   }
 
-  /** The identity a request resolved, when the host gave an owner; else none. */
-  private identityOf(
-    resolved: ResolvedConnection,
-  ): SessionIdentity | undefined {
+  /**
+   * What a request's session is kept as, when the host gave an owner: the
+   * destination, and the backend user the request names (absent for a token
+   * credential: SAP answers it after `connect()`). None over RFC.
+   */
+  private sessionOf(resolved: ResolvedConnection): KnownSession | undefined {
     if (this.leftoverSessions === undefined) return undefined;
-    return sessionIdentity(resolved.settings, resolved.systemContext?.login);
+    const destination = sessionDestination(resolved.settings);
+    if (destination === undefined) return undefined;
+    const stated = sessionIdentity(
+      resolved.settings,
+      resolved.systemContext?.login,
+    );
+    return stated === undefined
+      ? { destination }
+      : { destination, user: stated.user };
   }
 
-  /** The owner, the caller's resolution and identity; refused without an owner. */
+  /**
+   * Keeps `connection`'s session in a runtime file: under the stated user,
+   * else the one SAP answers (`systemUserOf`, as the debugger's request user
+   * is read). A system that names none, or a failed question, keeps no file
+   * and fails nothing.
+   */
+  private async keepSession(
+    connection: AbapConnection,
+    session: KnownSession,
+  ): Promise<void> {
+    const owner = this.leftoverSessions;
+    if (owner === undefined) return;
+    let user = session.user;
+    if (user === undefined) {
+      try {
+        user = await systemUserOf(connection);
+      } catch {
+        user = undefined;
+      }
+    }
+    const identity = withUser(session.destination, user);
+    if (identity !== undefined) owner.track(connection, 'built', identity);
+  }
+
+  /**
+   * The owner, the caller's resolution and identity; refused without an
+   * owner. A request that names no backend user (a token credential) is
+   * asked of SAP: the user of the instance's own connection — which this
+   * builds, with its logon, when the instance holds none yet.
+   */
   private async leftoverCaller(signal: AbortSignal): Promise<{
     owner: LeftoverSessions;
     resolved: ResolvedConnection;
@@ -756,7 +798,24 @@ export abstract class BaseMcpServer extends McpServer {
       throw new ServerRefusal('leftover_sessions_unavailable');
     }
     const resolved = await this.resolveCaller(signal);
-    return { owner, resolved, identity: this.identityOf(resolved) };
+    const session = this.sessionOf(resolved);
+    if (session === undefined) return { owner, resolved, identity: undefined };
+    if (session.user !== undefined) {
+      return {
+        owner,
+        resolved,
+        identity: withUser(session.destination, session.user),
+      };
+    }
+    const connection = await this.getConnection(signal);
+    try {
+      const identity =
+        owner.identityOf(connection) ??
+        withUser(session.destination, await systemUserOf(connection));
+      return { owner, resolved, identity };
+    } finally {
+      this.connectionReleased(connection);
+    }
   }
 
   /** The leftover-session tools' port for one call. */
@@ -807,6 +866,7 @@ export abstract class BaseMcpServer extends McpServer {
       handle,
       signal,
     );
+    let settled = false;
     try {
       if (claimed.role !== 'built') {
         throw new ServerRefusal('leftover_session_not_resumable');
@@ -828,14 +888,17 @@ export abstract class BaseMcpServer extends McpServer {
         await endConnection(connection);
         const sap = sapAnswerOf(error);
         if (sap === undefined || !sessionGone(sap.status)) throw error;
-        owner.forget(claimed.handle);
+        owner.forget(claimed);
+        settled = true;
         return { handle: claimed.handle, state: 'gone', sap };
       }
       owner.adopt(claimed, connection, identity);
+      settled = true;
       this.takeAsBuilt(resolved, connection);
       return { handle: claimed.handle, state: 'resumed' };
     } finally {
-      owner.release(claimed.handle);
+      // Not settled: the session stays a leftover, its file named again.
+      if (!settled) owner.release(claimed);
     }
   }
 
@@ -854,6 +917,7 @@ export abstract class BaseMcpServer extends McpServer {
       handle,
       signal,
     );
+    let settled = false;
     try {
       const connection = createAbapConnection(
         resolved.settings,
@@ -870,7 +934,8 @@ export abstract class BaseMcpServer extends McpServer {
         await endConnection(connection);
         const sap = sapAnswerOf(error);
         if (sap === undefined || !sessionGone(sap.status)) throw error;
-        owner.forget(claimed.handle);
+        owner.forget(claimed);
+        settled = true;
         return { handle: claimed.handle, state: 'already_ended', sap };
       }
       let failed = false;
@@ -878,10 +943,11 @@ export abstract class BaseMcpServer extends McpServer {
         failed = true;
       });
       if (failed) throw new Error(LEFTOVER_LOGOFF_NOT_WRITTEN_WORDS);
-      owner.forget(claimed.handle);
+      owner.forget(claimed);
+      settled = true;
       return { handle: claimed.handle, state: 'logged_off' };
     } finally {
-      owner.release(claimed.handle);
+      if (!settled) owner.release(claimed);
     }
   }
 
@@ -1057,6 +1123,13 @@ function isSpent(connection: AbapConnection): boolean {
   } catch {
     return false;
   }
+}
+
+/** What a request's session is kept as: its destination, and the user it names. */
+interface KnownSession {
+  destination: SessionDestination;
+  /** Absent for a token credential: SAP answers it after `connect()`. */
+  user?: string;
 }
 
 /** The fixed words of a leftover session's logoff that was not written. */

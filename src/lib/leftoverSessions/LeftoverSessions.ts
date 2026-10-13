@@ -31,6 +31,15 @@
  * process is alive (pid and start time) is never listed or touched — it is
  * that process's, this one's included. No TTL: a file stays until the user
  * acts, and SAP's answer decides whether its session is alive.
+ *
+ * **Claims.** Before a resume or a logoff, a process claims the file by
+ * renaming it to `<handle>.claimed.<pid>.<start>`: an atomic rename, so of
+ * two processes one acts and the other answers "not available". A claimed
+ * file whose claimer died is available again, as any dead process's file.
+ *
+ * **The backend user** is the one the request names (`SAP_USERNAME`,
+ * `x-sap-login`); a token credential names none, and the user is then the
+ * one SAP answers for the session (`systemUserOf`, asked after `connect()`).
  */
 
 import { randomBytes } from 'node:crypto';
@@ -70,13 +79,22 @@ export interface LeftoverListing {
   written_at: string;
 }
 
-/** A leftover session claimed for one operation of this process. */
+/**
+ * A leftover session claimed for one operation of this process: its file
+ * renamed to a name carrying this process (`<handle>.claimed.<pid>.<start>`),
+ * so another process cannot act on it at the same time.
+ */
 export interface ClaimedSession {
   handle: string;
   role: LeftoverRole;
   /** The session's cookies: a secret, handed only to the connection. */
   cookies: string;
+  /** The claimed file's name in the runtime directory. */
+  file: string;
 }
+
+/** Where a session's destination is, without its user. */
+export type SessionDestination = Omit<SessionIdentity, 'user'>;
 
 /** What the file holds. */
 interface RuntimeFile {
@@ -139,15 +157,81 @@ export function sessionIdentity(
   settings: SapConfig,
   login?: string,
 ): SessionIdentity | undefined {
+  const destination = sessionDestination(settings);
+  return destination === undefined
+    ? undefined
+    : withUser(destination, settings.username ?? login);
+}
+
+/**
+ * The destination a request's settings name (URL, client, system kind, the
+ * HTTP wire), without a user; `undefined` over RFC — an RFC session is its
+ * conversation and keeps no file.
+ */
+export function sessionDestination(
+  settings: SapConfig,
+): SessionDestination | undefined {
   if (settings.connectionType === 'rfc') return undefined;
-  const user = (settings.username ?? login ?? '').trim().toUpperCase();
-  if (user === '' || typeof settings.url !== 'string') return undefined;
+  if (typeof settings.url !== 'string') return undefined;
   return {
     url: withoutTrailingSlashes(settings.url.trim()),
     client: (settings.client ?? '').trim(),
     system: resolveSystemKind(settings),
     wire: 'http',
-    user,
+  };
+}
+
+/**
+ * `destination` with its backend user — stated by the request, or answered
+ * by SAP for a token credential (`systemUserOf`); `undefined` without one.
+ */
+export function withUser(
+  destination: SessionDestination,
+  user: string | undefined,
+): SessionIdentity | undefined {
+  const named = (user ?? '').trim().toUpperCase();
+  return named === '' ? undefined : { ...destination, user: named };
+}
+
+/** A runtime file's name: `<handle>`, or `<handle>.claimed.<pid>.<start in hex>`. */
+interface FileName {
+  name: string;
+  handle: string;
+  /** The process that claimed it, when it is claimed. */
+  claimer?: ProcessStamp;
+}
+
+const CLAIMED = '.claimed.';
+
+function claimedName(handle: string, by: ProcessStamp): string {
+  const start = by.start === null ? '' : Buffer.from(by.start).toString('hex');
+  return `${handle}${CLAIMED}${by.pid}.${start}`;
+}
+
+/** A runtime file's name read back; `undefined` for anything else. Plain code. */
+function parseName(name: string): FileName | undefined {
+  if (name.length === 32) {
+    return isHandle(name) ? { name, handle: name } : undefined;
+  }
+  const handle = name.slice(0, 32);
+  if (!isHandle(handle) || !name.startsWith(CLAIMED, 32)) return undefined;
+  const rest = name.slice(32 + CLAIMED.length);
+  const dot = rest.indexOf('.');
+  if (dot <= 0) return undefined;
+  const pidText = rest.slice(0, dot);
+  const hex = rest.slice(dot + 1);
+  for (const c of pidText) if (c < '0' || c > '9') return undefined;
+  if (hex.length % 2 !== 0) return undefined;
+  for (const c of hex) if (!HEX.includes(c)) return undefined;
+  const pid = Number(pidText);
+  if (!Number.isSafeInteger(pid)) return undefined;
+  return {
+    name,
+    handle,
+    claimer: {
+      pid,
+      start: hex === '' ? null : Buffer.from(hex, 'hex').toString(),
+    },
   };
 }
 
@@ -239,8 +323,6 @@ export class LeftoverSessions {
   private readonly tracked = new WeakMap<object, Tracked>();
   /** Keyed weakly: what each connection was built for, so a sibling inherits it. */
   private readonly identities = new WeakMap<object, SessionIdentity>();
-  /** Handles this process works on now (a resume, a logoff): not listed, not claimed twice. */
-  private readonly claimed = new Set<string>();
 
   constructor(options: LeftoverSessionsOptions) {
     this.directory = options.directory;
@@ -300,13 +382,15 @@ export class LeftoverSessions {
   /** The caller's leftover sessions: dead processes' files of `identity`. */
   list(identity: SessionIdentity): LeftoverListing[] {
     const listed: LeftoverListing[] = [];
-    for (const handle of this.handles()) {
-      if (this.claimed.has(handle)) continue;
-      const file = this.read(handle);
+    const seen = new Set<string>();
+    for (const entry of this.available()) {
+      if (seen.has(entry.handle)) continue;
+      const file = this.read(entry.name);
       if (file === undefined || this.alive(file)) continue;
       if (!sameIdentity(identityOfFile(file), identity)) continue;
+      seen.add(entry.handle);
       listed.push({
-        handle,
+        handle: entry.handle,
         role: file.role,
         destination: {
           url: file.destination.url,
@@ -323,33 +407,60 @@ export class LeftoverSessions {
   /**
    * The leftover session `handle` names, claimed for one operation of this
    * process — or `undefined`, the same for an unknown handle, someone
-   * else's file, a live process's file and one already claimed. Released by
-   * `release(handle)`.
+   * else's file, a live process's file and one another process claimed
+   * first. The claim is the file's atomic rename to a name carrying this
+   * process: of two processes renaming the same file, one wins and the
+   * other finds nothing. A file whose claimer died is available again, as
+   * any dead process's file. Ends with `release` (the session stays a
+   * leftover), `forget` (it is gone) or `adopt` (resumed here).
    */
   claim(
     handle: unknown,
     identity: SessionIdentity,
   ): ClaimedSession | undefined {
-    if (!isHandle(handle) || this.claimed.has(handle)) return undefined;
-    const file = this.read(handle);
+    if (!isHandle(handle)) return undefined;
+    const entry = this.available().find((e) => e.handle === handle);
+    if (entry === undefined) return undefined;
+    const file = this.read(entry.name);
     if (file === undefined || this.alive(file)) return undefined;
     if (!sameIdentity(identityOfFile(file), identity)) return undefined;
-    this.claimed.add(handle);
-    return { handle, role: file.role, cookies: file.cookies };
+    const mine = claimedName(handle, this.probe.self());
+    try {
+      fs.renameSync(
+        path.join(this.directory, entry.name),
+        path.join(this.directory, mine),
+      );
+    } catch {
+      // Another process renamed it first.
+      return undefined;
+    }
+    return { handle, role: file.role, cookies: file.cookies, file: mine };
   }
 
-  release(handle: string): void {
-    this.claimed.delete(handle);
+  /** The claimed session stays a leftover: its file is named by its handle again. */
+  release(claimed: ClaimedSession): void {
+    const target = path.join(this.directory, claimed.handle);
+    try {
+      // Never over a file of the same handle (one adopted meanwhile).
+      if (fs.existsSync(target)) {
+        this.removeFile(claimed.file);
+        return;
+      }
+      fs.renameSync(path.join(this.directory, claimed.file), target);
+    } catch {
+      this.say();
+    }
   }
 
-  /** Deletes the file of `handle`: its session is gone, or logged off. */
-  forget(handle: string): void {
-    if (isHandle(handle)) this.remove(handle);
+  /** The claimed session is gone, or logged off: its file is deleted. */
+  forget(claimed: ClaimedSession): void {
+    this.removeFile(claimed.file);
   }
 
   /**
    * A resumed session is this process's now: `connection` (built on it)
-   * keeps the same handle, and the file is rewritten as this process's.
+   * keeps the same handle, its file is written as this process's, and the
+   * claimed one is deleted.
    */
   adopt(
     claimed: ClaimedSession,
@@ -357,6 +468,7 @@ export class LeftoverSessions {
     identity: SessionIdentity,
   ): void {
     this.track(connection, claimed.role, identity, claimed.handle);
+    this.removeFile(claimed.file);
   }
 
   /** Writes again whatever changed in `connection`'s cookies. */
@@ -426,8 +538,12 @@ export class LeftoverSessions {
   }
 
   private remove(handle: string): void {
+    this.removeFile(handle);
+  }
+
+  private removeFile(name: string): void {
     try {
-      fs.rmSync(path.join(this.directory, handle), { force: true });
+      fs.rmSync(path.join(this.directory, name), { force: true });
     } catch {
       this.say();
     }
@@ -441,18 +557,34 @@ export class LeftoverSessions {
     }
   }
 
-  private handles(): string[] {
+  /**
+   * The files no live process works on: every `<handle>`, and every claimed
+   * file whose claimer is dead. Plain files first.
+   */
+  private available(): FileName[] {
+    let names: string[];
     try {
-      return fs.readdirSync(this.directory).filter((name) => isHandle(name));
+      names = fs.readdirSync(this.directory);
     } catch {
       return [];
     }
+    const parsed = names
+      .map(parseName)
+      .filter((entry): entry is FileName => entry !== undefined)
+      .filter(
+        (entry) =>
+          entry.claimer === undefined || !this.stampAlive(entry.claimer),
+      );
+    return [
+      ...parsed.filter((entry) => entry.claimer === undefined),
+      ...parsed.filter((entry) => entry.claimer !== undefined),
+    ];
   }
 
-  private read(handle: string): RuntimeFile | undefined {
+  private read(name: string): RuntimeFile | undefined {
     try {
       return parseFile(
-        fs.readFileSync(path.join(this.directory, handle), 'utf8'),
+        fs.readFileSync(path.join(this.directory, name), 'utf8'),
       );
     } catch {
       return undefined;
@@ -460,8 +592,12 @@ export class LeftoverSessions {
   }
 
   private alive(file: RuntimeFile): boolean {
+    return this.stampAlive({ pid: file.pid, start: file.start });
+  }
+
+  private stampAlive(stamp: ProcessStamp): boolean {
     try {
-      return this.probe.isAlive({ pid: file.pid, start: file.start });
+      return this.probe.isAlive(stamp);
     } catch {
       // Unknown is alive: a live process's file is never touched.
       return true;

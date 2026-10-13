@@ -808,7 +808,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       );
       expect(full.tools).not.toContain('DebugStartListener');
       expect(compact.debugTools).toEqual(expect.arrayContaining(COMPACT_DEBUG));
-      expect(compact.debugTools).toHaveLength(16 + 4 + 3);
+      expect(compact.debugTools).toHaveLength(16 + 4 + 2);
       expect(compact.tools).not.toContain('HandlerDebugStart');
     });
   },
@@ -871,9 +871,10 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       return tools;
     };
 
-    it('exposition: ro serves the 16 that change nothing, and the leftover-session tools', async () => {
+    it('exposition: ro serves the 16 that change nothing, and the leftover-session list and logoff', async () => {
       const tools = await servedTools([conf('ro')]);
-      expect(tools).toHaveLength(16 + 3);
+      expect(tools).toHaveLength(16 + 2);
+      expect(tools).not.toContain('HandlerLeftoverSessionResume');
       expect(tools).toContain('HandlerGet');
       expect(tools).not.toContain('HandlerCreate');
     });
@@ -885,7 +886,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         '--exposition=readonly',
         '--exposition=ro',
       ]);
-      expect(tools).toHaveLength(16 + 3);
+      expect(tools).toHaveLength(16 + 2);
       expect(tools).not.toContain('HandlerCreate');
     });
 
@@ -894,7 +895,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         '--exposition=debug',
         '--exposition=ro,debug',
       ]);
-      expect(tools).toHaveLength(16 + 4 + 3);
+      expect(tools).toHaveLength(16 + 4 + 2);
       expect(tools).toEqual(expect.arrayContaining(COMPACT_DEBUG));
     });
 

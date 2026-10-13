@@ -1,12 +1,14 @@
 /**
  * The compact leftover-session tools, served beside every compact
- * exposition: the SAP sessions an ended process left open, listed, resumed
- * or logged off by the user. Each works on no connection of the instance
+ * exposition — the resume only beside `rw`: the SAP sessions an ended
+ * process left open, listed, resumed or logged off by the user. Each works on no connection of the instance
  * (`connectionless`).
  */
+import type { LeftoverSessionToolsOptions } from '../../handlers/groups/LeftoverSessionHandlersGroup';
 import {
   BaseHandlerGroup,
   defineTool,
+  type HandlerContext,
   type HandlerEntry,
 } from '../../handlers/index';
 import {
@@ -22,16 +24,22 @@ import {
   handleHandlerLeftoverSessionResume,
 } from './handleHandlerLeftoverSessionResume';
 
-export function compactLeftoverSessionEntries(): HandlerEntry[] {
+export function compactLeftoverSessionEntries(
+  options: LeftoverSessionToolsOptions = {},
+): HandlerEntry[] {
   return [
     defineTool(
       HandlerLeftoverSessionList_Tool,
       handleHandlerLeftoverSessionList,
     ),
-    defineTool(
-      HandlerLeftoverSessionResume_Tool,
-      handleHandlerLeftoverSessionResume,
-    ),
+    ...(options.resume === false
+      ? []
+      : [
+          defineTool(
+            HandlerLeftoverSessionResume_Tool,
+            handleHandlerLeftoverSessionResume,
+          ),
+        ]),
     defineTool(
       HandlerLeftoverSessionLogoff_Tool,
       handleHandlerLeftoverSessionLogoff,
@@ -42,7 +50,14 @@ export function compactLeftoverSessionEntries(): HandlerEntry[] {
 export class CompactLeftoverSessionHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'CompactLeftoverSessionHandlers';
 
+  constructor(
+    context: HandlerContext,
+    private readonly options: LeftoverSessionToolsOptions = {},
+  ) {
+    super(context);
+  }
+
   getHandlers(): HandlerEntry[] {
-    return compactLeftoverSessionEntries();
+    return compactLeftoverSessionEntries(this.options);
   }
 }

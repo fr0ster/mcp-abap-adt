@@ -173,15 +173,24 @@ tools; the server decides nothing by itself (session-resume spec).
   `makeAdtRequest`); deleted from inside the connection's end once its `disconnect()` resolved —
   `whenLoggedOff` in `ownedConnections.ts` — so the terminal close, a replacement and the forced
   close all delete it after the logoff is written, and a logoff that failed keeps it. Never
-  logged, never in an answer. RFC, and a request naming no backend user (a token credential),
-  keep no file (`sessionIdentity` answers none).
+  logged, never in an answer. RFC keeps no file. The backend user is the request's
+  (`sessionIdentity`), else — a token credential names none — the one SAP answers after
+  `connect()` (`keepSession` → `systemUserOf`, `src/lib/systemUser.ts`, shared with the
+  debugger's `requestUserOf`); a system that names none keeps no file.
 - **The tools** (`ListLeftoverSessions` / `ResumeLeftoverSession` / `LogoffLeftoverSession`;
-  compact `HandlerLeftoverSession{List,Resume,Logoff}`), served on every exposition, are
+  compact `HandlerLeftoverSession{List,Resume,Logoff}`) — the list and the logoff on every
+  exposition, the resume only beside a writing one (`high` / `low`, compact `rw`) — are
   `connectionless` entries: the tool wrapper calls them without `getConnection` (a resume must
   not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
-  resolves the caller from the instance's source (`resolveCaller`), and a file is the caller's
-  when its identity equals the caller's; an unknown handle, someone else's file, a live process's
-  file and one this process already works on are refused alike (`leftover_session_not_available`).
+  resolves the caller from the instance's source (`resolveCaller`) — a token caller's user from
+  the instance's own connection (`leftoverCaller`, which builds it when there is none) — and a
+  file is the caller's when its identity equals the caller's; an unknown handle, someone else's
+  file, a live process's file and one another live process claimed are refused alike
+  (`leftover_session_not_available`).
+- **Claims.** Before acting, `claim` renames the file to `<handle>.claimed.<pid>.<start>` — the
+  atomic step two processes race on; the loser finds nothing. `adopt` (resumed), `forget` (gone,
+  logged off) or `release` (anything else: back to `<handle>`) ends the claim; a claimed file
+  whose claimer died is listed and claimable again. Off Linux liveness is the pid alone.
 - **Resume** (`built` only) builds the instance's connection with `createAbapConnection(…,
   session)`, records it as `built` before `connect()`, and on success makes it the instance's
   (`takeAsBuilt`: the previous one retired, ended after its last call) and the file this

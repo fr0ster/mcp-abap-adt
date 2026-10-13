@@ -126,7 +126,8 @@ export interface CompactHalves {
  * The compact tool set, composed of the two halves' entry builders: `ro` the
  * read-only half, `rw` (the default) both, `debug` beside either the four
  * debugger verbs — and no search, so the list is short by construction. The
- * three leftover-session tools are served beside every exposition.
+ * leftover-session list and logoff are served beside every exposition, the
+ * resume beside `rw` only.
  *
  * Every group is a real `BaseHandlerGroup`, never an object literal wrapping
  * the entries: the launcher sets the per-request context on the group that
@@ -160,7 +161,10 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
             )
           : new CompactHandlersGroup(context, [halves.readOnly, halves.modify]);
       // Every exposition: the user's own leftover sessions.
-      const leftover = new CompactLeftoverSessionHandlersGroup(context);
+      // The resume only beside rw: in ro, the list and the logoff.
+      const leftover = new CompactLeftoverSessionHandlersGroup(context, {
+        resume: exposition[0] !== 'ro',
+      });
       return exposition.includes('debug')
         ? [half, new CompactDebugHandlersGroup(context), leftover]
         : [half, leftover];

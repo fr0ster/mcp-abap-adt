@@ -5,11 +5,13 @@
  *
  * - `fullToolSet` builds today's groups: readonly (with system), high, low,
  *   debug and search, in today's order and with today's tools, and the
- *   leftover-session tools last, on every exposition;
+ *   leftover-session tools last, on every exposition (the resume only beside
+ *   high or low);
  * - `compactToolSetOf({ readOnly, modify })`, given the two halves' entry
  *   builders, builds today's compact groups — `ro` the read-only half, `rw`
- *   both, `debug` the four verbs beside either, the three leftover-session
- *   tools beside every exposition — and refuses an empty or an
+ *   both, `debug` the four verbs beside either, the leftover-session list and
+ *   logoff beside every exposition and the resume beside `rw` — and refuses
+ *   an empty or an
  *   unknown `--exposition` in today's words, verbatim.
  */
 
@@ -81,7 +83,9 @@ function todaysFullGroups(exposition: readonly string[]): IHandlerGroup[] {
   groups.push(
     ...overriding,
     new SearchHandlersGroup(context),
-    new LeftoverSessionHandlersGroup(context),
+    new LeftoverSessionHandlersGroup(context, {
+      resume: exposition.includes('high') || exposition.includes('low'),
+    }),
   );
   return groups;
 }
@@ -202,7 +206,7 @@ describe('compactToolSetOf, with the two halves', () => {
     expect(shape(groupsFor(['--exposition=ro']))).toEqual(
       shape([
         new CompactReadOnlyHandlersGroup(context),
-        new CompactLeftoverSessionHandlersGroup(context),
+        new CompactLeftoverSessionHandlersGroup(context, { resume: false }),
       ]),
     );
     expect(

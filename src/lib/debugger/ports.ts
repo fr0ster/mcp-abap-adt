@@ -6,7 +6,6 @@ import {
   AbapDebugger,
   AdtExecutor,
   AmdpDebugger,
-  getSystemInformation,
   type IDebuggerListenerConflict,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
@@ -17,6 +16,7 @@ import { endConnection, own } from '../ownedConnections';
 import { openFreshConnection } from '../packageSessions';
 import { getRequestContext } from '../requestContext';
 import { ourClassExecutor, ourProgramExecutor } from '../strategies/resultSets';
+import { systemUserOf } from '../systemUser';
 import type { AmdpSessionPorts } from './AmdpSession';
 import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
 
@@ -29,9 +29,10 @@ import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
 export async function requestUserOf(
   connection: IAbapConnection,
 ): Promise<string> {
-  const info = await getSystemInformation(connection);
   const user =
-    info?.userName || getRequestContext()?.login || process.env.SAP_USERNAME;
+    (await systemUserOf(connection)) ||
+    getRequestContext()?.login ||
+    process.env.SAP_USERNAME;
   if (!user?.trim()) {
     throw new Error(
       'the ABAP user of this connection is unknown: the system names none and no login is configured',

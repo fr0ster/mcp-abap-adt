@@ -141,10 +141,13 @@ still lives.
 
 - **No file over RFC**: an RFC session is its conversation and cannot be picked up by another
   process (and SAP ends it within seconds of the process's death — measured).
-- **No file without a backend user.** A file is matched to its caller by the destination and the
-  backend user the caller's request states: the destination's `SAP_USERNAME`, or `x-sap-login`.
-  A token credential (a service key, `x-sap-jwt-token`) states no user, so its sessions keep no
-  file and such a caller sees none.
+- **The backend user.** A file is matched to its caller by the destination and the backend user:
+  the one the request states (the destination's `SAP_USERNAME`, or `x-sap-login`), else — for a
+  token credential (a service key, a browser login, `x-sap-jwt-token`), which states none — the
+  one SAP answers for the session (`systeminformation`'s `userName`, asked once after
+  `connect()`, the way the debugger reads its request user). For such a caller the tools ask the
+  same of the instance's own connection, logging on first if the instance holds none yet. A
+  system that names no user keeps no file, and such a caller owns none.
 
 **Security: the files are bearer secrets.** The cookies in a file act as that SAP user for as long
 as the session lives — anyone who can read the file can work in the session, the locks it holds
@@ -153,7 +156,10 @@ included. The directory is created `0700` (an existing one is narrowed to `0700`
 directory out of backups, synchronised folders and container images, and do not share it between
 OS users. The server never logs a file's content and never shows a cookie to the model.
 
-**The tools**, on every transport and with every exposition:
+**The tools**, on every transport. The list and the logoff are served with every exposition — a
+logoff is a system action, not a data change, so compact `ro` and full `readonly` serve them too;
+the resume only with a writing one (full `high` or `low`, compact `rw`), since a resumed session
+is for finishing a write or an unlock:
 
 | Full binaries | Compact binaries | What it does |
 |---|---|---|
@@ -167,9 +173,21 @@ OS users. The server never logs a file's content and never shows a cookie to the
   files — this one's included — are never listed or touched.
 - **Resuming a debugger session is refused** (`leftover_session_not_resumable`): its listener,
   breakpoints and poll lived in the ended process. Log it off instead.
-- **Over Streamable HTTP** an instance that holds no state leaves after its request, and its
-  connection — a resumed one too — is logged off then: a resume there ends the session after the
-  call, as a logoff would.
+- **One process at a time.** Before a resume or a logoff, a process claims the file by renaming
+  it to a name carrying its own process id (`<handle>.claimed.<pid>.<start>`), an atomic rename:
+  of two processes acting on one leftover session at once, one acts and the other answers
+  `leftover_session_not_available`. An operation that fails without settling the session gives
+  the file back under its handle; a claimed file whose process died is listed and claimable again,
+  as any dead process's file.
+- **Where a resume is useful: stdio, SSE and a pooled Streamable HTTP instance.** Over Streamable
+  HTTP each request is served by an instance of its own (a pooled one too gets a new credential with
+  each request, which replaces its connection): a resumed session lives for that one request and is
+  logged off when it ends — as a logoff would. Resume on stdio or SSE, where the instance and its
+  connection outlive the call.
+- **Off Linux, a process's liveness is read by its process id alone.** On Linux the start time in
+  the file is compared with `/proc`; elsewhere no start time is read, so a process id the system
+  has reused for another process hides the dead process's file until that other process ends — the
+  safe side: a live process's file is never touched.
 
 ## HTTP users
 

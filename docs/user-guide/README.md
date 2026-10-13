@@ -89,14 +89,19 @@ transport, three tools act on **your** leftover sessions, and nothing else does:
   user and time of each session a dead process left; never a cookie.
 - `ResumeLeftoverSession { handle }` (compact `HandlerLeftoverSessionResume`) — the server goes on
   in that session instead of logging on, so a `lock_handle` taken there works again: finish the
-  write, or unlock. A debugger's session cannot be resumed. If SAP says the session is gone, you
-  get SAP's answer and the record is deleted.
+  write, or unlock. Served only with a writing exposition (`high`, `low`; compact `rw`). A
+  debugger's session cannot be resumed. If SAP says the session is gone, you get SAP's answer and
+  the record is deleted. Useful on stdio and SSE: over Streamable HTTP each request has an
+  instance of its own, so a resumed session lives for that one request and is logged off with it.
 - `LogoffLeftoverSession { handle }` (compact `HandlerLeftoverSessionLogoff`) — logs the session off
   (every lock in it is released), with no credential, and deletes the record.
 
-A record is yours when its destination and SAP user equal those of your request (the
-destination's `SAP_USERNAME`, or `x-sap-login`); a token credential names no user, so its
-sessions are not recorded. A session of a server still running is never shown. The records hold
+A record is yours when its destination and SAP user equal those of your request: the
+destination's `SAP_USERNAME` or `x-sap-login`, or — for a token credential, which names none — the
+user SAP answers for the session. A session of a server still running is never shown; off Linux a
+server's liveness is read by its process id alone, so a reused id hides a record until that other
+process ends. Two servers never act on one record at once: the first to claim it acts, the other
+answers that it is not available. The records hold
 the session's cookies, which act as you while the session lives: the directory is owner-only
 (`0700`, files `0600`) — keep it out of backups and shared folders. Details:
 [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-leftover-sap-sessions-of-a-killed-process).

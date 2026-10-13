@@ -148,7 +148,7 @@ function page(entries) {
   md +=
     '- Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`\n';
   md +=
-    '- Leftover-session tools: `@mcp-abap-adt/lib`, served with every exposition\n';
+    '- Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff with every exposition, the resume beside `rw` only\n';
   md += '- Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)\n\n';
   md += '## How it works\n\n';
   md +=
@@ -165,7 +165,7 @@ function page(entries) {
       half === 'debug'
         ? '**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)\n\n'
         : half === 'session'
-          ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib` (every exposition)\n\n'
+          ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)\n\n'
           : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
     const available = tool.available_in

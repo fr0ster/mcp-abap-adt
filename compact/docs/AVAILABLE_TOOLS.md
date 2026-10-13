@@ -7,7 +7,7 @@ definitions a client receives.
 - Read-only half: `@mcp-abap-adt/compact-readonly`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`
-- Leftover-session tools: `@mcp-abap-adt/lib`, served with every exposition
+- Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff with every exposition, the resume beside `rw` only
 - Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)
 
 ## How it works
@@ -612,7 +612,7 @@ per request.
 
 ### HandlerLeftoverSessionList
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib` (every exposition)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)
 
 **Description:** Lists your SAP sessions an ended server process left open (it was killed before logging them off): handle, role (built or debugger), destination, user, when recorded. Sessions of a running process are not listed.
 
@@ -622,7 +622,7 @@ per request.
 
 ### HandlerLeftoverSessionResume
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib` (every exposition)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)
 
 **Description:** Continues a leftover SAP session (role built only) as this server's connection, without a new logon, so its locks and lock handles work again. A session already held here ends with its logoff once unused. If SAP answers the session is gone, the answer is SAP's and its record is deleted.
 
@@ -634,7 +634,7 @@ per request.
 
 ### HandlerLeftoverSessionLogoff
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib` (every exposition)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)
 
 **Description:** Logs off a leftover SAP session (any role), releasing every lock it holds; no credential is sent. Its record is deleted afterwards; a session SAP had already ended is reported as such.
 

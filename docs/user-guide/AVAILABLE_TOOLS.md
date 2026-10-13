@@ -17,7 +17,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `high` -> [High-Level Group](#high-level-group)
 - `low` -> [Low-Level Group](#low-level-group)
 - `debug` (opt-in) -> [Debug Group](#debug-group)
-- every exposition -> [Session Group](#session-group) (leftover SAP sessions of an ended process)
+- every exposition -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume beside `high` or `low` only)
 - `compact` -> [High-Level / Compact](#high-level-compact)
 
 ## Navigation

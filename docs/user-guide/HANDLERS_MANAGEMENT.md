@@ -96,11 +96,12 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - Transactions
 
 8. **leftover sessions** - Always included, in every exposition of every binary (compact too)
-   - `ListLeftoverSessions`, `ResumeLeftoverSession`, `LogoffLeftoverSession`; compact
-     `HandlerLeftoverSessionList`, `HandlerLeftoverSessionResume`, `HandlerLeftoverSessionLogoff`
+   - `ListLeftoverSessions` and `LogoffLeftoverSession` with every exposition (`readonly` and
+     compact `ro` included: a logoff is a system action, not a data change);
+     `ResumeLeftoverSession` only beside `high` or `low`. Compact: `HandlerLeftoverSessionList`,
+     `HandlerLeftoverSessionLogoff`, and `HandlerLeftoverSessionResume` beside `rw` only
    - The SAP sessions a killed server process left open, listed, resumed or logged off by the
-     user; they act only on the caller's own sessions. Compact `ro` serves them too, beside its
-     16 tools that change nothing: a logoff ends a session the caller already holds.
+     user; they act only on the caller's own sessions.
    - [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process)
 
 ## Usage

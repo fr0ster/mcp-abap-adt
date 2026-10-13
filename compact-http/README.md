@@ -32,9 +32,10 @@ tool list at all), and `debug` beside either for the four debugger verbs (`Handl
 `HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`). `debug` alone, an empty value
 and the full binaries' sets (`readonly`, `high`, `low`) are refused at start. A config file's
 `exposition` (`--conf`) is read the same way, the flag winning; the template writes
-`exposition: rw`. The three leftover-session tools (`HandlerLeftoverSessionList`, `-Resume`, `-Logoff`:
-the SAP sessions a killed server process left open, only the caller's own) are served beside every
-exposition, `ro` included:
+`exposition: rw`. The leftover-session tools (the SAP sessions a killed server process left open, only the
+caller's own): `HandlerLeftoverSessionList` and `HandlerLeftoverSessionLogoff` beside every
+exposition, `ro` included, and `HandlerLeftoverSessionResume` beside `rw` only. Over Streamable HTTP
+a resumed session lives for its one request:
 [Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process). A breakpoint catches every request of the connected SAP user, which is why the
 debugger verbs are never served by default: [Debugger](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 

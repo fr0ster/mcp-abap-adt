@@ -828,7 +828,7 @@ function generateMarkdown(tools) {
   md += `- \`high\` -> [High-Level Group](#high-level-group)\n`;
   md += `- \`low\` -> [Low-Level Group](#low-level-group)\n`;
   md += `- \`debug\` (opt-in) -> [Debug Group](#debug-group)\n`;
-  md += `- every exposition -> [Session Group](#session-group) (leftover SAP sessions of an ended process)\n`;
+  md += `- every exposition -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume beside \`high\` or \`low\` only)\n`;
   md += `- \`compact\` -> [High-Level / Compact](#high-level-compact)\n\n`;
 
   md += `## Navigation\n\n`;

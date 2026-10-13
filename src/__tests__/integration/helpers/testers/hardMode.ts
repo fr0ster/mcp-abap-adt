@@ -290,21 +290,18 @@ export function toolCandidates(
     | 'activate'
     | 'delete',
   entity: string,
-  mode: 'high' | 'low',
+  _mode: 'high',
   handlerName: string,
 ): string[] {
+  // The full binaries serve no low set since 19.0.0 (D56): the candidates are
+  // the high tools only.
   const cap = step[0].toUpperCase() + step.slice(1);
-  const low = `${cap}${entity}Low`;
   const high = `${cap}${entity}`;
 
   if (step === 'delete' && handlerName.includes('behavior_implementation')) {
-    return ['DeleteClass', 'DeleteClassLow', high, low];
+    return ['DeleteClass', high];
   }
-
-  if (mode === 'high') {
-    return [high, low];
-  }
-  return [low, high];
+  return [high];
 }
 
 export async function callTool(

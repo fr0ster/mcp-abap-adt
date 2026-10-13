@@ -26,8 +26,8 @@ import { handleReadFunctionModule } from '../src/handlers/function_module/readon
 import { handleCreateFunctionGroup } from '../src/handlers/function/high/handleCreateFunctionGroup';
 import { handleCreateFunctionModule } from '../src/handlers/function/high/handleCreateFunctionModule';
 import { handleUpdateFunctionModule } from '../src/handlers/function/high/handleUpdateFunctionModule';
-import { handleDeleteFunctionModule } from '../src/handlers/function/low/handleDeleteFunctionModule';
-import { handleDeleteFunctionGroup } from '../src/handlers/function/low/handleDeleteFunctionGroup';
+import { handleDeleteFunctionModule } from '../src/handlers/function_module/high/handleDeleteFunctionModule';
+import { handleDeleteFunctionGroup } from '../src/handlers/function_group/high/handleDeleteFunctionGroup';
 
 function getArg(args: string[], flag: string): string | undefined {
   const i = args.indexOf(flag);

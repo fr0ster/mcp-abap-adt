@@ -87,10 +87,9 @@ MCP_LIVE_ENV_PATHS=/path/to/a.env:/path/to/b.env npm test -- src/__tests__/live
 
 ## Test Levels
 
-Each object type has up to three test levels:
+Each object type has up to two test levels (the low level and `LowTester` left with the low set in 19.0.0; compact's single-step operations are tested against an ADT stand-in in `src/__tests__/unit/lowToCompact.test.ts`):
 
 - **HIGH** (`HighTester`): Tests full handler workflow (create -> update -> activate -> delete)
-- **LOW** (`LowTester`): Tests low-level ADT client operations
 - **Lambda** (`LambdaTester`): Tests individual handler functions in isolation
 
 ## Cleanup Behavior

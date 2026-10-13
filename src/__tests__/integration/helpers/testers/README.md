@@ -2,7 +2,7 @@
 
 ## Overview
 
-Testers (`HighTester`, `ReadOnlyTester`; `LowTester` left with the low set in 19.0.0) support two approaches for defining handler calls:
+Testers (`HighTester`, `ReadOnlyTester`) support two approaches for defining handler calls:
 
 1. **Old approach**: Pass handler functions directly (backward compatible)
 2. **New approach**: Pass workflow functions (lambdas) that receive tester context
@@ -28,8 +28,8 @@ interface TesterContext {
   params: any;                   // Test parameters from YAML
   packageName: string;            // Resolved package name
   transportRequest?: string;     // Resolved transport request
-  lockHandle?: string | null;    // Lock handle (for LowTester)
-  lockSession?: SessionInfo | null; // Lock session (for LowTester)
+  lockHandle?: string | null;    // Lock handle, when a workflow takes one
+  lockSession?: SessionInfo | null; // Lock session, when a workflow takes one
 }
 ```
 
@@ -99,56 +99,6 @@ const tester = new HighTester(
       
       return updateData;
     }
-  }
-);
-```
-
-## Example: LowTester with Workflow Functions
-
-```typescript
-import { LowTester, type TesterContext } from '../helpers/testers/LowTester';
-import { handleCreateClass } from '../../../handlers/class/low/handleCreateClass';
-import { handleLockClass } from '../../../handlers/class/low/handleLockClass';
-// ... other handlers
-
-const tester = new LowTester(
-  'create_class_low',
-  'full_workflow',
-  'class-low',
-  {
-    create: async (context: TesterContext) => {
-      const { connection, session, logger, objectName, params, packageName } = context;
-      
-      logger.info(`   • create: ${objectName}`);
-
-      const createResponse = await handleCreateClass(connection, {
-        class_name: objectName,
-        package_name: packageName,
-        source_code: params.source_code,
-        session_id: session.session_id,
-        session_state: session.session_state
-      });
-
-      // Handle response, update session, etc.
-      return parseHandlerResponse(createResponse);
-    },
-
-    lock: async (context: TesterContext) => {
-      const { connection, session, logger, objectName } = context;
-      
-      logger.info(`   • lock: ${objectName}`);
-
-      const lockResponse = await handleLockClass(connection, {
-        class_name: objectName,
-        session_id: session.session_id,
-        session_state: session.session_state
-      });
-
-      // Extract lock handle, update lockSession, etc.
-      return parseHandlerResponse(lockResponse);
-    },
-
-    // ... other workflow functions
   }
 );
 ```

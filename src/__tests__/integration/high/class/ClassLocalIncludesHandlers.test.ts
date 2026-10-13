@@ -418,7 +418,7 @@ END-OF-DEFINITION.`;
 
         // Activate class after updates to match adt-clients flow
         const activateResponse = await invoke(
-          'ActivateClassLow',
+          'ActivateClass',
           { class_name: className },
           async () =>
             handleActivateClass(

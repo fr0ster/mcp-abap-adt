@@ -1,215 +1,61 @@
-# Integration Tests for Low-Level Handlers
+# Integration Tests
 
-> **19.0.0:** the low set left the full binaries (D56) and its integration suites (`integration/low/`, `LowTester`) were removed with it. The suites under `integration/high/` and the readonly ones remain; compact's lifecycle tools are covered by unit tests against the ADT stand-in (`src/__tests__/unit/lowToCompact.test.ts`). The pattern below is kept as history.
+The tests in this directory run the handlers against a real SAP system. They need
+`tests/test-config.yaml` (copied from `tests/test-config.yaml.template`) and skip without it.
 
-This directory contains integration tests for low-level MCP handlers. These tests verify that handlers work correctly with real SAP systems.
-
-## Overview
-
-Integration tests for low-level handlers are similar to builder tests in `@mcp-abap-adt/adt-clients`, but they test the handler functions directly instead of using builders.
-
-## Test Structure
-
-### Directory Organization
+## Structure
 
 ```
-src/__tests__/integration/
-├── README.md (this file)
-├── helpers/
-│   ├── testHelpers.ts          # Common test utilities
-│   ├── sessionHelpers.ts        # Session management helpers
-│   └── configHelpers.ts        # Configuration loading
-├── class/
-│   └── ClassLowHandlers.test.ts # Tests for all class low-level handlers
-├── program/
-│   └── ProgramLowHandlers.test.ts
-├── interface/
-│   └── InterfaceLowHandlers.test.ts
-├── functionGroup/
-│   └── FunctionGroupLowHandlers.test.ts
-├── domain/
-│   └── DomainLowHandlers.test.ts
-└── ... (other object types)
+integration/
+├── high/        # the high tools, one directory per object type (create → update → activate → delete)
+├── readOnly/    # the read-only tools (ATC, function, structure, system, transport)
+├── debugger/    # the debugger tools
+├── server/      # EmbeddableMcpServer against the system
+└── helpers/     # configuration, sessions, shared objects, the testers
 ```
 
-## Test Pattern
+There is no `low/` directory: the low set left the full binaries in 19.0.0 (D56), and its suites
+and `LowTester` were removed with it. The single-step operations it served — lock, a write under
+the lock, unlock, check, validate, activate — are the compact binaries'. Their requests are tested
+against an ADT stand-in in `src/__tests__/unit/lowToCompact.test.ts` and
+`src/__tests__/unit/compactCoversLow.test.ts`, not here.
 
-Each test file follows this pattern:
+## Testers
 
-1. **Setup**: Load configuration, create connection, get session
-2. **Test Workflow**: Execute handler functions in sequence (GetSession → Validate → Create → Lock → Update → Unlock → Activate)
-3. **Cleanup**: Delete test objects (runs in `afterEach` even if the test fails)
+- `HighTester` runs a high tool's workflow and its cleanup.
+- `ReadOnlyTester` runs a read.
+- `LambdaTester` runs workflow functions (lambdas) that receive the tester's context — see
+  [`helpers/testers/README.md`](helpers/testers/README.md).
 
-## Example Test Structure
+In soft mode (the default) a tester calls the handler functions directly. In hard mode
+(`integration_hard_mode.enabled: true`) it spawns the server and calls its MCP tools by name, so a
+test names the tool the full binary serves (`ActivateClass`, `DeleteClass`, …). An operation only
+compact serves (a package delete, `HandlerDelete` PACKAGE) is not served by a full-binary hard
+mode; such a call is reported as not found.
 
-```typescript
-import { handleGetSession } from '../../../handlers/system/readonly/handleGetSession';
-import { handleValidateClassLow } from '../../../handlers/class/low/handleValidateClass';
-import { handleCreateClassLow } from '../../../handlers/class/low/handleCreateClass';
-import { handleLockClassLow } from '../../../handlers/class/low/handleLockClass';
-import { handleUpdateClassLow } from '../../../handlers/class/low/handleUpdateClass';
-import { handleUnlockClassLow } from '../../../handlers/class/low/handleUnlockClass';
-import { handleActivateClassLow } from '../../../handlers/class/low/handleActivateClass';
-import { handleDeleteClassLow } from '../../../handlers/class/low/handleDeleteClass';
-
-describe('Class Low-Level Handlers Integration', () => {
-  let sessionId: string | null = null;
-  let sessionState: any = null;
-  
-  beforeAll(async () => {
-    // Get session
-    const sessionResult = await handleGetSession({});
-    const sessionData = JSON.parse(sessionResult.content[0].text);
-    sessionId = sessionData.session_id;
-    sessionState = sessionData.session_state;
-  });
-  
-  it('should execute full workflow: Validate → Create → Lock → Update → Unlock → Activate', async () => {
-    const className = 'ZADT_TEST_CLASS_001';
-    const packageName = 'ZOK_LOCAL';
-    
-    // 1. Validate
-    const validateResult = await handleValidateClassLow({
-      class_name: className,
-      package_name: packageName,
-      session_id: sessionId,
-      session_state: sessionState
-    });
-    // Update session state from response
-    const validateData = JSON.parse(validateResult.content[0].text);
-    sessionState = validateData.session_state;
-    
-    // 2. Create
-    const createResult = await handleCreateClassLow({
-      class_name: className,
-      description: 'Test class',
-      package_name: packageName,
-      session_id: sessionId,
-      session_state: sessionState
-    });
-    const createData = JSON.parse(createResult.content[0].text);
-    sessionState = createData.session_state;
-    
-    // 3. Lock
-    const lockResult = await handleLockClassLow({
-      class_name: className,
-      session_id: sessionId,
-      session_state: sessionState
-    });
-    const lockData = JSON.parse(lockResult.content[0].text);
-    const lockHandle = lockData.lock_handle;
-    // CRITICAL: Save session from Lock response
-    const lockSessionId = lockData.session_id;
-    const lockSessionState = lockData.session_state;
-    
-    // 4. Update
-    const updateResult = await handleUpdateClassLow({
-      class_name: className,
-      source_code: 'CLASS ... ENDCLASS.',
-      lock_handle: lockHandle,
-      session_id: lockSessionId,  // ← From Lock response
-      session_state: lockSessionState  // ← From Lock response
-    });
-    
-    // 5. Unlock
-    const unlockResult = await handleUnlockClassLow({
-      class_name: className,
-      lock_handle: lockHandle,
-      session_id: lockSessionId,  // ← From Lock response
-      session_state: lockSessionState  // ← From Lock response
-    });
-    
-    // 6. Activate
-    const activateResult = await handleActivateClassLow({
-      class_name: className,
-      session_id: sessionId,
-      session_state: sessionState
-    });
-    
-    expect(activateResult.isError).toBe(false);
-  });
-  
-  afterAll(async () => {
-    // Cleanup: Delete test object (manual tests only)
-    if (sessionId && sessionState) {
-      await handleDeleteClassLow({
-        class_name: 'ZADT_TEST_CLASS_001',
-        session_id: sessionId,
-        session_state: sessionState
-      });
-    }
-  });
-});
-```
-
-## Key Differences from Builder Tests
-
-1. **Direct Handler Calls**: Tests call handler functions directly, not builders
-2. **Manual Session Management**: Tests must manually manage `session_id` and `session_state`
-3. **Response Parsing**: Tests must parse JSON responses from handlers
-4. **Session State Updates**: Tests must update `session_state` after each operation
-5. **Lock Session Handling**: Tests must use `session_id` and `session_state` from Lock response
-
-## Configuration
-
-Tests use the same `test-config.yaml` as builder tests in `adt-clients`, but with handler-specific test cases:
-
-```yaml
-# Handler-specific test cases
-create_class_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      params:
-        class_name: "ZADT_BLD_CLS01"
-        package_name: "ZADT_BLD_PKG01"
-        description: "Test class for low-level handler"
-```
-
-## Running Tests
+## Running
 
 ```bash
-# Run all integration tests
-npm test -- --testPathPattern=integration
-# or use shortcut:
-npm run test:integration
+# All integration tests — save the full log
+npm run test:integration 2>&1 | tee /tmp/integration-test.log
 
-# Run only high-level handler tests
+# The high tools only
 npm run test:high
 
-# Run only low-level handler tests
-npm run test:low
+# One object type
+npm test -- --testPathPatterns=integration/high/class
 
-# Run specific object type tests
-npm test -- --testPathPattern=integration/class
-
-# Run with debug logs
-DEBUG_TESTS=true npm test -- --testPathPattern=integration/class
-DEBUG_HANDLERS=true npm test -- --testPathPattern=integration/class
-DEBUG_ADT_LIBS=true npm test -- --testPathPattern=integration/class
+# With debug logs
+DEBUG_TESTS=true npm test -- --testPathPatterns=integration/high/class
 ```
 
-## Test Helpers
+## Notes
 
-Common helpers are available in `helpers/`:
-
-- `testHelpers.ts`: Parse handler responses, extract session state, etc.
-- `sessionHelpers.ts`: Session management utilities
-- `configHelpers.ts`: Load test configuration from YAML
-
-## Important Notes
-
-1. **Session Management**: Always use `session_id` and `session_state` from Lock response for Update and Unlock operations
-2. **Error Handling**: Always check `result.isError` before parsing response
-3. **Cleanup**:
-   - `LowTester`/`HighTester` run cleanup automatically in `afterEach` (even on failures), unless disabled via YAML (`skip_cleanup=true` or `cleanup_after=false`).
-   - For manual tests (no tester wrappers), delete objects explicitly in `afterAll`/`finally`.
-   - If a test creates **multiple objects** (e.g., domain + data element + structure), add extra cleanup steps for the additional objects.
-4. **Timeouts**: Use appropriate timeouts for long-running operations
-5. **Delays**: Add delays between operations to allow SAP to process changes
-
-## Related Documentation
-
-- [Builder Tests in adt-clients](../../../../mcp-abap-adt-clients/src/__tests__/integration/README.md) - Reference for test patterns
-- [Session Management Guide](../../../docs/user-guide/scenarios/SESSION_MANAGEMENT.md) - Understanding sessions
-- [Creating Classes Guide](../../../docs/user-guide/scenarios/CREATING_CLASSES.md) - Workflow examples
+1. **Cleanup.** `HighTester` and `LambdaTester` clean up in `afterEach`, even on failure, unless the
+   YAML disables it (`skip_cleanup=true` or `cleanup_after=false`). A test that creates several
+   objects deletes each of them.
+2. **Errors.** Check `result.isError` before parsing an answer.
+3. **Locks.** A lock a test takes is released by the test, and a refused release fails it
+   (`helpers/rapFixtures.ts` shows the pattern).
+4. **Shared objects** are created once with `npm run shared:setup` and checked with
+   `npm run shared:check`.

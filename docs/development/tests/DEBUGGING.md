@@ -1,6 +1,6 @@
 # Debugging Integration Tests
 
-This guide explains how to debug integration tests for low-level handlers, especially focusing on session management and lock operations.
+This guide explains how to debug the integration tests, especially session management and lock operations.
 
 ## Environment Variables for Debugging
 

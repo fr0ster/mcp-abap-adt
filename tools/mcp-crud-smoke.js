@@ -29,7 +29,7 @@ Options:
   --include-disabled             Include disabled test cases
   --fail-fast                    Stop on first failed case
   --suffix=<text>                Suffix for object names to avoid collisions
-  --delete-tool=<name>           Delete tool name (default: DeleteProgramLow)
+  --delete-tool=<name>           Delete tool name (default: DeleteProgram)
 
 Stdio options:
   --stdio-command=<cmd>          Command to spawn (default: mcp-abap-adt, the installed server)
@@ -59,7 +59,7 @@ function parseArgs(argv) {
     includeDisabled: false,
     failFast: false,
     suffix: '',
-    deleteTool: 'DeleteProgramLow',
+    deleteTool: 'DeleteProgram',
     stdioCommand: process.execPath,
     stdioCommandExplicit: false,
     stdioArgs: [],

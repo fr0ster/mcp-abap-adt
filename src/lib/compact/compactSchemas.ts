@@ -366,7 +366,7 @@ export const compactUpdateSchema = {
     properties: {
       type: 'object',
       description:
-        'DOMAIN or DATA_ELEMENT under lock_handle: further properties to change, by their property names.',
+        'DOMAIN or DATA_ELEMENT under lock_handle: further properties to change, by their property names — for a data element its own fields (type_kind, type_name, data_type, the labels, search_help) go only here.',
     },
     description: {
       type: 'string',

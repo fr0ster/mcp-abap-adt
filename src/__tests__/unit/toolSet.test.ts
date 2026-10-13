@@ -432,7 +432,9 @@ describe('the full and the compact binaries duplicate no tool', () => {
         expect(names.length).toBeGreaterThan(0);
         expect({
           words,
-          low: names.filter((n) => LOW_TOOLS.includes(n)),
+          // The fixed list, and any name in the low set's style: a surviving
+          // `…Low` TOOL_DEFINITION registered again under a new name.
+          low: names.filter((n) => LOW_TOOLS.includes(n) || n.endsWith('Low')),
           compact: names.filter((n) => compactNames.has(n)),
         }).toEqual({ words, low: [], compact: [] });
       }

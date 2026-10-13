@@ -32,7 +32,7 @@ import { handleUpdateClass } from '../src/handlers/class/high/handleUpdateClass'
 import { handleActivateClass } from '../src/handlers/class/low/handleActivateClass';
 import { handleCreateFunctionGroup } from '../src/handlers/function/high/handleCreateFunctionGroup';
 import { handleActivateFunctionGroup } from '../src/handlers/function/low/handleActivateFunctionGroup';
-import { handleDeleteFunctionGroup } from '../src/handlers/function/low/handleDeleteFunctionGroup';
+import { handleDeleteFunctionGroup } from '../src/handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleGetInactiveObjects } from '../src/handlers/system/readonly/handleGetInactiveObjects';
 import { loadTestConfig } from '../src/__tests__/integration/helpers/configHelpers';
 import { createTestConnectionAndSession } from '../src/__tests__/integration/helpers/sessionHelpers';

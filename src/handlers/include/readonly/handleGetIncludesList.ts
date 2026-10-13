@@ -1,16 +1,19 @@
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Recursively discover and list ALL include files within an ABAP program or include.',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       object_name: {
         type: 'string',
         description: 'Name of the ABAP program or include',
@@ -26,10 +29,6 @@ export const TOOL_DEFINITION = {
         description:
           '[read-only] If true, returns structured JSON with metadata and raw XML.',
         default: false,
-      },
-      timeout: {
-        type: 'number',
-        description: '[read-only] Timeout in ms for each ADT request.',
       },
     },
     required: ['object_name', 'object_type'],
@@ -157,7 +156,7 @@ export async function handleGetIncludesList(
 ) {
   const { connection, logger } = context;
   try {
-    const { object_name, object_type, timeout } = args;
+    const { object_name, object_type } = args;
 
     if (
       !object_name ||
@@ -179,27 +178,9 @@ export async function handleGetIncludesList(
       );
     }
 
-    // Default timeout: 30 seconds per request
-    const requestTimeout =
-      timeout && typeof timeout === 'number' ? timeout : 30000;
-    const withTimeout = <T>(p: Promise<T>, what: string): Promise<T> => {
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      // The timer is cleared once the request settles: a pending one kept
-      // the process (and Jest) alive for its whole length.
-      return Promise.race([
-        p,
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () =>
-              reject(
-                new Error(`Timeout after ${requestTimeout}ms while ${what}`),
-              ),
-            requestTimeout,
-          );
-        }),
-      ]).finally(() => clearTimeout(timer));
-    };
-
+    // No deadline of the server's on a request (spec §5.8): the call's own
+    // `timeout`, when given, ends only the wait — a request abandoned here
+    // would run on in SAP while its session is logged off under it.
     logger?.info(
       `Starting includes tree discovery for ${parent.name} (${parent.kind})`,
     );
@@ -221,7 +202,7 @@ export async function handleGetIncludesList(
       return '';
     };
     const readInclude = async (name: string) =>
-      sourceOf(name, withTimeout(utils.getInclude(name), `reading ${name}`));
+      sourceOf(name, utils.getInclude(name));
 
     // Two different things, and one `visited` set was calling both a cycle.
     //
@@ -269,10 +250,7 @@ export async function handleGetIncludesList(
       // main), with no name of their own.
       const meta = await sourceOf(
         `class ${parent.name}`,
-        withTimeout(
-          utils.readObjectMetadata('class', parent.name),
-          `reading class ${parent.name}`,
-        ),
+        utils.readObjectMetadata('class', parent.name),
       );
       children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
         (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
@@ -281,9 +259,10 @@ export async function handleGetIncludesList(
       // The group's main program cannot be read, so which includes it names
       // directly is worked out from the rest: every include of the group,
       // less those another include of the group names.
-      const listed = await withTimeout(
-        fetchFunctionGroupChildren(utils, parent.name, 'FUGR/I'),
-        `listing the includes of ${parent.name}`,
+      const listed = await fetchFunctionGroupChildren(
+        utils,
+        parent.name,
+        'FUGR/I',
       );
       if (!listed.ok) throw new Error(listed.getError().message);
       const all: string[] = listed
@@ -305,10 +284,7 @@ export async function handleGetIncludesList(
         parent.kind === 'PROG/P'
           ? await sourceOf(
               `program ${parent.name}`,
-              withTimeout(
-                utils.readObjectSource('program', parent.name),
-                `reading program ${parent.name}`,
-              ),
+              utils.readObjectSource('program', parent.name),
             )
           : await readInclude(parent.name);
       children = await expand(

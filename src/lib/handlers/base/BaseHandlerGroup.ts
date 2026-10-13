@@ -1,5 +1,13 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../../handlers/interfaces.js';
+import { runLongCall } from '../../longCall.js';
+import {
+  isLongTool,
+  longToolMode,
+  readTimeout,
+  TIMEOUT_INVALID_WORDS,
+  withoutTimeout,
+} from '../../longTools.js';
 import { withResolvedSystemContext } from '../../requestSystemResolution.js';
 import { normalizeToolContent } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
@@ -80,10 +88,51 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
         try {
           // A request that lacks responsible/master system gets them from an
           // ABAP Cloud connection — see src/lib/requestSystemResolution.ts.
-          const result = await withResolvedSystemContext(
-            this.context?.connection,
-            () => handler(this.context, args),
-          );
+          const context = this.context;
+          let result: any;
+          if (isLongTool(toolName)) {
+            // A listed long tool (spec §5.8): on a connection of its own,
+            // its `timeout` ending only the wait.
+            const timeoutSeconds = readTimeout(args);
+            if (timeoutSeconds === null) {
+              return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
+                isError: true;
+                content: { type: 'text'; text: string }[];
+              };
+            }
+            result = await withResolvedSystemContext(context?.connection, () =>
+              runLongCall({
+                name: toolName,
+                connection: context.connection,
+                logger: context.logger,
+                timeoutSeconds,
+                mode: longToolMode(toolName, args),
+                run: (own) => {
+                  const ownContext = {
+                    ...context,
+                    connection: own,
+                  } as HandlerContext;
+                  if (handler.length >= 2) {
+                    return handler(ownContext, withoutTimeout(args));
+                  }
+                  // An args-only handler reads its group's context when it is
+                  // called: the call's own, for exactly that synchronous call.
+                  this.context = ownContext;
+                  try {
+                    return (handler as (args: unknown) => Promise<unknown>)(
+                      withoutTimeout(args),
+                    );
+                  } finally {
+                    this.context = context;
+                  }
+                },
+              }),
+            );
+          } else {
+            result = await withResolvedSystemContext(context?.connection, () =>
+              handler(context, args),
+            );
+          }
 
           // Same normalizer as BaseMcpServer — see src/lib/toolResult.ts.
           // Note this also fixes a pre-existing divergence: the old inline copy

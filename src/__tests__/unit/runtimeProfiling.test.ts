@@ -1,5 +1,6 @@
 /**
- * `RuntimeRunClass` and `RuntimeRunClassWithProfiling` — task 24.
+ * `RuntimeRunClass` with and without `profile` — task 24. (The deprecated
+ * `RuntimeRunClassWithProfiling` is gone in 19.0.0.)
  *
  * The corpus holds no profiling exchange (no captured wire fixture for
  * `scheduleTrace`/`runWithProfiler`/the profiler feed), so every case here
@@ -17,7 +18,6 @@
  */
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { handleRuntimeRunClass } from '../../handlers/system/readonly/handleRuntimeRunClass';
-import { handleRuntimeRunClassWithProfiling } from '../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 // A new file, so nothing is in scope from anywhere else — unlike the tasks that
@@ -54,11 +54,6 @@ const handlers = [
     'RuntimeRunClass',
     handleRuntimeRunClass,
     { class_name: 'ZCL_X', profile: true },
-  ],
-  [
-    'RuntimeRunClassWithProfiling',
-    handleRuntimeRunClassWithProfiling,
-    { class_name: 'ZCL_X' },
   ],
 ] as const;
 
@@ -400,22 +395,14 @@ it.each(handlers)(
 // implementation expects an id, and `newTraceAfter` an object where it expects
 // an array.
 
-// The two answer the id in DIFFERENT PLACES, so this cannot be parametrised
-// on the field: `RuntimeRunClass` nests it under `profile`, and the deprecated
-// `RuntimeRunClassWithProfiling` puts it at the top level. A shared assertion
-// on the top-level field passes for the first handler without touching it.
+// `RuntimeRunClass` nests the id under `profile`: an assertion on a top-level
+// field would pass without touching it.
 it.each([
   [
     'RuntimeRunClass',
     handleRuntimeRunClass,
     { class_name: 'ZCL_X', profile: true },
     (p: any) => p.profile?.trace_id,
-  ],
-  [
-    'RuntimeRunClassWithProfiling',
-    handleRuntimeRunClassWithProfiling,
-    { class_name: 'ZCL_X' },
-    (p: any) => p.trace_id,
   ],
 ] as const)(
   '%s answers its trace id where its own schema puts it',

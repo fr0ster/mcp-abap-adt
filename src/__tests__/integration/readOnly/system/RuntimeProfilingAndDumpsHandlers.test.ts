@@ -14,8 +14,8 @@ import { handleRuntimeGetDumpById } from '../../../../handlers/system/readonly/h
 import { handleRuntimeGetProfilerTraceData } from '../../../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
 import { handleRuntimeListFeeds } from '../../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleRuntimeListProfilerTraceFiles } from '../../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
-import { handleRuntimeRunClassWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
-import { handleRuntimeRunProgramWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
+import { handleRuntimeRunClass } from '../../../../handlers/system/readonly/handleRuntimeRunClass';
+import { handleRuntimeRunProgram } from '../../../../handlers/system/readonly/handleRuntimeRunProgram';
 import { getTimeout, sharedDependencyKind } from '../../helpers/configHelpers';
 import { candidatesWorthOpening } from '../../helpers/dumpFeed';
 import { createTestLogger } from '../../helpers/loggerHelpers';
@@ -165,6 +165,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         }
         const args = {
           class_name: className,
+          profile: true,
           description: `MCP_RUNTIME_CLASS_${Date.now()}`,
           max_trace_attempts:
             toPositiveInt(context.params?.profiled_run_max_trace_attempts, 0) ||
@@ -176,10 +177,10 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             ) || undefined,
         };
         const run = await tester.invokeToolOrHandler(
-          'RuntimeRunClassWithProfiling',
+          'RuntimeRunClass',
           args,
           async () =>
-            handleRuntimeRunClassWithProfiling(
+            handleRuntimeRunClass(
               createHandlerContext({ connection: context.connection, logger }),
               args,
             ),
@@ -187,13 +188,14 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         expect(run.isError).toBe(false);
         const data = parseTextPayload(run);
         expect(data.success).toBe(true);
-        if (!data.trace_id) {
+        const traceId = data.profile?.trace_id;
+        if (!traceId) {
           throw new Error(
             `the run of ${className} answered no trace id: ${JSON.stringify(data)}`,
           );
         }
-        createdTraceIds.add(String(data.trace_id).toUpperCase());
-        logger?.info(`class ${className} traced: ${data.trace_id}`);
+        createdTraceIds.add(String(traceId).toUpperCase());
+        logger?.info(`class ${className} traced: ${traceId}`);
       });
     },
     getTimeout('long'),
@@ -220,13 +222,14 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         const before = new Set((await listTraces(context)).map((t) => t.id));
         const args = {
           program_name: programName,
+          profile: true,
           description: `MCP_RUNTIME_PROGRAM_${Date.now()}`,
         };
         const run = await tester.invokeToolOrHandler(
-          'RuntimeRunProgramWithProfiling',
+          'RuntimeRunProgram',
           args,
           async () =>
-            handleRuntimeRunProgramWithProfiling(
+            handleRuntimeRunProgram(
               createHandlerContext({ connection: context.connection, logger }),
               args,
             ),
@@ -234,7 +237,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         expect(run.isError).toBe(false);
         const data = parseTextPayload(run);
         expect(data.success).toBe(true);
-        expect(data.profiler_id).toBeDefined();
+        expect(data.profile?.profiler_id).toBeDefined();
 
         const attempts = toPositiveInt(context.params?.trace_feed_retries, 6);
         const waitMs = Math.max(

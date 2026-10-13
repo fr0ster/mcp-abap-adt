@@ -1,6 +1,7 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { fetchWhereUsedReferences } from '../../../lib/strategies/whereUsedList';
 import {
@@ -12,13 +13,15 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetStructuresList',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. ' +
-    'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the ' +
-    'DDIC structure/table endpoints this needs are not present there (issue #207).',
+      'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the ' +
+      'DDIC structure/table endpoints this needs are not present there (issue #207).',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       structure_name: {
         type: 'string',
         description: 'Structure name.',
@@ -34,10 +37,6 @@ export const TOOL_DEFINITION = {
         description:
           '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
         default: true,
-      },
-      timeout: {
-        type: 'number',
-        description: '[read-only] Timeout in ms for each ADT request.',
       },
     },
     required: ['structure_name'],
@@ -164,7 +163,6 @@ export async function handleGetStructuresList(
     structure_name: string;
     version?: 'active' | 'inactive';
     include_extensions?: boolean;
-    timeout?: number;
   },
 ) {
   const { connection, logger } = context;

@@ -3,7 +3,7 @@
  *
  * Uses `new AdtExecutor(connection, logger).getProgramExecutor()` from
  * @mcp-abap-adt/adt-clients 19 — not `createAdtClient`, per
- * `AdtExecutor`'s own shape (see `handleRuntimeRunProgramWithProfiling.ts`
+ * `AdtExecutor`'s own shape (see `handleRuntimeRunClass.ts`
  * and Task 24's class-profiling pair for the same door).
  *
  * **`runWithProfiling` was split, not deleted.** `ProgramExecutor`'s own
@@ -30,6 +30,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
@@ -37,11 +38,13 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunProgram',
   available_in: ['onprem'] as const,
-  description:
+  description: withLongToolAdvice(
     '[runtime] Execute an ABAP program (report) and return its output. Set profile=true to also start a profiler trace; use RuntimeListProfilerTraceFiles afterwards to locate the trace (program execution is fire-and-forget, so traceId is not returned synchronously).',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       program_name: {
         type: 'string',
         description: 'ABAP program name to execute.',

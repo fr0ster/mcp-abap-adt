@@ -5,6 +5,7 @@
 
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
 import { projectRun, runAndWait } from '../shared/runTests';
@@ -12,10 +13,13 @@ import { projectRun, runAndWait } from '../shared/runTests';
 export const TOOL_DEFINITION = {
   name: 'RunProgramUnitTest',
   available_in: ['onprem'] as const,
-  description: 'Run the ABAP Unit tests of a report and return the result.',
+  description: withLongToolAdvice(
+    'Run the ABAP Unit tests of a report and return the result.',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       program_name: {
         type: 'string',
         description: 'Report whose tests run.',

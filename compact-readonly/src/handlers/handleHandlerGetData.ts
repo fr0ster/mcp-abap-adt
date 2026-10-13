@@ -1,4 +1,4 @@
-import { compactGetDataSchema } from '@mcp-abap-adt/lib/compact-shared';
+import { compactGetDataSchema, withLongToolAdvice } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetSqlQuery,
@@ -9,8 +9,9 @@ import { return_error } from '@mcp-abap-adt/lib/utils';
 export const TOOL_DEFINITION = {
   name: 'HandlerGetData',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     'Read rows of a table or CDS view: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON.',
+  ),
   inputSchema: compactGetDataSchema,
 } as const;
 

@@ -181,7 +181,9 @@ export function createSourceReaderDeps(
         ctx.connection,
         `/sap/bc/adt/programs/includes/${encodeSapObjectName(includeName)}/source/main`,
         'GET',
-        'default',
+        // No deadline of the server's (spec §5.8): a request cut here runs
+        // on in SAP while SearchSource's own session is logged off under it.
+        0,
       );
       return typeof r?.data === 'string' ? r.data : null;
     },
@@ -202,7 +204,9 @@ export function createSourceReaderDeps(
         ctx.connection,
         `/sap/bc/adt/functions/groups/${encodeSapObjectName(fugrName.toLowerCase())}/fmodules/${encodeSapObjectName(fmName.toLowerCase())}/source/main`,
         'GET',
-        'default',
+        // No deadline of the server's (spec §5.8): a request cut here runs
+        // on in SAP while SearchSource's own session is logged off under it.
+        0,
       );
       return typeof r?.data === 'string' ? r.data : null;
     },

@@ -4,6 +4,24 @@ import { join } from 'node:path';
 import { spawnOptionsForNpx } from '../helpers/platform';
 
 /**
+ * **The long tools on the approved list gain `timeout` (19.0.0, D56).** The
+ * user approved them tool by tool (`tools/long-handlers.json`); each may
+ * gain `timeout` and nothing else for it. `GetIncludesList` and
+ * `GetStructuresList` already declared one (per request, in ms) — the name
+ * stays, its meaning is now the call's (seconds, on the wait only).
+ */
+const LONG_TOOLS = new Set(
+  (
+    JSON.parse(
+      readFileSync(
+        join(__dirname, '../../../tools/long-handlers.json'),
+        'utf8',
+      ),
+    ) as Array<{ tool: string }>
+  ).map((entry) => entry.tool),
+);
+
+/**
  * The tool surface is a contract with callers who never read this repository.
  *
  * `detail` is the one addition the adt-clients 19 migration may make; anything
@@ -221,18 +239,27 @@ describe('the MCP tool surface', () => {
           'settings',
         ],
       };
-      expect({
+      const isLong = LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1));
+      const gainsTimeout = isLong && !had.includes('timeout');
+      const added = has.filter(
+        (p) =>
+          !had.includes(p) &&
+          p !== relaxed &&
+          p !== `${tightened}*` &&
+          !(gainsTimeout && p === 'timeout'),
+      );
+      // A long tool whose only change is its `timeout` (gained, or moved
+      // first in the list) gained nothing else.
+      if (isLong && added.length === 0) continue;
+      expect({ tool, added: [...added].sort() }).toEqual({
         tool,
-        added: has.filter(
-          (p) => !had.includes(p) && p !== relaxed && p !== `${tightened}*`,
-        ),
-      }).toEqual({
-        tool,
-        added: MAY_GAIN_VERSION.has(tool)
-          ? ['version']
-          : relaxed !== undefined
-            ? []
-            : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail']),
+        added: [
+          ...(MAY_GAIN_VERSION.has(tool)
+            ? ['version']
+            : relaxed !== undefined
+              ? []
+              : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail'])),
+        ].sort(),
       });
     }
   });
@@ -266,6 +293,14 @@ describe('the MCP tool surface', () => {
    * **The third deliberate move: `DebugSetSettings` arrived** with the debugger
    * on adt-clients 29 — the settings at the current stop. Every other row was
    * checked unchanged.
+   */
+  /**
+   * **The fourth deliberate move: two tools left (19.0.0).** The deprecated
+   * `RuntimeRunClassWithProfiling` and `RuntimeRunProgramWithProfiling` are
+   * deleted, as the user decided with the long-tool list (2026-10-13):
+   * `RuntimeRunClass` / `RuntimeRunProgram` with `profile=true` and the
+   * profiler tools do what they did. Their rows left the snapshot; every
+   * other row was checked unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

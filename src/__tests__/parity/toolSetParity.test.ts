@@ -153,16 +153,25 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
   },
 };
 
-/** A read of one class on each set: the tool that sends it differs, nothing else. */
+/**
+ * A read about one class on each set: the tool that sends it differs,
+ * nothing else. Where-used, because both sets' tools for it are listed long
+ * tools (spec §5.8) and so behave alike — each on a connection of its own;
+ * compact's class read (`HandlerGet`) is listed and full's (`GetClass`) is
+ * not, so those two no longer share a failure path.
+ */
 const readCall = (
   set: SetName,
   className = 'ZCL_PARITY',
 ): { name: string; arguments: Record<string, unknown> } =>
   set === 'full'
-    ? { name: 'GetClass', arguments: { class_name: className } }
+    ? {
+        name: 'GetWhereUsed',
+        arguments: { object_name: className, object_type: 'class' },
+      }
     : {
-        name: 'HandlerGet',
-        arguments: { object_type: 'CLASS', class_name: className },
+        name: 'HandlerWhereUsed',
+        arguments: { object_type: 'CLASS', object_name: className },
       };
 const READ_CALL: Record<SetName, ReturnType<typeof readCall>> = {
   full: readCall('full'),
@@ -397,9 +406,19 @@ function outcomeOf(result: unknown): Record<string, unknown> {
   return { ok: false, ...(JSON.parse(text) as Record<string, unknown>) };
 }
 
-/** The `Authorization` headers the stand-in received since `from`. */
+/**
+ * The `Authorization` headers the stand-in received since `from`. A logoff
+ * presents the session, not the credential: compact's `HandlerGet` is a
+ * listed long tool (spec §5.8) whose own connection is logged off after its
+ * answer, and the full set's `GetClass` is not.
+ */
 const seenSince = (from: number) => [
-  ...new Set(standIn.requests.slice(from).map((r) => r.authorization)),
+  ...new Set(
+    standIn.requests
+      .slice(from)
+      .filter((r) => !isLogoff(r.url))
+      .map((r) => r.authorization),
+  ),
 ];
 
 /** One call with the stand-in answering, then one with it refusing the credential. */

@@ -1,3 +1,4 @@
+import { TIMEOUT_PROPERTY } from '../longTools';
 import { COMPACT_OBJECT_TYPES } from './compactObjectTypes';
 
 const versionSchema = {
@@ -157,6 +158,7 @@ const readPartSchema = {
 export const compactGetSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     object_type: commonObjectTypeSchema,
     part: readPartSchema,
     package_name: { type: 'string', description: 'Package name.' },
@@ -472,6 +474,7 @@ export const compactUnitTestStatusSchema = {
 export const compactUnitTestResultSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     run_id: { type: 'string', description: 'Unit test run id.' },
     with_navigation_uris: {
       type: 'boolean',
@@ -493,6 +496,7 @@ export const compactCdsUnitTestResultSchema = compactUnitTestResultSchema;
 export const compactProfileRunSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     target_type: {
       type: 'string',
       enum: ['CLASS', 'PROGRAM'],
@@ -557,6 +561,7 @@ export const compactProfileListSchema = {
 export const compactProfileViewSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     trace_id_or_uri: {
       type: 'string',
       description: 'Profiler trace id or URI.',
@@ -595,6 +600,7 @@ export const compactProfileViewSchema = {
 export const compactDumpListSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     feed_type: {
       type: 'string',
       enum: ['dumps', 'system_messages', 'gateway_errors'],
@@ -964,6 +970,7 @@ export const compactActivateSchema = {
 export const compactSearchSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     query: {
       type: 'string',
       description: 'Object name or mask, with * as a wildcard.',
@@ -985,6 +992,7 @@ export const compactSearchSchema = {
 export const compactWhereUsedSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     object_type: {
       type: 'string',
       enum: [
@@ -1021,6 +1029,7 @@ export const compactWhereUsedSchema = {
 export const compactGetDataSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     object_name: {
       type: 'string',
       description:

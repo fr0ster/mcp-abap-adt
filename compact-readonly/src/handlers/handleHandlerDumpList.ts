@@ -1,12 +1,13 @@
-import { compactDumpListSchema } from '@mcp-abap-adt/lib/compact-shared';
+import { compactDumpListSchema, withLongToolAdvice } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleRuntimeListFeeds } from '@mcp-abap-adt/lib/handlers/read';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpList',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     'Runtime feed list, newest first. object_type: not used. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, runtime_error, exception, object_name, package, component, top, from, to. Response: JSON; each dump carries dump_id, and next_to when more remain.',
+  ),
   inputSchema: compactDumpListSchema,
 } as const;
 

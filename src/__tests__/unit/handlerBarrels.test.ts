@@ -68,8 +68,9 @@ describe("lib's read and write handler barrels", () => {
     expect(read).toHaveLength(59);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
-    // module, CDS run) and the compact facade's run start.
-    expect(write).toHaveLength(79);
+    // module, CDS run) and the compact facade's run start. 19.0.0 deleted the
+    // two deprecated `…WithProfiling` runs (76 handlers).
+    expect(write).toHaveLength(77);
   });
 
   it('share not one symbol', () => {

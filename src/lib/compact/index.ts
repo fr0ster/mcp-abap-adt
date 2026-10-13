@@ -12,6 +12,7 @@
  * and undo the capability split (`compactCapabilitySplit.test.ts`).
  */
 
+export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
 export { DETAIL_PROPERTY } from '../strategies/detail.js';
 export {
   type LowObjectType,

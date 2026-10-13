@@ -126,6 +126,13 @@
     "why": "held state's own stateful connection, recorded with role state"
   },
   {
+    "file": "src/lib/longCall.ts",
+    "function": "runLongCall",
+    "site": "openFreshConnection",
+    "end": "once SAP answered the call's request: closeQuietly (endConnection) on success and failure, also after a timeout ended the wait; the terminal close waits for that answer before its logoff (untilAnswered); the forced close ends it at once",
+    "why": "a listed long tool's own stateless connection (spec \u00a75.8), role long, recorded as the calling instance's"
+  },
+  {
     "file": "src/lib/ownedConnections.ts",
     "function": "owned",
     "site": "Map<OwnedConnection, Owned>",
@@ -145,6 +152,13 @@
     "site": "WeakMap<OwnedConnection, Promise<void>>",
     "end": "none needed: keyed weakly; it IS the end (the one disconnect() of each connection, joined)",
     "why": "connection 16 refuses a second disconnect(): every end joins the first"
+  },
+  {
+    "file": "src/lib/ownedConnections.ts",
+    "function": "answering",
+    "site": "WeakMap<OwnedConnection, Promise<void>>",
+    "end": "none needed: keyed weakly, holds a promise, not a connection",
+    "why": "a listed long tool's request still running in SAP (untilAnswered): the terminal close waits for its answer before the logoff; the forced close does not"
   },
   {
     "file": "src/lib/packageSessions.ts",

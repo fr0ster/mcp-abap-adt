@@ -227,9 +227,10 @@ export async function handleGetServiceBindingPreviewUrl(
                   `/sap/bc/adt/businessservices/${facts.protocol}/` +
                   `${bindingName}`,
                 method: 'GET',
-                // The contract requires one; this read is an enrichment, so it
-                // gets a short leash rather than the default.
-                timeout: 30_000,
+                // None of the server's (`0`): a deadline closes the socket
+                // under a running request, which kills it in SAP (spec §5.8);
+                // HandlerGet's `timeout` ends only its wait.
+                timeout: 0,
                 params: {
                   servicename: facts.service,
                   serviceversion: facts.version ?? '0001',

@@ -56,6 +56,47 @@ The packages, all at **19.0.0**:
   `--exposition=compact` names. Remove `search` or `system` from an exposition (they come with
   every set and with `readonly`).
 
+## Every transport: the long tools take a `timeout`, each on an ABAP session of its own
+
+These tools, approved one by one (`tools/long-handlers.json` in the repository), take an
+optional **`timeout`** — seconds, a whole number from 1, **no default**: without it the call
+waits until SAP answers, as before. Each runs **stateless on an ABAP session of its own**, logged
+off when it ends; the session your other calls use is not touched.
+
+| Mode | Tools | When the `timeout` passes |
+|---|---|---|
+| a read | `GetWhereUsed`, `SearchObject`, `SearchSource`, `GetPackageContents`, `GetPackageTree`, `GetObjectsList`, `GetStructuresList`, `GetIncludesList`, `RuntimeListFeeds`, `ListTransports`, `GetSqlQuery`, `GetTableContents`, `GetObjectInfo`, `DescribeByList`, `GetAbapSystemSymbols`, `GetATCFindings`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`; compact `HandlerWhereUsed`, `HandlerSearch`, `HandlerDumpList`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` (every mode but `UNIT_TEST` / `CDS_UNIT_TEST`) | the request is cancelled — its session is logged off at once — and nothing was changed: "The request was cancelled; nothing was changed." |
+| a started run | `RunUnitTest`, `RunCdsUnitTest`, `RunProgramUnitTest`, `RunFunctionGroupUnitTest`, `RunFunctionModuleUnitTest`, `GetUnitTestResult`, `RunATC` (`wait=false`, the default); compact `HandlerUnitTestResult`, `HandlerCdsUnitTestResult`, `HandlerGet` (`UNIT_TEST` / `CDS_UNIT_TEST`) | the polling stops and the session is logged off; the run goes on in SAP (it survives that logoff) and the answer names it: "The run continues in SAP; read it later with run_id … / worklist_id …" |
+| a run of code | `RuntimeRunClass`, `RuntimeRunProgram` (with or without `profile`), `RunATC` with `wait=true`; compact `HandlerProfileRun` | the request runs on to its end — a logoff or a closed connection would kill it and lose what it writes — and its session is logged off only after SAP answered: "The request is still running in SAP, which finishes it on its own; its answer will not be reported." |
+
+The timed-out answer is a tool error (`isError: true`) whose JSON carries `timed_out: true`,
+`timeout`, the sentence above and, for a started run, `run_id` / `worklist_id` once the tool
+holds one. **Set `timeout` below your MCP client's own request limit** — the TypeScript SDK's
+client cancels at 60 s — because **a cancel does nothing to SAP**: no request is recalled, no
+session is logged off or reopened. A shutdown waits for a run of code still running after its
+`timeout` before its logoff; the forced close (`--shutdown-timeout`, a second signal) logs it off
+at once, which ends it. A tool not on the list — activation and the debugger among them — takes
+no `timeout` and runs to its end; a session is stateful only for lock → write → unlock and
+activation.
+
+- `GetIncludesList` and `GetStructuresList` already had a `timeout`, in milliseconds per request
+  (`GetIncludesList` defaulted to 30 s per request; `GetStructuresList` ignored it). It is the call's
+  `timeout` now, in **seconds**, with no default.
+- No listed tool's request carries a deadline of the server's any more: `SearchSource`'s source
+  reads (45 s each) and `HandlerGet`'s preview-URL read (30 s) are gone. `SearchSource` keeps
+  `time_budget_ms` (partial hits) beside `timeout`.
+- On an embedded server given a connection without `freshConnection`, a listed tool is refused:
+  "This operation needs an ABAP session of its own; the connection was given by the host, which
+  supplied no fresh-connection factory (`freshConnection`)".
+- **`RuntimeRunClassWithProfiling` and `RuntimeRunProgramWithProfiling` are deleted.** Use
+  `RuntimeRunClass` / `RuntimeRunProgram` with `profile: true` (the same trace flags; the profiler
+  id and, for a class, the trace id answer under `profile`), and the profiler tools
+  (`RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`).
+  Compact's `HandlerProfileRun` answers as those two do.
+- **`UpdateServiceBinding` sends its publication job with no deadline of the server's** (it was
+  11 minutes). The connection's own ceiling inside a lock window (`SAP_TIMEOUT_CRITICAL`, default
+  10 minutes) still applies to it.
+
 ## HTTP users
 
 - **Install `@mcp-abap-adt/http` and run `mcp-abap-adt-http`**, without `--transport` (see
@@ -349,8 +390,9 @@ packages, each with one binary and its transport's options only:
   `destination_refused` with its words, and `fresh_connection_unavailable` /
   `credentials_required` with fixed ones.
 - **`EmbeddableMcpServer` takes `freshConnection?: () => Promise<IAbapConnection>`.** Some operations need an ABAP session of their own: `CreatePackage`
-  (high and low) and `LockPackage` over RFC, `DeletePackage` with `force_new_connection`, and a
-  debug session's own connections. On an injected connection, these now take that session from
+  (high and low) and `LockPackage` over RFC, `DeletePackage` with `force_new_connection`, a
+  debug session's own connections, and every call of a listed long tool (see "the long tools take a
+  `timeout`" above). On an injected connection, these now take that session from
   your factory, and from nowhere else. 18.x rebuilt one from the injected connection's
   `getConfig()` / `config`.
   - **Without the factory, these operations are refused** with `fresh_connection_unavailable`

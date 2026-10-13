@@ -12,7 +12,7 @@
  *
  * `ClassExecutor`'s constructor takes only a connection and logger — no
  * class name — and `scheduleTrace` itself takes none either (see
- * `handleRuntimeRunClassWithProfiling.ts`, which calls the identical member
+ * `handleRuntimeRunClass.ts` with `profile=true`, which calls the identical member
  * the same way to feed its own run). This tool's schema never named an
  * object to run, and the tool surface is frozen for this migration (only an
  * optional `detail` parameter may be added — see the migration's ruling),

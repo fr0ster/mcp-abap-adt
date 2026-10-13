@@ -5,6 +5,11 @@
  * method, path and `Authorization` header — what a credential put on the
  * wire. A suite may hold one request until it lets it go (`hold`). A probe tool that sends `GET /sap/bc/adt/probe/<id>` lets a suite
  * tell which call presented which credential.
+ *
+ * Each ABAP session is its own: a request that carries no session cookie
+ * opens a new one (`session-<n>`), and every request records the session it
+ * ran in (`session`) and its `x-sap-adt-sessiontype` (`sessionType`) — so a
+ * suite can tell which connection sent what, and which one was logged off.
  */
 
 import * as http from 'node:http';
@@ -19,6 +24,10 @@ export interface StandInRequest {
   method: string;
   url: string;
   authorization: string | undefined;
+  /** The ABAP session the request ran in (`session-<n>`). */
+  session: string;
+  /** Its `x-sap-adt-sessiontype` header, if any. */
+  sessionType: string | undefined;
 }
 
 export interface AdtStandIn {
@@ -40,8 +49,19 @@ export interface AdtStandIn {
   answer(match: (request: StandInRequest) => boolean, status: number): void;
   /** The next request `match` accepts is answered `status`, once. */
   answerOnce(match: (request: StandInRequest) => boolean, status: number): void;
+  /**
+   * From now on every request `match` accepts is answered `200` with `text`
+   * as its body, and `headers` beside the stand-in's own.
+   */
+  body(
+    match: (request: StandInRequest) => boolean,
+    text: string,
+    headers?: Record<string, string>,
+  ): void;
   /** The logoffs received so far: `disconnect()` reached the system. */
   logoffs(): number;
+  /** The sessions logged off so far, in order. */
+  loggedOff(): string[];
   close(): Promise<void>;
 }
 
@@ -57,6 +77,21 @@ export interface StandInHold {
 }
 
 export const PROBE_PATH = '/sap/bc/adt/probe/';
+
+const SESSION_COOKIE = 'SAP_SESSIONID_X01_100';
+
+/** The session a request's `Cookie` names, if any. */
+function sessionOf(cookie: string | undefined): string | undefined {
+  for (const part of (cookie ?? '').split(';')) {
+    const at = part.indexOf('=');
+    if (at < 0) continue;
+    if (part.slice(0, at).trim() === SESSION_COOKIE) {
+      const value = part.slice(at + 1).trim();
+      if (value !== '') return value;
+    }
+  }
+  return undefined;
+}
 
 export async function adtStandIn(): Promise<AdtStandIn> {
   const requests: StandInRequest[] = [];
@@ -74,11 +109,22 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     released: Promise<void>;
     release: () => void;
   }> = [];
+  const bodies: Array<{
+    match: (request: StandInRequest) => boolean;
+    text: string;
+    headers?: Record<string, string>;
+  }> = [];
+  let sessions = 0;
   const server = http.createServer((req, res) => {
+    const carried = sessionOf(req.headers.cookie);
+    const session = carried ?? `session-${++sessions}`;
+    const sessionType = req.headers['x-sap-adt-sessiontype'];
     const request: StandInRequest = {
       method: req.method ?? '',
       url: req.url ?? '',
       authorization: req.headers.authorization,
+      session,
+      sessionType: Array.isArray(sessionType) ? sessionType[0] : sessionType,
     };
     requests.push(request);
     const hold = holds.find((h) => !h.taken && h.match(request));
@@ -101,15 +147,20 @@ export async function adtStandIn(): Promise<AdtStandIn> {
         res.end('');
         return;
       }
+      const said = bodies.find((b) => b.match(request));
       res.writeHead(200, {
+        ...said?.headers,
         'content-type': 'text/plain',
         'x-csrf-token': 'csrf-placeholder',
         // An ABAP session: what a connection needs before it reports connected.
-        'set-cookie': 'SAP_SESSIONID_X01_100=session-placeholder; path=/',
+        'set-cookie': `${SESSION_COOKIE}=${session}; path=/`,
       });
       // A lock answers a real lock handle, so a write's lock → update →
       // unlock runs through the real clients.
-      res.end(request.url.includes('_action=LOCK') ? LOCK_SUCCESS_XML : '');
+      res.end(
+        said?.text ??
+          (request.url.includes('_action=LOCK') ? LOCK_SUCCESS_XML : ''),
+      );
     });
   });
   await new Promise<void>((resolve) =>
@@ -142,7 +193,12 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     answerOnce: (match, status) => {
       answers.push({ match, status, once: true });
     },
+    body: (match, text, headers) => {
+      bodies.push({ match, text, headers });
+    },
     logoffs: () => requests.filter((r) => isLogoff(r.url)).length,
+    loggedOff: () =>
+      requests.filter((r) => isLogoff(r.url)).map((r) => r.session),
     close: () =>
       new Promise<void>((resolve) => {
         for (const hold of holds) hold.release();

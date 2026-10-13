@@ -2,6 +2,11 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  noteLongCallId,
+  TIMEOUT_PROPERTY,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
 import { parseAtcWorklist } from '../../../lib/strategies/atcFindings';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { ourAtc } from '../../../lib/strategies/resultSets';
@@ -20,11 +25,13 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetATCFindings',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     'Read what an ATC run found, by the worklist_id RunATC answered. Works whether or not the run waited. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority.',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       worklist_id: {
         type: 'string',
         description: 'Worklist identifier answered by RunATC.',
@@ -52,6 +59,8 @@ export async function handleGetATCFindings(
     );
   }
 
+  // A timed-out answer names the worklist it reads (spec §5.8).
+  noteLongCallId('worklist_id', worklistId);
   const atc = new AdtRuntimeClient(connection, logger).getAtc(ourAtc);
   const detail = detailOf(args);
 

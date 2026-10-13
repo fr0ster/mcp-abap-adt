@@ -73,15 +73,16 @@
  * adapter failure, and the type narrows `'published' | 'unpublished'` for
  * the call that follows.
  *
- * **An explicit timeout, well past the measured job.**
- * `IServiceBindingPublicationParams.timeout`'s own doc comment: "A
- * publication is the slowest request this library makes — ~135s measured on
- * a trial, and one unpublish still unsettled after eleven minutes — so the
- * 120s `SAP_TIMEOUT_LONG` default is a floor." Leaving `options.timeout`
- * unset would take that 120s floor into a job already measured to run
- * longer than it, on a system that this handler cannot know is the fast
- * case or the eleven-minute one. `PUBLISH_TIMEOUT_MS` below is the
- * documented worst case, not a guess at a middle ground.
+ * **No client-side deadline (19.0.0).** A publication is the slowest request
+ * this server sends — ~135 s measured on a trial, and one unpublish still
+ * unsettled after eleven minutes — and a deadline that fires while the job
+ * runs closes the socket under it, which ends the request in SAP (measured
+ * 2026-10-13: a logoff or a closed socket kills a running request). So the
+ * job is sent with `timeout: 0` — none: adt-clients' `timeout ?? 120 s`
+ * default would otherwise apply. What still bounds it is the connection's
+ * own critical-section ceiling (`SAP_TIMEOUT_CRITICAL`, default 10 minutes,
+ * applied to every request of a lock → write → unlock window), which is
+ * connection's, not this server's.
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
@@ -103,14 +104,6 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils';
-
-/**
- * The documented worst case ("one unpublish still unsettled after eleven
- * minutes"), not the common one — a client-side timeout that fires while
- * the job is still genuinely running server-side is worse than a caller
- * waiting.
- */
-export const PUBLISH_TIMEOUT_MS = 11 * 60 * 1000;
 
 type DesiredPublicationStateInput = 'published' | 'unpublished' | 'unchanged';
 
@@ -259,7 +252,8 @@ export async function handleUpdateServiceBinding(
             // own (MIGRATION-23 §3); `analysePublication` is that verdict.
             {
               lockHandle,
-              timeout: PUBLISH_TIMEOUT_MS,
+              // None of the server's: see the file header.
+              timeout: 0,
               analyse: analysePublication,
             },
           );

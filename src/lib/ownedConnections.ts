@@ -40,7 +40,14 @@ export type ConnectionRole =
   /** Holding a package lock until its unlock (`connectionForPackageLock`). */
   | 'lock'
   /** Held state's own (the debugger's sessions). */
-  | 'state';
+  | 'state'
+  /**
+   * A listed long tool's own (`runLongCall`, spec §5.8): its request may still
+   * run in SAP after the call's `timeout` ended the wait, so the terminal
+   * close waits for that request's answer before the logoff; the forced
+   * close does not.
+   */
+  | 'long';
 
 /** A connection, as the registry keeps it: any object with an optional `disconnect()`. */
 type OwnedConnection = object;
@@ -62,6 +69,14 @@ const endListeners = new WeakMap<OwnedConnection, Array<() => void>>();
  * it is written.
  */
 const writing = new Set<Promise<void>>();
+/**
+ * A connection whose request is still running in SAP (a listed long tool's,
+ * after its `timeout`): settles when SAP answers. The terminal close waits
+ * for it before the logoff — a logoff, or a closed socket, under a running
+ * request kills it and loses its write (measured, spec §5.8); the forced
+ * close does not wait (the user's escape).
+ */
+const answering = new WeakMap<OwnedConnection, Promise<void>>();
 const ownerScope = new AsyncLocalStorage<object>();
 
 /** The fixed words of a close that failed. */
@@ -94,6 +109,24 @@ export function own(
     owner: options.owner ?? known?.owner ?? currentOwner(),
     role: options.role,
   });
+}
+
+/**
+ * `connection`'s request is still running in SAP until `answered` settles:
+ * the terminal close waits for it before the logoff (spec §5.8). Never
+ * rejects: a failed request is an answer too.
+ */
+export function untilAnswered(
+  connection: object,
+  answered: Promise<unknown>,
+): void {
+  answering.set(
+    connection,
+    answered.then(
+      () => undefined,
+      () => undefined,
+    ),
+  );
 }
 
 /** Whether `connection` was ended here (its `disconnect()` was asked for). */
@@ -174,16 +207,20 @@ export function ownedConnections(
  * connection `instance` owns — or only those of `roles` — each once; a
  * failure logged in fixed words. Never conditional on the state undo: every
  * terminal disposal runs it after the undo was tried, whatever it answered.
- * An injected connection was never recorded, so it is never closed.
+ * An injected connection was never recorded, so it is never closed. A
+ * connection whose request still runs in SAP (`untilAnswered`) is logged off
+ * once SAP answered it, never under it (spec §5.8).
  */
 export async function closeOwnedConnections(
   instance: object,
   roles?: readonly ConnectionRole[],
 ): Promise<void> {
   await Promise.all(
-    ownedConnections(instance, roles).map((connection) =>
-      endConnection(connection),
-    ),
+    ownedConnections(instance, roles).map(async (connection) => {
+      const running = answering.get(connection);
+      if (running !== undefined) await running;
+      await endConnection(connection);
+    }),
   );
 }
 

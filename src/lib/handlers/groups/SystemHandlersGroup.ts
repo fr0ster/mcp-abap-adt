@@ -107,17 +107,9 @@ import {
   TOOL_DEFINITION as RuntimeRunClass_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeRunClass';
 import {
-  handleRuntimeRunClassWithProfiling,
-  TOOL_DEFINITION as RuntimeRunClassWithProfiling_Tool,
-} from '../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
-import {
   handleRuntimeRunProgram,
   TOOL_DEFINITION as RuntimeRunProgram_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeRunProgram';
-import {
-  handleRuntimeRunProgramWithProfiling,
-  TOOL_DEFINITION as RuntimeRunProgramWithProfiling_Tool,
-} from '../../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -171,16 +163,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: RuntimeRunProgram_Tool,
         handler: (args: any) => handleRuntimeRunProgram(this.context, args),
-      },
-      {
-        toolDefinition: RuntimeRunClassWithProfiling_Tool,
-        handler: (args: any) =>
-          handleRuntimeRunClassWithProfiling(this.context, args),
-      },
-      {
-        toolDefinition: RuntimeRunProgramWithProfiling_Tool,
-        handler: (args: any) =>
-          handleRuntimeRunProgramWithProfiling(this.context, args),
       },
       {
         toolDefinition: RuntimeAnalyzeProfilerTrace_Tool,

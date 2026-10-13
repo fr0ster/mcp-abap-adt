@@ -203,11 +203,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** Read what an ATC run found, by the worklist_id RunATC answered. Works whether or not the run waited. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority.
+**Description:** Read what an ATC run found, by the worklist_id RunATC answered. Works whether or not the run waited. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `worklist_id` (string, required) - Worklist identifier answered by RunATC.
 
 ---
@@ -225,7 +226,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runatc-high-level-atc"></a>
 #### RunATC (High-Level / Atc)
-**Description:** Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings whether or not the run waited. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts.
+**Description:** Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings whether or not the run waited. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts. Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
@@ -233,6 +234,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
 - `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
 - `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
 
 ---
@@ -1938,7 +1940,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions.
+**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -1948,6 +1950,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
 - `package_name` (string, required) - Package name
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -2233,12 +2236,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.
+**Description:** Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound. Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Parameters:**
 - `run_id` (string, required) - Run id a unit test run answered.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -2256,56 +2260,61 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runcdsunittest-high-level-unit-test"></a>
 #### RunCdsUnitTest (High-Level / Unit Test)
-**Description:** Run the ABAP Unit tests of a CDS view and return the result.
+**Description:** Run the ABAP Unit tests of a CDS view and return the result. Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
 <a id="runfunctiongroupunittest-high-level-unit-test"></a>
 #### RunFunctionGroupUnitTest (High-Level / Unit Test)
-**Description:** Run all ABAP Unit tests of a function group and return the result.
+**Description:** Run all ABAP Unit tests of a function group and return the result. Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group whose tests run.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
 <a id="runfunctionmoduleunittest-high-level-unit-test"></a>
 #### RunFunctionModuleUnitTest (High-Level / Unit Test)
-**Description:** Run the ABAP Unit tests of a function module and return the result.
+**Description:** Run the ABAP Unit tests of a function module and return the result. Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
 
 **Parameters:**
 - `function_module_name` (string, required) - Function module whose tests run.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
 <a id="runprogramunittest-high-level-unit-test"></a>
 #### RunProgramUnitTest (High-Level / Unit Test)
-**Description:** Run the ABAP Unit tests of a report and return the result.
+**Description:** Run the ABAP Unit tests of a report and return the result. Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
 **Parameters:**
 - `program_name` (string, required) - Report whose tests run.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Run the ABAP Unit tests of a class and return the result.
+**Description:** Run the ABAP Unit tests of a class and return the result. Runs on an ABAP session of its own. Optional timeout (seconds) ends the wait: a read is cancelled, a started run goes on in SAP (read it later by its id), a run of code goes on to its end; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the call answers at once: a read is cancelled and nothing was changed; a started run goes on in SAP and the answer names it (run_id / worklist_id) to read later; a run of code goes on to its end in SAP and its answer is not reported. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -2361,4 +2370,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-10-12*
+*Last updated: 2026-10-13*

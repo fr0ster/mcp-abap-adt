@@ -66,9 +66,7 @@ export { handleCreateStructure } from '../../handlers/structure/high/handleCreat
 export { handleDeleteStructure } from '../../handlers/structure/high/handleDeleteStructure.js';
 export { handleUpdateStructure } from '../../handlers/structure/high/handleUpdateStructure.js';
 export { handleRuntimeRunClass } from '../../handlers/system/readonly/handleRuntimeRunClass.js';
-export { handleRuntimeRunClassWithProfiling } from '../../handlers/system/readonly/handleRuntimeRunClassWithProfiling.js';
 export { handleRuntimeRunProgram } from '../../handlers/system/readonly/handleRuntimeRunProgram.js';
-export { handleRuntimeRunProgramWithProfiling } from '../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling.js';
 export { handleCreateTable } from '../../handlers/table/high/handleCreateTable.js';
 export { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable.js';
 export { handleUpdateTable } from '../../handlers/table/high/handleUpdateTable.js';

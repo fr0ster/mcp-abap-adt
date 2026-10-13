@@ -41,14 +41,10 @@ import {
 import { handleListFunctionGroupIncludes } from '../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
-import {
-  handleUpdateServiceBinding,
-  PUBLISH_TIMEOUT_MS,
-} from '../../handlers/service_binding/high/handleUpdateServiceBinding';
+import { handleUpdateServiceBinding } from '../../handlers/service_binding/high/handleUpdateServiceBinding';
 import { handleValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed';
 import { handleRuntimeRunProgram } from '../../handlers/system/readonly/handleRuntimeRunProgram';
-import { handleRuntimeRunProgramWithProfiling } from '../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
 import { createPackageContentsFetcher } from '../../lib/search-source/packageEnumerator';
 import { createPackagePatternResolver } from '../../lib/search-source/packageResolver';
 import {
@@ -61,8 +57,8 @@ import {
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
-// SHAPE 3's door: `handleRuntimeRunProgram.ts`/`handleRuntimeRunProgramWithProfiling.ts`
-// do not go through `createAdtClient` — each writes `new AdtExecutor(connection,
+// SHAPE 3's door: `handleRuntimeRunProgram.ts` does not go through
+// `createAdtClient` — it writes `new AdtExecutor(connection,
 // logger)` directly and reaches its members through `executor.getProgramExecutor()`,
 // so the `../../lib/clients` mock above does nothing for them. `jest.mock` must sit
 // at module top level (not nested in a `describe`) for babel-plugin-jest-hoist to
@@ -264,7 +260,7 @@ describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () =
   });
 });
 
-describe('SHAPE 3 — the two program-profiling handlers: two calls where there was one', () => {
+describe('SHAPE 3 — the program-profiling handler: two calls where there was one', () => {
   const PROGRAM_REQUEST = 'profiler-request-1';
 
   const profiling = [
@@ -272,11 +268,6 @@ describe('SHAPE 3 — the two program-profiling handlers: two calls where there 
       'RuntimeRunProgram',
       handleRuntimeRunProgram,
       { program_name: 'ZP', profile: true },
-    ],
-    [
-      'RuntimeRunProgramWithProfiling',
-      handleRuntimeRunProgramWithProfiling,
-      { program_name: 'ZP' },
     ],
   ] as const;
 
@@ -362,10 +353,9 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
     // own. `classifyServiceBinding` is not called: there was never a second
     // member in the removed composite's replacement to call.
     expect((seen.options as any).lockHandle).toBe('LOCK_HANDLE_1');
-    // Against the documented worst case itself, not "anything past the
-    // 120s default" — a value one second past the default would satisfy a
-    // loose bound and still fall short of what the job is measured to take.
-    expect((seen.options as any).timeout).toBe(PUBLISH_TIMEOUT_MS);
+    // No deadline of the server's (19.0.0): `0` — not absent, which would
+    // take adt-clients' 120 s default into a job measured to run longer.
+    expect((seen.options as any).timeout).toBe(0);
     expect((seen.options as any).analyse).toBe(analysePublication);
     // The handle `unlock` releases is the one `lock` answered — a wrong or
     // constant handle would still pass every assertion above.

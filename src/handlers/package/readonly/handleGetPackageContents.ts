@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
 import { assembleList, walkPackage } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -8,9 +9,11 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages.',
+  ),
   inputSchema: {
+    timeout: timeoutField(),
     package_name: z.string().describe('Name of the ABAP package'),
     include_subpackages: z
       .boolean()

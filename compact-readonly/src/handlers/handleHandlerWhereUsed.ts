@@ -1,4 +1,4 @@
-import { compactWhereUsedSchema } from '@mcp-abap-adt/lib/compact-shared';
+import { compactWhereUsedSchema, withLongToolAdvice } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleGetWhereUsed } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
@@ -6,8 +6,9 @@ import { return_error } from '@mcp-abap-adt/lib/utils';
 export const TOOL_DEFINITION = {
   name: 'HandlerWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     'Where-used list of an ABAP object: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON.',
+  ),
   inputSchema: compactWhereUsedSchema,
 } as const;
 

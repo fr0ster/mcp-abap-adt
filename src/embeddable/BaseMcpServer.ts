@@ -25,6 +25,14 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
+import { runLongCall } from '../lib/longCall.js';
+import {
+  isLongTool,
+  longToolMode,
+  readTimeout,
+  TIMEOUT_INVALID_WORDS,
+  withoutTimeout,
+} from '../lib/longTools.js';
 import {
   closeOwnedConnections,
   endConnection,
@@ -461,7 +469,33 @@ export abstract class BaseMcpServer extends McpServer {
                   ),
                 );
               let handlerPromise: Promise<unknown>;
-              if ((entry.handler as HandlerFnWithContext).length >= 2) {
+              if (isLongTool(entry.toolDefinition.name)) {
+                // A listed long tool (spec §5.8): on a connection of its own,
+                // its `timeout` ending only the wait.
+                const timeoutSeconds = readTimeout(args);
+                if (timeoutSeconds === null) {
+                  return return_error(new Error(TIMEOUT_INVALID_WORDS)) as {
+                    isError: true;
+                    content: { type: 'text'; text: string }[];
+                  };
+                }
+                handlerPromise = resolved(() =>
+                  runLongCall({
+                    name: entry.toolDefinition.name,
+                    connection,
+                    logger: this.logger,
+                    timeoutSeconds,
+                    mode: longToolMode(entry.toolDefinition.name, args),
+                    run: (own) =>
+                      callHandler(
+                        entry.handler,
+                        group,
+                        { ...context, connection: own as AbapConnection },
+                        withoutTimeout(args),
+                      ),
+                  }),
+                );
+              } else if ((entry.handler as HandlerFnWithContext).length >= 2) {
                 handlerPromise = resolved(() =>
                   (entry.handler as HandlerFnWithContext)(context, args),
                 );
@@ -674,6 +708,37 @@ export abstract class BaseMcpServer extends McpServer {
       },
     });
   }
+}
+
+/**
+ * Calls a group's handler with `context`: one that takes `(context, args)`
+ * directly, an older one that reads its group's context after it was set.
+ */
+function callHandler(
+  handler: unknown,
+  group: unknown,
+  context: HandlerContext,
+  args: unknown,
+): Promise<unknown> {
+  const withContext = handler as (
+    context: HandlerContext,
+    args: unknown,
+  ) => Promise<unknown>;
+  if (withContext.length >= 2) return withContext(context, args);
+  const contextAwareGroup = group as Partial<{
+    setContext: (ctx: HandlerContext) => void;
+    context: HandlerContext;
+  }>;
+  try {
+    if (typeof contextAwareGroup.setContext === 'function') {
+      contextAwareGroup.setContext(context);
+    } else {
+      contextAwareGroup.context = context;
+    }
+  } catch {
+    // ignore if group doesn't expose context setter
+  }
+  return (handler as (args: unknown) => Promise<unknown>)(args);
 }
 
 /**

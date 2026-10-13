@@ -56,18 +56,6 @@ describe('compact covers what the low set did', () => {
   });
   afterEach(() => resetSystemContextCache());
 
-  it('a PACKAGE update without lock_handle is refused before any request', async () => {
-    const answered = await call('HandlerUpdate', {
-      object_type: 'PACKAGE',
-      package_name: 'PKG_A',
-      super_package: 'PKG_SUPER',
-      description: 'New text',
-    });
-    expect(answered.isError).toBe(true);
-    expect(answered.text).toContain('lock_handle is required');
-    expect(answered.sent).toBe(0);
-  });
-
   it('a write under lock_handle activates nothing: activate: true is refused', async () => {
     const answered = await call('HandlerUpdate', {
       object_type: 'CLASS',

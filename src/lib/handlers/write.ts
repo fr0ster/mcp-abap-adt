@@ -54,7 +54,8 @@ export { handleDeleteInterface } from '../../handlers/interface/high/handleDelet
 export { handleUpdateInterface } from '../../handlers/interface/high/handleUpdateInterface.js';
 export { handleDeleteMetadataExtension } from '../../handlers/metadata_extension/high/handleDeleteMetadataExtension.js';
 export { handleCreatePackage } from '../../handlers/package/high/handleCreatePackage.js';
-export { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage.js';
+export { handleDeletePackage } from '../../handlers/package/high/handleDeletePackage.js';
+export { handleUpdatePackage } from '../../handlers/package/high/handleUpdatePackage.js';
 export { handleCreateProgram } from '../../handlers/program/high/handleCreateProgram.js';
 export { handleDeleteProgram } from '../../handlers/program/high/handleDeleteProgram.js';
 export { handleUpdateProgram } from '../../handlers/program/high/handleUpdateProgram.js';

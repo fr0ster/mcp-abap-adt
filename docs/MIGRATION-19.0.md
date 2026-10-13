@@ -255,6 +255,8 @@ of the full set's high or low tools; only read-only reads may be in both.
   check or activation of its own (`activate: true` beside it is refused); `HandlerUnlock`
   releases it. Without `lock_handle`, `HandlerUpdate` locks and unlocks itself, as before.
   **Keeping the lock short is yours:** the server releases nothing on its own clock.
+  `HandlerLock` / `HandlerUnlock` also take BEHAVIOR_IMPLEMENTATION: the implementation class's
+  own lock and unlock (the same requests as CLASS).
 - **Validate, check, activate.** `HandlerValidate` (now with `super_package` for a package,
   `superclass` for a class, `package_name` for a function group, and FUNCTION_MODULE),
   `HandlerCheckRun` (now PACKAGE and FUNCTION_MODULE, and `source_code` to check source that is
@@ -267,8 +269,15 @@ of the full set's high or low tools; only read-only reads may be in both.
   as a failure.
 - **Packages.** `HandlerCreate` PACKAGE takes `super_package` and the package settings (it could
   not create a package before: the parameter was not declared); `HandlerUpdate` PACKAGE writes the
-  description under your `lock_handle`; `HandlerDelete` PACKAGE, with `force_new_connection`;
-  `HandlerCheckRun` PACKAGE.
+  description — under your `lock_handle`, or without one locking, writing and unlocking itself;
+  `HandlerDelete` PACKAGE, with `force_new_connection`; `HandlerCheckRun` PACKAGE.
+- **The full binaries gain two package tools** for what `UpdatePackageLow` and `DeletePackageLow`
+  did: the high **`UpdatePackage`** (`package_name`, `description`, `transport_request`: lock,
+  write, unlock in one tool; over RFC in an ABAP session of its own, as `CreatePackage`) and
+  **`DeletePackage`** (`package_name`, `transport_request`, `force_new_connection`: the delete
+  alone, without the deletion check the other high deletes send first). They send the same
+  requests as compact's `HandlerUpdate` PACKAGE without `lock_handle` and `HandlerDelete`
+  PACKAGE.
 - **Creation parameters.** `HandlerCreate` takes `superclass`, `final`, `abstract`,
   `create_protected` for a class and `master_language`.
 - **The repository by address.** `HandlerGet` with `part: object_structure` (`object_adt_type`,
@@ -339,7 +348,7 @@ first; a function module, service definition or service binding activates throug
 | `DeleteFunctionModuleLow` | `HandlerDelete` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
 | `DeleteInterfaceLow` | `HandlerDelete` (object_type: INTERFACE, interface_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
 | `DeleteMetadataExtensionLow` | `HandlerDelete` (object_type: METADATA_EXTENSION, metadata_extension_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeletePackageLow` | `HandlerDelete` (object_type: PACKAGE, package_name, transport_request) | force_new_connection is taken as the low tool took it: the delete is sent from a new connection, closed afterwards. |
+| `DeletePackageLow` | `HandlerDelete` (object_type: PACKAGE, package_name, transport_request) | force_new_connection is taken as the low tool took it: the delete is sent from a new connection, closed afterwards. The full set has it too: the high DeletePackage, the same request. |
 | `DeleteProgramLow` | `HandlerDelete` (object_type: PROGRAM, program_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
 | `DeleteStructureLow` | `HandlerDelete` (object_type: STRUCTURE, structure_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
 | `DeleteTableLow` | `HandlerDelete` (object_type: TABLE, table_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
@@ -381,7 +390,7 @@ first; a function module, service definition or service binding activates throug
 | `UpdateFunctionModuleLow` | `HandlerUpdate` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateInterfaceLow` | `HandlerUpdate` (object_type: INTERFACE, interface_name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateMetadataExtensionLow` | `HandlerUpdate` (object_type: METADATA_EXTENSION, name, source_code, lock_handle, transport_request) | the same requests |
-| `UpdatePackageLow` | `HandlerUpdate` (object_type: PACKAGE, package_name, super_package, description, lock_handle, transport_request) | the same requests |
+| `UpdatePackageLow` | `HandlerUpdate` (object_type: PACKAGE, package_name, super_package, description, lock_handle, transport_request) | The full set has it too: the high UpdatePackage (lock, write, unlock in one tool) — compact's HandlerUpdate PACKAGE without lock_handle sends the same. |
 | `UpdateProgramLow` | `HandlerUpdate` (object_type: PROGRAM, program_name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateStructureLow` | `HandlerUpdate` (object_type: STRUCTURE, structure_name, ddl_code, lock_handle, transport_request) | the same requests |
 | `UpdateTableLow` | `HandlerUpdate` (object_type: TABLE, table_name, ddl_code, lock_handle, transport_request) | the same requests |

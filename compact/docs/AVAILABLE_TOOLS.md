@@ -358,7 +358,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Update operation. With lock_handle (from HandlerLock) the write is sent under the lock already held — no lock, unlock, check or activation of its own — for PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION and METADATA_EXTENSION; without it the update locks and unlocks itself. object_type required: PACKAGE(package_name*, super_package*, description*, lock_handle*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(class_name*, test_class_source*).
+**Description:** Update operation. With lock_handle (from HandlerLock) the write is sent under the lock already held — no lock, unlock, check or activation of its own — for PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION and METADATA_EXTENSION; without it the update locks and unlocks itself. object_type required: PACKAGE(package_name*, description*; under lock_handle also super_package*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(class_name*, test_class_source*).
 
 **Available in:** cloud, onprem
 
@@ -378,7 +378,7 @@ per request.
 - `activate` — Activate object after update.
 - `lock_handle` — Lock handle from HandlerLock: write under the lock already held, with no lock, unlock, check or activation of its own. Without it the update locks and unlocks itself.
 - `super_package` — Super package (PACKAGE update).
-- `properties` — DOMAIN or DATA_ELEMENT under lock_handle: further properties to change, by their property names.
+- `properties` — DOMAIN or DATA_ELEMENT under lock_handle: further properties to change, by their property names — for a data element its own fields (type_kind, type_name, data_type, the labels, search_help) go only here.
 - `description` — Human-readable object description.
 - `datatype` — ABAP data type.
 - `length` — Length for typed artifacts.

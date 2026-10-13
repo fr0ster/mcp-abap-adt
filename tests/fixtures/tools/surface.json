@@ -337,6 +337,18 @@
   },
   {
     "group": "high",
+    "name": "UpdatePackage",
+    "inputs": "package_name*, description*, transport_request, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "DeletePackage",
+    "inputs": "package_name*, transport_request, force_new_connection, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "GetPackage",
     "inputs": "package_name*, version",
     "available_in": "cloud, onprem"

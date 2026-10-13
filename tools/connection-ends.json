@@ -42,7 +42,14 @@
     "why": "a fresh RFC session for one create (PAK/058); recorded as the calling instance's, so its terminal close also reaches it"
   },
   {
-    "file": "src/handlers/package/low/handleDeletePackage.ts",
+    "file": "src/handlers/package/high/handleUpdatePackage.ts",
+    "function": "handleUpdatePackage",
+    "site": "inOwnSessionOverRfc",
+    "end": "inOwnSessionOverRfc's finally: closeQuietly (endConnection) on success and failure",
+    "why": "a fresh RFC session for one lock, write and unlock (PAK/058); recorded as the calling instance's, so its terminal close also reaches it"
+  },
+  {
+    "file": "src/handlers/package/high/handleDeletePackage.ts",
     "function": "handleDeletePackage",
     "site": "openFreshConnection",
     "end": "the handler's finally: closeQuietly (endConnection) on success and failure; a failed connect is ended inside openFreshConnection",

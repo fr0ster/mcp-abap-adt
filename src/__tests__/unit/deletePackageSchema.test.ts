@@ -20,9 +20,9 @@ jest.mock('../../lib/answer', () => ({
 import {
   handleDeletePackage,
   TOOL_DEFINITION,
-} from '../../handlers/package/low/handleDeletePackage';
+} from '../../handlers/package/high/handleDeletePackage';
 
-describe('DeletePackageLow input', () => {
+describe('DeletePackage input', () => {
   it('has no connection_config, and still has force_new_connection', () => {
     const properties = TOOL_DEFINITION.inputSchema.properties as Record<
       string,

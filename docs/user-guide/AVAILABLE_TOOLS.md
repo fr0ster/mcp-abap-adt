@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 261
+- Total tools: 263
 - Read-only tools: 69
-- High-level tools: 159
+- High-level tools: 161
 - Debug tools: 30
 - Session tools: 3
 
@@ -240,7 +240,9 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Package](#high-level-package)
     - [CheckPackage](#checkpackage-high-level-package)
     - [CreatePackage](#createpackage-high-level-package)
+    - [DeletePackage](#deletepackage-high-level-package)
     - [GetPackage](#getpackage-high-level-package)
+    - [UpdatePackage](#updatepackage-high-level-package)
   - [Program](#high-level-program)
     - [CheckProgram](#checkprogram-high-level-program)
     - [CreateProgram](#createprogram-high-level-program)
@@ -2765,6 +2767,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletepackage-high-level-package"></a>
+#### DeletePackage (High-Level / Package)
+**Description:** Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
+
+**Source:** `src/handlers/package/high/handleDeletePackage.ts`
+
+**Parameters:**
+- `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
+- `package_name` (string, required) - Package name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
+
+---
+
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
 **Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
@@ -2774,6 +2789,19 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+
+---
+
+<a id="updatepackage-high-level-package"></a>
+#### UpdatePackage (High-Level / Package)
+**Description:** Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.
+
+**Source:** `src/handlers/package/high/handleUpdatePackage.ts`
+
+**Parameters:**
+- `description` (string, required) - New description for the package.
+- `package_name` (string, required) - Package name. Package must already exist.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 

@@ -201,7 +201,8 @@
             "Accept": "application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml"
           }
         }
-      ]
+      ],
+      "note": "The full set has it too: the high UpdatePackage (lock, write, unlock in one tool) — compact's HandlerUpdate PACKAGE without lock_handle sends the same."
     },
     {
       "tool": "DeletePackageLow",
@@ -221,7 +222,7 @@
           }
         }
       ],
-      "note": "force_new_connection is taken as the low tool took it: the delete is sent from a new connection, closed afterwards.",
+      "note": "force_new_connection is taken as the low tool took it: the delete is sent from a new connection, closed afterwards. The full set has it too: the high DeletePackage, the same request.",
       "low_requests": [
         {
           "method": "POST",

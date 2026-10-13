@@ -78,16 +78,16 @@ import {
   handleUpdateServiceDefinition,
   handleUpdateStructure,
   handleUpdateTable,
-  handleUpdateUnderLock,
+  handleUpdatePackage,
   handleUpdateUnitTest,
 } from '@mcp-abap-adt/lib/handlers/write';
 
 export const compactWriteRouterMap: CompactRouterMap = {
   PACKAGE: {
     create: handleCreatePackage as unknown as CompactHandler,
-    // A package is written only under a lock the caller holds (lock_handle):
-    // without one this answers that the handle is required.
-    update: handleUpdateUnderLock as unknown as CompactHandler,
+    // Without lock_handle the high UpdatePackage: lock, write, unlock. With
+    // one HandlerUpdate writes under the caller's lock before routing here.
+    update: handleUpdatePackage as unknown as CompactHandler,
     delete: handleDeletePackage as unknown as CompactHandler,
   },
   DOMAIN: {

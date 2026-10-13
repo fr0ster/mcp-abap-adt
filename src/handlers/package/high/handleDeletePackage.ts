@@ -1,6 +1,11 @@
 /**
  * DeletePackage Handler - Delete ABAP Package
  *
+ * One tool of the high set and the route of compact's `HandlerDelete`
+ * PACKAGE (19.0.0; the low set's DeletePackageLow before it). It sends the
+ * delete alone — no deletion check first, unlike the other high deletes:
+ * that is the request the package delete has always sent.
+ *
  * Uses AdtClient.getPackage().delete from @mcp-abap-adt/adt-clients 19.
  *
  * `analyseDeletion` is passed explicitly rather than left to the shipped
@@ -29,10 +34,10 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'DeletePackageLow',
+  name: 'DeletePackage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.',
+    'Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -105,7 +110,7 @@ export async function handleDeletePackage(
 
   try {
     return await answer(
-      { tool: 'DeletePackageLow', detail },
+      { tool: 'DeletePackage', detail },
       () =>
         createAdtClient(deleteConnection, logger)
           .getPackage(resultsFor(packageDocuments))

@@ -61,8 +61,8 @@ import { handleUpdateFunctionModule } from '../../handlers/function/low/handleUp
 import { handleActivateInterface } from '../../handlers/interface/low/handleActivateInterface';
 import { handleCheckInterface } from '../../handlers/interface/low/handleCheckInterface';
 import { handleUpdateInterface } from '../../handlers/interface/low/handleUpdateInterface';
+import { handleDeletePackage } from '../../handlers/package/high/handleDeletePackage';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
-import { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage';
 import { handleUpdatePackage } from '../../handlers/package/low/handleUpdatePackage';
 import { handleActivateProgram } from '../../handlers/program/low/handleActivateProgram';
 import { handleCheckProgram } from '../../handlers/program/low/handleCheckProgram';
@@ -1340,7 +1340,7 @@ describe('package — no Activate tool (a package is a container, no activation)
     });
   });
 
-  it('DeletePackageLow passes transportRequest through to the delete member, taking analyseDeletion explicitly over the shipped packageDeletionRefusal default', async () => {
+  it('DeletePackage passes transportRequest through to the delete member, taking analyseDeletion explicitly over the shipped packageDeletionRefusal default', async () => {
     await handleDeletePackage(context as any, {
       package_name: 'ZP_X',
       transport_request: 'SIDK900001',
@@ -1355,7 +1355,7 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(call?.analyse).toBe(analyseDeletion);
   });
 
-  it('DeletePackageLow answers the structured delete-success fixture through terseDeletion', async () => {
+  it('DeletePackage answers the structured delete-success fixture through terseDeletion', async () => {
     const reading = structured({
       data: corpusBody('delete-success--01-deletion-delete'),
       status: 200,

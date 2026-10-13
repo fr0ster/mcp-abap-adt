@@ -18,7 +18,7 @@ V2 server supports flexible handler set configuration through the `--exposition`
 2. **high** - High-level write operations
    - Object creation
    - Object modification through ADT
-   - Package creation
+   - Package creation, update (`UpdatePackage`) and deletion (`DeletePackage`)
    - Transport operations
 
 3. **low** - gone from `mcp-abap-adt`, `-http` and `-sse` in 19.0.0. `--exposition=…,low`

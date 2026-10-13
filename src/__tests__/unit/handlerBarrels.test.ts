@@ -77,7 +77,9 @@ describe("lib's read and write handler barrels", () => {
     // `HandlerTransportSortAndCompress` / `HandlerTransportMoveObjects` (78).
     // 19.0.0 (C14): the write under the caller's lock and the package delete,
     // for compact's `HandlerUpdate` with lock_handle and `HandlerDelete` PACKAGE.
-    expect(write).toHaveLength(81);
+    // 19.0.0 (C14 round 3): the high UpdatePackage, for `HandlerUpdate`
+    // PACKAGE without lock_handle (82).
+    expect(write).toHaveLength(82);
   });
 
   it('share not one symbol', () => {

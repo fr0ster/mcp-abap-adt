@@ -15,7 +15,7 @@
  */
 
 import { handleCreatePackage } from '../../../../handlers/package/high/handleCreatePackage';
-import { handleDeletePackage } from '../../../../handlers/package/low/handleDeletePackage';
+import { handleDeletePackage } from '../../../../handlers/package/high/handleDeletePackage';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -48,14 +48,9 @@ describe('Package High-Level Handlers Integration', () => {
         logger?.info(`   • cleanup: delete ${objectName}`);
         try {
           const deleteLogger = createTestLogger('package-high-delete');
-          // The low DeletePackage left with the low set (19.0.0); its
-          // operation is compact's HandlerDelete PACKAGE. A full-binary hard
-          // mode has no package delete, so there the cleanup is reported
-          // as failed and the package left, as the catch below says.
           const deleteResponse = await tester.invokeToolOrHandler(
-            'HandlerDelete',
+            'DeletePackage',
             {
-              object_type: 'PACKAGE',
               package_name: objectName,
               force_new_connection: true,
               ...(transportRequest && { transport_request: transportRequest }),

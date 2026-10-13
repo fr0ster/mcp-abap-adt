@@ -131,6 +131,12 @@ interface BuiltConnection {
   users: number;
   /** Replaced: it ends with its logoff once no call works on it. */
   retired: boolean;
+  /**
+   * Its connect looked the system up (`buildConnection`); absent for a
+   * connection taken without a connect of ours (a resumed session), which
+   * `getConnection` looks up on first use.
+   */
+  lookedUpAtConnect?: true;
 }
 
 /**
@@ -430,12 +436,15 @@ export abstract class BaseMcpServer extends McpServer {
       throw error;
     }
     // A connection taken without a connect of ours (a resumed session) is
-    // looked up here, before any tool on it proceeds.
-    try {
-      await raceRequestSignal(this.lookupSystem(connection), signal);
-    } catch (error) {
-      this.release(held);
-      throw error;
+    // looked up here, before any tool on it proceeds; a built one was looked
+    // up by its connect.
+    if (held.lookedUpAtConnect !== true) {
+      try {
+        await raceRequestSignal(this.lookupSystem(connection), signal);
+      } catch (error) {
+        this.release(held);
+        throw error;
+      }
     }
     this.entries.set(connection, held);
     this.systemContexts.set(connection, resolved.systemContext);
@@ -447,9 +456,10 @@ export abstract class BaseMcpServer extends McpServer {
    * after another. Resolves with the call's `leave` once every call queued
    * before it has left; no timeout on the wait. A call whose signal aborts
    * while it waits leaves the queue at once — its place passes on, and it
-   * answers `aborted` without reaching its tool (D5) — so a shutdown or an
-   * instance close, which aborts the calls it waits for, never waits behind a
-   * queued one.
+   * answers `aborted` without reaching its tool (D5). A shutdown or an
+   * instance close aborts no call (D55): it waits for the running call and
+   * every queued one to run to their end; only an SSE close, whose transport
+   * aborts the request signals, makes the queued calls leave.
    */
   private enterMainFlow(signal: AbortSignal): Promise<() => void> {
     const before = this.mainFlow;
@@ -655,6 +665,7 @@ export abstract class BaseMcpServer extends McpServer {
       connection: Promise.resolve() as unknown as Promise<AbapConnection>,
       users: 0,
       retired: false,
+      lookedUpAtConnect: true,
     };
     entry.connection = (async () => {
       const connection = create();

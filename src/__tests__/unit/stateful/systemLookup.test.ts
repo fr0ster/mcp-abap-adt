@@ -18,6 +18,7 @@ import type {
   IHandlerGroup,
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { SystemContextMissingError } from '../../../lib/systemContextGuard';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -288,4 +289,39 @@ describe('ABAP Cloud, the lookup at connect refused', () => {
       await standIn.close();
     }
   });
+});
+
+it('ABAP Cloud, the lookup at connect refused: a tool outside the flow that the guard refuses asks nothing again', async () => {
+  // A debugger-listed name (outside the flow) whose handler meets the guard,
+  // as a create would: the refusal stands, and no lookup is sent for it.
+  const guarded: HandlerEntry = {
+    toolDefinition: {
+      name: 'DebugWait',
+      description: 'DebugWait',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    handler: (async (_context: unknown, _args: unknown) => {
+      throw new SystemContextMissingError();
+    }) as never,
+  } as unknown as HandlerEntry;
+  process.env.SAP_SYSTEM_TYPE = 'cloud';
+  const s = await statefulStand(['ReadClass'], {
+    systemType: 'cloud',
+    groups: [
+      {
+        getName: () => 'guarded-out-of-flow',
+        getHandlers: () => [guarded],
+        registerHandlers: () => {},
+      } as unknown as IHandlerGroup,
+    ],
+  });
+  s.standIn.answer(isLookup, 500);
+  try {
+    const answer = await s.call('DebugWait', {});
+    expect(answer.isError).toBe(true);
+    // The one lookup of the connection's first use, and no retry.
+    expect(s.standIn.requests.filter(isLookup)).toHaveLength(1);
+  } finally {
+    await s.close();
+  }
 });

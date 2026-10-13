@@ -2,7 +2,7 @@
  * GetSession Handler - Get session ID and session state for reuse across multiple requests
  *
  * Returns session ID and session state (cookies, CSRF token) that can be passed
- * to other handlers to maintain the same session and lock handle across operations.
+ * to other handlers; it changes nothing: every call runs in the instance's own session.
  */
 
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -67,7 +67,7 @@ export async function handleGetSession(
           success: true,
           session_id: sessionId,
           session_state: null, // Session state management is now handled by auth-broker
-          message: `Session ID generated. Use this session_id in subsequent requests to maintain the same session.`,
+          message: `Session ID generated. It is sent on no request: every call runs in the instance's own session.`,
         },
         null,
         2,

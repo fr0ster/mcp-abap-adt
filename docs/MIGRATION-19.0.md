@@ -306,12 +306,15 @@ waits, with no timeout, until the previous one settled. So a call never runs ins
 lock, and an `UNLOCK` is never sent outside its lock's session because another call ended its own.
 Where it matters: stdio (one instance for the process) and SSE (one instance per SSE connection).
 Over Streamable HTTP each request has its instance and connection, so its calls never met anyway.
-Every send on the instance's connection is inside the order — also the `systeminformation`
-lookup a background run, a leftover-session tool or the debugger makes for its caller's user (run
-directly when the call that makes it already holds the flow). Outside the order, because they work
+Every send a call makes on the instance's connection is inside the order — also the
+`systeminformation` lookup a background run, a leftover-session tool or the debugger makes for its
+caller's user (run directly when the call that makes it already holds the flow); the connect's own
+sends (its session record, the ABAP Cloud system lookup) come before any tool can use the
+connection. An embedder's own registry that is not a `CompositeHandlersRegistry` (it registers its
+tools itself) gets no main-flow queue. Outside the order, because they work
 on a connection of their own: a background run (`background: true`), a listed long read (on its
 fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow). A call you cancel while it waits leaves the queue at
-once and never reaches SAP; a shutdown or an instance's close does not wait behind a queued call. A
+once and never reaches SAP. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. A
 queued call that meets a session the call ahead of it found lost gets that error as it is; the next
 call gets a new connection.
 

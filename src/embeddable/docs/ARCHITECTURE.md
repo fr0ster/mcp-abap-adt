@@ -156,7 +156,9 @@ and only a tool the guard refuses for want of a responsible asks again from insi
 outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
 handlers as `HandlerContext.onMainConnection` — directly from a call that holds the flow, else in
 turn. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
-reaches its tool, so a close never waits behind a queued call. A queued call that meets a session
+reaches its tool. An embedder's own registry that is not a `CompositeHandlersRegistry`
+(`registerAllTools(trackingRegistrations())`) gets no main-flow queue: its tools take no place in
+the flow. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. A queued call that meets a session
 the call ahead found lost gets that error as it is.
 
 **A connection is replaced only when SAP lost its session** (D56), or when a new credential

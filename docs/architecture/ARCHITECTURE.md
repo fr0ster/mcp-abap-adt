@@ -291,7 +291,8 @@ stand-in). So the server does not trust the client: the calls of an instance tha
 work on its connection run strictly one after another (`BaseMcpServer.enterMainFlow`,
 in the registered tool wrapper). The next waits until the previous settled, with no
 timeout; a call cancelled while it waits leaves the queue at once and never reaches
-its tool; an instance's close and a shutdown do not wait behind a queued call.
+its tool. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
+main-flow queue. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals.
 Every send on the instance's connection is inside the order: the identity lookups
 (`systeminformation`) of the background-run and leftover-session tools and the
 debugger's request user go through `onMainConnection` — directly from a call that

@@ -20,7 +20,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckClassLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {

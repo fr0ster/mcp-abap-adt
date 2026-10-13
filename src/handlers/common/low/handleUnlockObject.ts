@@ -42,7 +42,7 @@ export const TOOL_DEFINITION = {
   name: 'UnlockObjectLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Unlock an ABAP object after modification. Must use the same session_id and lock_handle from the LockObject operation.',
+    '[low-level] Unlock an ABAP object after modification, with the lock_handle the LockObject operation answered (the lock stays in the instance’s own session until then).',
   inputSchema: {
     type: 'object',
     properties: {

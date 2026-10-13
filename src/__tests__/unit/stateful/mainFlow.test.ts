@@ -24,6 +24,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { IDestinations } from '../../../../server/src/auth/IAuthBrokerFactory';
 import { StdioServer } from '../../../../server/src/StdioServer';
+import { activeTools } from '../../../lib/activeTools';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import { callerOn, isClassRun } from '../backgroundRuns/harness';
@@ -267,8 +268,13 @@ describe('one main flow per instance', () => {
           () => 'cancelled',
         );
       await settleWhile();
+      expect(activeTools()).toHaveLength(2);
       cancel.abort();
       expect(await queued).toBe('cancelled');
+      // On the server too, before the holder ends: the cancelled call left
+      // the queue at once — only the holder is still running.
+      await until(() => activeTools().length === 1);
+      expect(activeTools().every((tool) => !tool.signal.aborted)).toBe(true);
       held.release();
       await holder;
       const after = await s.call('UpdateClass', {

@@ -248,13 +248,15 @@ export async function withResolvedSystemContext<T>(
 export async function withKnownSystemContext<T>(
   resolved: ResolvedSystemContext | undefined,
   fn: () => Promise<T> | T,
+  /** The lookup failed: a refusal for want of a responsible says so. */
+  failed = false,
 ): Promise<T> {
   if (resolved === undefined) return fn();
   const stated = getStatedSystemContext();
   if (stated.responsible && stated.masterSystem) return fn();
   return applyResolved(
     resolved,
-    false,
+    failed,
     stated,
     getEffectiveSystemContext(),
     fn,

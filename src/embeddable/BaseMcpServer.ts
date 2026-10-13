@@ -96,6 +96,7 @@ import {
   stateLoggerOf,
 } from '../lib/state/InstanceState.js';
 import { systemContextFromConfiguration } from '../lib/systemContext.js';
+import { watchSystemContextGuard } from '../lib/systemContextGuard.js';
 import { systemUserOf } from '../lib/systemUser.js';
 import {
   normalizeToolContent,
@@ -389,8 +390,7 @@ export abstract class BaseMcpServer extends McpServer {
     }
     if (context.kind === 'injected') {
       // The host's connection: its system looked up once, on first use,
-      // before any tool on it proceeds (a failed lookup fails this call
-      // and is asked again by the next).
+      // before any tool on it proceeds (a failed lookup fails nothing).
       await raceRequestSignal(this.lookupSystem(context.connection), signal);
       return context.connection;
     }
@@ -472,13 +472,25 @@ export abstract class BaseMcpServer extends McpServer {
   private readonly systemLookups = new WeakMap<object, Promise<void>>();
 
   /**
-   * Resolves `connection`'s system context once (on-premise: nothing sent,
-   * `null`); concurrent callers share the attempt, and a failed one is not
-   * kept — the next asks again.
+   * The connections whose lookup at connect failed: they carry no system
+   * context, and only a tool that needs it asks again (`retryLookup`).
+   */
+  private readonly lookupFailedAt = new WeakSet<object>();
+
+  /**
+   * Resolves `connection`'s system context once, at connect (on-premise:
+   * nothing sent, `null`); concurrent callers share the attempt. A failure
+   * fails nothing: the connection carries no system context, nothing failed
+   * is kept, and no later connect of it asks again — only a tool that needs
+   * the context does, from inside the main flow (`retryLookup`).
    */
   private lookupSystem(connection: object): Promise<void> {
     const resolver = this.systemContextResolver;
-    if (resolver === null || this.systems.has(connection)) {
+    if (
+      resolver === null ||
+      this.systems.has(connection) ||
+      this.lookupFailedAt.has(connection)
+    ) {
       return Promise.resolve();
     }
     const running = this.systemLookups.get(connection);
@@ -492,14 +504,12 @@ export abstract class BaseMcpServer extends McpServer {
           await resolveOnce(resolver, connection as AbapConnection),
         );
       } catch (error) {
-        // A chain failure (the credential refused, a connection error) is
-        // answered as it is; anything else in fixed words — a lookup's
-        // message may quote what the system answered (H4).
-        if (readGuarded(failureOf, error) !== undefined) throw error;
+        // The class only: a lookup's message may quote what the system
+        // answered (H4).
         this.logger?.warn?.(
           `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
         );
-        throw new ServerRefusal('system_lookup_failed');
+        this.lookupFailedAt.add(connection);
       } finally {
         this.systemLookups.delete(connection);
       }
@@ -508,11 +518,66 @@ export abstract class BaseMcpServer extends McpServer {
     return attempt;
   }
 
-  /** What `lookupSystem` resolved for `connection`; `undefined`: nothing to resolve. */
+  /**
+   * A tool that needs the system context, on a connection whose lookup at
+   * connect failed, asks again — on the instance's connection, through the
+   * main flow it already holds (`onMainConnection`). A chain failure is
+   * answered as it is; any other refuses the tool, `system_lookup_failed`.
+   */
+  private async retryLookup(
+    connection: object,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const resolver = this.systemContextResolver;
+    if (resolver === null) return;
+    try {
+      const resolved = await this.onMainConnection(signal, () =>
+        resolveOnce(resolver, connection as AbapConnection),
+      );
+      this.systems.set(connection, resolved);
+      this.lookupFailedAt.delete(connection);
+    } catch (error) {
+      if (readGuarded(failureOf, error) !== undefined) throw error;
+      this.logger?.warn?.(
+        `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
+      );
+      throw new ServerRefusal('system_lookup_failed');
+    }
+  }
+
+  /**
+   * What `lookupSystem` resolved for `connection`; `{}` when its lookup
+   * failed (on ABAP Cloud the login never stands in); `undefined`: nothing to
+   * resolve.
+   */
   private systemOf(connection: object): ResolvedSystemContext | undefined {
-    return this.systemContextResolver === null
-      ? undefined
-      : this.systems.get(connection);
+    if (this.systemContextResolver === null) return undefined;
+    if (this.lookupFailedAt.has(connection)) return {};
+    return this.systems.get(connection);
+  }
+
+  /**
+   * Runs a tool with its connection's system context, sending nothing. When
+   * the tool needed the context — the guard refused it for want of a
+   * responsible (`SystemContextMissingError`) — on a connection whose lookup
+   * at connect failed, and the call holds the main flow, the lookup is asked
+   * again (`retryLookup`) and the tool runs again with its answer: the guard
+   * refuses before the change is sent. Out of the flow no lookup is sent; the
+   * tool's refusal stands.
+   */
+  private async withSystemContextOf<T>(
+    connection: object,
+    holdsFlow: boolean,
+    signal: AbortSignal,
+    run: () => Promise<T>,
+  ): Promise<T> {
+    const failed = () => this.lookupFailedAt.has(connection);
+    const first = await watchSystemContextGuard(() =>
+      withKnownSystemContext(this.systemOf(connection), run, failed()),
+    );
+    if (!first.fired || !holdsFlow || !failed()) return first.settled();
+    await this.retryLookup(connection, signal);
+    return withKnownSystemContext(this.systemOf(connection), run, failed());
   }
 
   /** Runs `fn` with this instance's flow marked held, when `holds`. */
@@ -610,13 +675,8 @@ export abstract class BaseMcpServer extends McpServer {
       if (session !== undefined) await this.keepSession(connection, session);
       // The system context (ABAP Cloud: `systeminformation`), part of the
       // connect: once per connection, before any tool proceeds, never a send
-      // outside the main flow. A failed lookup fails the connect.
-      try {
-        await this.lookupSystem(connection);
-      } catch (error) {
-        await endConnection(connection);
-        throw error;
-      }
+      // outside the main flow. A failed lookup fails nothing.
+      await this.lookupSystem(connection);
       entry.ready = connection;
       return connection;
     })();
@@ -724,8 +784,10 @@ export abstract class BaseMcpServer extends McpServer {
                       () =>
                         // Resolved at connect (`lookupSystem`): nothing is
                         // sent here, so no call sends outside the flow.
-                        withKnownSystemContext(
-                          this.systemOf(context.connection),
+                        this.withSystemContextOf(
+                          context.connection,
+                          holdsFlow,
+                          signal,
                           () => {
                             throwIfRequestAborted(signal);
                             return fn();

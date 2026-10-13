@@ -18,6 +18,7 @@
  * so a retry, not a key to set (setting one would not help).
  */
 
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { systemLookupFailed } from './requestSystemResolution';
 import {
   getEffectiveSystemContext,
@@ -36,6 +37,33 @@ export class SystemContextMissingError extends Error {
   constructor(lookupFailed = systemLookupFailed()) {
     super(lookupFailed ? RESPONSIBLE_LOOKUP_FAILED : MISSING_RESPONSIBLE);
     this.name = 'SystemContextMissingError';
+    const watched = guardWatch.getStore();
+    if (watched) watched.fired = true;
+  }
+}
+
+/** A tool run being watched for the guard's refusal (`watchSystemContextGuard`). */
+const guardWatch = new AsyncLocalStorage<{ fired: boolean }>();
+
+/**
+ * Runs `fn` and says whether the guard refused something in it for want of a
+ * responsible — whether `fn` threw that refusal or answered it.
+ * `settled()` answers `fn`'s result again, or throws what it threw.
+ */
+export async function watchSystemContextGuard<T>(
+  fn: () => Promise<T>,
+): Promise<{ fired: boolean; settled: () => T }> {
+  const watched = { fired: false };
+  try {
+    const value = await guardWatch.run(watched, fn);
+    return { fired: watched.fired, settled: () => value };
+  } catch (error) {
+    return {
+      fired: watched.fired,
+      settled: () => {
+        throw error;
+      },
+    };
   }
 }
 

@@ -982,8 +982,11 @@ Only work on a connection of its own — a background run, a listed long read on
 connection, the debugger tools whose SAP work is on the debugger's own connections (every
 `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool, audited; the `MemorySnapshot*` tools stay in) — is
 outside that order. The ABAP Cloud system-context lookup is part of the connect (once per
-connection, inside `getConnection`, before any tool proceeds; its failure fails the connect and is
-not kept), so it is never a send outside the flow. A long call on the main connection holds
+connection, inside `getConnection`, before any tool proceeds), so it is never a send outside the
+flow. Its failure widens nothing (the owner's ruling on CR7): the connect succeeds without a system
+context, nothing failed is kept, and only a tool that needs the context (one the guard refuses for
+want of a responsible) asks again from inside the flow — refused `system_lookup_failed` when that
+fails too; every other tool, and every tool outside the flow, never asks. A long call on the main connection holds
 the flow by design; `background: true` or a tool on its own connection does not. A queued call
 that meets a session the call ahead found lost gets that error as it is. The server enforces it and does not trust the client
 (`BaseMcpServer.enterMainFlow`), on every transport; the instance's end does not wait behind a

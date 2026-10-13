@@ -79,6 +79,8 @@ async function builtStand(standIn: AdtStandIn, kind: 'cloud' | 'onprem') {
   const client = await clientOf(server);
   return {
     call: client.call,
+    register: (group: IHandlerGroup) =>
+      server.register(new CompositeHandlersRegistry([group])),
     close: async () => {
       await client.close();
       await server.terminalClose();
@@ -192,4 +194,98 @@ it('on-premise: no lookup is sent', async () => {
     await s.close();
     await standIn.close();
   }
+});
+
+/**
+ * The lookup at connect never widens failures (C15 round 4): when it is
+ * refused the connect succeeds and the connection carries no system
+ * context. Only a tool that needs the context — a create, refused by the
+ * guard for want of a responsible — asks again, from inside the main flow;
+ * a read and every tool outside the flow send no lookup.
+ */
+describe('ABAP Cloud, the lookup at connect refused', () => {
+  // A service definition's create writes `adtcore:responsible`: the guard
+  // refuses it for want of one (a class create sends none).
+  const isClassCreate = (r: StandInRequest) =>
+    r.method === 'POST' &&
+    r.url.split('?')[0] === '/sap/bc/adt/ddic/srvd/sources';
+
+  async function refusedAtConnect() {
+    const standIn = await adtStandIn();
+    // The connect's lookup is refused once; a later one as told per case.
+    standIn.answerOnce(isLookup, 500);
+    const s = await builtStand(standIn, 'cloud');
+    s.register(oneToolGroup('CreateServiceDefinition'));
+    return { standIn, s };
+  }
+
+  it('a read tool works, and asks nothing again', async () => {
+    const { standIn, s } = await refusedAtConnect();
+    try {
+      const read = await s.call('ReadClass', { class_name: 'ZCL_READ' });
+      expect(read.isError).toBe(false);
+      await s.call('ReadClass', { class_name: 'ZCL_READ_AGAIN' });
+      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  });
+
+  it('a create asks again and is refused when the retry is refused too; nothing created', async () => {
+    const { standIn, s } = await refusedAtConnect();
+    standIn.answer(isLookup, 500);
+    try {
+      const created = await s.call('CreateServiceDefinition', {
+        service_definition_name: 'ZSD_CREATED',
+        package_name: '$TMP',
+      });
+      expect(created.isError).toBe(true);
+      expect(created.payload).toMatchObject({ error: 'system_lookup_failed' });
+      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
+      expect(standIn.requests.some(isClassCreate)).toBe(false);
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  });
+
+  it('a create asks again and goes on with the answer when the retry is answered', async () => {
+    const { standIn, s } = await refusedAtConnect();
+    standIn.body(
+      isLookup,
+      JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
+    );
+    try {
+      await s.call('CreateServiceDefinition', {
+        service_definition_name: 'ZSD_CREATED',
+        package_name: '$TMP',
+      });
+      const lookups = standIn.requests
+        .map((r, i) => (isLookup(r) ? i : -1))
+        .filter((i) => i >= 0);
+      expect(lookups).toHaveLength(2);
+      const create = standIn.requests.findIndex(isClassCreate);
+      expect(create).toBeGreaterThan(lookups[1] ?? Number.MAX_SAFE_INTEGER);
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  });
+
+  it('a tool outside the flow sends no lookup and is not refused', async () => {
+    const { standIn, s } = await refusedAtConnect();
+    try {
+      const started = await s.call('RuntimeRunClass', {
+        class_name: 'ZCL_BACKGROUND',
+        background: true,
+      });
+      expect(started.isError).toBe(false);
+      await until(() => standIn.requests.some(isClassRun));
+      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  });
 });

@@ -317,9 +317,11 @@ call gets a new connection.
 
 **On ABAP Cloud the system is asked once per connection, when it connects** (`systeminformation`:
 the user as responsible, the system id as master system, for what a create needs and the request
-does not state). Before, the first call asked it and a failure was ignored; now a failed lookup
-fails the connect — the call answers `system_lookup_failed` (or `authentication_failed`, as a
-connect would) and the next call tries again. On-premise nothing is asked.
+does not state). A failed lookup fails nothing: the connection carries no system context, and
+only a create that needs a responsible the request does not state asks again, when it runs; if
+that fails too, that create answers `system_lookup_failed` (before, the same create was refused
+naming the unreachable system). Reads, searches, runs and every other tool never ask again and are
+never refused because of it. On-premise nothing is asked.
 
 **A long call on the main connection holds the flow; `background: true` or a tool on its own
 connection does not.** A unit-test run (and `HandlerGet`'s `UNIT_TEST` polling), `RunATC` with
@@ -856,8 +858,9 @@ transport's options only:
   `background: true`. `HandlerContext` has `backgroundRuns?` (the tools' port); `ServerRefusalCode`
   / `FailureCode` add `background_runs_unavailable`, `background_run_not_available`,
   `background_run_running`, `background_run_limit` and `background_run_caller_unknown` (a caller
-  whose backend user neither the request nor SAP names); and `system_lookup_failed` (the
-  connect's ABAP Cloud `systeminformation` lookup failed). `withKnownSystemContext` applies a
+  whose backend user neither the request nor SAP names); and `system_lookup_failed` (a tool that
+  needs the system context, on a connection whose ABAP Cloud `systeminformation` lookup failed at
+  connect, asked again and failed again). `withKnownSystemContext` applies a
   resolution made at connect; `withResolvedSystemContext` (which looks up) is still there for
   `HandlerExporter` and `BaseHandlerGroup`. `ConnectionRole` adds `background`: the
   run's connection is owned by the strategy, so no instance's terminal close cuts it.

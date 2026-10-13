@@ -149,8 +149,10 @@ the instance's connection one after another (`enterMainFlow`), whatever the clie
 a background run, a listed long read and the debugger tools that work on the debugger's own
 connections (`ownConnectionTools.ts`: every `Debug*`, `AmdpDebug*`, `HandlerDebug*` tool) take no
 place in it. The ABAP Cloud system-context lookup is part of the connect (`lookupSystem`, once per
-connection, before any tool; a failure fails the connect with `system_lookup_failed`); the wrapper
-reads it (`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
+connection, before any tool; a failure fails nothing — the connection carries no system context,
+and only a tool the guard refuses for want of a responsible asks again from inside the flow,
+`retryLookup`, refused `system_lookup_failed` when that fails too); the wrapper reads it
+(`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
 outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
 handlers as `HandlerContext.onMainConnection` — directly from a call that holds the flow, else in
 turn. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never

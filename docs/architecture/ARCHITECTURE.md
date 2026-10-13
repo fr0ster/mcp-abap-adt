@@ -305,9 +305,13 @@ SSE connection's; Streamable HTTP builds one per request. The ABAP Cloud system-
 responsible and master system a create fills) is part of the connect: once per
 connection, inside `getConnection` (`lookupSystem`, shared by every caller of the
 connect), before any tool proceeds; the tool wrapper reads its answer
-(`withKnownSystemContext`) and sends nothing. A lookup that fails fails the connect
-(`system_lookup_failed`, or a chain failure as it is), and the next call asks again;
-on-premise nothing is asked.
+(`withKnownSystemContext`) and sends nothing. A lookup that fails fails nothing: the
+connect succeeds and the connection carries no system context. Only a tool that needs the context — one the guard refuses for want of a responsible: a create that writes `adtcore:responsible` (service definition, message class, behavior implementation, transport, …), never a read, a search or a run — asks
+again when it runs, from inside the main flow it holds (`retryLookup` through
+`onMainConnection`), and runs again with the answer (the guard refuses before the
+change is sent); a retry that fails too refuses that tool, `system_lookup_failed`, as
+only such tools failed before. A tool outside the flow never asks; on-premise nothing
+is asked.
 
 - **Compact's `HandlerLock`** keeps the lock across calls until `HandlerUnlock` —
   the consumer's choice — where the connection lives across calls (stdio, SSE): the

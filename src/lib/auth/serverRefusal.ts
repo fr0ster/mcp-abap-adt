@@ -80,11 +80,12 @@ export const BACKGROUND_RUN_RUNNING_WORDS =
   'this background run is still running and cannot be discarded: a started run cannot be stopped; discard it once it has finished';
 
 /**
- * The connect's system-context lookup (ABAP Cloud `systeminformation`) failed
- * for a reason that is not a chain failure: the connection was not used.
+ * A tool that needs the system context (a create's responsible) on an ABAP
+ * Cloud connection whose `systeminformation` lookup failed at connect asked
+ * again, and that failed too — for a reason that is not a chain failure.
  */
 export const SYSTEM_LOOKUP_FAILED_WORDS =
-  'the ABAP Cloud system could not be asked for the session user and system id (systeminformation) when connecting: nothing else was sent; retry when the system is available';
+  'No responsible person for this change: the ABAP Cloud system could not be asked for the session user and system id (systeminformation), so nothing was sent; retry when the system is available';
 
 /** A background run whose request names no backend user, and SAP named none either. */
 export const BACKGROUND_RUN_CALLER_UNKNOWN_WORDS =

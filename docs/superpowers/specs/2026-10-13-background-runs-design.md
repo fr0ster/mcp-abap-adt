@@ -65,4 +65,4 @@ own ids); persisting kept answers across processes; stopping a run.
 ## Decided by the user (2026-10-13)
 
 The limit is 16 per owner; discarding is its own tool; the store is a strategy — the server's in
-memory, an embedder's its own. Open: a process-wide limit for the server's implementation.
+memory, an embedder's its own. No process-wide limit: 16 per owner is enough (the user).

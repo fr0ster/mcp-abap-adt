@@ -15,8 +15,8 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 /**
  * Self-contained stdio client. Deliberately does not reuse the integration
- * hard-mode helper: that one passes `--exposition=readonly,high,low`, which
- * validateExposition rejects (high and low are mutually exclusive).
+ * hard-mode helper (historically it passed an exposition beside `low`, which
+ * validateExposition rejects; 19.0.0 refuses `low` outright).
  */
 async function connect(destination: string, exposition: string) {
   const client = new Client(

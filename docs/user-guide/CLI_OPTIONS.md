@@ -40,7 +40,7 @@ These rows are lib's shared rows: each binary's table holds them, with the same 
 | CLI | Environment | YAML | Value | Meaning |
 |-----|-------------|------|-------|---------|
 | `--conf=<path>` (alias `--config`) | — | — | path | The YAML config file of this binary; a missing file gets the binary's template and the start ends |
-| `--exposition=<sets>` | — | `exposition` | `readonly`, `high`, `low`, `debug` | The tool sets to serve (default `readonly,high`); see [Handler Exposition](#handler-exposition) |
+| `--exposition=<sets>` | — | `exposition` | `readonly`, `high`, `debug` | The tool sets to serve (default `readonly,high`); see [Handler Exposition](#handler-exposition) |
 | `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type: the tools offered (default `cloud`); the connector and whether the responsible / master system are asked of the system |
 | `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
 | `--shutdown-timeout=<seconds>` | `MCP_SHUTDOWN_TIMEOUT` | `shutdown-timeout` | 1-86400 | Forces a shutdown not finished after this many seconds (default: none); see [Shutdown](#shutdown) |
@@ -391,8 +391,9 @@ mcp-abap-adt-sse \
 
 **--exposition=\<sets\>** (YAML `exposition`), on every binary.
 
-A comma list of the tool sets to serve: `readonly`, `high`, `low`, `debug`. Default
-`readonly,high`. `high` and `low` are mutually exclusive; `compact` is refused (the
+A comma list of the tool sets to serve: `readonly`, `high`, `debug`. Default
+`readonly,high`. `low` stops the start (19.0.0): *"the low set is gone from mcp-abap-adt /
+-http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. `compact` is refused (the
 compact facade is its own binaries, `mcp-abap-adt-compact`, `-compact-http` and `-compact-sse`,
 whose `--exposition` takes `ro` / `rw` and `debug` beside either). A set the binary does not serve
 stops the start in its words. The search tools are always served, the system tools with `readonly`.

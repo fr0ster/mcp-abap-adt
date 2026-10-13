@@ -77,7 +77,9 @@ describe('the MCP tool surface', () => {
 
   it('enumerates the whole surface, so the assertions below are not vacuous', () => {
     // A run that listed nothing would satisfy every comparison that follows.
-    expect(frozen.length).toBeGreaterThan(300);
+    // 19.0.0 (D56): the 112 low tools left the surface, and their rows the
+    // fixture — 264 remain.
+    expect(frozen.length).toBeGreaterThan(250);
     expect(current.length).toBe(frozen.length);
   });
 

@@ -5,10 +5,6 @@ describe('validateExposition', () => {
     expect(() => validateExposition(['readonly', 'high'])).not.toThrow();
   });
 
-  it('accepts [readonly, low]', () => {
-    expect(() => validateExposition(['readonly', 'low'])).not.toThrow();
-  });
-
   it('accepts [readonly]', () => {
     expect(() => validateExposition(['readonly'])).not.toThrow();
   });
@@ -17,19 +13,22 @@ describe('validateExposition', () => {
     expect(() => validateExposition(['high'])).not.toThrow();
   });
 
-  it('accepts [low] alone', () => {
-    expect(() => validateExposition(['low'])).not.toThrow();
-  });
-
   it('accepts empty array', () => {
     expect(() => validateExposition([])).not.toThrow();
   });
 
-  it('rejects high + low as mutually exclusive', () => {
-    expect(() => validateExposition(['high', 'low'])).toThrow(
-      /mutually exclusive/i,
-    );
-  });
+  // D56: the low set left the full binaries in 19.0.0; its word stops the
+  // start with the sentence, verbatim, alone or beside any other set.
+  it.each([[['low']], [['readonly', 'low']], [['high', 'low']]])(
+    'refuses %j with D56’s sentence',
+    (exposition) => {
+      expect(() => validateExposition(exposition)).toThrow(
+        new Error(
+          'the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)',
+        ),
+      );
+    },
+  );
 
   // `compact` is not served from here any more: the facade is
   // `@mcp-abap-adt/compact`, its own command. The value is still recognised, and

@@ -132,7 +132,6 @@
     "test": "jest --passWithNoTests",
     "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
     "test:high": "jest --testPathPatterns='integration.*High' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
-    "test:low": "jest --testPathPatterns='integration.*Low' --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",

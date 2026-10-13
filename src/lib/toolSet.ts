@@ -94,8 +94,9 @@ const listOf = (value: ParameterValue | undefined): string[] | undefined =>
 
 /**
  * The object-oriented tool set of `mcp-abap-adt`, `mcp-abap-adt-http` and
- * `mcp-abap-adt-sse`: readonly (with system), high, low, debug, and search —
- * `readonly,high` by default. `compact` and `high` beside `low` are refused.
+ * `mcp-abap-adt-sse`: readonly (with system), high, debug, and search —
+ * `readonly,high` by default. `compact` is refused, and `low` with D56's
+ * sentence: the low set left these binaries in 19.0.0, compact is its analogue.
  */
 export const fullToolSet: ToolSet = {
   expositionRow: EXPOSITION_ROW,

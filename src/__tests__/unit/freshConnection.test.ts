@@ -2,9 +2,10 @@
  * A fresh connection on a host's connection comes from the host (spec §4.3,
  * D20–D22, §14.3).
  *
- * `CreatePackage` (high and low) and `LockPackage` over RFC, and
- * `DeletePackage` with `force_new_connection`, need an ABAP session of their
- * own. On an injected connection — here one whose configuration names RFC and
+ * `CreatePackage` (high, and compact's `HandlerCreate` PACKAGE) and compact's
+ * `HandlerLock` PACKAGE over RFC, and compact's `HandlerDelete` PACKAGE with
+ * `force_new_connection`, need an ABAP session of their own (19.0.0: the low
+ * set's package tools left the full binaries; compact took their cases). On an injected connection — here one whose configuration names RFC and
  * holds no usable credential, so nothing could be built from it — that session
  * is the host's `freshConnection` factory's: it is called with no argument —
  * no signal (D56: a fresh connection is made inside a started tool, which
@@ -63,13 +64,19 @@ jest.mock('../../lib/connectionFactory', () => {
   };
 });
 
+import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { FRESH_CONNECTION_UNAVAILABLE_WORDS } from '../../lib/auth/serverRefusal';
+import { CompactHandlersGroup } from '../../lib/compact/group';
 import { liveDebugPorts } from '../../lib/debugger/ports';
+import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
+import type { HandlerContext } from '../../lib/handlers/interfaces';
+import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
 import { runWithRequestSignal } from '../../lib/requestSignal';
 import {
   type RecordingConnection,
@@ -138,9 +145,21 @@ async function served(
   injected: IAbapConnection,
   freshConnection?: () => Promise<IAbapConnection>,
 ): Promise<Client> {
+  // The high set and both compact halves, as the full and the compact binaries
+  // serve them.
+  const context = {
+    connection: null as never,
+    logger: undefined,
+  } as unknown as HandlerContext;
   const server = new EmbeddableMcpServer({
     connection: injected as unknown as AbapConnection,
-    exposition: ['high', 'low'],
+    handlersRegistry: new CompositeHandlersRegistry([
+      new HighLevelHandlersGroup(context),
+      new CompactHandlersGroup(context, [
+        compactReadOnlyEntries,
+        compactModifyEntries,
+      ]),
+    ]),
     systemType: 'onprem',
     systemContextResolver: null,
     systemContext: { responsible: 'DEVELOPER', masterSystem: 'DEV' },
@@ -165,19 +184,28 @@ const OPERATIONS: Array<[string, string, Record<string, unknown>]> = [
     { package_name: 'ZFRESH', super_package: 'ZROOT', description: 'd' },
   ],
   [
-    'CreatePackage (low) over RFC',
-    'CreatePackageLow',
-    { package_name: 'ZFRESH', super_package: 'ZROOT', description: 'd' },
+    'HandlerCreate PACKAGE over RFC',
+    'HandlerCreate',
+    {
+      object_type: 'PACKAGE',
+      package_name: 'ZFRESH',
+      super_package: 'ZROOT',
+      description: 'd',
+    },
   ],
   [
-    'LockPackage over RFC',
-    'LockPackageLow',
-    { package_name: 'ZFRESH', super_package: 'ZROOT' },
+    'HandlerLock PACKAGE over RFC',
+    'HandlerLock',
+    { object_type: 'PACKAGE', object_name: 'ZFRESH', super_package: 'ZROOT' },
   ],
   [
-    'DeletePackage with force_new_connection',
-    'DeletePackageLow',
-    { package_name: 'ZFRESH', force_new_connection: true },
+    'HandlerDelete PACKAGE with force_new_connection',
+    'HandlerDelete',
+    {
+      object_type: 'PACKAGE',
+      package_name: 'ZFRESH',
+      force_new_connection: true,
+    },
   ],
 ];
 
@@ -204,7 +232,7 @@ describe('with the host’s freshConnection', () => {
     },
   );
 
-  it.each(OPERATIONS.filter(([, tool]) => tool !== 'LockPackageLow'))(
+  it.each(OPERATIONS.filter(([, tool]) => tool !== 'HandlerLock'))(
     '%s disconnects the factory’s connection when it answers',
     async (_label, tool, args) => {
       const factory = hostFactory();
@@ -217,14 +245,18 @@ describe('with the host’s freshConnection', () => {
     },
   );
 
-  it('LockPackage keeps the factory’s connection under its handle until the unlock disconnects it', async () => {
+  it('HandlerLock PACKAGE keeps the factory’s connection under its handle until HandlerUnlock disconnects it', async () => {
     const injected = rfcConnection();
     const factory = hostFactory();
     const client = await served(injected, factory);
 
     const locked = await client.callTool({
-      name: 'LockPackageLow',
-      arguments: { package_name: 'ZFRESH', super_package: 'ZROOT' },
+      name: 'HandlerLock',
+      arguments: {
+        object_type: 'PACKAGE',
+        object_name: 'ZFRESH',
+        super_package: 'ZROOT',
+      },
     });
     const lockHandle = JSON.parse(textOf(locked)).lock_handle as string;
     expect(typeof lockHandle).toBe('string');
@@ -233,10 +265,10 @@ describe('with the host’s freshConnection', () => {
     const sentBeforeUnlock = fresh.requests.length;
 
     await client.callTool({
-      name: 'UnlockPackageLow',
+      name: 'HandlerUnlock',
       arguments: {
-        package_name: 'ZFRESH',
-        super_package: 'ZROOT',
+        object_type: 'PACKAGE',
+        object_name: 'ZFRESH',
         lock_handle: lockHandle,
         session_id: 'embedded',
       },
@@ -256,7 +288,7 @@ describe('a handed-over connection that cannot connect', () => {
     const client = await served(rfcConnection(), async () => fresh);
 
     const result = await client.callTool({
-      name: 'CreatePackageLow',
+      name: 'HandlerCreate',
       arguments: OPERATIONS[1][2],
     });
 
@@ -275,7 +307,7 @@ describe('the same connection injected again', () => {
     const second = await served(injected);
 
     const result = await second.callTool({
-      name: 'CreatePackageLow',
+      name: 'HandlerCreate',
       arguments: OPERATIONS[1][2],
     });
 
@@ -296,7 +328,7 @@ describe('the same connection injected again', () => {
     const second = await served(injected, later);
 
     await first.callTool({
-      name: 'CreatePackageLow',
+      name: 'HandlerCreate',
       arguments: OPERATIONS[1][2],
     });
 

@@ -42,13 +42,6 @@
     "why": "a fresh RFC session for one create (PAK/058); recorded as the calling instance's, so its terminal close also reaches it"
   },
   {
-    "file": "src/handlers/package/low/handleCreatePackage.ts",
-    "function": "handleCreatePackageLow",
-    "site": "inOwnSessionOverRfc",
-    "end": "inOwnSessionOverRfc's finally: closeQuietly (endConnection) on success and failure",
-    "why": "a fresh RFC session for one create (PAK/058)"
-  },
-  {
     "file": "src/handlers/package/low/handleDeletePackage.ts",
     "function": "handleDeletePackage",
     "site": "openFreshConnection",
@@ -58,13 +51,6 @@
   {
     "file": "src/handlers/common/low/handleLockObject.ts",
     "function": "handleLockObject",
-    "site": "connectionForPackageLock",
-    "end": "lock not taken: drop() (endConnection); taken: kept under its handle until releasePackageLockSession (the unlock) \u2014 or the instance's terminal close, which ends it and forgets the handle",
-    "why": "RFC only: the lock session (role lock); over HTTP the caller's own connection serves and nothing new is made"
-  },
-  {
-    "file": "src/handlers/package/low/handleLockPackage.ts",
-    "function": "handleLockPackage",
     "site": "connectionForPackageLock",
     "end": "lock not taken: drop() (endConnection); taken: kept under its handle until releasePackageLockSession (the unlock) \u2014 or the instance's terminal close, which ends it and forgets the handle",
     "why": "RFC only: the lock session (role lock); over HTTP the caller's own connection serves and nothing new is made"

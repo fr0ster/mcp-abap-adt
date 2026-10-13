@@ -963,13 +963,13 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
     it('the full binary refuses ro (and any unknown word), never dropping it', async () => {
       expect(await refusalOf(full, ['--exposition=ro'])).toEqual({
         stderr: [
-          `[MCP] Invalid exposition: 'ro' is not a set of this command, which takes readonly, high, low and debug, comma-separated. 'ro' and 'rw' are the sets of \`${bin}\` (${pkg}).`,
+          `[MCP] Invalid exposition: 'ro' is not a set of this command, which takes readonly, high and debug, comma-separated. 'ro' and 'rw' are the sets of \`${bin}\` (${pkg}).`,
         ],
         exits: [1],
       });
       expect(await refusalOf(full, ['--exposition=readonly,search'])).toEqual({
         stderr: [
-          "[MCP] Invalid exposition: 'search' is not a set of this command, which takes readonly, high, low and debug, comma-separated.",
+          "[MCP] Invalid exposition: 'search' is not a set of this command, which takes readonly, high and debug, comma-separated.",
         ],
         exits: [1],
       });

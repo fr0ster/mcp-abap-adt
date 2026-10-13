@@ -36,7 +36,10 @@ import {
   type ParityRequest,
   parityConnection,
   parityRequests,
+  renderLowToCompactTable,
   silentLogger,
+  TABLE_END,
+  TABLE_START,
 } from '../helpers/lowToCompact';
 
 const TABLE = JSON.parse(
@@ -310,5 +313,36 @@ describe('the low set → compact mapping table', () => {
       'deletion-check',
       'extra-requests',
     ]);
+  });
+});
+
+/**
+ * MIGRATION-19.0's table is rendered from the JSON: the committed text must be
+ * the rendering. `WRITE_LOW_TO_COMPACT_TABLE=1` writes it first (refused under CI).
+ */
+describe('docs/MIGRATION-19.0.md', () => {
+  const file = path.join(
+    __dirname,
+    '..',
+    '..',
+    '..',
+    'docs',
+    'MIGRATION-19.0.md',
+  );
+  it('holds the low → compact table rendered from tools/low-to-compact.json', () => {
+    const text = fs.readFileSync(file, 'utf-8');
+    const start = text.indexOf(TABLE_START);
+    const end = text.indexOf(TABLE_END);
+    expect(start).toBeGreaterThan(-1);
+    expect(end).toBeGreaterThan(start);
+    const rendered = renderLowToCompactTable(TABLE.rows);
+    if (process.env.WRITE_LOW_TO_COMPACT_TABLE === '1' && !process.env.CI) {
+      fs.writeFileSync(
+        file,
+        text.slice(0, start) + rendered + text.slice(end + TABLE_END.length),
+      );
+      return;
+    }
+    expect(text.slice(start, end + TABLE_END.length)).toBe(rendered);
   });
 });

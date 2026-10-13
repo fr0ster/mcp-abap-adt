@@ -9,7 +9,6 @@ import { BackgroundRunHandlersGroup } from '../groups/BackgroundRunHandlersGroup
 import { DebugHandlersGroup } from '../groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../groups/HighLevelHandlersGroup.js';
 import { LeftoverSessionHandlersGroup } from '../groups/LeftoverSessionHandlersGroup.js';
-import { LowLevelHandlersGroup } from '../groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from '../groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../groups/SystemHandlersGroup.js';
@@ -40,9 +39,6 @@ export function expositionGroups(
   if (exposition.includes('high')) {
     overridingGroups.push(new HighLevelHandlersGroup(baseContext));
   }
-  if (exposition.includes('low')) {
-    overridingGroups.push(new LowLevelHandlersGroup(baseContext));
-  }
   if (exposition.includes('debug')) {
     overridingGroups.push(new DebugHandlersGroup(baseContext));
   }
@@ -71,10 +67,10 @@ export function expositionGroups(
   handlerGroups.push(...overridingGroups);
   handlerGroups.push(new SearchHandlersGroup(baseContext));
   // Every exposition: the user's own leftover sessions, listed and logged
-  // off; resumed only where writes are served (high, low).
+  // off; resumed only where writes are served (high).
   handlerGroups.push(
     new LeftoverSessionHandlersGroup(baseContext, {
-      resume: exposition.includes('high') || exposition.includes('low'),
+      resume: exposition.includes('high'),
     }),
   );
   return handlerGroups;

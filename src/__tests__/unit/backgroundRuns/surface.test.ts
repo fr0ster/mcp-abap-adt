@@ -193,10 +193,8 @@ describe('where the background-run tools are served: beside the run tools', () =
   it.each<[HandlerSet[], boolean]>([
     [['readonly'], true],
     [['readonly', 'high'], true],
-    [['readonly', 'low'], true],
     [['readonly', 'debug'], true],
     [['high'], false],
-    [['low'], false],
     [['debug'], false],
   ])('full %j: served %s, as RuntimeRunClass is', (exposition, served) => {
     const tools = namesOf(registryForExposition(exposition).getHandlerGroups());
@@ -234,7 +232,6 @@ describe('which tools take background', () => {
     ...new HandlerExporter({
       includeReadOnly: true,
       includeHighLevel: true,
-      includeLowLevel: true,
       includeSystem: true,
       includeSearch: true,
       includeDebug: true,

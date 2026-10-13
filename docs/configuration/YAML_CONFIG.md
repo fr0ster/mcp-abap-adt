@@ -37,7 +37,7 @@ mcp-abap-adt-http --conf=http.yaml --port=8080
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `exposition` | string or string[] | `readonly,high` | Tool sets: `readonly`, `high`, `low`, `debug` (compact: `ro` / `rw`, `debug` beside either) |
+| `exposition` | string or string[] | `readonly,high` | Tool sets: `readonly`, `high`, `debug` (`low` is refused since 19.0.0: compact is its analogue; compact: `ro` / `rw`, `debug` beside either) |
 | `system-type` | string | tools: `cloud`; connector: `cloud` for a `jwt`, else `onprem` | `onprem`, `cloud` or `legacy`; never guessed from the URL |
 | `state-idle-minutes` | number | `30` | See [Held State](#held-state) |
 | `shutdown-timeout` | number | — | Seconds after which a shutdown is forced, 1-86400; no default: a shutdown waits for running tools and session writes. Forced, it logs off every ADT session and exits `1`; a tool may be cut short and a session write lost. See [CLI options: Shutdown](../user-guide/CLI_OPTIONS.md#shutdown) |

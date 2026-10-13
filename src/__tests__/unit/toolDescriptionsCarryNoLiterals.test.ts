@@ -136,7 +136,6 @@ describe('descriptions carry no incidental literals', () => {
     ...new HandlerExporter({
       includeReadOnly: true,
       includeHighLevel: true,
-      includeLowLevel: true,
       includeSystem: true,
       includeSearch: true,
       includeDebug: true,
@@ -183,7 +182,8 @@ describe('descriptions carry no incidental literals', () => {
   });
 
   it('sees every tool group', () => {
-    expect(tools.length).toBeGreaterThan(300);
+    // 19.0.0 (D56): the low set's tools left; compact's are read here too.
+    expect(tools.length).toBeGreaterThan(250);
   });
 
   it('reads the parameter descriptions it claims to read', () => {

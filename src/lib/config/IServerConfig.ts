@@ -26,7 +26,7 @@ export interface TlsConfig {
  * that asks for it is recognised and refused with that pointer
  * (`validateExposition`) rather than parsed as a typo or silently ignored.
  */
-export type HandlerSet = 'readonly' | 'high' | 'low' | 'compact' | 'debug';
+export type HandlerSet = 'readonly' | 'high' | 'compact' | 'debug';
 
 export interface IServerConfig {
   /**

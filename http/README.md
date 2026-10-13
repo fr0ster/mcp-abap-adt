@@ -10,6 +10,8 @@ npm install -g @mcp-abap-adt/http
 mcp-abap-adt-http --port=3000
 ```
 
+**No low set (19.0.0).** `--exposition=…,low` stops the start: *"the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations are compact's — see [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+
 ## Credentials: each request's headers, nothing else
 
 Every request carries its own credentials, and the server takes them from nowhere else: no

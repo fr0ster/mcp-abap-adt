@@ -10,8 +10,9 @@
  * that change nothing — no create, update, delete, activate, lock, unlock,
  * unit-test run or profiler run anywhere in the list. Locally the default gives
  * every access (`rw`); `ro` is there for a host that means to hand out a surface
- * which cannot change the system. `readonly/high/low` are sets of the
- * object-oriented surface, which the compact binaries do not serve.
+ * which cannot change the system. `readonly/high` are sets of the
+ * object-oriented surface, which the compact binaries do not serve; the low
+ * set left that surface in 19.0.0, and compact is its analogue.
  *
  * Plain code over the arguments, no regular expression (D26).
  */
@@ -44,7 +45,7 @@ HANDLER EXPOSITION:
                                          ...Step). They catch every request
                                          of the connected SAP user.
 
-                                   The object-oriented sets (readonly, high, low)
+                                   The object-oriented sets (readonly, high)
                                    belong to the full binaries (\`mcp-abap-adt\`,
                                    \`mcp-abap-adt-http\`, \`mcp-abap-adt-sse\`); this
                                    command serves the compact facade only, where
@@ -110,7 +111,7 @@ function halfOf(values: readonly string[]): CompactExposition {
     if (v === 'ro' || v === 'rw') base = v;
     else if (v !== 'debug') {
       throw new ParameterRefusal(
-        `--exposition=${v} is not a compact set. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 27, the default), and 'debug' beside either. The sets readonly/high/low belong to \`mcp-abap-adt\`.`,
+        `--exposition=${v} is not a compact set. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 27, the default), and 'debug' beside either. The sets readonly/high belong to \`mcp-abap-adt\`.`,
       );
     }
   }

@@ -17,6 +17,8 @@ context, no tool-RAG, no way to select tools per request — and must still driv
 through MCP reliably. A consumer that does select per request (cloud-llm-hub, for
 one) has no use for it and should take `@mcp-abap-adt/lib` instead.
 
+**The low set's analogue.** The low set left the full binaries in 19.0.0; its single-step operations are compact's: `HandlerLock`, `HandlerUpdate` with the `lock_handle` it answered (the write alone, under your lock), `HandlerUnlock`, `HandlerCheckRun`, `HandlerValidate`, `HandlerActivate`, and `HandlerGet` `part` `object_structure` / `node_structure` / `virtual_folders`. **Keeping a lock from `HandlerLock` short is your job:** the server releases nothing on its own clock — unlock as soon as the write is done. The tool-by-tool table: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+
 ## Why two library packages
 
 Capability is decided by what you import, not by a flag a caller can pass. A tool
@@ -44,7 +46,7 @@ mcp-abap-adt-compact --version
 what a local server gives) or **`ro`** (the 16 tools that change nothing: no create,
 update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool
 list at all, so a client cannot call one). The object-oriented sets
-`readonly`/`high`/`low` belong to `mcp-abap-adt` and are refused here by name. A config file's
+`readonly`/`high` belong to `mcp-abap-adt` and are refused here by name. A config file's
 `exposition` (`--conf`) is read the same way, the flag winning; the template writes `exposition: rw`.
 
 **Leftover sessions, with every exposition.** `HandlerLeftoverSessionList` and

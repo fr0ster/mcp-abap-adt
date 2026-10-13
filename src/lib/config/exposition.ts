@@ -24,11 +24,7 @@ export function toHandlerSets(
 ): HandlerSet[] {
   const sets = (values ?? []).filter(
     (s): s is HandlerSet =>
-      s === 'readonly' ||
-      s === 'high' ||
-      s === 'low' ||
-      s === 'compact' ||
-      s === 'debug',
+      s === 'readonly' || s === 'high' || s === 'compact' || s === 'debug',
   );
   return sets.length > 0 ? sets : ['readonly', 'high'];
 }
@@ -42,17 +38,15 @@ export function expositionHelp(transport: ServedTransport = 'stdio'): string {
   return `
 HANDLER EXPOSITION:
   --exposition=<sets>              Comma-separated handler sets to expose
-                                   Options: readonly, high, low, debug
+                                   Options: readonly, high, debug
                                    Default: readonly,high
 
                                    Handler Sets:
                                    - readonly: Get*, Check*, Validate*, Lock*, Unlock*
                                                (read operations, validation, locking)
                                                Also includes: search, system
-                                   - high:     Create*, Update*High
-                                               (safe create/update via ADT)
-                                   - low:      Update*Low, Delete*, Activate*
-                                               (direct/dangerous operations)
+                                   - high:     Create*, Update*, Delete*, Activate*
+                                               (each a whole workflow via ADT)
                                    - debug:    the debugger tools; opt-in, never part of the
                                                default. A breakpoint or a listener catches
                                                every request of the connected SAP user
@@ -64,13 +58,14 @@ HANDLER EXPOSITION:
                                    Examples:
                                    --exposition=readonly       (readonly + search + system)
                                    --exposition=readonly,high  (readonly + high + search + system)
-                                   --exposition=readonly,low   (readonly + low + search + system)
                                    --exposition=high           (high + search, no system)
                                    --exposition=readonly,debug (readonly + debug + search + system)
 
-                                   'high' and 'low' are mutually exclusive and the
-                                   pair is refused at startup, so there is no value
-                                   that serves every handler at once.
+                                   The low set is gone from this command (19.0.0):
+                                   --exposition=...,low is refused. Its single-step
+                                   operations (lock, write under a lock, unlock,
+                                   check, validate, activate) are the compact
+                                   command's.
 
                                    The compact facade is NOT an exposition of this
                                    command. It is its own command, with that tool

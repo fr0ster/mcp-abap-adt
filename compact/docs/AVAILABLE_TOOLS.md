@@ -24,15 +24,15 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly`
 
-**Description:** Read operation. part selects the aspect: source (default), metadata, urls, or contents (the objects of a PACKAGE); a part the type does not offer is refused, naming the ones it does. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects the transport request or task holds, each with the position HandlerTransportMoveObjects takes. timeout applies to the reads only: UNIT_TEST and CDS_UNIT_TEST take none. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+**Description:** Read operation. part selects the aspect: source (default), metadata, urls, or contents (the objects of a PACKAGE); a part the type does not offer is refused, naming the ones it does. Three parts read the repository by ADT address and take no object_type: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Otherwise object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects the transport request or task holds, each with the position HandlerTransportMoveObjects takes. timeout applies to the reads only: UNIT_TEST and CDS_UNIT_TEST take none. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `timeout` — Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-- `object_type` (required) — ABAP object type for routed compact operation.
-- `part` — Which aspect to read: the source, the ADT metadata document, the service and preview URLs, or the objects a package contains. A part this object type does not offer is refused, naming the parts it does.
+- `object_type` — ABAP object type for routed compact operation.
+- `part` — Which aspect to read: the source, the ADT metadata document, the service and preview URLs, or the objects a package contains. A part this object type does not offer is refused, naming the parts it does. Three parts read the repository by ADT address and take no object_type: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions).
 - `package_name` — Package name.
 - `max_results` — Maximum number of members listed (part contents).
 - `class_name` — Class name.
@@ -54,6 +54,15 @@ per request.
 - `run_id` — Unit test run id.
 - `response_format` — Response format for SERVICE_BINDING reads.
 - `version` — Object version to read/check.
+- `object_adt_type` — ADT type code of the object (object_structure) or of the parent node (node_structure).
+- `object_name` — Object name (object_structure) or parent name (node_structure).
+- `node_id` — Node id to expand (node_structure); the root when absent.
+- `with_short_descriptions` — Include short descriptions (node_structure).
+- `object_search_pattern` — Object name pattern (virtual_folders).
+- `preselection` — Facet preselections (virtual_folders).
+- `facet_order` — Facet order (virtual_folders).
+- `with_versions` — Include versions (virtual_folders).
+- `ignore_short_descriptions` — Leave out short descriptions (virtual_folders).
 
 ### HandlerSearch
 
@@ -105,15 +114,17 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly`
 
-**Description:** Validate before create only. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
+**Description:** Validate before create only. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `object_type` (required) — Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.
-- `object_name` (required) — Required object name. For SERVICE_BINDING this is the service binding name.
+- `object_name` (required) — Required object name. For SERVICE_BINDING this is the service binding name; a function module is named GROUP|MODULE.
 - `package_name` — Optional package context for validation (especially for create scenarios).
+- `super_package` — Super package of the package to validate (PACKAGE).
+- `superclass` — Superclass of the class to validate (CLASS).
 - `description` — Optional object description used during validation.
 - `behavior_definition` — Optional behavior definition name, used when validating behavior implementation.
 - `root_entity` — Optional CDS root entity name, used for behavior-related validation.
@@ -127,15 +138,16 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly`
 
-**Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
+**Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks source that is not saved, for CLASS, STRUCTURE and DDL.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `object_type` (required) — ABAP object type for routed compact operation.
-- `object_name` (required) — Primary object name for lifecycle operation.
+- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, METADATA_EXTENSION.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `version` — Version to syntax-check.
+- `source_code` — Source to check instead of the saved one; nothing is saved. CLASS, STRUCTURE and DDL only.
 - `session_id` — Optional ADT session id for stateful check flow.
 - `session_state` — Optional ADT session state container (cookies/CSRF) for stateful check flow.
 
@@ -290,7 +302,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(cds_view_name*, class_name*, package_name*, test_class_source*).
+**Description:** Create operation. object_type required: PACKAGE(package_name*, super_package*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(cds_view_name*, class_name*, package_name*, test_class_source*).
 
 **Available in:** cloud, onprem
 
@@ -307,6 +319,17 @@ per request.
 - `description` — Human-readable object description.
 - `transport_request` — Transport request id (if required by system).
 - `activate` — Activate object after create.
+- `master_language` — Original language of the created object; the session language when absent.
+- `super_package` — Super package (PACKAGE create).
+- `package_type` — Package type (PACKAGE create).
+- `software_component` — Software component (PACKAGE create).
+- `transport_layer` — Transport layer (PACKAGE create).
+- `record_changes` — Record changes (PACKAGE create).
+- `application_component` — Application component (PACKAGE create).
+- `superclass` — Superclass name (CLASS create).
+- `final` — Mark the class final (CLASS create).
+- `abstract` — Mark the class abstract (CLASS create).
+- `create_protected` — Protected constructor (CLASS create).
 - `program_type` — ABAP program type.
 - `application` — Domain application area.
 - `datatype` — ABAP data type.
@@ -335,7 +358,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(class_name*, test_class_source*).
+**Description:** Update operation. With lock_handle (from HandlerLock) the write is sent under the lock already held — no lock, unlock, check or activation of its own — for PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION and METADATA_EXTENSION; without it the update locks and unlocks itself. object_type required: PACKAGE(package_name*, super_package*, description*, lock_handle*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(class_name*, test_class_source*).
 
 **Available in:** cloud, onprem
 
@@ -353,6 +376,9 @@ per request.
 - `ddl_source` — Complete DDL source code (for DDL update).
 - `transport_request` — Transport request id (if required by system).
 - `activate` — Activate object after update.
+- `lock_handle` — Lock handle from HandlerLock: write under the lock already held, with no lock, unlock, check or activation of its own. Without it the update locks and unlocks itself.
+- `super_package` — Super package (PACKAGE update).
+- `properties` — DOMAIN or DATA_ELEMENT under lock_handle: further properties to change, by their property names.
 - `description` — Human-readable object description.
 - `datatype` — ABAP data type.
 - `length` — Length for typed artifacts.
@@ -385,13 +411,15 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Delete operation. object_type required: DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(class_name*), CDS_UNIT_TEST(class_name*).
+**Description:** Delete operation. object_type required: PACKAGE(package_name*; force_new_connection deletes from a new connection), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(class_name*), CDS_UNIT_TEST(class_name*).
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `object_type` (required) — ABAP object type for routed compact operation.
+- `package_name` — ABAP package name.
+- `force_new_connection` — PACKAGE: delete from a new connection, closed afterwards — for a package saved earlier through this connection.
 - `class_name` — ABAP class name.
 - `program_name` — ABAP program name.
 - `domain_name` — ABAP domain name.
@@ -476,8 +504,8 @@ per request.
 
 **Parameters:**
 
-- `object_type` (required) — ABAP object type for routed compact operation.
-- `object_name` (required) — Primary object name for lifecycle operation.
+- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `super_package` — Super package context when relevant.
 - `session_id` — Optional ADT session id for stateful lock flow.
 - `session_state` — Optional ADT session state container (cookies/CSRF) for stateful lock flow.
@@ -492,8 +520,8 @@ per request.
 
 **Parameters:**
 
-- `object_type` (required) — ABAP object type for routed compact operation.
-- `object_name` (required) — Primary object name for lifecycle operation.
+- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `lock_handle` (required) — Lock handle returned by lock.
 - `session_id` (required) — ADT session id used during lock.
 - `session_state` — Optional ADT session state container (cookies/CSRF) for stateful unlock flow.

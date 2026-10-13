@@ -21,8 +21,8 @@ import { handleCreateFunctionGroup } from '../../../../handlers/function/high/ha
 import { handleCreateFunctionModule } from '../../../../handlers/function/high/handleCreateFunctionModule';
 import { handleUpdateFunctionGroup } from '../../../../handlers/function/high/handleUpdateFunctionGroup';
 import { handleUpdateFunctionModule } from '../../../../handlers/function/high/handleUpdateFunctionModule';
-import { handleDeleteFunctionGroup } from '../../../../handlers/function/low/handleDeleteFunctionGroup';
-import { handleDeleteFunctionModule } from '../../../../handlers/function/low/handleDeleteFunctionModule';
+import { handleDeleteFunctionGroup } from '../../../../handlers/function_group/high/handleDeleteFunctionGroup';
+import { handleDeleteFunctionModule } from '../../../../handlers/function_module/high/handleDeleteFunctionModule';
 import { handleGetSession } from '../../../../handlers/system/readonly/handleGetSession';
 import {
   getCleanupAfter,

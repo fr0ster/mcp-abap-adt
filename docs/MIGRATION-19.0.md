@@ -48,10 +48,10 @@ The packages, all at **19.0.0**:
 - `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, `--exposition` (with
   `debug`), `--system-type` and `--conf` are in every binary's table, unchanged.
 - **An unknown `--exposition` word stops the full binaries** (`mcp-abap-adt`, `mcp-abap-adt-http`,
-  `mcp-abap-adt-sse`), in the CLI and the YAML form: they take `readonly`, `high`, `low` and
-  `debug`. 18.x dropped any other word silently — `mcp-abap-adt --exposition=ro` served
+  `mcp-abap-adt-sse`), in the CLI and the YAML form: they take `readonly`, `high` and
+  `debug` (`low` is gone, see "The low set leaves the full binaries"). 18.x dropped any other word silently — `mcp-abap-adt --exposition=ro` served
   `readonly,high`. Now: *Invalid exposition: 'ro' is not a set of this command, which takes
-  readonly, high, low and debug, comma-separated. 'ro' and 'rw' are the sets of
+  readonly, high and debug, comma-separated. 'ro' and 'rw' are the sets of
   \`mcp-abap-adt-compact\` (@mcp-abap-adt/compact).* — the compact binary named is the one of the
   binary's own transport (`mcp-abap-adt-compact-http` / `-compact-sse`), and so is the one
   `--exposition=compact` names. Remove `search` or `system` from an exposition (they come with
@@ -161,7 +161,7 @@ OS users. The server never logs a file's content and never shows a cookie to the
 
 **The tools**, on every transport. The list and the logoff are served with every exposition — a
 logoff is a system action, not a data change, so compact `ro` and full `readonly` serve them too;
-the resume only with a writing one (full `high` or `low`, compact `rw`), since a resumed session
+the resume only with a writing one (full `high`, compact `rw`), since a resumed session
 is for finishing a write or an unlock:
 
 | Full binaries | Compact binaries | What it does |
@@ -233,6 +233,168 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
   (`Still running at the forced close: RuntimeRunClass (background)`).
 - **No session of its own to be had** — an embedded server given a connection without
   `freshConnection` — refuses the start with the fresh-connection words, as the listed long reads.
+
+## The low set leaves the full binaries
+
+**`mcp-abap-adt`, `mcp-abap-adt-http` and `mcp-abap-adt-sse` serve no low set.**
+`--exposition=…,low` — alone or beside any other set, in the CLI or the YAML form — stops the start:
+
+> the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)
+
+The full binaries take `readonly`, `high` and `debug`. The 112 low tools are gone from their tool
+list — the `*Low` tools of the low set and the three `*Low` reads of the system group
+(`GetVirtualFoldersLow`, `GetNodeStructureLow`, `GetObjectStructureLow`). The binaries no longer
+duplicate each other: a full binary carries no low tool and no compact tool, a compact binary none
+of the full set's high or low tools; only read-only reads may be in both.
+
+**If you used the low set, run the compact binary of your transport** (`mcp-abap-adt-compact`,
+`-compact-http`, `-compact-sse`), which does what the low set did, a step at a time:
+
+- **Lock, write, unlock.** `HandlerLock` answers a `lock_handle` and a `session_id`;
+  `HandlerUpdate` with that `lock_handle` sends the write alone under your lock — no lock, unlock,
+  check or activation of its own (`activate: true` beside it is refused); `HandlerUnlock`
+  releases it. Without `lock_handle`, `HandlerUpdate` locks and unlocks itself, as before.
+  **Keeping the lock short is yours:** the server releases nothing on its own clock.
+- **Validate, check, activate.** `HandlerValidate` (now with `super_package` for a package,
+  `superclass` for a class, `package_name` for a function group, and FUNCTION_MODULE),
+  `HandlerCheckRun` (now PACKAGE and FUNCTION_MODULE, and `source_code` to check source that is
+  not saved for CLASS, STRUCTURE and DDL), `HandlerActivate`. A function module is named
+  `GROUP|MODULE` in the lifecycle tools' `object_name`.
+- **Packages.** `HandlerCreate` PACKAGE takes `super_package` and the package settings (it could
+  not create a package before: the parameter was not declared); `HandlerUpdate` PACKAGE writes the
+  description under your `lock_handle`; `HandlerDelete` PACKAGE, with `force_new_connection`;
+  `HandlerCheckRun` PACKAGE.
+- **Creation parameters.** `HandlerCreate` takes `superclass`, `final`, `abstract`,
+  `create_protected` for a class and `master_language`.
+- **The repository by address.** `HandlerGet` with `part: object_structure` (`object_adt_type`,
+  `object_name`), `part: node_structure` (`object_adt_type`, `object_name`, `node_id`,
+  `with_short_descriptions`) and `part: virtual_folders` (`object_search_pattern`, `preselection`,
+  `facet_order`, `with_versions`, `ignore_short_descriptions`); these three parts take no
+  `object_type`.
+
+Each low tool and the compact call that replaces it — the same ADT requests, tested against a
+stand-in (`src/__tests__/unit/lowToCompact.test.ts`) with the low tool's requests captured before it
+was removed (`tools/low-to-compact.json`). Three differences are accepted and named in their rows: a
+create through `HandlerCreate` of a domain, data element, structure, behavior definition or metadata
+extension also validates, locks and checks; a delete through `HandlerDelete` asks the deletion check
+first; a function module, service definition or service binding activates through the activation run.
+
+<!-- low-to-compact table: rendered from tools/low-to-compact.json -->
+| Low tool | Compact call | Difference / note |
+|---|---|---|
+| `ActivateBehaviorDefinitionLow` | `HandlerActivate` (object_type: BEHAVIOR_DEFINITION, object_name) | the same requests |
+| `ActivateClassLow` | `HandlerActivate` (object_type: CLASS, object_name) | the same requests |
+| `ActivateDataElementLow` | `HandlerActivate` (object_type: DATA_ELEMENT, object_name) | the same requests |
+| `ActivateDdlLow` | `HandlerActivate` (object_type: DDL, object_name) | the same requests |
+| `ActivateDomainLow` | `HandlerActivate` (object_type: DOMAIN, object_name) | the same requests |
+| `ActivateFunctionGroupLow` | `HandlerActivate` (object_type: FUNCTION_GROUP, object_name) | the same requests |
+| `ActivateFunctionModuleLow` | `HandlerActivate` (objects) | **accepted:** HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation. |
+| `ActivateInterfaceLow` | `HandlerActivate` (object_type: INTERFACE, object_name) | the same requests |
+| `ActivateMetadataExtensionLow` | `HandlerActivate` (object_type: METADATA_EXTENSION, object_name) | the same requests |
+| `ActivateObjectLow` | `HandlerActivate` (objects, preaudit) | the same requests |
+| `ActivateProgramLow` | `HandlerActivate` (object_type: PROGRAM, object_name) | the same requests |
+| `ActivateServiceBindingLow` | `HandlerActivate` (object_type: SERVICE_BINDING, object_name) | **accepted:** HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation. |
+| `ActivateServiceDefinitionLow` | `HandlerActivate` (object_type: SERVICE_DEFINITION, object_name) | **accepted:** HandlerActivate activates this type through the activation run (POST /sap/bc/adt/activation/runs, then the run's status and results) instead of the single-object POST /sap/bc/adt/activation. |
+| `ActivateStructureLow` | `HandlerActivate` (object_type: STRUCTURE, object_name) | the same requests |
+| `ActivateTableLow` | `HandlerActivate` (object_type: TABLE, object_name) | the same requests |
+| `CheckBdefLow` | `HandlerCheckRun` (object_type: BEHAVIOR_DEFINITION, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
+| `CheckClassLow` | `HandlerCheckRun` (object_type: CLASS, object_name, version, source_code) | The low tool's source_code is HandlerCheckRun's source_code. |
+| `CheckDataElementLow` | `HandlerCheckRun` (object_type: DATA_ELEMENT, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
+| `CheckDdlLow` | `HandlerCheckRun` (object_type: DDL, object_name, version, source_code) | The low tool's ddl_source is HandlerCheckRun's source_code. |
+| `CheckDomainLow` | `HandlerCheckRun` (object_type: DOMAIN, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
+| `CheckFunctionGroupLow` | `HandlerCheckRun` (object_type: FUNCTION_GROUP, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
+| `CheckFunctionModuleLow` | `HandlerCheckRun` (object_type: FUNCTION_MODULE, object_name, version) | The lifecycle tools name a function module GROUP\|MODULE in object_name. |
+| `CheckInterfaceLow` | `HandlerCheckRun` (object_type: INTERFACE, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
+| `CheckMetadataExtensionLow` | `HandlerCheckRun` (object_type: METADATA_EXTENSION, object_name, version) | the same requests |
+| `CheckPackageLow` | `HandlerCheckRun` (object_type: PACKAGE, object_name) | the same requests |
+| `CheckProgramLow` | `HandlerCheckRun` (object_type: PROGRAM, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
+| `CheckStructureLow` | `HandlerCheckRun` (object_type: STRUCTURE, object_name, version, source_code) | The low tool's ddl_code is HandlerCheckRun's source_code. |
+| `CheckTableLow` | `HandlerCheckRun` (object_type: TABLE, object_name, version) | CheckTableLow accepted ddl_code and reporter and sent neither. |
+| `CreateBehaviorDefinitionLow` | `HandlerCreate` (object_type: BEHAVIOR_DEFINITION, name, description, package_name, transport_request, root_entity, implementation_type, activate) | **accepted:** HandlerCreate runs the high create, which locks, checks, unlocks and reads back after the create; the low tool's create request is among them, unchanged. |
+| `CreateBehaviorImplementationLow` | `HandlerCreate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, behavior_definition, description, package_name, transport_request), then `HandlerUpdate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, behavior_definition, implementation_code, transport_request, activate) | With implementation_code, two compact calls: the create, then the update (lock, write the implementations include, unlock). |
+| `CreateClassLow` | `HandlerCreate` (object_type: CLASS, class_name, description, package_name, transport_request, superclass, final, abstract, create_protected) | the same requests |
+| `CreateDataElementLow` | `HandlerCreate` (object_type: DATA_ELEMENT, data_element_name, description, package_name, transport_request, activate) | **accepted:** HandlerCreate runs the high create, which validates, creates, locks, writes the properties with their defaults, unlocks and checks; the low tool's create request is among them, unchanged. |
+| `CreateDdlLow` | `HandlerCreate` (object_type: DDL, ddl_name, description, package_name, transport_request) | the same requests |
+| `CreateDomainLow` | `HandlerCreate` (object_type: DOMAIN, domain_name, description, package_name, transport_request, activate) | **accepted:** HandlerCreate runs the high create, which validates, creates, locks, writes the properties with their defaults, unlocks and checks; the low tool's create request is among them, unchanged. |
+| `CreateFunctionGroupLow` | `HandlerCreate` (object_type: FUNCTION_GROUP, function_group_name, description, package_name, transport_request, activate) | On the 400 "Interface SAPL… has not been created" both read the group back. |
+| `CreateFunctionModuleLow` | `HandlerCreate` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, description, transport_request) | the same requests |
+| `CreateInterfaceLow` | `HandlerCreate` (object_type: INTERFACE, interface_name, description, package_name, transport_request) | the same requests |
+| `CreateMetadataExtensionLow` | `HandlerCreate` (object_type: METADATA_EXTENSION, name, description, package_name, transport_request, master_language, activate) | **accepted:** HandlerCreate runs the high create, which locks, checks and unlocks after the create; the low tool's create request is among them, unchanged. |
+| `CreatePackageLow` | `HandlerCreate` (object_type: PACKAGE, package_name, super_package, description, package_type, software_component, transport_layer, transport_request, record_changes, application_component) | the same requests |
+| `CreateProgramLow` | `HandlerCreate` (object_type: PROGRAM, program_name, description, package_name, transport_request, program_type, application) | the same requests |
+| `CreateStructureLow` | `HandlerCreate` (object_type: STRUCTURE, structure_name, description, package_name, transport_request, fields, activate) | **accepted:** HandlerCreate runs the high create, which validates before and checks after the create; the low tool's create request is among them, unchanged. HandlerCreate STRUCTURE requires fields, which do not reach the create (set them with HandlerUpdate ddl_code). |
+| `CreateTableLow` | `HandlerCreate` (object_type: TABLE, table_name, package_name, transport_request) | the same requests |
+| `CreateTransportLow` | `HandlerTransportCreate` (description, transport_type) | the same requests |
+| `DeleteBehaviorDefinitionLow` | `HandlerDelete` (object_type: BEHAVIOR_DEFINITION, behavior_definition_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteClassLow` | `HandlerDelete` (object_type: CLASS, class_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteDataElementLow` | `HandlerDelete` (object_type: DATA_ELEMENT, data_element_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteDdlLow` | `HandlerDelete` (object_type: DDL, ddl_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteDomainLow` | `HandlerDelete` (object_type: DOMAIN, domain_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteFunctionGroupLow` | `HandlerDelete` (object_type: FUNCTION_GROUP, function_group_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteFunctionModuleLow` | `HandlerDelete` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteInterfaceLow` | `HandlerDelete` (object_type: INTERFACE, interface_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteMetadataExtensionLow` | `HandlerDelete` (object_type: METADATA_EXTENSION, metadata_extension_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeletePackageLow` | `HandlerDelete` (object_type: PACKAGE, package_name, transport_request) | force_new_connection is taken as the low tool took it: the delete is sent from a new connection, closed afterwards. |
+| `DeleteProgramLow` | `HandlerDelete` (object_type: PROGRAM, program_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteStructureLow` | `HandlerDelete` (object_type: STRUCTURE, structure_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteTableLow` | `HandlerDelete` (object_type: TABLE, table_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `GetNodeStructureLow` | `HandlerGet` (part: node_structure, object_adt_type, object_name, node_id, with_short_descriptions) | the same requests |
+| `GetObjectStructureLow` | `HandlerGet` (part: object_structure, object_adt_type, object_name) | the same requests |
+| `GetVirtualFoldersLow` | `HandlerGet` (part: virtual_folders, object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions) | the same requests |
+| `LockBehaviorDefinitionLow` | `HandlerLock` (object_type: BEHAVIOR_DEFINITION, object_name) | the same requests |
+| `LockBehaviorImplementationLow` | `HandlerLock` (object_type: BEHAVIOR_IMPLEMENTATION, object_name) | the same requests |
+| `LockClassLow` | `HandlerLock` (object_type: CLASS, object_name) | the same requests |
+| `LockDataElementLow` | `HandlerLock` (object_type: DATA_ELEMENT, object_name) | the same requests |
+| `LockDdlLow` | `HandlerLock` (object_type: DDL, object_name) | the same requests |
+| `LockDomainLow` | `HandlerLock` (object_type: DOMAIN, object_name) | the same requests |
+| `LockFunctionGroupLow` | `HandlerLock` (object_type: FUNCTION_GROUP, object_name) | the same requests |
+| `LockFunctionModuleLow` | `HandlerLock` (object_type: FUNCTION_MODULE, object_name) | The lifecycle tools name a function module GROUP\|MODULE in object_name. |
+| `LockInterfaceLow` | `HandlerLock` (object_type: INTERFACE, object_name) | the same requests |
+| `LockMetadataExtensionLow` | `HandlerLock` (object_type: METADATA_EXTENSION, object_name) | the same requests |
+| `LockPackageLow` | `HandlerLock` (object_type: PACKAGE, object_name, super_package) | the same requests |
+| `LockProgramLow` | `HandlerLock` (object_type: PROGRAM, object_name) | the same requests |
+| `LockStructureLow` | `HandlerLock` (object_type: STRUCTURE, object_name) | the same requests |
+| `LockTableLow` | `HandlerLock` (object_type: TABLE, object_name) | the same requests |
+| `UnlockBehaviorDefinitionLow` | `HandlerUnlock` (object_type: BEHAVIOR_DEFINITION, object_name, lock_handle, session_id) | the same requests |
+| `UnlockClassLow` | `HandlerUnlock` (object_type: CLASS, object_name, lock_handle, session_id) | the same requests |
+| `UnlockDataElementLow` | `HandlerUnlock` (object_type: DATA_ELEMENT, object_name, lock_handle, session_id) | the same requests |
+| `UnlockDdlLow` | `HandlerUnlock` (object_type: DDL, object_name, lock_handle, session_id) | the same requests |
+| `UnlockDomainLow` | `HandlerUnlock` (object_type: DOMAIN, object_name, lock_handle, session_id) | the same requests |
+| `UnlockFunctionGroupLow` | `HandlerUnlock` (object_type: FUNCTION_GROUP, object_name, lock_handle, session_id) | the same requests |
+| `UnlockFunctionModuleLow` | `HandlerUnlock` (object_type: FUNCTION_MODULE, object_name, lock_handle, session_id) | The lifecycle tools name a function module GROUP\|MODULE in object_name. |
+| `UnlockInterfaceLow` | `HandlerUnlock` (object_type: INTERFACE, object_name, lock_handle, session_id) | the same requests |
+| `UnlockMetadataExtensionLow` | `HandlerUnlock` (object_type: METADATA_EXTENSION, object_name, lock_handle, session_id) | the same requests |
+| `UnlockPackageLow` | `HandlerUnlock` (object_type: PACKAGE, object_name, lock_handle, session_id) | the same requests |
+| `UnlockProgramLow` | `HandlerUnlock` (object_type: PROGRAM, object_name, lock_handle, session_id) | the same requests |
+| `UnlockStructureLow` | `HandlerUnlock` (object_type: STRUCTURE, object_name, lock_handle, session_id) | the same requests |
+| `UnlockTableLow` | `HandlerUnlock` (object_type: TABLE, object_name, lock_handle, session_id) | the same requests |
+| `UpdateBehaviorDefinitionLow` | `HandlerUpdate` (object_type: BEHAVIOR_DEFINITION, name, source_code, lock_handle, transport_request) | the same requests |
+| `UpdateClassLow` | `HandlerUpdate` (object_type: CLASS, class_name, source_code, lock_handle, transport_request) | the same requests |
+| `UpdateDataElementLow` | `HandlerUpdate` (object_type: DATA_ELEMENT, data_element_name, description, lock_handle) | The properties go as the compact update names them (description, datatype, length, …) or in properties. |
+| `UpdateDdlLow` | `HandlerUpdate` (object_type: DDL, ddl_name, ddl_source, lock_handle, transport_request) | the same requests |
+| `UpdateDomainLow` | `HandlerUpdate` (object_type: DOMAIN, domain_name, description, lock_handle) | The properties go as the compact update names them (description, datatype, length, …) or in properties. |
+| `UpdateFunctionModuleLow` | `HandlerUpdate` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, source_code, lock_handle, transport_request) | the same requests |
+| `UpdateInterfaceLow` | `HandlerUpdate` (object_type: INTERFACE, interface_name, source_code, lock_handle, transport_request) | the same requests |
+| `UpdateMetadataExtensionLow` | `HandlerUpdate` (object_type: METADATA_EXTENSION, name, source_code, lock_handle, transport_request) | the same requests |
+| `UpdatePackageLow` | `HandlerUpdate` (object_type: PACKAGE, package_name, super_package, description, lock_handle, transport_request) | the same requests |
+| `UpdateProgramLow` | `HandlerUpdate` (object_type: PROGRAM, program_name, source_code, lock_handle, transport_request) | the same requests |
+| `UpdateStructureLow` | `HandlerUpdate` (object_type: STRUCTURE, structure_name, ddl_code, lock_handle, transport_request) | the same requests |
+| `UpdateTableLow` | `HandlerUpdate` (object_type: TABLE, table_name, ddl_code, lock_handle, transport_request) | the same requests |
+| `ValidateBehaviorDefinitionLow` | `HandlerValidate` (object_type: BEHAVIOR_DEFINITION, object_name, root_entity, implementation_type, package_name, description) | ValidateBehaviorDefinitionLow validated the root entity's name; object_name carries it. |
+| `ValidateBehaviorImplementationLow` | `HandlerValidate` (object_type: BEHAVIOR_IMPLEMENTATION, object_name, behavior_definition, package_name, description) | the same requests |
+| `ValidateClassLow` | `HandlerValidate` (object_type: CLASS, object_name, package_name, description, superclass) | the same requests |
+| `ValidateDataElementLow` | `HandlerValidate` (object_type: DATA_ELEMENT, object_name, description, package_name) | the same requests |
+| `ValidateDdlLow` | `HandlerValidate` (object_type: DDL, object_name, package_name, description) | the same requests |
+| `ValidateDomainLow` | `HandlerValidate` (object_type: DOMAIN, object_name, description, package_name) | the same requests |
+| `ValidateFunctionGroupLow` | `HandlerValidate` (object_type: FUNCTION_GROUP, object_name, package_name, description) | the same requests |
+| `ValidateFunctionModuleLow` | `HandlerValidate` (object_type: FUNCTION_MODULE, object_name, description) | The lifecycle tools name a function module GROUP\|MODULE in object_name. |
+| `ValidateInterfaceLow` | `HandlerValidate` (object_type: INTERFACE, object_name, package_name, description) | the same requests |
+| `ValidateMetadataExtensionLow` | `HandlerValidate` (object_type: METADATA_EXTENSION, object_name, package_name, description) | the same requests |
+| `ValidatePackageLow` | `HandlerValidate` (object_type: PACKAGE, object_name, super_package) | the same requests |
+| `ValidateProgramLow` | `HandlerValidate` (object_type: PROGRAM, object_name, package_name, description) | the same requests |
+| `ValidateStructureLow` | `HandlerValidate` (object_type: STRUCTURE, object_name, package_name, description) | the same requests |
+| `ValidateTableLow` | `HandlerValidate` (object_type: TABLE, object_name, package_name, description) | the same requests |
+<!-- end of the low-to-compact table -->
 
 ## HTTP users
 
@@ -325,6 +487,9 @@ packages, each with one binary and its transport's options only:
   change nothing), and `debug` beside either for the four debugger verbs (`HandlerDebugStart`,
   `…Wait`, `…View`, `…Step`) — on stdio, Streamable HTTP and SSE alike. `debug` alone, an empty
   value and a set of the full binaries (`readonly`, `high`, `low`) stop the start, as in 18.x.
+- **Compact is the low set's analogue.** See "The low set leaves the full binaries" above: the
+  write under your `lock_handle`, the package operations, the creation and validation parameters,
+  the check of unsaved source, and `HandlerGet`'s three repository parts are new on `rw` / `ro`.
 - **A config file's `exposition` is honoured now.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Each compact binary's template now writes `exposition: rw`, its help lists `ro` / `rw`
@@ -583,7 +748,8 @@ packages, each with one binary and its transport's options only:
   `destination_refused` with its words, and `fresh_connection_unavailable` /
   `credentials_required` with fixed ones.
 - **`EmbeddableMcpServer` takes `freshConnection?: () => Promise<IAbapConnection>`.** Some operations need an ABAP session of their own: `CreatePackage`
-  (high and low) and `LockPackage` over RFC, `DeletePackage` with `force_new_connection`, a
+  (high, and compact's `HandlerCreate` PACKAGE) and compact's `HandlerLock` PACKAGE over RFC,
+  compact's `HandlerDelete` PACKAGE with `force_new_connection`, a
   debug session's own connections, and every call of a listed long read (see "the long reads take a
   `timeout`" above). On an injected connection, these now take that session from
   your factory, and from nowhere else. 18.x rebuilt one from the injected connection's
@@ -635,7 +801,8 @@ packages, each with one binary and its transport's options only:
   `FirstConnectLock`, `destinationFailureAnswer` and `DestinationHeaderError` are gone.
 - **The tools a binary serves are its `ToolSet`** (`@mcp-abap-adt/lib/tool-set`): the groups for
   an exposition, and the exposition's row, default and help. `fullToolSet` is the full binaries'
-  (readonly, high, low, debug, search, system); `compactToolSetOf({ readOnly, modify })` composes
+  (readonly, high, debug, search, system; `low` is refused, see "The low set leaves the full
+  binaries"); `compactToolSetOf({ readOnly, modify })` composes
   the compact halves' entry builders (`compactReadOnlyEntries`, `compactModifyEntries`) — the
   compact debugger verbs moved into lib with it; `registryOf(toolSet, exposition)` builds the
   registry. core's, http's and sse's `main({ toolSet, program, version })` take nothing else of the
@@ -651,8 +818,17 @@ packages, each with one binary and its transport's options only:
   `registryForExposition(exposition)` (`@mcp-abap-adt/lib/handlers`) stays, building the full
   set's registry; its `extraGroups` / `includeSearch` options are gone (a command passes a
   `ToolSet`).
-- **An exposition the set does not serve stops the start in its words** (`--exposition=high,low`,
-  `compact` on a full binary): `[MCP] Invalid exposition: …`, exit 1 — 18.x failed the launcher with
+- **The low set is gone from lib's surface too.** `LowLevelHandlersGroup` (and its export from
+  `@mcp-abap-adt/lib/handlers`) is deleted; `HandlerExporter` has no `includeLowLevel`;
+  `EmbeddableMcpServer`'s `exposition` and the `HandlerSet` type have no `'low'`. The handler
+  functions compact delegates to stay exported: `handleLockObject`, `handleUnlockObject`,
+  `handleActivateObject` and the new `handleUpdateUnderLock` and `handleDeletePackage`
+  (`@mcp-abap-adt/lib/handlers/write`); `handleCheckObject`, `handleValidateObject`,
+  `handleGetNodeStructure`, `handleGetVirtualFolders`, `handleGetObjectStructure`
+  (`@mcp-abap-adt/lib/handlers/read`). An embedder that composed the low group serves the compact
+  halves instead (`compactReadOnlyEntries`, `compactModifyEntries`).
+- **An exposition the set does not serve stops the start in its words** (`compact` on a full
+  binary; `low` with the sentence of "The low set leaves the full binaries"): `[MCP] Invalid exposition: …`, exit 1 — 18.x failed the launcher with
   no words.
 - **Each binary reads its own parameter table** (`@mcp-abap-adt/lib/config` keeps the machinery
   and the shared rows). `ServerConfigManager`, `ArgumentsParser` and `applyYamlConfigToArgs` are

@@ -155,7 +155,7 @@ const server = new EmbeddableMcpServer({
 await server.connect(transport);
 ```
 
-See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high/low, how to opt out with `NoDedupStrategy`, and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
+See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high, how to opt out with `NoDedupStrategy`, and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
 
 ## Quick Start
 
@@ -165,7 +165,7 @@ See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-gui
 4. **Use**:
    - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
    - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
-   - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
+   - [Compact Tools](compact/docs/AVAILABLE_TOOLS.md) — the single-step operations (lock, write under the lock, unlock, check, activate) the low set had; the low set left `mcp-abap-adt` / `-http` / `-sse` in 19.0.0 ([MIGRATION-19.0](docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries))
 
 ## Use Cases
 
@@ -256,7 +256,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **Tools by level**
   - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
   - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
-  - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
+  - [Compact Tools](compact/docs/AVAILABLE_TOOLS.md) (the low set's analogue since 19.0.0)
 
 ### For Administrators
 - **[Security](SECURITY.md)** - Never more secure than its host: who may call the server, HTTPS, TLS to SAP, credentials and state handles, a deployment checklist

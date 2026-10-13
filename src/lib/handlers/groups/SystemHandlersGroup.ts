@@ -2,18 +2,6 @@ import {
   TOOL_DEFINITION as GetPackageTree_Tool,
   handleGetPackageTree,
 } from '../../../handlers/system/high/handleGetPackageTree';
-import {
-  TOOL_DEFINITION as GetNodeStructureLow_Tool,
-  handleGetNodeStructure,
-} from '../../../handlers/system/low/handleGetNodeStructure';
-import {
-  TOOL_DEFINITION as GetObjectStructureLow_Tool,
-  handleGetObjectStructure as handleGetObjectStructureLow,
-} from '../../../handlers/system/low/handleGetObjectStructure';
-import {
-  TOOL_DEFINITION as GetVirtualFoldersLow_Tool,
-  handleGetVirtualFolders,
-} from '../../../handlers/system/low/handleGetVirtualFolders';
 import { TOOL_DEFINITION as DescribeByList_Tool } from '../../../handlers/system/readonly/handleDescribeByList';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList.js';
 import {
@@ -270,37 +258,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
                   object_name: string;
                   cache_type: string;
                 },
-          );
-        },
-      },
-      // Low-level handlers for virtual folders, node structure, and object structure
-      {
-        toolDefinition: GetVirtualFoldersLow_Tool,
-        handler: (args: any) => {
-          return handleGetVirtualFolders(this.context, args);
-        },
-      },
-      {
-        toolDefinition: GetNodeStructureLow_Tool,
-        handler: (args: any) => {
-          return handleGetNodeStructure(this.context, args);
-        },
-      },
-      {
-        toolDefinition: GetObjectStructureLow_Tool,
-        handler: (args: any) => {
-          return handleGetObjectStructureLow(
-            this.context,
-            args as {
-              object_type: string;
-              object_name: string;
-              session_id?: string;
-              session_state?: {
-                cookies?: string;
-                csrf_token?: string;
-                cookie_store?: Record<string, string>;
-              };
-            },
           );
         },
       },

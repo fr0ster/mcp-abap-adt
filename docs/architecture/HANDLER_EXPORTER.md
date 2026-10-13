@@ -98,7 +98,6 @@ By default, all handler groups are included. You can customize this:
 const exporter = new HandlerExporter({
   includeReadOnly: true,   // getProgram, getClass, getTable, etc.
   includeHighLevel: true,  // createProgram, updateClass, etc.
-  includeLowLevel: true,   // low-level ADT operations
   includeSystem: true,     // getInactiveObjects, etc.
   includeSearch: true,     // whereUsed, quickFix, etc.
 });
@@ -112,7 +111,6 @@ For a read-only server:
 const exporter = new HandlerExporter({
   includeReadOnly: true,
   includeHighLevel: false,
-  includeLowLevel: false,
   includeSystem: true,
   includeSearch: true,
 });

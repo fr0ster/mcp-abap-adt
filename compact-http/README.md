@@ -23,6 +23,8 @@ mcp-abap-adt-compact-http --help                     # every option, from this b
 
 There is no `--transport`: a binary is its transport.
 
+**The low set's analogue.** The low set left the full binaries in 19.0.0; its single-step operations are compact's: `HandlerLock`, `HandlerUpdate` with the `lock_handle` it answered (the write alone, under your lock), `HandlerUnlock`, `HandlerCheckRun`, `HandlerValidate`, `HandlerActivate`, and `HandlerGet` `part` `object_structure` / `node_structure` / `virtual_folders`. **Keeping a lock from `HandlerLock` short is your job:** the server releases nothing on its own clock — unlock as soon as the write is done. The tool-by-tool table: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+
 **Credentials** come only from each request's `x-sap-*` headers — `x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`; nothing is stored, shared or cached across requests. Held state (a debug session) is reached again with its `state_handle` on the pooled instance that holds it. A request without them is answered `400`; so is one
 carrying `x-mcp-destination` (destinations are served only by `mcp-abap-adt`, stdio).
 
@@ -30,7 +32,7 @@ carrying `x-mcp-destination` (destinations are served only by `mcp-abap-adt`, st
 nothing: no create, update, delete, activate, lock, unlock, unit-test run or profiler run is in the
 tool list at all), and `debug` beside either for the four debugger verbs (`HandlerDebugStart`,
 `HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`). `debug` alone, an empty value
-and the full binaries' sets (`readonly`, `high`, `low`) are refused at start. A config file's
+and the full binaries' sets (`readonly`, `high`) are refused at start. A config file's
 `exposition` (`--conf`) is read the same way, the flag winning; the template writes
 `exposition: rw`. The leftover-session tools (the SAP sessions a killed server process left open, only the
 caller's own): `HandlerLeftoverSessionList` and `HandlerLeftoverSessionLogoff` beside every

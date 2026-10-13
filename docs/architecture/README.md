@@ -32,7 +32,6 @@ import { HandlerExporter } from '@mcp-abap-adt/lib/handlers';
 const exporter = new HandlerExporter({
   includeReadOnly: true,
   includeHighLevel: true,
-  includeLowLevel: false,
   includeSystem: true,
   includeSearch: true,
 });
@@ -49,7 +48,6 @@ const server = new EmbeddableMcpServer({
 
 - **ReadOnlyHandlersGroup** — read-only operations
 - **HighLevelHandlersGroup** — high-level operations (create, update)
-- **LowLevelHandlersGroup** — low-level ADT operations
 - **SystemHandlersGroup** — system operations
 - **SearchHandlersGroup** — search operations
 

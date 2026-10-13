@@ -23,10 +23,8 @@ export interface HardModeConfig {
   /**
    * stdio only: the exposition the spawned server serves.
    *
-   * `high` and `low` are mutually exclusive — `validateExposition` refuses the
-   * pair and the launcher exits — so there is no value that serves both tiers,
-   * and asking for both was never a test of anything. A run covers one tier;
-   * set this to `readonly,low` for the low one.
+   * `readonly`, `high` and `debug`; `low` stops the start since 19.0.0 (the
+   * low set left the full binaries — compact is its analogue).
    */
   exposition?: string;
   // http/sse only: auth headers sent to a running server

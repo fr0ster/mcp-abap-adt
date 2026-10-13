@@ -5,7 +5,6 @@ import type { HandlerContext } from '../src/handlers/interfaces.js';
 import {
   DebugHandlersGroup,
   HighLevelHandlersGroup,
-  LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
   ReadVsGetDedupStrategy,
   SearchHandlersGroup,
@@ -23,7 +22,6 @@ const groups = {
   // so this is the full read-only surface before any exposition hides part of it.
   readonly: new ReadOnlyHandlersGroup(ctx),
   high: new HighLevelHandlersGroup(ctx),
-  low: new LowLevelHandlersGroup(ctx),
   system: new SystemHandlersGroup(ctx),
   search: new SearchHandlersGroup(ctx),
   debug: new DebugHandlersGroup(ctx),
@@ -127,9 +125,9 @@ type GroupKey = keyof typeof groups;
 const EXPOSITIONS: ReadonlyArray<readonly GroupKey[]> = [
   ['readonly'],
   ['high'],
-  ['low'],
   ['readonly', 'high'], // the default
-  ['readonly', 'low'],
+  // `['low']` and `['readonly', 'low']` were two more: the low set left the
+  // full binaries in 19.0.0 (D56), and `validateExposition` refuses the value.
   // `['compact']` was the sixth: the facade is `@mcp-abap-adt/compact` now, a
   // command of its own, and `validateExposition` refuses the value here.
 ];

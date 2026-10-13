@@ -1,5 +1,7 @@
 # Integration Tests for Low-Level Handlers
 
+> **19.0.0:** the low set left the full binaries (D56) and its integration suites (`integration/low/`, `LowTester`) were removed with it. The suites under `integration/high/` and the readonly ones remain; compact's lifecycle tools are covered by unit tests against the ADT stand-in (`src/__tests__/unit/lowToCompact.test.ts`). The pattern below is kept as history.
+
 This directory contains integration tests for low-level MCP handlers. These tests verify that handlers work correctly with real SAP systems.
 
 ## Overview

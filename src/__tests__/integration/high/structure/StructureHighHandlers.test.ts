@@ -15,8 +15,8 @@
  */
 
 import { handleCreateStructure } from '../../../../handlers/structure/high/handleCreateStructure';
+import { handleDeleteStructure } from '../../../../handlers/structure/high/handleDeleteStructure';
 import { handleUpdateStructure } from '../../../../handlers/structure/high/handleUpdateStructure';
-import { handleDeleteStructure } from '../../../../handlers/structure/low/handleDeleteStructure';
 import { getTimeout } from '../../helpers/configHelpers';
 import { HighTester } from '../../helpers/testers/HighTester';
 

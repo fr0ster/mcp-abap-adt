@@ -2,7 +2,7 @@
 
 ## Overview
 
-Testers (`HighTester`, `LowTester`, `ReadOnlyTester`) support two approaches for defining handler calls:
+Testers (`HighTester`, `ReadOnlyTester`; `LowTester` left with the low set in 19.0.0) support two approaches for defining handler calls:
 
 1. **Old approach**: Pass handler functions directly (backward compatible)
 2. **New approach**: Pass workflow functions (lambdas) that receive tester context

@@ -10,6 +10,8 @@ HTTP+SSE is deprecated in MCP since 2025-03-26; it is served for the clients tha
 SSE. A client that speaks Streamable HTTP wants
 [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http).
 
+**No low set (19.0.0).** `--exposition=…,low` stops the start: *"the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations are compact's — see [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+
 ```bash
 npm install -g @mcp-abap-adt/sse
 mcp-abap-adt-sse --sse-port=3001

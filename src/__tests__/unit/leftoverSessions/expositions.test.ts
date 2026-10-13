@@ -35,7 +35,6 @@ describe('the full binaries', () => {
     [['debug'], ['ListLeftoverSessions', 'LogoffLeftoverSession']],
     [['readonly', 'high'], FULL],
     [['high'], FULL],
-    [['low'], FULL],
   ])('%j serves %j', (exposition, expected) => {
     const tools = registryForExposition(exposition)
       .getHandlerGroups()

@@ -26,20 +26,20 @@ const OUTPUT_PATHS = {
     '../docs/user-guide/AVAILABLE_TOOLS_READONLY.md',
   ),
   high: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_HIGH.md'),
-  low: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LOW.md'),
   legacy: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LEGACY.md'),
 };
-const LEVELS = ['readonly', 'high', 'low', 'debug', 'session'];
+// `low` left in 19.0.0 (D56): the low set is not served by the full binaries,
+// and the low handler files that remain serve compact and high only.
+const LEVELS = ['readonly', 'high', 'debug', 'session'];
 
 if (process.argv.includes('--help') || process.argv.includes('-h')) {
   console.log(`
 Usage: node tools/generate-tools-docs.js
 
-Scans src/handlers/**/(readonly|high|low|debug|session)/*.ts and generates:
+Scans src/handlers/**/(readonly|high|debug|session)/*.ts and generates:
   docs/user-guide/AVAILABLE_TOOLS.md
   docs/user-guide/AVAILABLE_TOOLS_READONLY.md
   docs/user-guide/AVAILABLE_TOOLS_HIGH.md
-  docs/user-guide/AVAILABLE_TOOLS_LOW.md
   docs/user-guide/AVAILABLE_TOOLS_LEGACY.md   (only when a tool declares legacy)
 
 Output hierarchy:
@@ -633,7 +633,6 @@ function builtDefinitions() {
   const entries = new HandlerExporter({
     includeReadOnly: true,
     includeHighLevel: true,
-    includeLowLevel: true,
     includeSystem: true,
     includeSearch: true,
     includeDebug: true,
@@ -808,7 +807,6 @@ function generateMarkdown(tools) {
     total: tools.length,
     readonly: tools.filter((t) => t.level === 'readonly').length,
     high: tools.filter((t) => t.level === 'high').length,
-    low: tools.filter((t) => t.level === 'low').length,
     debug: tools.filter((t) => t.level === 'debug').length,
     session: tools.filter((t) => t.level === 'session').length,
   };
@@ -819,16 +817,14 @@ function generateMarkdown(tools) {
   md += `- Total tools: ${summary.total}\n`;
   md += `- Read-only tools: ${summary.readonly}\n`;
   md += `- High-level tools: ${summary.high}\n`;
-  md += `- Low-level tools: ${summary.low}\n`;
   md += `- Debug tools: ${summary.debug}\n`;
   md += `- Session tools: ${summary.session}\n\n`;
 
   md += `## Handler Sets\n\n`;
   md += `- \`readonly\` -> [Read-Only Group](#read-only-group)\n`;
   md += `- \`high\` -> [High-Level Group](#high-level-group)\n`;
-  md += `- \`low\` -> [Low-Level Group](#low-level-group)\n`;
   md += `- \`debug\` (opt-in) -> [Debug Group](#debug-group)\n`;
-  md += `- every exposition -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume beside \`high\` or \`low\` only)\n`;
+  md += `- every exposition -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume beside \`high\` only)\n`;
   md += `- \`compact\` -> [High-Level / Compact](#high-level-compact)\n\n`;
 
   md += `## Navigation\n\n`;
@@ -1032,11 +1028,6 @@ function main() {
     generateLevelMarkdown(tools, 'high'),
     'utf8',
   );
-  fs.writeFileSync(
-    OUTPUT_PATHS.low,
-    generateLevelMarkdown(tools, 'low'),
-    'utf8',
-  );
   // The legacy page writes itself back when there is something to put on it.
   //
   // Support for legacy systems (BASIS < 7.50) is parked on
@@ -1065,7 +1056,6 @@ function main() {
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.all}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.readonly}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.high}`);
-  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.low}`);
   console.log(
     declaresLegacy
       ? `✅ Documentation generated: ${OUTPUT_PATHS.legacy}`

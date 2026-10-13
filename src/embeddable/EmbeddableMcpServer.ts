@@ -6,7 +6,6 @@ import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
-import { LowLevelHandlersGroup } from '../lib/handlers/groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from '../lib/handlers/groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../lib/handlers/groups/SystemHandlersGroup.js';
@@ -84,14 +83,7 @@ export interface EmbeddableMcpServerOptions {
    * Exposition levels to include when creating default registry
    * @default ['readonly', 'high']
    */
-  exposition?: (
-    | 'readonly'
-    | 'high'
-    | 'low'
-    | 'compact'
-    | 'system'
-    | 'search'
-  )[];
+  exposition?: ('readonly' | 'high' | 'compact' | 'system' | 'search')[];
 
   /**
    * Server version
@@ -126,7 +118,7 @@ export interface EmbeddableMcpServerOptions {
 
   /**
    * Optional strategy that decides which readonly handlers to dedup (hide)
-   * when overriding groups (high / low / compact) are also exposed.
+   * when overriding groups (high / compact) are also exposed.
    *
    * Default: `ReadVsGetDedupStrategy` — hides a readonly `Read<X>` handler
    * when a corresponding `Get<X>` is contributed by another group, so a single
@@ -136,7 +128,7 @@ export interface EmbeddableMcpServerOptions {
    * bespoke role-based rules.
    *
    * Whatever the strategy, a readonly tool with the same NAME as a tool of an
-   * exposed high/low group (e.g. GetUnitTestResult) is registered once, from
+   * exposed high group (e.g. GetUnitTestResult) is registered once, from
    * that group.
    */
   readOnlyDedupStrategy?: IReadOnlyDedupStrategy;
@@ -242,14 +234,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
    * Creates default handlers registry based on exposition levels
    */
   private createDefaultRegistry(
-    exposition: (
-      | 'readonly'
-      | 'high'
-      | 'low'
-      | 'compact'
-      | 'system'
-      | 'search'
-    )[],
+    exposition: ('readonly' | 'high' | 'compact' | 'system' | 'search')[],
     logger?: Logger,
     readOnlyDedupStrategy: IReadOnlyDedupStrategy = new ReadVsGetDedupStrategy(),
   ): IHandlersRegistry {
@@ -265,9 +250,6 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     const overridingGroups: IHandlerGroup[] = [];
     if (exposition.includes('high')) {
       overridingGroups.push(new HighLevelHandlersGroup(dummyContext));
-    }
-    if (exposition.includes('low')) {
-      overridingGroups.push(new LowLevelHandlersGroup(dummyContext));
     }
 
     const overridingToolNames = new Set<string>();

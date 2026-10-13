@@ -11,8 +11,8 @@
  * reached only through another handler it delegates to.
  *
  * `handleValidateObject`'s own `TOOL_DEFINITION` (`ValidateObjectLow`) is
- * not even a registered tool — `LowLevelHandlersGroup.ts` comments its
- * registration out — so for every `object_type` except `SERVICE_BINDING`
+ * not a registered tool — and since 19.0.0 no low set is served at all —
+ * so for every `object_type` except `SERVICE_BINDING`
  * this compact facade is the ONLY way a caller reaches that function's
  * logic at all. Deliberately kept off this facade's own reduced,
  * `compactValidateSchema` surface (the same simplification `compact/` tools

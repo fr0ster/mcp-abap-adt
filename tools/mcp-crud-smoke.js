@@ -37,7 +37,7 @@ Stdio options:
                                  default args:
                                    --transport=stdio
                                    --env-path=.env
-                                   --exposition=readonly,high,low
+                                   --exposition=readonly,high
 
 Examples:
   node tools/mcp-crud-smoke.js --transport=http
@@ -228,7 +228,7 @@ async function createTransport(args) {
         ? args.stdioArgs
         : [
             '--env-path=.env',
-            '--exposition=readonly,high,low',
+            '--exposition=readonly,high',
           ];
     return new StdioClientTransport({
       command: args.stdioCommand || 'mcp-abap-adt',
@@ -277,7 +277,7 @@ async function main() {
     if (envPath.trim()) {
       args.stdioArgs = [
         `--env-path=${envPath}`,
-        '--exposition=readonly,high,low',
+        '--exposition=readonly,high',
       ];
     }
   }

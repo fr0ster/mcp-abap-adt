@@ -48,7 +48,7 @@ mcp-abap-adt-http --port=3000
 - **[CLIENT_CONFIGURATION.md](CLIENT_CONFIGURATION.md)** - Guide for configuring MCP clients to connect to the server, including HTTP header configuration for dynamic SAP connection setup
 - **[AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md)** - Read-only tools (auto-generated)
 - **[AVAILABLE_TOOLS_HIGH.md](AVAILABLE_TOOLS_HIGH.md)** - High-level tools (auto-generated)
-- **[AVAILABLE_TOOLS_LOW.md](AVAILABLE_TOOLS_LOW.md)** - Low-level tools (auto-generated)
+- **[Compact tools](../../compact/docs/AVAILABLE_TOOLS.md)** - the compact set, which does what the low set did (auto-generated)
 - **Compact facade tools** — moved to `@mcp-abap-adt/compact` and documented there (`compact/docs/AVAILABLE_TOOLS.md`) (auto-generated)
 - **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Full combined tools reference (auto-generated)
 - **[AUTHENTICATION.md](AUTHENTICATION.md)** - The four supported authentications, destinations, service key locations, and header-based auth
@@ -66,7 +66,7 @@ mcp-abap-adt-http --port=3000
 3. **Explore available tools**:
    - [Read-only tools](AVAILABLE_TOOLS_READONLY.md)
    - [High-level tools](AVAILABLE_TOOLS_HIGH.md)
-   - [Low-level tools](AVAILABLE_TOOLS_LOW.md)
+   - [Compact tools](../../compact/docs/AVAILABLE_TOOLS.md) (the low set's analogue since 19.0.0)
    - Compact tools — in the `@mcp-abap-adt/compact` package
 4. **Long reads take a `timeout`** (seconds, no default) — the approved list, each on an ABAP
    session of its own. When it passes the read is cancelled (its session logged off) and nothing
@@ -115,7 +115,7 @@ transport, three tools act on **your** leftover sessions, and nothing else does:
   user and time of each session a dead process left; never a cookie.
 - `ResumeLeftoverSession { handle }` (compact `HandlerLeftoverSessionResume`) — the server goes on
   in that session instead of logging on, so a `lock_handle` taken there works again: finish the
-  write, or unlock. Served only with a writing exposition (`high`, `low`; compact `rw`). A
+  write, or unlock. Served only with a writing exposition (`high`; compact `rw`). A
   debugger's session cannot be resumed. If SAP says the session is gone, you get SAP's answer and
   the record is deleted. Useful on stdio and SSE: over Streamable HTTP each request has an
   instance of its own, so a resumed session lives for that one request and is logged off with it.

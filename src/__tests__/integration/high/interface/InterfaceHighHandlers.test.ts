@@ -15,8 +15,8 @@
  */
 
 import { handleCreateInterface } from '../../../../handlers/interface/high/handleCreateInterface';
+import { handleDeleteInterface } from '../../../../handlers/interface/high/handleDeleteInterface';
 import { handleUpdateInterface } from '../../../../handlers/interface/high/handleUpdateInterface';
-import { handleDeleteInterface } from '../../../../handlers/interface/low/handleDeleteInterface';
 import { getTimeout } from '../../helpers/configHelpers';
 import { HighTester } from '../../helpers/testers/HighTester';
 

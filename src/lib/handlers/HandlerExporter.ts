@@ -9,7 +9,6 @@ import {
 import { BackgroundRunHandlersGroup } from './groups/BackgroundRunHandlersGroup.js';
 import { DebugHandlersGroup } from './groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
-import { LowLevelHandlersGroup } from './groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from './groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from './groups/SystemHandlersGroup.js';
@@ -43,12 +42,6 @@ export interface HandlerExporterOptions {
    * @default true
    */
   includeHighLevel?: boolean;
-
-  /**
-   * Include low-level handlers
-   * @default true
-   */
-  includeLowLevel?: boolean;
 
   /**
    * Include system handlers
@@ -103,7 +96,6 @@ export interface HandlerExporterOptions {
  * const exporter = new HandlerExporter({
  *   includeReadOnly: true,
  *   includeHighLevel: true,
- *   includeLowLevel: false,
  * });
  *
  * // Use with EmbeddableMcpServer
@@ -135,7 +127,7 @@ export class HandlerExporter {
     // Build handler groups based on options
     this.handlerGroups = [];
 
-    // High and low are built first: a readonly tool that is a copy of one of
+    // High is built first: a readonly tool that is a copy of one of
     // theirs under the same name is withheld from the readonly group, so a
     // tool appears once and comes from high. No other readonly tool is hidden
     // here (NoDedupStrategy) — this exporter has always listed Read<X>
@@ -143,9 +135,6 @@ export class HandlerExporter {
     const overridingGroups: IHandlerGroup[] = [];
     if (options?.includeHighLevel !== false) {
       overridingGroups.push(new HighLevelHandlersGroup(dummyContext));
-    }
-    if (options?.includeLowLevel !== false) {
-      overridingGroups.push(new LowLevelHandlersGroup(dummyContext));
     }
     const overridingToolNames = new Set<string>();
     for (const g of overridingGroups) {

@@ -138,7 +138,6 @@ describe('the same tool in readonly and high', () => {
     it('readonly only: one entry', () => {
       const exporter = new HandlerExporter({
         includeHighLevel: false,
-        includeLowLevel: false,
       });
       expect(exporter.getToolNames().filter((n) => n === TOOL)).toHaveLength(1);
     });
@@ -147,7 +146,6 @@ describe('the same tool in readonly and high', () => {
       const spy = spyOnContributors();
       try {
         const exporter = new HandlerExporter({
-          includeLowLevel: false,
           systemContextResolver: null,
         });
         const all = exporter.getToolNames();

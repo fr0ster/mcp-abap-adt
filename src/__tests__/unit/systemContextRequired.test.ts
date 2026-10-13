@@ -22,8 +22,7 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationHigh } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
-import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationLow } from '../../handlers/behavior_implementation/low/handleCreateBehaviorImplementation';
-import { handleCreateClass as handleCreateClassLow } from '../../handlers/class/low/handleCreateClass';
+import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
 import { handleReadClass } from '../../handlers/class/readonly/handleReadClass';
 import {
   TOOL_DEFINITION as CreateMessageClassTool,
@@ -103,7 +102,7 @@ const createMessageClass = async () => {
 /** A class create, which carries neither. */
 const createClass = async () => {
   const connection = recordingConnection();
-  const result = await handleCreateClassLow(
+  const result = await handleCreateClass(
     { connection, logger: undefined } as never,
     CLASS_ARGS,
   );
@@ -247,10 +246,7 @@ describe('on-premise', () => {
     description: 'placeholder',
     package_name: 'ZPACKAGE_PLACEHOLDER',
   };
-  const bimpTools = [
-    ['low', handleCreateBehaviorImplementationLow],
-    ['high', handleCreateBehaviorImplementationHigh],
-  ] as const;
+  const bimpTools = [['high', handleCreateBehaviorImplementationHigh]] as const;
 
   it.each(bimpTools)(
     'CreateBehaviorImplementation (%s), basic: no responsible attribute, no master system, not refused',

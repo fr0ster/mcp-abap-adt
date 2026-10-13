@@ -179,7 +179,7 @@ tools; the server decides nothing by itself (session-resume spec).
   debugger's `requestUserOf`); a system that names none keeps no file.
 - **The tools** (`ListLeftoverSessions` / `ResumeLeftoverSession` / `LogoffLeftoverSession`;
   compact `HandlerLeftoverSession{List,Resume,Logoff}`) — the list and the logoff on every
-  exposition, the resume only beside a writing one (`high` / `low`, compact `rw`) — are
+  exposition, the resume only beside a writing one (`high`, compact `rw`) — are
   `connectionless` entries: the tool wrapper calls them without `getConnection` (a resume must
   not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
   resolves the caller from the instance's source (`resolveCaller`) — a token caller's user from
@@ -342,8 +342,9 @@ option), where the header rules above hold.
 
 Some operations need an ABAP session of their own:
 
-- `CreatePackage` (high and low) and `LockPackage` over RFC;
-- `DeletePackage` with `force_new_connection`;
+- `CreatePackage` (high, and compact's `HandlerCreate` PACKAGE) and compact's `HandlerLock`
+  PACKAGE over RFC;
+- compact's `HandlerDelete` PACKAGE with `force_new_connection`;
 - a debug session's own connections.
 
 A package can be saved only once per ABAP session (PAK/058), which is why these cannot share the
@@ -402,13 +403,13 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
 - **Registry and groups.** `IHandlersRegistry` is the registry a server takes;
   `CompositeHandlersRegistry` is the one built from handler groups (`IHandlerGroup`:
   `getName()`, `getHandlers()`, each a `TOOL_DEFINITION` with its handler). The groups are
-  `ReadOnlyHandlersGroup`, `HighLevelHandlersGroup`, `LowLevelHandlersGroup`,
-  `SystemHandlersGroup`, `SearchHandlersGroup` and `DebugHandlersGroup`.
+  `ReadOnlyHandlersGroup`, `HighLevelHandlersGroup`, `SystemHandlersGroup`,
+  `SearchHandlersGroup` and `DebugHandlersGroup` (`LowLevelHandlersGroup` is gone since 19.0.0).
 - **Tool sets.** A binary's tools are its `ToolSet` (`@mcp-abap-adt/lib/tool-set`): the groups for
   an exposition, plus the exposition's row, default and help. `fullToolSet` covers readonly, high,
-  low, debug and search. `compactToolSetOf({ readOnly, modify })` is the compact facade's.
+  debug and search; it refuses `low` (the low set left the full binaries in 19.0.0). `compactToolSetOf({ readOnly, modify })` is the compact facade's.
   `registryOf(toolSet, exposition)` builds the registry.
 - **Embedders.** `EmbeddableMcpServer` builds its registry from `exposition` (`readonly`, `high`,
-  `low`, `compact`, `system`, `search`), or takes `handlersRegistry`.
+  `compact`, `system`, `search`), or takes `handlersRegistry`.
 - **Availability.** A tool is registered only if its `available_in` includes the instance's
   system type: the `systemType` option, else `SAP_SYSTEM_TYPE`.

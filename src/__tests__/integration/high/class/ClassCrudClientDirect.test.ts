@@ -19,7 +19,7 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
+import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { createAdtClient } from '../../../../lib/clients';
 import { createAbapConnection } from '../../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../../lib/credentialSources';

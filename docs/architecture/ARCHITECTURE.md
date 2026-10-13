@@ -293,7 +293,6 @@ Handlers are organized into groups by access level:
 |:---|:---|:---|
 | `ReadOnlyHandlersGroup` | Get operations (read source, metadata) | ~29 |
 | `HighLevelHandlersGroup` | Full CRUD (Create, Update, Delete, Get) | ~121 |
-| `LowLevelHandlersGroup` | Fine-grained (lock, unlock, activate, validate) | ~120 |
 | `SearchHandlersGroup` | Repository search, where-used | ~4 |
 | `SystemHandlersGroup` | System info, discovery | ~30 |
 
@@ -665,7 +664,7 @@ For troubleshooting:
 - **Strict interface isolation** prevents accidental coupling between packages
 - **Three authentications over stdio** -- basic, SNC, JWT with browser login -- and a JWT you hold in the HTTP and SSE headers, covering on-premise through BTP cloud
 - **Operation chain model** provides atomic, auditable CRUD sequences with automatic lock/unlock
-- **Exposition control** enables deployment profiles (read-only, full CRUD, low-level)
+- **Exposition control** enables deployment profiles (read-only, full CRUD; the single-step lock / write / unlock flow is the compact binaries' since 19.0.0)
 - **Transport flexibility** (stdio, HTTP, SSE) adapts to different client architectures
 - **22+ ABAP object types** with uniform interface -- broad coverage with consistent API
 

@@ -44,7 +44,6 @@ function shippedDefinitions(): ToolDefinition[] {
     ...new HandlerExporter({
       includeReadOnly: true,
       includeHighLevel: true,
-      includeLowLevel: true,
       includeSystem: true,
       includeSearch: true,
       includeDebug: true,
@@ -81,7 +80,8 @@ describe('the approved list of long tools (D56)', () => {
   const names = new Set(listed().map((l) => l.tool));
 
   it('sees every shipped tool, so the checks below are not vacuous', () => {
-    expect(definitions.length).toBeGreaterThan(300);
+    // 19.0.0 (D56): the low set's 112 tools left the surface.
+    expect(definitions.length).toBeGreaterThan(250);
   });
 
   it("the server's list is the JSON's, each tool once", () => {

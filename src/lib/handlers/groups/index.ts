@@ -17,7 +17,6 @@ export {
   type LeftoverSessionToolsOptions,
   leftoverSessionEntries,
 } from './LeftoverSessionHandlersGroup.js';
-export { LowLevelHandlersGroup } from './LowLevelHandlersGroup.js';
 export { ReadOnlyHandlersGroup } from './ReadOnlyHandlersGroup.js';
 export { SearchHandlersGroup } from './SearchHandlersGroup.js';
 export { SystemHandlersGroup } from './SystemHandlersGroup.js';

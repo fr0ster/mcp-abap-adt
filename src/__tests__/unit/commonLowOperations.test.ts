@@ -4,7 +4,6 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import { handleCheckObject } from '../../handlers/common/low/handleCheckObject';
-import { handleDeleteObject } from '../../handlers/common/low/handleDeleteObject';
 import { handleLockObject } from '../../handlers/common/low/handleLockObject';
 import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject';
 import { handleValidateObject } from '../../handlers/common/low/handleValidateObject';
@@ -77,23 +76,6 @@ const refusalFrom = (
   });
 
 describe('the three masking cases (Task 13, Step 2)', () => {
-  it('reports a refused deletion as an error, though ADT answered 200', async () => {
-    fakeClient = refusalFrom(
-      'delete',
-      'refusal-delete-refused--01-deletion-delete',
-      analyseDeletion,
-    );
-    const result: any = await handleDeleteObject(context as any, {
-      object_type: 'class',
-      object_name: 'ZCL_X',
-    });
-    expect(result.isError).toBe(true);
-    // What failed, not just that something did. A local validation error
-    // answers isError too, and would pass the line below unchanged.
-    expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
-    expect(result.content[0].text).not.toContain('"success": true');
-  });
-
   it('reports an inadmissible name as an error', async () => {
     fakeClient = refusalFrom(
       'validate',
@@ -234,84 +216,6 @@ describe('ValidateObjectLow', () => {
     });
     expect(
       seen.calls.filter((c) => c.member === 'validate').at(-1)?.factory,
-    ).toBe('getMetadataExtension');
-  });
-});
-
-describe('DeleteObjectLow', () => {
-  it('answers the structured delete-success fixture through terseDeletion', async () => {
-    const reading = structured({
-      data: corpusBody('delete-success--01-deletion-delete'),
-      status: 200,
-    } as any);
-    fakeClient = fakeClientOf({ delete: async () => okResponse(reading) });
-
-    const result: any = await handleDeleteObject(context as any, {
-      object_type: 'domain',
-      object_name: 'zd',
-    });
-
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
-      deleted: true,
-      object: 'ZMCP_BLD_ANSCH01',
-    });
-  });
-
-  it('hands delete its own analyseDeletion, with the transport request forwarded', async () => {
-    fakeClient = seen.client;
-    await handleDeleteObject(context as any, {
-      object_type: 'class',
-      object_name: 'zcl_x',
-      transport_request: 'SIDK900001',
-    });
-    const call = seen.calls.filter((c) => c.member === 'delete').at(-1);
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseDeletion);
-    expect(call?.args[0]).toEqual({
-      className: 'ZCL_X',
-      transportRequest: 'SIDK900001',
-    });
-  });
-
-  it('requires function_group_name for function_module deletion, and forwards both names', async () => {
-    fakeClient = seen.client;
-    const missing: any = await handleDeleteObject(context as any, {
-      object_type: 'function_module',
-      object_name: 'ZFM',
-    });
-    expect(missing.isError).toBe(true);
-    expect(seen.calls.length).toBe(0);
-
-    await handleDeleteObject(context as any, {
-      object_type: 'function_module',
-      object_name: 'zfm',
-      function_group_name: 'zfg',
-    });
-    const call = seen.calls.filter((c) => c.member === 'delete').at(-1);
-    expect(call?.args[0]).toEqual({
-      functionGroupName: 'ZFG',
-      functionModuleName: 'ZFM',
-      transportRequest: undefined,
-    });
-  });
-
-  it('behavior_definition and metadata_extension reach their own factory', async () => {
-    fakeClient = seen.client;
-    await handleDeleteObject(context as any, {
-      object_type: 'behavior_definition',
-      object_name: 'zbd',
-    });
-    expect(
-      seen.calls.filter((c) => c.member === 'delete').at(-1)?.factory,
-    ).toBe('getBehaviorDefinition');
-
-    await handleDeleteObject(context as any, {
-      object_type: 'metadata_extension',
-      object_name: 'zmd',
-    });
-    expect(
-      seen.calls.filter((c) => c.member === 'delete').at(-1)?.factory,
     ).toBe('getMetadataExtension');
   });
 });

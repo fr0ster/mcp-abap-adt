@@ -3,7 +3,7 @@
  *
  * The command serves the compact facade, so `readonly`/`high`/`low` — sets of the
  * object-oriented surface — mean nothing here. What IS a real choice at startup is
- * which half of the facade to serve: `rw` gives all 25 tools, `ro` the 16 that change
+ * which half of the facade to serve: `rw` gives all 27 tools, `ro` the 16 that change
  * nothing. Locally the default is `rw`, every access; `ro` exists for a host that
  * means to hand out a surface which cannot change the system.
  *
@@ -37,7 +37,7 @@ describe('the compact command reads its own exposition', () => {
 
   it('refuses a flag that was given no value, rather than defaulting', () => {
     // Reported in review: `--exposition="$MODE"` with an unset variable opened all
-    // 25 tools, writes included, and an empty repeat overrode a deliberate `ro`.
+    // 27 tools, writes included, and an empty repeat overrode a deliberate `ro`.
     // The default belongs to an ABSENT flag only.
     for (const argv of [
       ['--exposition='],

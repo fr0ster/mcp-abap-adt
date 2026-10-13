@@ -717,6 +717,67 @@ export const compactTransportCreateSchema = {
   required: ['description'],
 } as const;
 
+export const compactTransportSortAndCompressSchema = {
+  type: 'object',
+  properties: {
+    transport_number: {
+      type: 'string',
+      description: 'Number of the transport task to sort and compress.',
+    },
+  },
+  required: ['transport_number'],
+} as const;
+
+/**
+ * One entry of `objects`, as a constant of its own: the tool docs are read
+ * from the sources as text, and a nested `default` inside the `objects`
+ * property would be reported as the default of `objects` itself.
+ */
+const compactMovedTransportEntry = {
+  type: 'object',
+  properties: {
+    object_name: { type: 'string', description: 'Object name.' },
+    object_type: {
+      type: 'string',
+      description:
+        'Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.',
+    },
+    position: {
+      type: 'string',
+      description:
+        "Position of the object's entry in the source task's object list.",
+    },
+    pgmid: {
+      type: 'string',
+      description: "Program id. Defaults to R3TR, a workbench object's.",
+      default: 'R3TR',
+    },
+  },
+  required: ['object_name', 'object_type', 'position'],
+} as const;
+
+export const compactTransportMoveObjectsSchema = {
+  type: 'object',
+  properties: {
+    transport_number: {
+      type: 'string',
+      description: 'Number of the transport task that holds the entries.',
+    },
+    target_number: {
+      type: 'string',
+      description: 'Number of the transport task the entries move to.',
+    },
+    objects: {
+      type: 'array',
+      minItems: 1,
+      description:
+        'The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.',
+      items: compactMovedTransportEntry,
+    },
+  },
+  required: ['transport_number', 'target_number', 'objects'],
+} as const;
+
 const compactLifecycleObjectSchema = {
   object_type: commonObjectTypeSchema,
   object_name: {

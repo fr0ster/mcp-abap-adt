@@ -193,7 +193,7 @@ packages, each with one binary and its transport's options only:
   `mcp-abap-adt-compact-http` `mcp-abap-adt-http`'s (credentials from each request's `x-sap-*`
   headers), `mcp-abap-adt-compact-sse` `mcp-abap-adt-sse`'s. The sections above apply to each as
   to its counterpart; only the tool list and `--exposition` differ.
-- **`--exposition` is compact's on each**: `rw` (all 25 tools, the default) or `ro` (the 16 that
+- **`--exposition` is compact's on each**: `rw` (all 27 tools, the default) or `ro` (the 16 that
   change nothing), and `debug` beside either for the four debugger verbs (`HandlerDebugStart`,
   `…Wait`, `…View`, `…Step`) — on stdio, Streamable HTTP and SSE alike. `debug` alone, an empty
   value and a set of the full binaries (`readonly`, `high`, `low`) stop the start, as in 18.x.
@@ -203,6 +203,9 @@ packages, each with one binary and its transport's options only:
   / `debug`, and a config file's `exposition` is read by the same parser as the flag (the flag
   wins): `exposition: ro` serves the 16 tools, `exposition: readonly,high` stops the start —
   replace it with `ro` or `rw`.
+- **Two transport tools join `rw`** (25 → 27): `HandlerTransportSortAndCompress` (the full set's
+  `SortAndCompressTransportTask`) and `HandlerTransportMoveObjects` (`MoveTransportObjects`) — the
+  same handlers, the same parameters without `detail`.
 - `@mcp-abap-adt/compact-http` and `@mcp-abap-adt/compact-sse` do not depend on
   `@mcp-abap-adt/core`: neither the auth broker nor the stores are installed with them.
 

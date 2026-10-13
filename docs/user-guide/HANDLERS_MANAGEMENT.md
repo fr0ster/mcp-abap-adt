@@ -40,7 +40,7 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - `HandlerProfileRun`, `HandlerProfileList`, `HandlerProfileView`
    - `HandlerDumpList`, `HandlerDumpView`
    - `HandlerServiceBindingListTypes`, `HandlerServiceBindingValidate`
-   - `HandlerTransportCreate`
+   - `HandlerTransportCreate`, `HandlerTransportSortAndCompress`, `HandlerTransportMoveObjects`
    - `HandlerCreate`
    - `HandlerGet`
    - `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData`

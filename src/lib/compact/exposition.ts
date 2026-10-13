@@ -6,7 +6,7 @@
  * way, and none of them may take it from another.
  *
  * **Why the vocabulary is its own.** The two halves of the facade are a real
- * choice for whoever starts the server: `rw` serves all 25 tools, `ro` the 16
+ * choice for whoever starts the server: `rw` serves all 27 tools, `ro` the 16
  * that change nothing — no create, update, delete, activate, lock, unlock,
  * unit-test run or profiler run anywhere in the list. Locally the default gives
  * every access (`rw`); `ro` is there for a host that means to hand out a surface
@@ -31,7 +31,7 @@ HANDLER EXPOSITION:
                                    Options: ro, rw, debug — a comma list
                                    Default: rw
 
-                                   - rw: all 25 tools — HandlerGet, HandlerCreate,
+                                   - rw: all 27 tools — HandlerGet, HandlerCreate,
                                          HandlerUpdate, HandlerDelete,
                                          HandlerActivate, HandlerLock, ...
                                    - ro: the 16 that change nothing. No create,
@@ -53,7 +53,7 @@ HANDLER EXPOSITION:
 `;
 
 const EMPTY_WORDS =
-  "--exposition was given no value. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 25), and 'debug' beside either. An empty value is refused rather than defaulted: an unset shell variable must not silently open the write tools.";
+  "--exposition was given no value. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 27), and 'debug' beside either. An empty value is refused rather than defaulted: an unset shell variable must not silently open the write tools.";
 
 /** `a,b` → `['a', 'b']`, each trimmed and lower-cased. Plain code. */
 function splitWords(text: string): string[] {
@@ -70,7 +70,7 @@ function splitWords(text: string): string[] {
  *
  * **The default belongs to an ABSENT flag, never to an empty value.** The first
  * version treated the two alike, so `--exposition="$MODE"` with an unset variable
- * opened all 25 tools — writes included — and `--exposition=ro --exposition=`
+ * opened all 27 tools — writes included — and `--exposition=ro --exposition=`
  * overrode a deliberate `ro` the same way (found in review on PR #247). A flag that
  * is present but says nothing is a caller who meant something and lost it in a
  * shell; the only safe answer is to refuse.
@@ -110,7 +110,7 @@ function halfOf(values: readonly string[]): CompactExposition {
     if (v === 'ro' || v === 'rw') base = v;
     else if (v !== 'debug') {
       throw new ParameterRefusal(
-        `--exposition=${v} is not a compact set. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 25, the default), and 'debug' beside either. The sets readonly/high/low belong to \`mcp-abap-adt\`.`,
+        `--exposition=${v} is not a compact set. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 27, the default), and 'debug' beside either. The sets readonly/high/low belong to \`mcp-abap-adt\`.`,
       );
     }
   }
@@ -169,5 +169,5 @@ export const COMPACT_EXPOSITION_ROW: Parameter = {
   default: ['rw'],
   valueHint: '=<ro|rw>[,debug]',
   section: 'OPTIONS',
-  help: 'The half of the compact facade to serve: ro (the 16 tools that change nothing) or rw (all 25, the default); debug beside either (see HANDLER EXPOSITION)',
+  help: 'The half of the compact facade to serve: ro (the 16 tools that change nothing) or rw (all 27, the default); debug beside either (see HANDLER EXPOSITION)',
 };

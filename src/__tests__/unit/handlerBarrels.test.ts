@@ -69,8 +69,10 @@ describe("lib's read and write handler barrels", () => {
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the
-    // two deprecated `…WithProfiling` runs (76 handlers).
-    expect(write).toHaveLength(77);
+    // two deprecated `…WithProfiling` runs (76 handlers). 19.0.0 added the
+    // transport organizer's sort-and-compress and move-objects, for compact's
+    // `HandlerTransportSortAndCompress` / `HandlerTransportMoveObjects` (78).
+    expect(write).toHaveLength(79);
   });
 
   it('share not one symbol', () => {

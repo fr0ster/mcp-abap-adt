@@ -71,6 +71,8 @@ export { handleCreateTable } from '../../handlers/table/high/handleCreateTable.j
 export { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable.js';
 export { handleUpdateTable } from '../../handlers/table/high/handleUpdateTable.js';
 export { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport.js';
+export { handleMoveTransportObjects } from '../../handlers/transport/high/handleMoveTransportObjects.js';
+export { handleSortAndCompressTransportTask } from '../../handlers/transport/high/handleSortAndCompressTransportTask.js';
 export { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest.js';
 export { handleCreateFunctionGroupUnitTest } from '../../handlers/unit_test/high/handleCreateFunctionGroupUnitTest.js';
 export { handleCreateProgramUnitTest } from '../../handlers/unit_test/high/handleCreateProgramUnitTest.js';

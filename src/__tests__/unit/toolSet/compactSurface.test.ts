@@ -1,5 +1,5 @@
 /**
- * The compact surface stays frozen — the same 29 tools — 25, plus the four debug verbs served with `--exposition=…,debug`.
+ * The compact surface stays frozen — the same 31 tools — 27, plus the four debug verbs served with `--exposition=…,debug`.
  *
  * **Why it lives here now.** `tests/fixtures/tools/surface.json` in `lib` froze all
  * 370 tools, 22 of them compact. The facade moved into packages, so `lib`'s fixture
@@ -67,8 +67,8 @@ describe('the compact tool surface', () => {
   }));
 
   it('enumerates the whole facade, so the assertions below are not vacuous', () => {
-    expect(frozen).toHaveLength(29);
-    expect(current).toHaveLength(29);
+    expect(frozen).toHaveLength(31);
+    expect(current).toHaveLength(31);
   });
 
   it('has the same tools', () => {

@@ -151,8 +151,7 @@ function page(entries) {
   md += '## How it works\n\n';
   md +=
     'One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with\n';
-  md +=
-    `\`object_type: "CLASS"\` rather than a \`CreateClass\` tool. ${entries.length} schemas instead of\n`;
+  md += `\`object_type: "CLASS"\` rather than a \`CreateClass\` tool. ${entries.length} schemas instead of\n`;
   md +=
     "the object-oriented surface's hundreds, for a host that cannot select tools\n";
   md += 'per request.\n\n';
@@ -195,7 +194,9 @@ function main() {
     ...modify
       .compactModifyEntries(context)
       .map((entry) => ({ half: 'modify', entry })),
-    ...requireFresh('compact', path.join('debug', 'group.js'))
+    // The debugger verbs live in lib (`src/lib/compact/debug`), served by
+    // the compact binaries with `debug` in their exposition.
+    ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
       .compactDebugEntries()
       .map((entry) => ({ half: 'debug', entry })),
   ];

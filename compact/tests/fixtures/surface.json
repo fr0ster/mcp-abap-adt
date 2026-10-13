@@ -109,6 +109,18 @@
   },
   {
     "group": "compact",
+    "name": "HandlerTransportSortAndCompress",
+    "inputs": "transport_number*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerTransportMoveObjects",
+    "inputs": "transport_number*, target_number*, objects*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
     "name": "HandlerCreate",
     "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, description, transport_request, activate, program_type, application, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, name, root_entity, implementation_type, behavior_definition, cds_view_name, fields, test_class_source",
     "available_in": "cloud, onprem"

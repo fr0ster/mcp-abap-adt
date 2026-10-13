@@ -716,6 +716,9 @@ const COMPACT_RW = [
   'HandlerDelete',
   'HandlerGet',
   'HandlerLock',
+  'HandlerTransportCreate',
+  'HandlerTransportMoveObjects',
+  'HandlerTransportSortAndCompress',
   'HandlerUnlock',
   'HandlerUpdate',
 ];
@@ -794,7 +797,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // The tools: the object-oriented surface, and the compact facade.
       expect(full.tools).toContain('GetClass');
       expect(full.tools).not.toContain('HandlerGet');
-      expect(compact.tools).toHaveLength(25);
+      expect(compact.tools).toHaveLength(27);
       expect(compact.tools).toEqual(expect.arrayContaining(COMPACT_RW));
       expect(compact.tools).not.toContain('GetClass');
 
@@ -901,7 +904,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       ]);
       expect(exits).toEqual([1]);
       expect(stderr).toEqual([
-        "[MCP] --exposition was given no value. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 25), and 'debug' beside either. An empty value is refused rather than defaulted: an unset shell variable must not silently open the write tools.",
+        "[MCP] --exposition was given no value. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 27), and 'debug' beside either. An empty value is refused rather than defaulted: an unset shell variable must not silently open the write tools.",
       ]);
     });
 

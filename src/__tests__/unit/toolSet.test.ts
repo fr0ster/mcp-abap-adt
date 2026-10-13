@@ -191,7 +191,7 @@ describe('compactToolSetOf, with the two halves', () => {
     ).toHaveLength(16);
   });
 
-  it('rw, and no flag: both halves, all 25, in one group', () => {
+  it('rw, and no flag: both halves, all 27, in one group', () => {
     const both = [
       ...new CompactReadOnlyHandlersGroup(context).getHandlers(),
       ...new CompactModifyHandlersGroup(context).getHandlers(),
@@ -201,7 +201,7 @@ describe('compactToolSetOf, with the two halves', () => {
         { group: 'CompactHandlers', tools: both },
       ]);
     }
-    expect(both).toHaveLength(25);
+    expect(both).toHaveLength(27);
   });
 
   it('debug beside either: the four verbs after the half, and no search', () => {
@@ -232,7 +232,7 @@ describe('compactToolSetOf, with the two halves', () => {
   ])('refuses an empty value in today’s words: %j', (...argv) => {
     expect(() => exposed(compact, argv)).toThrow(
       new ParameterRefusal(
-        "--exposition was given no value. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 25), and 'debug' beside either. An empty value is refused rather than defaulted: an unset shell variable must not silently open the write tools.",
+        "--exposition was given no value. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 27), and 'debug' beside either. An empty value is refused rather than defaulted: an unset shell variable must not silently open the write tools.",
       ),
     );
   });
@@ -242,7 +242,7 @@ describe('compactToolSetOf, with the two halves', () => {
     (word) => {
       expect(() => exposed(compact, [`--exposition=${word}`])).toThrow(
         new ParameterRefusal(
-          `--exposition=${word} is not a compact set. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 25, the default), and 'debug' beside either. The sets readonly/high/low belong to \`mcp-abap-adt\`.`,
+          `--exposition=${word} is not a compact set. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 27, the default), and 'debug' beside either. The sets readonly/high/low belong to \`mcp-abap-adt\`.`,
         ),
       );
     },

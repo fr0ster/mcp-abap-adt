@@ -1,6 +1,6 @@
 # @mcp-abap-adt/compact
 
-The compact MCP server over **stdio** — the command that serves all 25, and the four debugger verbs on
+The compact MCP server over **stdio** — the command that serves all 27, and the four debugger verbs on
 request. Streamable HTTP is [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)
 (`mcp-abap-adt-compact-http`), SSE [`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse)
 (`mcp-abap-adt-compact-sse`): the same tools, a package per transport.
@@ -10,7 +10,7 @@ request. Streamable HTTP is [`@mcp-abap-adt/compact-http`](https://www.npmjs.com
 A different decomposition of the same ABAP ADT surface: the **operation** is the
 tool and the object moves into the arguments. Where the object-oriented surface has
 `CreateClass`, `CreateDomain`, `CreateDdl` and so on, compact has one
-`HandlerCreate` with `object_type`. Twenty-five tool schemas instead of hundreds.
+`HandlerCreate` with `object_type`. Twenty-seven tool schemas instead of hundreds.
 
 It exists for a host that **cannot build a retrieval pipeline of its own** — a small
 context, no tool-RAG, no way to select tools per request — and must still drive ABAP
@@ -34,13 +34,13 @@ smaller install, and it is not a sandbox — code that deliberately reaches into
 
 ```bash
 npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact                    # stdio, all 25 compact tools (no --transport: a binary is its transport)
+mcp-abap-adt-compact                    # stdio, all 27 compact tools (no --transport: a binary is its transport)
 mcp-abap-adt-compact --exposition=ro    # the 16 that change nothing
-mcp-abap-adt-compact --exposition=rw,debug   # all 25 and the four debugger verbs
+mcp-abap-adt-compact --exposition=rw,debug   # all 27 and the four debugger verbs
 mcp-abap-adt-compact --version
 ```
 
-`--exposition` takes **`rw`** (the default — all 25 tools, every access, which is
+`--exposition` takes **`rw`** (the default — all 27 tools, every access, which is
 what a local server gives) or **`ro`** (the 16 tools that change nothing: no create,
 update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool
 list at all, so a client cannot call one). The object-oriented sets

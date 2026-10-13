@@ -1,11 +1,12 @@
 /**
- * The compact tools that change the system, or run code on it — nine of the
- * twenty-two.
+ * The compact tools that change the system, or run code on it — eleven of the
+ * twenty-seven.
  *
  * The other half of the capability split described in
  * `CompactReadOnlyHandlersGroup`. Everything here either writes to the repository
  * (`HandlerCreate`, `HandlerUpdate`, `HandlerDelete`, `HandlerActivate`,
- * `HandlerTransportCreate`), takes an enqueue (`HandlerLock`, `HandlerUnlock` — a
+ * `HandlerTransportCreate`, `HandlerTransportSortAndCompress`,
+ * `HandlerTransportMoveObjects`), takes an enqueue (`HandlerLock`, `HandlerUnlock` — a
  * lock changes state and blocks other users), or executes ABAP and leaves traces
  * (`HandlerUnitTestRun`, `HandlerProfileRun`).
  *
@@ -40,6 +41,14 @@ import {
   TOOL_DEFINITION as HandlerTransportCreate_Tool,
   handleHandlerTransportCreate,
 } from './handlers/handleHandlerTransportCreate';
+import {
+  TOOL_DEFINITION as HandlerTransportMoveObjects_Tool,
+  handleHandlerTransportMoveObjects,
+} from './handlers/handleHandlerTransportMoveObjects';
+import {
+  TOOL_DEFINITION as HandlerTransportSortAndCompress_Tool,
+  handleHandlerTransportSortAndCompress,
+} from './handlers/handleHandlerTransportSortAndCompress';
 import {
   TOOL_DEFINITION as HandlerUnitTestRun_Tool,
   handleHandlerUnitTestRun,
@@ -89,6 +98,14 @@ export function compactModifyEntries(
     {
       toolDefinition: HandlerTransportCreate_Tool,
       handler: withContext(handleHandlerTransportCreate),
+    },
+    {
+      toolDefinition: HandlerTransportSortAndCompress_Tool,
+      handler: withContext(handleHandlerTransportSortAndCompress),
+    },
+    {
+      toolDefinition: HandlerTransportMoveObjects_Tool,
+      handler: withContext(handleHandlerTransportMoveObjects),
     },
     {
       toolDefinition: HandlerLock_Tool,

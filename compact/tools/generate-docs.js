@@ -147,6 +147,8 @@ function page(entries) {
   md += '- Modifying half: `@mcp-abap-adt/compact-modify`\n';
   md +=
     '- Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`\n';
+  md +=
+    '- Leftover-session tools: `@mcp-abap-adt/lib`, served with every exposition\n';
   md += '- Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)\n\n';
   md += '## How it works\n\n';
   md +=
@@ -162,7 +164,9 @@ function page(entries) {
     md +=
       half === 'debug'
         ? '**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)\n\n'
-        : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
+        : half === 'session'
+          ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib` (every exposition)\n\n'
+          : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
     const available = tool.available_in
       ? [...tool.available_in].sort().join(', ')
@@ -199,6 +203,11 @@ function main() {
     ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
       .compactDebugEntries()
       .map((entry) => ({ half: 'debug', entry })),
+    // The leftover-session tools live in lib (`src/lib/compact/session`),
+    // served by the compact binaries beside every exposition.
+    ...requireFresh('.', path.join('lib', 'compact', 'session', 'group.js'))
+      .compactLeftoverSessionEntries()
+      .map((entry) => ({ half: 'session', entry })),
   ];
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, page(entries), 'utf8');

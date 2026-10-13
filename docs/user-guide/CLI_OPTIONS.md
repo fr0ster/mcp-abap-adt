@@ -228,7 +228,10 @@ container's stop grace, a service manager's `TimeoutStopSec`), a few seconds bel
 A crash outside a tool (an uncaught exception, an unhandled promise rejection) runs the same
 forced close: every ADT session is logged off, one stderr line names the failure by its class,
 exit `1`. A process that is killed (`SIGKILL`, out of memory) cannot log off: SAP's own idle
-timeout ends its sessions and their locks.
+timeout ends its sessions and their locks — unless you act first. Its HTTP sessions are recorded
+in `<config dir>/runtime/` (`--auth-broker-path` moves it), and a later server process lists them
+(`ListLeftoverSessions`, compact `HandlerLeftoverSessionList`) and resumes or logs off the one you
+choose: [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process).
 
 ```bash
 mcp-abap-adt-http --shutdown-timeout=25

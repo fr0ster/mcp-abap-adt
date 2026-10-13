@@ -4,11 +4,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 372
+- Total tools: 375
 - Read-only tools: 66
 - High-level tools: 159
 - Low-level tools: 117
 - Debug tools: 30
+- Session tools: 3
 
 ## Handler Sets
 
@@ -16,6 +17,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `high` -> [High-Level Group](#high-level-group)
 - `low` -> [Low-Level Group](#low-level-group)
 - `debug` (opt-in) -> [Debug Group](#debug-group)
+- every exposition -> [Session Group](#session-group) (leftover SAP sessions of an ended process)
 - `compact` -> [High-Level / Compact](#high-level-compact)
 
 ## Navigation
@@ -466,6 +468,11 @@ Generated from code in `src/handlers/**` (not from docs).
     - [MemorySnapshotDelta](#memorysnapshotdelta-debug-debugger)
     - [MemorySnapshotGet](#memorysnapshotget-debug-debugger)
     - [MemorySnapshotList](#memorysnapshotlist-debug-debugger)
+- [Session Group](#session-group)
+  - [Leftover Session](#session-leftover-session)
+    - [ListLeftoverSessions](#listleftoversessions-session-leftover-session)
+    - [LogoffLeftoverSession](#logoffleftoversession-session-leftover-session)
+    - [ResumeLeftoverSession](#resumeleftoversession-session-leftover-session)
 
 ---
 
@@ -5743,6 +5750,45 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `user` (string, optional) - Only the snapshots of this SAP user.
+
+---
+
+<a id="session-group"></a>
+## Session Group
+
+<a id="session-leftover-session"></a>
+### Session / Leftover Session
+
+<a id="listleftoversessions-session-leftover-session"></a>
+#### ListLeftoverSessions (Session / Leftover Session)
+**Description:** [session] Lists the SAP sessions of yours that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user and when it was last recorded. Sessions of a running process are not listed. Resume one or log it off by its handle; nothing happens to them otherwise.
+
+**Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="logoffleftoversession-session-leftover-session"></a>
+#### LogoffLeftoverSession (Session / Leftover Session)
+**Description:** [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. No credential is sent with the logoff. The session record is deleted afterwards; a session SAP had already ended is reported as such.
+
+**Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
+
+**Parameters:**
+- `handle` (string, required) - The handle of a leftover session, as the list of leftover sessions answers it.
+
+---
+
+<a id="resumeleftoversession-session-leftover-session"></a>
+#### ResumeLeftoverSession (Session / Leftover Session)
+**Description:** [session] Continues a leftover SAP session (role built only) as this server's own connection, without a new logon: the locks it holds and their lock handles work again, so an object locked there can be finished or unlocked. A session this server already held is ended with its logoff once no call uses it. When SAP answers that the session is gone, the answer is SAP's and the session's record is deleted.
+
+**Source:** `src/handlers/leftover_session/session/handleResumeLeftoverSession.ts`
+
+**Parameters:**
+- `handle` (string, required) - The handle of a leftover session, as the list of leftover sessions answers it.
 
 ---
 

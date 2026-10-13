@@ -47,6 +47,13 @@ list at all, so a client cannot call one). The object-oriented sets
 `readonly`/`high`/`low` belong to `mcp-abap-adt` and are refused here by name. A config file's
 `exposition` (`--conf`) is read the same way, the flag winning; the template writes `exposition: rw`.
 
+**Leftover sessions, with every exposition.** Three more tools are served beside `ro` and `rw`
+alike: `HandlerLeftoverSessionList`, `HandlerLeftoverSessionResume` and
+`HandlerLeftoverSessionLogoff` — the SAP sessions a killed server process left open (and the locks
+in them), listed, resumed or logged off by the user, only the caller's own. In `ro` they are the
+only tools that change anything, and only the caller's own leftover sessions:
+[Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process).
+
 **The debugger is opt-in.** `debug` beside `ro` or `rw` (`--exposition=ro,debug`)
 adds four verbs: `HandlerDebugStart` (`kind: abap|amdp`, the breakpoints, `take_over`,
 an optional background `run`, and for `abap` `request_user`, `debugging_mode` and

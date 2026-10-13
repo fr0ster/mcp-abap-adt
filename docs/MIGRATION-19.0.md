@@ -116,6 +116,61 @@ the debugger. A session is stateful only for lock → write → unlock and activ
   does not answer now waits until the network fails; a bound on it is the client's own. The
   listed long reads' `timeout` above is the one deadline left, and it is the caller's.
 
+## Every transport: leftover SAP sessions of a killed process
+
+A server process killed from outside (`SIGKILL`, out of memory, a host that kills its child)
+cannot log off its SAP sessions, and a lock a session holds (`HandlerLock`, `LockClass`, …) stays
+until SAP's idle timeout. 19.0.0 keeps a record of every HTTP session the server holds, so that a
+later server process — on any transport — lets you **see** the sessions a killed one left and
+**choose** for each: resume it, or log it off. The server decides nothing by itself: it resumes
+nothing, logs off nothing and picks nothing unless you call one of the tools below.
+
+**The runtime files.** `<config dir>/runtime/`: `~/.config/mcp-abap-adt/runtime` on Unix,
+`Documents\mcp-abap-adt\runtime` on Windows; `mcp-abap-adt`'s `--auth-broker-path` moves it with
+`sessions/` and `service-keys/`, and `AUTH_BROKER_PATH`'s first entry moves it for every binary. One
+file per HTTP connection the server owns and that holds a session — an instance's own connection
+(role `built`) and each debugger connection (role `debugger`) — named by a random 128-bit handle.
+It holds the process id and its start time, the role, the destination (URL, client, system kind,
+wire), the backend user and the session's cookies. It is written once the connection holds a
+session and again after a request that changed the session's cookies (a stateful request's
+context cookie), and deleted once that connection's logoff is written — at every end: a tool's
+end, a replacement, the instance's close, the shutdown, the forced close and a crash's. So a file
+survives only a process that died without its logoff, or a logoff that could not be written.
+There is no expiry: a file stays until you act, and SAP's answer decides whether its session
+still lives.
+
+- **No file over RFC**: an RFC session is its conversation and cannot be picked up by another
+  process (and SAP ends it within seconds of the process's death — measured).
+- **No file without a backend user.** A file is matched to its caller by the destination and the
+  backend user the caller's request states: the destination's `SAP_USERNAME`, or `x-sap-login`.
+  A token credential (a service key, `x-sap-jwt-token`) states no user, so its sessions keep no
+  file and such a caller sees none.
+
+**Security: the files are bearer secrets.** The cookies in a file act as that SAP user for as long
+as the session lives — anyone who can read the file can work in the session, the locks it holds
+included. The directory is created `0700` (an existing one is narrowed to `0700`) and each file
+`0600`, owner-only; on Windows the directory's own ACL applies — keep it in your profile. Keep the
+directory out of backups, synchronised folders and container images, and do not share it between
+OS users. The server never logs a file's content and never shows a cookie to the model.
+
+**The tools**, on every transport and with every exposition:
+
+| Full binaries | Compact binaries | What it does |
+|---|---|---|
+| `ListLeftoverSessions` | `HandlerLeftoverSessionList` | your sessions a killed process left: `handle`, `role`, `destination` (`url`, `client`, `system`), `user`, `written_at` — never a cookie |
+| `ResumeLeftoverSession` `{ handle }` | `HandlerLeftoverSessionResume` | role `built` only: this server's connection is built on that session instead of logging on, so its locks and their `lock_handle`s work again; the file is this process's from then on. A session this server held before is logged off once no call uses it. SAP answering that the session is gone (`401`, a redirect, another session) is the answer, as SAP gave it (`state: "gone"`, `sap.status`), and the file is deleted |
+| `LogoffLeftoverSession` `{ handle }` | `HandlerLeftoverSessionLogoff` | any role: the platform's ICF logoff with the session's cookies and no credential (every lock of the session is released), then the file is deleted; a session SAP had already ended answers `state: "already_ended"` and its file is deleted too |
+
+- **Only your own.** A file is yours when its destination and backend user equal what your request
+  resolved. Someone else's file, an unknown handle and a file whose process still runs (process id
+  and start time) all get the same answer: `leftover_session_not_available`. A running process's
+  files — this one's included — are never listed or touched.
+- **Resuming a debugger session is refused** (`leftover_session_not_resumable`): its listener,
+  breakpoints and poll lived in the ended process. Log it off instead.
+- **Over Streamable HTTP** an instance that holds no state leaves after its request, and its
+  connection — a resumed one too — is logged off then: a resume there ends the session after the
+  call, as a logoff would.
+
 ## HTTP users
 
 - **Install `@mcp-abap-adt/http` and run `mcp-abap-adt-http`**, without `--transport` (see
@@ -399,6 +454,25 @@ packages, each with one binary and its transport's options only:
   `SettleReport.notStored` lines are `"<destination>": <reason>`, the reason auth-errors'
   classification. `beginShutdown()` (new) refuses every later interactive login with the shutdown
   sentence while the gate stays open for running tools.
+- **Leftover sessions: give your instances an owner, or they keep no record.** `BaseMcpServer`
+  takes `leftoverSessions?: LeftoverSessions` (`@mcp-abap-adt/lib/embeddable`): one per process,
+  created by you — `new LeftoverSessions({ directory: runtimeDirectory() })` — and handed to every
+  instance; no module global. With it, each HTTP connection an instance builds and holds a session
+  on keeps a runtime file until its logoff is written, and the three leftover-session tools work;
+  without it they answer `leftover_sessions_unavailable`, as they do on an instance whose
+  connection you injected. `StdioServer`, `StreamableHttpServer` and `SseServer` take the same
+  option; the launchers pass one. The server's `resolveCaller(signal)` (protected) is who the tools
+  answer for; core overrides it to refuse in inspection-only mode.
+- **`HandlerEntry.connectionless?: true`** marks a tool that works on no connection of the
+  instance: the server calls it without building or connecting one, its context's `connection`
+  absent. The leftover-session tools are such tools (their resume must not log on). `HandlerContext`
+  has `sessionFiles?` (the owner, which keeps a debugger's own connection) and `leftoverSessions?`
+  (the tools' port). `ServerRefusalCode` / `FailureCode` add `leftover_sessions_unavailable`,
+  `leftover_session_not_available` and `leftover_session_not_resumable`.
+- **`createAbapConnection(settings, credential, logger?, sessionId?, session?)`**: `session` builds
+  the connection on an existing SAP session (connection 17's `createConnection({ …, session })`):
+  `connect()` logs on nowhere and asks SAP, without the credential, whether that session lives.
+  HTTP only; over RFC it throws.
 - **`inspectionOnlyDestinations()` is gone**: `new StdioServer(registry, undefined)` is
   inspection-only, and a tool call answers lib's `ServerRefusal('inspection_only')`
   (`@mcp-abap-adt/lib/auth`).

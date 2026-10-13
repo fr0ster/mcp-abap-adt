@@ -75,6 +75,32 @@ mcp-abap-adt-http --port=3000
    one. The list:
    [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own).
 
+## Leftover SAP sessions of a killed process
+
+A server process killed from outside (`SIGKILL`, out of memory, a client that kills its child)
+cannot log off, so its SAP sessions — and the locks a lock tool took in them — stay open until
+SAP's idle timeout. Every server keeps a record of the HTTP sessions it holds in
+`<config dir>/runtime/` (`~/.config/mcp-abap-adt/runtime`, `Documents\mcp-abap-adt\runtime` on
+Windows; `--auth-broker-path` moves it) and deletes each record once that session's logoff is
+written, so only a killed process leaves records behind. From a later server process, on any
+transport, three tools act on **your** leftover sessions, and nothing else does:
+
+- `ListLeftoverSessions` (compact `HandlerLeftoverSessionList`) — the handle, role, destination,
+  user and time of each session a dead process left; never a cookie.
+- `ResumeLeftoverSession { handle }` (compact `HandlerLeftoverSessionResume`) — the server goes on
+  in that session instead of logging on, so a `lock_handle` taken there works again: finish the
+  write, or unlock. A debugger's session cannot be resumed. If SAP says the session is gone, you
+  get SAP's answer and the record is deleted.
+- `LogoffLeftoverSession { handle }` (compact `HandlerLeftoverSessionLogoff`) — logs the session off
+  (every lock in it is released), with no credential, and deletes the record.
+
+A record is yours when its destination and SAP user equal those of your request (the
+destination's `SAP_USERNAME`, or `x-sap-login`); a token credential names no user, so its
+sessions are not recorded. A session of a server still running is never shown. The records hold
+the session's cookies, which act as you while the session lives: the directory is owner-only
+(`0700`, files `0600`) — keep it out of backups and shared folders. Details:
+[MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-leftover-sap-sessions-of-a-killed-process).
+
 ## Package Tree Output
 
 `GetPackageTree` returns a package root with nested subpackages and a flat list of

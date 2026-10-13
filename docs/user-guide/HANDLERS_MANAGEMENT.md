@@ -95,6 +95,14 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - Inactive objects
    - Transactions
 
+8. **leftover sessions** - Always included, in every exposition of every binary (compact too)
+   - `ListLeftoverSessions`, `ResumeLeftoverSession`, `LogoffLeftoverSession`; compact
+     `HandlerLeftoverSessionList`, `HandlerLeftoverSessionResume`, `HandlerLeftoverSessionLogoff`
+   - The SAP sessions a killed server process left open, listed, resumed or logged off by the
+     user; they act only on the caller's own sessions. Compact `ro` serves them too, beside its
+     16 tools that change nothing: a logoff ends a session the caller already holds.
+   - [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process)
+
 ## Usage
 
 **Note:** The `search` handler group is ALWAYS included regardless of `--exposition`. The `system` handler group is included only when the exposition contains `readonly` (it is registered together with the read-only group). The default exposition is `readonly,high`, so both are present by default.

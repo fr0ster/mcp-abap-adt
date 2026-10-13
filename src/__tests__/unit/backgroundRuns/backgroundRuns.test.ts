@@ -9,6 +9,7 @@
  * until the case lets it go — the "long run".
  */
 
+import { BACKGROUND_RUNS_PER_CALLER } from '@mcp-abap-adt/background-runs-memory';
 import {
   activeTools,
   pending,
@@ -21,7 +22,6 @@ import {
   BACKGROUND_RUNS_UNAVAILABLE_WORDS,
   backgroundRunLimitWords,
 } from '../../../lib/auth/serverRefusal';
-import { BACKGROUND_RUNS_PER_CALLER } from '../../../lib/backgroundRuns/InMemoryBackgroundRuns';
 import { closeInstance } from '../../../lib/instanceClose';
 import { forceClose } from '../../../lib/ownedConnections';
 import { isLogoff } from '../../helpers/adtStandIn';

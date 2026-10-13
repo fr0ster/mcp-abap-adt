@@ -94,6 +94,7 @@ package.json
 !/server/package.json
 !/http/package.json
 !/sse/package.json
+!/background-runs-memory/package.json
 !/compact-readonly/package.json
 !/compact-modify/package.json
 !/compact/package.json

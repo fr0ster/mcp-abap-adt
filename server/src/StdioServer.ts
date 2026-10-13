@@ -45,7 +45,8 @@ export interface StdioServerOptions {
   leftoverSessions?: LeftoverSessions;
   /**
    * Where background runs and their answers are kept (the launcher's
-   * `InMemoryBackgroundRuns`). Absent: `background: true` is refused.
+   * `InMemoryBackgroundRuns` of
+   * `@mcp-abap-adt/background-runs-memory`). Absent: `background: true` is refused.
    */
   backgroundRuns?: IBackgroundRuns;
 }

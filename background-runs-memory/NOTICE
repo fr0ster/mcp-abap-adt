@@ -1,0 +1,12 @@
+@mcp-abap-adt/background-runs-memory
+Copyright 2025-2026 Oleksii Kyslytsia and contributors
+
+This product includes software developed as part of the mcp-abap-adt project
+(https://github.com/fr0ster/mcp-abap-adt).
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+The standalone server that uses this package is distributed separately as
+@mcp-abap-adt/core, @mcp-abap-adt/http and @mcp-abap-adt/sse under the GNU
+Affero General Public License v3.0 only. It is not part of this package, and
+nothing here is subject to its terms.

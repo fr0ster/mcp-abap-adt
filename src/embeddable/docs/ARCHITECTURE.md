@@ -217,7 +217,11 @@ their answers are kept is the host's: a strategy.
   handle and someone else's alike. Every method may answer a promise. The strategy decides only
   where runs are kept and how a handle is found (an embedder: its store, its routing between
   replicas).
-- **The servers' implementation** (`InMemoryBackgroundRuns({ prefix? })`): the process's memory,
+- **lib ships no implementation.** An embedder implements `IBackgroundRuns`, or takes the
+  servers' store from its own package, `@mcp-abap-adt/background-runs-memory` (an entry-surface
+  test keeps every lib entry free of one).
+- **The servers' implementation** (`InMemoryBackgroundRuns({ prefix? })`, package
+  `@mcp-abap-adt/background-runs-memory`, `background-runs-memory/`): the process's memory,
   16 per caller (running plus kept), no process-wide limit, no TTL; the handle is the host's
   `prefix` (an instance id) and 128 random bits as hex. Created by each launcher and handed to its
   instances (`backgroundRuns` on `StdioServer`, `StreamableHttpServer`, `SseServer`,

@@ -59,7 +59,8 @@ export interface EmbeddableMcpServerOptions {
   /**
    * Where background runs and their answers are kept: your strategy
    * (`IBackgroundRuns` — a store of your choosing, your own routing between
-   * replicas; `InMemoryBackgroundRuns` keeps them in this process's memory).
+   * replicas; `@mcp-abap-adt/background-runs-memory`'s `InMemoryBackgroundRuns`
+   * keeps them in this process's memory).
    * A run tool called with `background: true` runs on a connection of its
    * own — from `freshConnection` on an injected connection — and its answer
    * is handed to the strategy. Without it, `background: true` and the

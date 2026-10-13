@@ -1,4 +1,5 @@
 import { classify, logFields } from '@mcp-abap-adt/auth-errors';
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import type { IBrowser } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
@@ -13,7 +14,6 @@ import {
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
 import {
-  InMemoryBackgroundRuns,
   LeftoverSessions,
   runtimeDirectory,
 } from '@mcp-abap-adt/lib/embeddable';

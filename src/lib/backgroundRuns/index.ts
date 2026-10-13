@@ -8,11 +8,6 @@ export type {
   BackgroundRunStarted,
   IBackgroundRuns,
 } from './contract';
-export {
-  BACKGROUND_RUNS_PER_CALLER,
-  InMemoryBackgroundRuns,
-  type InMemoryBackgroundRunsOptions,
-} from './InMemoryBackgroundRuns';
 export { type BackgroundRunTools, backgroundRunTools } from './port';
 export {
   BACKGROUND_FINISH_FAILED_WORDS,

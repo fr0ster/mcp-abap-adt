@@ -9,8 +9,9 @@
  * after it, and hands the answer to the strategy (`finish`).
  *
  * **The strategy decides only where runs and their answers are kept and how
- * a handle is found** — the server's in memory (`InMemoryBackgroundRuns`,
- * created by the launcher), an embedder's its own (a store of its choosing,
+ * a handle is found** — the servers' in memory
+ * (`@mcp-abap-adt/background-runs-memory`, created by the launchers; lib
+ * ships no implementation), an embedder's its own (a store of its choosing,
  * its own routing between replicas). The library holds no default: an
  * instance without a strategy refuses `background: true` in fixed words.
  *

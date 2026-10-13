@@ -90,6 +90,13 @@ const PACKAGES: Row[] = [
     dir: '.',
     forbidden: [...CHAIN_STATE, '@mcp-abap-adt/core'],
   },
+  // The in-memory background-run store: lib's contract, nothing else of ours.
+  {
+    name: '@mcp-abap-adt/background-runs-memory',
+    dir: 'background-runs-memory',
+    forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES],
+    required: ['@mcp-abap-adt/lib'],
+  },
   {
     name: '@mcp-abap-adt/http',
     dir: 'http',
@@ -130,6 +137,7 @@ const PACKAGES: Row[] = [
 /** Every package of this repository, by name: how a sibling import is followed. */
 const SIBLING_DIRS = [
   '.',
+  'background-runs-memory',
   'server',
   'http',
   'sse',

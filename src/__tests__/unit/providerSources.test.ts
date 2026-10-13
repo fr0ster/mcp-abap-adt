@@ -30,6 +30,7 @@ const ROOTS = [
   'compact/src',
   'compact-readonly/src',
   'compact-modify/src',
+  'background-runs-memory/src',
 ].map((root) => path.join(REPO, root));
 
 const FACTORY_FILE = path.join(REPO, 'src/lib/connectionFactory.ts');

@@ -36,6 +36,7 @@
       "@mcp-abap-adt/lib/auth": ["./src/lib/auth/index.ts"],
       "@mcp-abap-adt/lib/http-transport": ["./src/lib/httpTransport/index.ts"],
       "@mcp-abap-adt/lib/tool-set": ["./src/lib/toolSet.ts"],
+      "@mcp-abap-adt/background-runs-memory": ["./background-runs-memory/src/index.ts"],
       "@mcp-abap-adt/compact-readonly": ["./compact-readonly/src/index.ts"],
       "@mcp-abap-adt/compact-readonly/routes": ["./compact-readonly/src/handlers/compactReadRoutes.ts"],
       "@mcp-abap-adt/compact-modify": ["./compact-modify/src/index.ts"],

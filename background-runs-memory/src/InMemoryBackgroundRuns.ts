@@ -1,9 +1,10 @@
 /**
- * The servers' background-run store: in the process's memory. The launchers
- * of `mcp-abap-adt`, `mcp-abap-adt-http` and `mcp-abap-adt-sse` (and the
- * compact binaries on them) create one and hand it to their server
- * instances; nothing creates one by default — an embedder passes its own
- * strategy, or none (then `background: true` is refused).
+ * The servers' background-run store: in the process's memory — a package of
+ * its own, so a consumer of `@mcp-abap-adt/lib` that keeps runs elsewhere
+ * never installs it. The launchers of `mcp-abap-adt`, `mcp-abap-adt-http`
+ * and `mcp-abap-adt-sse` (and the compact binaries on them) create one and
+ * hand it to their server instances; lib creates none — an embedder passes
+ * this, its own strategy, or none (then `background: true` is refused).
  *
  * - **Handles**: 128 random bits as hex, after the host's `prefix` (an
  *   instance id, when the host routes handles between instances — the
@@ -26,7 +27,7 @@ import type {
   BackgroundRunStart,
   BackgroundRunStarted,
   IBackgroundRuns,
-} from './contract';
+} from '@mcp-abap-adt/lib/embeddable';
 
 /** Runs a caller may hold at once, running and kept (the user's number). */
 export const BACKGROUND_RUNS_PER_CALLER = 16;

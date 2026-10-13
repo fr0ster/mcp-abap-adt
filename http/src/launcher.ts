@@ -5,6 +5,7 @@
  */
 
 import type { EventEmitter } from 'node:events';
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import {
   answerVersionOrHelp,
   generateHelp,
@@ -13,7 +14,6 @@ import {
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
 import {
-  InMemoryBackgroundRuns,
   LeftoverSessions,
   runtimeDirectory,
 } from '@mcp-abap-adt/lib/embeddable';

@@ -15,6 +15,7 @@ import {
   BasicAuthProvider,
   TokenAuthProvider,
 } from '@mcp-abap-adt/auth-providers';
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -22,7 +23,6 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { IBackgroundRuns } from '../../../lib/backgroundRuns/contract';
-import { InMemoryBackgroundRuns } from '../../../lib/backgroundRuns/InMemoryBackgroundRuns';
 import { CompactBackgroundRunHandlersGroup } from '../../../lib/compact/backgroundRuns/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';

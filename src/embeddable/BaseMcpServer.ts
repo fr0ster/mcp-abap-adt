@@ -223,7 +223,8 @@ export abstract class BaseMcpServer extends McpServer {
     leftoverSessions?: LeftoverSessions;
     /**
      * Where background runs and their answers are kept: the host's strategy,
-     * shared by its instances (the launchers' `InMemoryBackgroundRuns`, an
+     * shared by its instances (the launchers' `InMemoryBackgroundRuns` of
+     * `@mcp-abap-adt/background-runs-memory`, an
      * embedder's own). Absent: `background: true` and the background-run
      * tools are refused.
      */

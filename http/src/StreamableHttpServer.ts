@@ -102,7 +102,8 @@ export interface StreamableHttpServerOptions {
   leftoverSessions?: LeftoverSessions;
   /**
    * Where background runs and their answers are kept, handed to every
-   * instance (the launcher's `InMemoryBackgroundRuns`). Absent:
+   * instance (the launcher's `InMemoryBackgroundRuns` of
+   * `@mcp-abap-adt/background-runs-memory`). Absent:
    * `background: true` is refused.
    */
   backgroundRuns?: IBackgroundRuns;

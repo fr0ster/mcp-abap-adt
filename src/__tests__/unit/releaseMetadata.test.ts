@@ -18,6 +18,7 @@ const manifests = {
   lib: json('package.json'),
   core: json('server/package.json'),
   compact: json('compact/package.json'),
+  'background-runs-memory': json('background-runs-memory/package.json'),
   'compact-readonly': json('compact-readonly/package.json'),
   'compact-modify': json('compact-modify/package.json'),
 };
@@ -25,7 +26,7 @@ const version: string = manifests.lib.version;
 const major = version.split('.')[0];
 
 describe('release metadata names the version npm will carry', () => {
-  it('the five packages are released together', () => {
+  it('the six packages are released together', () => {
     for (const [name, manifest] of Object.entries(manifests)) {
       expect(`${name} ${manifest.version}`).toBe(`${name} ${version}`);
     }

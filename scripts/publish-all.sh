@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the nine packages of this repository to npm, in dependency order.
+# Publish the ten packages of this repository to npm, in dependency order.
 #
 # Usage: npm run release:publish            (add --dry-run to rehearse)
 #
@@ -25,10 +25,12 @@ done
 
 # Order matters and is not cosmetic: dependency order. core (./server), http
 # and sse each resolve @mcp-abap-adt/lib through paths into ../dist, so none
-# can build until the library has; compact depends on core, compact-http on
+# can build until the library has; background-runs-memory depends on lib, and
+# core, http and sse depend on it; compact depends on core, compact-http on
 # http and compact-sse on sse. core, http and sse do not depend on one another.
 PACKAGES=(
   "."
+  "./background-runs-memory"
   "./compact-readonly"
   "./compact-modify"
   "./server"

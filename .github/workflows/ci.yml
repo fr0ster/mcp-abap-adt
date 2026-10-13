@@ -52,6 +52,9 @@ jobs:
       - name: Run Biome lint (sse)
         run: npm --prefix sse run lint:check
 
+      - name: Run Biome lint (background-runs-memory)
+        run: npm --prefix background-runs-memory run lint:check
+
       # Their suites run in the root `npm test` (its Jest roots name them).
       - name: Run Biome lint (compact-http)
         run: npm --prefix compact-http run lint:check
@@ -133,11 +136,18 @@ jobs:
       - name: Run sse tests
         run: npm --prefix sse test
 
+      # The in-memory background-run store's own tests.
+      - name: Type-check background-runs-memory tests
+        run: npm --prefix background-runs-memory run test:check
+
+      - name: Run background-runs-memory tests
+        run: npm --prefix background-runs-memory test
+
       - name: Security audit (production deps, high+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high
 
-      # All nine packages. 10.0.0 split them: the repository root is
+      # All ten packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
       # one carrying the `mcp-abap-adt` binary. `npm pack` at the root produces
       # `mcp-abap-adt-lib-*.tgz`, so the install step below looked for a file
@@ -151,7 +161,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
           npm pack
-          npm pack ./compact-readonly ./compact-modify ./http ./sse ./server ./compact ./compact-http ./compact-sse
+          npm pack ./background-runs-memory ./compact-readonly ./compact-modify ./http ./sse ./server ./compact ./compact-http ./compact-sse
 
       # **Both tarballs in one install, or this step cannot pass a release.**
       # `core` depends on `lib` by range, so installing the core tarball alone
@@ -194,7 +204,7 @@ jobs:
           node -e "const {readFileSync,existsSync}=require('node:fs');
             const nm='node_modules/@mcp-abap-adt/';
             const pkg=n=>JSON.parse(readFileSync(nm+n+'/package.json','utf8'));
-            const ours=['lib','http','sse','core','compact','compact-http','compact-sse','compact-readonly','compact-modify'];
+            const ours=['lib','background-runs-memory','http','sse','core','compact','compact-http','compact-sse','compact-readonly','compact-modify'];
             let bad=0;
             for (const p of ours) for (const d of Object.keys(pkg(p).dependencies||{})) {
               const n=d.replace('@mcp-abap-adt/','');

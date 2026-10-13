@@ -11,7 +11,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { LeftoverSessions } from '@mcp-abap-adt/lib/embeddable';
-import { isLogoff, PROBE_PATH } from '../../../src/__tests__/helpers/adtStandIn';
+import {
+  isLogoff,
+  PROBE_PATH,
+} from '../../../src/__tests__/helpers/adtStandIn';
 import {
   fakeProbe,
   killedProcessSession,

@@ -21,6 +21,9 @@
     "outDir": "./dist",
     "noImplicitAny": false,
     "paths": {
+      "@mcp-abap-adt/background-runs-memory": [
+        "../background-runs-memory/dist/index.d.ts"
+      ],
       "@mcp-abap-adt/lib": [
         "../dist/index.d.ts"
       ],

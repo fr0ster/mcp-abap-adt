@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": [
+      "es2022"
+    ],
+    "module": "node16",
+    "moduleResolution": "node16",
+    "isolatedModules": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": [
+      "node",
+      "jest"
+    ],
+    "rootDir": "..",
+    "outDir": "./dist",
+    "noImplicitAny": false,
+    "paths": {
+      "@mcp-abap-adt/lib/embeddable": [
+        "../src/embeddable/index.ts"
+      ]
+    },
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": []
+}

@@ -438,9 +438,7 @@ describe('one destination per process', () => {
     const server = stdioStart.mock.instances[0] as unknown as {
       leftoverSessions?: { directory: string };
     };
-    expect(server.leftoverSessions?.directory).toBe(
-      path.join(root, 'runtime'),
-    );
+    expect(server.leftoverSessions?.directory).toBe(path.join(root, 'runtime'));
   });
 
   it('neither: inspection-only, no broker', async () => {

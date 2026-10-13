@@ -2,10 +2,13 @@
  * Background runs, around the run itself: an embedder's injected connection
  * (its fresh-connection factory decides), where the tools are served, which
  * tools take `background`, a group registered on its own (no strategy), and
- * the in-memory store's own rules.
+ * that lib's entries carry no store (its own package's tests cover it).
  */
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
+import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -14,10 +17,6 @@ import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group
 import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly/src/group';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { FRESH_CONNECTION_UNAVAILABLE_WORDS } from '../../../lib/auth/serverRefusal';
-import {
-  BACKGROUND_RUNS_PER_CALLER,
-  InMemoryBackgroundRuns,
-} from '../../../lib/backgroundRuns/InMemoryBackgroundRuns';
 import {
   BACKGROUND_TOOLS,
   readBackground,
@@ -282,71 +281,55 @@ describe('which tools take background', () => {
   });
 });
 
-describe('the in-memory store', () => {
-  const alice = { url: 'http://sys', client: '100', user: 'ALICE' };
-  const bob = { url: 'http://sys', client: '100', user: 'BOB' };
-  const otherClient = { url: 'http://sys', client: '200', user: 'ALICE' };
-  const run = { tool: 'RuntimeRunClass', object: 'X', started_at: 't0' };
-  const answer = { content: [{ type: 'text' as const, text: 'out' }] };
+describe('lib ships the contract only, no store', () => {
+  const REPO = path.resolve(__dirname, '../../../..');
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),
+  ) as { exports: Record<string, { types: string }> };
+  /** Each entry's source module, from its published `types` path. */
+  const entries = Object.entries(manifest.exports).map(([entry, target]) => [
+    entry,
+    path.join(
+      REPO,
+      target.types.replace('./dist/', 'src/').replace(/\.d\.ts$/, '.ts'),
+    ),
+  ]);
 
-  it('keeps each run for its caller only: URL, client and user', () => {
-    const store = new InMemoryBackgroundRuns();
-    const started = store.start(alice, run);
-    if (!('handle' in started)) throw new Error('refused');
-    for (const someone of [bob, otherClient]) {
-      expect(store.get(started.handle, someone)).toBeUndefined();
-      expect(store.list(someone)).toEqual([]);
-      expect(store.discard(started.handle, someone)).toBe('not-available');
-    }
-    expect(store.get(started.handle, alice)).toMatchObject({
-      state: 'running',
-    });
-  });
+  it.each(entries)(
+    '%s exports no IBackgroundRuns implementation',
+    (_entry, file) => {
+      const exported = require(file) as Record<string, unknown>;
+      for (const [name, value] of Object.entries(exported)) {
+        expect(name).not.toMatch(/InMemory|BACKGROUND_RUNS_PER_CALLER/);
+        const proto = (value as { prototype?: Record<string, unknown> })
+          ?.prototype;
+        const isStore =
+          typeof value === 'function' &&
+          proto !== undefined &&
+          ['start', 'finish', 'get', 'list', 'discard'].every(
+            (method) => typeof proto[method] === 'function',
+          );
+        expect({ name, isStore }).toEqual({ name, isStore: false });
+      }
+    },
+  );
 
-  it('a finished run keeps its answer until discarded; a running one is not discarded', () => {
-    const store = new InMemoryBackgroundRuns();
-    const started = store.start(alice, run);
-    if (!('handle' in started)) throw new Error('refused');
-    expect(store.discard(started.handle, alice)).toBe('running');
-    store.finish(started.handle, answer, 't1');
-    expect(store.get(started.handle, alice)).toEqual({
-      ...run,
-      run_handle: started.handle,
-      state: 'finished',
-      finished_at: 't1',
-      answer,
-    });
-    expect(store.discard(started.handle, alice)).toBe('discarded');
-    expect(store.get(started.handle, alice)).toBeUndefined();
-  });
-
-  it(`refuses the ${BACKGROUND_RUNS_PER_CALLER + 1}th run of a caller, running and kept counted; others are not limited`, () => {
-    const store = new InMemoryBackgroundRuns();
-    const handles: string[] = [];
-    for (let i = 0; i < BACKGROUND_RUNS_PER_CALLER; i += 1) {
-      const started = store.start(alice, run);
-      if (!('handle' in started)) throw new Error('refused early');
-      handles.push(started.handle);
-    }
-    expect(store.start(alice, run)).toEqual({
-      refused: 'limit',
-      limit: BACKGROUND_RUNS_PER_CALLER,
-    });
-    expect('handle' in store.start(bob, run)).toBe(true);
-    const first = handles[0] ?? '';
-    store.finish(first, answer, 't1');
-    // Kept still counts.
-    expect('refused' in store.start(alice, run)).toBe(true);
-    store.discard(first, alice);
-    expect('handle' in store.start(alice, run)).toBe(true);
-  });
-
-  it('handles are 128 random bits after the prefix', () => {
-    const store = new InMemoryBackgroundRuns({ prefix: 'i7-' });
-    const a = store.start(alice, run);
-    const b = store.start(alice, run);
-    if (!('handle' in a) || !('handle' in b)) throw new Error('refused');
-    expect(a.handle).toMatch(/^i7-[0-9a-f]{32}$/);
-    expect(a.handle).not.toBe(b.handle);
+  it('no lib source implements IBackgroundRuns', () => {
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name !== '__tests__') walk(full);
+        } else if (
+          entry.name.endsWith('.ts') &&
+          fs.readFileSync(full, 'utf8').includes('implements IBackgroundRuns')
+        ) {
+          offenders.push(path.relative(REPO, full));
+        }
+      }
+    };
+    walk(path.join(REPO, 'src'));
+    expect(offenders).toEqual([]);
   });
 });

@@ -2,16 +2,14 @@
 
 Generated from code in `src/handlers/**` (not from docs).
 
+Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
+
 - Level: Read-Only
 - Total tools: 69
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
-  - [Background Run](#read-only-background-run)
-    - [DiscardBackgroundRun](#discardbackgroundrun-read-only-background-run)
-    - [GetBackgroundRun](#getbackgroundrun-read-only-background-run)
-    - [ListBackgroundRuns](#listbackgroundruns-read-only-background-run)
   - [Behavior Definition](#read-only-behavior-definition)
     - [ReadBehaviorDefinition](#readbehaviordefinition-read-only-behavior-definition)
   - [Behavior Implementation](#read-only-behavior-implementation)
@@ -19,9 +17,9 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Class](#read-only-class)
     - [ReadClass](#readclass-read-only-class)
   - [Common](#read-only-common)
-    - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
     - [GetObjectVersions](#getobjectversions-read-only-common)
     - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
+    - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
   - [Data Element](#read-only-data-element)
     - [ReadDataElement](#readdataelement-read-only-data-element)
   - [Ddl](#read-only-ddl)
@@ -29,15 +27,15 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Domain](#read-only-domain)
     - [ReadDomain](#readdomain-read-only-domain)
   - [Enhancement](#read-only-enhancement)
-    - [GetEnhancementImpl](#getenhancementimpl-read-only-enhancement)
     - [GetEnhancements](#getenhancements-read-only-enhancement)
     - [GetEnhancementSpot](#getenhancementspot-read-only-enhancement)
+    - [GetEnhancementImpl](#getenhancementimpl-read-only-enhancement)
   - [Function Group](#read-only-function-group)
     - [ReadFunctionGroup](#readfunctiongroup-read-only-function-group)
   - [Function Include](#read-only-function-include)
+    - [ReadFunctionInclude](#readfunctioninclude-read-only-function-include)
     - [ListFunctionGroupIncludes](#listfunctiongroupincludes-read-only-function-include)
     - [ListFunctionModules](#listfunctionmodules-read-only-function-include)
-    - [ReadFunctionInclude](#readfunctioninclude-read-only-function-include)
   - [Function Module](#read-only-function-module)
     - [ReadFunctionModule](#readfunctionmodule-read-only-function-module)
   - [Include](#read-only-include)
@@ -45,6 +43,9 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetIncludesList](#getincludeslist-read-only-include)
   - [Interface](#read-only-interface)
     - [ReadInterface](#readinterface-read-only-interface)
+  - [Leftover Session](#read-only-leftover-session)
+    - [ListLeftoverSessions](#listleftoversessions-read-only-leftover-session)
+    - [LogoffLeftoverSession](#logoffleftoversession-read-only-leftover-session)
   - [Message Class](#read-only-message-class)
     - [ReadMessageClass](#readmessageclass-read-only-message-class)
     - [ReadMessageClassMessage](#readmessageclassmessage-read-only-message-class)
@@ -56,42 +57,43 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Program](#read-only-program)
     - [ReadProgram](#readprogram-read-only-program)
   - [Search](#read-only-search)
-    - [GetObjectsByType](#getobjectsbytype-read-only-search)
-    - [GetObjectsList](#getobjectslist-read-only-search)
     - [SearchObject](#searchobject-read-only-search)
+    - [GetObjectsList](#getobjectslist-read-only-search)
+    - [GetObjectsByType](#getobjectsbytype-read-only-search)
   - [Service Binding](#read-only-service-binding)
     - [ReadServiceBinding](#readservicebinding-read-only-service-binding)
   - [Service Definition](#read-only-service-definition)
     - [ReadServiceDefinition](#readservicedefinition-read-only-service-definition)
   - [Structure](#read-only-structure)
-    - [GetStructuresList](#getstructureslist-read-only-structure)
     - [ReadStructure](#readstructure-read-only-structure)
+    - [GetStructuresList](#getstructureslist-read-only-structure)
   - [System](#read-only-system)
-    - [DescribeByList](#describebylist-read-only-system)
+    - [GetServiceBindingPreviewUrl](#getservicebindingpreviewurl-read-only-system)
+    - [GetTypeInfo](#gettypeinfo-read-only-system)
+    - [GetTransaction](#gettransaction-read-only-system)
+    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-read-only-system)
+    - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
+    - [RuntimeGetProfilerTraceData](#runtimegetprofilertracedata-read-only-system)
+    - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
+    - [RuntimeRunClass](#runtimerunclass-read-only-system)
+    - [RuntimeRunProgram](#runtimerunprogram-read-only-system)
+    - [RuntimeAnalyzeProfilerTrace](#runtimeanalyzeprofilertrace-read-only-system)
+    - [RuntimeListFeeds](#runtimelistfeeds-read-only-system)
+    - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
+    - [RuntimeGetGatewayErrorLog](#runtimegetgatewayerrorlog-read-only-system)
+    - [GetSqlQuery](#getsqlquery-read-only-system)
+    - [GetWhereUsed](#getwhereused-read-only-system)
+    - [GetObjectInfo](#getobjectinfo-read-only-system)
     - [GetAbapAST](#getabapast-read-only-system)
     - [GetAbapSemanticAnalysis](#getabapsemanticanalysis-read-only-system)
     - [GetAbapSystemSymbols](#getabapsystemsymbols-read-only-system)
-    - [GetAdtTypes](#getadttypes-read-only-system)
-    - [GetInactiveObjects](#getinactiveobjects-read-only-system)
-    - [GetObjectInfo](#getobjectinfo-read-only-system)
-    - [GetObjectNodeFromCache](#getobjectnodefromcache-read-only-system)
-    - [GetObjectStructure](#getobjectstructure-read-only-system)
-    - [GetServiceBindingPreviewUrl](#getservicebindingpreviewurl-read-only-system)
     - [GetSession](#getsession-read-only-system)
-    - [GetSqlQuery](#getsqlquery-read-only-system)
-    - [GetTransaction](#gettransaction-read-only-system)
-    - [GetTypeInfo](#gettypeinfo-read-only-system)
-    - [GetWhereUsed](#getwhereused-read-only-system)
-    - [RuntimeAnalyzeProfilerTrace](#runtimeanalyzeprofilertrace-read-only-system)
-    - [RuntimeCreateProfilerTraceParameters](#runtimecreateprofilertraceparameters-read-only-system)
-    - [RuntimeGetDumpById](#runtimegetdumpbyid-read-only-system)
-    - [RuntimeGetGatewayErrorLog](#runtimegetgatewayerrorlog-read-only-system)
-    - [RuntimeGetProfilerTraceData](#runtimegetprofilertracedata-read-only-system)
-    - [RuntimeListFeeds](#runtimelistfeeds-read-only-system)
-    - [RuntimeListProfilerTraceFiles](#runtimelistprofilertracefiles-read-only-system)
-    - [RuntimeListSystemMessages](#runtimelistsystemmessages-read-only-system)
-    - [RuntimeRunClass](#runtimerunclass-read-only-system)
-    - [RuntimeRunProgram](#runtimerunprogram-read-only-system)
+    - [GetInactiveObjects](#getinactiveobjects-read-only-system)
+    - [GetAdtTypes](#getadttypes-read-only-system)
+    - [GetObjectStructure](#getobjectstructure-read-only-system)
+    - [GetObjectNodeFromCache](#getobjectnodefromcache-read-only-system)
+    - [DescribeByList](#describebylist-read-only-system)
+    - [GetPackageTree](#getpackagetree-read-only-system)
     - [SearchSource](#searchsource-read-only-system)
   - [Table](#read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
@@ -99,8 +101,8 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
-    - [ReadTransportActionLog](#readtransportactionlog-read-only-transport)
     - [ReadTransportObjects](#readtransportobjects-read-only-transport)
+    - [ReadTransportActionLog](#readtransportactionlog-read-only-transport)
   - [Unit Test](#read-only-unit-test)
     - [GetUnitTestResult](#getunittestresult-read-only-unit-test)
 
@@ -108,42 +110,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="read-only-group"></a>
 ## Read-Only Group
-
-<a id="read-only-background-run"></a>
-### Read-Only / Background Run
-
-<a id="discardbackgroundrun-read-only-background-run"></a>
-#### DiscardBackgroundRun (Read-Only / Background Run)
-**Description:** [runtime] Removes the kept answer of one of your finished background runs. A run still running cannot be discarded: a started run cannot be stopped.
-
-**Source:** `src/handlers/background_run/readonly/handleDiscardBackgroundRun.ts`
-
-**Parameters:**
-- `run_handle` (string, required) - The run_handle a run started with background=true answered.
-
----
-
-<a id="getbackgroundrun-read-only-background-run"></a>
-#### GetBackgroundRun (Read-Only / Background Run)
-**Description:** [runtime] Reads one of your background runs by its run_handle: running, or finished with what the run tool answered (the system answer as it is, an error included). Reading does not remove it; a finished run is kept until you discard it.
-
-**Source:** `src/handlers/background_run/readonly/handleGetBackgroundRun.ts`
-
-**Parameters:**
-- `run_handle` (string, required) - The run_handle a run started with background=true answered.
-
----
-
-<a id="listbackgroundruns-read-only-background-run"></a>
-#### ListBackgroundRuns (Read-Only / Background Run)
-**Description:** [runtime] Lists your background runs: run_handle, tool, object, when it started, and running or finished. No output: read a run with its run_handle.
-
-**Source:** `src/handlers/background_run/readonly/handleListBackgroundRuns.ts`
-
-**Parameters:**
-- None
-
----
 
 <a id="read-only-behavior-definition"></a>
 ### Read-Only / Behavior Definition
@@ -193,19 +159,6 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="read-only-common"></a>
 ### Read-Only / Common
 
-<a id="getobjectversiondiff-read-only-common"></a>
-#### GetObjectVersionDiff (Read-Only / Common)
-**Description:** [read-only] Compute a unified diff between two object versions. Pass the two opaque content_uris from GetObjectVersions entries; returns the unified diff (jsdiff) of their sources.
-
-**Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetObjectVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetObjectVersions entry).
-- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
-
----
-
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
 **Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version source via GetObjectVersionSource.
@@ -227,6 +180,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri taken from a GetObjectVersions version entry.
+- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
+
+---
+
+<a id="getobjectversiondiff-read-only-common"></a>
+#### GetObjectVersionDiff (Read-Only / Common)
+**Description:** [read-only] Compute a unified diff between two object versions. Pass the two opaque content_uris from GetObjectVersions entries; returns the unified diff (jsdiff) of their sources.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetObjectVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetObjectVersions entry).
 - `object_type` (string, required) - Object type (same value used in GetObjectVersions).
 
 ---
@@ -279,18 +245,6 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="read-only-enhancement"></a>
 ### Read-Only / Enhancement
 
-<a id="getenhancementimpl-read-only-enhancement"></a>
-#### GetEnhancementImpl (Read-Only / Enhancement)
-**Description:** [read-only] Retrieve source code of a specific enhancement implementation by its name and enhancement spot.
-
-**Source:** `src/handlers/enhancement/readonly/handleGetEnhancementImpl.ts`
-
-**Parameters:**
-- `enhancement_name` (string, required) - [read-only] Name of the enhancement implementation
-- `enhancement_spot` (string, required) - Name of the enhancement spot
-
----
-
 <a id="getenhancements-read-only-enhancement"></a>
 #### GetEnhancements (Read-Only / Enhancement)
 **Description:** [read-only] Retrieve a list of enhancements for a given ABAP object.
@@ -314,6 +268,18 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getenhancementimpl-read-only-enhancement"></a>
+#### GetEnhancementImpl (Read-Only / Enhancement)
+**Description:** [read-only] Retrieve source code of a specific enhancement implementation by its name and enhancement spot.
+
+**Source:** `src/handlers/enhancement/readonly/handleGetEnhancementImpl.ts`
+
+**Parameters:**
+- `enhancement_name` (string, required) - [read-only] Name of the enhancement implementation
+- `enhancement_spot` (string, required) - Name of the enhancement spot
+
+---
+
 <a id="read-only-function-group"></a>
 ### Read-Only / Function Group
 
@@ -331,6 +297,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="read-only-function-include"></a>
 ### Read-Only / Function Include
+
+<a id="readfunctioninclude-read-only-function-include"></a>
+#### ReadFunctionInclude (Read-Only / Function Include)
+**Description:** [read-only] Read ABAP function group include source code and metadata. Answers: "show function group include code", "display include source", "view include of function group". Returns source code and include metadata.
+
+**Source:** `src/handlers/function_include/readonly/handleReadFunctionInclude.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the include.
+- `include_name` (string, required) - Include name.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
@@ -351,19 +330,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group name.
-
----
-
-<a id="readfunctioninclude-read-only-function-include"></a>
-#### ReadFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Read ABAP function group include source code and metadata. Answers: "show function group include code", "display include source", "view include of function group". Returns source code and include metadata.
-
-**Source:** `src/handlers/function_include/readonly/handleReadFunctionInclude.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name containing the include.
-- `include_name` (string, required) - Include name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
 
@@ -423,6 +389,31 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-leftover-session"></a>
+### Read-Only / Leftover Session
+
+<a id="listleftoversessions-read-only-leftover-session"></a>
+#### ListLeftoverSessions (Read-Only / Leftover Session)
+**Description:** [session] Lists the SAP sessions of yours that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user and when it was last recorded. Sessions of a running process are not listed. Resume one or log it off by its handle; nothing happens to them otherwise.
+
+**Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="logoffleftoversession-read-only-leftover-session"></a>
+#### LogoffLeftoverSession (Read-Only / Leftover Session)
+**Description:** [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, with no credential. The session record is deleted afterwards.
+
+**Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
+
+**Parameters:**
+- `handle` (string, required) - The handle of a leftover session, as the list of leftover sessions answers it.
 
 ---
 
@@ -511,19 +502,17 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="read-only-search"></a>
 ### Read-Only / Search
 
-<a id="getobjectsbytype-read-only-search"></a>
-#### GetObjectsByType (Read-Only / Search)
-**Description:** [read-only] Retrieves all ABAP objects of a specific type (classes, tables, programs, interfaces, etc.) under a given parent node. Useful for listing all objects of one type within a package or composite object.
+<a id="searchobject-read-only-search"></a>
+#### SearchObject (Read-Only / Search)
+**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by type (PROG, CLAS, INTF, DEVC, TABL, DDLS, DTEL, FUGR, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
-**Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
+**Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
 **Parameters:**
-- `format` (string, optional) - [read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.
-- `node_id` (string, required) - [read-only] Node ID
-- `parent_name` (string, required) - [read-only] Parent object name
-- `parent_tech_name` (string, required) - [read-only] Parent technical name
-- `parent_type` (string, required) - [read-only] Parent object type
-- `with_short_descriptions` (boolean, optional) - [read-only] Include short descriptions
+- `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
+- `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
+- `object_type` (string, optional) - [read-only] Optional ABAP object type (e.g. 'TABL', 'CLAS/OC')
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -542,17 +531,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="searchobject-read-only-search"></a>
-#### SearchObject (Read-Only / Search)
-**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by type (PROG, CLAS, INTF, DEVC, TABL, DDLS, DTEL, FUGR, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+<a id="getobjectsbytype-read-only-search"></a>
+#### GetObjectsByType (Read-Only / Search)
+**Description:** [read-only] Retrieves all ABAP objects of a specific type (classes, tables, programs, interfaces, etc.) under a given parent node. Useful for listing all objects of one type within a package or composite object.
 
-**Source:** `src/handlers/search/readonly/handleSearchObject.ts`
+**Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
 **Parameters:**
-- `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
-- `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
-- `object_type` (string, optional) - [read-only] Optional ABAP object type (e.g. 'TABL', 'CLAS/OC')
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `format` (string, optional) - [read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.
+- `node_id` (string, required) - [read-only] Node ID
+- `parent_name` (string, required) - [read-only] Parent object name
+- `parent_tech_name` (string, required) - [read-only] Parent technical name
+- `parent_type` (string, required) - [read-only] Parent object type
+- `with_short_descriptions` (boolean, optional) - [read-only] Include short descriptions
 
 ---
 
@@ -588,6 +579,18 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="read-only-structure"></a>
 ### Read-Only / Structure
 
+<a id="readstructure-read-only-structure"></a>
+#### ReadStructure (Read-Only / Structure)
+**Description:** [read-only] Read ABAP structure definition and metadata. Answers: "show structure fields", "display structure X", "view structure definition", "get structure components". Returns field list, package, responsible, description.
+
+**Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
+
+**Parameters:**
+- `structure_name` (string, required) - Structure name.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
 **Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the DDIC structure/table endpoints this needs are not present there (issue #207). Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
@@ -602,29 +605,273 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="readstructure-read-only-structure"></a>
-#### ReadStructure (Read-Only / Structure)
-**Description:** [read-only] Read ABAP structure definition and metadata. Answers: "show structure fields", "display structure X", "view structure definition", "get structure components". Returns field list, package, responsible, description.
-
-**Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
-
-**Parameters:**
-- `structure_name` (string, required) - Structure name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
-
----
-
 <a id="read-only-system"></a>
 ### Read-Only / System
 
-<a id="describebylist-read-only-system"></a>
-#### DescribeByList (Read-Only / System)
-**Description:** [read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+<a id="getservicebindingpreviewurl-read-only-system"></a>
+#### GetServiceBindingPreviewUrl (Read-Only / System)
+**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, and says what is missing rather than guessing. A Web API binding has no preview page and answers the service URLs instead.
 
-**Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
+**Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
 **Parameters:**
-- `objects` (array, required) - [read-only] Object name (required, must be valid ABAP object name or mask)
+- `client` (string, optional) - Client for the sap-client parameter. Omitted, the client the system reports is used; an empty string leaves the parameter out.
+- `entity_set` (string, optional) - Entity set to open. Omitted, the first one the service definition exposes is used.
+- `language` (string, optional) - Logon language for the preview. Omitted, the language the system reports is used.
+- `navigation` (string, optional) - Association or composition to follow. Omitted, the first one of the exposed root view is used.
+- `service_binding_name` (string, required) - Service binding name.
+- `target_entity_set` (string, optional) - Entity set the navigation reaches. Omitted, the second exposed entity set is used.
+
+---
+
+<a id="gettypeinfo-read-only-system"></a>
+#### GetTypeInfo (Read-Only / System)
+**Description:** [read-only] Retrieve ABAP type information for domains (DOMA), data elements (DTEL), table types, and structures. Returns field definitions, value ranges, fixed values, and DDIC metadata.
+
+**Source:** `src/handlers/system/readonly/handleGetTypeInfo.ts`
+
+**Parameters:**
+- `include_structure_fallback` (boolean, optional (default: true)) - When true (default), tries DDIC structure lookup only if type lookup returns 404/empty.
+- `type_name` (string, required) - Name of the ABAP type
+
+---
+
+<a id="gettransaction-read-only-system"></a>
+#### GetTransaction (Read-Only / System)
+**Description:** [read-only] Retrieve ABAP transaction (t-code) details — program, screen, authorization object, and transaction type (dialog, report, OO).
+
+**Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
+
+**Parameters:**
+- `transaction_name` (string, required) - Name of the ABAP transaction
+
+---
+
+<a id="runtimecreateprofilertraceparameters-read-only-system"></a>
+#### RuntimeCreateProfilerTraceParameters (Read-Only / System)
+**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `description` (string, required) - Human-readable trace description.
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimelistprofilertracefiles-read-only-system"></a>
+#### RuntimeListProfilerTraceFiles (Read-Only / System)
+**Description:** [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="runtimegetprofilertracedata-read-only-system"></a>
+#### RuntimeGetProfilerTraceData (Read-Only / System)
+**Description:** [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
+
+**Parameters:**
+- `auto_drill_down_threshold` (number, optional) - Auto drill-down threshold (for statements view).
+- `id` (number, optional) - Statement node ID (for statements view).
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `trace_id_or_uri` (string, required) - Profiler trace ID or full ADT trace URI.
+- `view` (string, required) - Trace view to retrieve.
+- `with_details` (boolean, optional) - Include statement details (for statements view).
+- `with_system_events` (boolean, optional) - Include system events.
+
+---
+
+<a id="runtimegetdumpbyid-read-only-system"></a>
+#### RuntimeGetDumpById (Read-Only / System)
+**Description:** [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
+
+**Parameters:**
+- `dump_id` (string, required) - The dump's id, or its URI as a dumps feed entry carries it.
+- `response_mode` (string, optional (default: both)) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.
+- `view` (string, optional (default: default)) - Dump view mode: default payload, summary section, or formatted long text.
+
+---
+
+<a id="runtimerunclass-read-only-system"></a>
+#### RuntimeRunClass (Read-Only / System)
+**Description:** [runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace has not appeared within that bound, the run still answers success with output and profiler_id but no trace_id — poll RuntimeListProfilerTraceFiles or RuntimeAnalyzeProfilerTrace afterwards. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `class_name` (string, required) - ABAP class name to execute.
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
+- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
+- `sql_trace` (boolean, optional) - 
+- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimerunprogram-read-only-system"></a>
+#### RuntimeRunProgram (Read-Only / System)
+**Description:** [runtime] Execute an ABAP program (report) and return its output. Set profile=true to also start a profiler trace; use RuntimeListProfilerTraceFiles afterwards to locate the trace (program execution is fire-and-forget, so traceId is not returned synchronously).
+
+**Source:** `src/handlers/system/readonly/handleRuntimeRunProgram.ts`
+
+**Parameters:**
+- `aggregate` (boolean, optional) - 
+- `all_db_events` (boolean, optional) - 
+- `all_dynpro_events` (boolean, optional) - 
+- `all_internal_table_events` (boolean, optional) - 
+- `all_misc_abap_statements` (boolean, optional) - 
+- `all_procedural_units` (boolean, optional) - 
+- `all_system_kernel_events` (boolean, optional) - 
+- `amdp_trace` (boolean, optional) - 
+- `description` (string, optional) - Profiler trace description (only used when profile=true).
+- `explicit_on_off` (boolean, optional) - 
+- `max_size_for_trace_file` (number, optional) - 
+- `max_time_for_tracing` (number, optional) - 
+- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
+- `program_name` (string, required) - ABAP program name to execute.
+- `sql_trace` (boolean, optional) - 
+- `with_rfc_tracing` (boolean, optional) - 
+
+---
+
+<a id="runtimeanalyzeprofilertrace-read-only-system"></a>
+#### RuntimeAnalyzeProfilerTrace (Read-Only / System)
+**Description:** [runtime] Read profiler trace view and return compact analysis summary (totals + top entries). Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
+
+**Parameters:**
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `top` (number, optional) - Number of top rows for summary. Default: 10.
+- `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
+- `view` (string, optional (default: hitlist)) - 
+- `with_system_events` (boolean, optional) - Include system events.
+
+---
+
+<a id="runtimelistfeeds-read-only-system"></a>
+#### RuntimeListFeeds (Read-Only / System)
+**Description:** [runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
+
+**Parameters:**
+- `component` (string, optional) - Dumps whose application component contains this text, in any case.
+- `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
+- `feed_type` (string, optional (default: descriptors)) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
+- `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
+- `max_results` (number, optional) - Most entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: 50.
+- `object_name` (string, optional) - Dumps whose terminated object name contains this text, in any case.
+- `package` (string, optional) - Dumps whose object package contains this text, in any case.
+- `runtime_error` (string, optional) - Dumps whose runtime error contains this text, in any case.
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.
+- `user` (string, optional) - Entries of this SAP user (exact match).
+
+---
+
+<a id="runtimelistsystemmessages-read-only-system"></a>
+#### RuntimeListSystemMessages (Read-Only / System)
+**Description:** [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
+
+**Parameters:**
+- `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
+- `max_results` (number, optional) - Maximum number of messages to return.
+- `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
+- `user` (string, optional) - Filter by author username.
+
+---
+
+<a id="runtimegetgatewayerrorlog-read-only-system"></a>
+#### RuntimeGetGatewayErrorLog (Read-Only / System)
+**Description:** [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.
+
+**Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
+
+**Parameters:**
+- `error_url` (string, optional) - Feed URL of a specific error entry (from a previous list response link field). When provided, returns detailed error info instead of listing.
+- `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
+- `max_results` (number, optional) - Maximum number of errors to return.
+- `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
+- `user` (string, optional) - Filter errors by SAP username.
+
+---
+
+<a id="getsqlquery-read-only-system"></a>
+#### GetSqlQuery (Read-Only / System)
+**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+**Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
+
+**Parameters:**
+- `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
+- `sql_query` (string, required) - SQL query to execute
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+---
+
+<a id="getwhereused-read-only-system"></a>
+#### GetWhereUsed (Read-Only / System)
+**Description:** [read-only] Where-used list of an ABAP object: every object that uses, calls or references it, with its type and package. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+**Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
+
+**Parameters:**
+- `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
+- `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
+- `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
+- `object_name` (string, required) - Name of the ABAP object. For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
+- `object_type` (string, required) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+---
+
+<a id="getobjectinfo-read-only-system"></a>
+#### GetObjectInfo (Read-Only / System)
+**Description:** [read-only] Return ABAP object tree structure for packages (DEVC), classes (CLAS), programs (PROG), function groups (FUGR), and other objects. Shows root, group nodes, and terminal leaves up to maxDepth. Enrich each node with description and package via SearchObject if enrich=true. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+
+**Source:** `src/handlers/system/readonly/handleGetObjectInfo.ts`
+
+**Parameters:**
+- `enrich` (boolean, optional (default: true)) - [read-only] Whether to add description and package via SearchObject (default true)
+- `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.
+- `parent_name` (string, required) - [read-only] Parent object name
+- `parent_type` (string, required) - [read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P)
 - `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
@@ -663,14 +910,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="getadttypes-read-only-system"></a>
-#### GetAdtTypes (Read-Only / System)
-**Description:** [read-only] Retrieve all valid ADT object types (CLAS, TABL, PROG, DEVC, FUGR, INTF, DDLS, DTEL, DOMA, SRVD, SRVB, BDEF, DDLX, etc.) or validate a specific type name.
+<a id="getsession-read-only-system"></a>
+#### GetSession (Read-Only / System)
+**Description:** [read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.
 
-**Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
+**Source:** `src/handlers/system/readonly/handleGetSession.ts`
 
 **Parameters:**
-- `validate_type` (string, optional) - Type name to validate (optional)
+- `force_new` (boolean, optional) - Force creation of a new session even if one exists. Default: false
 
 ---
 
@@ -685,18 +932,26 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="getobjectinfo-read-only-system"></a>
-#### GetObjectInfo (Read-Only / System)
-**Description:** [read-only] Return ABAP object tree structure for packages (DEVC), classes (CLAS), programs (PROG), function groups (FUGR), and other objects. Shows root, group nodes, and terminal leaves up to maxDepth. Enrich each node with description and package via SearchObject if enrich=true. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+<a id="getadttypes-read-only-system"></a>
+#### GetAdtTypes (Read-Only / System)
+**Description:** [read-only] Retrieve all valid ADT object types (CLAS, TABL, PROG, DEVC, FUGR, INTF, DDLS, DTEL, DOMA, SRVD, SRVB, BDEF, DDLX, etc.) or validate a specific type name.
 
-**Source:** `src/handlers/system/readonly/handleGetObjectInfo.ts`
+**Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
 **Parameters:**
-- `enrich` (boolean, optional (default: true)) - [read-only] Whether to add description and package via SearchObject (default true)
-- `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.
-- `parent_name` (string, required) - [read-only] Parent object name
-- `parent_type` (string, required) - [read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P)
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+- `validate_type` (string, optional) - Type name to validate (optional)
+
+---
+
+<a id="getobjectstructure-read-only-system"></a>
+#### GetObjectStructure (Read-Only / System)
+**Description:** [read-only] Retrieve ADT object structure as a compact JSON tree.
+
+**Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
+
+**Parameters:**
+- `objectname` (string, required) - ADT object name (e.g. /CBY/ACQ_DDL)
+- `objecttype` (string, required) - ADT object type (e.g. DDLS/DF)
 
 ---
 
@@ -713,281 +968,31 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="getobjectstructure-read-only-system"></a>
-#### GetObjectStructure (Read-Only / System)
-**Description:** [read-only] Retrieve ADT object structure as a compact JSON tree.
+<a id="describebylist-read-only-system"></a>
+#### DescribeByList (Read-Only / System)
+**Description:** [read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
-**Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
-
-**Parameters:**
-- `objectname` (string, required) - ADT object name (e.g. /CBY/ACQ_DDL)
-- `objecttype` (string, required) - ADT object type (e.g. DDLS/DF)
-
----
-
-<a id="getservicebindingpreviewurl-read-only-system"></a>
-#### GetServiceBindingPreviewUrl (Read-Only / System)
-**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, and says what is missing rather than guessing. A Web API binding has no preview page and answers the service URLs instead.
-
-**Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
+**Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
 **Parameters:**
-- `client` (string, optional) - Client for the sap-client parameter. Omitted, the client the system reports is used; an empty string leaves the parameter out.
-- `entity_set` (string, optional) - Entity set to open. Omitted, the first one the service definition exposes is used.
-- `language` (string, optional) - Logon language for the preview. Omitted, the language the system reports is used.
-- `navigation` (string, optional) - Association or composition to follow. Omitted, the first one of the exposed root view is used.
-- `service_binding_name` (string, required) - Service binding name.
-- `target_entity_set` (string, optional) - Entity set the navigation reaches. Omitted, the second exposed entity set is used.
-
----
-
-<a id="getsession-read-only-system"></a>
-#### GetSession (Read-Only / System)
-**Description:** [read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.
-
-**Source:** `src/handlers/system/readonly/handleGetSession.ts`
-
-**Parameters:**
-- `force_new` (boolean, optional) - Force creation of a new session even if one exists. Default: false
-
----
-
-<a id="getsqlquery-read-only-system"></a>
-#### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-
-**Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
-
-**Parameters:**
-- `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
-- `sql_query` (string, required) - SQL query to execute
+- `objects` (array, required) - [read-only] Object name (required, must be valid ABAP object name or mask)
 - `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
-<a id="gettransaction-read-only-system"></a>
-#### GetTransaction (Read-Only / System)
-**Description:** [read-only] Retrieve ABAP transaction (t-code) details — program, screen, authorization object, and transaction type (dialog, report, OO).
+<a id="getpackagetree-read-only-system"></a>
+#### GetPackageTree (Read-Only / System)
+**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
-**Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
-
-**Parameters:**
-- `transaction_name` (string, required) - Name of the ABAP transaction
-
----
-
-<a id="gettypeinfo-read-only-system"></a>
-#### GetTypeInfo (Read-Only / System)
-**Description:** [read-only] Retrieve ABAP type information for domains (DOMA), data elements (DTEL), table types, and structures. Returns field definitions, value ranges, fixed values, and DDIC metadata.
-
-**Source:** `src/handlers/system/readonly/handleGetTypeInfo.ts`
+**Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
 **Parameters:**
-- `include_structure_fallback` (boolean, optional (default: true)) - When true (default), tries DDIC structure lookup only if type lookup returns 404/empty.
-- `type_name` (string, required) - Name of the ABAP type
-
----
-
-<a id="getwhereused-read-only-system"></a>
-#### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Where-used list of an ABAP object: every object that uses, calls or references it, with its type and package. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-
-**Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
-
-**Parameters:**
-- `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
-- `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
-- `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
-- `object_name` (string, required) - Name of the ABAP object. For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
-- `object_type` (string, required) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).
+- `debug` (boolean, optional (default: false)) - Include diagnostic metadata in response (counts, types, hierarchy info). Default: false
+- `include_descriptions` (boolean, optional (default: true)) - Include object descriptions in response. Default: true
+- `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
+- `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
+- `package_name` (string, required) - Package name
 - `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-
----
-
-<a id="runtimeanalyzeprofilertrace-read-only-system"></a>
-#### RuntimeAnalyzeProfilerTrace (Read-Only / System)
-**Description:** [runtime] Read profiler trace view and return compact analysis summary (totals + top entries). Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
-
-**Parameters:**
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-- `top` (number, optional) - Number of top rows for summary. Default: 10.
-- `trace_id_or_uri` (string, required) - Profiler trace ID or full trace URI.
-- `view` (string, optional (default: hitlist)) - 
-- `with_system_events` (boolean, optional) - Include system events.
-
----
-
-<a id="runtimecreateprofilertraceparameters-read-only-system"></a>
-#### RuntimeCreateProfilerTraceParameters (Read-Only / System)
-**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `description` (string, required) - Human-readable trace description.
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
-<a id="runtimegetdumpbyid-read-only-system"></a>
-#### RuntimeGetDumpById (Read-Only / System)
-**Description:** [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
-
-**Parameters:**
-- `dump_id` (string, required) - The dump's id, or its URI as a dumps feed entry carries it.
-- `response_mode` (string, optional (default: both)) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.
-- `view` (string, optional (default: default)) - Dump view mode: default payload, summary section, or formatted long text.
-
----
-
-<a id="runtimegetgatewayerrorlog-read-only-system"></a>
-#### RuntimeGetGatewayErrorLog (Read-Only / System)
-**Description:** [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
-
-**Parameters:**
-- `error_url` (string, optional) - Feed URL of a specific error entry (from a previous list response link field). When provided, returns detailed error info instead of listing.
-- `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
-- `max_results` (number, optional) - Maximum number of errors to return.
-- `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
-- `user` (string, optional) - Filter errors by SAP username.
-
----
-
-<a id="runtimegetprofilertracedata-read-only-system"></a>
-#### RuntimeGetProfilerTraceData (Read-Only / System)
-**Description:** [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
-
-**Parameters:**
-- `auto_drill_down_threshold` (number, optional) - Auto drill-down threshold (for statements view).
-- `id` (number, optional) - Statement node ID (for statements view).
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-- `trace_id_or_uri` (string, required) - Profiler trace ID or full ADT trace URI.
-- `view` (string, required) - Trace view to retrieve.
-- `with_details` (boolean, optional) - Include statement details (for statements view).
-- `with_system_events` (boolean, optional) - Include system events.
-
----
-
-<a id="runtimelistfeeds-read-only-system"></a>
-#### RuntimeListFeeds (Read-Only / System)
-**Description:** [runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
-
-**Parameters:**
-- `component` (string, optional) - Dumps whose application component contains this text, in any case.
-- `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
-- `feed_type` (string, optional (default: descriptors)) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
-- `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
-- `max_results` (number, optional) - Most entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: 50.
-- `object_name` (string, optional) - Dumps whose terminated object name contains this text, in any case.
-- `package` (string, optional) - Dumps whose object package contains this text, in any case.
-- `runtime_error` (string, optional) - Dumps whose runtime error contains this text, in any case.
-- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-- `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.
-- `user` (string, optional) - Entries of this SAP user (exact match).
-
----
-
-<a id="runtimelistprofilertracefiles-read-only-system"></a>
-#### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
-
-**Parameters:**
-- None
-
----
-
-<a id="runtimelistsystemmessages-read-only-system"></a>
-#### RuntimeListSystemMessages (Read-Only / System)
-**Description:** [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
-
-**Parameters:**
-- `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
-- `max_results` (number, optional) - Maximum number of messages to return.
-- `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
-- `user` (string, optional) - Filter by author username.
-
----
-
-<a id="runtimerunclass-read-only-system"></a>
-#### RuntimeRunClass (Read-Only / System)
-**Description:** [runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace has not appeared within that bound, the run still answers success with output and profiler_id but no trace_id — poll RuntimeListProfilerTraceFiles or RuntimeAnalyzeProfilerTrace afterwards. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run.
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `background` (any, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
-- `class_name` (string, required) - ABAP class name to execute.
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
-- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
-- `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
-- `with_rfc_tracing` (boolean, optional) - 
-
----
-
-<a id="runtimerunprogram-read-only-system"></a>
-#### RuntimeRunProgram (Read-Only / System)
-**Description:** [runtime] Execute an ABAP program (report) and return its output. Set profile=true to also start a profiler trace; use RuntimeListProfilerTraceFiles afterwards to locate the trace (program execution is fire-and-forget, so traceId is not returned synchronously).
-
-**Source:** `src/handlers/system/readonly/handleRuntimeRunProgram.ts`
-
-**Parameters:**
-- `aggregate` (boolean, optional) - 
-- `all_db_events` (boolean, optional) - 
-- `all_dynpro_events` (boolean, optional) - 
-- `all_internal_table_events` (boolean, optional) - 
-- `all_misc_abap_statements` (boolean, optional) - 
-- `all_procedural_units` (boolean, optional) - 
-- `all_system_kernel_events` (boolean, optional) - 
-- `amdp_trace` (boolean, optional) - 
-- `background` (any, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
-- `description` (string, optional) - Profiler trace description (only used when profile=true).
-- `explicit_on_off` (boolean, optional) - 
-- `max_size_for_trace_file` (number, optional) - 
-- `max_time_for_tracing` (number, optional) - 
-- `profile` (boolean, optional) - When true, run with the profiler. Default false. Trace must be located afterwards via RuntimeListProfilerTraceFiles — program execution does not return traceId synchronously.
-- `program_name` (string, required) - ABAP program name to execute.
-- `sql_trace` (boolean, optional) - 
-- `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
@@ -1057,17 +1062,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="readtransportactionlog-read-only-transport"></a>
-#### ReadTransportActionLog (Read-Only / Transport)
-**Description:** [read-only] Read the action log of a transport request: one entry per lifecycle event — created, object added, object deleted, owner changed. This is what confirms a RemoveTransportObject landed, since that call answers by echoing what it was asked.
-
-**Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
-
-**Parameters:**
-- `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
-
----
-
 <a id="readtransportobjects-read-only-transport"></a>
 #### ReadTransportObjects (Read-Only / Transport)
 **Description:** [read-only] List the objects a transport request or task holds, each with the `position` that RemoveTransportObject needs. Objects live on TASKS: a request shows its tasks' entries, but a removal addressed at the request is refused. Read a task number to get entries that can be acted on.
@@ -1076,6 +1070,17 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `transport_number` (string, required) - Transport REQUEST or TASK number. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.
+
+---
+
+<a id="readtransportactionlog-read-only-transport"></a>
+#### ReadTransportActionLog (Read-Only / Transport)
+**Description:** [read-only] Read the action log of a transport request: one entry per lifecycle event — created, object added, object deleted, owner changed. This is what confirms a RemoveTransportObject landed, since that call answers by echoing what it was asked.
+
+**Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
+
+**Parameters:**
+- `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
 
 ---
 

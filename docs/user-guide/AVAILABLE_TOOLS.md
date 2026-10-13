@@ -14,7 +14,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
-- `readonly` -> [Read-Only Group](#read-only-group): `mcp-abap-adt` and `mcp-abap-adt-ro` (and `-http`, `-sse`, each with its `-ro`)
+- `readonly` -> [Read-Only Group](#read-only-group): `mcp-abap-adt` (and `-http`, `-sse`). The read-only binaries (`mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group without the background-run tools, the system and search tools, the leftover-session list and logoff, and the run tools without `background`
 - `high` -> [High-Level Group](#high-level-group): `mcp-abap-adt`, `-http`, `-sse`
 - `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
 - every binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume in the write binaries only)

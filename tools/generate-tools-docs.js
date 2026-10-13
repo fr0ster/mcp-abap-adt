@@ -754,6 +754,57 @@ function readOnlyCopies(tools) {
   return copies;
 }
 
+/**
+ * The tools a read-only binary serves (`mcp-abap-adt-ro`, `-http-ro`,
+ * `-sse-ro`), taken from the set the binary uses — `fullReadOnlyToolSet` of
+ * the build — never from a group or a folder: the readonly folders also hold
+ * the background-run tools, which core-ro does not serve, and the run tools
+ * are served there without `background` (C23). Each tool keeps its source
+ * file and object; its parameters are the set's: a parameter the set's
+ * definition does not declare is dropped. Throws when the set serves a tool
+ * the file walk did not find, so the page cannot silently miss one.
+ */
+function readOnlySetTools(tools) {
+  const distEntry = path.join(__dirname, '..', 'dist', 'lib', 'toolSet.js');
+  requireFreshBuild(distEntry);
+  const { fullReadOnlyToolSet } = require(distEntry);
+  const entries = fullReadOnlyToolSet
+    .groups({ connection: null })
+    .flatMap((group) => group.getHandlers());
+  return entries.map((entry) => {
+    const definition = entry.toolDefinition;
+    const source = tools.find((t) => t.name === definition.name);
+    if (!source) {
+      throw new Error(
+        `${definition.name} is served by mcp-abap-adt-ro but was found in no handler file`,
+      );
+    }
+    const declared = builtPropertiesOf(definition);
+    const parsed = source.inputSchema?.properties;
+    const inputSchema =
+      parsed && declared
+        ? {
+            ...source.inputSchema,
+            properties: Object.fromEntries(
+              Object.entries(parsed).filter(([key]) => declared.has(key)),
+            ),
+            required: (source.inputSchema.required || []).filter((key) =>
+              declared.has(key),
+            ),
+          }
+        : source.inputSchema;
+    return { ...source, inputSchema, level: 'readonly' };
+  });
+}
+
+/** The parameter names a built definition declares, in either schema shape. */
+function builtPropertiesOf(definition) {
+  const schema = definition.inputSchema;
+  if (!schema || typeof schema !== 'object') return undefined;
+  const properties = schema.properties ? schema.properties : schema;
+  return new Set(Object.keys(properties));
+}
+
 function levelTitle(level) {
   if (level === 'readonly') return 'Read-Only';
   if (level === 'high') return 'High-Level';
@@ -822,7 +873,7 @@ function generateMarkdown(tools) {
 
   md += `## Handler Sets\n\n`;
   md += `The binary fixes its tool set (19.0.0); there is no \`--exposition\`.\n\n`;
-  md += `- \`readonly\` -> [Read-Only Group](#read-only-group): \`mcp-abap-adt\` and \`mcp-abap-adt-ro\` (and \`-http\`, \`-sse\`, each with its \`-ro\`)\n`;
+  md += `- \`readonly\` -> [Read-Only Group](#read-only-group): \`mcp-abap-adt\` (and \`-http\`, \`-sse\`). The read-only binaries (\`mcp-abap-adt-ro\`, \`-http-ro\`, \`-sse-ro\`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group without the background-run tools, the system and search tools, the leftover-session list and logoff, and the run tools without \`background\`\n`;
   md += `- \`high\` -> [High-Level Group](#high-level-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`\n`;
   md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
   md += `- every binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume in the write binaries only)\n`;
@@ -888,7 +939,7 @@ function generateMarkdown(tools) {
   return md;
 }
 
-function generateLevelMarkdown(tools, level) {
+function generateLevelMarkdown(tools, level, intro) {
   const levelTools = tools.filter((t) => t.level === level);
   const grouped = groupByLevelAndObject(levelTools);
   const objects = Object.values(grouped[level]).sort((a, b) =>
@@ -897,6 +948,7 @@ function generateLevelMarkdown(tools, level) {
 
   let md = `# ${levelTitle(level)} Tools - MCP ABAP ADT Server\n\n`;
   md += `Generated from code in \`src/handlers/**\` (not from docs).\n\n`;
+  if (intro) md += `${intro}\n\n`;
   md += `- Level: ${levelTitle(level)}\n`;
   md += `- Total tools: ${levelTools.length}\n\n`;
 
@@ -1007,6 +1059,10 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
   return md;
 }
 
+/** What the read-only page lists, said on the page. */
+const READ_ONLY_PAGE_INTRO =
+  'Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).';
+
 function main() {
   console.log('🔍 Scanning handler code in src/handlers...');
   const tools = loadToolsFromHandlers();
@@ -1021,7 +1077,11 @@ function main() {
   fs.writeFileSync(OUTPUT_PATHS.all, markdownAll, 'utf8');
   fs.writeFileSync(
     OUTPUT_PATHS.readonly,
-    generateLevelMarkdown(tools, 'readonly'),
+    generateLevelMarkdown(
+      readOnlySetTools(tools),
+      'readonly',
+      READ_ONLY_PAGE_INTRO,
+    ),
     'utf8',
   );
   fs.writeFileSync(
@@ -1074,6 +1134,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  readOnlySetTools,
   extractToolDefinition,
   loadToolsFromHandlers,
   parseTopLevelProperties,

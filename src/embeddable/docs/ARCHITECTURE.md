@@ -158,8 +158,10 @@ handlers as `HandlerContext.onMainConnection` — directly from a call that hold
 turn. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
 reaches its tool. An embedder's own registry that is not a `CompositeHandlersRegistry`
 (`registerAllTools(trackingRegistrations())`) gets no main-flow queue: its tools take no place in
-the flow. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. A queued call that meets a session
-the call ahead found lost gets that error as it is.
+the flow. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the flow, a queued call
+checks its connection again (`isSpentBuilt`): when the call ahead found the session lost, it gives
+the spent connection back (`connectionReleased`) and takes the replacement (`getConnection`)
+before its tool runs, so only the call that met the loss fails; it is not replayed.
 
 **A connection is replaced only when SAP lost its session** (D56), or when a new credential
 arrives where the credential is the request's (http, sse) — never for a source that keeps its

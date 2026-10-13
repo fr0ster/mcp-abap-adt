@@ -314,9 +314,10 @@ connection. An embedder's own registry that is not a `CompositeHandlersRegistry`
 tools itself) gets no main-flow queue. Outside the order, because they work
 on a connection of their own: a background run (`background: true`), a listed long read (on its
 fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow). A call you cancel while it waits leaves the queue at
-once and never reaches SAP. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. A
-queued call that meets a session the call ahead of it found lost gets that error as it is; the next
-call gets a new connection.
+once and never reaches SAP. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the order,
+a queued call checks its connection again: when the call ahead found the session lost, it takes the
+replacement connection before its tool runs, so only the call that met the loss fails (it is not
+retried).
 
 **On ABAP Cloud the system is asked once per connection, when it connects** (`systeminformation`:
 the user as responsible, the system id as master system, for what a create needs and the request

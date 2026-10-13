@@ -590,6 +590,18 @@ export abstract class BaseMcpServer extends McpServer {
     return withKnownSystemContext(this.systemOf(connection), run, failed());
   }
 
+  /**
+   * Whether `connection` is one this instance built (not a host's) whose
+   * session SAP already lost: the next `getConnection` replaces it.
+   */
+  private isSpentBuilt(connection: AbapConnection): boolean {
+    return (
+      this.connectionContext?.kind === 'built' &&
+      this.entries.has(connection) &&
+      isSpent(connection)
+    );
+  }
+
   /** Runs `fn` with this instance's flow marked held, when `holds`. */
   private inHeldFlow<T>(holds: boolean, fn: () => T): T {
     if (!holds) return fn();
@@ -745,7 +757,7 @@ export abstract class BaseMcpServer extends McpServer {
                 : args;
               // Get connection from context (this.connectionContext), with
               // the request's signal: a cancelled call settles at once.
-              const connection = await this.getConnection(signal);
+              let connection = await this.getConnection(signal);
               inUse = connection;
               // One instance, one connection, one main flow: a call that works
               // on the instance's connection waits until the call before it
@@ -761,7 +773,20 @@ export abstract class BaseMcpServer extends McpServer {
                 (isLongTool(entry.toolDefinition.name) &&
                   isLongRead(entry.toolDefinition.name, args)) ||
                 isDebuggerOwnConnectionTool(entry.toolDefinition.name);
-              if (!ownConnection) leaveFlow = await this.enterMainFlow(signal);
+              if (!ownConnection) {
+                leaveFlow = await this.enterMainFlow(signal);
+                // The call ahead may have met a session SAP already lost: the
+                // connection this call took before it waited is spent. It is
+                // given back and the replacement taken — inside the flow,
+                // before the tool runs — so a queued batch does not fail on
+                // the one lost session.
+                if (this.isSpentBuilt(connection)) {
+                  inUse = undefined;
+                  this.connectionReleased(connection);
+                  connection = await this.getConnection(signal);
+                  inUse = connection;
+                }
+              }
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,

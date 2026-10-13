@@ -987,8 +987,10 @@ flow. Its failure widens nothing (the owner's ruling on CR7): the connect succee
 context, nothing failed is kept, and only a tool that needs the context (one the guard refuses for
 want of a responsible) asks again from inside the flow — refused `system_lookup_failed` when that
 fails too; every other tool, and every tool outside the flow, never asks. A long call on the main connection holds
-the flow by design; `background: true` or a tool on its own connection does not. A queued call
-that meets a session the call ahead found lost gets that error as it is. The server enforces it and does not trust the client
+the flow by design; `background: true` or a tool on its own connection does not. Once in the flow, a
+queued call checks its connection again: when the call ahead found the session lost, it gives the
+spent connection back and takes the replacement before its tool runs, so only the call that met
+the loss fails, and it is not replayed. The server enforces it and does not trust the client
 (`BaseMcpServer.enterMainFlow`), on every transport. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals.
 
 - **Where a session turns stateful today**, read from the code: the server's

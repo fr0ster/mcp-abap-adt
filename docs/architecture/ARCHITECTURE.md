@@ -300,8 +300,7 @@ already holds the flow (an `AsyncLocalStorage` mark), else in turn. Outside the 
 because they work on a connection of their own: a background run, a listed long read
 (its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one
-`connect()`; a queued call that meets a session the call ahead found lost gets that
-error as it is. The connections that are shared this way are stdio's kept one and an
+`connect()`; once in the flow, a queued call checks its connection again: when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed). The connections that are shared this way are stdio's kept one and an
 SSE connection's; Streamable HTTP builds one per request. The ABAP Cloud system-context lookup (`systeminformation`, the
 responsible and master system a create fills) is part of the connect: once per
 connection, inside `getConnection` (`lookupSystem`, shared by every caller of the

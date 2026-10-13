@@ -37,12 +37,19 @@ mcp-abap-adt-http --conf=http.yaml --port=8080
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `exposition` | string or string[] | `readonly,high` | Tool sets: `readonly`, `high`, `debug` (`low` is refused since 19.0.0: compact is its analogue; compact: `ro` / `rw`, `debug` beside either) |
 | `system-type` | string | tools: `cloud`; connector: `cloud` for a `jwt`, else `onprem` | `onprem`, `cloud` or `legacy`; never guessed from the URL |
 | `state-idle-minutes` | number | `30` | See [Held State](#held-state) |
 | `shutdown-timeout` | number | — | Seconds after which a shutdown is forced, 1-86400; no default: a shutdown waits for running tools and session writes. Forced, it logs off every ADT session and exits `1`; a tool may be cut short and a session write lost. See [CLI options: Shutdown](../user-guide/CLI_OPTIONS.md#shutdown) |
 
 `transport` is gone: the key, with any value, stops every binary naming the binary to run.
+
+`exposition` is gone (19.0.0): **the binary fixes its tool set**, so a config file states no tools.
+The key, with any value, stops every binary with the sentence of its word, naming the binary of the
+same transport that serves what it asked for — `exposition (config file) is gone (19.0.0): the
+binary fixes its tool set, so remove it; …`. Install the binary you want instead (`mcp-abap-adt`,
+`mcp-abap-adt-ro`, `mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`, or their `-http` / `-sse`
+siblings): [Handlers Management](../user-guide/HANDLERS_MANAGEMENT.md#--exposition-is-gone).
+Each binary's template (`--conf=<new file>`) writes no `exposition`.
 
 ## `mcp-abap-adt` (stdio)
 
@@ -61,7 +68,6 @@ browser: system                # system | auto | chrome | edge | firefox | none 
 renewal: refresh-then-login    # refresh-then-login | refresh-only
 browser-auth-port: 61001
 # login-timeout: 300           # seconds, 1-86400; no default (a login has no bound)
-exposition: readonly,high
 state-idle-minutes: 30
 # shutdown-timeout: 25         # seconds, 1-86400; no default (a shutdown waits)
 ```
@@ -84,7 +90,7 @@ state-idle-minutes: 30
 
 Refused in `mcp-abap-adt`'s file: `http` (Streamable HTTP is `mcp-abap-adt-http`'s), `sse`
 (`mcp-abap-adt-sse`'s), `allow-destination-header` (gone: there is no destination header),
-`transport`, and 16.0.0's `auth-broker`.
+`transport`, `exposition`, and 16.0.0's `auth-broker`.
 
 ## `mcp-abap-adt-http` (Streamable HTTP)
 
@@ -100,7 +106,6 @@ http:
     cert: /path/to/server.crt   # cert and key together start HTTPS
     key: /path/to/server.key
     # ca: /path/to/ca.crt
-exposition: readonly,high
 state-idle-minutes: 30
 ```
 
@@ -121,7 +126,7 @@ Refused in `mcp-abap-adt-http`'s file: the destination and login keys (`mcp`, `e
 `auth-broker-path`, `allow-destination-header`, `unsafe`, `connection-type`, `browser`,
 `browser-program`, `browser-auth-port`, `login-timeout`, `renewal`, `auth-debug`:
 ``<key> (config file): destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers``),
-`sse`, and
+`sse`, `exposition` and
 `transport`.
 
 ## `mcp-abap-adt-sse` (HTTP + SSE)
@@ -136,7 +141,6 @@ sse:
   tls:
     cert: /path/to/server.crt
     key: /path/to/server.key
-exposition: readonly,high
 state-idle-minutes: 30
 ```
 
@@ -154,7 +158,7 @@ connection closes.
 
 The SSE and `POST` paths have no YAML key: `--sse-path`, `--post-path`. Refused in
 `mcp-abap-adt-sse`'s file: the destination and login keys (as for `mcp-abap-adt-http`), `http`,
-and `transport`.
+`exposition` and `transport`.
 
 ## Held State
 

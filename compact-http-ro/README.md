@@ -32,7 +32,7 @@ mcp-abap-adt-compact-http-ro --version
 
 There is no `--transport` (a binary is its transport) and no `--exposition`: passing it, or a
 config file's `exposition`, stops the start with a sentence naming the binary that serves what you
-asked for — for example `--exposition=high` names `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`).
+asked for — for example `--exposition=rw` names `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`).
 
 **Credentials** come only from each request's `x-sap-*` headers — `x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`; nothing is stored, shared or cached across requests. A request without them is answered `400`; so is one carrying `x-mcp-destination` (destinations are served only over stdio). No auth broker, no stores.
 

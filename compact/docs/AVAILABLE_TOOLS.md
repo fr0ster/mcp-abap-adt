@@ -6,10 +6,10 @@ definitions a client receives.
 - Tools: 37
 - Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
-- Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`
-- Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff with every exposition, the resume beside `rw` only
-- Background-run tools: `@mcp-abap-adt/lib`, beside `rw` (where `HandlerProfileRun` is)
-- Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)
+- Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
+- Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff in every binary, the resume in the write binaries only
+- Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)
+- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`)
 
 ## How it works
 
@@ -575,7 +575,7 @@ per request.
 
 ### HandlerDebugStart
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
 **Description:** Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. request_user, debugging_mode and settings apply to abap only. take_over: abap — Displaces another debugger listening for the same user; amdp — ends an AMDP session of this user left behind. Without take_over, abap is refused before anything is placed while another debugger listens for that user. abap: in user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server. abap: the breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole. amdp: catches every request of the connected SAP user, not only programs run by this server.
 
@@ -594,7 +594,7 @@ per request.
 
 ### HandlerDebugWait
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
 **Description:** State of a debug session after waiting up to hold_seconds; for AMDP, its events.
 
@@ -608,7 +608,7 @@ per request.
 
 ### HandlerDebugView
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
 **Description:** The stopped debuggee: stack, variables (by name, or the scopes), memory, or an AMDP table variable's rows.
 
@@ -623,7 +623,7 @@ per request.
 
 ### HandlerDebugStep
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
 **Description:** Moves the stopped debuggee (into, over, return, continue, run or jump to a line), leaves it running (detach, release_debugger), ends it where it stands, or ends the debug session.
 
@@ -642,7 +642,7 @@ per request.
 
 ### HandlerBackgroundRunGet
 
-**Half:** background-run tools of `@mcp-abap-adt/lib` (beside `rw`, where `HandlerProfileRun` is)
+**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)
 
 **Description:** Reads one of your background runs by its run_handle: running, or finished with what HandlerProfileRun answered (the system answer as it is, an error included). Reading does not remove it.
 
@@ -654,7 +654,7 @@ per request.
 
 ### HandlerBackgroundRunList
 
-**Half:** background-run tools of `@mcp-abap-adt/lib` (beside `rw`, where `HandlerProfileRun` is)
+**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)
 
 **Description:** Lists your background runs: run_handle, tool, object, when it started, and running or finished. No output.
 
@@ -664,7 +664,7 @@ per request.
 
 ### HandlerBackgroundRunDiscard
 
-**Half:** background-run tools of `@mcp-abap-adt/lib` (beside `rw`, where `HandlerProfileRun` is)
+**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)
 
 **Description:** Removes the kept answer of one of your finished background runs. A run still running cannot be discarded: a started run cannot be stopped.
 
@@ -676,7 +676,7 @@ per request.
 
 ### HandlerLeftoverSessionList
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff in every binary, the resume in the write binaries)
 
 **Description:** Lists your SAP sessions an ended server process left open (it was killed before logging them off): handle, role (built or debugger), destination, user, when recorded. Sessions of a running process are not listed.
 
@@ -686,7 +686,7 @@ per request.
 
 ### HandlerLeftoverSessionResume
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff in every binary, the resume in the write binaries)
 
 **Description:** Continues a leftover SAP session (role built only) as this server's connection, without a new logon, so its locks and lock handles work again. A session already held here ends with its logoff once unused. If SAP answers the session is gone, the answer is SAP's and its record is deleted.
 
@@ -698,7 +698,7 @@ per request.
 
 ### HandlerLeftoverSessionLogoff
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff in every binary, the resume in the write binaries)
 
 **Description:** Logs off a leftover SAP session (any role), releasing every lock it holds; only the logoff is sent, with no credential. Its record is deleted afterwards.
 

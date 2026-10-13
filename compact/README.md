@@ -1,7 +1,10 @@
 # @mcp-abap-adt/compact
 
-The compact MCP server over **stdio** — the command that serves all 27, and the four debugger verbs on
-request. Streamable HTTP is [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)
+The compact MCP server over **stdio** — the command that serves all 27, the four debugger verbs, the
+leftover sessions and background runs. The 16 that change nothing alone are
+[`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro)
+(`mcp-abap-adt-compact-ro`): the binary fixes the tool set (19.0.0), there is no `--exposition`.
+Streamable HTTP is [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)
 (`mcp-abap-adt-compact-http`), SSE [`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse)
 (`mcp-abap-adt-compact-sse`): the same tools, a package per transport.
 
@@ -36,51 +39,51 @@ smaller install, and it is not a sandbox — code that deliberately reaches into
 
 ```bash
 npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact                    # stdio, all 27 compact tools (no --transport: a binary is its transport)
-mcp-abap-adt-compact --exposition=ro    # the 16 that change nothing
-mcp-abap-adt-compact --exposition=rw,debug   # all 27 and the four debugger verbs
+mcp-abap-adt-compact                    # stdio: all 27, the debugger verbs, leftover sessions, background runs
 mcp-abap-adt-compact --version
+
+npm install -g @mcp-abap-adt/compact-ro
+mcp-abap-adt-compact-ro                 # the 16 that change nothing, the leftover-session list and logoff
 ```
 
-`--exposition` takes **`rw`** (the default — all 27 tools, every access, which is
-what a local server gives) or **`ro`** (the 16 tools that change nothing: no create,
-update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool
-list at all, so a client cannot call one). The object-oriented sets
-`readonly`/`high` belong to `mcp-abap-adt` and are refused here by name. A config file's
-`exposition` (`--conf`) is read the same way, the flag winning; the template writes `exposition: rw`.
+**The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 27 tools (every access, which
+is what a local server gives), the four debugger verbs, the leftover-session tools and the
+background-run tools — 37. `mcp-abap-adt-compact-ro` serves the 16 tools that change nothing (no
+create, update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool list at
+all, so a client cannot call one) and the leftover-session list and logoff — 18. `--exposition`
+(`ro`, `rw`, `debug`, any word) and a config file's `exposition` stop the start with a sentence
+naming the binary to install instead, e.g. *--exposition is gone (19.0.0): the binary fixes its tool
+set, so remove it; the compact tools that change nothing are served by `mcp-abap-adt-compact-ro`
+(`@mcp-abap-adt/compact-ro`)*.
 
-**Leftover sessions, with every exposition.** `HandlerLeftoverSessionList` and
-`HandlerLeftoverSessionLogoff` are served beside `ro` and `rw` alike (a logoff is a system action,
-not a data change), `HandlerLeftoverSessionResume` beside `rw` only — the SAP sessions a killed
+**Leftover sessions, in both.** `HandlerLeftoverSessionList` and
+`HandlerLeftoverSessionLogoff` are served by `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro`
+alike (a logoff is a system action, not a data change), `HandlerLeftoverSessionResume` by
+`mcp-abap-adt-compact` only — the SAP sessions a killed
 server process left open (and the locks in them), listed, resumed or logged off by the user, only
 the caller's own:
 [Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process).
 
-**Background runs, beside `rw`.** `HandlerProfileRun` takes `background: true` (no default):
+**Background runs, in `mcp-abap-adt-compact`.** `HandlerProfileRun` takes `background: true` (no default):
 the call answers at once with a `run_handle`, and the run goes on in an ABAP session of its own
 until SAP answers — it cannot be cut. `HandlerBackgroundRunGet`, `HandlerBackgroundRunList` and
 `HandlerBackgroundRunDiscard` read, list and remove the caller's own runs (16 at most, kept in the
 server's memory until discarded or the process ends):
 [Background runs](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#background-runs-of-a-class-or-a-program).
 
-**The debugger is opt-in.** `debug` beside `ro` or `rw` (`--exposition=ro,debug`)
-adds four verbs: `HandlerDebugStart` (`kind: abap|amdp`, the breakpoints, `take_over`,
+**The debugger, always in `mcp-abap-adt-compact`, never in `-ro`.** Four verbs: `HandlerDebugStart` (`kind: abap|amdp`, the breakpoints, `take_over`,
 an optional background `run`, and for `abap` `request_user`, `debugging_mode` and
 `settings`; answers a `state_handle`), `HandlerDebugWait`, `HandlerDebugView` (stack,
 variables, memory, an AMDP table) and `HandlerDebugStep` (the steps, `detach` and
-`release_debugger`, `terminate`, and `stop`, which ends the session). `debug` alone is
-refused: it names no half of the facade, and taking `rw` for it would open the write
-tools unasked. In user mode a breakpoint catches every request of the request
-user (the connected SAP user unless another is named), which is why the verbs are never
-served by default. What a debug session is, what keeps it
+`release_debugger`, `terminate`, and `stop`, which ends the session). In user mode a
+breakpoint catches every request of the request user (the connected SAP user unless another
+is named): where that must not be possible, install `mcp-abap-adt-compact-ro`. What a debug session is, what keeps it
 alive on each transport and what ends it: [Debugger](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 
 Configuration — the destination, authentication, the login — is the same as
 `mcp-abap-adt`'s, because the launcher is the same one: this command passes the
 compact tool set (`compactToolSetOf` of `@mcp-abap-adt/lib/tool-set`, with the two
-halves' entry builders) to `@mcp-abap-adt/core`'s `main`, and nothing else. The
-object-oriented command no longer accepts `--exposition=compact`; it refuses the
-value and names this package.
+halves' entry builders) to `@mcp-abap-adt/core`'s `main`, and nothing else.
 
 **RFC and SNC** work here exactly as in the full server, and need the same preparation **before** `npm install -g @mcp-abap-adt/compact`: the SAP NW RFC SDK, a C++ toolchain and `SAPNWRFC_HOME` set in the shell — the RFC module is compiled during the install and silently left out when it cannot be. Check with `npm ls -g @mcp-abap-adt/sap-rfc-lite`. Steps: [RFC Setup](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/RFC_SETUP.md); every variant: [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
 

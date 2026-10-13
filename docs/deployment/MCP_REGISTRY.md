@@ -1,14 +1,16 @@
 # MCP Registry Publishing
 
-The repository publishes **two** entries to the official MCP Registry, one per server command —
-a different tool list is a different server:
+The repository publishes **four** entries to the official MCP Registry, one per stdio server
+command — a different tool list is a different server:
 
 | Metadata file | Registry name | npm package (stdio) | Command |
 |---|---|---|---|
 | `server.json` | `io.github.fr0ster/mcp-abap-adt` | `@mcp-abap-adt/core` (`server/`) | `mcp-abap-adt` |
 | `server-compact.json` | `io.github.fr0ster/mcp-abap-adt-compact` | `@mcp-abap-adt/compact` (`compact/`) | `mcp-abap-adt-compact` |
+| `server-ro.json` | `io.github.fr0ster/mcp-abap-adt-ro` | `@mcp-abap-adt/core-ro` (`core-ro/`) | `mcp-abap-adt-ro` |
+| `server-compact-ro.json` | `io.github.fr0ster/mcp-abap-adt-compact-ro` | `@mcp-abap-adt/compact-ro` (`compact-ro/`) | `mcp-abap-adt-compact-ro` |
 
-Both files sit in the repository root and follow the schema their `$schema` names
+The files sit in the repository root and follow the schema their `$schema` names
 (`https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json`).
 
 ## Required metadata
@@ -23,6 +25,11 @@ Both files sit in the repository root and follow the schema their `$schema` name
     Not the root `package.json`: that is `@mcp-abap-adt/lib`, which the registry never reads.
   - `compact/package.json` (`@mcp-abap-adt/compact`):
     `"mcpName": "io.github.fr0ster/mcp-abap-adt-compact"`.
+  - `core-ro/package.json` (`@mcp-abap-adt/core-ro`): `"mcpName": "io.github.fr0ster/mcp-abap-adt-ro"`.
+  - `compact-ro/package.json` (`@mcp-abap-adt/compact-ro`):
+    `"mcpName": "io.github.fr0ster/mcp-abap-adt-compact-ro"`.
+  - `compact-http-ro` and `compact-sse-ro` carry an `mcpName` as `compact-http` and `compact-sse`
+    do, with no registry file of their own.
 
 The registry reads `mcpName` from the package **published on npm**, so it can only be checked in
 the tarball:
@@ -34,7 +41,7 @@ tar -xOf <package>.tgz package/package.json | grep mcpName
 ## Prerequisites
 
 - `mcp-publisher` installed (see the registry's documentation).
-- The npm packages at the versions the two files name are already on npm (`npm run
+- The npm packages at the versions the four files name are already on npm (`npm run
   release:publish`, see [RELEASE.md](./RELEASE.md)). **`npm publish` comes first**, the registry
   second.
 
@@ -43,9 +50,13 @@ tar -xOf <package>.tgz package/package.json | grep mcpName
 ```bash
 mcp-publisher validate server.json            # schema check only; it does not look at npm
 mcp-publisher validate server-compact.json
+mcp-publisher validate server-ro.json
+mcp-publisher validate server-compact-ro.json
 mcp-publisher login github
 mcp-publisher publish server.json
 mcp-publisher publish server-compact.json
+mcp-publisher publish server-ro.json
+mcp-publisher publish server-compact-ro.json
 ```
 
 `mcp-publisher publish` without an argument reads `./server.json` only.

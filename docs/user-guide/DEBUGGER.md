@@ -9,21 +9,22 @@ The tool reference is generated: the [Debug group](AVAILABLE_TOOLS.md#debug-grou
 of the full server, and the four debugger verbs of the
 [compact server](../../compact/docs/AVAILABLE_TOOLS.md).
 
-## Turning it on
+## Where it is served
 
-The debugger tools are an **opt-in** set. No default exposition carries them,
-because in user mode a breakpoint catches every request of the request user — the
-connected SAP user unless another is named (see
-[What a breakpoint catches](#what-a-breakpoint-catches)).
+**The binary fixes the tool set** (19.0.0; there is no `--exposition`). The debugger is served,
+always, by the write binaries and by no `-ro` binary, because in user mode a breakpoint catches
+every request of the request user — the connected SAP user unless another is named (see
+[What a breakpoint catches](#what-a-breakpoint-catches)):
 
 ```bash
-mcp-abap-adt --exposition=readonly,high,debug      # the full server, 30 debugger tools beside the rest
-mcp-abap-adt-compact --exposition=rw,debug         # compact: four verbs beside the 25
+mcp-abap-adt            # the full server (and -http, -sse): 30 debugger tools beside the rest
+mcp-abap-adt-compact    # compact (and -compact-http, -compact-sse): four verbs beside the 27
+mcp-abap-adt-ro         # no debugger (nor -http-ro, -sse-ro, -compact-ro, -compact-http-ro, -compact-sse-ro)
 ```
 
-The compact command refuses `--exposition=debug` alone: it names no half of the
-facade. An embedder passes `includeDebug: true` to `HandlerExporter`, or adds
-`DebugHandlersGroup` from `@mcp-abap-adt/lib/handlers` to its own registry.
+Where a breakpoint must not be possible, install a `-ro` binary. An embedder passes
+`includeDebug: true` to `HandlerExporter`, or adds `DebugHandlersGroup` from
+`@mcp-abap-adt/lib/handlers` to its own registry.
 
 ## Scope: what it debugs
 

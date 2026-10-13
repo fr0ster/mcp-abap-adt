@@ -27,7 +27,13 @@ RFC and SNC: [RFC Setup](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/
 From 17.0.0 the HTTPS server certificate is verified — see the
 [migration note](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-17.0.md).
 
-**No low set (19.0.0).** `--exposition=…,low` stops the start: *"the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations are compact's — see [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+**The binary fixes the tool set (19.0.0).** `mcp-abap-adt` serves readonly (with system and search),
+high, the debugger, the leftover sessions (list, resume, logoff) and background runs; the readonly
+tools alone are [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro) (`mcp-abap-adt-ro`). There is no
+`--exposition`: passing it, or a config file's `exposition`, stops the start with a sentence naming
+the binary to install instead.
+
+**No low set (19.0.0).** `--exposition=…,low` stops the start with D56's sentence: *"the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations are compact's — see [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
 
 The tools themselves are not here. They live in
 [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib), which

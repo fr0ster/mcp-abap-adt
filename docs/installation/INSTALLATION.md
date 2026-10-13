@@ -7,14 +7,19 @@ Platform walk-throughs: [Windows](./platforms/INSTALL_WINDOWS.md), [macOS](./pla
 ## Installation variants
 
 Two choices make a variant: **which server** and **how it connects to the ABAP system**. They are
-independent — either server connects every way.
+independent — every server connects every way. **The server fixes its tool set** (19.0.0): there
+is no `--exposition`, so choosing the server is choosing the tools. Each server below is stdio; its
+Streamable HTTP and SSE siblings are packages of their own (`@mcp-abap-adt/http`, `sse`, `http-ro`,
+`sse-ro`, `compact-http`, `compact-sse`, `compact-http-ro`, `compact-sse-ro`).
 
 ### Which server
 
 | Package | What it is | Command |
 |---|---|---|
-| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | **The full server**: one tool per object type and operation (`CreateClass`, `GetTable`, …), in the `readonly` and `high` sets (and `debug`). The low set left it in 19.0.0: its single-step operations are the compact server's. | `mcp-abap-adt` |
-| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | **The compact server**: one tool per operation, the object type in the arguments (`HandlerCreate` with `object_type`) — a short tool list for a host that cannot select tools per request. Configuration is the full server's. | `mcp-abap-adt-compact` |
+| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | **The full server**: one tool per object type and operation (`CreateClass`, `GetTable`, …): the `readonly`, `high` and `debug` sets, the leftover sessions and background runs. The low set left it in 19.0.0: its single-step operations are the compact server's. | `mcp-abap-adt` |
+| [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro) | **The read-only full server**: the `readonly` tools (with system and search), the leftover-session list and logoff — no high, debugger, background-run or resume tool. Configuration is the full server's. | `mcp-abap-adt-ro` |
+| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | **The compact server**: one tool per operation, the object type in the arguments (`HandlerCreate` with `object_type`) — a short tool list for a host that cannot select tools per request — with the four debugger verbs. Configuration is the full server's. | `mcp-abap-adt-compact` |
+| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) | **The read-only compact server**: the 16 compact tools that change nothing, the leftover-session list and logoff. | `mcp-abap-adt-compact-ro` |
 | [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib), [`compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify), [`background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Libraries, not servers: the tool handlers, an embeddable server for your own application, and the in-memory store of background runs. | — |
 
 ### How it connects
@@ -33,7 +38,9 @@ The authentications in full: [Authentication & Destinations](../user-guide/AUTHE
 
 ```bash
 npm install -g @mcp-abap-adt/core        # mcp-abap-adt
+npm install -g @mcp-abap-adt/core-ro     # mcp-abap-adt-ro: the readonly tools alone
 npm install -g @mcp-abap-adt/compact     # mcp-abap-adt-compact
+npm install -g @mcp-abap-adt/compact-ro  # mcp-abap-adt-compact-ro: the compact tools that change nothing
 ```
 
 **RFC and SNC** — the same command, run **after** the SDK and the toolchain are in place and with
@@ -93,7 +100,10 @@ through the auth broker. A binary is its transport: `npm install -g @mcp-abap-ad
 `mcp-abap-adt-http` (Streamable HTTP), `npm install -g @mcp-abap-adt/sse` gives `mcp-abap-adt-sse`
 (HTTP+SSE); both take credentials only from each request's `x-sap-*` headers. There is no
 `--transport` option. `@mcp-abap-adt/compact` gives `mcp-abap-adt-compact`, which takes
-`mcp-abap-adt`'s options. Each binary reads only its own options (`<binary> --help`); another
+`mcp-abap-adt`'s options; each `-ro` package (`core-ro`, `http-ro`, `sse-ro`, `compact-ro`,
+`compact-http-ro`, `compact-sse-ro`) gives the read-only binary of the same transport, with its
+write counterpart's options. There is no `--exposition` option: the binary fixes its tool set.
+Each binary reads only its own options (`<binary> --help`); another
 binary's, on the command line or in the config file, stops the start, naming the binary that serves
 it. Another binary's environment variables are not read, so one shell can serve several binaries.
 
@@ -302,7 +312,8 @@ mcp-abap-adt-sse --sse-port=3001
 
 Each binary takes only its own options; an option of another binary, or `--transport`, stops the
 start naming the binary that serves it. Every binary takes `--help`, `--version`, `--conf`,
-`--exposition`, `--system-type` and `--state-idle-minutes`.
+`--system-type` and `--state-idle-minutes`; `--exposition` is gone (19.0.0) and stops the start,
+naming the binary that serves the tools it asked for.
 
 **`mcp-abap-adt` (stdio):**
 - `--help` - Show complete help message with all available options

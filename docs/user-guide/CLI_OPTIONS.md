@@ -20,10 +20,16 @@ an environment is inherited, so one shell profile or one `EnvironmentFile` can s
 | `mcp-abap-adt-compact` | `@mcp-abap-adt/compact` | stdio | as `mcp-abap-adt`, with the compact tool set |
 | `mcp-abap-adt-compact-http` | `@mcp-abap-adt/compact-http` | Streamable HTTP | as `mcp-abap-adt-http`, with the compact tool set |
 | `mcp-abap-adt-compact-sse` | `@mcp-abap-adt/compact-sse` | HTTP + SSE | as `mcp-abap-adt-sse`, with the compact tool set |
+| `mcp-abap-adt-ro` | `@mcp-abap-adt/core-ro` | stdio | as `mcp-abap-adt`, with the read-only tool set |
+| `mcp-abap-adt-http-ro` | `@mcp-abap-adt/http-ro` | Streamable HTTP | as `mcp-abap-adt-http`, with the read-only tool set |
+| `mcp-abap-adt-sse-ro` | `@mcp-abap-adt/sse-ro` | HTTP + SSE | as `mcp-abap-adt-sse`, with the read-only tool set |
+| `mcp-abap-adt-compact-ro` | `@mcp-abap-adt/compact-ro` | stdio | as `mcp-abap-adt`, with the read-only compact tool set |
+| `mcp-abap-adt-compact-http-ro` | `@mcp-abap-adt/compact-http-ro` | Streamable HTTP | as `mcp-abap-adt-http`, with the read-only compact tool set |
+| `mcp-abap-adt-compact-sse-ro` | `@mcp-abap-adt/compact-sse-ro` | HTTP + SSE | as `mcp-abap-adt-sse`, with the read-only compact tool set |
 
-A compact binary's table is its full counterpart's with compact's `--exposition` row (`ro` /
-`rw`, `debug` beside either), nothing else: its help, `--conf` template and config-file validation
-show compact's values, and a config file's `exposition` is read by compact's parser.
+**The binary fixes the tool set** (19.0.0): every binary's table is its transport's, the same for
+the four tool sets — its help differs only in its name and its TOOLS section. There is no
+`--exposition`; see [`--exposition` is gone](#handler-exposition).
 
 Each binary's `--help` lists exactly its own table; `--version` prints its version.
 
@@ -40,7 +46,6 @@ These rows are lib's shared rows: each binary's table holds them, with the same 
 | CLI | Environment | YAML | Value | Meaning |
 |-----|-------------|------|-------|---------|
 | `--conf=<path>` (alias `--config`) | — | — | path | The YAML config file of this binary; a missing file gets the binary's template and the start ends |
-| `--exposition=<sets>` | — | `exposition` | `readonly`, `high`, `debug` | The tool sets to serve (default `readonly,high`); see [Handler Exposition](#handler-exposition) |
 | `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type: the tools offered (default `cloud`); the connector and whether the responsible / master system are asked of the system |
 | `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
 | `--shutdown-timeout=<seconds>` | `MCP_SHUTDOWN_TIMEOUT` | `shutdown-timeout` | 1-86400 | Forces a shutdown not finished after this many seconds (default: none); see [Shutdown](#shutdown) |
@@ -103,6 +108,7 @@ The environment forms `MCP_DESTINATION` and `MCP_ENV` do **not** exist; use `--m
 | Parameter | Words |
 |---|---|
 | `--transport`, `MCP_TRANSPORT`, YAML `transport` | the stdio sentence above |
+| `--exposition`, YAML `exposition`, with any value | the sentence of its word, naming the binary of this transport that serves it (see [Handler Exposition](#handler-exposition)) |
 | `--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, YAML `sse` | ``<form>: SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)`` |
 | `--host`, `--port`, `--path`, `--http-*`, YAML `http` | ``<form>: Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)`` |
 | `--tls-*` | ``<form>: TLS is an option of `mcp-abap-adt-http` and `mcp-abap-adt-sse` `` |
@@ -262,7 +268,7 @@ See [Authentication & Destinations](AUTHENTICATION.md) for the supported authent
 
 ### The debugger's ids
 
-`SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` (with `--exposition=...,debug`): first found, the
+`SAP_DEBUG_TERMINAL_ID` / `SAP_DEBUG_IDE_ID` (where the debugger is served): first found, the
 destination's `.env`, then the process environment; else random per instance. See
 [Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one).
 
@@ -303,6 +309,7 @@ the instance that holds it.
 | Parameter | Words |
 |---|---|
 | `--transport`, `MCP_TRANSPORT`, YAML `transport` | the http sentence above |
+| `--exposition`, YAML `exposition`, with any value | the sentence of its word, naming the binary of this transport that serves it (see [Handler Exposition](#handler-exposition)) |
 | `--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
 | `--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, YAML `sse` | ``<form>: SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)`` |
 
@@ -333,7 +340,8 @@ mcp-abap-adt-http \
 ### Example
 
 ```bash
-mcp-abap-adt-http --host=0.0.0.0 --port=8080 --exposition=readonly,high
+mcp-abap-adt-http --host=0.0.0.0 --port=8080
+mcp-abap-adt-http-ro --host=0.0.0.0 --port=8080     # the readonly tools alone
 ```
 
 ## `mcp-abap-adt-sse` (HTTP + SSE)
@@ -368,6 +376,7 @@ until the connection closes; see [Held State](#held-state).
 | Parameter | Words |
 |---|---|
 | `--transport`, `MCP_TRANSPORT`, YAML `transport` | the sse sentence above |
+| `--exposition`, YAML `exposition`, with any value | the sentence of its word, naming the binary of this transport that serves it (see [Handler Exposition](#handler-exposition)) |
 | the destination and login options, as for `mcp-abap-adt-http` (`--auth-broker-path` and `--connection-type` included), and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
 | `--host`, `--port`, `--path`, `--http-*`, YAML `http` | ``<form>: Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)`` |
 
@@ -389,24 +398,31 @@ mcp-abap-adt-sse \
 
 ## Handler Exposition
 
-**--exposition=\<sets\>** (YAML `exposition`), on every binary.
+**`--exposition` is gone (19.0.0): the binary fixes its tool set.** Install the package whose
+binary serves the tools you want:
 
-A comma list of the tool sets to serve: `readonly`, `high`, `debug`. Default
-`readonly,high`. `low` stops the start (19.0.0): *"the low set is gone from mcp-abap-adt /
--http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. `compact` is refused (the
-compact facade is its own binaries, `mcp-abap-adt-compact`, `-compact-http` and `-compact-sse`,
-whose `--exposition` takes `ro` / `rw` and `debug` beside either). A set the binary does not serve
-stops the start in its words. The search tools are always served, the system tools with `readonly`.
+| Kind | Binaries | Tools |
+|---|---|---|
+| core | `mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse` | readonly (with system and search), high, debug, the leftover sessions (list, resume, logoff), background runs |
+| core-ro | `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro` | readonly (with system and search), the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the 27 compact tools, the four debugger verbs, the leftover sessions, background runs |
+| compact-ro | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the 16 compact tools that change nothing, the leftover-session list and logoff |
 
-`debug` is the debugger — opt-in, never part of the default, because in user mode a
-breakpoint or a listener catches every request of the request user (the connected SAP
-user unless another is named). It goes beside any other set,
-or alone. See [Debugger](DEBUGGER.md) and [Handlers Management](HANDLERS_MANAGEMENT.md).
+`--exposition` in either spelling, with any value or none, and the YAML key `exposition`, stop
+every binary before anything is read, with one sentence per word naming the binary of the same
+transport that serves what the word asked for — for example, on `mcp-abap-adt-http`:
 
-```bash
-mcp-abap-adt --mcp=TRIAL --exposition=readonly,high,debug
-mcp-abap-adt-http --exposition=readonly,debug
+```text
+[MCP] --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`)
 ```
+
+`low` keeps D56's sentence: *"the low set is gone from mcp-abap-adt / -http / -sse; use
+mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Every word and its sentence:
+[Handlers Management](HANDLERS_MANAGEMENT.md#--exposition-is-gone).
+
+The debugger is served by every write binary, always: in user mode a breakpoint or a listener
+catches every request of the request user (the connected SAP user unless another is named). Where
+that must not be possible, run a `-ro` binary. See [Debugger](DEBUGGER.md).
 
 ## Held State
 
@@ -431,8 +447,8 @@ itself, so SAP's own session timeout never ends an abandoned debug session.
 - `mcp-abap-adt-sse`: each SSE connection's instance, until the connection closes.
 
 ```bash
-mcp-abap-adt --mcp=TRIAL --exposition=readonly,debug --state-idle-minutes=60
-mcp-abap-adt-http --exposition=readonly,debug --state-idle-minutes=60
+mcp-abap-adt --mcp=TRIAL --state-idle-minutes=60
+mcp-abap-adt-http --state-idle-minutes=60
 ```
 
 ## Environment Variables

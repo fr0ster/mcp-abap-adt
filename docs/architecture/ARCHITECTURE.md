@@ -271,16 +271,22 @@ never reach each other.
 
 `server/src/launcher.ts` (core), `http/src/launcher.ts` and `sse/src/launcher.ts` wire each
 binary. Each `main({ toolSet, program, version })` takes the tools as a `ToolSet`
-(`@mcp-abap-adt/lib/tool-set`) and nothing else of them: the full bins pass `fullToolSet`, the
-compact packages (`compact/`, `compact-http/`, `compact-sse/`) pass `compactToolSetOf` with the two
-halves' entry builders, so full and compact share every transport's behaviour:
+(`@mcp-abap-adt/lib/tool-set`) and nothing else of them, and the binary fixes it (C23): the full
+bins pass `fullToolSet`, the read-only packages (`core-ro/`, `http-ro/`, `sse-ro/`)
+`fullReadOnlyToolSet`, the compact packages (`compact/`, `compact-http/`, `compact-sse/`)
+`compactToolSetOf` with the two halves' entry builders, and the read-only compact ones
+(`compact-ro/`, `compact-http-ro/`, `compact-sse-ro/`) `compactReadOnlyToolSetOf` with the read-only
+half — so the four sets share every transport's behaviour:
 
 ```
 main({ toolSet, program, version })
-  ├── readStartupConfig(<binary>Parameters(toolSet))  // its own table + the set's --exposition row
-  ├── toolSet.exposition(...)                         // the set's words; an unserved one stops the start
-  ├── registryOf(toolSet, exposition)                 // full: ReadOnly, HighLevel, LowLevel, Debug,
-  │                                                   //   Search, System; compact: its half (+ debug verbs)
+  ├── readStartupConfig(<binary>Parameters(toolSet))  // its own table; the set's removed --exposition
+  │                                                   //   stops the start, naming the binary to use
+  ├── registryOf(toolSet)                             // full: ReadOnly, System, BackgroundRun, HighLevel,
+  │                                                   //   Debug, Search, LeftoverSession; ro: ReadOnly,
+  │                                                   //   System, Search, the list and logoff; compact:
+  │                                                   //   both halves, debug verbs, background runs, ...
+  ├── a background-run store only if toolSet.backgroundRuns
   ├── core only: AuthBrokerFactory                    // the destination, the startup check (D18)
   └── StdioServer | StreamableHttpServer | SseServer
 ```
@@ -298,7 +304,8 @@ Handlers are organized into groups by access level:
 
 Counts drift as tools are added; see [AVAILABLE_TOOLS.md](../user-guide/AVAILABLE_TOOLS.md) for the authoritative, up-to-date list.
 
-The `exposition` configuration controls which groups are active, enabling read-only deployments or full-access modes.
+The binary installed decides which groups are active (C23): a `-ro` binary for read-only
+deployments, a write binary for full access.
 
 **Handler registration flow:**
 
@@ -486,13 +493,13 @@ The system has three distinct IoC boundaries:
 2. Chooses the stores of a destination (`server/src/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
 3. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
 4. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`, on first use
-5. Assembles the registry of the tool set it is given (`registryOf(toolSet, exposition)`)
+5. Assembles the registry of the tool set it is given (`registryOf(toolSet)`)
 6. Starts `StdioServer` with `destinationSource`
 
 `http/src/launcher.ts` and `sse/src/launcher.ts` read their configuration, assemble the
 registry of the tool set they are given and start their server; neither has a broker, a store
 or a login. `compact/`, `compact-http/` and `compact-sse/` are each one call of their transport's
-`main` with the compact tool set.
+`main` with the compact tool set; the six `-ro` packages one call each with a read-only set.
 
 No other file in the system creates concrete cross-package dependencies.
 
@@ -536,8 +543,9 @@ An embedder that has its own connection passes it as an injected source (`Embedd
 Each binary reads its own parameter table (D38) through lib's machinery (`src/lib/config/authParameters.ts`):
 `CORE_PARAMETERS` (`server/src/config/coreParameters.ts`: the destination, browser and login rows),
 `HTTP_PARAMETERS` (`http/src/config/httpParameters.ts`) and `SSE_PARAMETERS`
-(`sse/src/config/sseParameters.ts`), each beside lib's shared rows (`--conf`, `--exposition`,
-`--system-type`, `--state-idle-minutes`; the TLS rows in http and sse). A table gives:
+(`sse/src/config/sseParameters.ts`), each beside lib's shared rows (`--conf`,
+`--system-type`, `--state-idle-minutes`; the TLS rows in http and sse), and the tool set's removed
+`--exposition`. A table gives:
 - CLI arguments, environment variables and YAML keys (`--conf <path>`; configuration only, a secret-looking key is refused); CLI beats env beats YAML
 - the help text, the `--conf` template and the YAML validation
 - the refusal of every other binary's options, and of `--transport` (gone), naming the binary that serves it
@@ -598,7 +606,7 @@ registry.addHandlerGroup(new CustomHandlerGroup(baseContext));
 |:---|:---|:---|
 | Local development with Claude Code | Main server | stdio |
 | Team deployment on BTP | Main server + proxy | HTTP |
-| Read-only monitoring | Main server (exposition=readonly) | HTTP/SSE |
+| Read-only monitoring | Read-only server (`mcp-abap-adt-http-ro` / `-sse-ro`) | HTTP/SSE |
 | Custom IDE integration | Main server (as npm dependency) | Embedded via `EmbeddableMcpServer` |
 | Multi-system landscape | Main server + proxy (multi-destination) | HTTP |
 
@@ -609,7 +617,7 @@ Consultants working with customer systems typically:
 1. Use `@mcp-abap-adt/configurator` to set up their MCP client
 2. Configure service keys for BTP systems or basic auth for on-premise
 3. Deploy the proxy for team-shared access with centralized auth
-4. Control tool exposure via `exposition` config (readonly for auditing, full for development)
+4. Control tool exposure by the binary they install (a `-ro` one for auditing, a write one for development)
 
 ### 6.4 Support Usage Patterns
 
@@ -673,14 +681,14 @@ For troubleshooting:
 | Risk | Mitigation |
 |:---|:---|
 | A login racing another for the callback port | stdio serves one destination per process, whose provider serializes its own logins; http and sse log nobody in |
-| Large handler count (~150 tools) may overwhelm AI model context | `exposition` config limits visible tools per deployment |
+| Large handler count (~150 tools) may overwhelm AI model context | the `-ro` and compact binaries serve shorter lists |
 | XML parsing of ADT responses is fragile across SAP versions | `fast-xml-parser` with per-object-type parsers; integration tests validate against real systems |
 | Service key files stored on filesystem | Configurable directory; `unsafe` flag controls file vs. in-memory storage |
 
 ### 7.6 Recommendations
 
 1. **For new contributors:** Follow the existing handler pattern exactly -- tool definition + handler function + handler group registration. Do not introduce new cross-package dependencies.
-2. **For custom deployments:** Start with the `exposition` config and `EmbeddableMcpServer` before building custom infrastructure.
+2. **For custom deployments:** Start with the binary that serves the tools you need, and `EmbeddableMcpServer`, before building custom infrastructure.
 3. **For enterprise adoption:** Use the proxy for centralized BTP authentication and the configurator for standardized client setup across teams.
 4. **For extending object type support:** Add a new module under `@mcp-abap-adt/adt-clients/src/core/{type}/` following the established pattern (types, CRUD functions, `IAdtObject` implementation).
 

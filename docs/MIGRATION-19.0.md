@@ -12,10 +12,16 @@ The packages, all at **19.0.0**:
 | `@mcp-abap-adt/http` | `http/` | `mcp-abap-adt-http` | Streamable HTTP |
 | `@mcp-abap-adt/sse` | `sse/` | `mcp-abap-adt-sse` | HTTP+SSE |
 | `@mcp-abap-adt/background-runs-memory` | `background-runs-memory/` | — | the in-memory store of background runs (new; core, http and sse depend on it) |
-| `@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify` | `compact-readonly-entries/`, `compact-modify/` | — | the compact tool set's halves |
+| `@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify` | `compact-readonly-entries/`, `compact-modify/` | — | the compact tool set's halves (`compact-readonly-entries` was `@mcp-abap-adt/compact-readonly`, renamed) |
 | `@mcp-abap-adt/compact` | `compact/` | `mcp-abap-adt-compact` | the compact tool set over stdio |
 | `@mcp-abap-adt/compact-http` | `compact-http/` | `mcp-abap-adt-compact-http` | the compact tool set over Streamable HTTP |
 | `@mcp-abap-adt/compact-sse` | `compact-sse/` | `mcp-abap-adt-compact-sse` | the compact tool set over HTTP+SSE |
+| `@mcp-abap-adt/core-ro` | `core-ro/` | `mcp-abap-adt-ro` | the read-only tool set over stdio (new) |
+| `@mcp-abap-adt/http-ro` | `http-ro/` | `mcp-abap-adt-http-ro` | the read-only tool set over Streamable HTTP (new) |
+| `@mcp-abap-adt/sse-ro` | `sse-ro/` | `mcp-abap-adt-sse-ro` | the read-only tool set over HTTP+SSE (new) |
+| `@mcp-abap-adt/compact-ro` | `compact-ro/` | `mcp-abap-adt-compact-ro` | the read-only compact tool set over stdio (new) |
+| `@mcp-abap-adt/compact-http-ro` | `compact-http-ro/` | `mcp-abap-adt-compact-http-ro` | the read-only compact tool set over Streamable HTTP (new) |
+| `@mcp-abap-adt/compact-sse-ro` | `compact-sse-ro/` | `mcp-abap-adt-compact-sse-ro` | the read-only compact tool set over HTTP+SSE (new) |
 
 ## Every binary: `--transport` is gone, and each reads only its own parameters
 
@@ -45,17 +51,67 @@ The packages, all at **19.0.0**:
 - **Values are checked in every form**: a port outside 1-65535, a flag that is not `true` /
   `false`, is refused at start (18.x fell back to the default for `--http-port` / `--sse-port`).
   TLS needs `--tls-cert` and `--tls-key` together (18.x served plain HTTP when one was missing).
-- `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, `--exposition` (with
-  `debug`), `--system-type` and `--conf` are in every binary's table, unchanged.
-- **An unknown `--exposition` word stops the full binaries** (`mcp-abap-adt`, `mcp-abap-adt-http`,
-  `mcp-abap-adt-sse`), in the CLI and the YAML form: they take `readonly`, `high` and
-  `debug` (`low` is gone, see "The low set leaves the full binaries"). 18.x dropped any other word silently — `mcp-abap-adt --exposition=ro` served
-  `readonly,high`. Now: *Invalid exposition: 'ro' is not a set of this command, which takes
-  readonly, high and debug, comma-separated. 'ro' and 'rw' are the sets of
-  \`mcp-abap-adt-compact\` (@mcp-abap-adt/compact).* — the compact binary named is the one of the
-  binary's own transport (`mcp-abap-adt-compact-http` / `-compact-sse`), and so is the one
-  `--exposition=compact` names. Remove `search` or `system` from an exposition (they come with
-  every set and with `readonly`).
+- `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, `--system-type` and
+  `--conf` are in every binary's table, unchanged. `--exposition` is gone: see the next section.
+
+## Every binary: `--exposition` is gone — the binary fixes its tool set
+
+**You choose the tools by the package you install**, not by a flag. `--exposition` (either
+spelling) and the YAML key `exposition` — and with them compact's `ro` / `rw` — are removed from
+every binary. Four kinds of binary, each on stdio, Streamable HTTP and SSE:
+
+| Kind | Binaries (packages) | Tools |
+|---|---|---|
+| core | `mcp-abap-adt` (`@mcp-abap-adt/core`), `mcp-abap-adt-http` (`@mcp-abap-adt/http`), `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, the leftover sessions (list, resume, logoff), background runs |
+| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`), `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`), `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`), `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the 27 compact tools, the four compact debugger verbs, the leftover sessions, background runs |
+| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`), `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`), `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the 16 compact tools that change nothing, the leftover-session list and logoff |
+
+No `-ro` binary serves the debugger, a background run or the resume. A `-ro` binary takes exactly
+the options, credentials and behaviour of its write counterpart (`mcp-abap-adt-ro` is
+`mcp-abap-adt`'s launcher, `mcp-abap-adt-http-ro` `mcp-abap-adt-http`'s, and so on).
+
+**What you passed → what to install** (shown for stdio; over Streamable HTTP and SSE take the
+`-http` / `-sse` package of the same row):
+
+| You passed | Install | Run |
+|---|---|---|
+| `mcp-abap-adt` with no `--exposition`, or `--exposition=readonly,high` | `@mcp-abap-adt/core` | `mcp-abap-adt` (it now also serves the debugger) |
+| `mcp-abap-adt --exposition=readonly,high,debug` (or `readonly,debug`, `high,debug`, `high`) | `@mcp-abap-adt/core` | `mcp-abap-adt` |
+| `mcp-abap-adt --exposition=readonly` | `@mcp-abap-adt/core-ro` | `mcp-abap-adt-ro` |
+| `mcp-abap-adt-compact` with no `--exposition`, `rw` or `rw,debug` | `@mcp-abap-adt/compact` | `mcp-abap-adt-compact` (it now also serves the four debugger verbs) |
+| `mcp-abap-adt-compact --exposition=ro` (or `ro,debug`) | `@mcp-abap-adt/compact-ro` | `mcp-abap-adt-compact-ro` (no debugger: it is the write binary's) |
+
+**The debugger is no longer opt-in** in the write binaries: a breakpoint or a listener catches every
+request of the connected SAP user. Where that must not be possible, install a `-ro` binary.
+
+**Passing it stops the start** — the flag in either spelling, with any value or none, and the
+config file's `exposition` — before anything is read, `[MCP] <sentence>`, exit `1`. One sentence
+per word, naming the binary of the binary's own transport that serves what the word asked for
+(stdio names below; `mcp-abap-adt-http` names `mcp-abap-adt-http-ro`, and so on):
+
+| Word | The sentence |
+|---|---|
+| `readonly` | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by \`mcp-abap-adt-ro\` (\`@mcp-abap-adt/core-ro\`) |
+| `high` | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the high tools are served, beside the readonly ones, by \`mcp-abap-adt\` (\`@mcp-abap-adt/core\`) |
+| `debug` (in `mcp-abap-adt` / `-ro`) | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the debugger is always served by \`mcp-abap-adt\` (\`@mcp-abap-adt/core\`), and by no -ro binary |
+| `debug` (in `mcp-abap-adt-compact` / `-ro`) | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the compact debugger is always served by \`mcp-abap-adt-compact\` (\`@mcp-abap-adt/compact\`), and by no -ro binary |
+| `ro` | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the compact tools that change nothing are served by \`mcp-abap-adt-compact-ro\` (\`@mcp-abap-adt/compact-ro\`) |
+| `rw` | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; all compact tools are served by \`mcp-abap-adt-compact\` (\`@mcp-abap-adt/compact\`) |
+| `compact` | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the compact tools are served by \`mcp-abap-adt-compact\` (\`@mcp-abap-adt/compact\`), those that change nothing by \`mcp-abap-adt-compact-ro\` (\`@mcp-abap-adt/compact-ro\`) |
+| `low` | the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse) |
+| any other word, or none (`mcp-abap-adt` / `-ro`) | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; \`mcp-abap-adt\` (\`@mcp-abap-adt/core\`) serves readonly, high and debug, \`mcp-abap-adt-ro\` (\`@mcp-abap-adt/core-ro\`) the readonly tools alone |
+| any other word, or none (`mcp-abap-adt-compact` / `-ro`) | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; \`mcp-abap-adt-compact\` (\`@mcp-abap-adt/compact\`) serves all compact tools, \`mcp-abap-adt-compact-ro\` (\`@mcp-abap-adt/compact-ro\`) those that change nothing |
+
+With several words the one asking for the most answers — `low`, `compact`, `high`, `rw`, `debug`,
+`readonly`, `ro`, in that order. From a config file the sentence begins `exposition (config file)
+is gone`. **Remove `--exposition` from every command line, client configuration and service unit,
+and `exposition` from every config file**; a `--conf` template no longer writes it.
+
+**`@mcp-abap-adt/compact-readonly` is renamed `@mcp-abap-adt/compact-readonly-entries`** (the
+library half that changes nothing; no binary), so it is not confused with `@mcp-abap-adt/compact-ro`
+(the read-only compact server). An embedder importing it changes the package name; the exports
+(`compactReadOnlyEntries`, `CompactReadOnlyHandlersGroup`, `./routes`) are the same.
 
 ## Every transport: the long reads take a `timeout`, each on an ABAP session of its own
 
@@ -159,10 +215,9 @@ included. The directory is created `0700` (an existing one is narrowed to `0700`
 directory out of backups, synchronised folders and container images, and do not share it between
 OS users. The server never logs a file's content and never shows a cookie to the model.
 
-**The tools**, on every transport. The list and the logoff are served with every exposition — a
-logoff is a system action, not a data change, so compact `ro` and full `readonly` serve them too;
-the resume only with a writing one (full `high`, compact `rw`), since a resumed session
-is for finishing a write or an unlock:
+**The tools**, on every transport. The list and the logoff are served by every binary — a
+logoff is a system action, not a data change, so the `-ro` binaries serve them too; the resume
+only by the write binaries, since a resumed session is for finishing a write or an unlock:
 
 | Full binaries | Compact binaries | What it does |
 |---|---|---|
@@ -205,8 +260,10 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
   "running"`, the `run_handle` (128 random bits), `tool`, `object`, `started_at`. The run's session
   stays open until SAP answers — whoever waits, whatever happens to the call or the request that
   started it — and is logged off right after the answer, which is then kept under the handle.
-- **The tools** — served beside the run tools: in the full binaries wherever `RuntimeRunClass` is
-  (the `readonly` exposition), in compact beside `rw`:
+- **The tools** — served by the write binaries, beside the run tools (`mcp-abap-adt`, `-http`,
+  `-sse` beside `RuntimeRunClass`; the compact ones beside `HandlerProfileRun`). The `-ro` binaries
+  serve none, and no store: `mcp-abap-adt-ro` keeps `RuntimeRunClass` / `RuntimeRunProgram` (system
+  tools), and their `background: true` is refused there (`background_runs_unavailable`):
 
 | Full binaries | Compact binaries | What it does |
 |---|---|---|
@@ -237,7 +294,8 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
 ## The low set leaves the full binaries
 
 **`mcp-abap-adt`, `mcp-abap-adt-http` and `mcp-abap-adt-sse` serve no low set.**
-`--exposition=…,low` — alone or beside any other set, in the CLI or the YAML form — stops the start:
+`--exposition=…,low` — alone or beside any other word, in the CLI or the YAML form — stops the start
+(as every `--exposition` does, see above), with D56's sentence:
 
 > the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)
 
@@ -417,8 +475,9 @@ first; a function module, service definition or service binding activates throug
   `MCP_HTTP_HOST`, `--port` / `--http-port` / `MCP_HTTP_PORT`, `--path` / `--http-path`,
   `--http-json-response`, `--http-allowed-hosts`, `--http-allowed-origins`,
   `--http-enable-dns-protection` (and their `MCP_HTTP_*`), `--tls-cert` / `--tls-key` / `--tls-ca`
-  (`MCP_TLS_*`), `--system-type`, `--exposition`, `--state-idle-minutes`, `--conf`. `GET
-  /mcp/health` answers as before.
+  (`MCP_TLS_*`), `--system-type`, `--state-idle-minutes`, `--conf`. `GET
+  /mcp/health` answers as before. `--exposition` is gone (see above): the readonly tools alone are
+  `@mcp-abap-adt/http-ro` (`mcp-abap-adt-http-ro`).
 - **Credentials come only from each request's headers**: `x-sap-url`, `x-sap-client`, and
   `x-sap-jwt-token`, or `x-sap-login` with `x-sap-password`. A request without them is answered
   `400` — *this server takes credentials only from the request's headers: send x-sap-url with
@@ -431,7 +490,7 @@ first; a function module, service definition or service binding activates throug
   the `service-keys` / `sessions` mounts (`AUTH_BROKER_PATH`) of a container or service running
   HTTP are no longer read: send the credential in the headers instead. A token you hold goes in
   `x-sap-jwt-token`.
-- **The debugger works as in 18.0**: `--exposition=...,debug`, the `state_handle` routes a call back
+- **The debugger works as in 18.0**, always served by `mcp-abap-adt-http` (no `--exposition=...,debug`): the `state_handle` routes a call back
   to the pooled instance that holds the state, the idle bound is `--state-idle-minutes`. Each
   request's own headers give its credential, also on a pooled instance. The debugger's ids come from
   `x-sap-debug-terminal-id` / `x-sap-debug-ide-id`, then `SAP_DEBUG_TERMINAL_ID` /
@@ -455,7 +514,8 @@ first; a function module, service definition or service binding activates throug
   The SSE options keep their names: `--sse-host` / `MCP_SSE_HOST`,
   `--sse-port` / `MCP_SSE_PORT`, `--sse-path`, `--post-path`, `--sse-allowed-hosts`,
   `--sse-allowed-origins`, `--sse-enable-dns-protection` (and their `MCP_SSE_*`), `--tls-*`
-  (`MCP_TLS_*`), `--system-type`, `--exposition`, `--state-idle-minutes`, `--conf`. **`--host`
+  (`MCP_TLS_*`), `--system-type`, `--state-idle-minutes`, `--conf` (`--exposition` is gone, see
+  above: the readonly tools alone are `@mcp-abap-adt/sse-ro`, `mcp-abap-adt-sse-ro`). **`--host`
   and `--port` no longer apply to SSE** (18.x: they beat the SSE ones): they are Streamable HTTP's
   and stop the SSE start; use `--sse-host` / `--sse-port`.
 - **Credentials come only from the `x-sap-*` headers of the `GET` that opens each SSE
@@ -482,34 +542,36 @@ first; a function module, service definition or service binding activates throug
 
 ## compact users
 
-**A package per transport, and the same tools on each.** The compact tool set is served by three
-packages, each with one binary and its transport's options only:
+**A package per transport and tool set, and the same tools on each transport.** The compact tool
+set is served by three packages, its read-only half by three more, each with one binary and its
+transport's options only:
 
 | You ran | Install | Run |
 |---|---|---|
 | `mcp-abap-adt-compact` (stdio) | `@mcp-abap-adt/compact` | `mcp-abap-adt-compact` |
 | `mcp-abap-adt-compact --transport=http` | `@mcp-abap-adt/compact-http` | `mcp-abap-adt-compact-http` |
 | `mcp-abap-adt-compact --transport=sse` | `@mcp-abap-adt/compact-sse` | `mcp-abap-adt-compact-sse` |
+| `mcp-abap-adt-compact --exposition=ro` (stdio) | `@mcp-abap-adt/compact-ro` | `mcp-abap-adt-compact-ro` |
+| `mcp-abap-adt-compact --transport=http --exposition=ro` | `@mcp-abap-adt/compact-http-ro` | `mcp-abap-adt-compact-http-ro` |
+| `mcp-abap-adt-compact --transport=sse --exposition=ro` | `@mcp-abap-adt/compact-sse-ro` | `mcp-abap-adt-compact-sse-ro` |
 
 - Each binary is its full counterpart's launcher with the compact tool set, nothing else:
   `mcp-abap-adt-compact` takes `mcp-abap-adt`'s options (the destination, the login),
   `mcp-abap-adt-compact-http` `mcp-abap-adt-http`'s (credentials from each request's `x-sap-*`
-  headers), `mcp-abap-adt-compact-sse` `mcp-abap-adt-sse`'s. The sections above apply to each as
-  to its counterpart; only the tool list and `--exposition` differ.
-- **`--exposition` is compact's on each**: `rw` (all 27 tools, the default; beside them the three
-  background-run tools and the three leftover-session tools) or `ro` (the 16 that
-  change nothing), and `debug` beside either for the four debugger verbs (`HandlerDebugStart`,
-  `…Wait`, `…View`, `…Step`) — on stdio, Streamable HTTP and SSE alike. `debug` alone, an empty
-  value and a set of the full binaries (`readonly`, `high`, `low`) stop the start, as in 18.x.
+  headers), `mcp-abap-adt-compact-sse` `mcp-abap-adt-sse`'s, and each `-ro` one the same as its
+  write binary. The sections above apply to each as to its counterpart; only the tool list differs.
+- **The binary fixes the tool list** (see "`--exposition` is gone" above): `mcp-abap-adt-compact`
+  (and `-http`, `-sse`) serves the 27 tools, the four debugger verbs (`HandlerDebugStart`,
+  `…Wait`, `…View`, `…Step`), the three background-run tools and the three leftover-session tools
+  — 37; `mcp-abap-adt-compact-ro` (and `-http-ro`, `-sse-ro`) the 16 that change nothing and the
+  leftover-session list and logoff — 18. `--exposition`, with `ro`, `rw`, `debug` or any word,
+  stops the start.
 - **Compact is the low set's analogue.** See "The low set leaves the full binaries" above: the
   write under your `lock_handle`, the package operations, the creation and validation parameters,
   the check of unsaved source, and `HandlerGet`'s three repository parts are new on `rw` / `ro`.
-- **A config file's `exposition` is honoured now.** 18.x read compact's exposition from the command
+- **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
-  ignored. Each compact binary's template now writes `exposition: rw`, its help lists `ro` / `rw`
-  / `debug`, and a config file's `exposition` is read by the same parser as the flag (the flag
-  wins): `exposition: ro` serves the 16 tools, `exposition: readonly,high` stops the start —
-  replace it with `ro` or `rw`.
+  ignored. Remove the key: the template writes none, and the binary you install chooses the tools.
 - **Two transport tools join `rw`** (25 → 27): `HandlerTransportSortAndCompress` (the full set's
   `SortAndCompressTransportTask`) and `HandlerTransportMoveObjects` (`MoveTransportObjects`) — the
   same handlers, the same parameters without `detail`.
@@ -813,25 +875,35 @@ packages, each with one binary and its transport's options only:
   `installTransportShutdown`, `CREDENTIALS_REQUIRED_WORDS`, `DESTINATIONS_ONLY_STDIO_WORDS`,
   besides the DNS-rebinding protection and the TLS listener. `destinationFromHeader`,
   `FirstConnectLock`, `destinationFailureAnswer` and `DestinationHeaderError` are gone.
-- **The tools a binary serves are its `ToolSet`** (`@mcp-abap-adt/lib/tool-set`): the groups for
-  an exposition, and the exposition's row, default and help. `fullToolSet` is the full binaries'
-  (readonly, high, debug, search, system; `low` is refused, see "The low set leaves the full
-  binaries"); `compactToolSetOf({ readOnly, modify })` composes
-  the compact halves' entry builders (`compactReadOnlyEntries`, `compactModifyEntries`) — the
-  compact debugger verbs moved into lib with it; `registryOf(toolSet, exposition)` builds the
-  registry. core's, http's and sse's `main({ toolSet, program, version })` take nothing else of the
-  tools: `LauncherOptions`' `extraGroups`, `exposition`, `helpExposition` and `includeSearch` are
-  gone, and `main()` without options is a type error; a second, optional argument gives the
-  process's edges (`processEdges()` of `@mcp-abap-adt/lib/config` by default). A `ToolSet`'s
-  `expositionHelp(transport)`, `expositionExamples(program)` and `exposition(read, argv,
-  transport)` take the binary's transport (`ServedTransport`: `stdio` / `http` / `sse`). Each binary's table is a function of the set
-  (`coreParameters(toolSet)`, `httpParameters(toolSet)`, `sseParameters(toolSet)`; the constants are
-  the full set's), and `readCoreConfig` / `readHttpConfig` / `readSseConfig` take the set as a
-  fourth argument (default `fullToolSet`). `@mcp-abap-adt/compact` no longer exports
-  `CompactHandlersGroup` or `compactExtraGroups`: it exports `compactToolSet` and `main`.
-  `registryForExposition(exposition)` (`@mcp-abap-adt/lib/handlers`) stays, building the full
-  set's registry; its `extraGroups` / `includeSearch` options are gone (a command passes a
-  `ToolSet`).
+- **The tools a binary serves are its `ToolSet`** (`@mcp-abap-adt/lib/tool-set`), fixed by the
+  binary: `kind` (`core`, `core-ro`, `compact`, `compact-ro`), `groups(context)`,
+  `toolsHelp(transport)` (the TOOLS section of `--help`), `expositionRemoved(transport)` (the
+  removed `--exposition` of the binary's table) and `backgroundRuns` (whether the launcher gives
+  the server a background-run store). Four sets: `fullToolSet` (readonly, high, debug, search,
+  system, every leftover-session tool, background runs; `low` is gone, see "The low set leaves the
+  full binaries"), `fullReadOnlyToolSet` (readonly, search, system, the leftover-session list and
+  logoff), `compactToolSetOf({ readOnly, modify })` (the compact halves' entry builders,
+  `compactReadOnlyEntries` and `compactModifyEntries`, with the compact debugger verbs, background
+  runs and every leftover-session tool) and `compactReadOnlyToolSetOf(readOnly)` (the read-only half,
+  the leftover-session list and logoff). `registryOf(toolSet)` builds the registry. core's, http's
+  and sse's `main({ toolSet, program, version })` take nothing else of the tools:
+  `LauncherOptions`' `extraGroups`, `exposition`, `helpExposition` and `includeSearch` are gone,
+  and `main()` without options is a type error; a second, optional argument gives the process's
+  edges (`processEdges()` of `@mcp-abap-adt/lib/config` by default). Each binary's table is a
+  function of the set (`coreParameters(toolSet)`, `httpParameters(toolSet)`,
+  `sseParameters(toolSet)`; the constants are the full set's), and `readCoreConfig` /
+  `readHttpConfig` / `readSseConfig` take the set as a fourth argument (default `fullToolSet`).
+  `@mcp-abap-adt/compact` no longer exports `CompactHandlersGroup` or `compactExtraGroups`: it
+  exports `compactToolSet` and `main`; each `-ro` package exports `readOnlyToolSet`, `main` and
+  its version. Gone with `--exposition`: `ToolSet`'s `expositionRow`, `expositionHelp`,
+  `expositionExamples` and `exposition()`; `EXPOSITION_ROW`, `toHandlerSets`, `expositionHelp`,
+  `COMPACT_BINARIES` (now `BINARIES`, every kind per transport), `expositionProblem` and
+  `validateExposition` (`@mcp-abap-adt/lib/config`); `parseCompactExposition`,
+  `parseCompactDebug` and `CompactExposition` (`@mcp-abap-adt/lib/tool-set`); `Parameter`'s
+  `cliReadByOwner`. A `RemovedParameter`'s `words(form, value)` now also receives the value the
+  form carried. `registryForExposition(exposition)` and `expositionGroups(exposition, context)`
+  (`@mcp-abap-adt/lib/handlers`) stay for an embedder combining the object-oriented sets; their
+  `extraGroups` / `includeSearch` options are gone.
 - **The low set is gone from lib's surface too.** `LowLevelHandlersGroup` (and its export from
   `@mcp-abap-adt/lib/handlers`) is deleted; `HandlerExporter` has no `includeLowLevel`;
   `EmbeddableMcpServer`'s `exposition` and the `HandlerSet` type have no `'low'`. The handler
@@ -841,21 +913,21 @@ packages, each with one binary and its transport's options only:
   `handleGetNodeStructure`, `handleGetVirtualFolders`, `handleGetObjectStructure`
   (`@mcp-abap-adt/lib/handlers/read`). An embedder that composed the low group serves the compact
   halves instead (`compactReadOnlyEntries`, `compactModifyEntries`).
-- **An exposition the set does not serve stops the start in its words** (`compact` on a full
-  binary; `low` with the sentence of "The low set leaves the full binaries"): `[MCP] Invalid exposition: …`, exit 1 — 18.x failed the launcher with
-  no words.
+- **`--exposition` stops the start in its words** (see "`--exposition` is gone"; `low` with the
+  sentence of "The low set leaves the full binaries"): `[MCP] <sentence>`, exit 1 — 18.x failed
+  the launcher with no words on a word it did not serve.
 - **Each binary reads its own parameter table** (`@mcp-abap-adt/lib/config` keeps the machinery
   and the shared rows). `ServerConfigManager`, `ArgumentsParser` and `applyYamlConfigToArgs` are
   gone: read a binary's configuration with `readCoreConfig(argv, env, yaml)` / `CORE_PARAMETERS`
   (`@mcp-abap-adt/core`), `readHttpConfig` / `HTTP_PARAMETERS` (`@mcp-abap-adt/http`),
   `readSseConfig` / `SSE_PARAMETERS` (`@mcp-abap-adt/sse`). lib's `readParameters(table, argv,
   env, yaml)`, `parameterSource`, `generateHelp(table, …)`, `readStartupConfig(table, …)` and the
-  shared rows (`CONF_ROW`, `EXPOSITION_ROW`, `SYSTEM_TYPE_ROW`, `STATE_IDLE_ROW`, `tlsRows`) build
+  shared rows (`CONF_ROW`, `SYSTEM_TYPE_ROW`, `STATE_IDLE_ROW`, `tlsRows`) build
   a table of your own; a refusal is a `ParameterRefusal` carrying its `words`.
   `loadYamlConfig(table, path)`, `validateYamlConfig(table, config)`,
   `generateYamlConfigTemplate(table)` and `generateConfigTemplateIfNeeded(table, path)` take the
   table; `parseConfigArg(argv?)` reads `--conf` / `--config`.
-- **`IServerConfig` holds the shared fields only** (`exposition`, `configFile`, `systemType`,
+- **`IServerConfig` holds the shared fields only** (`configFile`, `systemType`,
   `systemTypeSource`, `stateIdleMinutes`): the destination fields are core's `CoreConfig`, the
   listener fields http's `HttpConfig` and sse's `SseConfig`. `Transport`, `IV2ServerConfig` and
   the legacy `transport`, `transportConfig`, `defaultMcpDestination`, `defaultDestination` and

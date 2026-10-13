@@ -32,7 +32,7 @@ mcp-abap-adt-compact-sse-ro --version
 
 There is no `--transport` (a binary is its transport) and no `--exposition`: passing it, or a
 config file's `exposition`, stops the start with a sentence naming the binary that serves what you
-asked for — for example `--exposition=high` names `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`).
+asked for — for example `--exposition=rw` names `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`).
 
 **Credentials** come only from the `x-sap-*` headers of the `GET` that opens each SSE connection — `x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`; that connection's `POST`s are served with them. No auth broker, no stores.
 

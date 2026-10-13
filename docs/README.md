@@ -22,7 +22,7 @@ Documentation for end users: configuration, usage, and available tools.
 - Configurator (auto-config): `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
-- `DEBUGGER.md` - The opt-in debugger: debug sessions and their handle, the SAP ids, transports, what ends a session
+- `DEBUGGER.md` - The debugger (the write binaries; no `-ro` one): debug sessions and their handle, the SAP ids, transports, what ends a session
 
 ### [configuration/](configuration/) - Configuration Guides
 Documentation for server configuration options.

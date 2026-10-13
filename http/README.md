@@ -10,7 +10,13 @@ npm install -g @mcp-abap-adt/http
 mcp-abap-adt-http --port=3000
 ```
 
-**No low set (19.0.0).** `--exposition=…,low` stops the start: *"the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations are compact's — see [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+**The binary fixes the tool set (19.0.0).** `mcp-abap-adt-http` serves readonly (with system and search),
+high, the debugger, the leftover sessions (list, resume, logoff) and background runs; the readonly
+tools alone are [`@mcp-abap-adt/http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/http-ro) (`mcp-abap-adt-http-ro`). There is no
+`--exposition`: passing it, or a config file's `exposition`, stops the start with a sentence naming
+the binary to install instead.
+
+**No low set (19.0.0).** `--exposition=…,low` stops the start with D56's sentence: *"the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations are compact's — see [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
 
 ## Credentials: each request's headers, nothing else
 
@@ -49,15 +55,13 @@ As before 19.0.0, under the same names: `--host` / `--http-host` / `MCP_HTTP_HOS
 `/mcp/stream/http`), `--http-json-response` / `MCP_HTTP_ENABLE_JSON_RESPONSE`,
 `--http-allowed-hosts` / `MCP_HTTP_ALLOWED_HOSTS`, `--http-allowed-origins` /
 `MCP_HTTP_ALLOWED_ORIGINS`, `--http-enable-dns-protection` / `MCP_HTTP_ENABLE_DNS_PROTECTION`,
-`--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--exposition` (with
-`debug`), `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`;
+`--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`;
 new in 19.0.0, `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` (see [Shutdown](#shutdown)).
 `mcp-abap-adt-http --help` lists them.
 
 ## Held state (the debugger)
 
-Every request is an MCP session of its own. A tool that holds state (a debug session, with
-`--exposition=...,debug`) answers a `state_handle`; a `tools/call` carrying it is routed to the
+Every request is an MCP session of its own. A tool that holds state (a debug session) answers a `state_handle`; a `tools/call` carrying it is routed to the
 instance that holds the state, one request at a time, and its own headers give its credential. The
 handle is a bearer secret: whoever holds it reaches the state. Held state ends by its stop tool,
 the idle bound (`--state-idle-minutes`, 30–35 791, default 30), or the server's stop. See

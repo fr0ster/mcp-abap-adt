@@ -2,7 +2,24 @@
 
 ## Overview
 
-V2 server supports flexible handler set configuration through the `--exposition` parameter.
+**The binary fixes the tool set** (19.0.0). There is no `--exposition` and no compact `ro` / `rw`:
+you choose the tools by the package you install. Four kinds of binary, each on stdio, Streamable
+HTTP and SSE, each `-ro` binary a package of its own:
+
+| Kind | stdio | Streamable HTTP | SSE | Tools |
+|---|---|---|---|---|
+| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, every leftover-session tool, background runs |
+| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger, every leftover-session tool, background runs |
+| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, the leftover-session list and logoff |
+
+No `-ro` binary carries a debugger, a background run or the resume of a leftover session. A
+write binary keeps every readonly tool: writing needs reading (in core a `Read<X>` gives way to
+the high group's `Get<X>` of the same object, see the dedup below).
+
+Tool counts (on-premise, measured by the tests): core-ro 69 tools; compact 37 (27 + 4 debugger
+verbs + 3 background-run + 3 leftover-session); compact-ro 18 (16 + the leftover-session list and
+logoff).
 
 ## Handler Sets
 
@@ -22,16 +39,17 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - Transport operations
 
 3. **low** - gone from `mcp-abap-adt`, `-http` and `-sse` in 19.0.0. `--exposition=…,low`
-   stops the start: *"the low set is gone from mcp-abap-adt / -http / -sse; use
+   stops the start, as every `--exposition` does, with D56's sentence: *"the low set is gone from mcp-abap-adt / -http / -sse; use
    mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations —
    lock, a write under the lock you hold, unlock, check, validate, activate, the node and
    object structure reads — are compact's: see [MIGRATION-19.0](../MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries)
    for the tool-by-tool table.
 
-4. **compact** - Compact facade operations — served by its own command, `mcp-abap-adt-compact`
-   (`@mcp-abap-adt/compact`); this command refuses `--exposition=compact`. With `debug` in
-   that command's exposition (`ro,debug`, `rw,debug`) it adds four debugger verbs:
-   `HandlerDebugStart`, `HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`.
+4. **compact** - Compact facade operations — served by their own commands, `mcp-abap-adt-compact`
+   (`@mcp-abap-adt/compact`, every tool below and four debugger verbs: `HandlerDebugStart`,
+   `HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`) and `mcp-abap-adt-compact-ro`
+   (`@mcp-abap-adt/compact-ro`, the 16 that change nothing: no create, update, delete,
+   activate, lock, unlock, unit-test run or profiler run, and no debugger verb).
    - `HandlerValidate`
    - `HandlerActivate`
    - `HandlerLock`
@@ -71,22 +89,22 @@ V2 server supports flexible handler set configuration through the `--exposition`
      - `RUNTIME_PROFILE`: `viewProfiles`, `viewProfile`
      - `RUNTIME_DUMP`: `viewDumps`, `viewDump`
 
-5. **debug** - The debugger (opt-in, never part of the default)
+5. **debug** - The debugger: always in `mcp-abap-adt`, `-http` and `-sse`; in no `-ro` binary
    - ABAP: `DebugStartListener`, `DebugTakeOverListener`, `DebugWait`, `DebugStop`,
      breakpoints, stack, variables, watchpoints, steps, termination, settings, memory
    - AMDP: `AmdpDebugStart`, `AmdpDebugWait`, `AmdpDebugStep`, `AmdpDebugGetTable`,
      `AmdpDebugSetBreakpoints`, `AmdpDebugCancel`, `AmdpDebugStop`
    - Memory snapshots: `MemorySnapshotList`, `MemorySnapshotGet`, `MemorySnapshotDelta`
    - In user mode a breakpoint or a listener catches **every request of the request
-     user** (the connected SAP user unless another is named), which is why no default
-     carries the set. Beside any other set, or alone.
+     user** (the connected SAP user unless another is named). Install a `-ro` binary where
+     that must not be possible.
    - Sessions, handles, the SAP ids and what ends a session: [Debugger](DEBUGGER.md)
 
-6. **search** - Always included automatically
+6. **search** - In every core and core-ro binary
    - Object search
    - Code search
 
-7. **system** - Included only when the exposition includes `readonly` (added alongside the read-only group)
+7. **system** - In every core and core-ro binary, beside the read-only group
    - Where-used analysis (GetWhereUsed)
    - Type information (GetTypeInfo)
    - Object info (GetObjectInfo)
@@ -98,48 +116,62 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - Transactions
    - Class and program runs (`RuntimeRunClass`, `RuntimeRunProgram`), and beside them their
      background runs: `GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`
-     ([Background runs](README.md#background-runs-of-a-class-or-a-program)). Compact serves
-     `HandlerBackgroundRunGet`, `HandlerBackgroundRunList` and `HandlerBackgroundRunDiscard`
-     beside `rw`, where `HandlerProfileRun` is
+     ([Background runs](README.md#background-runs-of-a-class-or-a-program)) — those three in
+     the core binaries only. `mcp-abap-adt-ro` keeps `RuntimeRunClass` and `RuntimeRunProgram`
+     (they are system tools) but serves no background run: a `background: true` call is refused
+     (`background_runs_unavailable`). Compact serves `HandlerBackgroundRunGet`,
+     `HandlerBackgroundRunList` and `HandlerBackgroundRunDiscard` beside `HandlerProfileRun`, in
+     the compact write binaries
 
-8. **leftover sessions** - Always included, in every exposition of every binary (compact too)
-   - `ListLeftoverSessions` and `LogoffLeftoverSession` with every exposition (`readonly` and
-     compact `ro` included: a logoff is a system action, not a data change);
-     `ResumeLeftoverSession` only beside `high`. Compact: `HandlerLeftoverSessionList`,
-     `HandlerLeftoverSessionLogoff`, and `HandlerLeftoverSessionResume` beside `rw` only
+8. **leftover sessions** - In every binary (compact too)
+   - `ListLeftoverSessions` and `LogoffLeftoverSession` in every binary (the `-ro` ones
+     included: a logoff is a system action, not a data change); `ResumeLeftoverSession` only in
+     the write binaries. Compact: `HandlerLeftoverSessionList`, `HandlerLeftoverSessionLogoff`,
+     and `HandlerLeftoverSessionResume` in the compact write binaries only
    - The SAP sessions a killed server process left open, listed, resumed or logged off by the
      user; they act only on the caller's own sessions.
    - [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process)
 
 ## Usage
 
-**Note:** The `search` handler group is ALWAYS included regardless of `--exposition`. The `system` handler group is included only when the exposition contains `readonly` (it is registered together with the read-only group). The default exposition is `readonly,high`, so both are present by default.
-
-### Command Line
+Install the package whose binary serves the tools you want; the binary takes no flag for it.
 
 ```bash
-# Default: readonly + high (+ search always; + system because readonly is present)
+# readonly, high, debug, leftover sessions, background runs
+npm install -g @mcp-abap-adt/core
 mcp-abap-adt --env-path=.env
 
-# Only read-only operations (safest)
-mcp-abap-adt --env-path=.env --exposition=readonly
+# the readonly tools alone (with system and search)
+npm install -g @mcp-abap-adt/core-ro
+mcp-abap-adt-ro --env-path=.env
 
-# Read-only + high-level writes (recommended)
-mcp-abap-adt --env-path=.env --exposition=readonly,high
-
-# The debugger beside the default sets (opt-in)
-mcp-abap-adt --env-path=.env --exposition=readonly,high,debug
+# the compact tools; and those that change nothing
+npm install -g @mcp-abap-adt/compact @mcp-abap-adt/compact-ro
+mcp-abap-adt-compact --env-path=.env
+mcp-abap-adt-compact-ro --env-path=.env
 ```
 
-#### Validation rules
+#### `--exposition` is gone
 
-The launcher rejects invalid `--exposition` combinations at startup:
+`--exposition` (either spelling) and the config file's `exposition` stop the start, before
+anything is read, with one sentence per word, naming the binary of the same transport that serves
+what the word asked for (here as stdio names them; `-http` / `-sse` name their own):
 
-- `compact` is refused: the compact facade is its own command, `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), whose `--exposition` takes `ro` or `rw`, and `debug` beside either.
-- `low` is refused with the sentence above: the low set is gone from the full binaries; compact is its analogue.
-- Any other word outside `readonly`, `high`, `debug` is refused, naming the accepted ones.
+| Word | The sentence |
+|---|---|
+| `readonly` | `--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by` `` `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) `` |
+| `high` | `…; the high tools are served, beside the readonly ones, by` `` `mcp-abap-adt` (`@mcp-abap-adt/core`) `` |
+| `debug` (core family) | `…; the debugger is always served by` `` `mcp-abap-adt` (`@mcp-abap-adt/core`) ``, `and by no -ro binary` |
+| `debug` (compact family) | `…; the compact debugger is always served by` `` `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) ``, `and by no -ro binary` |
+| `ro` | `…; the compact tools that change nothing are served by` `` `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) `` |
+| `rw` | `…; all compact tools are served by` `` `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) `` |
+| `compact` | `…; the compact tools are served by` `` `mcp-abap-adt-compact` (…) ``, `those that change nothing by` `` `mcp-abap-adt-compact-ro` (…) `` |
+| `low` | `the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)` (D56, verbatim) |
+| anything else, or none | `…;` `` `mcp-abap-adt` (…) `` `serves readonly, high and debug,` `` `mcp-abap-adt-ro` (…) `` `the readonly tools alone` (compact: the compact pair) |
 
-Valid combinations: `[readonly]`, `[readonly, high]`, `[high]`, each with or without `debug`, and `[debug]` alone.
+With several words, the one asking for the most answers: `low`, `compact`, `high`, `rw`, `debug`,
+`readonly`, `ro`, in that order (`--exposition=readonly,high` names the write binary). From the
+config file the form is `exposition (config file)`.
 
 The binaries duplicate no tool: the full ones carry no low tool and no compact `Handler*` tool,
 the compact ones none of the full set's high tools; only read-only reads may appear in both
@@ -147,40 +179,21 @@ the compact ones none of the full set's high tools; only read-only reads may app
 
 #### Readonly / high-level dedup
 
-When both `readonly` and `high` are exposed, `Read<X>` readonly handlers duplicate the corresponding `Get<X>` from the high-level group (e.g. `ReadFunctionModule` vs `GetFunctionModule`). The launcher hides the readonly `Read<X>` variants in this case so that only one tool per operation is visible to the client.
+In the core binaries, where `readonly` and `high` are both served, `Read<X>` readonly handlers duplicate the corresponding `Get<X>` from the high-level group (e.g. `ReadFunctionModule` vs `GetFunctionModule`). The launcher hides the readonly `Read<X>` variants there so that only one tool per operation is visible to the client; the `-ro` binaries serve the `Read<X>` variants.
 
 `EmbeddableMcpServer` applies the same dedup by default, so embedders see one tool per operation just like the launcher. Consumers that need both variants can opt out by passing `new NoDedupStrategy()` as `readOnlyDedupStrategy`. See [EmbeddableMcpServer dedup strategies](#embeddablemcpserver-dedup-strategies) below.
 
 **The same tool in two groups.** A few tools are a copy in both `readonly` and `high` — the same name, schema and handler, because the operation only reads (today: `GetUnitTestResult`). The rule:
 
-- `readonly` alone → the tool comes from `readonly`.
-- `readonly` + `high` → the tool appears **once**, from `high`.
+- `readonly` alone (the `-ro` binaries) → the tool comes from `readonly`.
+- `readonly` + `high` (the core binaries) → the tool appears **once**, from `high`.
 
 `ReadOnlyHandlersGroup` enforces this itself, whatever dedup strategy is passed — a strategy decides about differently named pairs, and one server cannot register two tools under one name. The launcher, `EmbeddableMcpServer` and `HandlerExporter` all hand the group the names of the exposed high tools.
 
 ### Config File
 
-If using `--config` parameter, specify in YAML:
-
-```yaml
-transport: stdio
-envFile: .env
-exposition:
-  - readonly
-  - high
-```
-
-### Environment Variable
-
-`--exposition` has no environment form; a config file states it (`--conf`, YAML `exposition`):
-
-```bash
-printf 'exposition: readonly,high\n' > config.yaml
-mcp-abap-adt --env-path=.env --conf=config.yaml
-```
-
-Every binary takes `--exposition`: `mcp-abap-adt-http --exposition=readonly,debug`,
-`mcp-abap-adt-sse --exposition=readonly`.
+A config file (`--conf`) states no tools: its `exposition` key stops the start with the sentence
+of its word, as the flag does. Remove it, and install the binary you want instead.
 
 ## Generating Handler Documentation
 
@@ -265,12 +278,14 @@ the compact tool set of `@mcp-abap-adt/lib/tool-set` on every transport.
 
 ## Security Recommendations
 
-1. **Production**: Use only `readonly`
-2. **Development**: Use `readonly,high` 
+1. **Production**: install a `-ro` binary (`mcp-abap-adt-ro`, `mcp-abap-adt-compact-ro`, or
+   their `-http` / `-sse` siblings): no high tool, no debugger, no background run. They keep the
+   system group's `RuntimeRunClass` and `RuntimeRunProgram`, which run code on the system
+2. **Development**: `mcp-abap-adt` (readonly, high and the debugger)
 3. **Single-step work** (lock, write under the lock, unlock): the compact command — and
    keep a lock short: releasing what `HandlerLock` took is the caller's job
-4. **Debugging**: add `debug` only while you debug. A breakpoint catches every request of
-   the request user, and a `state_handle` gives whoever holds it that debug session — see [Debugger](DEBUGGER.md) and [Security](../../SECURITY.md)
+4. **Debugging**: the debugger is in every core and compact write binary. A breakpoint
+   catches every request of the request user, and a `state_handle` gives whoever holds it that debug session — see [Debugger](DEBUGGER.md) and [Security](../../SECURITY.md)
 
 ## Implementation
 
@@ -278,19 +293,27 @@ Handler sets are a `ToolSet` (`@mcp-abap-adt/lib/tool-set`, [src/lib/toolSet.ts]
 the one input of each binary's launcher (`main({ toolSet, program, version })`):
 
 - `fullToolSet` — `mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse`. Its groups
-  (`expositionGroups`, [src/lib/handlers/registry/expositionRegistry.ts](../../src/lib/handlers/registry/expositionRegistry.ts)):
+  (`expositionGroups(['readonly', 'high', 'debug'])`, [src/lib/handlers/registry/expositionRegistry.ts](../../src/lib/handlers/registry/expositionRegistry.ts)):
   the non-readonly groups first (`high`, `debug`), so their tool names feed the readonly
-  dedup; then `readonly` with `SystemHandlersGroup`; then search, always. A word outside
-  `readonly`, `high`, `debug` stops the start in fixed words, and `low` with D56's sentence.
+  dedup; then `readonly` with `SystemHandlersGroup` and the background-run tools; then search
+  and every leftover-session tool.
+- `fullReadOnlyToolSet` — `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`: `readonly`, `system`,
+  search, and the leftover-session list and logoff.
 - `compactToolSetOf({ readOnly, modify })` — `mcp-abap-adt-compact`, `-compact-http`,
-  `-compact-sse`, with the two halves' entry builders: `ro` the read-only half, `rw` both (the
-  default), `debug` beside either the four `HandlerDebug*` verbs; no search.
+  `-compact-sse`, with the two halves' entry builders: both halves, the four `HandlerDebug*`
+  verbs, the background-run tools, every leftover-session tool; no search.
+- `compactReadOnlyToolSetOf(readOnly)` — `mcp-abap-adt-compact-ro`, `-compact-http-ro`,
+  `-compact-sse-ro`: the read-only half (`@mcp-abap-adt/compact-readonly-entries`), the
+  leftover-session list and logoff.
+
+Each set's `expositionRemoved(transport)` is the removed `--exposition` of its launcher's table,
+its `toolsHelp(transport)` the TOOLS section of `--help`, and `backgroundRuns` whether the launcher
+hands the server a background-run store.
 
 ```typescript
-import { fullToolSet, registryOf } from '@mcp-abap-adt/lib/tool-set';
+import { fullReadOnlyToolSet, registryOf } from '@mcp-abap-adt/lib/tool-set';
 
-const exposition = fullToolSet.exposition(['readonly', 'high'], [], 'stdio');
-const registry = registryOf(fullToolSet, exposition); // a CompositeHandlersRegistry
+const registry = registryOf(fullReadOnlyToolSet); // a CompositeHandlersRegistry
 ```
 
 ## Adding New Handlers

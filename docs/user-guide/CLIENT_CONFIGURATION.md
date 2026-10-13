@@ -256,7 +256,7 @@ SAP_SYSTEM_TYPE=onprem
 # SAP_RESPONSIBLE=<user>
 # SAP_MASTER_SYSTEM=<system id>
 
-# Debugger ids (optional, with the opt-in debug set): random per instance when absent;
+# Debugger ids (optional; the write binaries serve the debugger): random per instance when absent;
 # the x-sap-debug-* headers win over these
 # SAP_DEBUG_TERMINAL_ID=<terminal id>
 # SAP_DEBUG_IDE_ID=<IDE id>

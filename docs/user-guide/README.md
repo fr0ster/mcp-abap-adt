@@ -55,7 +55,7 @@ mcp-abap-adt-http --port=3000
 - **[CLI_OPTIONS.md](CLI_OPTIONS.md)** - Each binary's command-line options with their environment and YAML forms
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups and exposure
-- **[DEBUGGER.md](DEBUGGER.md)** - The opt-in debugger: debug sessions, the SAP ids, transports, what ends a session
+- **[DEBUGGER.md](DEBUGGER.md)** - The debugger (the write binaries; no `-ro` one): debug sessions, the SAP ids, transports, what ends a session
 
 ## Getting Started
 
@@ -115,7 +115,8 @@ transport, three tools act on **your** leftover sessions, and nothing else does:
   user and time of each session a dead process left; never a cookie.
 - `ResumeLeftoverSession { handle }` (compact `HandlerLeftoverSessionResume`) — the server goes on
   in that session instead of logging on, so a `lock_handle` taken there works again: finish the
-  write, or unlock. Served only with a writing exposition (`high`; compact `rw`). A
+  write, or unlock. Served only by the write binaries (`mcp-abap-adt`, `mcp-abap-adt-compact` and their `-http` /
+  `-sse` siblings), never by a `-ro` one. A
   debugger's session cannot be resumed. If SAP says the session is gone, you get SAP's answer and
   the record is deleted. Useful on stdio and SSE: over Streamable HTTP each request has an
   instance of its own, so a resumed session lives for that one request and is logged off with it.

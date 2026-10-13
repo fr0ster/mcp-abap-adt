@@ -10,7 +10,13 @@ HTTP+SSE is deprecated in MCP since 2025-03-26; it is served for the clients tha
 SSE. A client that speaks Streamable HTTP wants
 [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http).
 
-**No low set (19.0.0).** `--exposition=…,low` stops the start: *"the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations are compact's — see [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+**The binary fixes the tool set (19.0.0).** `mcp-abap-adt-sse` serves readonly (with system and search),
+high, the debugger, the leftover sessions (list, resume, logoff) and background runs; the readonly
+tools alone are [`@mcp-abap-adt/sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/sse-ro) (`mcp-abap-adt-sse-ro`). There is no
+`--exposition`: passing it, or a config file's `exposition`, stops the start with a sentence naming
+the binary to install instead.
+
+**No low set (19.0.0).** `--exposition=…,low` stops the start with D56's sentence: *"the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations are compact's — see [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
 
 ```bash
 npm install -g @mcp-abap-adt/sse
@@ -37,8 +43,8 @@ nowhere else: no destination, no service key, no session file, no login, no auth
 - A `POST` is routed by its `sessionId` alone: its own `x-sap-*` headers are not read, so a
   connection's credential is the one it opened with.
 - Each connection has its own credential, instance and connection to the system; nothing is shared
-  with another connection, and nothing outlives it. Held state (a debug session, with
-  `--exposition=...,debug`) lives in the connection's instance until the connection closes, its
+  with another connection, and nothing outlives it. Held state (a debug session)
+  lives in the connection's instance until the connection closes, its
   stop tool runs or the idle bound (`--state-idle-minutes`) ends it.
 - The system kind follows `--system-type` / `SAP_SYSTEM_TYPE`.
 
@@ -52,8 +58,7 @@ As before 19.0.0, under the same names: `--sse-host` / `MCP_SSE_HOST`, `--sse-po
 `MCP_SSE_PORT` (default `3001`), `--sse-path` (default `/sse`), `--post-path` (default
 `/messages`), `--sse-allowed-hosts` / `MCP_SSE_ALLOWED_HOSTS`, `--sse-allowed-origins` /
 `MCP_SSE_ALLOWED_ORIGINS`, `--sse-enable-dns-protection` / `MCP_SSE_ENABLE_DNS_PROTECTION`,
-`--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--exposition` (with
-`debug`), `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`;
+`--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`;
 new in 19.0.0, `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` (see [Shutdown](#shutdown)).
 
 ## A closed connection disposes its instance

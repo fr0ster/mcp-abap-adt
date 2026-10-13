@@ -32,7 +32,7 @@ mcp-abap-adt-compact-ro --version
 
 There is no `--transport` (a binary is its transport) and no `--exposition`: passing it, or a
 config file's `exposition`, stops the start with a sentence naming the binary that serves what you
-asked for — for example `--exposition=high` names `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`).
+asked for — for example `--exposition=rw` names `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`).
 
 **One destination per process** through the auth broker, exactly as `mcp-abap-adt`: a service key, a session, an `--env` file, the browser login. It connects to the ABAP system over HTTP (basic or JWT), RFC (basic) or SNC (passwordless, over RFC); **RFC and SNC need the SAP NW RFC SDK, a C++ toolchain and `SAPNWRFC_HOME` set before `npm install`** (see [RFC Setup](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/RFC_SETUP.md)).
 

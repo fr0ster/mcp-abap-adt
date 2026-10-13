@@ -12,11 +12,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Handler Sets
 
-- `readonly` -> [Read-Only Group](#read-only-group)
-- `high` -> [High-Level Group](#high-level-group)
-- `debug` (opt-in) -> [Debug Group](#debug-group)
-- every exposition -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume beside `high` only)
-- `compact` -> [High-Level / Compact](#high-level-compact)
+The binary fixes its tool set (19.0.0); there is no `--exposition`.
+
+- `readonly` -> [Read-Only Group](#read-only-group): `mcp-abap-adt` and `mcp-abap-adt-ro` (and `-http`, `-sse`, each with its `-ro`)
+- `high` -> [High-Level Group](#high-level-group): `mcp-abap-adt`, `-http`, `-sse`
+- `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
+- every binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume in the write binaries only)
+- compact -> [High-Level / Compact](#high-level-compact): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
 
 ## Navigation
 

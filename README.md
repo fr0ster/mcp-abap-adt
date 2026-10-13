@@ -114,12 +114,17 @@ the obligations of a server that service never runs.
 | [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http) | AGPL-3.0-only | The compact server over Streamable HTTP, `mcp-abap-adt-compact-http`: `http`'s launcher and configuration with the compact tool set. |
 | [`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse) | AGPL-3.0-only | The compact server over HTTP+SSE, `mcp-abap-adt-compact-sse`: `sse`'s launcher and configuration with the compact tool set. |
 | [`@mcp-abap-adt/background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Apache-2.0 | The in-memory store of background runs (`IBackgroundRuns` of the library): the servers' store, for an embedder that keeps runs in its process. `core`, `http` and `sse` depend on it. |
-| [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes. |
+| [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro), [`http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/http-ro), [`sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/sse-ro) | AGPL-3.0-only | The read-only servers, `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: `core`'s, `http`'s and `sse`'s launcher with the readonly tools (with system and search) and the leftover-session list and logoff — no high, debugger, background-run or resume tool. |
+| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 16 compact tools that change nothing and the leftover-session list and logoff. |
+| [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes (`compact-readonly-entries` was `compact-readonly` before 19.0.0). |
 
-Ten packages, six binaries: one full and one compact binary per transport. Install the one for
-your transport to run a server — `@mcp-abap-adt/core`, `http` or `sse` (or `compact`,
-`compact-http`, `compact-sse`). Install `@mcp-abap-adt/lib` to embed the tools in your own
-application.
+Sixteen packages, twelve binaries: four kinds of binary — core, core-ro, compact, compact-ro — on
+each transport. **The binary fixes the tool set** (19.0.0; there is no `--exposition`): install the
+one for your transport and the tools you want to run a server — `@mcp-abap-adt/core`, `http` or
+`sse` (readonly, high, the debugger), their `-ro` packages (the readonly tools alone), `compact`,
+`compact-http`, `compact-sse`, or their `-ro` packages (the compact tools that change nothing).
+Install `@mcp-abap-adt/lib` to embed the tools in your own application. Every binary and its
+tools: [Handler sets](docs/user-guide/HANDLERS_MANAGEMENT.md).
 
 ### 1. Standalone MCP Server (Default)
 Run as a standalone MCP server; a binary is its transport (there is no `--transport` option):
@@ -130,6 +135,9 @@ mcp-abap-adt-sse                       # SSE (@mcp-abap-adt/sse): x-sap-* header
 mcp-abap-adt-compact --mcp=TRIAL       # the compact tool set over stdio (@mcp-abap-adt/compact)
 mcp-abap-adt-compact-http              # ... over Streamable HTTP (@mcp-abap-adt/compact-http)
 mcp-abap-adt-compact-sse               # ... over SSE (@mcp-abap-adt/compact-sse)
+mcp-abap-adt-ro --mcp=TRIAL            # the readonly tools alone over stdio (@mcp-abap-adt/core-ro)
+mcp-abap-adt-compact-ro --mcp=TRIAL    # the compact tools that change nothing (@mcp-abap-adt/compact-ro)
+                                       # (and -http-ro, -sse-ro, -compact-http-ro, -compact-sse-ro)
 ```
 
 ### 2. Embeddable Server (For Integration)
@@ -235,7 +243,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🌐 Service Binding Preview**: `GetServiceBindingPreviewUrl` - The browser URL that opens a published service binding's Fiori preview, beside its OData service and `$metadata` URLs. Composed from the binding, its service definition and the exposed root view — no document carries it. OData V2 and V4; a Web API binding has no preview and says so. On SAP BTP the preview URL carries the browser host (`abap-web`), where the BTP logon answers, while the service URLs keep the ADT host
 - **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
 - **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader (dumps — filtered by user, runtime error, exception, object, package or component, and read past SAP's 100 entries per request — system messages, gateway errors), SM02 system messages, Gateway error log
-- **🐞 Debugger** (opt-in, `--exposition=…,debug`): ABAP and AMDP — breakpoints (line, exception, statement, message; a line breakpoint may carry a condition), a background run of a class or report caught at them, another user's requests and terminal mode, stack, variables, watchpoints, steps, leaving a debuggee running, the debugger settings, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. In user mode a breakpoint catches every request of the request user (the connected SAP user unless another is named), so the set is never on by default. See [Debugger](docs/user-guide/DEBUGGER.md)
+- **🐞 Debugger** (in `mcp-abap-adt`, `-http`, `-sse` and the compact write binaries; in no `-ro` binary): ABAP and AMDP — breakpoints (line, exception, statement, message; a line breakpoint may carry a condition), a background run of a class or report caught at them, another user's requests and terminal mode, stack, variables, watchpoints, steps, leaving a debuggee running, the debugger settings, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. In user mode a breakpoint catches every request of the request user (the connected SAP user unless another is named): where that must not be possible, install a `-ro` binary. See [Debugger](docs/user-guide/DEBUGGER.md)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
@@ -250,8 +258,8 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[RFC Setup](docs/installation/RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC SDK and a C++ toolchain before the install
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
-- **[Debugger](docs/user-guide/DEBUGGER.md)** - The opt-in `debug` set: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
-- **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups
+- **[Debugger](docs/user-guide/DEBUGGER.md)** - The `debug` set of the write binaries: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
+- **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - The twelve binaries and the tools each serves
 - **Configurator**: `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)) provides the `mcp-conf` CLI to auto-configure clients
 - **Tools by level**
   - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
@@ -318,10 +326,14 @@ mcp-abap-adt --env-path=/path/to/my.env
 # SSE (@mcp-abap-adt/sse; credentials from the opening GET's x-sap-* headers)
 mcp-abap-adt-sse --sse-port=3001
 
-# The compact servers take their full counterpart's options, with --exposition=ro|rw[,debug]
+# The compact servers take their full counterpart's options; the binary fixes the tools
 mcp-abap-adt-compact --env-path=/path/to/my.env       # npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact-http --exposition=ro             # npm install -g @mcp-abap-adt/compact-http
+mcp-abap-adt-compact-http --port=8080                 # npm install -g @mcp-abap-adt/compact-http
 mcp-abap-adt-compact-sse --sse-port=3001              # npm install -g @mcp-abap-adt/compact-sse
+
+# The read-only servers: the same options, the tools that change nothing
+mcp-abap-adt-ro --env-path=/path/to/my.env            # npm install -g @mcp-abap-adt/core-ro
+mcp-abap-adt-compact-http-ro --port=8080              # npm install -g @mcp-abap-adt/compact-http-ro
 ```
 
 ### Development Mode

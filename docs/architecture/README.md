@@ -4,7 +4,7 @@ Technical documentation about the system architecture, design decisions, and int
 
 ## Packages
 
-The repository holds five npm packages (not npm workspaces; each is built and published by path):
+The repository holds sixteen npm packages (not npm workspaces; each is built and published by path):
 
 | Directory | Package | Role |
 |---|---|---|
@@ -12,7 +12,13 @@ The repository holds five npm packages (not npm workspaces; each is built and pu
 | `server/` | `@mcp-abap-adt/core` | The `mcp-abap-adt` command: launcher and transports |
 | `background-runs-memory/` | `@mcp-abap-adt/background-runs-memory` | The in-memory store of background runs (`IBackgroundRuns` of lib); core, http and sse create it |
 | `compact-readonly-entries/`, `compact-modify/` | `@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify` | The two halves of the compact tool set |
-| `compact/` | `@mcp-abap-adt/compact` | The `mcp-abap-adt-compact` command: core's launcher with the compact tool list |
+| `http/`, `sse/` | `@mcp-abap-adt/http`, `@mcp-abap-adt/sse` | The `mcp-abap-adt-http` and `mcp-abap-adt-sse` commands |
+| `compact/`, `compact-http/`, `compact-sse/` | `@mcp-abap-adt/compact`, `compact-http`, `compact-sse` | The compact commands: each transport's launcher with the compact tool list |
+| `core-ro/`, `http-ro/`, `sse-ro/` | `@mcp-abap-adt/core-ro`, `http-ro`, `sse-ro` | The read-only commands (`mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`): each transport's launcher with the read-only tool set |
+| `compact-ro/`, `compact-http-ro/`, `compact-sse-ro/` | `@mcp-abap-adt/compact-ro`, `compact-http-ro`, `compact-sse-ro` | The read-only compact commands: each transport's launcher with the compact half that changes nothing |
+
+The binary fixes the tool set (19.0.0): there is no `--exposition`. See
+[Handlers Management](../user-guide/HANDLERS_MANAGEMENT.md).
 
 ### Standalone server
 

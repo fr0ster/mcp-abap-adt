@@ -178,8 +178,8 @@ tools; the server decides nothing by itself (session-resume spec).
   `connect()` (`keepSession` → `systemUserOf`, `src/lib/systemUser.ts`, shared with the
   debugger's `requestUserOf`); a system that names none keeps no file.
 - **The tools** (`ListLeftoverSessions` / `ResumeLeftoverSession` / `LogoffLeftoverSession`;
-  compact `HandlerLeftoverSession{List,Resume,Logoff}`) — the list and the logoff on every
-  exposition, the resume only beside a writing one (`high`, compact `rw`) — are
+  compact `HandlerLeftoverSession{List,Resume,Logoff}`) — the list and the logoff in every
+  binary, the resume only in the write binaries (none of the `-ro` ones) — are
   `connectionless` entries: the tool wrapper calls them without `getConnection` (a resume must
   not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
   resolves the caller from the instance's source (`resolveCaller`) — a token caller's user from
@@ -405,10 +405,13 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
   `getName()`, `getHandlers()`, each a `TOOL_DEFINITION` with its handler). The groups are
   `ReadOnlyHandlersGroup`, `HighLevelHandlersGroup`, `SystemHandlersGroup`,
   `SearchHandlersGroup` and `DebugHandlersGroup` (`LowLevelHandlersGroup` is gone since 19.0.0).
-- **Tool sets.** A binary's tools are its `ToolSet` (`@mcp-abap-adt/lib/tool-set`): the groups for
-  an exposition, plus the exposition's row, default and help. `fullToolSet` covers readonly, high,
-  debug and search; it refuses `low` (the low set left the full binaries in 19.0.0). `compactToolSetOf({ readOnly, modify })` is the compact facade's.
-  `registryOf(toolSet, exposition)` builds the registry.
+- **Tool sets.** A binary's tools are its `ToolSet` (`@mcp-abap-adt/lib/tool-set`), fixed by the
+  binary (C23; there is no `--exposition`): its groups, the TOOLS section of its help, its removed
+  `--exposition` and whether it serves background runs. `fullToolSet` covers readonly, high, debug,
+  search, the leftover sessions and background runs; `fullReadOnlyToolSet` readonly, search and
+  the leftover-session list and logoff; `compactToolSetOf({ readOnly, modify })` is the compact
+  facade's, `compactReadOnlyToolSetOf(readOnly)` its read-only half's. `registryOf(toolSet)`
+  builds the registry.
 - **Embedders.** `EmbeddableMcpServer` builds its registry from `exposition` (`readonly`, `high`,
   `compact`, `system`, `search`), or takes `handlersRegistry`.
 - **Availability.** A tool is registered only if its `available_in` includes the instance's

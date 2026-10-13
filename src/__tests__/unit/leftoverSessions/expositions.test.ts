@@ -1,8 +1,9 @@
 /**
- * Which leftover-session tools an exposition serves (owner's decision on
- * C21): the list and the logoff with every set — a logoff is a system
- * action, not a data change — and the resume only with a writing set (full
- * `high` / `low`, compact `rw`).
+ * Which leftover-session tools a tool set serves (owner's decision on C21,
+ * the binaries fixed by C23): the list and the logoff in every binary — a
+ * logoff is a system action, not a data change — and the resume only in the
+ * write binaries (core, compact); for an embedder's handler sets, only
+ * beside `high`.
  */
 
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';

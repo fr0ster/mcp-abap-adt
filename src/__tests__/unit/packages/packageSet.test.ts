@@ -91,6 +91,42 @@ function isRegistryRange(range: string): boolean {
   });
 }
 
+/** `a.b.c` (a pre-release or build tag cut off) as three numbers. Plain code. */
+function versionOf(text: string): [number, number, number] {
+  let end = text.length;
+  for (const mark of ['-', '+']) {
+    const at = text.indexOf(mark);
+    if (at !== -1 && at < end) end = at;
+  }
+  const [a, b, c] = text.slice(0, end).split('.').map(Number);
+  return [a ?? Number.NaN, b ?? Number.NaN, c ?? Number.NaN];
+}
+
+/** `a` compared with `b`: negative, zero or positive. */
+function compare(a: readonly number[], b: readonly number[]): number {
+  for (let i = 0; i < 3; i += 1) if (a[i] !== b[i]) return a[i] - b[i];
+  return 0;
+}
+
+/**
+ * Whether `range` (`^x.y.z`, `~x.y.z` or `x.y.z`) accepts `version`, as npm
+ * reads it for the ranges this repository writes. Plain code.
+ */
+function accepts(range: string, version: string): boolean {
+  const have = versionOf(version);
+  const first = range[0];
+  const floor = versionOf(
+    first === '^' || first === '~' ? range.slice(1) : range,
+  );
+  if (first !== '^' && first !== '~') return compare(have, floor) === 0;
+  if (compare(have, floor) < 0) return false;
+  if (first === '~') return have[0] === floor[0] && have[1] === floor[1];
+  // `^`: the first non-zero part stays.
+  if (floor[0] !== 0) return have[0] === floor[0];
+  if (floor[1] !== 0) return have[0] === 0 && have[1] === floor[1];
+  return compare(have, floor) === 0;
+}
+
 describe('the package set', () => {
   it('is sixteen packages, every manifest kept by .gitignore’s exceptions', () => {
     const ignore = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
@@ -135,6 +171,57 @@ describe('the package set', () => {
       }
     }
     expect(refused).toEqual([]);
+  });
+
+  // A sibling's range must accept the version the sibling's manifest
+  // carries: a range ahead of it builds here (the mappers read the sources)
+  // and fails the packed install, where npm asks the registry for it.
+  it.each(PACKAGES)(
+    '%s: every sibling range accepts the sibling’s own version',
+    (dir) => {
+      const versions = new Map(
+        PACKAGES.map(([d, name]) => [name, manifestOf(d).version] as const),
+      );
+      const manifest = manifestOf(dir);
+      const refused: string[] = [];
+      for (const field of [
+        'dependencies',
+        'optionalDependencies',
+        'peerDependencies',
+      ] as const) {
+        for (const [dep, range] of Object.entries(manifest[field] ?? {})) {
+          const version = versions.get(dep);
+          if (version !== undefined && !accepts(range, version)) {
+            refused.push(`${dep} ${range} refuses ${version}`);
+          }
+        }
+      }
+      expect(refused).toEqual([]);
+    },
+  );
+
+  it('the range reading is npm’s for the ranges written here', () => {
+    const cases: Array<[string, string, boolean]> = [
+      ['^18.1.0', '18.1.0', true],
+      ['^18.1.0', '18.4.2', true],
+      ['^18.1.0', '18.0.9', false],
+      ['^18.1.0', '19.0.0', false],
+      ['^18.1.0', '17.1.0', false],
+      ['^17.1.0', '18.1.0', false],
+      ['~1.2.3', '1.2.9', true],
+      ['~1.2.3', '1.3.0', false],
+      ['^0.4.1', '0.4.9', true],
+      ['^0.4.1', '0.5.0', false],
+      ['18.1.0', '18.1.0', true],
+      ['18.1.0', '18.1.1', false],
+    ];
+    for (const [range, version, ok] of cases) {
+      expect({ range, version, ok: accepts(range, version) }).toEqual({
+        range,
+        version,
+        ok,
+      });
+    }
   });
 
   it('the range check refuses a local link in any form', () => {

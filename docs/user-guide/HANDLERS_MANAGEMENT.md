@@ -118,8 +118,9 @@ logoff).
      background runs: `GetBackgroundRun`, `ListBackgroundRuns`, `DiscardBackgroundRun`
      ([Background runs](README.md#background-runs-of-a-class-or-a-program)) — those three in
      the core binaries only. `mcp-abap-adt-ro` keeps `RuntimeRunClass` and `RuntimeRunProgram`
-     (they are system tools) but serves no background run: a `background: true` call is refused
-     (`background_runs_unavailable`). Compact serves `HandlerBackgroundRunGet`,
+     (they are system tools: "read-only" means the user cannot change code, and running it is
+     allowed, as in SAP) without `background` — it keeps no background run, so the parameter is
+     not in their schema and is not read. Compact serves `HandlerBackgroundRunGet`,
      `HandlerBackgroundRunList` and `HandlerBackgroundRunDiscard` beside `HandlerProfileRun`, in
      the compact write binaries
 
@@ -166,7 +167,8 @@ what the word asked for (here as stdio names them; `-http` / `-sse` name their o
 | `ro` | `…; the compact tools that change nothing are served by` `` `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) `` |
 | `rw` | `…; all compact tools are served by` `` `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) `` |
 | `compact` | `…; the compact tools are served by` `` `mcp-abap-adt-compact` (…) ``, `those that change nothing by` `` `mcp-abap-adt-compact-ro` (…) `` |
-| `low` | `the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)` (D56, verbatim) |
+| `low` (core family) | `the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)` (D56, verbatim) |
+| `low` (compact family) | `…; the low set is gone from mcp-abap-adt / -http / -sse, and this binary serves its analogue, the compact tools` |
 | anything else, or none | `…;` `` `mcp-abap-adt` (…) `` `serves readonly, high and debug,` `` `mcp-abap-adt-ro` (…) `` `the readonly tools alone` (compact: the compact pair) |
 
 With several words, the one asking for the most answers: `low`, `compact`, `high`, `rw`, `debug`,

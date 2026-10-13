@@ -303,6 +303,45 @@ describe('a -ro set holds no write, debugger, background-run or resume tool; a w
 });
 
 /**
+ * The run tools in a -ro set (C23, the owner's decision: running code changes
+ * no code, as in SAP): served, but without `background` — a -ro set keeps no
+ * background run, so the parameter, and its pointer to GetBackgroundRun, do
+ * not exist there. The write set's run tools keep it; the shared
+ * definitions are not changed.
+ */
+describe('the run tools of a -ro set offer no background', () => {
+  const RUN_TOOLS = ['RuntimeRunClass', 'RuntimeRunProgram'];
+  const runTools = (set: ToolSet) =>
+    set
+      .groups(context)
+      .flatMap((g) => g.getHandlers())
+      .filter((e) => RUN_TOOLS.includes(e.toolDefinition.name))
+      .map((e) => ({
+        name: e.toolDefinition.name,
+        background: Object.hasOwn(
+          (e.toolDefinition.inputSchema as { properties: object }).properties,
+          'background',
+        ),
+        pointer: JSON.stringify(e.toolDefinition).includes('GetBackgroundRun'),
+      }));
+
+  it('core-ro: both run tools, neither with background nor its pointer', () => {
+    expect(runTools(fullReadOnlyToolSet)).toEqual([
+      { name: 'RuntimeRunClass', background: false, pointer: false },
+      { name: 'RuntimeRunProgram', background: false, pointer: false },
+    ]);
+  });
+
+  it('core: both run tools with background, still after core-ro was built', () => {
+    runTools(fullReadOnlyToolSet);
+    expect(runTools(fullToolSet)).toEqual([
+      { name: 'RuntimeRunClass', background: true, pointer: true },
+      { name: 'RuntimeRunProgram', background: true, pointer: true },
+    ]);
+  });
+});
+
+/**
  * The binaries duplicate no tool (the owner, C14): the full sets carry no
  * low tool — the fixed list of every tool the low set registered, the three
  * System `*Low` reads included — and no compact tool; the compact sets carry
@@ -378,7 +417,9 @@ describe('--exposition is gone: each word stops the start with its sentence', ()
     const gone = `${form} is gone (19.0.0): the binary fixes its tool set, so remove it`;
     switch (word) {
       case 'low':
-        return LOW_SET_GONE;
+        return family === 'core'
+          ? LOW_SET_GONE
+          : `${gone}; the low set is gone from mcp-abap-adt / -http / -sse, and this binary serves its analogue, the compact tools`;
       case 'compact':
         return `${gone}; the compact tools are served by ${n('compact')}, those that change nothing by ${n('compact-ro')}`;
       case 'high':
@@ -439,6 +480,7 @@ describe('--exposition is gone: each word stops the start with its sentence', ()
       compactDebug: words('compact', 'debug'),
       compact: words('core', 'compact'),
       low: words('core', 'low'),
+      compactLow: words('compact', 'low'),
       other: words('core', 'search'),
       compactOther: words('compact', ''),
     }).toEqual({
@@ -454,6 +496,8 @@ describe('--exposition is gone: each word stops the start with its sentence', ()
       compact:
         '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the compact tools are served by `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), those that change nothing by `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`)',
       low: 'the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)',
+      compactLow:
+        '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the low set is gone from mcp-abap-adt / -http / -sse, and this binary serves its analogue, the compact tools',
       other:
         '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; `mcp-abap-adt` (`@mcp-abap-adt/core`) serves readonly, high and debug, `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) the readonly tools alone',
       compactOther:

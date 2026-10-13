@@ -17,7 +17,7 @@ import {
   type HandlerEntry,
 } from '../interfaces.js';
 
-/** Which of the leftover-session tools an exposition serves. */
+/** Which of the leftover-session tools a tool set serves. */
 export interface LeftoverSessionToolsOptions {
   /**
    * The resume, served only with a writing set: a resumed session is for
@@ -28,7 +28,7 @@ export interface LeftoverSessionToolsOptions {
 }
 
 /**
- * The leftover-session tools (every transport, every exposition — the
+ * The leftover-session tools (every transport, every binary — the
  * resume only with a writing one): the SAP sessions an ended process left
  * open, listed, resumed or logged off by the user. Each works on no
  * connection of the instance (`connectionless`): the server calls it

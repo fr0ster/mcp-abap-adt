@@ -86,7 +86,7 @@ mdd.json
 # it was tracked before the rule existed; server/package.json was created after
 # and silently never committed — the server package had no manifest in git. It
 # happened AGAIN when the compact packages were added: three manifests missing
-# from the commit, and CI said `ENOENT .../compact-readonly-entries/package.json`, not
+# from the commit, and CI said `ENOENT .../compact-readonly/package.json`, not
 # "this file is ignored". Every manifest this repository publishes is listed
 # below; a new package adds its line here in the same commit that adds it.
 package.json

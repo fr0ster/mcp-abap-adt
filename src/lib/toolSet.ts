@@ -177,7 +177,9 @@ export const fullReadOnlyToolSet: ToolSet = {
       new Set<string>(),
       new ReadVsGetDedupStrategy(),
     ),
-    new SystemHandlersGroup(context),
+    // The run tools stay (running code changes no code, as in SAP), without
+    // `background`: this set keeps no background run.
+    new SystemHandlersGroup(context, { background: false }),
     new SearchHandlersGroup(context),
     new LeftoverSessionHandlersGroup(context, { resume: false }),
   ],

@@ -1,5 +1,5 @@
 /**
- * The compact surface stays frozen — the same 31 tools — 27, plus the four debug verbs served with `--exposition=…,debug`.
+ * The compact surface stays frozen — the same 31 tools — 27, plus the four debug verbs the compact write binaries serve.
  *
  * **Why it lives here now.** `tests/fixtures/tools/surface.json` in `lib` froze all
  * 370 tools, 22 of them compact. The facade moved into packages, so `lib`'s fixture

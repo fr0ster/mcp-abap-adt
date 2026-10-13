@@ -416,8 +416,9 @@ transport that serves what the word asked for — for example, on `mcp-abap-adt-
 [MCP] --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`)
 ```
 
-`low` keeps D56's sentence: *"the low set is gone from mcp-abap-adt / -http / -sse; use
-mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Every word and its sentence:
+`low` keeps D56's sentence in the full binaries: *"the low set is gone from mcp-abap-adt / -http /
+-sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*; a compact binary, which already
+serves the low set's analogue, says to remove the flag. Every word and its sentence:
 [Handlers Management](HANDLERS_MANAGEMENT.md#--exposition-is-gone).
 
 The debugger is served by every write binary, always: in user mode a breakpoint or a listener

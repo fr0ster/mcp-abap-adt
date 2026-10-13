@@ -1,6 +1,6 @@
 /**
  * The compact background-run tools, served beside compact's run tool
- * (`HandlerProfileRun`, in `rw`): a run started with `background: true`,
+ * (`HandlerProfileRun`, in the compact write binaries): a run started with `background: true`,
  * read, listed and discarded by the user. Each works on no connection of the
  * instance (`connectionless`).
  */

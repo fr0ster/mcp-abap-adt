@@ -1,5 +1,6 @@
 /**
- * The compact debugger: four verb tools, served with `--exposition=…,debug`.
+ * The compact debugger: four verb tools, served by the compact write binaries
+ * (`compactToolSetOf`), never by a `-ro` one.
  *
  * One debug session per instance holds either ABAP or AMDP, never both. The kind is
  * fixed by the start; the other three verbs read it from the instance.

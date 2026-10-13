@@ -27,7 +27,7 @@ import {
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { CompactHandlersGroup } from '../../../lib/compact/group';
 
-/** lib's composition of the two halves, as `compactToolSetOf` builds it for `rw`. */
+/** lib's composition of the two halves, as `compactToolSetOf` builds it for the compact write binaries. */
 class BothHalvesGroup extends CompactHandlersGroup {
   constructor(context: HandlerContext) {
     super(context, [compactReadOnlyEntries, compactModifyEntries]);

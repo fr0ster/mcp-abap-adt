@@ -30,6 +30,43 @@ export function isBackgroundTool(name: string): boolean {
   return Object.hasOwn(BACKGROUND_TOOLS, name);
 }
 
+/**
+ * A tool definition without the `background` parameter: the same name,
+ * description and schema otherwise. The definition passed is not changed.
+ * A read-only binary serves the run tools so (C23): it keeps no background
+ * run, so the parameter does not exist there. A call carrying it anyway is
+ * an ordinary run — the server's object schema drops a key it does not
+ * declare before the wrapper reads anything (measured through the binary,
+ * `toolSetParity.test.ts`), so nothing refuses it.
+ */
+export function withoutBackgroundParameter<T extends { inputSchema: unknown }>(
+  definition: T,
+): T {
+  const schema = definition.inputSchema as {
+    properties?: Record<string, unknown>;
+    required?: readonly string[];
+  };
+  if (
+    schema === null ||
+    typeof schema !== 'object' ||
+    schema.properties === undefined ||
+    !Object.hasOwn(schema.properties, 'background')
+  ) {
+    return definition;
+  }
+  const { background: _dropped, ...properties } = schema.properties;
+  return {
+    ...definition,
+    inputSchema: {
+      ...schema,
+      properties,
+      ...(schema.required !== undefined && {
+        required: schema.required.filter((name) => name !== 'background'),
+      }),
+    },
+  };
+}
+
 /** The `background` property of a full run tool's JSON Schema. */
 export const BACKGROUND_PROPERTY = {
   type: 'boolean',

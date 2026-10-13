@@ -20,10 +20,11 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 background runs and the resume of a leftover session — those are
 `mcp-abap-adt`'s ([`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)).
 
-**Know what the runs do.** `RuntimeRunClass` and `RuntimeRunProgram` are system tools and are
-served here: they run a class or a program on the system, and what that code does is the code's.
-Their `background: true` is refused (`background_runs_unavailable`): this binary keeps no
-background run.
+**Running code is reading here.** `RuntimeRunClass` and `RuntimeRunProgram` are system tools and
+are served here: "read-only" means the user cannot change code, and running it is allowed, as in
+SAP. What that code does is the code's. They are served **without `background`**: this binary
+keeps no background run, so the parameter is not in their schema and is not read — a call runs
+and waits for its answer.
 
 ## Running it
 

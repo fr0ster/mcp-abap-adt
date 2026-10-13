@@ -29,9 +29,9 @@ export class CompactHandlersGroup extends BaseHandlerGroup {
 
   /**
    * @param builders the halves served, in order
-   * @param groupName `CompactHandlers` for both halves (`rw`),
-   *   `CompactReadOnlyHandlers` for the read-only one (`ro`) — the names the
-   *   groups had before the composition moved here
+   * @param groupName `CompactHandlers` for both halves (the compact
+   *   binaries), `CompactReadOnlyHandlers` for the read-only one (the
+   *   compact `-ro` binaries)
    */
   constructor(
     context: HandlerContext,

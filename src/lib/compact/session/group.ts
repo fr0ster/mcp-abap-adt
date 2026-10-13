@@ -1,6 +1,6 @@
 /**
- * The compact leftover-session tools, served beside every compact
- * exposition — the resume only beside `rw`: the SAP sessions an ended
+ * The compact leftover-session tools, served by every compact binary — the
+ * resume only by the write ones (`compactToolSetOf`): the SAP sessions an ended
  * process left open, listed, resumed or logged off by the user. Each works on no connection of the instance
  * (`connectionless`).
  */

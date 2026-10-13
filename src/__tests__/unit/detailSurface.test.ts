@@ -266,11 +266,15 @@ const JSON_ANSWERING: readonly string[] = [
 /** The same flat `{ group, name, inputs }` rows Task 1 pins. */
 const surface: Array<{ group: string; name: string; inputs: string }> =
   JSON.parse(
-    execFileSync('npx', ['tsx', 'scripts/list-tools.ts'], {
-      ...spawnOptionsForNpx,
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    }),
+    execFileSync(
+      'npx',
+      ['tsx', '--tsconfig', 'tsconfig.test.json', 'scripts/list-tools.ts'],
+      {
+        ...spawnOptionsForNpx,
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+      },
+    ),
   );
 
 /** Every tool whose input schema declares the parameter. */

@@ -987,10 +987,12 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
 );
 
 /**
- * A `-ro` binary's launcher creates no background-run store (C23): its run
- * tools (`RuntimeRunClass` is a system tool) refuse `background: true` in
- * fixed words before anything reaches the system; the write binary's start a
- * run. On each transport, through the binary.
+ * A `-ro` binary keeps no background run (C23, the owner's decision): its run
+ * tools (`RuntimeRunClass` is a system tool; running code changes no code)
+ * offer no `background` — not in the schema a client lists, and not read:
+ * a call carrying it anyway runs as any run, never refused. The write
+ * binary's run tool offers it and starts a run. On each transport, through
+ * the binary.
  */
 describe.each<TransportName>(['stdio', 'http', 'sse'])(
   '%s: a -ro binary serves no background run',
@@ -1046,30 +1048,54 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
               }),
         );
       }
-      const from = standIn.requests.length;
-      const answer = outcomeOf(
-        await client.callTool({
-          name: 'RuntimeRunClass',
-          arguments: { class_name: 'ZCL_PARITY_RUN', background: true },
-        }),
+      const listed = (await client.listTools()).tools.find(
+        (tool) => tool.name === 'RuntimeRunClass',
       );
+      const offered = Object.hasOwn(
+        (listed?.inputSchema.properties ?? {}) as object,
+        'background',
+      );
+      const from = standIn.requests.length;
+      const result = await client.callTool({
+        name: 'RuntimeRunClass',
+        arguments: { class_name: 'ZCL_PARITY_RUN', background: true },
+      });
+      const text = JSON.stringify(result.content);
+      const answer = outcomeOf(result);
       const reached = standIn.requests.length - from;
       await client.close();
       await started.stop();
-      return { answer, reached };
+      return {
+        listed: listed !== undefined,
+        offered,
+        answer,
+        reached,
+        runHandle: text.includes('run_handle'),
+        unavailable: text.includes('background_runs_unavailable'),
+      };
     };
 
-    it('full-ro refuses background: true before the system; full does not refuse it so', async () => {
+    it('full-ro serves RuntimeRunClass without background, and never refuses it; full offers it and starts a run', async () => {
       const ro = await backgroundCall('full-ro');
-      expect(ro).toEqual({
-        answer: expect.objectContaining({
-          ok: false,
-          error: 'background_runs_unavailable',
-        }),
-        reached: 0,
+      expect({
+        listed: ro.listed,
+        offered: ro.offered,
+        unavailable: ro.unavailable,
+        runHandle: ro.runHandle,
+      }).toEqual({
+        listed: true,
+        offered: false,
+        unavailable: false,
+        runHandle: false,
       });
+      // It ran as any run: the call reached the system.
+      expect(ro.reached).toBeGreaterThan(0);
       const full = await backgroundCall('full');
-      expect(full.answer.error).not.toBe('background_runs_unavailable');
+      expect({
+        listed: full.listed,
+        offered: full.offered,
+        runHandle: full.runHandle,
+      }).toEqual({ listed: true, offered: true, runHandle: true });
     });
   },
 );

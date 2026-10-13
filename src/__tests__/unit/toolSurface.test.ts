@@ -68,11 +68,15 @@ describe('the MCP tool surface', () => {
   );
 
   const current: Row[] = JSON.parse(
-    execFileSync('npx', ['tsx', 'scripts/list-tools.ts'], {
-      ...spawnOptionsForNpx,
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    }),
+    execFileSync(
+      'npx',
+      ['tsx', '--tsconfig', 'tsconfig.test.json', 'scripts/list-tools.ts'],
+      {
+        ...spawnOptionsForNpx,
+        encoding: 'utf8',
+        maxBuffer: 32 * 1024 * 1024,
+      },
+    ),
   );
 
   it('enumerates the whole surface, so the assertions below are not vacuous', () => {

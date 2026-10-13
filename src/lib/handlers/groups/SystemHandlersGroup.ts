@@ -98,8 +98,20 @@ import {
   handleRuntimeRunProgram,
   TOOL_DEFINITION as RuntimeRunProgram_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeRunProgram';
+import { withoutBackgroundParameter } from '../../backgroundRuns/tools.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
-import type { HandlerEntry } from '../interfaces.js';
+import type { HandlerContext, HandlerEntry } from '../interfaces.js';
+
+/** Which form of the system tools a binary serves. */
+export interface SystemHandlersOptions {
+  /**
+   * Whether the run tools (`RuntimeRunClass`, `RuntimeRunProgram`) offer
+   * `background`. Default: offered. A read-only binary serves them without
+   * it (C23): it keeps no background run, so the parameter does not exist
+   * there — not offered, not read, not refused.
+   */
+  background?: boolean;
+}
 
 /**
  * Handler group for all system-related handlers
@@ -108,10 +120,27 @@ import type { HandlerEntry } from '../interfaces.js';
 export class SystemHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'SystemHandlers';
 
+  constructor(
+    context: HandlerContext,
+    private readonly options: SystemHandlersOptions = {},
+  ) {
+    super(context);
+  }
+
   /**
    * Gets all system handler entries
    */
   getHandlers(): HandlerEntry[] {
+    const entries = this.entries();
+    return this.options.background === false
+      ? entries.map((entry) => ({
+          ...entry,
+          toolDefinition: withoutBackgroundParameter(entry.toolDefinition),
+        }))
+      : entries;
+  }
+
+  private entries(): HandlerEntry[] {
     return [
       {
         toolDefinition: GetServiceBindingPreviewUrl_Tool,

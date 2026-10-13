@@ -99,7 +99,8 @@ per word, naming the binary of the binary's own transport that serves what the w
 | `ro` | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the compact tools that change nothing are served by \`mcp-abap-adt-compact-ro\` (\`@mcp-abap-adt/compact-ro\`) |
 | `rw` | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; all compact tools are served by \`mcp-abap-adt-compact\` (\`@mcp-abap-adt/compact\`) |
 | `compact` | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the compact tools are served by \`mcp-abap-adt-compact\` (\`@mcp-abap-adt/compact\`), those that change nothing by \`mcp-abap-adt-compact-ro\` (\`@mcp-abap-adt/compact-ro\`) |
-| `low` | the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse) |
+| `low` (in `mcp-abap-adt` / `-ro`) | the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse) |
+| `low` (in `mcp-abap-adt-compact` / `-ro`) | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the low set is gone from mcp-abap-adt / -http / -sse, and this binary serves its analogue, the compact tools |
 | any other word, or none (`mcp-abap-adt` / `-ro`) | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; \`mcp-abap-adt\` (\`@mcp-abap-adt/core\`) serves readonly, high and debug, \`mcp-abap-adt-ro\` (\`@mcp-abap-adt/core-ro\`) the readonly tools alone |
 | any other word, or none (`mcp-abap-adt-compact` / `-ro`) | --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; \`mcp-abap-adt-compact\` (\`@mcp-abap-adt/compact\`) serves all compact tools, \`mcp-abap-adt-compact-ro\` (\`@mcp-abap-adt/compact-ro\`) those that change nothing |
 
@@ -263,7 +264,8 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
 - **The tools** — served by the write binaries, beside the run tools (`mcp-abap-adt`, `-http`,
   `-sse` beside `RuntimeRunClass`; the compact ones beside `HandlerProfileRun`). The `-ro` binaries
   serve none, and no store: `mcp-abap-adt-ro` keeps `RuntimeRunClass` / `RuntimeRunProgram` (system
-  tools), and their `background: true` is refused there (`background_runs_unavailable`):
+  tools; "read-only" means the user cannot change code, and running it is allowed, as in SAP),
+  served there without `background` — the parameter is not in their schema and is not read:
 
 | Full binaries | Compact binaries | What it does |
 |---|---|---|

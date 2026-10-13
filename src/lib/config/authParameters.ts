@@ -526,7 +526,7 @@ export function parametersHelp(table: ParameterTable): string {
 
 /**
  * The help text of a binary: USAGE, its description, its table, then the
- * sections it adds (the exposition, the environment, examples). Every
+ * sections it adds (the tools, the environment, examples). Every
  * option listed is one the binary reads; none of another binary's is.
  */
 export function generateHelp(

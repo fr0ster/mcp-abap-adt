@@ -111,7 +111,8 @@ export function decidingWord(value: unknown): DecidingWord | undefined {
  * The sentence that refuses a removed `--exposition` in a binary of
  * `family` serving `transport`, given the form used and its value — one
  * sentence per word (C23). It names the binary serving what the words
- * asked for, of the same transport; `low` keeps D56's sentence verbatim.
+ * asked for, of the same transport; `low` keeps D56's sentence verbatim in
+ * the full binaries, and says to drop the flag in the compact ones.
  */
 export function expositionGoneWords(
   family: 'core' | 'compact',
@@ -124,7 +125,11 @@ export function expositionGoneWords(
   const word = decidingWord(value);
   switch (word) {
     case 'low':
-      return LOW_SET_GONE;
+      // D56's sentence in the full binaries; a compact one already serves
+      // the low set's analogue, so it says to drop the flag.
+      return family === 'core'
+        ? LOW_SET_GONE
+        : `${gone}; the low set is gone from mcp-abap-adt / -http / -sse, and this binary serves its analogue, the compact tools`;
     case 'compact':
       return `${gone}; the compact tools are served by ${named(binaries.compact)}, those that change nothing by ${named(binaries['compact-ro'])}`;
     case 'high':

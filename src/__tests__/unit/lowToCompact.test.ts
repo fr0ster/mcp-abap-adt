@@ -327,17 +327,18 @@ describe('the low set → compact mapping table', () => {
     ['DeleteFunctionModuleLow', 'deletion-check'],
     ['DeleteBehaviorDefinitionLow', 'deletion-check'],
     ['DeleteMetadataExtensionLow', 'deletion-check'],
+    ['DeletePackageLow', 'deletion-check'],
     ['ActivateFunctionModuleLow', 'activation-run'],
     ['ActivateServiceDefinitionLow', 'activation-run'],
     ['ActivateServiceBindingLow', 'activation-run'],
   ];
 
-  it('accepts exactly the 20 rows the owner accepted, each with its kind', () => {
+  it('accepts exactly the 21 rows the owner accepted, each with its kind', () => {
     const accepted = TABLE.rows
       .filter((r) => r.accepted)
       .map((r) => [r.tool, r.accepted?.kind] as [string, string | undefined])
       .sort((x, y) => x[0].localeCompare(y[0]));
-    expect(ACCEPTED).toHaveLength(20);
+    expect(ACCEPTED).toHaveLength(21);
     expect(accepted).toEqual(
       [...ACCEPTED].sort((x, y) => x[0].localeCompare(y[0])),
     );

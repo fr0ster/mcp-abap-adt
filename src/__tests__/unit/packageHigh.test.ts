@@ -6,7 +6,11 @@
  * - UpdatePackage locks, reads the package's metadata, writes it back with
  *   the description patched, and unlocks — the unlock sent whatever the
  *   write answered, nothing written when the lock is refused.
- * - DeletePackage sends the delete alone.
+ * - DeletePackage asks the deletion check first, as every high delete, and
+ *   sends no delete on a refusal or an absent package. What SAP answers to a
+ *   package's deletion check is not measured: the stand-in answers it empty
+ *   (permitted), or with the shapes `deletionRefusal.ts` reads for the other
+ *   types.
  */
 
 import * as fs from 'node:fs';
@@ -151,28 +155,81 @@ describe('UpdatePackage (high)', () => {
   });
 });
 
+describe('HandlerUpdate PACKAGE under lock_handle', () => {
+  it('takes no super_package: the write is the same without it', async () => {
+    const send = async (extra: Record<string, unknown>) => {
+      const connection = parityConnection();
+      const answered = (await compactTool(
+        connection,
+        'HandlerUpdate',
+      )({
+        object_type: 'PACKAGE',
+        package_name: 'PKG_A',
+        description: 'New text',
+        lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
+        ...extra,
+      })) as { isError?: boolean };
+      expect(answered.isError).toBeFalsy();
+      return parityRequests(connection.requests);
+    };
+    const without = await send({});
+    expect(without.map((r) => r.method)).toEqual(['GET', 'PUT']);
+    expect(without).toEqual(await send({ super_package: 'PKG_SUPER' }));
+  });
+});
+
 describe('DeletePackage (high)', () => {
-  it('sends the delete alone', async () => {
+  it('asks the deletion check, then sends the delete', async () => {
     const connection = parityConnection();
     await handleDeletePackage(ctx(connection), {
       package_name: 'PKG_A',
       transport_request: 'XXXK900001',
     });
     expect(shape(connection.requests)).toEqual([
+      'POST /sap/bc/adt/deletion/check',
       'POST /sap/bc/adt/deletion/delete',
     ]);
-    expect(String(connection.requests[0]?.data)).toContain('pkg_a');
+    expect(String(connection.requests[1]?.data)).toContain('pkg_a');
   });
 
-  it('a refused delete is answered as refused', async () => {
+  it('a refused check sends no delete', async () => {
+    // A captured refusal of another object type: the package's own is not
+    // measured, and `analyseDeletion` reads the same `del:isDeletable`.
     const connection = recordingConnection([
+      { data: corpusBody('refusal-deletion-check-refuses--01-deletion-check') },
+    ]);
+    const answered = (await handleDeletePackage(ctx(connection), {
+      package_name: 'PKG_A',
+    })) as { isError?: boolean };
+    expect(answered.isError).toBe(true);
+    expect(shape(connection.requests)).toEqual([
+      'POST /sap/bc/adt/deletion/check',
+    ]);
+  });
+
+  it('a package the check reports absent gets no delete', async () => {
+    const absent =
+      '<?xml version="1.0" encoding="utf-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">' +
+      '<del:object adtcore:uri="/sap/bc/adt/packages/pkg_a" del:isDeletable="true">' +
+      '<del:message del:type="W"><del:text>Object PKG_A does not exist</del:text></del:message>' +
+      '</del:object></del:checkResponse>';
+    const connection = recordingConnection([{ data: absent }]);
+    await handleDeletePackage(ctx(connection), { package_name: 'PKG_A' });
+    expect(shape(connection.requests)).toEqual([
+      'POST /sap/bc/adt/deletion/check',
+    ]);
+  });
+
+  it('a refused delete after a permitted check is answered as refused', async () => {
+    const connection = recordingConnection([
+      undefined,
       { status: 400, statusText: 'Bad Request', data: REFUSAL },
     ]);
     const answered = (await handleDeletePackage(ctx(connection), {
       package_name: 'PKG_A',
     })) as { isError?: boolean };
     expect(answered.isError).toBe(true);
-    expect(connection.requests).toHaveLength(1);
+    expect(connection.requests).toHaveLength(2);
   });
 
   it('sends exactly what compact’s HandlerDelete PACKAGE sends', async () => {
@@ -193,8 +250,9 @@ describe('DeletePackage (high)', () => {
     expect(parityRequests(compact.requests)).toEqual(
       parityRequests(high.requests),
     );
-    expect(high.requests).toHaveLength(1);
-    expect(parityRequests(high.requests)).toEqual(
+    expect(high.requests).toHaveLength(2);
+    // The delete itself is the low tool's request; the check comes first.
+    expect(parityRequests(high.requests.slice(1))).toEqual(
       lowRequestsOf('DeletePackageLow'),
     );
   });

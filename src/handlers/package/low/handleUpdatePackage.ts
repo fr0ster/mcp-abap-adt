@@ -50,7 +50,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
+    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -93,18 +93,13 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: [
-      'package_name',
-      'super_package',
-      'updated_description',
-      'lock_handle',
-    ],
+    required: ['package_name', 'updated_description', 'lock_handle'],
   },
 } as const;
 
 interface UpdatePackageArgs {
   package_name: string;
-  super_package: string;
+  super_package?: string;
   updated_description: string;
   lock_handle: string;
   transport_request?: string;
@@ -132,15 +127,10 @@ export async function handleUpdatePackage(
       session_state,
     } = args as UpdatePackageArgs;
 
-    if (
-      !package_name ||
-      !super_package ||
-      !updated_description ||
-      !lock_handle
-    ) {
+    if (!package_name || !updated_description || !lock_handle) {
       return return_error(
         new Error(
-          'package_name, super_package, updated_description, and lock_handle are required',
+          'package_name, updated_description, and lock_handle are required',
         ),
       );
     }
@@ -207,7 +197,9 @@ export async function handleUpdatePackage(
           {
             success: true,
             package_name: packageName,
-            super_package: super_package.toUpperCase(),
+            ...(super_package && {
+              super_package: super_package.toUpperCase(),
+            }),
             updated_description,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,

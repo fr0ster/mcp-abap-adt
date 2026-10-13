@@ -2,9 +2,10 @@
  * DeletePackage Handler - Delete ABAP Package
  *
  * One tool of the high set and the route of compact's `HandlerDelete`
- * PACKAGE (19.0.0; the low set's DeletePackageLow before it). It sends the
- * delete alone — no deletion check first, unlike the other high deletes:
- * that is the request the package delete has always sent.
+ * PACKAGE (19.0.0; the low set's DeletePackageLow before it). Like every
+ * other high delete it asks the deletion check first (`deleteIfDeletable`):
+ * a refusal is answered as it came and an object the check reports absent
+ * gets no delete. The low tool sent the delete alone.
  *
  * Uses AdtClient.getPackage().delete from @mcp-abap-adt/adt-clients 19.
  *
@@ -27,7 +28,7 @@ import {
   closeQuietly,
   openFreshConnection,
 } from '../../../lib/packageSessions';
-import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
+import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -112,12 +113,12 @@ export async function handleDeletePackage(
     return await answer(
       { tool: 'DeletePackage', detail },
       () =>
-        createAdtClient(deleteConnection, logger)
-          .getPackage(resultsFor(packageDocuments))
-          .delete(
-            { packageName, transportRequest: transport_request },
-            { analyse: analyseDeletion },
+        deleteIfDeletable(
+          createAdtClient(deleteConnection, logger).getPackage(
+            resultsFor(packageDocuments),
           ),
+          { packageName, transportRequest: transport_request },
+        ),
       project(detail, terseDeletion),
     );
   } finally {

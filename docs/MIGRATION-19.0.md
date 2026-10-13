@@ -274,9 +274,9 @@ of the full set's high or low tools; only read-only reads may be in both.
 - **The full binaries gain two package tools** for what `UpdatePackageLow` and `DeletePackageLow`
   did: the high **`UpdatePackage`** (`package_name`, `description`, `transport_request`: lock,
   write, unlock in one tool; over RFC in an ABAP session of its own, as `CreatePackage`) and
-  **`DeletePackage`** (`package_name`, `transport_request`, `force_new_connection`: the delete
-  alone, without the deletion check the other high deletes send first). They send the same
-  requests as compact's `HandlerUpdate` PACKAGE without `lock_handle` and `HandlerDelete`
+  **`DeletePackage`** (`package_name`, `transport_request`, `force_new_connection`: the deletion
+  check first, as every high delete — a refusal is answered as it came, and an absent package
+  gets no delete). They send the same requests as compact's `HandlerUpdate` PACKAGE without `lock_handle` and `HandlerDelete`
   PACKAGE.
 - **Creation parameters.** `HandlerCreate` takes `superclass`, `final`, `abstract`,
   `create_protected` for a class and `master_language`.
@@ -348,7 +348,7 @@ first; a function module, service definition or service binding activates throug
 | `DeleteFunctionModuleLow` | `HandlerDelete` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
 | `DeleteInterfaceLow` | `HandlerDelete` (object_type: INTERFACE, interface_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
 | `DeleteMetadataExtensionLow` | `HandlerDelete` (object_type: METADATA_EXTENSION, metadata_extension_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeletePackageLow` | `HandlerDelete` (object_type: PACKAGE, package_name, transport_request) | force_new_connection is taken as the low tool took it: the delete is sent from a new connection, closed afterwards. The full set has it too: the high DeletePackage, the same request. |
+| `DeletePackageLow` | `HandlerDelete` (object_type: PACKAGE, package_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. force_new_connection is taken as the low tool took it: the check and the delete are sent from a new connection, closed afterwards. The full set has it too: the high DeletePackage, the same requests. What SAP answers to the deletion check of a package is not measured; the stand-in answers it empty. |
 | `DeleteProgramLow` | `HandlerDelete` (object_type: PROGRAM, program_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
 | `DeleteStructureLow` | `HandlerDelete` (object_type: STRUCTURE, structure_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
 | `DeleteTableLow` | `HandlerDelete` (object_type: TABLE, table_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |

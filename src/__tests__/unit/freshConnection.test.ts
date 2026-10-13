@@ -194,6 +194,11 @@ const OPERATIONS: Array<[string, string, Record<string, unknown>]> = [
     },
   ],
   [
+    'UpdatePackage (high) over RFC',
+    'UpdatePackage',
+    { package_name: 'ZFRESH', description: 'd' },
+  ],
+  [
     'HandlerLock PACKAGE over RFC',
     'HandlerLock',
     { object_type: 'PACKAGE', object_name: 'ZFRESH', super_package: 'ZROOT' },

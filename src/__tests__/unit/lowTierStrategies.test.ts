@@ -121,6 +121,148 @@ beforeEach(() => {
 const callTo = (member: string) =>
   seen.calls.filter((c) => c.member === member).at(-1);
 
+/**
+ * The activation strategy, family by family (restored in 19.0.0 from the
+ * table the low set's suite carried, its delete and validate columns left
+ * with their handlers): each Activate handler that backs a high Activate
+ * tool reaches its own factory's `activate` with `analyseActivation`.
+ */
+it.each([
+  [
+    'class',
+    handleActivateClass,
+    'getClass',
+    {
+      class_name: 'ZCL_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'interface',
+    handleActivateInterface,
+    'getInterface',
+    {
+      interface_name: 'ZIF_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'behavior_definition',
+    handleActivateBehaviorDefinition,
+    'getBehaviorDefinition',
+    {
+      name: 'ZBDEF_X',
+      package_name: 'ZP',
+      description: 'x',
+      root_entity: 'ZI_X',
+      implementation_type: 'Managed',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'ddl',
+    handleActivateDdl,
+    'getDdl',
+    {
+      ddl_name: 'ZVW_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'ddlx (metadataExtension)',
+    handleActivateMetadataExtension,
+    'getMetadataExtension',
+    {
+      name: 'ZI_X_DDLX',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'structure',
+    handleActivateStructure,
+    'getStructure',
+    {
+      structure_name: 'ZST_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'table',
+    handleActivateTable,
+    'getTable',
+    {
+      table_name: 'ZT_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'program',
+    handleActivateProgram,
+    'getProgram',
+    {
+      program_name: 'Z_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'function (function group)',
+    handleActivateFunctionGroup,
+    'getFunctionGroup',
+    {
+      function_group_name: 'ZFG_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'function (function module)',
+    handleActivateFunctionModule,
+    'getFunctionModule',
+    {
+      function_module_name: 'ZFM_X',
+      function_group_name: 'ZFG_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'data_element',
+    handleActivateDataElement,
+    'getDataElement',
+    {
+      data_element_name: 'ZDT_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+] as const)(
+  '%s activates on its own factory with analyseActivation',
+  async (_family, activate, factory, args) => {
+    await (activate as any)(context as any, args);
+    const activateCall = callTo('activate');
+    expect(activateCall?.factory).toBe(factory);
+    expect(activateCall?.carriedAnalyse).toBe(true);
+    expect(activateCall?.analyse).toBe(analyseActivation);
+  },
+);
+
 describe('class', () => {
   it('CheckClassLow defaults the check member\'s status to "active" when version is omitted', async () => {
     await handleCheckClass(context as any, { class_name: 'ZCL_X' });

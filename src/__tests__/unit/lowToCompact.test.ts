@@ -304,6 +304,45 @@ describe('the low set → compact mapping table', () => {
     },
   );
 
+  /**
+   * The rows the owner accepted (2026-10-13), each with its kind — fixed
+   * here, so a row cannot be marked accepted later, or change its kind,
+   * without this test going red.
+   */
+  const ACCEPTED: ReadonlyArray<[string, string]> = [
+    ['CreateDomainLow', 'extra-requests'],
+    ['CreateDataElementLow', 'extra-requests'],
+    ['CreateStructureLow', 'extra-requests'],
+    ['CreateBehaviorDefinitionLow', 'extra-requests'],
+    ['CreateMetadataExtensionLow', 'extra-requests'],
+    ['DeleteDomainLow', 'deletion-check'],
+    ['DeleteDataElementLow', 'deletion-check'],
+    ['DeleteTableLow', 'deletion-check'],
+    ['DeleteStructureLow', 'deletion-check'],
+    ['DeleteDdlLow', 'deletion-check'],
+    ['DeleteClassLow', 'deletion-check'],
+    ['DeleteProgramLow', 'deletion-check'],
+    ['DeleteInterfaceLow', 'deletion-check'],
+    ['DeleteFunctionGroupLow', 'deletion-check'],
+    ['DeleteFunctionModuleLow', 'deletion-check'],
+    ['DeleteBehaviorDefinitionLow', 'deletion-check'],
+    ['DeleteMetadataExtensionLow', 'deletion-check'],
+    ['ActivateFunctionModuleLow', 'activation-run'],
+    ['ActivateServiceDefinitionLow', 'activation-run'],
+    ['ActivateServiceBindingLow', 'activation-run'],
+  ];
+
+  it('accepts exactly the 20 rows the owner accepted, each with its kind', () => {
+    const accepted = TABLE.rows
+      .filter((r) => r.accepted)
+      .map((r) => [r.tool, r.accepted?.kind] as [string, string | undefined])
+      .sort((x, y) => x[0].localeCompare(y[0]));
+    expect(ACCEPTED).toHaveLength(20);
+    expect(accepted).toEqual(
+      [...ACCEPTED].sort((x, y) => x[0].localeCompare(y[0])),
+    );
+  });
+
   it('accepts no other kind of difference', () => {
     const kinds = new Set(
       TABLE.rows.flatMap((r) => (r.accepted ? [r.accepted.kind] : [])),

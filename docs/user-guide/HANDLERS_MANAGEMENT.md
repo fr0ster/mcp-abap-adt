@@ -318,9 +318,8 @@ To add handlers to a specific set:
    ```
 
 4. Register in appropriate group:
-   - `src/server/v2/handlers/ReadOnlyHandlersGroup.ts`
-   - `src/server/v2/handlers/HighLevelHandlersGroup.ts`
-   - `src/server/v2/handlers/LowLevelHandlersGroup.ts`
+   - `src/lib/handlers/groups/ReadOnlyHandlersGroup.ts`
+   - `src/lib/handlers/groups/HighLevelHandlersGroup.ts`
 
 5. Regenerate docs:
    ```bash

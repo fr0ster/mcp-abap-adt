@@ -260,6 +260,11 @@ of the full set's high or low tools; only read-only reads may be in both.
   `HandlerCheckRun` (now PACKAGE and FUNCTION_MODULE, and `source_code` to check source that is
   not saved for CLASS, STRUCTURE and DDL), `HandlerActivate`. A function module is named
   `GROUP|MODULE` in the lifecycle tools' `object_name`.
+- **A function group create reads the group back.** On SAP's 400 "Interface SAPL… has not been
+  created" — a refusal that can come with a create that landed — `HandlerCreate` FUNCTION_GROUP
+  **and the full set's `CreateFunctionGroup`** now read the group back; if it is there, the create
+  is answered as done (and activated when asked). 18.x's `CreateFunctionGroup` answered that 400
+  as a failure.
 - **Packages.** `HandlerCreate` PACKAGE takes `super_package` and the package settings (it could
   not create a package before: the parameter was not declared); `HandlerUpdate` PACKAGE writes the
   description under your `lock_handle`; `HandlerDelete` PACKAGE, with `force_new_connection`;

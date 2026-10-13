@@ -76,6 +76,11 @@ export async function handleHandlerGet(
     return routeAddressPart(context, requested, args);
   }
   const part = requested as CompactReadPart;
+  // Every other part reads an object: without object_type the router
+  // refuses it, in its own words and through its log, whatever the part.
+  if (!args.object_type) {
+    return routeCompactRead(context, args);
+  }
   const hasSource = compactReadRouterMap[args.object_type]?.get !== undefined;
 
   if (part === 'source') {

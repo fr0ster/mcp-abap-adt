@@ -136,6 +136,17 @@ describe('compact covers what the low set did', () => {
     },
   );
 
+  it.each(['source', 'metadata', 'urls', 'contents'])(
+    'HandlerGet part=%s without object_type is refused: object_type is required',
+    async (part) => {
+      const answered = await call('HandlerGet', { part });
+      expect(answered.isError).toBe(true);
+      expect(answered.text).toContain('object_type is required');
+      expect(answered.text).not.toContain('undefined');
+      expect(answered.sent).toBe(0);
+    },
+  );
+
   it('a function module is named GROUP|MODULE for validate and check', async () => {
     for (const tool of ['HandlerValidate', 'HandlerCheckRun']) {
       const answered = await call(tool, {

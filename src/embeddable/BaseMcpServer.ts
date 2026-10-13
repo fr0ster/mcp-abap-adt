@@ -14,6 +14,7 @@ import {
   type ReadFailure,
   readGuarded,
 } from '../lib/auth/failures.js';
+import { ServerRefusal } from '../lib/auth/serverRefusal.js';
 import { createAbapConnection } from '../lib/connectionFactory.js';
 import {
   createDebuggerInstance,
@@ -25,6 +26,18 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
+import {
+  type ClaimedSession,
+  type LeftoverSessions,
+  type SessionIdentity,
+  sessionIdentity,
+} from '../lib/leftoverSessions/LeftoverSessions.js';
+import {
+  type LeftoverSessionTools,
+  type LogoffOutcome,
+  type ResumeOutcome,
+  sapAnswerOf,
+} from '../lib/leftoverSessions/port.js';
 import { runLongCall } from '../lib/longCall.js';
 import {
   isLongRead,
@@ -64,7 +77,10 @@ import {
   type ToolResultLike,
 } from '../lib/toolResult.js';
 import { return_error } from '../lib/utils.js';
-import type { ConnectionContext } from './ConnectionContext.js';
+import type {
+  ConnectionContext,
+  ResolvedConnection,
+} from './ConnectionContext.js';
 
 /** What the SDK hands a tool callback beside its arguments: the request's signal. */
 interface ToolCallExtra {
@@ -145,6 +161,13 @@ export abstract class BaseMcpServer extends McpServer {
   /** The built entry of each connection handed out: what a release counts down. */
   private readonly entries = new WeakMap<AbapConnection, BuiltConnection>();
 
+  /**
+   * The process's runtime files of the SAP sessions it holds — their owner,
+   * given by the host (`leftoverSessions` option); absent, this instance
+   * keeps none and its leftover-session tools answer "not available here".
+   */
+  protected readonly leftoverSessions: LeftoverSessions | undefined;
+
   constructor(options: {
     name: string;
     version?: string;
@@ -160,9 +183,18 @@ export abstract class BaseMcpServer extends McpServer {
      * defaulted to silence (such a host passes this option itself).
      */
     stateLogger?: StateLogger;
+    /**
+     * The owner of the process's runtime session files, created by the host
+     * and shared by its instances: each owned HTTP connection holding a
+     * session keeps a file there until its logoff is written, and the
+     * leftover-session tools read it. Absent: no file, and those tools
+     * answer "not available here".
+     */
+    leftoverSessions?: LeftoverSessions;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
+    this.leftoverSessions = options.leftoverSessions;
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
       logger: stateLoggerOf(options),
@@ -312,8 +344,10 @@ export abstract class BaseMcpServer extends McpServer {
       // connection is replaced, and the replaced one ends with its logoff —
       // once no call works on it any more (spec §6.4).
       if (held) this.retire(held);
-      held = this.buildConnection(resolved.credential, () =>
-        createAbapConnection(resolved.settings, resolved.credential),
+      held = this.buildConnection(
+        resolved.credential,
+        () => createAbapConnection(resolved.settings, resolved.credential),
+        this.identityOf(resolved),
       );
     }
     // This call is the entry's user from now on — counted before the await,
@@ -363,10 +397,15 @@ export abstract class BaseMcpServer extends McpServer {
     );
   }
 
-  /** Connects what `create` builds for `credential`, kept as `built`. */
+  /**
+   * Connects what `create` builds for `credential`, kept as `built`; once
+   * connected, its session is kept in a runtime file when the host gave an
+   * owner and the request names its backend user (`identity`).
+   */
   private buildConnection(
     credential: IAuthProvider,
     create: () => AbapConnection,
+    identity: SessionIdentity | undefined,
   ): BuiltConnection {
     const entry: BuiltConnection = {
       credential,
@@ -391,6 +430,9 @@ export abstract class BaseMcpServer extends McpServer {
         throw error;
       }
       entry.ready = connection;
+      if (identity !== undefined) {
+        this.leftoverSessions?.track(connection, 'built', identity);
+      }
       return connection;
     })();
     this.built = entry;
@@ -428,6 +470,11 @@ export abstract class BaseMcpServer extends McpServer {
           type HandlerFnArgsOnly = (args: unknown) => Promise<unknown>;
 
           const runCall = async (args: unknown, signal: AbortSignal) => {
+            // A tool that works on no connection (the leftover-session
+            // tools): called without one being built or connected first.
+            if (entry.connectionless === true) {
+              return this.runConnectionless(entry.handler, group, args, signal);
+            }
             let inUse: AbapConnection | undefined;
             try {
               // Get connection from context (this.connectionContext), with
@@ -439,6 +486,9 @@ export abstract class BaseMcpServer extends McpServer {
                 logger: this.logger,
                 state: this.state,
                 debugger: () => this.debuggerFor(),
+                ...(this.leftoverSessions !== undefined
+                  ? { sessionFiles: this.leftoverSessions }
+                  : {}),
               };
 
               // If handler expects context+args (preferred), pass both.
@@ -615,6 +665,247 @@ export abstract class BaseMcpServer extends McpServer {
     }
   }
   /**
+   * A tool that works on no connection of the instance (`connectionless`):
+   * the call's context has none, and the leftover-session port when the host
+   * gave an owner. Answered like any tool: its failure through the failure
+   * reader, else `return_error`.
+   */
+  private async runConnectionless(
+    handler: unknown,
+    group: unknown,
+    args: unknown,
+    signal: AbortSignal,
+  ): Promise<{
+    content: { type: 'text'; text: string }[];
+    isError?: true;
+  }> {
+    try {
+      const context: HandlerContext = {
+        connection: undefined as never,
+        logger: this.logger,
+        state: this.state,
+        debugger: () => this.debuggerFor(),
+        ...(this.leftoverSessions !== undefined
+          ? {
+              sessionFiles: this.leftoverSessions,
+              leftoverSessions: this.leftoverPort(signal),
+            }
+          : {}),
+      };
+      const result = await runWithRequestSignal(signal, () => {
+        throwIfRequestAborted(signal);
+        return callHandler(handler, group, context, args);
+      });
+      const content = normalizeToolContent(result) as {
+        type: 'text';
+        text: string;
+      }[];
+      if ((result as ToolResultLike | undefined)?.isError) {
+        return { content, isError: true };
+      }
+      return { content };
+    } catch (error) {
+      const read = readGuarded((t) => this.readFailure(t), error);
+      if (read !== undefined) {
+        return answerRead(read) as {
+          content: { type: 'text'; text: string }[];
+          isError: true;
+        };
+      }
+      return return_error(error) as {
+        isError: true;
+        content: { type: 'text'; text: string }[];
+      };
+    }
+  }
+
+  /**
+   * Who calls, for the leftover-session tools: the request's settings and
+   * credential, resolved from the instance's source. An instance whose
+   * connection the host gave has none to resolve: not available here. A
+   * server that refuses before any connection (core's inspection-only mode)
+   * overrides this.
+   */
+  protected async resolveCaller(
+    signal: AbortSignal,
+  ): Promise<ResolvedConnection> {
+    const context = this.connectionContext;
+    if (context?.kind !== 'built') {
+      throw new ServerRefusal('leftover_sessions_unavailable');
+    }
+    throwIfRequestAborted(signal);
+    return context.source.resolve(signal);
+  }
+
+  /** The identity a request resolved, when the host gave an owner; else none. */
+  private identityOf(
+    resolved: ResolvedConnection,
+  ): SessionIdentity | undefined {
+    if (this.leftoverSessions === undefined) return undefined;
+    return sessionIdentity(resolved.settings, resolved.systemContext?.login);
+  }
+
+  /** The owner, the caller's resolution and identity; refused without an owner. */
+  private async leftoverCaller(signal: AbortSignal): Promise<{
+    owner: LeftoverSessions;
+    resolved: ResolvedConnection;
+    identity: SessionIdentity | undefined;
+  }> {
+    const owner = this.leftoverSessions;
+    if (owner === undefined) {
+      throw new ServerRefusal('leftover_sessions_unavailable');
+    }
+    const resolved = await this.resolveCaller(signal);
+    return { owner, resolved, identity: this.identityOf(resolved) };
+  }
+
+  /** The leftover-session tools' port for one call. */
+  private leftoverPort(signal: AbortSignal): LeftoverSessionTools {
+    return {
+      list: async () => {
+        const { owner, identity } = await this.leftoverCaller(signal);
+        // A caller whose backend user is not stated owns no file.
+        return identity === undefined ? [] : owner.list(identity);
+      },
+      resume: (handle) => this.resumeLeftover(handle, signal),
+      logoff: (handle) => this.logoffLeftover(handle, signal),
+    };
+  }
+
+  /** The caller's leftover session `handle`, claimed; refused the same way whatever the reason. */
+  private async claimLeftover(
+    handle: string,
+    signal: AbortSignal,
+  ): Promise<{
+    owner: LeftoverSessions;
+    resolved: ResolvedConnection;
+    identity: SessionIdentity;
+    claimed: ClaimedSession;
+  }> {
+    const { owner, resolved, identity } = await this.leftoverCaller(signal);
+    const claimed =
+      identity === undefined ? undefined : owner.claim(handle, identity);
+    if (identity === undefined || claimed === undefined) {
+      throw new ServerRefusal('leftover_session_not_available');
+    }
+    return { owner, resolved, identity, claimed };
+  }
+
+  /**
+   * Resume (`built` role only): this instance's own connection is built on
+   * the session instead of logging on (connection 17's `session`), and the
+   * file is this process's from then on. SAP's answer that the session is
+   * gone is the call's answer, and the file is deleted. A connection the
+   * instance already held is ended as a replaced one: its logoff after the
+   * last call that uses it.
+   */
+  private async resumeLeftover(
+    handle: string,
+    signal: AbortSignal,
+  ): Promise<ResumeOutcome> {
+    const { owner, resolved, identity, claimed } = await this.claimLeftover(
+      handle,
+      signal,
+    );
+    try {
+      if (claimed.role !== 'built') {
+        throw new ServerRefusal('leftover_session_not_resumable');
+      }
+      const connection = createAbapConnection(
+        resolved.settings,
+        resolved.credential,
+        undefined,
+        undefined,
+        claimed.cookies,
+      ) as AbapConnection;
+      // The instance's own from here on, like any built connection (§6.4).
+      own(connection, { owner: this, role: 'built' });
+      try {
+        await connection.connect();
+      } catch (error) {
+        // Spent either way; connection logs nothing off for a session it
+        // did not take.
+        await endConnection(connection);
+        const sap = sapAnswerOf(error);
+        if (sap === undefined || !sessionGone(sap.status)) throw error;
+        owner.forget(claimed.handle);
+        return { handle: claimed.handle, state: 'gone', sap };
+      }
+      owner.adopt(claimed, connection, identity);
+      this.takeAsBuilt(resolved, connection);
+      return { handle: claimed.handle, state: 'resumed' };
+    } finally {
+      owner.release(claimed.handle);
+    }
+  }
+
+  /**
+   * Logoff (any role): the platform's ICF logoff with the session's cookies
+   * and no credential, then the file deleted. connection 17 sends it from an
+   * instance built on the session — one request in that session first, the
+   * CSRF fetch, also without the credential; a session SAP already ended
+   * answers that request, nothing is logged off, and the file is deleted.
+   */
+  private async logoffLeftover(
+    handle: string,
+    signal: AbortSignal,
+  ): Promise<LogoffOutcome> {
+    const { owner, resolved, claimed } = await this.claimLeftover(
+      handle,
+      signal,
+    );
+    try {
+      const connection = createAbapConnection(
+        resolved.settings,
+        resolved.credential,
+        undefined,
+        undefined,
+        claimed.cookies,
+      );
+      // For this one operation: ended here, or by the instance's close.
+      own(connection, { owner: this, role: 'fresh' });
+      try {
+        await connection.connect();
+      } catch (error) {
+        await endConnection(connection);
+        const sap = sapAnswerOf(error);
+        if (sap === undefined || !sessionGone(sap.status)) throw error;
+        owner.forget(claimed.handle);
+        return { handle: claimed.handle, state: 'already_ended', sap };
+      }
+      let failed = false;
+      await endConnection(connection, () => {
+        failed = true;
+      });
+      if (failed) throw new Error(LEFTOVER_LOGOFF_NOT_WRITTEN_WORDS);
+      owner.forget(claimed.handle);
+      return { handle: claimed.handle, state: 'logged_off' };
+    } finally {
+      owner.release(claimed.handle);
+    }
+  }
+
+  /**
+   * A resumed connection becomes this instance's own (`built`): the one it
+   * held before is retired — ended with its logoff once no call uses it.
+   */
+  private takeAsBuilt(
+    resolved: ResolvedConnection,
+    connection: AbapConnection,
+  ): void {
+    const previous = this.built;
+    if (previous) this.retire(previous);
+    this.built = {
+      credential: resolved.credential,
+      connection: Promise.resolve(connection),
+      ready: connection,
+      users: 0,
+      retired: false,
+    };
+    this.systemContexts.set(connection, resolved.systemContext);
+  }
+
+  /**
    * One tool call, tracked from its entry — before the connection is
    * acquired — so idle() cannot miss a call still acquiring its connection.
    * The same entry and end are the user activity the state's idle bound
@@ -766,6 +1057,21 @@ function isSpent(connection: AbapConnection): boolean {
   } catch {
     return false;
   }
+}
+
+/** The fixed words of a leftover session's logoff that was not written. */
+export const LEFTOVER_LOGOFF_NOT_WRITTEN_WORDS =
+  'the logoff of the leftover session could not be written; its record is kept';
+
+/**
+ * Whether SAP's answer to the request in a resumed session says the session
+ * is gone (connection 17): a `401`, a redirect (not followed), or an answer
+ * that is not that session's (a `2xx` naming another session, none, or no
+ * token). Any other status — a server failure — leaves the file: the session
+ * may still live.
+ */
+function sessionGone(status: number): boolean {
+  return status === 401 || (status >= 200 && status < 400);
 }
 
 function getDefaultLogger(): Logger {

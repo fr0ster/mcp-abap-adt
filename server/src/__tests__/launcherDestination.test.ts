@@ -431,6 +431,18 @@ describe('one destination per process', () => {
     expect(stderr.join('\n')).toContain(`Source:        ${file}`);
   });
 
+  it('the runtime session files live beside the sessions: <auth-broker-path>/runtime', async () => {
+    writeSession('dest', basicLines());
+    const { exits } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
+    expect(exits).toEqual([]);
+    const server = stdioStart.mock.instances[0] as unknown as {
+      leftoverSessions?: { directory: string };
+    };
+    expect(server.leftoverSessions?.directory).toBe(
+      path.join(root, 'runtime'),
+    );
+  });
+
   it('neither: inspection-only, no broker', async () => {
     const { stderr } = await run([]);
     expect(constructed).not.toHaveBeenCalled();

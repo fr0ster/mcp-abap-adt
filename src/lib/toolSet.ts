@@ -21,6 +21,7 @@ import {
   type CompactEntryBuilder,
   CompactHandlersGroup,
 } from './compact/group';
+import { CompactLeftoverSessionHandlersGroup } from './compact/session/group';
 import {
   EXPOSITION_ROW,
   type Parameter,
@@ -124,7 +125,8 @@ export interface CompactHalves {
 /**
  * The compact tool set, composed of the two halves' entry builders: `ro` the
  * read-only half, `rw` (the default) both, `debug` beside either the four
- * debugger verbs — and no search, so the list is short by construction.
+ * debugger verbs — and no search, so the list is short by construction. The
+ * three leftover-session tools are served beside every exposition.
  *
  * Every group is a real `BaseHandlerGroup`, never an object literal wrapping
  * the entries: the launcher sets the per-request context on the group that
@@ -157,9 +159,11 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
               'CompactReadOnlyHandlers',
             )
           : new CompactHandlersGroup(context, [halves.readOnly, halves.modify]);
+      // Every exposition: the user's own leftover sessions.
+      const leftover = new CompactLeftoverSessionHandlersGroup(context);
       return exposition.includes('debug')
-        ? [half, new CompactDebugHandlersGroup(context)]
-        : [half];
+        ? [half, new CompactDebugHandlersGroup(context), leftover]
+        : [half, leftover];
     },
   };
 }

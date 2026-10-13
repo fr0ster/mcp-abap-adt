@@ -7,7 +7,10 @@ import type {
   IHttpApplication,
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
-import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
+import {
+  BaseMcpServer,
+  type LeftoverSessions,
+} from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
@@ -89,6 +92,13 @@ export interface StreamableHttpServerOptions {
   allowedOrigins?: string[];
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
+  /**
+   * The owner of the process's runtime session files, handed to every
+   * per-request instance: the SAP sessions they hold, kept until their
+   * logoff is written, and the leftover-session tools. Absent: none kept,
+   * the tools not available.
+   */
+  leftoverSessions?: LeftoverSessions;
 }
 
 /** What the pool keeps of a per-request server, and what the request handler drives on it. */
@@ -130,6 +140,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly pool = new InstancePool<PerRequestServerApi>();
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
+  private readonly sessionFilesOwner: LeftoverSessions | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -146,6 +157,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     });
     this.stateIdleMinutes = opts?.stateIdleMinutes;
     this.stateLogger = stateLoggerOf(opts ?? {});
+    this.sessionFilesOwner = opts?.leftoverSessions;
     this.version = opts?.version ?? HTTP_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
@@ -452,7 +464,11 @@ export class StreamableHttpServer extends BaseMcpServer {
         private readonly registry: IHandlersRegistry,
         version: string,
         logger: Logger,
-        state: { stateIdleMinutes?: number; stateLogger?: StateLogger },
+        state: {
+          stateIdleMinutes?: number;
+          stateLogger?: StateLogger;
+          leftoverSessions?: LeftoverSessions;
+        },
       ) {
         super({ name: 'mcp-abap-adt', version, logger, ...state });
         this.registerHandlers(this.registry);
@@ -478,6 +494,9 @@ export class StreamableHttpServer extends BaseMcpServer {
       {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
+        ...(this.sessionFilesOwner !== undefined && {
+          leftoverSessions: this.sessionFilesOwner,
+        }),
       },
     );
   }

@@ -141,7 +141,8 @@ that never completes keeps the process until it is killed (`SIGKILL`). The launc
 a crash outside a tool (`uncaughtException`, `unhandledRejection`, registered beside the signals
 in lib's `shutdownSequence.ts`): one fixed-words line naming the failure by its class, exit `1`; a
 crash during a shutdown forces it, and a second crash joins the forced close under way. A killed
-process (`SIGKILL`, out of memory) cannot log off: SAP's idle timeout ends its sessions and locks.
+process (`SIGKILL`, out of memory) cannot log off: SAP's idle timeout ends its sessions and locks,
+unless the user resumes or logs them off from a later process (below).
 
 **A connection is replaced only when SAP lost its session** (D56), or when a new credential
 arrives: `getConnection` builds a new instance for the next call, and the replaced one is logged
@@ -151,6 +152,44 @@ connection out, before any await, and ends with `connectionReleased(connection)`
 `getConnection` itself calls it too; a missing release keeps a replaced connection open until the
 terminal close, a second one ends it under another call). A cancelled call causes no
 logoff. The forced close also awaits, to its write, every logoff an orderly end already began.
+
+### Leftover sessions: the runtime files
+
+What a killed process leaves behind is the user's to see and to settle, through three explicit
+tools; the server decides nothing by itself (session-resume spec).
+
+- **The owner** (`LeftoverSessions`, `src/lib/leftoverSessions/`): one per process, created by the
+  host — each launcher; an embedder decides whether to give one — and handed to the instances as
+  `leftoverSessions`. It holds no module global. The directory is `runtimeDirectory(base?)`:
+  `<config dir>/runtime`, the same config dir as `sessions/` (`--auth-broker-path`, else
+  `AUTH_BROKER_PATH`'s first entry, else the platform's).
+- **One file per owned HTTP connection that holds a session**, named by a random 128-bit handle:
+  `getConnection`'s connection once connected (`track(connection, 'built', identity)`) and each
+  debugger connection (`openStateful` → `trackSibling(connection, 'debugger', origin)`, the
+  origin's identity). Contents: pid and start time (`ProcessProbe`: `/proc` on Linux, the pid
+  alone elsewhere), role, destination identity (URL, client, system kind, wire), backend user,
+  `sessionCookies()`. Directory `0700`, file `0600`, written atomically (a `.partial` renamed).
+  Rewritten after a request whose answer changed the cookies (the owner wraps
+  `makeAdtRequest`); deleted from inside the connection's end once its `disconnect()` resolved —
+  `whenLoggedOff` in `ownedConnections.ts` — so the terminal close, a replacement and the forced
+  close all delete it after the logoff is written, and a logoff that failed keeps it. Never
+  logged, never in an answer. RFC, and a request naming no backend user (a token credential),
+  keep no file (`sessionIdentity` answers none).
+- **The tools** (`ListLeftoverSessions` / `ResumeLeftoverSession` / `LogoffLeftoverSession`;
+  compact `HandlerLeftoverSession{List,Resume,Logoff}`), served on every exposition, are
+  `connectionless` entries: the tool wrapper calls them without `getConnection` (a resume must
+  not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
+  resolves the caller from the instance's source (`resolveCaller`), and a file is the caller's
+  when its identity equals the caller's; an unknown handle, someone else's file, a live process's
+  file and one this process already works on are refused alike (`leftover_session_not_available`).
+- **Resume** (`built` only) builds the instance's connection with `createAbapConnection(…,
+  session)`, records it as `built` before `connect()`, and on success makes it the instance's
+  (`takeAsBuilt`: the previous one retired, ended after its last call) and the file this
+  process's (`adopt`, same handle). SAP's "gone" — `401`, a redirect, an answer not the session's —
+  ends the spent connection and deletes the file; any other failure keeps it.
+- **Logoff** builds a connection on the session (role `fresh`) and ends it at once: connection 17
+  sends the ICF logoff without `sap-contextid` and without a credential. A session SAP already
+  ended answers the first request; nothing is logged off and the file is deleted.
 
 ## The servers
 

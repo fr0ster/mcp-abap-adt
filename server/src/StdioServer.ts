@@ -5,7 +5,11 @@ import {
   type ReadFailure,
   ServerRefusal,
 } from '@mcp-abap-adt/lib/auth';
-import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
+import {
+  BaseMcpServer,
+  type LeftoverSessions,
+  type ResolvedConnection,
+} from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
@@ -32,6 +36,12 @@ export interface StdioServerOptions {
    * factory's `abortedByServer`. Such a login is not retried (D7).
    */
   abortedByServer?: (error: IAuthProviderError) => boolean;
+  /**
+   * The owner of the process's runtime session files (the launcher's): the
+   * SAP sessions this server holds, kept until their logoff is written, and
+   * the leftover-session tools. Absent: none kept, the tools not available.
+   */
+  leftoverSessions?: LeftoverSessions;
 }
 
 /**
@@ -64,6 +74,9 @@ export class StdioServer extends BaseMcpServer {
       stateIdleMinutes: opts?.stateIdleMinutes,
       // From the options as given: the silent default above is never the state's.
       stateLogger: stateLoggerOf(opts ?? {}),
+      ...(opts?.leftoverSessions !== undefined && {
+        leftoverSessions: opts.leftoverSessions,
+      }),
     });
     this.sentenceFor = opts?.sentenceFor;
     this.abortedByServer = opts?.abortedByServer;
@@ -117,6 +130,14 @@ export class StdioServer extends BaseMcpServer {
       if (signal.aborted || !this.loginAbortedByAnother(error)) throw error;
       return super.getConnection(signal);
     }
+  }
+
+  /** Inspection-only mode refuses the leftover-session tools too, before anything is read. */
+  protected override resolveCaller(
+    signal: AbortSignal,
+  ): Promise<ResolvedConnection> {
+    if (!this.destinations) throw new ServerRefusal('inspection_only');
+    return super.resolveCaller(signal);
   }
 
   /** Whether `thrown` is a login another caller's abort ended. */

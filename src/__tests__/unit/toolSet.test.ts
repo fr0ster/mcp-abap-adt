@@ -4,10 +4,12 @@
  * tools is a launcher's.
  *
  * - `fullToolSet` builds today's groups: readonly (with system), high, low,
- *   debug and search, in today's order and with today's tools;
+ *   debug and search, in today's order and with today's tools, and the
+ *   leftover-session tools last, on every exposition;
  * - `compactToolSetOf({ readOnly, modify })`, given the two halves' entry
  *   builders, builds today's compact groups — `ro` the read-only half, `rw`
- *   both, `debug` the four verbs beside either — and refuses an empty or an
+ *   both, `debug` the four verbs beside either, the three leftover-session
+ *   tools beside every exposition — and refuses an empty or an
  *   unknown `--exposition` in today's words, verbatim.
  */
 
@@ -19,10 +21,12 @@ import {
   CompactReadOnlyHandlersGroup,
   compactReadOnlyEntries,
 } from '@mcp-abap-adt/compact-readonly';
+import { CompactLeftoverSessionHandlersGroup } from '../../lib/compact/session/group';
 import { ParameterRefusal } from '../../lib/config/index';
 import {
   DebugHandlersGroup,
   HighLevelHandlersGroup,
+  LeftoverSessionHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
   SearchHandlersGroup,
@@ -74,7 +78,11 @@ function todaysFullGroups(exposition: readonly string[]): IHandlerGroup[] {
     );
     groups.push(new SystemHandlersGroup(context));
   }
-  groups.push(...overriding, new SearchHandlersGroup(context));
+  groups.push(
+    ...overriding,
+    new SearchHandlersGroup(context),
+    new LeftoverSessionHandlersGroup(context),
+  );
   return groups;
 }
 
@@ -172,6 +180,16 @@ describe('fullToolSet', () => {
   });
 });
 
+/** The compact leftover-session group, beside every compact exposition. */
+const LEFTOVER = {
+  group: 'CompactLeftoverSessionHandlers',
+  tools: [
+    'HandlerLeftoverSessionList',
+    'HandlerLeftoverSessionResume',
+    'HandlerLeftoverSessionLogoff',
+  ],
+};
+
 describe('compactToolSetOf, with the two halves', () => {
   const compact = compactToolSetOf({
     readOnly: compactReadOnlyEntries,
@@ -182,7 +200,10 @@ describe('compactToolSetOf, with the two halves', () => {
 
   it('ro: today’s read-only half, alone', () => {
     expect(shape(groupsFor(['--exposition=ro']))).toEqual(
-      shape([new CompactReadOnlyHandlersGroup(context)]),
+      shape([
+        new CompactReadOnlyHandlersGroup(context),
+        new CompactLeftoverSessionHandlersGroup(context),
+      ]),
     );
     expect(
       groupsFor(['--exposition=ro'])[0]
@@ -199,6 +220,7 @@ describe('compactToolSetOf, with the two halves', () => {
     for (const argv of [['--exposition=rw'], []]) {
       expect(shape(groupsFor(argv))).toEqual([
         { group: 'CompactHandlers', tools: both },
+        LEFTOVER,
       ]);
     }
     expect(both).toHaveLength(27);
@@ -207,7 +229,11 @@ describe('compactToolSetOf, with the two halves', () => {
   it('debug beside either: the four verbs after the half, and no search', () => {
     expect(
       shape(groupsFor(['--exposition=ro,debug'])).map((g) => g.group),
-    ).toEqual(['CompactReadOnlyHandlers', 'CompactDebugHandlers']);
+    ).toEqual([
+      'CompactReadOnlyHandlers',
+      'CompactDebugHandlers',
+      'CompactLeftoverSessionHandlers',
+    ]);
     expect(shape(groupsFor(['--exposition=rw,debug']))[1]).toEqual({
       group: 'CompactDebugHandlers',
       tools: [

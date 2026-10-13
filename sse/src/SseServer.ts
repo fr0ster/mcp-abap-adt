@@ -5,6 +5,7 @@ import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   ConnectionContext,
   IHttpApplication,
+  LeftoverSessions,
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
 import { BaseMcpServer, closeInstance } from '@mcp-abap-adt/lib/embeddable';
@@ -86,6 +87,13 @@ export interface SseServerOptions {
   allowedOrigins?: string[];
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
+  /**
+   * The owner of the process's runtime session files, handed to every SSE
+   * session's instance: the SAP sessions they hold, kept until their logoff
+   * is written, and the leftover-session tools. Absent: none kept, the tools
+   * not available.
+   */
+  leftoverSessions?: LeftoverSessions;
 }
 
 type SessionEntry = {
@@ -138,6 +146,7 @@ export class SseServer {
   private readonly enableDnsRebindingProtection?: boolean;
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
+  private readonly leftoverSessions: LeftoverSessions | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -161,6 +170,7 @@ export class SseServer {
         : parseStateIdleMinutes(opts.stateIdleMinutes, 'stateIdleMinutes');
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
+    this.leftoverSessions = opts?.leftoverSessions;
   }
 
   /**
@@ -354,7 +364,11 @@ export class SseServer {
         private readonly registry: IHandlersRegistry,
         readonly loggerImpl: Logger,
         readonly ver: string,
-        state: { stateIdleMinutes?: number; stateLogger?: StateLogger },
+        state: {
+          stateIdleMinutes?: number;
+          stateLogger?: StateLogger;
+          leftoverSessions?: LeftoverSessions;
+        },
       ) {
         super({
           name: 'mcp-abap-adt-sse',
@@ -377,6 +391,9 @@ export class SseServer {
       {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
+        ...(this.leftoverSessions !== undefined && {
+          leftoverSessions: this.leftoverSessions,
+        }),
       },
     );
     server.init(context);

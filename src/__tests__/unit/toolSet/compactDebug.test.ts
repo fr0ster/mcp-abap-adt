@@ -75,9 +75,16 @@ describe('compact debug', () => {
     expect(names(['--exposition=ro,debug'])).toEqual([
       'CompactReadOnlyHandlers',
       'CompactDebugHandlers',
+      'CompactLeftoverSessionHandlers',
     ]);
-    expect(names(['--exposition=rw'])).toEqual(['CompactHandlers']);
-    expect(names([])).toEqual(['CompactHandlers']);
+    expect(names(['--exposition=rw'])).toEqual([
+      'CompactHandlers',
+      'CompactLeftoverSessionHandlers',
+    ]);
+    expect(names([])).toEqual([
+      'CompactHandlers',
+      'CompactLeftoverSessionHandlers',
+    ]);
   });
   it('the start describes user mode and taking over as facts', () => {
     const start = entries.find(

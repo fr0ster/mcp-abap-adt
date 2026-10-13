@@ -9,7 +9,11 @@ import { EventEmitter } from 'node:events';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import * as net from 'node:net';
-import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import type { LeftoverSessions } from '@mcp-abap-adt/lib/embeddable';
+import {
+  CompositeHandlersRegistry,
+  leftoverSessionEntries,
+} from '@mcp-abap-adt/lib/handlers';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import {
   type AdtStandIn,
@@ -62,15 +66,28 @@ export const basicHeaders = (url: string) => ({
 });
 
 export async function httpStand(
-  options: { shutdownTimeoutMs?: number; stateIdleMinutes?: number } = {},
+  options: {
+    shutdownTimeoutMs?: number;
+    stateIdleMinutes?: number;
+    /** The runtime files' owner, and the leftover-session tools beside the others. */
+    leftoverSessions?: LeftoverSessions;
+  } = {},
 ): Promise<HttpStand> {
   resetProcessLatchForTests();
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   const standIn = await adtStandIn();
   const stateErrors: string[] = [];
   const mcp = new StreamableHttpServer(
-    new CompositeHandlersRegistry([probeGroup(shutdownTools())]),
+    new CompositeHandlersRegistry([
+      probeGroup([
+        ...shutdownTools(),
+        ...(options.leftoverSessions ? leftoverSessionEntries() : []),
+      ]),
+    ]),
     {
+      ...(options.leftoverSessions && {
+        leftoverSessions: options.leftoverSessions,
+      }),
       host: '127.0.0.1',
       port: 0,
       stateLogger: {

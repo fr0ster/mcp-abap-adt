@@ -8,6 +8,20 @@
   },
   {
     "file": "src/embeddable/BaseMcpServer.ts",
+    "function": "BaseMcpServer.resumeLeftover",
+    "site": "createAbapConnection",
+    "end": "once connected, the instance's own (role 'built') like the one getConnection builds: the instance's terminal close, a replacement (a new credential, a session SAP lost, another resume) ended after its last call; a connect SAP refused ends at once (endConnection), nothing logged off for a session it did not take",
+    "why": "ResumeLeftoverSession: the instance's connection built on a leftover session's cookies (connection 17's `session`) instead of a logon; the resumed connection is an owned built connection like any other, its runtime file adopted by this process"
+  },
+  {
+    "file": "src/embeddable/BaseMcpServer.ts",
+    "function": "BaseMcpServer.logoffLeftover",
+    "site": "createAbapConnection",
+    "end": "in the same call: endConnection (its one disconnect(), the ICF logoff) once connected, or at once when the connect failed; recorded as the instance's (role 'fresh'), so its terminal close and the forced close reach it too",
+    "why": "LogoffLeftoverSession: an instance on the leftover session's cookies, only to send the ICF logoff with them and no credential"
+  },
+  {
+    "file": "src/embeddable/BaseMcpServer.ts",
     "function": "BaseMcpServer.entries",
     "site": "WeakMap<AbapConnection, BuiltConnection>",
     "end": "none needed: keyed weakly; the entry it names counts the calls handed its connection, and a replaced entry ends its connection when the count reaches zero",
@@ -145,6 +159,13 @@
     "site": "WeakMap<OwnedConnection, Array<() => void>>",
     "end": "none needed: keyed weakly, emptied when the connection ends",
     "why": "who wants to know a connection ended (a package lock session forgets its handle)"
+  },
+  {
+    "file": "src/lib/ownedConnections.ts",
+    "function": "logoffListeners",
+    "site": "WeakMap<OwnedConnection, Array<() => void>>",
+    "end": "none needed: keyed weakly, emptied when the connection's end settles",
+    "why": "who wants to know a connection's logoff was written (the runtime session files, deleted only then)"
   },
   {
     "file": "src/lib/ownedConnections.ts",

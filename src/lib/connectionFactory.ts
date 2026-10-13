@@ -304,6 +304,13 @@ export function createAbapConnection(
   credential: IAuthProvider,
   logger?: ILogger | null,
   sessionId?: string,
+  /**
+   * An existing SAP session to build the instance on (connection 17): the
+   * cookies an earlier instance's `sessionCookies()` returned. `connect()`
+   * then logs on nowhere and asks SAP, without the credential, whether that
+   * session lives. HTTP only: over RFC connection refuses it.
+   */
+  session?: string,
 ): IAbapConnection {
   // connection's `createConnection` with the system and the wire stated: the
   // choice is this server's, made from the settings as before; the connector
@@ -314,11 +321,13 @@ export function createAbapConnection(
     logger,
     ...(sessionId !== undefined ? { sessionId } : {}),
   };
+  const resumed = session !== undefined ? { session } : {};
   const built = ((): IAbapConnection => {
     if (resolveSystemKind(settings) === 'cloud') {
       return withHttpWireLog(
         createConnection({
           ...common,
+          ...resumed,
           system: 'cloud',
           transport: 'http',
           wireLogger: logger,
@@ -327,6 +336,13 @@ export function createAbapConnection(
     }
 
     if (settings.connectionType === 'rfc') {
+      // No `session` over RFC: its session is a conversation, which cannot
+      // be taken over (no runtime file is kept of one).
+      if (session !== undefined) {
+        throw new Error(
+          'An RFC session cannot be taken over by another process',
+        );
+      }
       return createConnection({
         ...common,
         system: 'onprem',
@@ -341,6 +357,7 @@ export function createAbapConnection(
     return withHttpWireLog(
       createConnection({
         ...common,
+        ...resumed,
         system: 'onprem',
         transport: 'http',
         wireLogger: logger,

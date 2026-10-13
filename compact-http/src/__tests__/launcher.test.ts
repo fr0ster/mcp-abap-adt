@@ -48,12 +48,12 @@ describe('mcp-abap-adt-compact-http', () => {
     expect(stderr.join('\n')).toContain('--exposition=<ro|rw>[,debug]');
   });
 
-  it('serves the compact tool set: rw by default, 27 tools', () => {
+  it('serves the compact tool set: rw by default, 27 tools and the three leftover-session tools', () => {
     const exposition = compactToolSet.exposition(undefined, [], 'stdio');
     expect(exposition).toEqual(['rw']);
     const tools = compactToolSet
       .groups({ connection: undefined as never, logger: undefined }, exposition)
       .flatMap((group) => group.getHandlers());
-    expect(tools).toHaveLength(27);
+    expect(tools).toHaveLength(30);
   });
 });

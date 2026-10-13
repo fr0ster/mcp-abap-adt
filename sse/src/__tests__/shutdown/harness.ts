@@ -10,7 +10,10 @@ import { EventEmitter } from 'node:events';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import * as net from 'node:net';
-import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import {
+  CompositeHandlersRegistry,
+  leftoverSessionEntries,
+} from '@mcp-abap-adt/lib/handlers';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import {
   type AdtStandIn,
@@ -84,7 +87,13 @@ export async function sseStand(
   const standIn = await adtStandIn();
   const stateErrors: string[] = [];
   const sse = new SseServer(
-    new CompositeHandlersRegistry([probeGroup(shutdownTools())]),
+    new CompositeHandlersRegistry([
+      probeGroup([
+        ...shutdownTools(),
+        // With an owner, the leftover-session tools beside the others.
+        ...(options.server?.leftoverSessions ? leftoverSessionEntries() : []),
+      ]),
+    ]),
     {
       host: '127.0.0.1',
       port: 0,

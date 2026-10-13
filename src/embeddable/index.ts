@@ -19,6 +19,20 @@ export { type ActiveTool, activeTools } from '../lib/activeTools.js';
  * (`@mcp-abap-adt/lib/state`).
  */
 export { type ClosableInstance, closeInstance } from '../lib/instanceClose.js';
+/**
+ * The owner of the process's runtime session files (leftover sessions of a
+ * killed process, listed, resumed or logged off by the user): created by the
+ * host, handed to its instances (`leftoverSessions`). Without one an
+ * instance keeps no file.
+ */
+export {
+  LeftoverSessions,
+  type LeftoverSessionsOptions,
+  nodeProcessProbe,
+  type ProcessProbe,
+  type ProcessStamp,
+  runtimeDirectory,
+} from '../lib/leftoverSessions/index.js';
 export {
   currentRequestSignal,
   RequestAbortedError,

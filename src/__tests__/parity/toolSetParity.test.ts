@@ -797,7 +797,8 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // The tools: the object-oriented surface, and the compact facade.
       expect(full.tools).toContain('GetClass');
       expect(full.tools).not.toContain('HandlerGet');
-      expect(compact.tools).toHaveLength(27);
+      // The 27 of rw, and the three leftover-session tools beside them.
+      expect(compact.tools).toHaveLength(27 + 3);
       expect(compact.tools).toEqual(expect.arrayContaining(COMPACT_RW));
       expect(compact.tools).not.toContain('GetClass');
 
@@ -807,7 +808,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       );
       expect(full.tools).not.toContain('DebugStartListener');
       expect(compact.debugTools).toEqual(expect.arrayContaining(COMPACT_DEBUG));
-      expect(compact.debugTools).toHaveLength(16 + 4);
+      expect(compact.debugTools).toHaveLength(16 + 4 + 3);
       expect(compact.tools).not.toContain('HandlerDebugStart');
     });
   },
@@ -870,9 +871,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       return tools;
     };
 
-    it('exposition: ro serves the 16 that change nothing', async () => {
+    it('exposition: ro serves the 16 that change nothing, and the leftover-session tools', async () => {
       const tools = await servedTools([conf('ro')]);
-      expect(tools).toHaveLength(16);
+      expect(tools).toHaveLength(16 + 3);
       expect(tools).toContain('HandlerGet');
       expect(tools).not.toContain('HandlerCreate');
     });
@@ -884,7 +885,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         '--exposition=readonly',
         '--exposition=ro',
       ]);
-      expect(tools).toHaveLength(16);
+      expect(tools).toHaveLength(16 + 3);
       expect(tools).not.toContain('HandlerCreate');
     });
 
@@ -893,7 +894,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         '--exposition=debug',
         '--exposition=ro,debug',
       ]);
-      expect(tools).toHaveLength(16 + 4);
+      expect(tools).toHaveLength(16 + 4 + 3);
       expect(tools).toEqual(expect.arrayContaining(COMPACT_DEBUG));
     });
 

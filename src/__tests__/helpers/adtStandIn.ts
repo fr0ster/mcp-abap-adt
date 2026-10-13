@@ -28,6 +28,8 @@ export interface StandInRequest {
   session: string;
   /** Its `x-sap-adt-sessiontype` header, if any. */
   sessionType: string | undefined;
+  /** Its `Cookie` header, if any. */
+  cookie: string | undefined;
 }
 
 export interface AdtStandIn {
@@ -125,6 +127,7 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       authorization: req.headers.authorization,
       session,
       sessionType: Array.isArray(sessionType) ? sessionType[0] : sessionType,
+      cookie: req.headers.cookie,
     };
     requests.push(request);
     const hold = holds.find((h) => !h.taken && h.match(request));
@@ -148,12 +151,18 @@ export async function adtStandIn(): Promise<AdtStandIn> {
         return;
       }
       const said = bodies.find((b) => b.match(request));
+      // A cookie a suite has the answer set (`body`'s headers) goes beside
+      // the session's own.
+      const { 'set-cookie': extraCookie, ...saidHeaders } = said?.headers ?? {};
       res.writeHead(200, {
-        ...said?.headers,
+        ...saidHeaders,
         'content-type': 'text/plain',
         'x-csrf-token': 'csrf-placeholder',
         // An ABAP session: what a connection needs before it reports connected.
-        'set-cookie': `${SESSION_COOKIE}=${session}; path=/`,
+        'set-cookie': [
+          `${SESSION_COOKIE}=${session}; path=/`,
+          ...(extraCookie !== undefined ? [extraCookie] : []),
+        ],
       });
       // A lock answers a real lock handle, so a write's lock → update →
       // unlock runs through the real clients.

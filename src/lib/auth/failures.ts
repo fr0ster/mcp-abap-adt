@@ -29,7 +29,10 @@ export type FailureCode =
   | 'destination_refused'
   | 'fresh_connection_unavailable'
   | 'inspection_only'
-  | 'credentials_required';
+  | 'credentials_required'
+  | 'leftover_sessions_unavailable'
+  | 'leftover_session_not_available'
+  | 'leftover_session_not_resumable';
 
 /**
  * A failure as it was read: the fields of the §7.3 answer, and the chain's

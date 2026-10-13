@@ -12,6 +12,10 @@ import {
   processEdges,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
+import {
+  LeftoverSessions,
+  runtimeDirectory,
+} from '@mcp-abap-adt/lib/embeddable';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
@@ -159,6 +163,10 @@ export async function launch(
       allowedHosts: config.allowedHosts,
       allowedOrigins: config.allowedOrigins,
       enableDnsRebindingProtection: config.enableDnsRebindingProtection,
+      // The process's runtime session files: the platform's config dir (or
+      // AUTH_BROKER_PATH's first entry) — this binary takes no
+      // --auth-broker-path.
+      leftoverSessions: new LeftoverSessions({ directory: runtimeDirectory() }),
     },
   );
   installTransportShutdown({

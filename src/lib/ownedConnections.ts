@@ -58,6 +58,12 @@ const owned = new Map<OwnedConnection, Owned>();
 const ending = new WeakMap<OwnedConnection, Promise<void>>();
 const endListeners = new WeakMap<OwnedConnection, Array<() => void>>();
 /**
+ * Who wants to know a connection's logoff was WRITTEN (its `disconnect()`
+ * resolved): the leftover-session files, deleted only then. Run inside the
+ * end itself, so the forced close, which awaits every end, awaits them too.
+ */
+const logoffListeners = new WeakMap<OwnedConnection, Array<() => void>>();
+/**
  * Logoffs asked for and not yet written: a connection leaves `owned` when
  * its end begins, and stays here until its `disconnect()` settles, so the
  * forced close awaits a logoff already under way instead of exiting before
@@ -115,6 +121,21 @@ export function whenEnded(connection: object, listener: () => void): void {
 }
 
 /**
+ * Calls `listener` once `connection`'s logoff is written — its one
+ * `disconnect()` resolved — and never when that `disconnect()` failed. Run
+ * synchronously inside the end, before the end's promise settles, so
+ * whoever awaits the end (the terminal close, the forced close) awaits it.
+ * A connection whose end already began is not followed: its listener never
+ * runs.
+ */
+export function whenLoggedOff(connection: object, listener: () => void): void {
+  if (ending.has(connection)) return;
+  const listeners = logoffListeners.get(connection) ?? [];
+  listeners.push(listener);
+  logoffListeners.set(connection, listeners);
+}
+
+/**
  * Ends `connection`: `disconnect()` once, joined by any later caller; a
  * failure is reported through `onFailure` (default: one stderr line in fixed
  * words), never thrown. Resolves when the logoff is written (connection 16).
@@ -135,10 +156,21 @@ export function endConnection(
         await closable.disconnect();
       }
     } catch {
+      logoffListeners.delete(connection);
       try {
         onFailure();
       } catch {
         // A reporter that throws changes nothing of the close.
+      }
+      return;
+    }
+    const written = logoffListeners.get(connection) ?? [];
+    logoffListeners.delete(connection);
+    for (const listener of written) {
+      try {
+        listener();
+      } catch {
+        // A listener that throws changes nothing of the close.
       }
     }
   })();

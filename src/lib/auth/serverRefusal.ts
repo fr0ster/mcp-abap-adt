@@ -14,7 +14,10 @@ export type ServerRefusalCode =
   | 'inspection_only'
   | 'destination_refused'
   | 'fresh_connection_unavailable'
-  | 'credentials_required';
+  | 'credentials_required'
+  | 'leftover_sessions_unavailable'
+  | 'leftover_session_not_available'
+  | 'leftover_session_not_resumable';
 
 /** Inspection-only mode: stdio started without a destination (D17). */
 export const INSPECTION_ONLY_WORDS =
@@ -32,6 +35,25 @@ export const CREDENTIALS_REQUIRED_WORDS =
 export const DESTINATIONS_ONLY_STDIO_WORDS =
   'destinations are served only by mcp-abap-adt (stdio); send x-sap-* headers';
 
+/**
+ * The leftover-session tools on an instance that keeps no runtime files: an
+ * embedder gave no owner, or the connection was given by the host.
+ */
+export const LEFTOVER_SESSIONS_UNAVAILABLE_WORDS =
+  'leftover sessions are not available here: this server keeps no record of the SAP sessions it holds';
+
+/**
+ * A handle that names no leftover session of the caller's: unknown, someone
+ * else's, one whose process still runs, or one already being worked on —
+ * the same words for each.
+ */
+export const LEFTOVER_SESSION_NOT_AVAILABLE_WORDS =
+  'no leftover session of yours with this handle is available';
+
+/** A resume of a debugger's session: only an instance's own session resumes. */
+export const LEFTOVER_SESSION_NOT_RESUMABLE_WORDS =
+  "a debugger's session cannot be resumed (its listener, breakpoints and poll lived in the ended process); log it off instead";
+
 /** The refusals whose words are fixed. */
 type FixedCode = Exclude<ServerRefusalCode, 'destination_refused'>;
 
@@ -39,6 +61,9 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   inspection_only: INSPECTION_ONLY_WORDS,
   fresh_connection_unavailable: FRESH_CONNECTION_UNAVAILABLE_WORDS,
   credentials_required: CREDENTIALS_REQUIRED_WORDS,
+  leftover_sessions_unavailable: LEFTOVER_SESSIONS_UNAVAILABLE_WORDS,
+  leftover_session_not_available: LEFTOVER_SESSION_NOT_AVAILABLE_WORDS,
+  leftover_session_not_resumable: LEFTOVER_SESSION_NOT_RESUMABLE_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

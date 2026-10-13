@@ -42,6 +42,12 @@ export type ToolHandler = (context: HandlerContext, args: any) => Promise<any>;
 export interface HandlerEntry {
   toolDefinition: ToolDefinition;
   handler: ToolHandler;
+  /**
+   * The tool works on no connection of the instance: the server calls it
+   * without building or connecting one first (the leftover-session tools,
+   * whose resume must not log on). Its context's `connection` is absent.
+   */
+  connectionless?: true;
 }
 
 /**

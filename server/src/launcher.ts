@@ -12,6 +12,10 @@ import {
   processEdges,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
+import {
+  LeftoverSessions,
+  runtimeDirectory,
+} from '@mcp-abap-adt/lib/embeddable';
 import { type StateLogger, stderrStateLogger } from '@mcp-abap-adt/lib/state';
 import {
   fullToolSet,
@@ -39,6 +43,7 @@ import {
   statedLoginTimeout,
 } from './config/coreParameters';
 import { hydrateSystemContextFromEnvFile } from './config/envFileContext';
+import { getPlatformPaths } from './config/platformPaths';
 import { StdioServer } from './StdioServer.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
 
@@ -632,6 +637,11 @@ export async function launch(
     destination ? factory : undefined,
     {
       version: options.version,
+      // The process's runtime session files, beside the destination's
+      // sessions (`--auth-broker-path` moves both).
+      leftoverSessions: new LeftoverSessions({
+        directory: runtimeDirectory(getPlatformPaths(config.authBrokerPath)[0]),
+      }),
       stateIdleMinutes: config.stateIdleMinutes,
       stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,

@@ -7,6 +7,7 @@
 import type { HandlerSet } from '../../config/IServerConfig.js';
 import { DebugHandlersGroup } from '../groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../groups/HighLevelHandlersGroup.js';
+import { LeftoverSessionHandlersGroup } from '../groups/LeftoverSessionHandlersGroup.js';
 import { LowLevelHandlersGroup } from '../groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from '../groups/SearchHandlersGroup.js';
@@ -27,7 +28,7 @@ export function noConnectionContext(): HandlerContext {
  * The groups for `exposition`, built against `baseContext`: the non-readonly
  * groups first, so their tool names feed the readonly dedup
  * (`ReadVsGetDedupStrategy`), then the readonly and system groups, the
- * others, and search — in registration order.
+ * others, search, and the leftover-session tools — in registration order.
  */
 export function expositionGroups(
   exposition: readonly string[],
@@ -64,6 +65,8 @@ export function expositionGroups(
   }
   handlerGroups.push(...overridingGroups);
   handlerGroups.push(new SearchHandlersGroup(baseContext));
+  // Every exposition: the user's own leftover sessions, whatever is served.
+  handlerGroups.push(new LeftoverSessionHandlersGroup(baseContext));
   return handlerGroups;
 }
 

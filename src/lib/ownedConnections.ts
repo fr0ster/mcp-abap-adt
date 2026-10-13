@@ -55,6 +55,13 @@ const owned = new Map<OwnedConnection, Owned>();
 /** Each `disconnect()` asked for, so a second caller joins it. */
 const ending = new WeakMap<OwnedConnection, Promise<void>>();
 const endListeners = new WeakMap<OwnedConnection, Array<() => void>>();
+/**
+ * Logoffs asked for and not yet written: a connection leaves `owned` when
+ * its end begins, and stays here until its `disconnect()` settles, so the
+ * forced close awaits a logoff already under way instead of exiting before
+ * it is written.
+ */
+const writing = new Set<Promise<void>>();
 const ownerScope = new AsyncLocalStorage<object>();
 
 /** The fixed words of a close that failed. */
@@ -134,6 +141,8 @@ export function endConnection(
     }
   })();
   ending.set(connection, closing);
+  writing.add(closing);
+  void closing.finally(() => writing.delete(closing));
   const listeners = endListeners.get(connection) ?? [];
   endListeners.delete(connection);
   for (const listener of listeners) {
@@ -185,7 +194,9 @@ export async function closeOwnedConnections(
  * state undo — only each logoff's write (connection 16).
  */
 export async function forceClose(): Promise<void> {
-  await Promise.all(
-    ownedConnections().map((connection) => endConnection(connection)),
+  const owned_ = ownedConnections().map((connection) =>
+    endConnection(connection),
   );
+  // Every logoff under way too — joined, never a second `disconnect()`.
+  await Promise.all([...owned_, ...writing]);
 }

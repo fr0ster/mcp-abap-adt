@@ -139,7 +139,10 @@ process (`SIGKILL`, out of memory) cannot log off: SAP's idle timeout ends its s
 
 **A connection is replaced only when SAP lost its session** (D56), or when a new credential
 arrives: `getConnection` builds a new instance for the next call, and the replaced one is logged
-off once no call works on it any more. A cancelled call causes no logoff.
+off once no call works on it any more — each call's use is counted when `getConnection` hands the
+connection out, before any await, and ends with `connectionReleased(connection)` (the tool wrapper
+calls it; a host that calls `getConnection` itself calls it too). A cancelled call causes no
+logoff. The forced close also awaits, to its write, every logoff an orderly end already began.
 
 ## The servers
 

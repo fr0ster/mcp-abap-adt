@@ -63,10 +63,12 @@ the idle bound (`--state-idle-minutes`, 30–35 791, default 30), or the server'
 
 ## Every ADT session ends with a logoff
 
-An instance logs off every ADT session it opened when it ends: a request's instance when the pool
-lets it go (after the request, when it holds nothing), a pooled instance when its state ends (its
-stop tool, the idle bound) or at shutdown — whatever the state's undo answered. The logoff is what
-releases a lock a tool left in its session.
+An instance logs off every ADT session it opened when it leaves the pool: a request's instance
+after its request, when it holds nothing; a pooled instance when its state ends (its stop tool,
+the idle bound). An instance whose state undo fails is kept for a retry — it has not left, and its
+sessions stay open — until a later undo succeeds or the server shuts down, where its sessions are
+logged off whatever the undo answered. (After the idle bound's stop a pooled instance's sessions
+are logged off even when the undo failed.) The logoff is what releases a lock a tool left.
 
 ## Shutdown
 

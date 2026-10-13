@@ -75,6 +75,28 @@ it('http, at shutdown (the pool lets the instance go): exit 1, every connection 
   }
 });
 
+it('http, a failed undo when the pool would let the instance go: kept for a retry with its sessions open, then logged off once at shutdown', async () => {
+  const s = await httpStand();
+  try {
+    const held = await s.call('HoldState', { id: 'S' });
+    refusesStop(s.standIn);
+    // Its stop tool: the undo fails, so the instance has not left the pool.
+    const stopped = await s.call('StopState', { state_handle: held.text });
+    expect(stopped.isError).toBe(true);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(ownedConnections().length).toBeGreaterThan(0);
+    const before = s.standIn.logoffs();
+    s.processLike.emit('SIGTERM');
+    expect(await s.exited).toBe(1);
+    expect(s.stderr.join('\n')).toContain('the debugger stop was refused');
+    expect(ownedConnections()).toEqual([]);
+    await until(() => s.standIn.logoffs() === connectsOf(s.standIn.requests));
+    expect(s.standIn.logoffs()).toBeGreaterThan(before);
+  } finally {
+    await s.close();
+  }
+});
+
 it("http, at the idle bound's stop: a state-logger line, every connection logged off", async () => {
   const s = await httpStand({ stateIdleMinutes: 30 });
   try {

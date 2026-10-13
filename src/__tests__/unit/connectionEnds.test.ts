@@ -39,7 +39,7 @@ jest.mock('../../lib/connectionFactory', () => {
 
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import type { ConnectionContext } from '../../embeddable/ConnectionContext';
-import { liveDebugPorts } from '../../lib/debugger/ports';
+import { LOGOFF_NOT_WRITTEN, liveDebugPorts } from '../../lib/debugger/ports';
 import {
   closeOwnedConnections,
   endConnection,
@@ -70,6 +70,12 @@ interface Closable extends IAbapConnection {
   connects: number;
   failConnect: boolean;
   live: boolean;
+  /** While set, `connect()` waits for it. */
+  connectGate?: Promise<void>;
+  /** While set, `disconnect()` waits for it before its logoff is written. */
+  writeGate?: Promise<void>;
+  /** Whether the logoff was written (`disconnect()` settled). */
+  written: boolean;
 }
 
 /** A connection whose `connect()` and `disconnect()` are counted; a second disconnect rejects, as connection 16's. */
@@ -79,13 +85,17 @@ function closable(rfc = false): Closable {
     connects: 0,
     failConnect: false,
     live: true,
+    written: false,
     async connect() {
       connection.connects += 1;
+      if (connection.connectGate) await connection.connectGate;
       if (connection.failConnect) throw new Error('connect refused');
     },
     async disconnect() {
       connection.disconnects += 1;
       if (connection.disconnects > 1) throw new Error('ADT_NOT_CONNECTED');
+      if (connection.writeGate) await connection.writeGate;
+      connection.written = true;
     },
     isConnected: () => connection.live,
     getConfig: () => ({ connectionType: rfc ? 'rfc' : 'http' }),
@@ -131,7 +141,23 @@ class Server extends BaseMcpServer {
   connection() {
     return this.getConnection(new AbortController().signal);
   }
+  /** A call done with the connection `connection()` handed it (as the wrapper does). */
+  done(connection: unknown) {
+    this.connectionReleased(connection as AbapConnection);
+  }
 }
+
+function gate() {
+  let open!: () => void;
+  const promise = new Promise<void>((r) => {
+    open = r;
+  });
+  return { promise, open };
+}
+
+const turns = async (n = 10) => {
+  for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
+};
 
 beforeEach(() => {
   built.splice(0);
@@ -190,18 +216,63 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     expect(built[1]?.disconnects).toBe(1);
   });
 
-  it('a new credential replaces it: the replaced one ends once, after the last call on it', async () => {
+  it('a new credential replaces it with no call on it: the replaced one ends at once, once', async () => {
     const server = serve([provider(), provider()]);
     const first = await server.connection();
+    server.done(first);
     const second = await server.connection();
     expect(second).not.toBe(first);
     expect(built[0]?.disconnects).toBe(1);
     expect(built[1]?.disconnects).toBe(0);
+    server.done(second);
     await server.terminalClose();
     expect(built.map((c) => c.disconnects)).toEqual([1, 1]);
   });
 
-  it('a session SAP lost (D56): a new connection instance for the next call; the spent one ends once', async () => {
+  it('a new credential while a call works on the old connection: its logoff waits until that call is done', async () => {
+    const server = serve([provider(), provider()]);
+    const first = await server.connection(); // a call in flight on it
+    const second = await server.connection(); // another credential: replaced
+    expect(second).not.toBe(first);
+    await turns();
+    expect(built[0]?.disconnects).toBe(0);
+    server.done(first);
+    await turns();
+    expect(built[0]?.disconnects).toBe(1);
+    server.done(second);
+    await server.terminalClose();
+    expect(built.map((c) => c.disconnects)).toEqual([1, 1]);
+  });
+
+  it('replaced while its connect is still running: the call waiting for it is not handed a disconnected connection', async () => {
+    const connecting = gate();
+    const real = jest.requireMock('../../lib/connectionFactory') as {
+      createAbapConnection: (s: SapConfig) => Closable;
+    };
+    const held = closable(true);
+    held.connectGate = connecting.promise;
+    jest.spyOn(real, 'createAbapConnection').mockImplementationOnce(() => {
+      built.push(held);
+      return held;
+    });
+    const server = serve([provider(), provider()]);
+    const a = server.connection(); // waits in the held connect
+    await turns();
+    const b = await server.connection(); // a new credential replaces it
+    connecting.open();
+    const handedToA = (await a) as unknown as Closable;
+    expect(handedToA).toBe(held);
+    await turns();
+    expect(handedToA.disconnects).toBe(0);
+    server.done(handedToA);
+    await turns();
+    expect(handedToA.disconnects).toBe(1);
+    server.done(b);
+    await server.terminalClose();
+    expect(handedToA.disconnects).toBe(1);
+  });
+
+  it('a session SAP lost (D56): a new connection instance for the next call; the spent one ends once, after the call on it', async () => {
     const credential = provider();
     const server = serve([credential]);
     const first = (await server.connection()) as unknown as Closable;
@@ -209,7 +280,12 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     const second = await server.connection();
     expect(second).not.toBe(first);
     expect(built).toHaveLength(2);
+    await turns();
+    expect(first.disconnects).toBe(0);
+    server.done(first);
+    await turns();
     expect(first.disconnects).toBe(1);
+    server.done(second);
     await server.terminalClose();
     expect(built.map((c) => c.disconnects)).toEqual([1, 1]);
   });
@@ -357,6 +433,55 @@ describe('the forced close', () => {
     expect(b.disconnects).toBe(1);
     expect(isEnded(a) && isEnded(b)).toBe(true);
     expect(ownedConnections()).toEqual([]);
+  });
+
+  it('awaits a logoff an orderly end began and has not written yet: joined, disconnect() once', async () => {
+    const c = closable();
+    const write = gate();
+    c.writeGate = write.promise;
+    own(c, { owner: {}, role: 'built' });
+    const orderly = endConnection(c); // the orderly terminal close, writing
+    let forced = false;
+    const forcing = forceClose().then(() => {
+      forced = true;
+    });
+    await turns();
+    expect(forced).toBe(false);
+    write.open();
+    await forcing;
+    await orderly;
+    expect(c.written).toBe(true);
+    expect(c.disconnects).toBe(1);
+  });
+
+  it("a site's own end after the forced close joins it: disconnect() once, no failure reported", async () => {
+    const c = closable(true);
+    own(c, { role: 'fresh' });
+    await forceClose();
+    const warned: string[] = [];
+    await closeQuietly(
+      c,
+      { warn: (m: string) => warned.push(m) } as never,
+      'test',
+    );
+    expect(c.disconnects).toBe(1);
+    expect(warned).toEqual([]);
+  });
+});
+
+describe("the debugger's close failure goes back to its session", () => {
+  it('in fixed words; a later close joins and sends nothing again', async () => {
+    const ports = liveDebugPorts();
+    const c = closable();
+    (c as unknown as { disconnect: () => Promise<void> }).disconnect =
+      async () => {
+        c.disconnects += 1;
+        throw new Error('a secret-looking socket error');
+      };
+    own(c, { role: 'state' });
+    await expect(ports.closeConnection(c)).rejects.toThrow(LOGOFF_NOT_WRITTEN);
+    await expect(ports.closeConnection(c)).resolves.toBeUndefined();
+    expect(c.disconnects).toBe(1);
   });
 });
 

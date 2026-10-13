@@ -72,6 +72,14 @@ interface BuiltConnection {
   connection: Promise<AbapConnection>;
   /** The connection once its connect completed. */
   ready?: AbapConnection;
+  /**
+   * Calls handed this entry's connection and not yet done with it — counted
+   * in the same turn it is handed out, before any await, so a replacement
+   * never ends it under a call that received it.
+   */
+  users: number;
+  /** Replaced: it ends with its logoff once no call works on it. */
+  retired: boolean;
 }
 
 /**
@@ -125,11 +133,8 @@ export abstract class BaseMcpServer extends McpServer {
   /** Every tool call of this instance still running, tracked from its entry. */
   private readonly inFlight = new Set<Promise<unknown>>();
 
-  /** Calls working on each built connection now: a replaced one ends when none does. */
-  private readonly users = new Map<AbapConnection, number>();
-
-  /** Built connections replaced while a call still worked on them. */
-  private readonly retiring = new Set<AbapConnection>();
+  /** The built entry of each connection handed out: what a release counts down. */
+  private readonly entries = new WeakMap<AbapConnection, BuiltConnection>();
 
   constructor(options: {
     name: string;
@@ -299,37 +304,49 @@ export abstract class BaseMcpServer extends McpServer {
         createAbapConnection(resolved.settings, resolved.credential),
       );
     }
-    const connection = await raceRequestSignal(held.connection, signal);
+    // This call is the entry's user from now on — counted before the await,
+    // so a replacement in between cannot end the connection under it.
+    held.users += 1;
+    let connection: AbapConnection;
+    try {
+      connection = await raceRequestSignal(held.connection, signal);
+    } catch (error) {
+      this.release(held);
+      throw error;
+    }
+    this.entries.set(connection, held);
     this.systemContexts.set(connection, resolved.systemContext);
     return connection;
+  }
+
+  /**
+   * A call is done with the connection `getConnection` handed it: a
+   * replaced one with no call left ends with its logoff. The tool wrapper
+   * calls it when a call ends; a host that calls `getConnection` itself
+   * calls it too, else a replaced connection ends only at the terminal close.
+   */
+  protected connectionReleased(connection: AbapConnection): void {
+    const entry = this.entries.get(connection);
+    if (entry !== undefined) this.release(entry);
+  }
+
+  private release(entry: BuiltConnection): void {
+    if (entry.users > 0) entry.users -= 1;
+    if (entry.users === 0 && entry.retired && entry.ready !== undefined) {
+      void endConnection(entry.ready);
+    }
   }
 
   /** A built connection replaced: ended now, or when its last call ends. */
   private retire(entry: BuiltConnection): void {
     if (this.built === entry) this.built = undefined;
+    entry.retired = true;
     entry.connection.then(
       (connection) => {
-        if (this.users.get(connection)) this.retiring.add(connection);
-        else void endConnection(connection);
+        if (entry.users === 0) void endConnection(connection);
       },
       () => undefined, // a failed connect was ended where it failed
     );
-  }
-
-  /** A call starts working on `connection`. */
-  private connectionInUse(connection: AbapConnection): void {
-    this.users.set(connection, (this.users.get(connection) ?? 0) + 1);
-  }
-
-  /** A call stops working on `connection`: a retired one with no call left ends. */
-  private connectionReleased(connection: AbapConnection): void {
-    const left = (this.users.get(connection) ?? 1) - 1;
-    if (left > 0) {
-      this.users.set(connection, left);
-      return;
-    }
-    this.users.delete(connection);
-    if (this.retiring.delete(connection)) void endConnection(connection);
   }
 
   /** Connects what `create` builds for `credential`, kept as `built`. */
@@ -340,6 +357,8 @@ export abstract class BaseMcpServer extends McpServer {
     const entry: BuiltConnection = {
       credential,
       connection: Promise.resolve() as unknown as Promise<AbapConnection>,
+      users: 0,
+      retired: false,
     };
     entry.connection = (async () => {
       const connection = create();
@@ -401,7 +420,6 @@ export abstract class BaseMcpServer extends McpServer {
               // the request's signal: a cancelled call settles at once.
               const connection = await this.getConnection(signal);
               inUse = connection;
-              this.connectionInUse(connection);
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,

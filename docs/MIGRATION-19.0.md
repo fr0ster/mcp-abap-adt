@@ -83,9 +83,11 @@ The packages, all at **19.0.0**:
   `x-sap-debug-terminal-id` / `x-sap-debug-ide-id`, then `SAP_DEBUG_TERMINAL_ID` /
   `SAP_DEBUG_IDE_ID` of the environment; a destination's `.env` (and its `SAP_DEBUG_*`) is read only
   by `mcp-abap-adt` (stdio).
-- **Every ADT session ends with a logoff.** A request's instance logs off its ADT session when the
-  pool lets it go (after the request when it holds nothing; for a pooled instance, when its state
-  ends — its stop tool or the idle bound — or at shutdown), whatever the state's undo answered.
+- **Every ADT session ends with a logoff.** A request's instance logs off its ADT session when it
+  leaves the pool: after the request when it holds nothing; for a pooled instance, when its state
+  ends (its stop tool or the idle bound). An instance whose undo fails is kept for a retry, its
+  sessions open, until a later undo succeeds or shutdown — which logs them off whatever the undo
+  answered (the idle bound's stop logs a pooled instance off even when its undo failed).
 - **Shutdown waits for the running tools** (no 30-second deadline): `SIGTERM` / `SIGINT` stops new
   requests (`503`), waits for every running tool on every instance — none aborted —, then disposes
   the pool's instances and logs off their sessions; exit `0`, or `1` with one line per instance

@@ -8,17 +8,10 @@
   },
   {
     "file": "src/embeddable/BaseMcpServer.ts",
-    "function": "BaseMcpServer.users",
-    "site": "Map<AbapConnection, number>",
-    "end": "an entry leaves when its last call ends",
-    "why": "counts the calls working on each built connection, so a replaced one is ended only when none does; holds no connection past its calls"
-  },
-  {
-    "file": "src/embeddable/BaseMcpServer.ts",
-    "function": "BaseMcpServer.retiring",
-    "site": "Set<AbapConnection>",
-    "end": "endConnection when the last call on it ends",
-    "why": "built connections replaced while a call still worked on them"
+    "function": "BaseMcpServer.entries",
+    "site": "WeakMap<AbapConnection, BuiltConnection>",
+    "end": "none needed: keyed weakly; the entry it names counts the calls handed its connection, and a replaced entry ends its connection when the count reaches zero",
+    "why": "a call releases the connection it was handed (connectionReleased); the use is counted in getConnection before any await, so a replacement never ends a connection under a call that received it"
   },
   {
     "file": "src/embeddable/BaseMcpServer.ts",

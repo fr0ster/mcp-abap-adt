@@ -54,14 +54,22 @@ async function openStateful(context: HandlerContext): Promise<IAbapConnection> {
   return connection;
 }
 
+/** The fixed words a session's close failure is reported back in. */
+export const LOGOFF_NOT_WRITTEN = 'its logoff could not be written';
+
 /**
  * Closes a session's own connection: its one `disconnect()` — the logoff —,
- * joined if the instance's terminal close already asked for it. connection
- * 16 refuses a second `disconnect()`, so a failure is not retried: it is
- * logged in fixed words.
+ * joined if the instance's terminal close already asked for it. A failure
+ * goes back to the session in fixed words, which reports it and keeps the
+ * connection for the next stop; that retry joins the ended close (connection
+ * 16 refuses a second `disconnect()`), so nothing is sent twice.
  */
 async function closeOwn(connection: IAbapConnection): Promise<void> {
-  await endConnection(connection);
+  let failed = false;
+  await endConnection(connection, () => {
+    failed = true;
+  });
+  if (failed) throw new Error(LOGOFF_NOT_WRITTEN);
 }
 
 /**

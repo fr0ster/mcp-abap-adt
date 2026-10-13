@@ -222,7 +222,7 @@
           }
         }
       ],
-      "note": "force_new_connection is taken as the low tool took it: the check and the delete are sent from a new connection, closed afterwards. The full set has it too: the high DeletePackage, the same requests. What SAP answers to the deletion check of a package is not measured; the stand-in answers it empty.",
+      "note": "force_new_connection is taken as the low tool took it: the check and the delete are sent from a new connection, closed afterwards. The full set has it too: the high DeletePackage, the same requests.",
       "low_requests": [
         {
           "method": "POST",
@@ -237,7 +237,8 @@
       "accepted": {
         "kind": "deletion-check",
         "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      }
+      },
+      "unmeasured": "What SAP answers to the deletion check of a package is not measured; the stand-in answers it empty."
     },
     {
       "tool": "CreateDomainLow",

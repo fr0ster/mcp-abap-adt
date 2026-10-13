@@ -25,6 +25,8 @@ export interface LowToCompactRow {
   compact: Array<{ tool: string; args: Record<string, unknown> }>;
   accepted?: { kind: string; reason: string };
   note?: string;
+  /** What the row rests on that is not measured; never rendered into the docs. */
+  unmeasured?: string;
   low_requests?: ParityRequest[];
 }
 

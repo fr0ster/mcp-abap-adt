@@ -342,6 +342,9 @@ export abstract class BaseMcpServer extends McpServer {
     return failureOf(thrown);
   }
 
+  /** The tail of the instance's main flow (`enterMainFlow`). */
+  private mainFlow: Promise<void> = Promise.resolve();
+
   /**
    * The connection a tool call works on. Injected: the connection as given —
    * no `resolve`, no `connect()`, no wrap. Built: the source resolves the
@@ -410,6 +413,31 @@ export abstract class BaseMcpServer extends McpServer {
     this.entries.set(connection, held);
     this.systemContexts.set(connection, resolved.systemContext);
     return connection;
+  }
+
+  /**
+   * The instance's main flow: the calls that work on its connection, one
+   * after another. Resolves with the call's `leave` once every call queued
+   * before it has left; no timeout on the wait. A call whose signal aborts
+   * while it waits leaves the queue at once — its place passes on, and it
+   * answers `aborted` without reaching its tool (D5) — so a shutdown or an
+   * instance close, which aborts the calls it waits for, never waits behind a
+   * queued one.
+   */
+  private enterMainFlow(signal: AbortSignal): Promise<() => void> {
+    const before = this.mainFlow;
+    let leave!: () => void;
+    const mine = new Promise<void>((resolve) => {
+      leave = resolve;
+    });
+    this.mainFlow = before.then(() => mine);
+    return raceRequestSignal(before, signal).then(
+      () => leave,
+      (error: unknown) => {
+        leave();
+        throw error;
+      },
+    );
   }
 
   /**
@@ -522,6 +550,7 @@ export abstract class BaseMcpServer extends McpServer {
               return this.runConnectionless(entry.handler, group, args, signal);
             }
             let inUse: AbapConnection | undefined;
+            let leaveFlow: (() => void) | undefined;
             try {
               // A run tool's `background` is the wrapper's: read, refused
               // when it is not a boolean or when the host gave no strategy —
@@ -536,6 +565,17 @@ export abstract class BaseMcpServer extends McpServer {
               // the request's signal: a cancelled call settles at once.
               const connection = await this.getConnection(signal);
               inUse = connection;
+              // One instance, one connection, one main flow: a call that works
+              // on the instance's connection waits until the call before it
+              // settled, whatever the client sends at once. Entered after the
+              // connection is ready, so concurrent callers still share one
+              // connect() (D32). A background run and a listed long read work
+              // on a connection of their own and take no place in it.
+              const ownConnection =
+                runsInBackground ||
+                (isLongTool(entry.toolDefinition.name) &&
+                  isLongRead(entry.toolDefinition.name, args));
+              if (!ownConnection) leaveFlow = await this.enterMainFlow(signal);
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,
@@ -676,6 +716,7 @@ export abstract class BaseMcpServer extends McpServer {
               };
             } finally {
               if (inUse !== undefined) this.connectionReleased(inUse);
+              leaveFlow?.();
             }
           };
 

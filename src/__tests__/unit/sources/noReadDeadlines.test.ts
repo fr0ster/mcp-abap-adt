@@ -48,7 +48,6 @@ const READS = [
   'src/handlers/enhancement/readonly/handleGetEnhancementImpl.ts',
   'src/handlers/enhancement/readonly/enhancementAvailability.ts',
   'src/handlers/enhancement/readonly/handleGetEnhancements.ts',
-  'src/lib/sessionUtils.ts',
   'src/lib/search-source/sourceReader.ts',
 ];
 
@@ -162,7 +161,7 @@ describe('no built-in deadline on the server reads', () => {
     const reads = scans.flatMap((s) =>
       s.calls.filter((c) => c.callee === 'makeAdtRequest'),
     );
-    // 12 since sessionUtils' two unused stateful helpers left (C15, D56).
+    // sessionUtils' two request helpers left in C15 (D56): 12 calls today.
     expect(reads.length).toBeGreaterThanOrEqual(12);
   });
 

@@ -11,8 +11,10 @@
  * and when the `LOCK` or the `UNLOCK` is refused — the next read is stateless.
  */
 
+import type { StandInRequest } from '../../helpers/adtStandIn';
 import {
   carriesContext,
+  isActivation,
   isLock,
   isStateful,
   isUnlock,
@@ -59,58 +61,86 @@ async function expectTheNextReadStateless(): Promise<void> {
   expect(sent.some(carriesContext)).toBe(false);
 }
 
+/**
+ * Runs a tool and asserts what it opened went out — a window that never
+ * opened would make the next read's check vacuous.
+ */
+async function ran(
+  name: string,
+  args: Record<string, unknown>,
+  opened: (r: StandInRequest) => boolean,
+): Promise<void> {
+  const sent = toolRequests(await s.during(() => s.call(name, args)));
+  expect(sent.filter(opened).length).toBeGreaterThan(0);
+}
+
+const statefulLock = (r: StandInRequest) => isLock(r) && isStateful(r);
+const statefulUnlock = (r: StandInRequest) => isUnlock(r) && isStateful(r);
+const anyRequest = () => true;
+
 it('after a full-binary update', async () => {
-  await s.call('UpdateClass', { class_name: NAME, source_code: SOURCE });
+  await ran(
+    'UpdateClass',
+    { class_name: NAME, source_code: SOURCE },
+    statefulUnlock,
+  );
   await expectTheNextReadStateless();
 });
 
 it('after an update whose UNLOCK is refused', async () => {
   s.standIn.answer(isUnlock, 500);
-  await s.call('UpdateClass', { class_name: NAME, source_code: SOURCE });
+  await ran(
+    'UpdateClass',
+    { class_name: NAME, source_code: SOURCE },
+    statefulUnlock,
+  );
   await expectTheNextReadStateless();
 });
 
 it('after an update whose LOCK is refused', async () => {
   s.standIn.answer(isLock, 403);
-  await s.call('UpdateClass', { class_name: NAME, source_code: SOURCE });
+  await ran(
+    'UpdateClass',
+    { class_name: NAME, source_code: SOURCE },
+    statefulLock,
+  );
   await expectTheNextReadStateless();
 });
 
 it('after an activation', async () => {
-  await s.call('ActivateClass', { class_name: NAME });
+  await ran('ActivateClass', { class_name: NAME }, isActivation);
   await expectTheNextReadStateless();
 });
 
 it('after an activation handed the legacy session arguments', async () => {
-  await s.call('ActivateClass', { class_name: NAME, ...LEGACY });
+  await ran('ActivateClass', { class_name: NAME, ...LEGACY }, isActivation);
   await expectTheNextReadStateless();
 });
 
 it("after compact's HandlerLock, also handed the legacy session arguments", async () => {
-  await s.call('HandlerLock', {
-    object_type: 'CLASS',
-    object_name: NAME,
-    ...LEGACY,
-  });
+  await ran(
+    'HandlerLock',
+    { object_type: 'CLASS', object_name: NAME, ...LEGACY },
+    statefulLock,
+  );
   await expectTheNextReadStateless();
 });
 
 it("after compact's HandlerUnlock, also handed the legacy session arguments", async () => {
   await s.call('HandlerLock', { object_type: 'CLASS', object_name: NAME });
-  await s.call('HandlerUnlock', {
-    object_type: 'CLASS',
-    object_name: NAME,
-    lock_handle: HANDLE,
-    ...LEGACY,
-  });
+  await ran(
+    'HandlerUnlock',
+    { object_type: 'CLASS', object_name: NAME, lock_handle: HANDLE, ...LEGACY },
+    statefulUnlock,
+  );
   await expectTheNextReadStateless();
 });
 
 it('after a check handed the legacy session arguments', async () => {
-  await s.call('HandlerCheckRun', {
-    object_type: 'CLASS',
-    object_name: NAME,
-    ...LEGACY,
-  });
+  await ran(
+    'HandlerCheckRun',
+    { object_type: 'CLASS', object_name: NAME, ...LEGACY },
+    anyRequest,
+  );
   await expectTheNextReadStateless();
 });

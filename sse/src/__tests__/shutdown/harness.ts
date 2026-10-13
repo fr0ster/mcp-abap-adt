@@ -12,6 +12,7 @@ import type { AddressInfo } from 'node:net';
 import * as net from 'node:net';
 import {
   CompositeHandlersRegistry,
+  type IHandlerGroup,
   leftoverSessionEntries,
 } from '@mcp-abap-adt/lib/handlers';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
@@ -80,6 +81,8 @@ export async function sseStand(
   options: {
     shutdownTimeoutMs?: number;
     server?: Partial<SseServerOptions>;
+    /** Groups served beside the probe and shutdown tools. */
+    groups?: IHandlerGroup[];
   } = {},
 ): Promise<SseStand> {
   resetProcessLatchForTests();
@@ -93,6 +96,7 @@ export async function sseStand(
         // With an owner, the leftover-session tools beside the others.
         ...(options.server?.leftoverSessions ? leftoverSessionEntries() : []),
       ]),
+      ...(options.groups ?? []),
     ]),
     {
       host: '127.0.0.1',

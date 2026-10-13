@@ -593,10 +593,6 @@ export function getManagedConnection(): IAbapConnection {
     }
     cachedConfigSignature = signature;
 
-    // Don't call enableStatefulSession during module import - it may trigger connection attempts
-    // Session ID is already set via createAbapConnection() constructor
-    // enableStatefulSession() will be called lazily when first request is made (if needed)
-
     // Don't call connect() here - it will be called lazily on first request
     // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
     // The retry logic in makeAdtRequest will handle connection establishment automatically

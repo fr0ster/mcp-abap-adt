@@ -73,12 +73,12 @@ export const TOOL_DEFINITION = {
       session_id: {
         type: 'string',
         description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
+          "Accepted and ignored: every call runs in the instance's own session.",
       },
       session_state: {
         type: 'object',
         description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+          "Accepted and ignored: every call runs in the instance's own session.",
         properties: {
           cookies: { type: 'string' },
           csrf_token: { type: 'string' },

@@ -1040,24 +1040,25 @@ export const compactValidateSchema = {
     },
     session_id: {
       type: 'string',
-      description: 'Optional ADT session id for stateful validation flow.',
+      description:
+        "Accepted and ignored: every call runs in the instance's own session.",
     },
     session_state: {
       type: 'object',
       description:
-        'Optional ADT session state container (cookies/CSRF) for stateful validation flow.',
+        "Accepted and ignored: every call runs in the instance's own session.",
       properties: {
         cookies: {
           type: 'string',
-          description: 'Serialized Cookie header to reuse server session.',
+          description: 'Accepted and ignored.',
         },
         csrf_token: {
           type: 'string',
-          description: 'CSRF token to reuse server session.',
+          description: 'Accepted and ignored.',
         },
         cookie_store: {
           type: 'object',
-          description: 'Cookie key/value map to reuse server session.',
+          description: 'Accepted and ignored.',
         },
       },
     },
@@ -1075,24 +1076,25 @@ export const compactLockSchema = {
     },
     session_id: {
       type: 'string',
-      description: 'Optional ADT session id for stateful lock flow.',
+      description:
+        "Accepted and ignored: every call runs in the instance's own session.",
     },
     session_state: {
       type: 'object',
       description:
-        'Optional ADT session state container (cookies/CSRF) for stateful lock flow.',
+        "Accepted and ignored: every call runs in the instance's own session.",
       properties: {
         cookies: {
           type: 'string',
-          description: 'Serialized Cookie header to reuse server session.',
+          description: 'Accepted and ignored.',
         },
         csrf_token: {
           type: 'string',
-          description: 'CSRF token to reuse server session.',
+          description: 'Accepted and ignored.',
         },
         cookie_store: {
           type: 'object',
-          description: 'Cookie key/value map to reuse server session.',
+          description: 'Accepted and ignored.',
         },
       },
     },
@@ -1110,24 +1112,25 @@ export const compactUnlockSchema = {
     },
     session_id: {
       type: 'string',
-      description: 'ADT session id used during lock.',
+      description:
+        'Required, and sent on no request: the unlock runs in the instance’s own session.',
     },
     session_state: {
       type: 'object',
       description:
-        'Optional ADT session state container (cookies/CSRF) for stateful unlock flow.',
+        "Accepted and ignored: every call runs in the instance's own session.",
       properties: {
         cookies: {
           type: 'string',
-          description: 'Serialized Cookie header to reuse server session.',
+          description: 'Accepted and ignored.',
         },
         csrf_token: {
           type: 'string',
-          description: 'CSRF token to reuse server session.',
+          description: 'Accepted and ignored.',
         },
         cookie_store: {
           type: 'object',
-          description: 'Cookie key/value map to reuse server session.',
+          description: 'Accepted and ignored.',
         },
       },
     },
@@ -1152,24 +1155,25 @@ export const compactCheckRunSchema = {
     },
     session_id: {
       type: 'string',
-      description: 'Optional ADT session id for stateful check flow.',
+      description:
+        "Accepted and ignored: every call runs in the instance's own session.",
     },
     session_state: {
       type: 'object',
       description:
-        'Optional ADT session state container (cookies/CSRF) for stateful check flow.',
+        "Accepted and ignored: every call runs in the instance's own session.",
       properties: {
         cookies: {
           type: 'string',
-          description: 'Serialized Cookie header to reuse server session.',
+          description: 'Accepted and ignored.',
         },
         csrf_token: {
           type: 'string',
-          description: 'CSRF token to reuse server session.',
+          description: 'Accepted and ignored.',
         },
         cookie_store: {
           type: 'object',
-          description: 'Cookie key/value map to reuse server session.',
+          description: 'Accepted and ignored.',
         },
       },
     },

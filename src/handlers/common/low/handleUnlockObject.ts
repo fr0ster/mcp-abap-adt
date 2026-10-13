@@ -78,12 +78,12 @@ export const TOOL_DEFINITION = {
       session_id: {
         type: 'string',
         description:
-          'Session ID from LockObject operation. Must be the same session.',
+          'Required, and sent on no request: the unlock runs in the instance’s own session.',
       },
       session_state: {
         type: 'object',
         description:
-          'Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+          "Accepted and ignored: every call runs in the instance's own session.",
         properties: {
           cookies: { type: 'string' },
           csrf_token: { type: 'string' },

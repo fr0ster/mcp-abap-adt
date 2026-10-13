@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
   name: 'LockObjectLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
+    '[low-level] Lock an ABAP object for modification. Returns the lock handle the update and the unlock take; the lock stays in the instance’s session until the unlock or the instance’s end.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -75,12 +75,12 @@ export const TOOL_DEFINITION = {
       session_id: {
         type: 'string',
         description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
+          "Accepted and ignored: every call runs in the instance's own session.",
       },
       session_state: {
         type: 'object',
         description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+          "Accepted and ignored: every call runs in the instance's own session.",
         properties: {
           cookies: { type: 'string' },
           csrf_token: { type: 'string' },

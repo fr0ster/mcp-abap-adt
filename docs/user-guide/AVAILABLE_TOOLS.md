@@ -983,7 +983,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getsession-read-only-system"></a>
 #### GetSession (Read-Only / System)
-**Description:** [read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.
+**Description:** [read-only] A new random session ID. It is sent on no request and changes nothing: every call runs in the instance’s own session, and a lock handle stays valid there until its unlock or the instance’s end.
 
 **Source:** `src/handlers/system/readonly/handleGetSession.ts`
 
@@ -2410,7 +2410,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Uses stateful session with proper lock/unlock mechanism.
+**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Locks the group, writes, and unlocks it.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 

@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
   name: 'GetSession',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.',
+    '[read-only] A new random session ID. It is sent on no request and changes nothing: every call runs in the instance’s own session, and a lock handle stays valid there until its unlock or the instance’s end.',
   inputSchema: {
     type: 'object',
     properties: {

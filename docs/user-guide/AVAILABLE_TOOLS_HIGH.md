@@ -1274,7 +1274,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Uses stateful session with proper lock/unlock mechanism.
+**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Locks the group, writes, and unlocks it.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 

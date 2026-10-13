@@ -13,6 +13,7 @@
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
@@ -58,8 +59,8 @@ function shippedGroups(): Array<
   ] as never;
 }
 
-/** A group offering `tool` alone, its handler reading its own group's context. */
-function oneToolGroup(tool: string): IHandlerGroup {
+/** A group offering the shipped `tool` alone, its handler reading its own group's context. */
+export function oneToolGroup(tool: string): IHandlerGroup {
   for (const group of shippedGroups()) {
     const entry = group
       .getHandlers()
@@ -86,6 +87,12 @@ export interface StatefulStand {
   standIn: AdtStandIn;
   /** Calls a tool; settles with its answer. */
   call(name: string, args: Record<string, unknown>): Promise<CallAnswer>;
+  /** Calls a tool the client may cancel through `signal`. */
+  callWith(
+    name: string,
+    args: Record<string, unknown>,
+    signal: AbortSignal,
+  ): Promise<CallAnswer>;
   /** The requests a block of work sent (the handshake left out). */
   during(work: () => Promise<unknown>): Promise<StandInRequest[]>;
   /** The instance's end: its connection's one `disconnect()`, the logoff. */
@@ -93,7 +100,13 @@ export interface StatefulStand {
   close(): Promise<void>;
 }
 
-export async function statefulStand(tools: string[]): Promise<StatefulStand> {
+export async function statefulStand(
+  tools: string[],
+  options: {
+    /** The credential the connection presents; basic by default. */
+    credential?: (basic: IAuthProvider) => IAuthProvider;
+  } = {},
+): Promise<StatefulStand> {
   const standIn = await adtStandIn();
   // A LOCK answers a lock handle and opens the stateful context.
   standIn.body((r) => r.url.includes('_action=LOCK'), LOCK_SUCCESS_XML, {
@@ -101,7 +114,9 @@ export async function statefulStand(tools: string[]): Promise<StatefulStand> {
   });
   const connection = createAbapConnection(
     { url: standIn.url, client: '100', authType: 'basic' },
-    new BasicAuthProvider('STATEFUL_USER', 'stateful-password'),
+    (options.credential ?? ((basic) => basic))(
+      new BasicAuthProvider('STATEFUL_USER', 'stateful-password'),
+    ),
   );
   await connection.connect();
   const server = new EmbeddableMcpServer({
@@ -121,6 +136,13 @@ export async function statefulStand(tools: string[]): Promise<StatefulStand> {
   return {
     standIn,
     call,
+    callWith: (name, args, signal) =>
+      client
+        .callTool({ name, arguments: args }, undefined, {
+          timeout: 60_000,
+          signal,
+        })
+        .then((answer) => answer as CallAnswer),
     during: async (work) => {
       const from = standIn.requests.length;
       await work();

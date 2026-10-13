@@ -912,7 +912,7 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 <a id="getsession-read-only-system"></a>
 #### GetSession (Read-Only / System)
-**Description:** [read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.
+**Description:** [read-only] A new random session ID. It is sent on no request and changes nothing: every call runs in the instance’s own session, and a lock handle stays valid there until its unlock or the instance’s end.
 
 **Source:** `src/handlers/system/readonly/handleGetSession.ts`
 

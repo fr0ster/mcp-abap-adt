@@ -2,7 +2,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
   logger,
-  makeAdtRequestWithTimeout,
+  makeAdtRequest,
   return_error,
 } from '../../../lib/utils';
 import { enhancementTypeOf, notThroughAdt } from './enhancementAvailability';
@@ -144,11 +144,12 @@ export async function handleGetEnhancementSpot(
 
     logger?.info(`Enhancement spot URL: ${url}`);
 
-    const response = await makeAdtRequestWithTimeout(
+    const response = await makeAdtRequest(
       connection,
       url,
       'GET',
-      'default',
+      // No deadline of the server's: the request waits for SAP's answer.
+      0,
       {
         Accept: 'application/vnd.sap.adt.enhancements.v1+xml',
       },

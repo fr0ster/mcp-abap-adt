@@ -73,7 +73,8 @@ export async function handleGetObjectNodeFromCache(
     };
     try {
       const endpoint = buildEndpoint(node.OBJECT_URI);
-      const resp = await makeAdtRequest(connection, endpoint, 'GET', 15000);
+      // No deadline of the server's: the request waits for SAP's answer.
+      const resp = await makeAdtRequest(connection, endpoint, 'GET', 0);
       node.object_uri_response =
         typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
 

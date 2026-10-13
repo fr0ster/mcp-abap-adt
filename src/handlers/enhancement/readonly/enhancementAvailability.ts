@@ -1,5 +1,5 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { makeAdtRequestWithTimeout } from '../../../lib/utils';
+import { makeAdtRequest } from '../../../lib/utils';
 
 /**
  * Enhancement types ADT does not expose. Eclipse ADT opens each in SAP GUI, and
@@ -35,11 +35,12 @@ export async function enhancementTypeOf(
   objectType: 'ENHO' | 'ENHS',
 ): Promise<string | undefined> {
   try {
-    const response = await makeAdtRequestWithTimeout(
+    const response = await makeAdtRequest(
       connection,
       `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodeURIComponent(name)}&maxResults=20&objectType=${objectType}`,
       'GET',
-      'default',
+      // No deadline of the server's: the request waits for SAP's answer.
+      0,
       undefined,
       undefined,
       { Accept: 'application/xml' },

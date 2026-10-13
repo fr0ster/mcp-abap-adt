@@ -17,7 +17,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  makeAdtRequestWithTimeout,
+  makeAdtRequest,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -211,11 +211,12 @@ export async function handleGetTransport(
     logger?.debug(`GET from: ${url}`);
 
     // Get transport request
-    const response = await makeAdtRequestWithTimeout(
+    const response = await makeAdtRequest(
       connection,
       url,
       'GET',
-      'default',
+      // No deadline of the server's: the request waits for SAP's answer.
+      0,
       undefined,
       undefined,
       headers,

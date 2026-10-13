@@ -349,7 +349,7 @@ describe('GetEnhancements', () => {
   /**
    * Not `refusingClient`: the required-args path (`object_name`,
    * `object_type`, no `include_nested`) never builds an adt-clients object at
-   * all — it goes through `makeAdtRequestWithTimeout`, which calls
+   * all — it goes through `makeAdtRequest`, which calls
    * `connection.makeAdtRequest` on the raw connection. A `connection` with no
    * such method is this family's equivalent of a refusal: the resulting
    * message reaches the caller, but as plain text (this handler's own

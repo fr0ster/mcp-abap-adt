@@ -2,7 +2,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
-import { encodeSapObjectName, makeAdtRequestWithTimeout } from '../utils';
+import { encodeSapObjectName, makeAdtRequest } from '../utils';
 import type { EnumeratedObject, ScanObjectType } from './packageEnumerator';
 
 export type SourceVersion = 'active' | 'inactive';
@@ -177,7 +177,7 @@ export function createSourceReaderDeps(
       return r.ok ? r.getResult().value : null;
     },
     async readInclude(includeName) {
-      const r = await makeAdtRequestWithTimeout(
+      const r = await makeAdtRequest(
         ctx.connection,
         `/sap/bc/adt/programs/includes/${encodeSapObjectName(includeName)}/source/main`,
         'GET',
@@ -200,7 +200,7 @@ export function createSourceReaderDeps(
       return r.ok ? parseFugrChildrenFromXml(r.getResult().value) : [];
     },
     async readFugrFm(fugrName, fmName) {
-      const r = await makeAdtRequestWithTimeout(
+      const r = await makeAdtRequest(
         ctx.connection,
         `/sap/bc/adt/functions/groups/${encodeSapObjectName(fugrName.toLowerCase())}/fmodules/${encodeSapObjectName(fmName.toLowerCase())}/source/main`,
         'GET',

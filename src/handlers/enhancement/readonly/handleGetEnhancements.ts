@@ -6,7 +6,7 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 import {
   encodeSapObjectName,
   logger,
-  makeAdtRequestWithTimeout,
+  makeAdtRequest,
   return_error,
 } from '../../../lib/utils';
 
@@ -241,11 +241,12 @@ async function determineObjectTypeAndPath(
     unreadable.length > 0 ? { ...path, unreadable } : path;
   const probe = async (url: string, accept: string) => {
     try {
-      const response = await makeAdtRequestWithTimeout(
+      const response = await makeAdtRequest(
         connection,
         url,
         'GET',
-        'csrf',
+        // No deadline of the server's: the request waits for SAP's answer.
+        0,
         undefined,
         undefined,
         { Accept: accept },
@@ -387,25 +388,16 @@ async function getIncludesListInternal(
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils(ourUtils);
 
-    // Step 1: Get root node structure to find the includes node (with timeout)
-    const rootResponse = await Promise.race([
-      utils.fetchNodeStructure(parentType, parentName, {
+    // Step 1: Get root node structure to find the includes node
+    const rootResponse = await utils.fetchNodeStructure(
+      parentType,
+      parentName,
+      {
         analyse: analyseException,
         nodeId: '000000', // Root node
         withShortDescriptions: true,
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Timeout: Failed to get root node structure for ${objectName} within 10000ms`,
-              ),
-            ),
-          10000,
-        ),
-      ),
-    ]);
+      },
+    );
 
     if (!rootResponse.ok) {
       logger?.warn(
@@ -426,25 +418,16 @@ async function getIncludesListInternal(
       return [];
     }
 
-    // Step 3: Get includes list using the found node ID (with timeout)
-    const includesResponse = await Promise.race([
-      utils.fetchNodeStructure(parentType, parentName, {
+    // Step 3: Get includes list using the found node ID
+    const includesResponse = await utils.fetchNodeStructure(
+      parentType,
+      parentName,
+      {
         analyse: analyseException,
         nodeId: includesNode.nodeId,
         withShortDescriptions: true,
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Timeout: Failed to get includes list for ${objectName} within 10000ms`,
-              ),
-            ),
-          10000,
-        ),
-      ),
-    ]);
+      },
+    );
 
     if (!includesResponse.ok) {
       logger?.warn(`Refused while fetching includes list for ${objectName}`);
@@ -510,11 +493,12 @@ async function getEnhancementsForSingleObject(
 
   // Name the object in a failure: with the type taken from the caller there
   // is no probe in front of this request to have said which object it was.
-  const response = await makeAdtRequestWithTimeout(
+  const response = await makeAdtRequest(
     connection,
     url,
     'GET',
-    'default',
+    // No deadline of the server's: the request waits for SAP's answer.
+    0,
   ).catch((error: unknown) => {
     throw new EnhancementInputError(
       `Failed to retrieve enhancements for ${objectName}: ${error instanceof Error ? error.message : String(error)}`,
@@ -607,7 +591,6 @@ function filterMinimalEnhancements(response: any): any {
  *   - program: Optional manual program context for includes
  *   - include_nested: Optional boolean - if true, also searches enhancements in all nested includes
  *   - detailed: Optional boolean - if false (default), returns minimal info; if true, returns full details including raw XML
- *   - timeout: Optional timeout in milliseconds for each ADT request (default: 30000ms = 30s)
  *   - max_includes: Optional maximum number of includes to process (default: 50)
  * @returns Response with parsed enhancement data or error
  */
@@ -628,8 +611,6 @@ export async function handleGetEnhancements(
     const includeNested = args.include_nested === true; // Optional boolean for recursive include search
     const isDetailed = args.detailed === true; // Optional boolean for detailed output
 
-    // Simple timeout logic: one timeout for all ADT requests
-    const requestTimeout = args.timeout ? parseInt(args.timeout, 10) : 30000; // Timeout for each ADT request (default: 30s)
     const maxIncludes = args.max_includes
       ? parseInt(args.max_includes, 10)
       : 50; // Maximum number of includes to process
@@ -637,7 +618,6 @@ export async function handleGetEnhancements(
     logger?.info(`Getting enhancements for object: ${objectName}`, {
       manualProgram: manualProgram || '(not provided)',
       includeNested: includeNested,
-      requestTimeout: requestTimeout,
       maxIncludes: maxIncludes,
     });
 
@@ -690,10 +670,10 @@ export async function handleGetEnhancements(
         includesList,
       );
 
-      // Limit the number of includes to process to avoid timeout
+      // Limit the number of includes to process
       if (includesList.length > maxIncludes) {
         logger?.warn(
-          `Too many includes found (${includesList.length}). Limiting to first ${maxIncludes} includes to avoid timeout.`,
+          `Too many includes found (${includesList.length}). Limiting to first ${maxIncludes} includes.`,
         );
         includesList = includesList.slice(0, maxIncludes);
       }
@@ -703,23 +683,17 @@ export async function handleGetEnhancements(
         mainEnhancementResponse,
       ];
 
-      // Simple sequential processing with individual timeouts
+      // Sequential processing. No deadline of the server's: each read waits
+      // for SAP's answer.
       for (const includeName of includesList) {
         try {
           logger?.info(`Getting enhancements for include: ${includeName}`);
 
-          // Create a promise with individual timeout for each include
-          const includeEnhancementsPromise = getEnhancementsForSingleObject(
+          const includeEnhancements = await getEnhancementsForSingleObject(
             connection,
             includeName,
             manualProgram,
             'include',
-          );
-
-          const includeEnhancements = await createPromiseWithTimeout(
-            includeEnhancementsPromise,
-            requestTimeout,
-            `Timeout: Failed to get enhancements for include ${includeName} within ${requestTimeout}ms`,
           );
 
           allEnhancementResponses.push(includeEnhancements);
@@ -735,15 +709,11 @@ export async function handleGetEnhancements(
       return allEnhancementResponses;
     };
 
-    // Execute nested processing without total timeout - each request has its own timeout
     let allEnhancementResponses: EnhancementResponse[];
     try {
       allEnhancementResponses = await processNestedIncludes();
     } catch (error) {
-      logger?.error(
-        'Nested enhancement processing failed or timed out:',
-        error,
-      );
+      logger?.error('Nested enhancement processing failed:', error);
       // Return partial results with just the main object
       const fallbackResult = {
         content: [
@@ -808,40 +778,4 @@ export async function handleGetEnhancements(
   } catch (error) {
     return return_error(error);
   }
-}
-
-/**
- * Creates a promise with timeout that properly cleans up the timeout when the promise resolves
- * @param promise - The promise to wrap with timeout
- * @param timeoutMs - Timeout in milliseconds
- * @param errorMessage - Error message to use when timeout occurs
- * @returns Promise that resolves with the original promise result or rejects with timeout error
- */
-function createPromiseWithTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  errorMessage: string,
-): Promise<T> {
-  let timeoutId: NodeJS.Timeout;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error(errorMessage));
-    }, timeoutMs);
-  });
-
-  return Promise.race([
-    promise
-      .then((result) => {
-        // Clear timeout when main promise resolves successfully
-        clearTimeout(timeoutId);
-        return result;
-      })
-      .catch((error) => {
-        // Clear timeout when main promise rejects
-        clearTimeout(timeoutId);
-        throw error;
-      }),
-    timeoutPromise,
-  ]);
 }

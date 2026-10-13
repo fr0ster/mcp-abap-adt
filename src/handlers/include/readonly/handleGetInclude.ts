@@ -2,7 +2,7 @@ import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
-  makeAdtRequestWithTimeout,
+  makeAdtRequest,
   return_error,
 } from '../../../lib/utils';
 
@@ -29,11 +29,12 @@ export async function handleGetInclude(context: HandlerContext, args: any) {
     }
     const url = `/sap/bc/adt/programs/includes/${encodeSapObjectName(args.include_name)}/source/main`;
     logger?.info(`Fetching include: ${args.include_name}`);
-    const response = await makeAdtRequestWithTimeout(
+    const response = await makeAdtRequest(
       connection,
       url,
       'GET',
-      'default',
+      // No deadline of the server's: the request waits for SAP's answer.
+      0,
     );
     const plainText = response.data;
     logger?.info(`✅ GetInclude completed: ${args.include_name}`);

@@ -32,7 +32,7 @@
 import * as crypto from 'node:crypto';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AxiosResponse } from 'axios';
-import { makeAdtRequestWithTimeout } from './utils';
+import { makeAdtRequest } from './utils';
 
 /**
  * Generate unique session ID for ADT stateful operations
@@ -68,7 +68,7 @@ export function generateRequestId(): string {
 /**
  * Make ADT request with stateful session management
  *
- * This is a wrapper around makeAdtRequestWithTimeout that automatically adds
+ * This is a wrapper around makeAdtRequest that automatically adds
  * the required headers for stateful ADT operations:
  * - sap-adt-connection-id: Session identifier (must be same for all requests)
  * - sap-adt-request-id: Request identifier (must be unique for each request)
@@ -143,12 +143,13 @@ export async function makeAdtRequestWithSession(
     ...additionalHeaders, // Merge any custom headers
   };
 
-  // Make request using standard timeout handling
-  return makeAdtRequestWithTimeout(
+  // No deadline of the server's: the request waits for SAP's answer.
+  return makeAdtRequest(
     connection,
     fullUrl,
     method,
-    'default',
+    // No deadline of the server's: the request waits for SAP's answer.
+    0,
     data,
     undefined,
     headers,
@@ -187,11 +188,12 @@ export async function makeAdtRequestStateless(
     ...additionalHeaders,
   };
 
-  return makeAdtRequestWithTimeout(
+  return makeAdtRequest(
     connection,
     fullUrl,
     method,
-    'default',
+    // No deadline of the server's: the request waits for SAP's answer.
+    0,
     data,
     undefined,
     headers,

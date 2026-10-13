@@ -5,7 +5,7 @@
  * - /sap/bc/adt/ddic/dataelements/{name}
  * - /sap/bc/adt/ddic/tabletypes/{name}
  * - /sap/bc/adt/repository/informationsystem/objectproperties/values
- * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ * This handler uses makeAdtRequest directly and should be moved to adt-clients infrastructure module
  */
 
 import { XMLParser } from 'fast-xml-parser';
@@ -13,7 +13,7 @@ import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
-  makeAdtRequestWithTimeout,
+  makeAdtRequest,
   return_error,
 } from '../../../lib/utils';
 
@@ -141,11 +141,12 @@ async function tryLookup(
   parseFn: (xml: string) => any,
 ): Promise<LookupResult> {
   try {
-    const response = await makeAdtRequestWithTimeout(
+    const response = await makeAdtRequest(
       connection,
       url,
       'GET',
-      'default',
+      // No deadline of the server's: the request waits for SAP's answer.
+      0,
     );
     if (!hasUsableResult(response?.data)) {
       return { status: 'not_found_or_empty' };

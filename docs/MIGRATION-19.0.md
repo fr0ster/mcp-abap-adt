@@ -89,6 +89,12 @@ the debugger. A session is stateful only for lock → write → unlock and activ
 - No listed tool's request carries a deadline of the server's any more: `SearchSource`'s source
   reads (45 s each) and `HandlerGet`'s preview-URL read (30 s) are gone. `SearchSource` keeps
   `time_budget_ms` (partial hits) beside `timeout`.
+- **No read off the list carries a deadline of the server's either.** `GetInclude`,
+  `GetTransport`, `GetTypeInfo`, `GetEnhancementSpot`, `GetEnhancementImpl`, `GetEnhancements` and
+  `GetObjectNodeFromCache` bounded their requests at 45 s (`SAP_TIMEOUT_DEFAULT`), 15 s or 10 s;
+  they now wait for SAP's answer. `GetEnhancements` no longer reads its undeclared `timeout`
+  argument (30 s per include): a slow include is no longer skipped. A bound on the wait is the
+  client's own.
 - On an embedded server given a connection without `freshConnection`, a listed read is refused:
   "This operation needs an ABAP session of its own; the connection was given by the host, which
   supplied no fresh-connection factory (`freshConnection`)".

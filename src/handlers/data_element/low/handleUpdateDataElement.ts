@@ -44,7 +44,6 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
-  restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -142,13 +141,8 @@ export async function handleUpdateDataElement(
 ) {
   const { connection, logger } = context;
   try {
-    const {
-      data_element_name,
-      properties,
-      lock_handle,
-      session_id,
-      session_state,
-    } = args as UpdateDataElementArgs;
+    const { data_element_name, properties, lock_handle, session_id } =
+      args as UpdateDataElementArgs;
 
     if (!data_element_name || !properties || !lock_handle) {
       return return_error(
@@ -163,10 +157,6 @@ export async function handleUpdateDataElement(
     const dataElementName = data_element_name.toUpperCase();
 
     logger?.info(`Starting data element update: ${dataElementName}`);
-
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
 
     const transportRequest =
       properties.transport_request || properties.transportRequest;

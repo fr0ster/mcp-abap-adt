@@ -12,7 +12,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateFunctionModuleLow',
@@ -68,22 +68,13 @@ export async function handleActivateFunctionModule(
   args: ActivateFunctionModuleArgs,
 ) {
   const { connection, logger } = context;
-  const {
-    function_module_name,
-    function_group_name,
-    session_id,
-    session_state,
-  } = args;
+  const { function_module_name, function_group_name } = args;
 
   if (!function_module_name) {
     return return_error(new Error('function_module_name is required'));
   }
   if (!function_group_name) {
     return return_error(new Error('function_group_name is required'));
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const functionModuleName = function_module_name.toUpperCase();

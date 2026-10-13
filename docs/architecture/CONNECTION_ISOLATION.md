@@ -18,7 +18,7 @@ In previous versions, the server used a global connection cache that could be ov
 
 A connection belongs to the `BaseMcpServer` instance that built it, and that instance belongs to one session or one request:
 
-- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built on the first tool call and kept while the destination's provider is the same one (D13).
+- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built on the first tool call and kept for the instance's life (D13 as amended by D56): a new provider the broker builds does not reopen it; only a session SAP already lost does.
 - **SSE** (`@mcp-abap-adt/sse`): one instance per SSE connection, its credential from the `GET` that opened it.
 - **HTTP (streamable)** (`@mcp-abap-adt/http`): one instance per request, or the pooled one its `state_handle` names; either way the request's own headers give its credential, so a request never sees another request's.
 
@@ -44,7 +44,7 @@ Values that belong to one request, such as the master language of created object
 
 #### 3. Connection construction
 
-`BaseMcpServer.getConnection(signal)` resolves the source, then builds the connector in one place (`src/lib/connectionFactory.ts`) from the settings and credential, and calls `connect()` — once per credential object: kept while the source answers the same one, built anew for a new one. The factory builds no credential from `settings.authType`.
+`BaseMcpServer.getConnection(signal)` resolves the source, then builds the connector in one place (`src/lib/connectionFactory.ts`) from the settings and credential, and calls `connect()` — once per credential object: kept while the source answers the same one, built anew for a new one (http, sse). stdio's source keeps its connection (`keepsConnection`): a new provider does not replace it, and a session SAP already lost is replaced with the provider that call resolved. The factory builds no credential from `settings.authType`.
 
 ### Session Lifecycle
 
@@ -53,6 +53,27 @@ Values that belong to one request, such as the master language of created object
 3. **Connection Creation**: the first tool call resolves the source and builds and connects the connector
 4. **Renewal**: a `401` is put to the credential (`rejected`); a renewed token gets the request one more attempt. A header credential is fixed: nothing renews it
 5. **Shutdown**: on `SIGTERM`/`SIGINT` the transport stops accepting; core's factory waits for provider calls in flight and flushes its broker
+
+### The stateful window
+
+A tool's session is stateful only for **lock → write → unlock and activation**
+(D56); everything else runs stateless. On the wire today (adt-clients 31.1) that is
+narrower still: the `LOCK` and the `UNLOCK`, each a request of its own, are sent
+stateful, and adt-clients sets the connection back to stateless in a `finally`
+whatever the request answered; the write under the lock and the activation go
+stateless. The server sets no tool's session stateful (`tools/stateful-sites.json`).
+Compact's `HandlerLock` leaves the lock in the session until `HandlerUnlock` (the
+consumer's choice), with every call between them stateless; the instance's logoff
+ends it at the latest.
+
+- **A cancel does nothing to SAP**: no logoff, no new session; the started tool runs
+  to its end.
+- **A reopen only when SAP lost the session**: stdio never replaces its connection
+  for a new provider; a lock held in the session would be left behind, or collide
+  with the next one.
+- **One connection, one session type**: the session type is the connection's while
+  a `LOCK` or `UNLOCK` is in flight, so two calls at once on one connection (stdio)
+  can cross. Write tools are called one at a time.
 
 ### Benefits
 

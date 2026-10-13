@@ -41,7 +41,19 @@ export interface ConnectionSource {
  * an embedder and used as given (no `resolve`, no `connect()`, no wrap).
  */
 export type Source =
-  | { kind: 'built'; source: ConnectionSource }
+  | {
+      kind: 'built';
+      source: ConnectionSource;
+      /**
+       * Whether the connection is kept for the instance's life (stdio, D13 as
+       * amended by D56): a new credential the source answers does not replace
+       * it — a reopen would leave the old session's locks behind — and only a
+       * session SAP already lost does, with the credential that call resolved.
+       * Absent: a new credential object builds a new connection (http and sse,
+       * where the credential is the request's).
+       */
+      keepsConnection?: boolean;
+    }
   | { kind: 'injected'; connection: AbapConnection };
 
 /**

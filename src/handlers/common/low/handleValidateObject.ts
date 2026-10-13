@@ -40,7 +40,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseValidation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateObjectLow',
@@ -190,8 +190,6 @@ export async function handleValidateObject(
     implementation_type,
     super_package,
     superclass,
-    session_id,
-    session_state,
   } = args as ValidateObjectArgs;
 
   if (!object_name || !object_type) {
@@ -263,10 +261,6 @@ export async function handleValidateObject(
     }
     functionGroupName = group;
     functionModuleName = module;
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const objectName = object_name.toUpperCase();

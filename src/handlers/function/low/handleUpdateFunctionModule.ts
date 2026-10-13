@@ -18,7 +18,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionModuleLow',
@@ -103,8 +103,6 @@ export async function handleUpdateFunctionModule(
     source_code,
     transport_request,
     lock_handle,
-    session_id,
-    session_state,
   } = args;
 
   if (
@@ -118,10 +116,6 @@ export async function handleUpdateFunctionModule(
         'function_module_name, function_group_name, source_code, and lock_handle are required',
       ),
     );
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const functionModuleName = function_module_name.toUpperCase();

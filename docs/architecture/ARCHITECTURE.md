@@ -188,7 +188,7 @@ Adding an authentication means a handler there, a row in this table and a test; 
 
 **Key capabilities:**
 - CSRF token management (automatic fetch, cache, refresh on error)
-- Stateful/stateless session switching via `sap-contextid` headers
+- Stateful or stateless per request: while the connection's session type is stateful (adt-clients sets it around one `LOCK` or one `UNLOCK`), a request goes with `x-sap-adt-sessiontype: stateful` and the `sap-contextid` context cookie over HTTP, or in the stateful conversation over RFC; every other request goes stateless, without the context cookie
 - Cookie management for session persistence
 - A `401` the wire's own recovery cannot clear is put to the credential (`rejected`); if it answers Ok (a renewed token), the request gets one more attempt
 - The HTTPS server certificate verified by default (connection 11); `TLS_REJECT_UNAUTHORIZED=0` or `NODE_TLS_REJECT_UNAUTHORIZED=0` in the process environment opts out, `NODE_EXTRA_CA_CERTS` adds a CA
@@ -252,13 +252,13 @@ interface ConnectionSource {
   resolve(signal: AbortSignal): Promise<{ settings: SapConfig; credential: IAuthProvider; systemContext? }>;
 }
 type Source =
-  | { kind: 'built'; source: ConnectionSource }        // core: a destination; http, sse: the headers
+  | { kind: 'built'; source: ConnectionSource; keepsConnection?: boolean } // core: a destination (kept); http, sse: the headers
   | { kind: 'injected'; connection: AbapConnection };  // embedded: the consumer's, used as given
 ```
 
 | Package | Source | Connection |
 |:---|:---|:---|
-| core (stdio) | `destinationSource(destination, factory)`: `settingsFor`, `getProvider(destination, { signal })`, `systemContextFor` | kept while `getProvider` answers the same provider; a new one for a new provider |
+| core (stdio) | `destinationSource(destination, factory)`: `settingsFor`, `getProvider(destination, { signal })`, `systemContextFor` | kept for the instance's life (`keepsConnection`): a new provider from `getProvider` does not reopen it; replaced only when SAP already lost the session, then built with the provider that call resolved |
 | http | `headerSource(req.headers)` per request, on a new instance or the pooled one its `state_handle` names | one per request |
 | sse | `headerSource` of the `GET` that opened the connection | one per SSE connection |
 | embedder | `{ kind: 'injected', connection }` (`EmbeddableMcpServer`) | the consumer's, never connected or wrapped |
@@ -266,6 +266,42 @@ type Source =
 The dependency rule is a test (`src/__tests__/unit/packages/dependencyRule.test.ts`): the published
 lib, http and sse declare and reach no broker, stores or `interfaces-auth-broker`; http and sse
 never reach each other.
+
+#### The stateful window (D56)
+
+A tool's session is stateful only for the lock and the unlock (and, as decided,
+activation): the window D56 allows is **lock → write → unlock and activation**, and
+everything else runs stateless. What goes stateful on the wire today is narrower,
+and it is adt-clients' (31.1), not the server's: the `LOCK` alone and the `UNLOCK`
+alone, each inside `inStatefulSession` or a `try`/`finally` that sets the connection
+back to stateless whatever the request answered. The write under the lock goes
+stateless and outside the lock's context, as Eclipse sends it (the lock handle
+carries it); an activation goes stateless. The server itself turns no tool's
+session stateful: its one stateful site is the debugger's own session
+(`src/lib/debugger/ports.ts`), and the listed long tools and background runs set
+their own fresh connections stateless. Every site is a row of
+`tools/stateful-sites.json` with the window it opens and where it returns to
+stateless; `src/__tests__/unit/sources/statefulSites.test.ts` holds the scan of
+the server's sources and adt-clients' installed `dist` equal to it.
+
+- **Compact's `HandlerLock`** leaves the window open across calls until
+  `HandlerUnlock` — the consumer's choice: the lock's ABAP context stays in the
+  session (its `sap-contextid` cookie is kept), the calls between run stateless and
+  outside it, and the `UNLOCK` reaches it. At the latest the instance's logoff ends
+  it: a logoff releases the session's locks.
+- **A cancel does nothing to SAP.** A started tool runs to its end; nothing is
+  logged off and no session is reopened because a request was cancelled.
+- **A reopen only when SAP already lost the session.** stdio keeps its connection
+  for the instance's life; http builds one per request (a pooled instance too, from
+  that request's headers), sse one per SSE connection.
+- **A shared connection's session type is the connection's.** adt-clients
+  switches it with `setSessionType` around the request, and the connection reads it
+  when the request is built — after an `await`. Two tool calls running at once on
+  one connection (stdio's kept one; HTTP serves one request at a time per instance)
+  can therefore cross: a read sent while another call's `LOCK` is in flight goes
+  stateful (seen against the stand-in), and, read from the code, an `UNLOCK` whose
+  request is built after another call's window closed would go stateless. Write tools are to be called one at a time (Known
+  Limitations).
 
 #### Composition Roots
 
@@ -728,7 +764,7 @@ For troubleshooting:
 MCP tool calls that modify SAP objects (Create, Update, Delete) must be executed **sequentially**, not in parallel. Each MCP server instance uses a single ABAP connection with one CSRF token and one HTTP session. Parallel write operations cause:
 
 - **CSRF token conflicts** -- SAP ties CSRF tokens to HTTP sessions; concurrent requests invalidate each other's tokens.
-- **Session type race conditions** -- lock/unlock operations toggle the connection between stateful and stateless modes; concurrent toggles corrupt session state.
+- **Session type race conditions** -- the session type is the connection's, set by adt-clients around a `LOCK` or an `UNLOCK` and read when a request is built: a read running while another call's `LOCK` is in flight goes stateful (seen against the stand-in), and, from the code, an `UNLOCK` built after another call's window closed would go stateless and release nothing ("The stateful window").
 - **Lock conflicts** -- SAP DDIC objects support only one lock per object; parallel locks on the same object will fail.
 
 Read-only operations (Read*, Search*, Get*) are safe to call in any order since they don't require CSRF tokens or session state changes.

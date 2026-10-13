@@ -347,7 +347,9 @@ export abstract class BaseMcpServer extends McpServer {
    * no `resolve`, no `connect()`, no wrap. Built: the source resolves the
    * settings and the credential with the request's `signal` (its own waits
    * race it), and the connection is built and connected once per credential
-   * object — kept while the source answers the same one (D13). The credential
+   * object — kept while the source answers the same one (D13); a source that
+   * keeps its connection (`keepsConnection`, stdio) keeps it for the
+   * instance's life, replaced only when SAP already lost the session. The credential
    * renews itself (a 401 reaches its `rejected()`), so nothing is looked up
    * here for refreshing.
    *
@@ -374,14 +376,20 @@ export abstract class BaseMcpServer extends McpServer {
     throwIfRequestAborted(signal);
     const resolved = await context.source.resolve(signal);
     let held = this.built;
+    const newCredential =
+      held !== undefined &&
+      held.credential !== resolved.credential &&
+      context.keepsConnection !== true;
     if (
       !held ||
-      held.credential !== resolved.credential ||
+      newCredential ||
       (held.ready !== undefined && isSpent(held.ready))
     ) {
-      // A new credential, or a session SAP already lost (D56): the
-      // connection is replaced, and the replaced one ends with its logoff —
-      // once no call works on it any more (spec §6.4).
+      // A new credential where the source's credential is the request's (http,
+      // sse), or a session SAP already lost (D56): the connection is
+      // replaced, and the replaced one ends with its logoff — once no call
+      // works on it any more (spec §6.4). A source that keeps its connection
+      // (stdio) is never reopened for a new credential (D13).
       if (held) this.retire(held);
       held = this.buildConnection(
         resolved.credential,

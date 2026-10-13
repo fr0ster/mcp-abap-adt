@@ -14,7 +14,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckClassLow',
@@ -78,13 +78,7 @@ export async function handleCheckClass(
   args: CheckClassArgs,
 ) {
   const { connection, logger } = context;
-  const {
-    class_name,
-    version = 'active',
-    source_code,
-    session_id,
-    session_state,
-  } = args;
+  const { class_name, version = 'active', source_code } = args;
 
   if (!class_name) {
     return return_error(new Error('class_name is required'));
@@ -94,10 +88,6 @@ export async function handleCheckClass(
     version && ['active', 'inactive'].includes(version.toLowerCase())
       ? (version.toLowerCase() as 'active' | 'inactive')
       : 'active';
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
-  }
 
   const className = class_name.toUpperCase();
   const detail = detailOf(args);

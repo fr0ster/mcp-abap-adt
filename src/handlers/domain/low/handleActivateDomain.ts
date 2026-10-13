@@ -12,7 +12,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateDomainLow',
@@ -63,14 +63,10 @@ export async function handleActivateDomain(
   args: ActivateDomainArgs,
 ) {
   const { connection, logger } = context;
-  const { domain_name, session_id, session_state } = args;
+  const { domain_name } = args;
 
   if (!domain_name) {
     return return_error(new Error('domain_name is required'));
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const domainName = domain_name.toUpperCase();

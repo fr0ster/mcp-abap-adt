@@ -19,7 +19,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateStructureLow',
@@ -87,17 +87,12 @@ export async function handleUpdateStructure(
   args: UpdateStructureArgs,
 ) {
   const { connection, logger } = context;
-  const { structure_name, ddl_code, lock_handle, session_id, session_state } =
-    args;
+  const { structure_name, ddl_code, lock_handle } = args;
 
   if (!structure_name || !ddl_code || !lock_handle) {
     return return_error(
       new Error('structure_name, ddl_code, and lock_handle are required'),
     );
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const structureName = structure_name.toUpperCase();

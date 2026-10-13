@@ -31,7 +31,6 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
-  restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -101,7 +100,7 @@ export async function handleUpdateDomain(
 ) {
   const { connection, logger } = context;
   try {
-    const { domain_name, properties, lock_handle, session_id, session_state } =
+    const { domain_name, properties, lock_handle, session_id } =
       args as UpdateDomainArgs;
 
     // Validation
@@ -116,11 +115,6 @@ export async function handleUpdateDomain(
     const domainName = domain_name.toUpperCase();
 
     logger?.info(`Starting domain update: ${domainName}`);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
 
     // `properties` always took both spellings, the same fallback
     // `UpdateDataElementLow`'s own `transportRequest` reads out of its

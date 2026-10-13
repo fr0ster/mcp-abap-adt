@@ -33,7 +33,7 @@ import { connectionForPackageLock } from '../../../lib/packageSessions';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'LockObjectLow',
@@ -126,7 +126,7 @@ export async function handleLockObject(
   args: LockObjectArgs,
 ) {
   const { connection, logger } = context;
-  const { object_name, object_type, super_package, session_id, session_state } =
+  const { object_name, object_type, super_package, session_id } =
     args as LockObjectArgs;
 
   if (!object_name || !object_type) {
@@ -161,10 +161,6 @@ export async function handleLockObject(
     return return_error(
       new Error('super_package is required for package locking.'),
     );
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const desiredSessionId = session_id || generateSessionId();

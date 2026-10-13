@@ -19,7 +19,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateTableLow',
@@ -87,23 +87,12 @@ export async function handleUpdateTable(
   args: UpdateTableArgs,
 ) {
   const { connection, logger } = context;
-  const {
-    table_name,
-    ddl_code,
-    lock_handle,
-    transport_request,
-    session_id,
-    session_state,
-  } = args;
+  const { table_name, ddl_code, lock_handle, transport_request } = args;
 
   if (!table_name || !ddl_code || !lock_handle) {
     return return_error(
       new Error('table_name, ddl_code, and lock_handle are required'),
     );
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const tableName = table_name.toUpperCase();

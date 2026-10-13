@@ -11,9 +11,11 @@
  * caller settles at once while the work runs on for the others, and a late
  * rejection is handled.
  *
- * The server keeps no provider: lib's server keeps its connection while this
- * answers the same provider object and builds a new one when it answers a
- * new provider (D13).
+ * The server keeps no provider, and stdio's instance keeps its connection
+ * for its life (D13 as amended by D56, `keepsConnection`): a new provider
+ * this answers — the broker builds one when what its build read changed —
+ * does not reopen it; only a session SAP already lost does, built with the
+ * provider that call resolved.
  */
 
 import {

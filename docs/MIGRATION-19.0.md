@@ -293,6 +293,26 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
 - **No session of its own to be had** — an embedded server given a connection without
   `freshConnection` — refuses the start with the fresh-connection words, as the listed long reads.
 
+## Every transport: a tool's session is stateful only for lock → write → unlock and activation
+
+A tool's ABAP session is stateful only for **lock → write → unlock and activation**; everything
+else runs stateless. On the wire that is the `LOCK` and the `UNLOCK` (adt-clients 31.1): the write
+under the lock and the activation go stateless, as Eclipse sends them. Nothing a tool does leaves
+the connection stateful after its window, so the next call — a read, a search, a run — never runs
+inside another call's lock session.
+
+- **`session_id` / `session_state` change nothing any more.** The tools that took them
+  (compact `HandlerLock`, `HandlerUnlock`, `HandlerValidate`, `HandlerCheckRun`, the `Activate*`
+  and `Check*` tools, `GetNodeStructure`, …) used to switch the shared connection to stateful for
+  every request that followed, and left it so. They still accept the arguments and ignore them;
+  `HandlerLock` still answers a `session_id` and `HandlerUnlock` still requires one, but it is sent
+  on no request. Nothing for you to change: a lock and its unlock meet in the instance's own
+  session.
+- **Compact `HandlerLock` keeps the lock until `HandlerUnlock`**, your choice: the calls in between
+  are stateless, and the instance's end (its logoff) releases a lock you never unlocked.
+- **The debugger's sessions are its own**, stateful for their life, and end with the debug session.
+- Every site that turns a session type is listed in `tools/stateful-sites.json`.
+
 ## The low set leaves the full binaries
 
 **`mcp-abap-adt`, `mcp-abap-adt-http` and `mcp-abap-adt-sse` serve no low set.**
@@ -597,6 +617,11 @@ transport's options only:
   with mcp-auth*. Send the token in `x-sap-jwt-token` to `mcp-abap-adt-http` / `mcp-abap-adt-sse`,
   or create the session with `mcp-auth` (a `jwt` / `authorization_code` destination). stdio serves
   three authentications: `basic`, `snc`, `jwt` / `authorization_code`.
+- **The connection is kept for the process's life.** A new provider the broker builds (it builds
+  one when what it read for the destination changed — a service key, the destination's `.env`)
+  no longer reopens the connection: a reopen would leave a lock held in the old session. The kept
+  connection is replaced only when SAP already lost its session. To take a changed destination,
+  restart the server.
 - **The auth chain is 6.0.** The server runs on `@mcp-abap-adt/auth-broker` 5,
   `@mcp-abap-adt/auth-providers` 6 and `@mcp-abap-adt/auth-stores` 5. Service keys keep working
   as they are; a destination's means in a `.env` too.
@@ -748,9 +773,16 @@ transport's options only:
 - **`connectionReleased(connection)`**: a subclass that calls `getConnection` itself calls it
   exactly once per `getConnection` when its work on the connection is done; a connection replaced
   meanwhile is logged off only then.
-- **The server replaces its connection only when SAP lost its session** (or a new credential
-  arrives): the next call gets a new connection instance, the spent one is logged off; the call
-  that met the loss gets the connection's error as it is.
+- **The server replaces its connection only when SAP lost its session** (or, where the
+  credential is the request's — http, sse — a new credential arrives): the next call gets a new
+  connection instance, the spent one is logged off; the call that met the loss gets the
+  connection's error as it is. A built source may say it keeps its connection
+  (`{ kind: 'built', source, keepsConnection: true }`, what stdio's `StdioServer` sets): a new
+  credential object from `resolve` then does not replace it.
+- **`restoreSessionInConnection` is gone from `@mcp-abap-adt/lib/utils`.** It switched the
+  connection to stateful and never back; a stateful request is adt-clients' to mark, for the one
+  `LOCK` or `UNLOCK`. `sessionUtils`' `makeAdtRequestWithSession` / `makeAdtRequestStateless` (not
+  exported) are gone too.
 - **`IAuthBrokerFactoryConfig.loginTimeoutStated?`** names the bound in D10's sentence (the
   launcher passes the form the user set, `` `--login-timeout=300` ``); absent, the sentence names
   `` `loginTimeoutMs: <ms>` ``, never a value the CLI would refuse.

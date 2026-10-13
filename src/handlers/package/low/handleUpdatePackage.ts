@@ -41,7 +41,6 @@ import { sequence } from '../../../lib/strategies/sequence';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
-  restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -124,7 +123,6 @@ export async function handleUpdatePackage(
       lock_handle,
       transport_request,
       session_id,
-      session_state,
     } = args as UpdatePackageArgs;
 
     if (!package_name || !updated_description || !lock_handle) {
@@ -144,10 +142,6 @@ export async function handleUpdatePackage(
     const packageName = package_name.toUpperCase();
 
     logger?.info(`Starting package update: ${packageName}`);
-
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
 
     try {
       // The three steps, in the handler because 19 put them there. `analyse`

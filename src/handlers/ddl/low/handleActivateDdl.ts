@@ -12,7 +12,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateDdlLow',
@@ -63,14 +63,10 @@ export async function handleActivateDdl(
   args: ActivateDdlArgs,
 ) {
   const { connection, logger } = context;
-  const { ddl_name, session_id, session_state } = args;
+  const { ddl_name } = args;
 
   if (!ddl_name) {
     return return_error(new Error('ddl_name is required'));
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const ddlName = ddl_name.toUpperCase();

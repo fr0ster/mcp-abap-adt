@@ -609,39 +609,6 @@ export function getManagedConnection(): IAbapConnection {
   return cachedConnection;
 }
 
-/**
- * Restore session state in connection
- * Note: Session state management (getSessionState/setSessionState) was removed in connection 0.2.0
- * Session state persistence is now handled by @mcp-abap-adt/auth-broker package
- * This function now only sets session type to stateful and session ID
- */
-export async function restoreSessionInConnection(
-  connection: IAbapConnection,
-  sessionId: string,
-  _sessionState: {
-    cookies?: string | null;
-    csrf_token?: string | null;
-    cookie_store?: Record<string, string>;
-  },
-): Promise<void> {
-  // Cast to access internal methods (not in interface but available in implementation)
-  const connectionWithStateful = connection as any;
-
-  try {
-    // Set session ID first (if not already set via constructor)
-    if (connectionWithStateful.setSessionId) {
-      connectionWithStateful.setSessionId(sessionId);
-    }
-    // Enable stateful session mode (adds x-sap-adt-sessiontype: stateful header)
-    connection.setSessionType('stateful');
-  } catch (error: any) {
-    logger?.warn('Failed to restore session in connection', {
-      sessionId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-  }
-}
-
 export function setConfigOverride(override?: SapConfig) {
   connectionManagerLogger?.debug(
     `[DEBUG] setConfigOverride - Setting config override`,

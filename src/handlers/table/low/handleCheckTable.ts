@@ -22,7 +22,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckTableLow',
@@ -93,14 +93,10 @@ export async function handleCheckTable(
   args: CheckTableArgs,
 ) {
   const { connection, logger } = context;
-  const { table_name, version, session_id, session_state } = args;
+  const { table_name, version } = args;
 
   if (!table_name) {
     return return_error(new Error('table_name is required'));
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const tableName = table_name.toUpperCase();

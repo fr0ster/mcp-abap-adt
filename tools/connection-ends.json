@@ -3,7 +3,7 @@
     "file": "src/embeddable/BaseMcpServer.ts",
     "function": "BaseMcpServer.getConnection",
     "site": "createAbapConnection",
-    "end": "the instance's terminal close (closeOwnedConnections): stdio at exit, an SSE close, the pool's eviction, shutdown; replaced only on a new credential or once SAP lost its session (D56), then ended when no call works on it any more; a failed connect() ends at once",
+    "end": "the instance's terminal close (closeOwnedConnections): stdio at exit, an SSE close, the pool's eviction, shutdown; replaced on a new credential where the credential is the request's (http, sse) — never on stdio, which keeps it for the instance's life (keepsConnection, D13) — or once SAP lost its session (D56), then ended when no call works on it any more; a failed connect() ends at once",
     "why": "the instance's own connection (role 'built'), recorded as its own before connect(); a connect that completed after its callers cancelled is kept and ends here too (D32/D56, RF1)"
   },
   {

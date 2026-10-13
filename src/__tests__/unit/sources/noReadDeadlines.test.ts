@@ -162,7 +162,8 @@ describe('no built-in deadline on the server reads', () => {
     const reads = scans.flatMap((s) =>
       s.calls.filter((c) => c.callee === 'makeAdtRequest'),
     );
-    expect(reads.length).toBeGreaterThanOrEqual(13);
+    // 12 since sessionUtils' two unused stateful helpers left (C15, D56).
+    expect(reads.length).toBeGreaterThanOrEqual(12);
   });
 
   it('every makeAdtRequest call passes no deadline (0)', () => {

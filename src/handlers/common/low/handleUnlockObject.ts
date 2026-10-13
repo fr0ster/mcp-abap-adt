@@ -36,7 +36,7 @@ import {
 } from '../../../lib/packageSessions';
 import { terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockObjectLow',
@@ -129,7 +129,7 @@ export async function handleUnlockObject(
   args: UnlockObjectArgs,
 ) {
   const { connection, logger } = context;
-  const { object_name, object_type, lock_handle, session_id, session_state } =
+  const { object_name, object_type, lock_handle, session_id } =
     args as UnlockObjectArgs;
 
   if (!object_name || !object_type || !lock_handle || !session_id) {
@@ -163,10 +163,6 @@ export async function handleUnlockObject(
     [functionGroupName, functionModuleName] = object_name
       .toUpperCase()
       .split('|');
-  }
-
-  if (session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const objectName = object_name.toUpperCase();

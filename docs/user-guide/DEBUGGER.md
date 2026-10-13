@@ -135,6 +135,14 @@ keep the instance:
 | Streamable HTTP (`@mcp-abap-adt/http`, `mcp-abap-adt-http`) | the server's pool of instances: each request takes the instance its `tools/call`'s `state_handle` names, or a new one, and its own `x-sap-*` headers give its credential; an instance that still holds state after the response stays in the pool, one that holds nothing is disposed. One request at a time per instance; a JSON-RPC batch carrying a `state_handle` is refused. The debug session keeps the connections it opened with the creating request's credential until it ends |
 | embedded (`EmbeddableMcpServer`) | the embedding host |
 
+**The debuggee session is the debugger's own.** The connections a debug session
+opens are stateful for their whole life — attach and the steps need the ABAP
+session that attached — and they are not a tool's session: no other tool runs on
+them, and they end with the debug session (its stop, the idle bound's stop, the
+host's stop or the instance's end), each with its logoff. A tool's own session is
+stateful only for a lock's `LOCK` and `UNLOCK`; the debugger's are the one place
+the server itself asks for a stateful session (`tools/stateful-sites.json`).
+
 Why a pool and not a session carried by the client: over HTTP the system's stop
 could be addressed again by its session cookies, but over RFC nothing carries an
 ABAP session to another connection (measured on premise and on the cloud,

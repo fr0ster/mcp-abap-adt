@@ -1,48 +1,62 @@
 # Stateful ADT Session Flow
 
-This guide describes the **stateful ADT request flow** required for write operations
-(lock/update/unlock) against ABAP via ADT. It is about **protocol behavior**, not
-file-based session persistence.
+This guide describes which ADT requests go in a **stateful** ABAP session, and
+which do not. It is about protocol behaviour, not about session files.
 
-## Why Stateful Matters
+## The window (D56)
 
-Write operations must share:
-- the same `sap-adt-connection-id` across LOCK/PUT/UNLOCK
-- preserved cookies/CSRF tokens between requests
+A tool's session is stateful only for **lock → write → unlock and activation**.
+Everything else — reads, searches, runs, where-used, checks — runs stateless.
 
-If these are not consistent, SAP rejects the lock handle or returns CSRF errors.
+What is sent stateful today is narrower, and it is decided by
+`@mcp-abap-adt/adt-clients` (31.1), not by the server:
 
-## Required Headers
+| Request | Session | Context cookie (`sap-contextid`) |
+|---|---|---|
+| `POST …?_action=LOCK&accessMode=MODIFY` | stateful | opened by SAP's answer, kept in the jar |
+| `PUT …?lockHandle=<handle>` (the write) | stateless | not sent: the lock handle carries the write |
+| `POST …?_action=UNLOCK&lockHandle=<handle>` | stateful | sent: the `UNLOCK` reaches the context the `LOCK` opened |
+| `POST /sap/bc/adt/activation` | stateless | not sent |
+| every other request | stateless | not sent |
 
-Each request in the flow must include:
+The write running outside the lock's context is what Eclipse does (an ADT capture of
+2026-08-31: every lock and unlock in the stateful "enqueue" session, the `PUT` and the
+reads around it stateless). An `UNLOCK` sent stateless releases nothing and still
+answers `200`, which is why it goes stateful.
 
-```
-sap-adt-connection-id: <session-id>    # same for all requests
-sap-adt-request-id:    <request-id>    # unique per request
-x-sap-adt-sessiontype: stateful
-```
+## How a request is marked
 
-## Standard Flow
+adt-clients sets the connection's session type around the one request
+(`inStatefulSession`, or `setSessionType('stateful')` with a `finally` that sets it
+back to `'stateless'`), and `@mcp-abap-adt/connection` marks the request
+`stateful` from it. Each wire says it its own way: HTTP sends
+`x-sap-adt-sessiontype: stateful` and the context cookie, BASIS 7.40's legacy wire
+drops the header, RFC routes the request to its stateful conversation. A
+non-stateful request never carries the context cookie.
 
-1) **LOCK**  
-`POST /sap/bc/adt/<object-path>?_action=LOCK&accessMode=MODIFY`
+`sap-adt-connection-id` (the connection's) and `sap-adt-request-id` (fresh per
+request) are written by the connection on every request; nothing in the server sets
+them. The `session_id` and `session_state` arguments some tools still accept change
+nothing on the wire: a tool cannot reach into the connection's session.
 
-Response includes `LOCK_HANDLE` and `CORRNR` (transport).
+## Across tool calls
 
-2) **PUT / UPDATE**  
-`PUT /sap/bc/adt/<object-path>?lockHandle=<LOCK_HANDLE>&corrNr=<CORRNR>`
+- **Compact `HandlerLock` → `HandlerUpdate { lock_handle }` → `HandlerUnlock`**: the
+  lock stays in the session between the calls — the consumer's choice. Every call
+  between them is stateless; the `UNLOCK` reaches the lock's context. At the latest
+  the instance's logoff ends it (a logoff releases the session's locks).
+- **A cancel does nothing to SAP**: no logoff, no new session.
+- **A reopen only when SAP lost the session**: stdio keeps its connection for the
+  instance's life.
+- **The debugger's session is its own**: a debug session opens connections of its
+  own, stateful for their life, and ends them with the debug session.
 
-3) **UNLOCK**  
-`POST /sap/bc/adt/<object-path>?_action=UNLOCK&lockHandle=<LOCK_HANDLE>`
+## Common pitfalls
 
-## Common Pitfalls
+- **Two calls at once on one connection**: the session type is the connection's
+  while a `LOCK` or an `UNLOCK` is in flight, so a concurrent read goes stateful
+  (seen against the stand-in), and an `UNLOCK` could go stateless. Call write tools one at a time.
+- **A missing `lockHandle` or `corrNr`** on the write.
 
-- **Different session IDs** between LOCK/PUT/UNLOCK
-- **New cookies/CSRF** (missing carry-over between requests)
-- **Missing lockHandle or corrNr** in update call
-
-## Notes
-
-- Session state may be managed in-memory or by external stores (auth-broker/stores),
-  but the ADT flow always requires the same `sap-adt-connection-id` and cookies
-  across the stateful sequence.
+Every site that changes a session type is listed in `tools/stateful-sites.json`
+with the window it opens and where the connection returns to stateless.

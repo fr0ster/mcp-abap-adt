@@ -59,7 +59,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetNodeStructureLow',
@@ -146,24 +146,13 @@ export async function handleGetNodeStructure(
   args: GetNodeStructureArgs,
 ) {
   const { connection, logger } = context;
-  const {
-    parent_type,
-    parent_name,
-    node_id,
-    with_short_descriptions,
-    session_id,
-    session_state,
-  } = args;
+  const { parent_type, parent_name, node_id, with_short_descriptions } = args;
 
   if (!parent_type) {
     return return_error(new Error('parent_type is required'));
   }
   if (!parent_name) {
     return return_error(new Error('parent_name is required'));
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   // Task 28: why this tool carries no `detail`. The node-level family's

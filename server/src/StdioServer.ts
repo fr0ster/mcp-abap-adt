@@ -113,6 +113,9 @@ export class StdioServer extends BaseMcpServer {
       this.setConnectionContext({
         kind: 'built',
         source: destinationSource(destination, this.destinations),
+        // No reopen while the instance lives (D13, D56): a new provider the
+        // broker built does not replace the kept connection.
+        keepsConnection: true,
         sessionId: destination,
         metadata: { destination },
       });

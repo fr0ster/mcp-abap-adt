@@ -40,7 +40,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckObjectLow',
@@ -148,8 +148,6 @@ export async function handleCheckObject(
     object_type,
     version = 'active',
     source_code,
-    session_id,
-    session_state,
   } = args as CheckObjectArgs;
 
   if (!object_name || !object_type) {
@@ -188,10 +186,6 @@ export async function handleCheckObject(
     }
     functionGroupName = group;
     functionModuleName = module;
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const objectName = object_name.toUpperCase();

@@ -118,7 +118,7 @@ export const fullToolSet: ToolSet = {
 
 /** The two halves of the compact facade, as their packages build them. */
 export interface CompactHalves {
-  /** `compactReadOnlyEntries` of `@mcp-abap-adt/compact-readonly`. */
+  /** `compactReadOnlyEntries` of `@mcp-abap-adt/compact-readonly-entries`. */
   readonly readOnly: CompactEntryBuilder;
   /** `compactModifyEntries` of `@mcp-abap-adt/compact-modify`. */
   readonly modify: CompactEntryBuilder;

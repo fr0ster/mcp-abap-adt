@@ -24,7 +24,7 @@ const PACKAGES = [
   'compact/src',
   'compact-http/src',
   'compact-sse/src',
-  'compact-readonly/src',
+  'compact-readonly-entries/src',
   'compact-modify/src',
   'server/src',
   'http/src',

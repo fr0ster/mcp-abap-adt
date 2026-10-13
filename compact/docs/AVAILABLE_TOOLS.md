@@ -4,7 +4,7 @@ Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
 - Tools: 37
-- Read-only half: `@mcp-abap-adt/compact-readonly`
+- Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`
 - Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff with every exposition, the resume beside `rw` only
@@ -22,7 +22,7 @@ per request.
 
 ### HandlerGet
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Read operation. part selects the aspect: source (default), metadata, urls, or contents (the objects of a PACKAGE); a part the type does not offer is refused, naming the ones it does. Three parts read the repository by ADT address and take no object_type: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Otherwise object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects the transport request or task holds, each with the position HandlerTransportMoveObjects takes. timeout applies to the reads only: UNIT_TEST and CDS_UNIT_TEST take none. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
@@ -66,7 +66,7 @@ per request.
 
 ### HandlerSearch
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Search ABAP repository objects by name or mask. Required: query*. Optional: object_type, max_results (default 100). Response: one object per line. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
@@ -81,7 +81,7 @@ per request.
 
 ### HandlerWhereUsed
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Where-used list of an ABAP object: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
@@ -97,7 +97,7 @@ per request.
 
 ### HandlerGetData
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Read rows of a table or CDS view: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
@@ -112,7 +112,7 @@ per request.
 
 ### HandlerValidate
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Validate before create only. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
 
@@ -136,7 +136,7 @@ per request.
 
 ### HandlerCheckRun
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks source that is not saved, for CLASS, STRUCTURE and DDL.
 
@@ -153,7 +153,7 @@ per request.
 
 ### HandlerUnitTestStatus
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** ABAP Unit test run status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.
 
@@ -166,7 +166,7 @@ per request.
 
 ### HandlerUnitTestResult
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** ABAP Unit test run result. object_type: not used. Required: run_id*. Optional: with_navigation_uris, format(abapunit|junit). Response: JSON.
 
@@ -180,7 +180,7 @@ per request.
 
 ### HandlerCdsUnitTestStatus
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** CDS unit test run status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.
 
@@ -193,7 +193,7 @@ per request.
 
 ### HandlerCdsUnitTestResult
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** CDS unit test run result. object_type: not used. Required: run_id*. Optional: with_navigation_uris, format(abapunit|junit). Response: JSON.
 
@@ -207,7 +207,7 @@ per request.
 
 ### HandlerProfileList
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Runtime profiling list. object_type: not used. Required: none. Response: JSON.
 
@@ -217,7 +217,7 @@ per request.
 
 ### HandlerProfileView
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Runtime profiling view. object_type: not used. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: mode(raw|analyze, default raw), top(analyze only), with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
@@ -237,7 +237,7 @@ per request.
 
 ### HandlerDumpList
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Runtime feed list, newest first. object_type: not used. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, runtime_error, exception, object_name, package, component, top, from, to. Response: JSON; each dump carries dump_id, and next_to when more remain. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
@@ -259,7 +259,7 @@ per request.
 
 ### HandlerDumpView
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Runtime dump view. object_type: not used. Required: dump_id* (id or URI). Optional: view(default|summary|formatted). Response: JSON.
 
@@ -272,7 +272,7 @@ per request.
 
 ### HandlerServiceBindingListTypes
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Service binding types list. object_type: not used. Required: none. Optional: response_format(xml|json|plain). Response: XML/JSON/plain by response_format.
 
@@ -284,7 +284,7 @@ per request.
 
 ### HandlerServiceBindingValidate
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Service binding validate before create. object_type: not used. Required: service_binding_name*, service_definition_name*. Optional: service_binding_version, package_name, description. Response: JSON.
 

@@ -23,7 +23,7 @@ import {
 import {
   CompactReadOnlyHandlersGroup,
   compactReadOnlyEntries,
-} from '@mcp-abap-adt/compact-readonly';
+} from '@mcp-abap-adt/compact-readonly-entries';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { CompactHandlersGroup } from '../../../lib/compact/group';
 

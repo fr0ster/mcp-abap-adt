@@ -28,7 +28,7 @@ import {
 import {
   CompactReadOnlyHandlersGroup,
   compactReadOnlyEntries,
-} from '@mcp-abap-adt/compact-readonly';
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { CompactLeftoverSessionHandlersGroup } from '../../lib/compact/session/group';
 import { ParameterRefusal } from '../../lib/config/index';
 import { LOW_SET_GONE } from '../../lib/config/validateExposition';

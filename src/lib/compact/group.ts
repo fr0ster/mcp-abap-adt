@@ -1,7 +1,7 @@
 /**
  * The compact facade, composed of its halves' entry builders.
  *
- * The halves are packages of their own — `@mcp-abap-adt/compact-readonly` and
+ * The halves are packages of their own — `@mcp-abap-adt/compact-readonly-entries` and
  * `@mcp-abap-adt/compact-modify` — so that a consumer can import the capability
  * it means to hand out, and they depend on lib. So lib cannot import them: the
  * group takes their ENTRY BUILDERS (`compactReadOnlyEntries`,

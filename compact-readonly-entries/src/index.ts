@@ -1,5 +1,5 @@
 /**
- * @mcp-abap-adt/compact-readonly — the read half of the compact facade.
+ * @mcp-abap-adt/compact-readonly-entries — the read half of the compact facade.
  *
  * Compact is a different decomposition of the same surface: the OPERATION is the
  * tool and the object moves into `object_type`. That is what makes the tool list

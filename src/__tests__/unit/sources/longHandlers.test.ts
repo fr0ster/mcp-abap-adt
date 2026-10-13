@@ -11,7 +11,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
-import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly/src/group';
+import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type {

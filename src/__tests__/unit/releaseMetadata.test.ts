@@ -19,7 +19,7 @@ const manifests = {
   core: json('server/package.json'),
   compact: json('compact/package.json'),
   'background-runs-memory': json('background-runs-memory/package.json'),
-  'compact-readonly': json('compact-readonly/package.json'),
+  'compact-readonly-entries': json('compact-readonly-entries/package.json'),
   'compact-modify': json('compact-modify/package.json'),
 };
 const version: string = manifests.lib.version;

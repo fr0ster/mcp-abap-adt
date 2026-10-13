@@ -1,7 +1,7 @@
 /**
  * The handlers that read — `lib`'s public half for a read-only facade.
  *
- * **Why two barrels instead of one.** `@mcp-abap-adt/compact-readonly` routes to
+ * **Why two barrels instead of one.** `@mcp-abap-adt/compact-readonly-entries` routes to
  * these and must not be able to reach a write handler: capability is what a
  * package imports, not what its tool list happens to enumerate
  * (`compactCapabilitySplit.test.ts`). A single barrel of all 104 handlers the

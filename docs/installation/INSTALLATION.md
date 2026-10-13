@@ -15,7 +15,7 @@ independent — either server connects every way.
 |---|---|---|
 | [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | **The full server**: one tool per object type and operation (`CreateClass`, `GetTable`, …), in the `readonly` and `high` sets (and `debug`). The low set left it in 19.0.0: its single-step operations are the compact server's. | `mcp-abap-adt` |
 | [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | **The compact server**: one tool per operation, the object type in the arguments (`HandlerCreate` with `object_type`) — a short tool list for a host that cannot select tools per request. Configuration is the full server's. | `mcp-abap-adt-compact` |
-| [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib), [`compact-readonly`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify), [`background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Libraries, not servers: the tool handlers, an embeddable server for your own application, and the in-memory store of background runs. | — |
+| [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib), [`compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify), [`background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Libraries, not servers: the tool handlers, an embeddable server for your own application, and the in-memory store of background runs. | — |
 
 ### How it connects
 

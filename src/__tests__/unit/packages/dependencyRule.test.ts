@@ -62,7 +62,7 @@ const TRANSPORTS = [
   '@mcp-abap-adt/compact-sse',
 ];
 const HALVES = [
-  '@mcp-abap-adt/compact-readonly',
+  '@mcp-abap-adt/compact-readonly-entries',
   '@mcp-abap-adt/compact-modify',
 ];
 
@@ -144,7 +144,7 @@ const SIBLING_DIRS = [
   'compact',
   'compact-http',
   'compact-sse',
-  'compact-readonly',
+  'compact-readonly-entries',
   'compact-modify',
 ];
 

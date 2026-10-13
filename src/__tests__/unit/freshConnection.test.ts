@@ -65,7 +65,7 @@ jest.mock('../../lib/connectionFactory', () => {
 });
 
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';

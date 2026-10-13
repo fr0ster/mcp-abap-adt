@@ -10,7 +10,7 @@
  */
 
 import { compactWriteRouterMap } from '@mcp-abap-adt/compact-modify/routes';
-import { compactReadRouterMap } from '@mcp-abap-adt/compact-readonly/routes';
+import { compactReadRouterMap } from '@mcp-abap-adt/compact-readonly-entries/routes';
 import {
   COMPACT_CRUD_MATRIX,
   COMPACT_OBJECT_TYPES,

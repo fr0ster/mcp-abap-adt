@@ -6,7 +6,7 @@
  * packages' graphs are not visible and their needs are not lib's business.)
  *
  * **What they are for.** The compact facade is moving into packages of its own, and
- * `@mcp-abap-adt/compact-readonly` must not be able to reach a write handler —
+ * `@mcp-abap-adt/compact-readonly-entries` must not be able to reach a write handler —
  * capability is what a package imports, not what its tool list enumerates. It
  * therefore imports `@mcp-abap-adt/lib/handlers/read` and nothing wider. One barrel
  * of all 104 handlers the facade needs would relink every write route into that

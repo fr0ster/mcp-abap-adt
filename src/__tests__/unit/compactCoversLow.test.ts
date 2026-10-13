@@ -5,7 +5,7 @@
  */
 
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type {
   HandlerContext,
   HandlerEntry,

@@ -13,10 +13,10 @@ How a release of this repository is made. Two things happen, and only one of the
 |---|---|---|
 | `.` | `@mcp-abap-adt/lib` | — |
 | `background-runs-memory/` | `@mcp-abap-adt/background-runs-memory` | `lib` (core, http and sse depend on it) |
-| `compact-readonly/` | `@mcp-abap-adt/compact-readonly` | `lib` |
+| `compact-readonly-entries/` | `@mcp-abap-adt/compact-readonly-entries` | `lib` |
 | `compact-modify/` | `@mcp-abap-adt/compact-modify` | `lib` |
 | `server/` | `@mcp-abap-adt/core` (bin `mcp-abap-adt`) | `lib` |
-| `compact/` | `@mcp-abap-adt/compact` (bin `mcp-abap-adt-compact`) | `lib`, `core`, `compact-readonly`, `compact-modify` |
+| `compact/` | `@mcp-abap-adt/compact` (bin `mcp-abap-adt-compact`) | `lib`, `core`, `compact-readonly-entries`, `compact-modify` |
 
 They are **not** npm workspaces: each is published by path. `scripts/publish-all.sh` publishes
 them in the order above (dependency order), skips any `name@version` already on npm, and aborts on
@@ -24,9 +24,9 @@ the first failure so that no package goes out on top of a dependency that is mis
 
 ## Steps
 
-1. **Bump every manifest.** `package.json`, `background-runs-memory/package.json`, `compact-readonly/package.json`,
+1. **Bump every manifest.** `package.json`, `background-runs-memory/package.json`, `compact-readonly-entries/package.json`,
    `compact-modify/package.json`, `server/package.json`, `compact/package.json` — and in each, the
-   ranges on sibling packages (`@mcp-abap-adt/lib`, `core`, `compact-readonly`, `compact-modify`)
+   ranges on sibling packages (`@mcp-abap-adt/lib`, `core`, `compact-readonly-entries`, `compact-modify`)
    so they accept the new versions. A manifest left at an old version is silently skipped by the
    publish script ("already on npm"). Then refresh the lockfile:
    ```bash
@@ -49,7 +49,7 @@ the first failure so that no package goes out on top of a dependency that is mis
 4. **Build and test**:
    ```bash
    npm ci
-   npm run build          # lib, server, compact-readonly, compact-modify, compact
+   npm run build          # lib, server, compact-readonly-entries, compact-modify, compact
    npm run test:check
    npm test               # includes binSmoke: packs, installs and runs both commands
    npm --prefix server run test:check

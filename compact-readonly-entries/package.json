@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-abap-adt/compact-readonly",
+  "name": "@mcp-abap-adt/compact-readonly-entries",
   "version": "18.1.0",
   "description": "The compact ABAP ADT tools that change nothing: one tool per read operation, the object in the arguments. A tool list a consumer can hand out knowing it carries no write route.",
   "license": "Apache-2.0",

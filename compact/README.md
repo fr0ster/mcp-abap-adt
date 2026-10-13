@@ -22,7 +22,7 @@ one) has no use for it and should take `@mcp-abap-adt/lib` instead.
 ## Why two library packages
 
 Capability is decided by what you import, not by a flag a caller can pass. A tool
-list assembled from `@mcp-abap-adt/compact-readonly` has **no route to a write
+list assembled from `@mcp-abap-adt/compact-readonly-entries` has **no route to a write
 handler in its module graph** — asserted against the graph, not against a list of
 names, in `compact/src/__tests__/compactCapabilitySplit.test.ts`. The read-only
 half depends on `@mcp-abap-adt/lib/handlers/read`; the modifying half on

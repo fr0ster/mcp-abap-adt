@@ -12,7 +12,7 @@
  * construction. `core` refuses `--exposition=compact` and says to install this.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import {
   main as coreMain,
   type StdioLauncherEdges,

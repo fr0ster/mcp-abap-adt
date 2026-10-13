@@ -21,7 +21,7 @@ Every step gates the run; none is `continue-on-error`.
 
 **On Ubuntu / Node 22 only:**
 - `npm audit --omit=dev --audit-level=high`
-- `npm pack` of every package (`lib`, `background-runs-memory`, `compact-readonly`, `compact-modify`, `http`, `sse`, `core`, `compact`, `compact-http`, `compact-sse`)
+- `npm pack` of every package (`lib`, `background-runs-memory`, `compact-readonly-entries`, `compact-modify`, `http`, `sse`, `core`, `compact`, `compact-http`, `compact-sse`)
 - an install of the five tarballs into an empty directory, a check that no package resolved a
   sibling other than the one built in that run (a nested copy is one the registry supplied), and
   `mcp-abap-adt --help`, `mcp-abap-adt-compact --version`

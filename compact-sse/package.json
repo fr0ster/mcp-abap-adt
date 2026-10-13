@@ -59,7 +59,7 @@
   },
   "dependencies": {
     "@mcp-abap-adt/compact-modify": "^18.1.0",
-    "@mcp-abap-adt/compact-readonly": "^18.1.0",
+    "@mcp-abap-adt/compact-readonly-entries": "^18.1.0",
     "@mcp-abap-adt/sse": "^17.1.0",
     "@mcp-abap-adt/lib": "^18.1.0"
   },

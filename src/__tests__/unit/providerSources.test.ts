@@ -28,7 +28,7 @@ const ROOTS = [
   'http/src',
   'sse/src',
   'compact/src',
-  'compact-readonly/src',
+  'compact-readonly-entries/src',
   'compact-modify/src',
   'background-runs-memory/src',
 ].map((root) => path.join(REPO, root));

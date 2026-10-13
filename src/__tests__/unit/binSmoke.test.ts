@@ -106,7 +106,7 @@ describe('the published bins start from an installed package', () => {
       'http',
       'sse',
       'server',
-      'compact-readonly',
+      'compact-readonly-entries',
       'compact-modify',
       'compact',
       'compact-http',

@@ -5,7 +5,7 @@
  * a host that cannot build a retrieval pipeline of its own and must still drive ABAP
  * through MCP reliably.
  *
- * The tools themselves are in `@mcp-abap-adt/compact-readonly` (16, changing
+ * The tools themselves are in `@mcp-abap-adt/compact-readonly-entries` (16, changing
  * nothing) and `@mcp-abap-adt/compact-modify` (9, writing, locking, activating or
  * executing), composed by `compactToolSetOf` of `@mcp-abap-adt/lib/tool-set`. A
  * consumer that wants only one capability imports that package directly; this one

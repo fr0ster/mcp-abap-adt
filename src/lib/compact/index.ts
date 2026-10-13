@@ -2,7 +2,7 @@
  * The compact facade's shared kernel — data and dispatch, no tool and no handler.
  *
  * The compact TOOLS move into packages of their own
- * (`@mcp-abap-adt/compact-readonly`, `@mcp-abap-adt/compact-modify`); these five
+ * (`@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify`); these five
  * modules do not, because both packages need them and neither may depend on the
  * other: the object types, the CRUD matrix that says which type does what, the
  * input schemas, the lifecycle helpers, and `dispatchCompact` with the route types.

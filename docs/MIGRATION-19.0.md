@@ -12,7 +12,7 @@ The packages, all at **19.0.0**:
 | `@mcp-abap-adt/http` | `http/` | `mcp-abap-adt-http` | Streamable HTTP |
 | `@mcp-abap-adt/sse` | `sse/` | `mcp-abap-adt-sse` | HTTP+SSE |
 | `@mcp-abap-adt/background-runs-memory` | `background-runs-memory/` | — | the in-memory store of background runs (new; core, http and sse depend on it) |
-| `@mcp-abap-adt/compact-readonly`, `@mcp-abap-adt/compact-modify` | `compact-readonly/`, `compact-modify/` | — | the compact tool set's halves |
+| `@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify` | `compact-readonly-entries/`, `compact-modify/` | — | the compact tool set's halves |
 | `@mcp-abap-adt/compact` | `compact/` | `mcp-abap-adt-compact` | the compact tool set over stdio |
 | `@mcp-abap-adt/compact-http` | `compact-http/` | `mcp-abap-adt-compact-http` | the compact tool set over Streamable HTTP |
 | `@mcp-abap-adt/compact-sse` | `compact-sse/` | `mcp-abap-adt-compact-sse` | the compact tool set over HTTP+SSE |

@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 
 interface Row {

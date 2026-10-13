@@ -31,7 +31,7 @@ done
 PACKAGES=(
   "."
   "./background-runs-memory"
-  "./compact-readonly"
+  "./compact-readonly-entries"
   "./compact-modify"
   "./server"
   "./http"

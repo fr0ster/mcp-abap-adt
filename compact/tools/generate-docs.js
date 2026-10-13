@@ -78,9 +78,9 @@ const LOCAL = {
     'config',
     'index.js',
   ),
-  '@mcp-abap-adt/compact-readonly': path.join(
+  '@mcp-abap-adt/compact-readonly-entries': path.join(
     REPO,
-    'compact-readonly',
+    'compact-readonly-entries',
     'dist',
     'index.js',
   ),
@@ -143,7 +143,7 @@ function page(entries) {
     'Generated from the built packages, not from source text: these are the tool\n';
   md += 'definitions a client receives.\n\n';
   md += `- Tools: ${entries.length}\n`;
-  md += '- Read-only half: `@mcp-abap-adt/compact-readonly`\n';
+  md += '- Read-only half: `@mcp-abap-adt/compact-readonly-entries`\n';
   md += '- Modifying half: `@mcp-abap-adt/compact-modify`\n';
   md +=
     '- Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`\n';
@@ -192,7 +192,7 @@ function page(entries) {
 }
 
 function main() {
-  const readOnly = requireFresh('compact-readonly');
+  const readOnly = requireFresh('compact-readonly-entries');
   const modify = requireFresh('compact-modify');
   const context = () => ({});
   const entries = [

@@ -6,7 +6,7 @@
  */
 
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type { HandlerSet } from '../../../lib/config/IServerConfig';
 import { registryForExposition } from '../../../lib/handlers/registry/expositionRegistry';
 import { compactToolSetOf, registryOf } from '../../../lib/toolSet';

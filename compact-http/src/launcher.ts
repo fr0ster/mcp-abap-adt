@@ -9,7 +9,7 @@
  * the stores are installed with it.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly';
+import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import { main as httpMain } from '@mcp-abap-adt/http/launcher';
 import { type LauncherEdges, processEdges } from '@mcp-abap-adt/lib/config';
 import { compactToolSetOf, type ToolSet } from '@mcp-abap-adt/lib/tool-set';

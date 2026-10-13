@@ -110,37 +110,37 @@
   {
     "tool": "HandlerWhereUsed",
     "set": "compact",
-    "handler": "compact-readonly/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
     "sends": "as GetWhereUsed"
   },
   {
     "tool": "HandlerSearch",
     "set": "compact",
-    "handler": "compact-readonly/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
     "sends": "as SearchObject"
   },
   {
     "tool": "HandlerDumpList",
     "set": "compact",
-    "handler": "compact-readonly/src/handlers/handleHandlerDumpList.ts#handleHandlerDumpList",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerDumpList.ts#handleHandlerDumpList",
     "sends": "as RuntimeListFeeds"
   },
   {
     "tool": "HandlerGetData",
     "set": "compact",
-    "handler": "compact-readonly/src/handlers/handleHandlerGetData.ts#handleHandlerGetData",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGetData.ts#handleHandlerGetData",
     "sends": "as GetSqlQuery or GetTableContents"
   },
   {
     "tool": "HandlerProfileView",
     "set": "compact",
-    "handler": "compact-readonly/src/handlers/handleHandlerProfileView.ts#handleHandlerProfileView",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerProfileView.ts#handleHandlerProfileView",
     "sends": "as RuntimeGetProfilerTraceData or RuntimeAnalyzeProfilerTrace"
   },
   {
     "tool": "HandlerGet",
     "set": "compact",
-    "handler": "compact-readonly/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
     "sends": "one GET per mode; part 'contents' of a package runs the nodestructure walk; the timeout applies to its reads only — UNIT_TEST / CDS_UNIT_TEST poll a run in SAP, run as an ordinary call on the instance's connection, and refuse a timeout"
   }
 ]

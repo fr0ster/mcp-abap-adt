@@ -14,7 +14,7 @@
       "@mcp-abap-adt/lib/http-transport": ["../dist/lib/httpTransport/index.d.ts"],
       "@mcp-abap-adt/lib/embeddable": ["../dist/embeddable/index.d.ts"],
       "@mcp-abap-adt/lib/logger": ["../dist/lib/handlerLogger.d.ts"],
-      "@mcp-abap-adt/compact-readonly": ["../compact-readonly/dist/index.d.ts"],
+      "@mcp-abap-adt/compact-readonly-entries": ["../compact-readonly-entries/dist/index.d.ts"],
       "@mcp-abap-adt/compact-modify": ["../compact-modify/dist/index.d.ts"],
       "@mcp-abap-adt/sse/launcher": ["../sse/dist/launcher.d.ts"]
     }

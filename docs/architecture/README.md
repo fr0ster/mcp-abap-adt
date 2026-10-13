@@ -11,7 +11,7 @@ The repository holds five npm packages (not npm workspaces; each is built and pu
 | `src/` (root) | `@mcp-abap-adt/lib` | Handlers, handler groups, configuration, auth, connection factory — everything an embedding server needs |
 | `server/` | `@mcp-abap-adt/core` | The `mcp-abap-adt` command: launcher and transports |
 | `background-runs-memory/` | `@mcp-abap-adt/background-runs-memory` | The in-memory store of background runs (`IBackgroundRuns` of lib); core, http and sse create it |
-| `compact-readonly/`, `compact-modify/` | `@mcp-abap-adt/compact-readonly`, `@mcp-abap-adt/compact-modify` | The two halves of the compact tool set |
+| `compact-readonly-entries/`, `compact-modify/` | `@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify` | The two halves of the compact tool set |
 | `compact/` | `@mcp-abap-adt/compact` | The `mcp-abap-adt-compact` command: core's launcher with the compact tool list |
 
 ### Standalone server

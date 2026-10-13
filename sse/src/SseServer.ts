@@ -7,7 +7,11 @@ import type {
   IHttpApplication,
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
-import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
+import {
+  BaseMcpServer,
+  closeInstance,
+  isLatched,
+} from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
@@ -115,12 +119,22 @@ export class SseServer {
   private readonly ssePath: string;
   private readonly postPath: string;
   private readonly sessions = new Map<string, SessionEntry>();
-  /** Disposals of closed sessions still running; stop() waits for them. */
-  private readonly closingSessions = new Set<Promise<string[]>>();
+  /**
+   * Every connection from its `GET` until its close settled — being set up,
+   * open, or closing — with its one cleanup (the instance close, D51): a
+   * shutdown runs it for the open ones and joins the ones already closing
+   * (RF7, RF8). A close that settled before the shutdown is only logged.
+   */
+  private readonly connections = new Map<
+    BaseMcpServer,
+    { sessionId: string; close: () => Promise<string[]> }
+  >();
   private readonly logger: Logger;
   private readonly version: string;
   private readonly externalApp?: IHttpApplication;
   private standaloneServer?: HttpServer | HttpsServer;
+  /** The listener stopped, until its last connections are closed after the last step. */
+  private stoppedListener?: HttpServer | HttpsServer;
   private readonly tls?: TlsConfig;
   private readonly allowedHosts?: string[];
   private readonly allowedOrigins?: string[];
@@ -261,40 +275,71 @@ export class SseServer {
     });
   }
 
-  /**
-   * Stops taking connections (shutdown, step 1). Requests already running are
-   * not waited for, nor is an open stream: the factory's gate holds them.
-   * Embedded on an external app, there is no listener of its own to stop.
-   * It then waits for the state of every session to be gone, and rejects with
-   * what could not be undone.
-   */
-  async stop(): Promise<void> {
+  /** Stops taking connections. Embedded on an external app there is no listener of its own. */
+  stopListening(): void {
     const server = this.standaloneServer;
     if (server) {
       this.standaloneServer = undefined;
+      this.stoppedListener = server;
       server.close();
       server.closeIdleConnections();
     }
+  }
 
-    // Every open session's instance is disposed, and the sessions that closed
-    // earlier are waited for (no timer): on an external app there is no
-    // listener here, but the sessions are still ours to drain.
-    const pending = [...this.closingSessions];
-    for (const [id, entry] of this.sessions) {
-      pending.push(
-        entry.server
-          .shutdownState()
-          .then((left) => left.map((l) => `${id}: ${l}`)),
-      );
-    }
-    this.sessions.clear();
-    const failures = (await Promise.all(pending)).flat();
+  /**
+   * After the last step nothing is answered any more: the connections still
+   * open on the stopped listener (a client's idle keep-alive) are closed, so
+   * none keeps the process alive.
+   */
+  private closeLeftConnections(): void {
+    this.stoppedListener?.closeAllConnections();
+    this.stoppedListener = undefined;
+  }
+
+  /**
+   * The shutdown's last step, after every registered tool settled (D33,
+   * D51): the instance close of every connection — run for the open ones,
+   * joined for those already closing — each ending its stream, its
+   * connections closed with a logoff whatever its undo answered. Answers one
+   * line per leftover. No timer.
+   */
+  async lastStep(): Promise<string[]> {
+    const failures = await this.closeAll();
+    this.closeLeftConnections();
+    return failures.map(
+      (failure) => `[MCP] State not undone at shutdown: ${failure}`,
+    );
+  }
+
+  /**
+   * For a host that stops the server itself (embedded): the listener
+   * closes, then every connection's instance close (no timer). Rejects with
+   * what could not be undone. A launcher's shutdown awaits every registered
+   * tool between the two (lib's `installTransportShutdown`).
+   */
+  async stop(): Promise<void> {
+    this.stopListening();
+    const failures = await this.closeAll();
+    this.closeLeftConnections();
     if (failures.length) {
       throw new Error(`state cleanup failed: ${failures.join('; ')}`);
     }
   }
 
+  /** The instance close of every connection, joined where one runs already. */
+  private async closeAll(): Promise<string[]> {
+    const closes = [...this.connections.values()].map((c) => c.close());
+    return (await Promise.all(closes)).flat();
+  }
+
   private async handleGet(req: any, res: any): Promise<void> {
+    // The shutdown began: no new connection (embedded hosts keep their
+    // listener; a launcher's is closed already).
+    if (isLatched()) {
+      if (!res.headersSent)
+        res.writeHead(503).end('the server is shutting down');
+      return;
+    }
     // The connection's source, from this GET's x-sap-* headers alone; a
     // header this server no longer serves is refused, never ignored.
     let context: ConnectionContext;
@@ -348,13 +393,24 @@ export class SseServer {
     // POST dispatch below so it never leaks into other sessions via a
     // process-global cache (#110).
     const requestContext = requestContextFromHeaders(req.headers);
-    this.sessions.set(sessionId, { server, transport, requestContext });
-    console.error(
-      `[SSE GET] Session stored, total sessions: ${this.sessions.size}`,
-    );
 
-    // Connect transport to server BEFORE registering close handler
-    // This ensures connection is established before any cleanup can happen
+    // The close tracking comes first, before the first setup await (D51,
+    // RF8): the response's close, the stream's failure and a rejected
+    // connect all reach this one cleanup — the instance close, once.
+    let cleanup: Promise<string[]> | undefined;
+    const close = (): Promise<string[]> => {
+      cleanup ??= this.closeConnection(sessionId, server);
+      return cleanup;
+    };
+    this.connections.set(server, { sessionId, close });
+    res.on('close', () => {
+      console.error(`[SSE CLOSE] Connection closed for session ${sessionId}`);
+      void close();
+    });
+    res.on('error', () => {
+      void close();
+    });
+
     try {
       await server.connect(transport);
       this.logger.debug(`SSE GET: server connected for session ${sessionId}`);
@@ -362,36 +418,48 @@ export class SseServer {
       this.logger.error(
         `SSE GET: failed to connect for session ${sessionId}: ${this.failureWords(error)}`,
       );
-      this.sessions.delete(sessionId);
       if (!res.headersSent) {
         res.writeHead(500).end('Internal Server Error');
       }
+      void close();
       return;
     }
 
-    // Register cleanup handler AFTER successful connection
-    res.on('close', () => {
-      console.error(`[SSE CLOSE] Connection closed for session ${sessionId}`);
-      const owned = this.sessions.delete(sessionId);
-      void transport.close();
-      void server.close();
-      // stop() took the session already and disposes it itself: its drain
-      // reports the outcome, so a late close adds nothing untracked.
-      if (!owned) return;
-      // The session's instance is owned until its state is gone: it settles on its own (an AMDP
-      // session when its last event batch arrives); stop() waits for it.
-      const closing = server.shutdownState().then((left) => {
-        if (left.length) {
-          // The state's line: always written (stderr unless an embedder chose a logger).
-          this.stateLogger.error(
-            `[SSE CLOSE] state cleanup for session ${sessionId} left: ${left.join('; ')}`,
-          );
-        }
-        return left.map((l) => `${sessionId}: ${l}`);
-      });
-      this.closingSessions.add(closing);
-      void closing.finally(() => this.closingSessions.delete(closing));
-    });
+    // An instance whose connection closed during setup is never published.
+    if (cleanup !== undefined) return;
+    this.sessions.set(sessionId, { server, transport, requestContext });
+    console.error(
+      `[SSE GET] Session stored, total sessions: ${this.sessions.size}`,
+    );
+  }
+
+  /**
+   * One connection's cleanup (D51): the session leaves the routing map first
+   * (main's: a later `POST` for it is an unknown session), then the instance
+   * close — the instance latch in this tick, its tools awaited (none
+   * aborted), its state undone, its connections closed with a logoff
+   * whatever the undo answered, its MCP server and stream closed. What the
+   * undo left is written on the state logger and answered.
+   */
+  private async closeConnection(
+    sessionId: string,
+    server: BaseMcpServer,
+  ): Promise<string[]> {
+    if (this.sessions.get(sessionId)?.server === server) {
+      this.sessions.delete(sessionId);
+    }
+    try {
+      const left = await closeInstance(server);
+      if (left.length) {
+        // The state's line: always written (stderr unless an embedder chose a logger).
+        this.stateLogger.error(
+          `[SSE CLOSE] state cleanup for session ${sessionId} left: ${left.join('; ')}`,
+        );
+      }
+      return left.map((l) => `${sessionId}: ${l}`);
+    } finally {
+      this.connections.delete(server);
+    }
   }
 
   private async handlePost(req: any, res: any, url?: URL): Promise<void> {

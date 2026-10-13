@@ -41,7 +41,6 @@ import {
 import { hydrateSystemContextFromEnvFile } from './config/envFileContext';
 import { StdioServer } from './StdioServer.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
-import { closeInstanceState } from './stateClose.js';
 
 const stderrLogger: ILogger = {
   info: (...args: any[]) => console.error(...args),
@@ -641,20 +640,19 @@ export async function launch(
     },
   );
   activeServer = server;
-  // Under stdio a signal is not the end of input: the factory's gate holds.
+  // The shutdown (D33): latch, the tools settle, the instance close with its
+  // logoffs, then the gate, the logins, the drain and the flush.
   installShutdown({
     factory,
-    servers: [
-      {
-        // The instance owns what it holds (a listener, a session) until it is
-        // gone; the close waits for that and reports what was left.
-        close: () => closeInstanceState(server),
-      },
-    ],
+    instance: server,
     onStdinEnd: true,
     exit: deps.exit,
     stderr: deps.stderr,
     processLike: deps.processLike,
+    shutdownTimeoutMs:
+      config.shutdownTimeout === undefined
+        ? undefined
+        : config.shutdownTimeout * 1000,
   });
   // stdio unless the edges carry a transport of their own (a test's).
   await (deps.transport === undefined

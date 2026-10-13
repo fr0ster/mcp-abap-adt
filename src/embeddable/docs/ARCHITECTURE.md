@@ -73,13 +73,19 @@ through one wrapper. A registry that registers its own tools (`registerAllTools`
 same way.
 
 1. **A request signal per call.** It aborts when the MCP request's `extra.signal` aborts (the
-   client cancelled, or its transport closed), when the call ends, and when the process shuts
-   down. The call is registered in the process-wide registry of live tools (`activeTools()`,
-   `abortActiveTools()`) at its entry, before any connection is built.
+   client cancelled, or its transport closed) and when the call ends — nothing else aborts it. The
+   call is registered at its entry, before any connection is built, in the one process-wide
+   registry of live tools (`src/lib/activeTools.ts`: `activeTools()`, `settled(instance?)`,
+   `latch(instance?)`, `pending()`), with its instance. The registry aborts nothing: a started
+   tool runs to its end, and a shutdown or an instance close awaits its settlement. Once the
+   process or the instance is latched, the call is refused right there — the shutdown refusal
+   (`interactive-login` `aborted`, "The server is shutting down."), no connection, no handler.
+   The call runs as its instance's (`runAsOwner`): a connection it opens is that instance's.
 2. **The handler's context.** The wrapper builds a `HandlerContext`: `{ connection, logger, state,
    debugger }`, where `connection` comes from `getConnection(signal)`.
 3. **The request signal scope.** The handler runs inside `runWithRequestSignal(signal, …)`;
-   `currentRequestSignal()` reads it. Nothing sent to SAP carries it. A call whose signal aborted
+   `currentRequestSignal()` reads it — for the server's own waits only: a tool's sends carry no
+   request signal (D55), and nothing sent to SAP carries it. A call whose signal aborted
    before its tool starts never reaches the tool. The
    responsible person and master system the call lacks are resolved first, from the destination's
    `.env`, the request's headers and, on ABAP Cloud, the system.
@@ -96,6 +102,40 @@ An instance holds state between tool calls, such as a debug session, in `state` 
 named by its handle (`stateHandle`). Held state ends after `stateIdleMinutes` without a tool call
 (default 30). It also ends through its own stop tool, `dispose()` / `shutdownState()`, or the
 system. `idle()` resolves when every tool call of the instance has settled.
+
+### How an instance ends (D51, D55)
+
+**The rule: every connection the server owns ends with `disconnect()`** — the logoff, which
+releases the locks its SAP session holds. On connection 16 it resolves once the logoff is
+**written**, not answered; it is called once per connection (a second call rejects), so every end
+goes through `endConnection` (`src/lib/ownedConnections.ts`), which joins a close already under
+way. Each connection is recorded there with its instance and role when it is made — the one
+`getConnection` builds, a fresh connection, a package lock session, held state's own — and the
+list of creation sites and their ends is `tools/connection-ends.json`, kept by a source test. A
+connection the consumer injects is never recorded and never closed.
+
+Ending an instance has two parts, kept apart:
+
+- **The state undo** — `dispose()` (and `shutdownState()`: dispose, settle, once more, settle):
+  callable again, each call retrying what the state could not undo. It closes no connection.
+- **The terminal close** — `terminalClose()` (lib's `closeOwnedConnections(instance)`): the
+  `disconnect()` of every connection the instance owns, each once, a failure logged in fixed
+  words. Every terminal disposal runs it after the undo was tried, **never conditional on the undo
+  succeeding**: a failed undo is reported, never a reason to keep a session — or a lock — open.
+
+**The instance close** (`closeInstance(instance)`, `src/lib/instanceClose.ts`), one promise per
+instance: `latch(instance)` in the tick it begins; await `settled(instance)` (none aborted); the
+state undo; the terminal close, whatever the undo answered; the MCP server and its transport
+closed. An SSE close, SSE's shutdown and core's shutdown use it; the pool runs the undo and the
+terminal close when an instance leaves it.
+
+**The forced close** (`forceClose()`): the logoff of every connection the process owns, joined
+where one is under way, awaiting nothing that waits on a tool, a request, an instance close or a
+state undo. The launchers use it for both escapes (a second signal, `--shutdown-timeout`).
+
+**A connection is replaced only when SAP lost its session** (D56), or when a new credential
+arrives: `getConnection` builds a new instance for the next call, and the replaced one is logged
+off once no call works on it any more. A cancelled call causes no logoff.
 
 ## The servers
 
@@ -131,7 +171,16 @@ await server.start(); // standalone, or registers its routes on `app` (registerR
   names a `state_handle` is routed to the instance holding that state. An instance is kept while
   it holds state and disposed when it no longer does. It goes back to the pool only after
   `idle()`.
-- **`stop()`** drains the pool and reports what could not be undone.
+- **Leaving the pool.** An instance that leaves the pool — nothing held after its request, its
+  stop tool, the idle bound, shutdown — goes through the awaited `dispose()` and then the terminal
+  close. One whose undo failed is kept for a retry (it has not left); when it leaves, the terminal
+  close runs whatever the retry answered. After the idle bound's stop a pooled instance's
+  connections are closed even when the undo failed.
+- **Shutdown** (`beginShutdown()`, `stopListening()`, `lastStep()`, driven by lib's
+  `installTransportShutdown`): the pool stops admitting (`503`) in the latch's tick, the listener
+  closes, every registered tool settles, then the pool's shutdown disposes and logs off every
+  instance and reports what could not be undone, each instance by its ordinal. `stop()` is the same
+  for an embedder, without the wait on the tools.
 
 ### SseServer (`@mcp-abap-adt/sse`)
 
@@ -146,8 +195,13 @@ await server.start();
   Its own `x-sap-*` headers are not read.
 - **Refusals.** A `GET` without credentials, and a `GET` or `POST` carrying `x-mcp-destination`,
   are answered `400`.
-- **Closing a connection.** When a connection closes, its session is removed, its transport and
-  MCP server are closed, and its held state is shut down.
+- **Closing a connection.** One cleanup per connection, installed before the first setup await:
+  the response's `close`, the stream's failure and a rejected `connect` all reach it. The session
+  leaves the routing map first; then the instance close (above) — its tools awaited, its state
+  undone, its connections logged off, its MCP server and stream closed. An instance whose
+  connection closed during setup is never routed to.
+- **Shutdown** (`stopListening()`, `lastStep()`): after every registered tool settled, the instance
+  close of every connection, joined where one is already closing.
 
 ### EmbeddableMcpServer (`@mcp-abap-adt/lib`): the consumer's connection
 

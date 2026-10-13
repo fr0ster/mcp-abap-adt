@@ -23,8 +23,11 @@
  *
  * A8's cancellation case (D5): a call cancelled after its connection is
  * ready — while the system lookup an ABAP Cloud call makes first is held at
- * the stand-in — never reaches its tool, the same on both sets. A10 adds its
- * shutdown cases here. Every case runs
+ * the stand-in — never reaches its tool, the same on both sets. A10's
+ * shutdown cases (D33, D55): a write whose update is held at the stand-in
+ * when the shutdown starts runs to its end — the `UNLOCK` lands, then the
+ * session's logoff, exit `0` — and a call arriving after the latch reaches no
+ * tool, the same on both sets. Every case runs
  * in this process against real sockets (HTTP, SSE) or an in-memory MCP
  * transport (stdio), with the process's edges given to `main`.
  */
@@ -49,14 +52,19 @@ import { CORE_VERSION } from '../../../server/src/coreVersion';
 import { main as coreMain } from '../../../server/src/launcher';
 import { main as sseMain } from '../../../sse/src/launcher';
 import { SSE_VERSION } from '../../../sse/src/sseVersion';
-import { activeTools } from '../../lib/activeTools';
+import { activeTools, resetProcessLatchForTests } from '../../lib/activeTools';
 import { parametersHelp } from '../../lib/config/authParameters';
 import {
   CREDENTIALS_REQUIRED_WORDS,
   DESTINATIONS_ONLY_STDIO_WORDS,
 } from '../../lib/httpTransport';
 import { fullToolSet, type ToolSet } from '../../lib/toolSet';
-import { type AdtStandIn, adtStandIn, basicOf } from '../helpers/adtStandIn';
+import {
+  type AdtStandIn,
+  adtStandIn,
+  basicOf,
+  isLogoff,
+} from '../helpers/adtStandIn';
 
 type TransportName = 'stdio' | 'http' | 'sse';
 type SetName = 'full' | 'compact';
@@ -262,6 +270,8 @@ interface Run {
   processLike: Edges['processLike'];
   /** Ends a running server as a signal would, and waits for its exit. */
   stop(): Promise<number>;
+  /** Resolves with the first exit code, however the shutdown was started. */
+  exited: Promise<number>;
 }
 
 async function run(
@@ -279,6 +289,9 @@ async function run(
   const processLike = Object.assign(new EventEmitter(), {
     stdin: new EventEmitter(),
   });
+  // One process, one shutdown: an earlier launcher's shutdown in this test
+  // process latched the registry; a new launcher is a new program.
+  resetProcessLatchForTests();
   await launcher.main({
     argv,
     stdout: (line) => stdout.push(line),
@@ -299,6 +312,7 @@ async function run(
       processLike.emit('SIGTERM');
       return exit;
     },
+    exited: exit,
   };
   open.runs.push(started);
   return started;
@@ -1081,6 +1095,255 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       const full = await cancelledRead(transportName, 'full');
       const compact = await cancelledRead(transportName, 'compact');
       expect(full).toEqual({ reached: false, exit: 0 });
+      expect(compact).toEqual(full);
+    });
+  },
+);
+
+/** A write of one class on each set: lock, update, unlock. */
+const writeCall = (
+  set: SetName,
+  className: string,
+): { name: string; arguments: Record<string, unknown> } => {
+  const source_code = `CLASS ${className} DEFINITION. ENDCLASS. CLASS ${className} IMPLEMENTATION. ENDCLASS.`;
+  return set === 'full'
+    ? { name: 'UpdateClass', arguments: { class_name: className, source_code } }
+    : {
+        name: 'HandlerUpdate',
+        arguments: { object_type: 'CLASS', class_name: className, source_code },
+      };
+};
+
+/** A `tools/call` written in two halves on a raw socket: accepted before `finish()`. */
+function halfPost(
+  port: number,
+  pathAndQuery: string,
+  headers: Record<string, string>,
+  body: object,
+) {
+  const text = JSON.stringify(body);
+  const half = Math.floor(text.length / 2);
+  const socket = net.connect(port, '127.0.0.1');
+  socket.on('error', () => undefined);
+  let received = '';
+  socket.on('data', (chunk) => {
+    received += chunk.toString('utf8');
+  });
+  const ended = new Promise<void>((r) => socket.on('close', () => r()));
+  const head = [
+    `POST ${pathAndQuery} HTTP/1.1`,
+    `Host: 127.0.0.1:${port}`,
+    'Content-Type: application/json',
+    'Accept: application/json, text/event-stream',
+    `Content-Length: ${Buffer.byteLength(text)}`,
+    'Connection: close',
+    ...Object.entries(headers).map(([k, v]) => `${k}: ${v}`),
+  ].join('\r\n');
+  const sent = new Promise<void>((resolve) =>
+    socket.on('connect', () =>
+      socket.write(`${head}\r\n\r\n${text.slice(0, half)}`, () => resolve()),
+    ),
+  );
+  return {
+    sent,
+    finish: async () => {
+      socket.write(text.slice(half));
+      await ended;
+      return Number(received.split(' ')[1]);
+    },
+  };
+}
+
+/** What a refused call answered: the fields that tell the shutdown refusal. */
+const shutdownRefusalOf = (outcome: Record<string, unknown>) => ({
+  ok: outcome.ok,
+  kind: outcome.kind,
+  server: outcome.server,
+});
+
+/**
+ * A write whose update is held at the stand-in when the shutdown starts
+ * (stdio: stdin's end; http and sse: `SIGTERM`), and a call accepted before
+ * the latch whose body — or, over stdio, whose message — arrives after it.
+ */
+async function shutdownCase(transportName: TransportName, set: SetName) {
+  const launcher = LAUNCHERS[transportName][set];
+  const className = 'ZCL_PARITY_DOWN';
+  const lateClass = 'ZCL_PARITY_LATE';
+  const isUpdate = (r: { method: string; url: string }) =>
+    r.method === 'PUT' && r.url.includes(className.toLowerCase());
+  const hold = standIn.hold(isUpdate);
+  let started: Run;
+  let written: Promise<Record<string, unknown>>;
+  let late: () => Promise<unknown>;
+
+  if (transportName === 'stdio') {
+    const envFile = path.join(workdir, 'shutdown.env');
+    fs.writeFileSync(
+      envFile,
+      [
+        `SAP_URL=${standIn.url}`,
+        'SAP_CLIENT=100',
+        'SAP_AUTH_TYPE=basic',
+        'SAP_USERNAME=PARITY_USER',
+        'SAP_PASSWORD=parity-password',
+        '',
+      ].join('\n'),
+    );
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'parity', version: '1.0.0' });
+    open.clients.push(client);
+    started = await run(
+      launcher,
+      [`--env-path=${envFile}`, '--system-type=onprem'],
+      serverSide,
+    );
+    await client.connect(clientSide);
+    written = client
+      .callTool(writeCall(set, className), undefined, { timeout: 600_000 })
+      .then(outcomeOf);
+    await hold.arrived;
+    started.processLike.stdin.emit('end');
+    late = async () =>
+      shutdownRefusalOf(
+        outcomeOf(await client.callTool(writeCall(set, lateClass))),
+      );
+  } else if (transportName === 'http') {
+    const port = await freePort();
+    started = await run(launcher, [
+      '--host=127.0.0.1',
+      `--port=${port}`,
+      '--system-type=onprem',
+    ]);
+    const post = (body: object) =>
+      fetch(`http://127.0.0.1:${port}/mcp/stream/http`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          ...basicHeaders(),
+        },
+        body: JSON.stringify(body),
+      });
+    written = post({
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/call',
+      params: writeCall(set, className),
+    })
+      .then((r) => r.json())
+      .then((b) => outcomeOf((b as { result: unknown }).result));
+    await hold.arrived;
+    const pending = halfPost(port, '/mcp/stream/http', basicHeaders(), {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: writeCall(set, lateClass),
+    });
+    await pending.sent;
+    await new Promise((r) => setTimeout(r, 100));
+    started.processLike.emit('SIGTERM');
+    late = async () => ({ status: await pending.finish() });
+  } else {
+    const port = await freePort();
+    started = await run(launcher, [
+      '--sse-host=127.0.0.1',
+      `--sse-port=${port}`,
+      '--system-type=onprem',
+    ]);
+    const controller = new AbortController();
+    const stream = await fetch(`http://127.0.0.1:${port}/sse`, {
+      headers: basicHeaders(),
+      signal: controller.signal,
+    });
+    const next = eventReader(stream.body as ReadableStream<Uint8Array>);
+    const postPath = await next('endpoint');
+    await fetch(new URL(postPath, `http://127.0.0.1:${port}`), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id: 1,
+        method: 'tools/call',
+        params: writeCall(set, className),
+      }),
+    });
+    await hold.arrived;
+    const pending = halfPost(
+      port,
+      postPath,
+      {},
+      {
+        jsonrpc: '2.0',
+        id: 2,
+        method: 'tools/call',
+        params: writeCall(set, lateClass),
+      },
+    );
+    await pending.sent;
+    await new Promise((r) => setTimeout(r, 100));
+    started.processLike.emit('SIGTERM');
+    const answers = new Map<number, Record<string, unknown>>();
+    const answerOf = async (id: number) => {
+      while (!answers.has(id)) {
+        const message = JSON.parse(await next('message')) as {
+          id: number;
+          result: unknown;
+        };
+        answers.set(message.id, outcomeOf(message.result));
+      }
+      return answers.get(id) as Record<string, unknown>;
+    };
+    late = async () => {
+      expect(await pending.finish()).toBe(202);
+      return shutdownRefusalOf(await answerOf(2));
+    };
+    written = answerOf(1).finally(() => controller.abort());
+  }
+
+  const lateAnswer = await late();
+  hold.release();
+  const writtenAnswer = await written;
+  const exit = await started.exited;
+  const log = standIn.requests;
+  const update = log.findIndex(isUpdate);
+  const unlock = log.findIndex(
+    (r, i) => i > update && r.url.includes('_action=UNLOCK'),
+  );
+  await until(() =>
+    standIn.requests.some((r, i) => i > unlock && isLogoff(r.url)),
+  );
+  return {
+    exit,
+    written: writtenAnswer,
+    unlockAfterUpdate: update >= 0 && unlock > update,
+    late: lateAnswer,
+    lateReached: log.some((r) => r.url.includes(lateClass.toLowerCase())),
+  };
+}
+
+describe.each<TransportName>(['stdio', 'http', 'sse'])(
+  '%s: the shutdown, on both sets (D33, D55)',
+  (transportName) => {
+    jest.setTimeout(60_000);
+
+    it('a held write runs to its end, its UNLOCK and then the logoff land, exit 0; a call after the latch reaches no tool', async () => {
+      const full = await shutdownCase(transportName, 'full');
+      const compact = await shutdownCase(transportName, 'compact');
+      expect(full).toMatchObject({
+        exit: 0,
+        written: { ok: true },
+        unlockAfterUpdate: true,
+        lateReached: false,
+        late:
+          transportName === 'http'
+            ? { status: 503 }
+            : {
+                ok: false,
+                kind: 'interactive-login',
+                server: 'The server is shutting down.',
+              },
+      });
       expect(compact).toEqual(full);
     });
   },

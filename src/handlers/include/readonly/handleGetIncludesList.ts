@@ -182,19 +182,23 @@ export async function handleGetIncludesList(
     // Default timeout: 30 seconds per request
     const requestTimeout =
       timeout && typeof timeout === 'number' ? timeout : 30000;
-    const withTimeout = <T>(p: Promise<T>, what: string): Promise<T> =>
-      Promise.race([
+    const withTimeout = <T>(p: Promise<T>, what: string): Promise<T> => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      // The timer is cleared once the request settles: a pending one kept
+      // the process (and Jest) alive for its whole length.
+      return Promise.race([
         p,
-        new Promise<never>((_, reject) =>
-          setTimeout(
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
             () =>
               reject(
                 new Error(`Timeout after ${requestTimeout}ms while ${what}`),
               ),
             requestTimeout,
-          ),
-        ),
-      ]);
+          );
+        }),
+      ]).finally(() => clearTimeout(timer));
+    };
 
     logger?.info(
       `Starting includes tree discovery for ${parent.name} (${parent.kind})`,

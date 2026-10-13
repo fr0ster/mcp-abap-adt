@@ -24,6 +24,7 @@ export {
   type RemovedParameter,
   readParameters,
   refuseRemovedParameters,
+  SHUTDOWN_TIMEOUT_ROW,
   SSE_ELSEWHERE,
   SSE_OPTIONS_REMOVED,
   STATE_IDLE_CLI,

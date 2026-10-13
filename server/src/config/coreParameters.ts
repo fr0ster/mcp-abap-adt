@@ -16,6 +16,7 @@ import {
   type ParameterValue,
   parameterSource,
   readParameters,
+  SHUTDOWN_TIMEOUT_ROW,
   SSE_OPTIONS_REMOVED,
   STATE_IDLE_ROW,
   SYSTEM_TYPE_ROW,
@@ -227,6 +228,7 @@ export function coreParameters(
       ...CORE_ROWS,
       LOGIN_TIMEOUT_ROW,
       STATE_IDLE_ROW,
+      SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
       transportRemoved('stdio'),
@@ -334,6 +336,7 @@ export function readCoreConfig(
     // (effectiveSystemType), as for the connection type.
     systemTypeSource: source('systemType'),
     stateIdleMinutes: values.stateIdleMinutes as number,
+    shutdownTimeout: values.shutdownTimeout as number | undefined,
     mcpDestination: str(values.mcpDestination),
     envDestination,
     envPath,

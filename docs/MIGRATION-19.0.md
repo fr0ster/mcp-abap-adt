@@ -83,6 +83,15 @@ The packages, all at **19.0.0**:
   `x-sap-debug-terminal-id` / `x-sap-debug-ide-id`, then `SAP_DEBUG_TERMINAL_ID` /
   `SAP_DEBUG_IDE_ID` of the environment; a destination's `.env` (and its `SAP_DEBUG_*`) is read only
   by `mcp-abap-adt` (stdio).
+- **Every ADT session ends with a logoff.** A request's instance logs off its ADT session when the
+  pool lets it go (after the request when it holds nothing; for a pooled instance, when its state
+  ends — its stop tool or the idle bound — or at shutdown), whatever the state's undo answered.
+- **Shutdown waits for the running tools** (no 30-second deadline): `SIGTERM` / `SIGINT` stops new
+  requests (`503`), waits for every running tool on every instance — none aborted —, then disposes
+  the pool's instances and logs off their sessions; exit `0`, or `1` with one line per instance
+  whose state could not be undone (named by its ordinal). A second signal or
+  **`--shutdown-timeout=<seconds>`** ends the waiting: every session is still logged off, exit `1`
+  naming the requests still running. In a container, set it below the orchestrator's kill grace.
 
 ## SSE users
 
@@ -106,6 +115,14 @@ The packages, all at **19.0.0**:
   connection closes, its stop tool runs or the idle bound ends it. Its ids come from the opening
   `GET`'s `x-sap-debug-*` headers, then `SAP_DEBUG_*` of the environment; a destination's `.env` is
   read only by `mcp-abap-adt` (stdio).
+- **A closed SSE connection's instance is disposed after its tools finished.** Its running tools
+  run to their end (18.x undid the state while they ran), then its held state is undone and its
+  ADT sessions are logged off — whatever the undo answered —, then its stream is closed. A `POST`
+  for a closing connection reaches no tool. A connection that closes, or fails, while it is being
+  set up is disposed too (18.x left it).
+- **Shutdown waits for the running tools**, as for HTTP: every open connection's instance is closed
+  after its tools settled, its sessions logged off, its stream ended; `--shutdown-timeout` and a
+  second signal end the waiting the same way.
 
 ## compact users
 
@@ -186,8 +203,24 @@ packages, each with one binary and its transport's options only:
   would need a login answers `renewal-declined` with "Logins are off (`--renewal=refresh-only`):
   log in with `mcp-auth`, or start without it."
 - **A failed write to your `--env` / `--env-path` file fails the request** and refuses the
-  destination until a write lands (18.x logged it and went on). A named destination's failed write
-  is still only logged (on stderr only with `DEBUG_AUTH_LOG=true`).
+  destination until a write lands (18.x logged it and went on): the tool answers `unknown`
+  (`persisting-tokens`) with "The session could not be written to the destination's file." A
+  named destination's failed write (`--unsafe`) lets the request go on and writes one stderr line,
+  `[MCP] A session write did not land: …`, **whatever `DEBUG_AUTH_LOG` says** (18.x: only with
+  `DEBUG_AUTH_LOG=true`).
+- **There is no shutdown deadline** (18.x gave up after 30 seconds). On `SIGTERM`, `SIGINT` or the
+  end of stdin the server stops taking calls (a call read from then on is answered "The server is
+  shutting down."), **waits for every running tool to finish** — none is aborted, so a write's
+  `UNLOCK` still goes out —, undoes its held state, **logs off every ADT session it opened** (the
+  logoff is what releases a lock a tool left), then writes the pending session secrets and exits
+  `0`, or `1` with one stderr line per fact not done. stdin's `end` and `close` are one trigger.
+  No interactive login starts once the shutdown began.
+- **Ending the waiting early**: a second `SIGTERM` / `SIGINT`, or **`--shutdown-timeout=<seconds>`**
+  (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; 1-86400, no default). Either is the forced
+  close: no more waiting on a tool, a state undo or a session write; every ADT session is still
+  logged off; exit `1` with a line per tool still running and the step that was cut short. What it
+  costs: a tool cut short mid-write, a session write lost — a discarded refresh token can come
+  back on the next start.
 - **The startup check builds the credential.** A destination the broker refuses (a missing client
   field, say) now stops the start, exit `1`, instead of failing the first tool call.
 - **There is no 30-second login timeout.** A login waits until the browser answers, the identity
@@ -254,14 +287,35 @@ packages, each with one binary and its transport's options only:
   `request_aborted` answer); the tools a registry
   registers itself (`registerAllTools`) are tracked the same way. A
   `ConnectionSource.resolve(signal)` gets it and should race its own waits against it
-  (`raceRequestSignal(work, signal)`). Live calls are listed by `activeTools()` and aborted by
-  `abortActiveTools()`. All of these come from `@mcp-abap-adt/lib/embeddable`.
+  (`raceRequestSignal(work, signal)`). All of these come from `@mcp-abap-adt/lib/embeddable`.
+- **The registry of live calls aborts nothing** (`@mcp-abap-adt/lib/embeddable`): `activeTools()`
+  lists the calls of every instance, `settled(instance?)` waits for them, `latch(instance?)` makes
+  every later call of the process (or of one instance) answer the shutdown refusal before any
+  connection, `pending()` names what still runs. Nothing aborts a call that runs: a tool already
+  running runs to its end, and a cancelled call ends only its waits.
+- **Ending an instance has two parts.** `BaseMcpServer.dispose()` stays the state undo — callable
+  again, each call retrying what is left — and closes no connection. Beside it,
+  **`terminalClose()`** (lib's `closeOwnedConnections(instance)`) closes every connection the
+  instance owns — the one it built, held state's own, package lock sessions, fresh connections
+  still open — each with its one `disconnect()` (the logoff, which releases its SAP locks),
+  whatever the undo answered; a connection you injected is never closed. A host that lets an
+  instance go runs both; **`closeInstance(instance)`** runs the whole close in order (the
+  instance's latch, its calls settle, the undo, the terminal close, the MCP server's close), once
+  per instance. `forceClose()` logs off every connection the process owns without waiting on
+  anything else, for a host's own escape.
+- **The server replaces its connection only when SAP lost its session** (or a new credential
+  arrives): the next call gets a new connection instance, the spent one is logged off; the call
+  that met the loss gets the connection's error as it is.
 - **`IAuthBrokerFactoryConfig.loginTimeoutStated?`** names the bound in D10's sentence (the
   launcher passes the form the user set, `` `--login-timeout=300` ``); absent, the sentence names
   `` `loginTimeoutMs: <ms>` ``, never a value the CLI would refuse.
-- **`IDestinations.getProvider(destination, { signal })`** takes the request's signal, and
-  `settle(deadlineMs, { signal })` hands it to the broker's `flush`. `SettleReport.notStored` lines
-  are `"<destination>": <reason>`, the reason auth-errors' classification.
+- **`IDestinations.getProvider(destination, { signal })`** takes the request's signal.
+  `settle({ signal })` takes **no deadline** (18.x: `settle(deadlineMs)`): it closes the gate,
+  disposes the logins, waits for the counted calls as long as they take, and hands the signal to
+  the broker's `flush`; `SettleReport` is `{ notStored }` — `abandoned` is gone.
+  `SettleReport.notStored` lines are `"<destination>": <reason>`, the reason auth-errors'
+  classification. `beginShutdown()` (new) refuses every later interactive login with the shutdown
+  sentence while the gate stays open for running tools.
 - **`inspectionOnlyDestinations()` is gone**: `new StdioServer(registry, undefined)` is
   inspection-only, and a tool call answers lib's `ServerRefusal('inspection_only')`
   (`@mcp-abap-adt/lib/auth`).

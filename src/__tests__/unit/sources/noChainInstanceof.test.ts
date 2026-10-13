@@ -49,23 +49,11 @@ const THROWN_SCOPE = [
 ];
 
 /**
- * The exact findings allowed, each with its reason. Main's instance pool,
- * carried as it is (ruling 16), quotes the held state's undo words in its
- * shutdown report; A10 removes both (the report reads `failureOf(e)?.message
- * ?? errorClassOf(e)`), and this list is then empty.
+ * The exact findings allowed, each with its reason. Empty: the instance
+ * pool's shutdown report reads the state's own words (`failures`), else
+ * `failureOf(e)?.message ?? errorClassOf(e)` (A10) — never a thrown message.
  */
-const ALLOWED: ReadonlyArray<{ where: string; text: string; why: string }> = [
-  {
-    where: 'http/src/InstancePool.ts:83',
-    text: 'e.message',
-    why: "the held state's undo words in the pool's shutdown report (A10)",
-  },
-  {
-    where: 'http/src/InstancePool.ts:83',
-    text: 'String(e)',
-    why: "the held state's undo words in the pool's shutdown report (A10)",
-  },
-];
+const ALLOWED: ReadonlyArray<{ where: string; text: string; why: string }> = [];
 
 /** Keyed by file, line and exact expression: any other read in that file fails. */
 const isAllowed = (finding: Finding) =>

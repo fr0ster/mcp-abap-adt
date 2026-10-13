@@ -17,6 +17,7 @@ import {
   type ParameterValue,
   parameterSource,
   readParameters,
+  SHUTDOWN_TIMEOUT_ROW,
   STATE_IDLE_ROW,
   SYSTEM_TYPE_ROW,
   type TlsConfig,
@@ -115,6 +116,7 @@ export function sseParameters(
       ...SSE_ROWS,
       ...tlsRows('sse'),
       STATE_IDLE_ROW,
+      SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
       transportRemoved('sse'),
@@ -167,6 +169,7 @@ export function readSseConfig(
     systemType: values.systemType as SseConfig['systemType'],
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
     stateIdleMinutes: values.stateIdleMinutes as number,
+    shutdownTimeout: values.shutdownTimeout as number | undefined,
     host: values.host as string,
     port: values.port as number,
     ssePath: values.ssePath as string | undefined,

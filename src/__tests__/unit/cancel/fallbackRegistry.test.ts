@@ -62,8 +62,9 @@ beforeEach(() => {
   const register = activeToolsModule.registerActiveTool;
   jest
     .spyOn(activeToolsModule, 'registerActiveTool')
-    .mockImplementation((controller) => {
-      const remove = register(controller);
+    .mockImplementation((controller, entry) => {
+      const remove = register(controller, entry);
+      if (remove === undefined) return undefined;
       return () => {
         ended += 1;
         remove();

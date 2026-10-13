@@ -13,9 +13,30 @@
 
 export {
   type ActiveTool,
-  abortActiveTools,
+  type ActiveToolEntry,
   activeTools,
+  isLatched,
+  latch,
+  pending,
+  SHUTDOWN_SENTENCE,
+  settled,
+  shutdownRefusal,
 } from '../lib/activeTools.js';
+export {
+  type ClosableInstance,
+  closeInstance,
+  isClosing,
+} from '../lib/instanceClose.js';
+export {
+  CLOSE_FAILED_WORDS,
+  type ConnectionRole,
+  closeOwnedConnections,
+  endConnection,
+  forceClose,
+  isEnded,
+  own,
+  ownedConnections,
+} from '../lib/ownedConnections.js';
 export {
   currentRequestSignal,
   RequestAbortedError,
@@ -23,6 +44,14 @@ export {
   runWithRequestSignal,
   throwIfRequestAborted,
 } from '../lib/requestSignal.js';
+export {
+  cutShortLine,
+  installShutdownSequence,
+  type ShutdownProcess,
+  type ShutdownRun,
+  type ShutdownSequenceOptions,
+  stillRunningLine,
+} from '../lib/shutdownSequence.js';
 export * from './BaseMcpServer.js';
 export * from './ConnectionContext.js';
 export * from './EmbeddableMcpServer.js';

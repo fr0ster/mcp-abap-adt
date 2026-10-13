@@ -681,6 +681,57 @@ export const STATE_IDLE_ROW: Parameter = {
   help: `Held state (a debug session) ends after this many minutes without a tool call. Default and minimum: 30; maximum: ${MAX_STATE_IDLE_MINUTES}; a whole number. Activity is a tool call on the instance; a call in flight (a wait on the server) pauses the bound, and a listener's own background re-poll does not count.`,
 };
 
+/** The longest `--shutdown-timeout`: a day. */
+export const MAX_SHUTDOWN_TIMEOUT_SECONDS = 86_400;
+
+/**
+ * `--shutdown-timeout`'s value: a whole number of seconds from 1 to 86 400,
+ * read by plain code — ASCII digits only, as a string or a YAML number.
+ */
+export function parseShutdownTimeout(raw: unknown, name: string): number {
+  const text = typeof raw === 'string' ? raw.trim() : String(raw);
+  let digits = text.length > 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text.charCodeAt(i);
+    if (c < 48 || c > 57) digits = false;
+  }
+  const value =
+    typeof raw === 'number'
+      ? raw
+      : digits
+        ? Number.parseInt(text, 10)
+        : Number.NaN;
+  if (
+    !Number.isInteger(value) ||
+    value < 1 ||
+    value > MAX_SHUTDOWN_TIMEOUT_SECONDS
+  ) {
+    throw new ParameterRefusal(
+      `Invalid ${name}: "${text}". Must be a whole number of seconds from 1 to ${MAX_SHUTDOWN_TIMEOUT_SECONDS}`,
+    );
+  }
+  return value;
+}
+
+/**
+ * `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` / `shutdown-timeout` (D33),
+ * in every binary's table: the forced close after this many seconds of a
+ * shutdown. **No default**: without it a shutdown waits for every running
+ * tool, every state undo and every session write, as long as they take; a
+ * second `SIGTERM` / `SIGINT` is the other way to end the waiting.
+ */
+export const SHUTDOWN_TIMEOUT_ROW: Parameter = {
+  key: 'shutdownTimeout',
+  cli: '--shutdown-timeout',
+  env: 'MCP_SHUTDOWN_TIMEOUT',
+  yaml: 'shutdown-timeout',
+  kind: 'custom',
+  parse: parseShutdownTimeout,
+  valueHint: '=<seconds>',
+  section: 'OPTIONS',
+  help: `Ends a shutdown that has not finished after this many seconds (1-${MAX_SHUTDOWN_TIMEOUT_SECONDS}): running tools are no longer waited for, every ADT session is logged off, exit 1 naming what was still running. Default: none — a shutdown waits for running tools to finish and session writes to land; a second SIGTERM/SIGINT ends the waiting the same way. What it costs: a tool cut short, a session write lost (a discarded refresh token can come back)`,
+};
+
 /**
  * The TLS rows (D50), read by `mcp-abap-adt-http` and `mcp-abap-adt-sse`:
  * `--tls-cert` / `--tls-key` / `--tls-ca`, `MCP_TLS_*`, YAML

@@ -9,6 +9,7 @@
  * Nothing here launches a browser or a program: the browser is the test's.
  */
 
+import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -32,10 +33,15 @@ import {
   PROBE_PATH,
   probeGroup,
 } from '../../../../src/__tests__/helpers/adtStandIn';
-import { activeTools } from '../../../../src/lib/activeTools';
+import { shutdownTools } from '../../../../src/__tests__/helpers/shutdownTools';
+import {
+  activeTools,
+  resetProcessLatchForTests,
+} from '../../../../src/lib/activeTools';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import type { IAuthBrokerFactoryConfig } from '../../auth/IAuthBrokerFactoryConfig';
 import { StdioServer } from '../../StdioServer';
+import { installShutdown } from '../../shutdown';
 import { silentLogger } from './factoryFixture';
 
 export interface Deferred<T> {
@@ -233,6 +239,17 @@ export interface StandOptions {
    * ended, before the connect waiting for it fails.
    */
   holdRefusedPrepare?: () => Promise<void>;
+  /** The factory's `renewal`. */
+  renewal?: 'refresh-then-login' | 'refresh-only';
+  /** An env file to serve instead of a new one (a later factory over the same file). */
+  envFile?: string;
+  /**
+   * Installs core's shutdown on a fake process (`processLike`), with this
+   * `--shutdown-timeout` in milliseconds, if any.
+   */
+  shutdown?: { timeoutMs?: number };
+  /** Where the factory's prompt logger writes (`info`: stderr in the program). */
+  promptLines?: string[];
 }
 
 export interface Stand {
@@ -255,6 +272,18 @@ export interface Stand {
   reached(id: string): boolean;
   /** The calls registered and still running, across the process. */
   active(): number;
+  /** Any tool call: its answer's text and whether it is an error. */
+  callTool(
+    name: string,
+    args: Record<string, unknown>,
+  ): Promise<{ text: string; isError: boolean } | 'cancelled'>;
+  /** The env file served. */
+  envFile: string;
+  /** With `shutdown`: the fake process, the exits and the shutdown's lines. */
+  processLike: EventEmitter & { stdin: EventEmitter };
+  exits: number[];
+  shutdownLines: string[];
+  exited: Promise<number>;
   close(): Promise<void>;
 }
 
@@ -267,28 +296,29 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
   const root = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'cancel-stand-')),
   );
-  const envFile = path.join(root, 'conn.env');
-  fs.writeFileSync(
-    envFile,
-    [
-      `SAP_URL=${adt.url}`,
-      'SAP_CLIENT=100',
-      ...(options.auth === 'jwt'
-        ? [
-            'SAP_AUTH_TYPE=jwt',
-            'SAP_GRANT_TYPE=authorization_code',
-            `SAP_UAA_URL=${tokens.url}`,
-            'SAP_UAA_CLIENT_ID=client-id',
-            'SAP_UAA_CLIENT_SECRET=client-secret',
-          ]
-        : [
-            'SAP_AUTH_TYPE=basic',
-            'SAP_USERNAME=CANCEL_USER',
-            'SAP_PASSWORD=cancel-password',
-          ]),
-      '',
-    ].join('\n'),
-  );
+  const envFile = options.envFile ?? path.join(root, 'conn.env');
+  if (options.envFile === undefined)
+    fs.writeFileSync(
+      envFile,
+      [
+        `SAP_URL=${adt.url}`,
+        'SAP_CLIENT=100',
+        ...(options.auth === 'jwt'
+          ? [
+              'SAP_AUTH_TYPE=jwt',
+              'SAP_GRANT_TYPE=authorization_code',
+              `SAP_UAA_URL=${tokens.url}`,
+              'SAP_UAA_CLIENT_ID=client-id',
+              'SAP_UAA_CLIENT_SECRET=client-secret',
+            ]
+          : [
+              'SAP_AUTH_TYPE=basic',
+              'SAP_USERNAME=CANCEL_USER',
+              'SAP_PASSWORD=cancel-password',
+            ]),
+        '',
+      ].join('\n'),
+    );
 
   const logins: LoginSettlements = [];
   const strategyOf = (
@@ -320,8 +350,17 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
     browser: browser.browser,
     browserAuthPort: 0,
     browserStrategy: (o) => strategyOf(browserCallbackStrategy(o)),
-    promptLogger: silentLogger,
+    promptLogger:
+      options.promptLines === undefined
+        ? silentLogger
+        : {
+            ...silentLogger,
+            info: (line: string) => {
+              options.promptLines?.push(line);
+            },
+          },
     logger: silentLogger,
+    ...(options.renewal !== undefined && { renewal: options.renewal }),
     ...(options.loginTimeoutStated !== undefined && {
       loginTimeoutStated: options.loginTimeoutStated,
     }),
@@ -355,7 +394,7 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
     return wrapper;
   };
   const server = new StdioServer(
-    new CompositeHandlersRegistry([probeGroup()]),
+    new CompositeHandlersRegistry([probeGroup(shutdownTools())]),
     {
       settingsFor: (d) => factory.settingsFor(d),
       systemContextFor: (d) => factory.systemContextFor(d),
@@ -378,6 +417,31 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
       stderr.push(String(chunk));
       return true;
     });
+
+  resetProcessLatchForTests();
+  const processLike = Object.assign(new EventEmitter(), {
+    stdin: new EventEmitter(),
+  });
+  const exits: number[] = [];
+  const shutdownLines: string[] = [];
+  let exitedWith!: (code: number) => void;
+  const exited = new Promise<number>((r) => {
+    exitedWith = r;
+  });
+  if (options.shutdown !== undefined) {
+    installShutdown({
+      factory,
+      instance: server,
+      onStdinEnd: true,
+      exit: (code) => {
+        exits.push(code);
+        exitedWith(code);
+      },
+      stderr: (line) => shutdownLines.push(line),
+      processLike,
+      shutdownTimeoutMs: options.shutdown.timeoutMs,
+    });
+  }
 
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'cancel-stand', version: '1.0.0' });
@@ -417,12 +481,33 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
     },
     reached: (id) => adt.requests.some((r) => r.url === `${PROBE_PATH}${id}`),
     active: () => activeTools().length,
+    callTool: (name, args) =>
+      client
+        .callTool({ name, arguments: args }, undefined, { timeout: 600_000 })
+        .then(
+          (result) => {
+            const { content, isError } = result as {
+              content: { text: string }[];
+              isError?: boolean;
+            };
+            return { text: content[0]?.text ?? '', isError: !!isError };
+          },
+          () => 'cancelled' as const,
+        ),
+    envFile,
+    processLike,
+    exits,
+    shutdownLines,
+    exited,
     close: async () => {
       await client.close().catch(() => undefined);
-      await factory.settle(0).catch(() => undefined);
+      await factory
+        .settle({ signal: AbortSignal.abort() })
+        .catch(() => undefined);
       spy.mockRestore();
       await adt.close();
       await tokens.close();
+      // A given env file lives elsewhere: only this stand's own directory goes.
       fs.rmSync(root, { recursive: true, force: true });
     },
   };

@@ -650,14 +650,14 @@ describe('AuthBrokerFactory', () => {
       const { calls, release } = await withHeld(f, 'dest');
       const p = await f.getProvider('dest');
       const running = p.rejected(REJECTION_401);
-      const settling = f.settle(30_000);
+      const settling = f.settle();
       const later = await f.getProvider('other');
       await expect(later.prepare()).resolves.toEqual(SHUTDOWN_REFUSAL);
       await expect(p.authorize({} as never)).resolves.toEqual(SHUTDOWN_REFUSAL);
       expect(calls).toEqual(['rejected']);
       release();
       await running;
-      await expect(settling).resolves.toEqual({ abandoned: 0, notStored: [] });
+      await expect(settling).resolves.toEqual({ notStored: [] });
     });
 
     it('waits for a held call, then flushes every broker built, once each', async () => {
@@ -680,31 +680,61 @@ describe('AuthBrokerFactory', () => {
         events.push('answered');
         return o;
       });
-      const settling = f.settle(30_000);
+      const settling = f.settle();
       await tick();
       await tick();
       expect(events).toEqual([]);
       release();
       await running;
-      await expect(settling).resolves.toEqual({ abandoned: 0, notStored: [] });
+      await expect(settling).resolves.toEqual({ notStored: [] });
       expect(events[0]).toBe('answered');
       expect(events.slice(1).sort()).toEqual(['flush dest', 'flush other']);
       expect(broker.flush).toHaveBeenCalledTimes(1);
       expect(other.flush).toHaveBeenCalledTimes(1);
     });
 
-    it('reports the calls still running at the deadline as abandoned', async () => {
+    it('has no deadline: a held call keeps settle() waiting until it answers (D33)', async () => {
+      jest.useFakeTimers();
+      try {
+        basic('dest');
+        const f = factory();
+        const { broker, release } = await withHeld(f, 'dest');
+        const flush = jest.spyOn(broker, 'flush');
+        const p = await f.getProvider('dest');
+        const running = p.prepare();
+        let done = false;
+        const settling = f.settle().then((report) => {
+          done = true;
+          return report;
+        });
+        for (let i = 0; i < 10; i += 1) await Promise.resolve();
+        // No timer of the server's: nothing to advance to.
+        expect(jest.getTimerCount()).toBe(0);
+        jest.advanceTimersByTime(60 * 60_000);
+        for (let i = 0; i < 10; i += 1) await Promise.resolve();
+        expect(done).toBe(false);
+        expect(flush).not.toHaveBeenCalled();
+        release();
+        await running;
+        await expect(settling).resolves.toEqual({ notStored: [] });
+        expect(flush).toHaveBeenCalledTimes(1);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it("the shutdown's signal releases the drain and reaches flush()", async () => {
       basic('dest');
       const f = factory();
       const { broker, release } = await withHeld(f, 'dest');
-      const flush = jest.spyOn(broker, 'flush');
+      const flush = jest.spyOn(broker, 'flush').mockResolvedValue(undefined);
       const p = await f.getProvider('dest');
       const running = p.prepare();
-      await expect(f.settle(50)).resolves.toEqual({
-        abandoned: 1,
-        notStored: [],
-      });
-      expect(flush).toHaveBeenCalledTimes(1);
+      const forced = new AbortController();
+      const settling = f.settle({ signal: forced.signal });
+      forced.abort();
+      await expect(settling).resolves.toEqual({ notStored: [] });
+      expect(flush).toHaveBeenCalledWith({ signal: forced.signal });
       release();
       await running;
     });
@@ -727,8 +757,7 @@ describe('AuthBrokerFactory', () => {
       class OddStoreFailure extends Error {}
       const odd = new OddStoreFailure('placeholder-secret');
       jest.spyOn(b, 'flush').mockRejectedValue(odd);
-      const report = await f.settle(1_000);
-      expect(report.abandoned).toBe(0);
+      const report = await f.settle();
       expect(report.notStored.sort()).toEqual([
         `"dest": ${classify(storeError, 'persisting-tokens').reason}`,
         `"other": ${classify(odd, 'persisting-tokens').reason}`,
@@ -876,11 +905,11 @@ describe('AuthBrokerFactory', () => {
       return { provider, answered };
     }
 
-    it('a refresh held while settle(30_000) runs: it answers, its token is stored, abandoned 0', async () => {
+    it('a refresh held while settle() runs: it answers and its token is stored', async () => {
       const f = factory({ envFile: { path: envFile, source: '--env' } });
       const { answered } = await refreshing(f);
       let settled = false;
-      const settling = f.settle(30_000).then((r) => {
+      const settling = f.settle().then((r) => {
         settled = true;
         return r;
       });
@@ -889,22 +918,11 @@ describe('AuthBrokerFactory', () => {
       expect(settled).toBe(false);
       releaseRefresh();
       await expect(answered).resolves.toEqual(OK);
-      await expect(settling).resolves.toEqual({ abandoned: 0, notStored: [] });
+      await expect(settling).resolves.toEqual({ notStored: [] });
       const stored = fs.readFileSync(envFile, 'utf8');
       expect(stored).toContain(`SAP_JWT_TOKEN=${ACCESS_2}`);
       expect(stored).toContain('SAP_REFRESH_TOKEN=placeholder-refresh-2');
       expect(tokenRequests).toEqual(['authorization_code', 'refresh_token']);
-    });
-
-    it('a refresh held past a short deadline: abandoned 1', async () => {
-      const f = factory({ envFile: { path: envFile, source: '--env' } });
-      const { answered } = await refreshing(f);
-      await expect(f.settle(50)).resolves.toEqual({
-        abandoned: 1,
-        notStored: [],
-      });
-      releaseRefresh();
-      await answered;
     });
 
     it('a 401 after settle began: the shutdown refusal, the inner provider never called, nothing written after the flush', async () => {
@@ -915,7 +933,7 @@ describe('AuthBrokerFactory', () => {
       const innerRejected = jest.spyOn(inner, 'rejected');
       const flush = jest.spyOn(broker, 'flush');
 
-      const settling = f.settle(30_000);
+      const settling = f.settle();
       // A request on the wire comes back 401 while settle waits. Raced
       // against a timer: forwarded, it would join the held refresh and wait.
       const verdict = await Promise.race([

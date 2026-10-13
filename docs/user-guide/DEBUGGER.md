@@ -394,8 +394,15 @@ ends by:
   the listener was stopped still succeeds, and a caught debuggee nobody attaches
   is held by the system for about 30 seconds and then runs on.
 - **`AmdpDebugStop`**: the AMDP part only (below).
-- **the host**: stdio at exit, SSE when its connection closes, the pool at shutdown
-  — each does the same complete stop and reports what it could not undo.
+- **the host**: stdio at exit, SSE when its connection closes, the pool when it lets the
+  instance go and at shutdown — each does the same complete stop, **after the instance's running
+  tool calls have finished** (none is aborted: a debugger call in flight runs to its end first),
+  and reports what it could not undo. Then every ADT session the instance opened — the session's
+  own connections included — is logged off, **whatever the stop answered**: a stop that failed is
+  reported, never a reason to keep a session open.
+- **the idle bound's stop and a failed undo**: after the idle bound's stop the session's own
+  connections are logged off whatever the stop answered (over Streamable HTTP, where the pooled
+  instance ends with its state, every connection of the instance).
 - **the SAP system**, when it answers the listener with an error or a conflict
   notification (another IDE took the user's debugging over): the listener ends.
   The listener's stop is still owed then: the state stays held until `DebugStop`,

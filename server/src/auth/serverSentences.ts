@@ -5,6 +5,7 @@
  */
 
 import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
+import { SHUTDOWN_SENTENCE } from '@mcp-abap-adt/lib/embeddable';
 
 /** How the provider renews (`--renewal`, D11). */
 export type RenewalMode = 'refresh-then-login' | 'refresh-only';
@@ -18,8 +19,18 @@ export const RENEWAL_MODES: readonly RenewalMode[] = [
 export const REFRESH_ONLY_SENTENCE =
   'Logins are off (`--renewal=refresh-only`): log in with `mcp-auth`, or start without it.';
 
-/** D17: a provider call behind the closed gate, or a login after the shutdown began. */
-export const SHUTDOWN_SENTENCE = 'The server is shutting down.';
+/**
+ * D17: a provider call behind the closed gate, a login after the shutdown
+ * began, or a call a latch refused — lib's one sentence.
+ */
+export { SHUTDOWN_SENTENCE };
+
+/**
+ * §7.4: a session write that did not land, under `onWriteFailure: 'fail'`
+ * (the `--env` / `--env-path` file, D12): `unknown` `persisting-tokens`.
+ */
+export const PERSISTING_TOKENS_SENTENCE =
+  "The session could not be written to the destination's file.";
 
 /**
  * D10: the login was ended by the login bound, named as it was set —
@@ -48,6 +59,12 @@ export function serverSentence(
 ): string | undefined {
   if (error.kind === 'renewal-declined' && state.renewal === 'refresh-only') {
     return REFRESH_ONLY_SENTENCE;
+  }
+  if (
+    error.kind === 'unknown' &&
+    (error.facts as { operation?: unknown }).operation === 'persisting-tokens'
+  ) {
+    return PERSISTING_TOKENS_SENTENCE;
   }
   if (error.kind === 'interactive-login' && error.facts.outcome === 'aborted') {
     if (state.shuttingDown) return SHUTDOWN_SENTENCE;

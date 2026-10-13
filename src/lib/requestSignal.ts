@@ -6,8 +6,10 @@
  * (`requestContext.ts`), which stdio does not enter and whose presence
  * changes what `getEffectiveSystemContext` answers. The tool wrapper runs
  * the handler inside `runWithRequestSignal(signal, …)`. It is for the
- * server's own waits (D32) and D5's check only: nothing sent to SAP carries
- * it, and no `freshConnection` factory receives it (D55, D56).
+ * server's own waits (D32) and D5's check only: a tool's sends carry no
+ * request signal — nothing sent to SAP carries it, and no `freshConnection`
+ * factory receives it (D55, D56). Nothing reads it to abort a running tool:
+ * a started tool runs to its end, and a shutdown awaits it.
  *
  * Also here: what a cancelled request ends with, and the race a server's own
  * wait runs against the request's signal (D32).

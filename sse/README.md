@@ -51,7 +51,27 @@ As before 19.0.0, under the same names: `--sse-host` / `MCP_SSE_HOST`, `--sse-po
 `/messages`), `--sse-allowed-hosts` / `MCP_SSE_ALLOWED_HOSTS`, `--sse-allowed-origins` /
 `MCP_SSE_ALLOWED_ORIGINS`, `--sse-enable-dns-protection` / `MCP_SSE_ENABLE_DNS_PROTECTION`,
 `--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--exposition` (with
-`debug`), `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`.
+`debug`), `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`;
+new in 19.0.0, `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` (see [Shutdown](#shutdown)).
+
+## A closed connection disposes its instance
+
+When an SSE connection closes — or fails while it is being set up — its session leaves the
+routing map at once (a later `POST` for it is an unknown session) and its instance is closed, in
+order: no call of it starts any more, **its running tools run to their end and are awaited**, its
+held state is undone, its ADT sessions are logged off — whatever the undo answered: the logoff
+releases a lock a tool left —, then its MCP server and stream are closed. What the undo could not
+undo is written on stderr. Another connection's tools and instance are not touched.
+
+## Shutdown
+
+On `SIGTERM` / `SIGINT` the server stops listening and takes no new call (a `POST` arriving after
+it is answered "The server is shutting down." and reaches no tool), **waits for every running tool
+to finish** on every connection — none is aborted —, then closes every connection's instance as
+above (one already closing is joined) and ends its stream. It exits `0`, or `1` with one stderr
+line per state that could not be undone. There is no deadline. A second signal, or
+`--shutdown-timeout=<seconds>` (no default), forces it: nothing more is waited for, every ADT
+session is still logged off, exit `1` naming the requests still running.
 
 ## Health
 

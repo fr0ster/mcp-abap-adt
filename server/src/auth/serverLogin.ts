@@ -18,7 +18,11 @@
  * callback port is free when a login ends, cancelled or not.
  */
 
-import { readFailure } from '@mcp-abap-adt/auth-errors';
+import {
+  AuthProviderFailure,
+  authError,
+  readFailure,
+} from '@mcp-abap-adt/auth-errors';
 import type {
   AuthorizationOutcome,
   AuthorizationRequest,
@@ -72,6 +76,12 @@ export interface ServerLoginContext {
   record(strategy: IAuthorizationStrategy<string>): void;
   /** `--login-timeout`; absent: no bound. */
   readonly bound?: LoginBound | undefined;
+  /**
+   * Whether the shutdown began: from then on no interactive login starts —
+   * it is refused `interactive-login` `aborted`, answered with the shutdown
+   * sentence (§6.4, §7.4). Absent: never.
+   */
+  readonly shuttingDown?: (() => boolean) | undefined;
 }
 
 /**
@@ -86,6 +96,50 @@ export function promptLogger(
   return {
     info: (message: string) => stderr(message),
     warn: (message, meta) => diagnostics.warn(message, meta),
+    error: (message, meta) => diagnostics.error(message, meta),
+    debug: (message, meta) => diagnostics.debug(message, meta),
+  };
+}
+
+/**
+ * How the chain logs a session write that did not land under
+ * `onWriteFailure: 'continue'` (a named destination, D12): auth-broker's
+ * writer (`[AuthBroker] Session write for <destination> failed; …`) and
+ * auth-providers' `refreshStatePersistence`. That line is a report the user
+ * must see. Read by its fixed opening words — the chain gives it no code.
+ */
+export const WRITE_FAILED_WORDS = [
+  '[AuthBroker] Session write for ',
+  '[refreshStatePersistence] Writing the tokens failed',
+] as const;
+
+function isWriteFailed(message: unknown): boolean {
+  return (
+    typeof message === 'string' &&
+    WRITE_FAILED_WORDS.some((words) => message.startsWith(words)) &&
+    message.includes('fail')
+  );
+}
+
+export function brokerLogger(
+  stderr: (line: string) => void,
+  diagnostics: ILogger,
+): ILogger {
+  return {
+    info: (message, meta) => diagnostics.info(message, meta),
+    warn: (message, meta) => {
+      if (isWriteFailed(message)) {
+        // The server's own words and the line's `logFields` — never the
+        // chain's message, which names a destination and a path.
+        stderr(
+          meta === undefined
+            ? '[MCP] A session write did not land'
+            : `[MCP] A session write did not land: ${JSON.stringify(meta)}`,
+        );
+        return;
+      }
+      diagnostics.warn(message, meta);
+    },
     error: (message, meta) => diagnostics.error(message, meta),
     debug: (message, meta) => diagnostics.debug(message, meta),
   };
@@ -106,6 +160,13 @@ export function serverLogin(
     authorize: (
       request: AuthorizationRequest,
     ): Promise<AuthorizationOutcome<string>> => {
+      if (context.shuttingDown?.() === true) {
+        return Promise.reject(
+          new AuthProviderFailure(
+            authError['interactive-login']({ outcome: 'aborted' }),
+          ),
+        );
+      }
       const bound = context.bound;
       if (bound === undefined) return pass(request, request.signal);
       return bounded(bound, request, (signal) => pass(request, signal));

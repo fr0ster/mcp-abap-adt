@@ -22,7 +22,7 @@ jest.setTimeout(30_000);
 let s: Stand;
 
 beforeEach(async () => {
-  s = await stand();
+  s = await stand({ shutdown: {} });
 });
 
 afterEach(async () => {
@@ -55,4 +55,11 @@ it('the sole caller cancels while connect() is held: the late connection is kept
     '/sap/bc/adt/probe/r2',
   ]);
   expect(s.adt.requests.some((r) => isLogoff(r.url))).toBe(false);
+
+  // The terminal close at shutdown disconnects it, once.
+  s.processLike.emit('SIGTERM');
+  expect(await s.exited).toBe(0);
+  await until(() => s.adt.logoffs() === 1);
+  await turns(20);
+  expect(s.adt.logoffs()).toBe(1);
 });

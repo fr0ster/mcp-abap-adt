@@ -31,6 +31,7 @@ import type {
   IAuthProviderError,
   IRenewalStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
   type DestinationSystemContext,
@@ -51,7 +52,7 @@ import {
 } from './handlers';
 import type { IAuthBrokerFactory, SettleReport } from './IAuthBrokerFactory.js';
 import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
-import { type LoginBound, loginBound } from './serverLogin';
+import { brokerLogger, type LoginBound, loginBound } from './serverLogin';
 import {
   type RenewalMode,
   type ServerState,
@@ -102,6 +103,14 @@ function unstoredLines(destination: string, error: unknown): string[] {
     : [`"${destination}": ${classify(error, 'persisting-tokens').reason}`];
 }
 
+/** The broker's diagnostics when the factory was given no logger. */
+const SILENT: ILogger = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  debug: () => {},
+};
+
 const RENEWALS: Readonly<Record<RenewalMode, () => IRenewalStrategy>> = {
   'refresh-then-login': refreshThenLogin,
   'refresh-only': refreshOnly,
@@ -113,6 +122,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   private readonly config: IAuthBrokerFactoryConfig;
   private readonly context: AuthHandlerContext;
   private readonly gate = new ProviderGate();
+  /** The shutdown began: no interactive login starts, `aborted` is the shutdown's. */
+  private shutdownBegan = false;
   private readonly renewal: RenewalMode;
   /** `--login-timeout` (D10): the bound every composed login runs under. */
   private readonly bound: LoginBound | undefined;
@@ -152,6 +163,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         record: (strategy) => {
           this.logins.add(strategy);
         },
+        shuttingDown: () => this.shutdownBegan || this.gate.closed,
         ...(this.bound !== undefined && { bound: this.bound }),
       },
     };
@@ -170,7 +182,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   private state(): ServerState {
     return {
       renewal: this.renewal,
-      shuttingDown: this.gate.closed,
+      shuttingDown: this.shutdownBegan || this.gate.closed,
       ...(this.bound !== undefined && { loginBound: this.bound }),
     };
   }
@@ -289,10 +301,12 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return wrapper;
   }
 
-  async settle(
-    deadlineMs: number,
-    options: BrokerCallOptions = {},
-  ): Promise<SettleReport> {
+  beginShutdown(): void {
+    this.shutdownBegan = true;
+  }
+
+  async settle(options: BrokerCallOptions = {}): Promise<SettleReport> {
+    this.shutdownBegan = true;
     // Closed first, before any await: a 401 answered from here on gets the
     // shutdown refusal instead of a renewal that would land after the flush.
     this.gate.close();
@@ -301,7 +315,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     await Promise.allSettled(
       [...this.logins].map((login) => login.dispose?.()),
     );
-    const abandoned = await this.gate.drained(deadlineMs);
+    // No deadline (D33): the shutdown's forced close is the one escape.
+    await this.gate.drained(options.signal);
     const builds = await Promise.allSettled(
       [...this.built.entries()].map(async ([destination, build]) => ({
         destination,
@@ -320,7 +335,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         }
       }),
     );
-    return { abandoned, notStored };
+    return { notStored };
   }
 
   /** The build of a destination, cached as a promise; a failed one is dropped. */
@@ -346,6 +361,12 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   private async build(destination: string): Promise<Built> {
     const mode = this.modeOf(destination);
     const stores = storesFor(mode, this.config.logger);
+    // The failed write under 'continue' reaches stderr whatever
+    // DEBUG_AUTH_LOG says (D12); the rest stays the gated diagnostics.
+    const logger = brokerLogger(
+      (line) => this.config.promptLogger.info(line),
+      this.config.logger ?? SILENT,
+    );
     const means = await stores.serviceKeyStore.getConnectionConfig(destination);
     const vetted = vetMeans(destination, means);
     const handler = handlerFor(destination, vetted);
@@ -363,7 +384,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         authDebug: false,
         ...handler.brokerOptions(this.context),
       },
-      this.config.logger,
+      logger,
     );
     return { broker, handler, vetted, stores };
   }

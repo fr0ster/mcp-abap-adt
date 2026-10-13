@@ -69,20 +69,22 @@ export class ProviderGate {
   }
 
   /**
-   * Resolves when no call is in flight, or at the deadline: with `0`, or with
-   * the number still running then (abandoned).
+   * Resolves when no call is in flight — no deadline, no timer (D33): a
+   * shutdown's forced close is what ends this waiting early, and it does not
+   * await it. `signal` (the shutdown's) releases this wait when it aborts.
    */
-  drained(deadlineMs: number): Promise<number> {
-    if (this.count === 0) return Promise.resolve(0);
-    return new Promise<number>((resolve) => {
-      const timer = setTimeout(() => {
-        this.waiters = this.waiters.filter((w) => w !== wake);
-        resolve(this.count);
-      }, deadlineMs);
+  drained(signal?: AbortSignal): Promise<void> {
+    if (this.count === 0 || signal?.aborted) return Promise.resolve();
+    return new Promise<void>((resolve) => {
       const wake = () => {
-        clearTimeout(timer);
-        resolve(0);
+        signal?.removeEventListener('abort', onAbort);
+        resolve();
       };
+      const onAbort = () => {
+        this.waiters = this.waiters.filter((w) => w !== wake);
+        resolve();
+      };
+      signal?.addEventListener('abort', onAbort, { once: true });
       this.waiters.push(wake);
     });
   }

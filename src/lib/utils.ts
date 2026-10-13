@@ -20,13 +20,28 @@ import { createAbapConnection } from './connectionFactory.js';
 import { credentialFromSapConfig } from './credentialSources.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
+import { endConnection } from './ownedConnections.js';
 import { getSystemContext } from './systemContext';
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
 let overrideConfig: SapConfig | undefined;
 let overrideConnection: IAbapConnection | undefined;
+/** Whether `overrideConnection` was built here, from a config: then it is ours to end. */
+let overrideBuilt = false;
 let cachedConnection: IAbapConnection | undefined;
+
+/**
+ * The end of a connection this module built (D55): its one `disconnect()` —
+ * the logoff —, when it is replaced or dropped. One a caller handed in
+ * (`setConnectionOverride`) is the caller's, never closed here.
+ */
+function endManaged(
+  connection: IAbapConnection | undefined,
+  built: boolean,
+): void {
+  if (connection !== undefined && built) void endConnection(connection);
+}
 let cachedConfigSignature: string | undefined;
 
 // AsyncLocalStorage for storing session context
@@ -542,7 +557,8 @@ export function getManagedConnection(): IAbapConnection {
       },
     );
 
-    /* cleanup */
+    // The connection it replaces was built here: it ends with its logoff.
+    endManaged(cachedConnection, true);
 
     // Generate unique session ID for fallback connections to prevent session sharing
     // When sessionContext is not available, each connection should have its own isolated session
@@ -640,7 +656,7 @@ export function setConfigOverride(override?: SapConfig) {
     },
   );
   overrideConfig = override;
-  /* cleanup */
+  endManaged(overrideConnection, overrideBuilt);
   overrideConnection = override
     ? createAbapConnection(
         override,
@@ -648,9 +664,10 @@ export function setConfigOverride(override?: SapConfig) {
         loggerAdapter,
       )
     : undefined;
+  overrideBuilt = override !== undefined;
 
   // Reset shared connection so that it will be re-created lazily with fresh config
-  /* cleanup */
+  endManaged(cachedConnection, true);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
   notifyConnectionResetListeners();
@@ -666,15 +683,13 @@ export function setConnectionOverride(connection?: IAbapConnection) {
   );
   // Use a local variable to avoid TDZ issues
   const currentOverride = overrideConnection;
-  if (currentOverride) {
-    /* cleanup */
-  }
+  endManaged(currentOverride, overrideBuilt);
   // Assign after reading to avoid TDZ
   overrideConnection = connection;
+  overrideBuilt = false;
   overrideConfig = undefined;
 
-  const _currentCached = cachedConnection;
-  /* cleanup */
+  endManaged(cachedConnection, true);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
   notifyConnectionResetListeners();
@@ -688,9 +703,10 @@ export function cleanup() {
       hadCachedConnection: !!cachedConnection,
     },
   );
-  /* cleanup */
-  /* cleanup */
+  endManaged(overrideConnection, overrideBuilt);
+  endManaged(cachedConnection, true);
   overrideConnection = undefined;
+  overrideBuilt = false;
   overrideConfig = undefined;
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
@@ -710,13 +726,14 @@ export function invalidateConnectionCache() {
       hadOverrideConnection: !!overrideConnection,
     },
   );
-  /* cleanup */
+  endManaged(cachedConnection, true);
   cachedConnection = undefined;
   cachedConfigSignature = undefined;
   // Also invalidate override connection if it exists
   if (overrideConnection) {
-    /* cleanup */
+    endManaged(overrideConnection, overrideBuilt);
     overrideConnection = undefined;
+    overrideBuilt = false;
   }
   notifyConnectionResetListeners();
 }

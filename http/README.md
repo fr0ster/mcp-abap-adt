@@ -48,7 +48,8 @@ As before 19.0.0, under the same names: `--host` / `--http-host` / `MCP_HTTP_HOS
 `--http-allowed-hosts` / `MCP_HTTP_ALLOWED_HOSTS`, `--http-allowed-origins` /
 `MCP_HTTP_ALLOWED_ORIGINS`, `--http-enable-dns-protection` / `MCP_HTTP_ENABLE_DNS_PROTECTION`,
 `--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--exposition` (with
-`debug`), `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`.
+`debug`), `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`;
+new in 19.0.0, `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` (see [Shutdown](#shutdown)).
 `mcp-abap-adt-http --help` lists them.
 
 ## Held state (the debugger)
@@ -60,6 +61,24 @@ handle is a bearer secret: whoever holds it reaches the state. Held state ends b
 the idle bound (`--state-idle-minutes`, 30–35 791, default 30), or the server's stop. See
 [the debugger guide](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 
+## Every ADT session ends with a logoff
+
+An instance logs off every ADT session it opened when it ends: a request's instance when the pool
+lets it go (after the request, when it holds nothing), a pooled instance when its state ends (its
+stop tool, the idle bound) or at shutdown — whatever the state's undo answered. The logoff is what
+releases a lock a tool left in its session.
+
+## Shutdown
+
+On `SIGTERM` / `SIGINT` the server stops taking requests (`503`, *the server is shutting down*;
+a call already accepted whose body arrives later reaches no tool), stops listening, **waits for
+every running tool to finish** on every instance — none is aborted, so a write still sends its
+`UNLOCK` —, then disposes the pool's instances and logs off their sessions. It exits `0`, or `1`
+with one stderr line per instance whose state could not be undone (named by its ordinal, never its
+handle). There is no deadline. A second signal, or `--shutdown-timeout=<seconds>` (no default),
+forces it: nothing more is waited for, every session is still logged off, exit `1` naming the
+requests still running.
+
 ## Health
 
 `GET /mcp/health` answers `{ status: 'ok', uptime, version, transport: 'http' }` without
@@ -69,4 +88,7 @@ credentials.
 
 `new StreamableHttpServer(handlersRegistry, options)` — the same options, and `app` to register
 the routes on your own Express (or CAP) application instead of listening itself. `main({ program,
-version })` is the binary's launcher (`@mcp-abap-adt/http/launcher`).
+version })` is the binary's launcher (`@mcp-abap-adt/http/launcher`). An embedder that stops the
+server itself calls `stop()`: admission stops, the listener closes, the pool's instances are
+disposed and logged off; to wait for the running tools first, await lib's `settled()` between
+`beginShutdown()` / `stopListening()` and `lastStep()`, as the binary does.

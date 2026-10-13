@@ -13,6 +13,7 @@ import type {
   HandlerEntry,
   IHandlerGroup,
 } from '../../lib/handlers/interfaces';
+import { LOCK_SUCCESS_XML } from './recordingConnection';
 
 export interface StandInRequest {
   method: string;
@@ -32,8 +33,20 @@ export interface AdtStandIn {
    * resolves `arrived`. One request each; the others are answered as ever.
    */
   hold(match: (request: StandInRequest) => boolean): StandInHold;
+  /**
+   * From now on every request `match` accepts is answered `status` (a
+   * refused `UNLOCK`, a refused debugger stop); the others as ever.
+   */
+  answer(match: (request: StandInRequest) => boolean, status: number): void;
+  /** The next request `match` accepts is answered `status`, once. */
+  answerOnce(match: (request: StandInRequest) => boolean, status: number): void;
+  /** The logoffs received so far: `disconnect()` reached the system. */
+  logoffs(): number;
   close(): Promise<void>;
 }
+
+/** Whether `url` is the platform's logoff (`/sap/public/bc/icf/logoff`). */
+export const isLogoff = (url: string): boolean => url.includes('logoff');
 
 /** A request held at the stand-in. */
 export interface StandInHold {
@@ -48,6 +61,12 @@ export const PROBE_PATH = '/sap/bc/adt/probe/';
 export async function adtStandIn(): Promise<AdtStandIn> {
   const requests: StandInRequest[] = [];
   let refusing = false;
+  const answers: Array<{
+    match: (request: StandInRequest) => boolean;
+    status: number;
+    once?: boolean;
+    used?: boolean;
+  }> = [];
   const holds: Array<{
     match: (request: StandInRequest) => boolean;
     taken: boolean;
@@ -75,13 +94,22 @@ export async function adtStandIn(): Promise<AdtStandIn> {
         res.end('');
         return;
       }
+      const given = answers.find((a) => !a.used && a.match(request));
+      if (given) {
+        if (given.once) given.used = true;
+        res.writeHead(given.status, { 'content-type': 'text/plain' });
+        res.end('');
+        return;
+      }
       res.writeHead(200, {
         'content-type': 'text/plain',
         'x-csrf-token': 'csrf-placeholder',
         // An ABAP session: what a connection needs before it reports connected.
         'set-cookie': 'SAP_SESSIONID_X01_100=session-placeholder; path=/',
       });
-      res.end('');
+      // A lock answers a real lock handle, so a write's lock → update →
+      // unlock runs through the real clients.
+      res.end(request.url.includes('_action=LOCK') ? LOCK_SUCCESS_XML : '');
     });
   });
   await new Promise<void>((resolve) =>
@@ -108,6 +136,13 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       holds.push({ match, taken: false, arrive, released, release });
       return { arrived, release };
     },
+    answer: (match, status) => {
+      answers.push({ match, status });
+    },
+    answerOnce: (match, status) => {
+      answers.push({ match, status, once: true });
+    },
+    logoffs: () => requests.filter((r) => isLogoff(r.url)).length,
     close: () =>
       new Promise<void>((resolve) => {
         for (const hold of holds) hold.release();

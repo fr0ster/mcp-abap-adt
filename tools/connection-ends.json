@@ -1,0 +1,219 @@
+[
+  {
+    "file": "src/embeddable/BaseMcpServer.ts",
+    "function": "BaseMcpServer.getConnection",
+    "site": "createAbapConnection",
+    "end": "the instance's terminal close (closeOwnedConnections): stdio at exit, an SSE close, the pool's eviction, shutdown; replaced only on a new credential or once SAP lost its session (D56), then ended when no call works on it any more; a failed connect() ends at once",
+    "why": "the instance's own connection (role 'built'), recorded as its own before connect(); a connect that completed after its callers cancelled is kept and ends here too (D32/D56, RF1)"
+  },
+  {
+    "file": "src/embeddable/BaseMcpServer.ts",
+    "function": "BaseMcpServer.users",
+    "site": "Map<AbapConnection, number>",
+    "end": "an entry leaves when its last call ends",
+    "why": "counts the calls working on each built connection, so a replaced one is ended only when none does; holds no connection past its calls"
+  },
+  {
+    "file": "src/embeddable/BaseMcpServer.ts",
+    "function": "BaseMcpServer.retiring",
+    "site": "Set<AbapConnection>",
+    "end": "endConnection when the last call on it ends",
+    "why": "built connections replaced while a call still worked on them"
+  },
+  {
+    "file": "src/embeddable/BaseMcpServer.ts",
+    "function": "BaseMcpServer.systemContexts",
+    "site": "WeakMap<AbapConnection, DestinationSystemContext | undefined>",
+    "end": "none needed: keyed weakly, holds no connection",
+    "why": "what each built connection's source stated; the connection itself ends through the instance's terminal close"
+  },
+  {
+    "file": "src/handlers/package/high/handleCreatePackage.ts",
+    "function": "handleCreatePackage",
+    "site": "inOwnSessionOverRfc",
+    "end": "inOwnSessionOverRfc's finally: closeQuietly (endConnection) on success and failure",
+    "why": "a fresh RFC session for one create (PAK/058); recorded as the calling instance's, so its terminal close also reaches it"
+  },
+  {
+    "file": "src/handlers/package/low/handleCreatePackage.ts",
+    "function": "handleCreatePackageLow",
+    "site": "inOwnSessionOverRfc",
+    "end": "inOwnSessionOverRfc's finally: closeQuietly (endConnection) on success and failure",
+    "why": "a fresh RFC session for one create (PAK/058)"
+  },
+  {
+    "file": "src/handlers/package/low/handleDeletePackage.ts",
+    "function": "handleDeletePackage",
+    "site": "openFreshConnection",
+    "end": "the handler's finally: closeQuietly (endConnection) on success and failure; a failed connect is ended inside openFreshConnection",
+    "why": "force_new_connection: a delete in an ABAP session of its own"
+  },
+  {
+    "file": "src/handlers/package/low/handleLockPackage.ts",
+    "function": "handleLockPackage",
+    "site": "connectionForPackageLock",
+    "end": "lock not taken: drop() (endConnection); taken: kept under its handle until releasePackageLockSession (the unlock) \u2014 or the instance's terminal close, which ends it and forgets the handle",
+    "why": "RFC only: the lock session (role lock); over HTTP the caller's own connection serves and nothing new is made"
+  },
+  {
+    "file": "src/lib/clients.ts",
+    "function": "getAdtClient",
+    "site": "getManagedConnection",
+    "end": "utils' ends of the managed connection (replacement, cleanup(), invalidateConnectionCache(), a new override)",
+    "why": "the ./utils process cache of a caller of the public API; no server instance builds or owns it"
+  },
+  {
+    "file": "src/lib/connectionFactory.ts",
+    "function": "createAbapConnection",
+    "site": "createConnection",
+    "end": "its caller's end: every caller of createAbapConnection is listed here (BaseMcpServer.getConnection, openFreshConnection, utils)",
+    "why": "the one place a connector is built (cloud/http, onprem/rfc, onprem/http); this function owns nothing itself"
+  },
+  {
+    "file": "src/lib/connectionFactory.ts",
+    "function": "createAbapConnection",
+    "site": "createConnection",
+    "end": "its caller's end: every caller of createAbapConnection is listed here (BaseMcpServer.getConnection, openFreshConnection, utils)",
+    "why": "the one place a connector is built (cloud/http, onprem/rfc, onprem/http); this function owns nothing itself"
+  },
+  {
+    "file": "src/lib/connectionFactory.ts",
+    "function": "createAbapConnection",
+    "site": "createConnection",
+    "end": "its caller's end: every caller of createAbapConnection is listed here (BaseMcpServer.getConnection, openFreshConnection, utils)",
+    "why": "the one place a connector is built (cloud/http, onprem/rfc, onprem/http); this function owns nothing itself"
+  },
+  {
+    "file": "src/lib/connectionFactory.ts",
+    "function": "records",
+    "site": "WeakMap<object, ConnectionRecord>",
+    "end": "none needed: keyed weakly, holds no connection",
+    "why": "how a connection was built, so a sibling can be opened like it (D20)"
+  },
+  {
+    "file": "src/lib/debugger/AmdpSession.ts",
+    "function": "AmdpSession.runs",
+    "site": "Set<{ connection?: IAbapConnection }>",
+    "end": "the run's own close at its end (closeConnection \u2192 endConnection); the instance's terminal close for one still open",
+    "why": "the AMDP session's background runs, each with the connection it ran on (role state)"
+  },
+  {
+    "file": "src/lib/debugger/AmdpSession.ts",
+    "function": "AmdpSession.unclosed",
+    "site": "Set<IAbapConnection>",
+    "end": "the next stop retries; the instance's terminal close ends it whatever the stop answered",
+    "why": "connections whose close failed, kept for the next stop"
+  },
+  {
+    "file": "src/lib/debugger/DebuggerInstance.ts",
+    "function": "createDebuggerInstance",
+    "site": "liveAmdpPorts",
+    "end": "AMDP's stop (closeConnection = endConnection), the idle bound's stop, the host's stop (shutdownState), dispose(); the terminal close for any left",
+    "why": "the AMDP session's own connections, opened by the port's openStateful (role state)"
+  },
+  {
+    "file": "src/lib/debugger/DebuggerInstance.ts",
+    "function": "createDebuggerInstance",
+    "site": "liveDebugPorts",
+    "end": "the debug session's stop (closeConnection / dropConnection = endConnection), the idle bound's stop, the host's stop (shutdownState), dispose(); the terminal close for any left",
+    "why": "the debug session's own connections, opened by the port's openStateful (role state)"
+  },
+  {
+    "file": "src/lib/debugger/DebugSession.ts",
+    "function": "DebugSession.unclosed",
+    "site": "Set<IAbapConnection>",
+    "end": "the next stop retries; the instance's terminal close ends it whatever the stop answered",
+    "why": "connections whose close failed, kept for the next stop"
+  },
+  {
+    "file": "src/lib/debugger/ports.ts",
+    "function": "openStateful",
+    "site": "openFreshConnection",
+    "end": "the session's stop, the idle bound's stop, the host's stop and dispose() (closeOwn = endConnection); the instance's terminal close for one still open",
+    "why": "held state's own stateful connection, recorded with role state"
+  },
+  {
+    "file": "src/lib/ownedConnections.ts",
+    "function": "owned",
+    "site": "Map<OwnedConnection, Owned>",
+    "end": "an entry leaves when its connection ends (endConnection)",
+    "why": "the connection-ends registry: every owned connection until it ends; the terminal close and the forced close read it"
+  },
+  {
+    "file": "src/lib/ownedConnections.ts",
+    "function": "endListeners",
+    "site": "WeakMap<OwnedConnection, Array<() => void>>",
+    "end": "none needed: keyed weakly, emptied when the connection ends",
+    "why": "who wants to know a connection ended (a package lock session forgets its handle)"
+  },
+  {
+    "file": "src/lib/ownedConnections.ts",
+    "function": "ending",
+    "site": "WeakMap<OwnedConnection, Promise<void>>",
+    "end": "none needed: keyed weakly; it IS the end (the one disconnect() of each connection, joined)",
+    "why": "connection 16 refuses a second disconnect(): every end joins the first"
+  },
+  {
+    "file": "src/lib/packageSessions.ts",
+    "function": "openFreshConnection",
+    "site": "createAbapConnection",
+    "end": "its caller's end (each caller of openFreshConnection is listed); a connect that fails ends here (connectedOrClosed); recorded as the calling instance's, so its terminal close reaches it",
+    "why": "a sibling of a connection the server built (D20)"
+  },
+  {
+    "file": "src/lib/packageSessions.ts",
+    "function": "openFreshConnection",
+    "site": "freshConnection",
+    "end": "the same as a sibling: the caller's end, connectedOrClosed on a failed connect, the instance's terminal close",
+    "why": "a consumer's freshConnection result is the server's once returned (D22)"
+  },
+  {
+    "file": "src/lib/packageSessions.ts",
+    "function": "lockSessions",
+    "site": "Map<string, IAbapConnection>",
+    "end": "releasePackageLockSession (the unlock) \u2014 closeQuietly; the instance's terminal close ends it and its whenEnded listener deletes the entry",
+    "why": "package lock sessions by lock handle (RFC)"
+  },
+  {
+    "file": "src/lib/packageSessions.ts",
+    "function": "inOwnSessionOverRfc",
+    "site": "openFreshConnection",
+    "end": "the finally: closeQuietly (endConnection), on success and failure",
+    "why": "a fresh RFC session for one operation"
+  },
+  {
+    "file": "src/lib/packageSessions.ts",
+    "function": "connectionForPackageLock",
+    "site": "openFreshConnection",
+    "end": "drop() when the lock was not taken; else releasePackageLockSession or the instance's terminal close",
+    "why": "the lock session (role lock)"
+  },
+  {
+    "file": "src/lib/packageSessions.ts",
+    "function": "hostFactories",
+    "site": "WeakMap<object, FreshConnectionFactory>",
+    "end": "none needed: keyed weakly, holds factories, not connections",
+    "why": "an injected connection's freshConnection factory (D20); the injected connection itself is the consumer's, never closed"
+  },
+  {
+    "file": "src/lib/utils.ts",
+    "function": "getManagedConnection",
+    "site": "createAbapConnection",
+    "end": "endManaged when replaced (a new config signature), setConfigOverride, setConnectionOverride, cleanup(), invalidateConnectionCache()",
+    "why": "the ./utils process cache (public API, integration helpers): no server instance uses it"
+  },
+  {
+    "file": "src/lib/utils.ts",
+    "function": "setConfigOverride",
+    "site": "createAbapConnection",
+    "end": "endManaged when the override is replaced or dropped (setConfigOverride, setConnectionOverride, cleanup(), invalidateConnectionCache())",
+    "why": "the ./utils override built from a config; one handed to setConnectionOverride is the caller's, never closed"
+  },
+  {
+    "file": "src/lib/utils.ts",
+    "function": "getBaseUrl",
+    "site": "getManagedConnection",
+    "end": "utils' ends of the managed connection",
+    "why": "reads the managed connection; creates through getManagedConnection only"
+  }
+]

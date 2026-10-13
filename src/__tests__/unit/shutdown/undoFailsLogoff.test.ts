@@ -1,0 +1,132 @@
+/**
+ * A failed undo still logs off (spec §6.4, §14.5, D55): a held state whose
+ * undo fails every time — the stand-in refuses the debugger stop — at
+ * shutdown (core, http, sse), at an SSE close, when the pool lets its
+ * instance go, and at the idle bound's stop. The failure is reported (exit
+ * `1` at shutdown, a state-logger line otherwise), and the stand-in received
+ * the logoff of every connection the instance owned, the state's own
+ * included. A failed undo never keeps a session, or a lock, open.
+ */
+
+import { httpStand } from '../../../../http/src/__tests__/shutdown/harness';
+import { stand as coreStand } from '../../../../server/src/__tests__/helpers/loginStand';
+import { sseStand } from '../../../../sse/src/__tests__/shutdown/harness';
+import { ownedConnections } from '../../../lib/ownedConnections';
+import { stopUrl } from '../../helpers/shutdownTools';
+
+jest.setTimeout(30_000);
+
+async function until(done: () => boolean, limitMs = 10_000) {
+  const end = Date.now() + limitMs;
+  while (!done()) {
+    if (Date.now() > end) throw new Error('the condition never held');
+    await new Promise((r) => setTimeout(r, 2));
+  }
+}
+
+const refusesStop = (standIn: {
+  answer(m: (r: { url: string }) => boolean, s: number): void;
+}) => standIn.answer((r) => r.url.includes(stopUrl('')), 500);
+
+const connectsOf = (requests: Array<{ url: string }>) =>
+  requests.filter((r) => r.url.includes('discovery')).length;
+
+beforeEach(() => {
+  jest.spyOn(console, 'error').mockImplementation(() => {});
+});
+
+afterEach(() => {
+  jest.useRealTimers();
+  jest.restoreAllMocks();
+});
+
+it('core, at shutdown: exit 1 with the undo named, every connection logged off', async () => {
+  const s = await coreStand({ shutdown: {} });
+  try {
+    expect(await s.callTool('HoldState', { id: 'S' })).toMatchObject({
+      isError: false,
+    });
+    refusesStop(s.adt);
+    s.processLike.emit('SIGTERM');
+    expect(await s.exited).toBe(1);
+    expect(s.shutdownLines).toEqual([
+      expect.stringContaining('the debugger stop was refused'),
+    ]);
+    expect(ownedConnections()).toEqual([]);
+    await until(() => s.adt.logoffs() === connectsOf(s.adt.requests));
+    expect(s.adt.logoffs()).toBe(2);
+  } finally {
+    await s.close();
+  }
+});
+
+it('http, at shutdown (the pool lets the instance go): exit 1, every connection logged off', async () => {
+  const s = await httpStand();
+  try {
+    await s.call('HoldState', { id: 'S' });
+    refusesStop(s.standIn);
+    s.processLike.emit('SIGTERM');
+    expect(await s.exited).toBe(1);
+    expect(s.stderr.join('\n')).toContain('the debugger stop was refused');
+    expect(ownedConnections()).toEqual([]);
+    await until(() => s.standIn.logoffs() === connectsOf(s.standIn.requests));
+  } finally {
+    await s.close();
+  }
+});
+
+it("http, at the idle bound's stop: a state-logger line, every connection logged off", async () => {
+  const s = await httpStand({ stateIdleMinutes: 30 });
+  try {
+    jest.useFakeTimers({
+      advanceTimers: true,
+      doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
+    });
+    await s.call('HoldState', { id: 'S' });
+    refusesStop(s.standIn);
+    jest.advanceTimersByTime(30 * 60_000);
+    jest.useRealTimers();
+    await until(() => s.stateErrors.length > 0);
+    expect(s.stateErrors.join('\n')).toContain('the debugger stop was refused');
+    await until(() => ownedConnections().length === 0);
+    await until(() => s.standIn.logoffs() === connectsOf(s.standIn.requests));
+  } finally {
+    await s.close();
+  }
+});
+
+it('sse, at shutdown: exit 1, every connection logged off', async () => {
+  const s = await sseStand();
+  try {
+    const connection = await s.open();
+    await connection.call('HoldState', { id: 'S' }, 1);
+    await connection.answer(1);
+    refusesStop(s.standIn);
+    s.processLike.emit('SIGTERM');
+    expect(await s.exited).toBe(1);
+    expect(s.stderr.join('\n')).toContain('the debugger stop was refused');
+    expect(ownedConnections()).toEqual([]);
+    await until(() => s.standIn.logoffs() === s.connects());
+    expect(s.standIn.logoffs()).toBe(2);
+  } finally {
+    await s.close();
+  }
+});
+
+it('sse, at an SSE close: a state-logger line, every connection logged off', async () => {
+  const s = await sseStand();
+  try {
+    const connection = await s.open();
+    await connection.call('HoldState', { id: 'S' }, 1);
+    await connection.answer(1);
+    refusesStop(s.standIn);
+    connection.close();
+    await until(() => s.stateErrors.length > 0);
+    expect(s.stateErrors.join('\n')).toContain('the debugger stop was refused');
+    await until(() => ownedConnections().length === 0);
+    await until(() => s.standIn.logoffs() === s.connects());
+    expect(s.standIn.logoffs()).toBe(2);
+  } finally {
+    await s.close();
+  }
+});

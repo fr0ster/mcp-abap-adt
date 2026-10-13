@@ -32,8 +32,6 @@ export interface IDestinations {
 
 /** What `settle` found. */
 export interface SettleReport {
-  /** Provider calls still running at the deadline: their result is lost. */
-  abandoned: number;
   /**
    * `"<destination>": <reason>` for each session secret not stored, the
    * reason auth-errors' `classify(entry, 'persisting-tokens')`.
@@ -51,12 +49,18 @@ export interface IAuthBrokerFactory extends IDestinations {
    */
   getBroker(destination: string): Promise<AuthBroker>;
   /**
+   * The shutdown began (in the latch's tick): no interactive login starts
+   * from here on, and an `aborted` login is answered with the shutdown
+   * sentence. The gate stays open: a tool still running is authorized with
+   * the credential held, a refresh included.
+   */
+  beginShutdown(): void;
+  /**
    * Closes the gate on provider calls, disposes the login strategies it
-   * composed, waits for the calls in progress up to `deadlineMs`, then
+   * composed, waits for the calls in progress — no deadline — then
    * `flush({ signal })`es every broker built.
    */
-  settle(
-    deadlineMs: number,
-    options?: { readonly signal?: AbortSignal | undefined },
-  ): Promise<SettleReport>;
+  settle(options?: {
+    readonly signal?: AbortSignal | undefined;
+  }): Promise<SettleReport>;
 }

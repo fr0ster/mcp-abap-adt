@@ -136,6 +136,8 @@ describe("sse's help", () => {
     '--conf',
     '--state-idle-minutes',
     'MCP_STATE_IDLE_MINUTES',
+    '--shutdown-timeout',
+    'MCP_SHUTDOWN_TIMEOUT',
     'x-sap-debug-terminal-id',
     'x-sap-debug-ide-id',
     'SAP_DEBUG_TERMINAL_ID',
@@ -213,6 +215,31 @@ describe('every SSE option of today is read under its name', () => {
       port: 3001,
       enableDnsRebindingProtection: false,
     });
+  });
+});
+
+describe('--shutdown-timeout is a row of sse (D33)', () => {
+  it('no default: absent unless given', () => {
+    expect(readSseConfig([], {}).shutdownTimeout).toBeUndefined();
+  });
+
+  it('CLI, env and YAML reach the config, in seconds', () => {
+    expect(readSseConfig(['--shutdown-timeout=5'], {}).shutdownTimeout).toBe(5);
+    expect(
+      readSseConfig([], { MCP_SHUTDOWN_TIMEOUT: '7' }).shutdownTimeout,
+    ).toBe(7);
+    expect(
+      readSseConfig([], {}, { 'shutdown-timeout': 9 }).shutdownTimeout,
+    ).toBe(9);
+  });
+
+  it.each(['0', '1.5', 'abc', '86401'])('%s stops the start', async (value) => {
+    const { stderr, exits, served } = await start([
+      `--shutdown-timeout=${value}`,
+    ]);
+    expect(stderr).toContain('Invalid --shutdown-timeout');
+    expect(exits).toEqual([1]);
+    expect(served).toBe(0);
   });
 });
 
@@ -381,7 +408,13 @@ describe('the YAML template and validation come from the table', () => {
 
   it('holds sse rows under sse, and no other binary keys', () => {
     expect(Object.keys(parsed).sort()).toEqual(
-      ['exposition', 'sse', 'state-idle-minutes', 'system-type'].sort(),
+      [
+        'exposition',
+        'sse',
+        'shutdown-timeout',
+        'state-idle-minutes',
+        'system-type',
+      ].sort(),
     );
     expect(Object.keys(parsed.sse as object).sort()).toEqual(
       [

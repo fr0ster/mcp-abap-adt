@@ -41,9 +41,9 @@ describe('settle: flush({ signal })', () => {
     const broker = await f.getBroker('dest');
     const flush = jest.spyOn(broker, 'flush').mockResolvedValue(undefined);
     const controller = new AbortController();
-    await expect(
-      f.settle(1_000, { signal: controller.signal }),
-    ).resolves.toEqual({ abandoned: 0, notStored: [] });
+    await expect(f.settle({ signal: controller.signal })).resolves.toEqual({
+      notStored: [],
+    });
     expect(flush).toHaveBeenCalledWith({ signal: controller.signal });
   });
 
@@ -61,9 +61,8 @@ describe('settle: flush({ signal })', () => {
     const plain = new Error(SECRET);
     jest.spyOn(b, 'flush').mockRejectedValue(plain);
 
-    const report = await f.settle(1_000);
+    const report = await f.settle();
 
-    expect(report.abandoned).toBe(0);
     expect(report.notStored.sort()).toEqual(
       [
         `"dest": ${classify(entry, 'persisting-tokens').reason}`,
@@ -81,7 +80,7 @@ describe('settle: flush({ signal })', () => {
     const a = await f.getBroker('dest');
     const empty = new AggregateError([], SECRET);
     jest.spyOn(a, 'flush').mockRejectedValue(empty);
-    const report = await f.settle(1_000);
+    const report = await f.settle();
     expect(report.notStored).toEqual([
       `"dest": ${classify(empty, 'persisting-tokens').reason}`,
     ]);

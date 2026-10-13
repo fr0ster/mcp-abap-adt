@@ -43,6 +43,7 @@ These rows are lib's shared rows: each binary's table holds them, with the same 
 | `--exposition=<sets>` | — | `exposition` | `readonly`, `high`, `low`, `debug` | The tool sets to serve (default `readonly,high`); see [Handler Exposition](#handler-exposition) |
 | `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type: the tools offered (default `cloud`); the connector and whether the responsible / master system are asked of the system |
 | `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
+| `--shutdown-timeout=<seconds>` | `MCP_SHUTDOWN_TIMEOUT` | `shutdown-timeout` | 1-86400 | Forces a shutdown not finished after this many seconds (default: none); see [Shutdown](#shutdown) |
 | `--help`, `-h` | — | — | — | The binary's help |
 | `--version`, `-v` | — | — | — | The binary's version |
 
@@ -202,6 +203,30 @@ is registered elsewhere.
 
 ```bash
 mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
+```
+
+### Shutdown
+
+On `SIGTERM`, `SIGINT` (and, for `mcp-abap-adt`, the end of stdin) a binary stops taking calls —
+a call arriving from then on is answered "The server is shutting down." and reaches no tool —,
+**waits for every running tool to finish** (none is aborted: a write runs to its `UNLOCK`),
+undoes the held state, **logs off every ADT session it opened** (whatever the undo answered: the
+logoff releases any lock a tool left), and — `mcp-abap-adt` only — writes the pending session
+secrets. Then it exits `0`, or `1` with one stderr line per fact not done. **There is no deadline**
+(18.x gave up after 30 s).
+
+`--shutdown-timeout=<seconds>` (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; a whole number
+from 1 to 86400, **no default**) ends the waiting after that long, and so does a second `SIGTERM`
+/ `SIGINT`: the forced close. Nothing more is waited for — not a running tool, not the state's
+undo, not a session write —, every ADT session is still logged off, and the exit is `1`, naming
+each tool still running (`Still running at the forced close: <tool>`) and the step cut short.
+**What it costs**: a tool cut short mid-write (its object half written, its lock released by the
+logoff), and a session write lost — a refresh token the token endpoint refused can come back on
+the next start. Set it against the time your supervisor waits before it kills the process (a
+container's stop grace, a service manager's `TimeoutStopSec`), a few seconds below it.
+
+```bash
+mcp-abap-adt-http --shutdown-timeout=25
 ```
 
 ### --login-timeout=\<seconds\>

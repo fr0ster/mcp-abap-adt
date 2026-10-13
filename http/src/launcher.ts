@@ -162,10 +162,16 @@ export async function launch(
     },
   );
   installTransportShutdown({
-    stop: () => server.stop(),
+    begin: () => server.beginShutdown(),
+    stopListening: () => server.stopListening(),
+    lastStep: () => server.lastStep(),
     exit: deps.exit,
     stderr: deps.stderr,
     processLike: deps.processLike,
+    shutdownTimeoutMs:
+      config.shutdownTimeout === undefined
+        ? undefined
+        : config.shutdownTimeout * 1000,
   });
   await server.start();
   return server;

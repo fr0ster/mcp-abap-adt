@@ -134,11 +134,16 @@ Where the renewed session is written decides what a failed write means (no optio
 
 | Store | A failed write |
 |---|---|
-| the `--env` / `--env-path` file | **fails the request** (`unknown`, `persisting-tokens`), and the destination is refused until a write lands: it is your own file, and a write that did not land must be seen |
-| a named destination, with `--unsafe` (`sessions/X.env`) or without (in memory) | is logged (on stderr only with `DEBUG_AUTH_LOG=true`), and the request goes on |
+| the `--env` / `--env-path` file | **fails the request** (`unknown`, `persisting-tokens`, with "The session could not be written to the destination's file."), and the destination is refused until a write lands: it is your own file, and a write that did not land must be seen |
+| a named destination, with `--unsafe` (`sessions/X.env`) or without (in memory) | is reported on stderr — `[MCP] A session write did not land: <logFields>` — **whatever `DEBUG_AUTH_LOG` says**, and the request goes on |
 
-At shutdown a write still pending is reported on stderr as `"<destination>": <reason>` and the
-exit is `1`; the reason is the classified failure, never the store's own message.
+Only a `jwt` / `authorization_code` destination writes a session; `basic` and `snc` obtain no
+session secret and are never written, and HTTP and SSE write nothing.
+
+At shutdown a write still pending is written once more before the exit (a refresh token the
+token endpoint refused is cleared this way, so it does not come back on the next start). One
+that still does not land is reported on stderr as `"<destination>": <reason>` and the exit is
+`1`; the reason is the classified failure, never the store's own message.
 
 ### Secrets live in `.env`, configuration in YAML
 
@@ -334,16 +339,33 @@ it in the connection's own words, with its hint.
 
 ## Shutdown
 
-On `SIGTERM`, `SIGINT` (and, for stdio, the end of stdin) the server stops accepting
-connections, waits up to **30 s** for logins and refreshes in flight, and flushes every
-session. It exits `0` when everything is stored. It exits `1`, with one stderr line per fact
-(never a secret, an error's message or anything read from a file), when:
+On `SIGTERM`, `SIGINT` or the end of stdin (its `end` and `close` are one trigger) the server,
+in this order:
 
-- a secret could not be stored (`Session secrets not stored: "<destination>": <ErrorClass>`);
-- a login or refresh was still running at the 30 s deadline (`N authorizations still running at
-  shutdown, their results are lost`);
-- a server did not close (`A server did not close at shutdown: <ErrorClass>`);
+1. stops taking calls: a call read from now on is answered `interactive-login` `aborted` with
+   "The server is shutting down.", and reaches no tool; no interactive login starts any more;
+2. **waits for every running tool to finish** — none is aborted, however long it takes: a
+   started write runs to its `UNLOCK`, its requests still authorized with the credential held
+   (a refresh included);
+3. undoes the held state (a debug session's stop), then **logs off every ADT session it opened**
+   — whatever the undo answered: the logoff is what releases a lock a tool left;
+4. closes the credential gate, ends the logins, waits for the provider calls in flight and
+   writes every pending session secret.
+
+There is **no deadline** (18.x gave up after 30 s). It exits `0` when everything is done. It
+exits `1`, with one stderr line per fact (never a secret, an error's message or anything read
+from a file), when:
+
+- the held state could not be undone (`State not undone at shutdown: <what>`);
+- a secret could not be stored (`Session secrets not stored: "<destination>": <reason>`);
 - settling itself failed (`Shutdown did not settle: <ErrorClass>`).
+
+**Ending the waiting early.** A second `SIGTERM` / `SIGINT`, or `--shutdown-timeout=<seconds>`
+(`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; no default), is the forced close: nothing more
+is waited for — not a tool, not the undo, not a write —, every ADT session is still logged off,
+and the exit is `1` with `Still running at the forced close: <tool>` per tool and `Not finished at
+the forced close: <step>`. What it costs: a tool cut short, a session write lost (a discarded
+refresh token can come back on the next start).
 
 Nothing is written to stdout.
 

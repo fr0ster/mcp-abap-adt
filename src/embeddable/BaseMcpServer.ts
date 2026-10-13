@@ -3,7 +3,10 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
-import { registerActiveTool } from '../lib/activeTools.js';
+import {
+  registerActiveTool,
+  shutdownRefusalAnswer,
+} from '../lib/activeTools.js';
 import { answerRead } from '../lib/auth/answerFailure.js';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
 import {
@@ -22,6 +25,13 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
+import {
+  closeOwnedConnections,
+  endConnection,
+  isEnded,
+  own,
+  runAsOwner,
+} from '../lib/ownedConnections.js';
 import {
   raceRequestSignal,
   runWithRequestSignal,
@@ -60,6 +70,8 @@ interface ToolCallExtra {
 interface BuiltConnection {
   credential: IAuthProvider;
   connection: Promise<AbapConnection>;
+  /** The connection once its connect completed. */
+  ready?: AbapConnection;
 }
 
 /**
@@ -113,6 +125,12 @@ export abstract class BaseMcpServer extends McpServer {
   /** Every tool call of this instance still running, tracked from its entry. */
   private readonly inFlight = new Set<Promise<unknown>>();
 
+  /** Calls working on each built connection now: a replaced one ends when none does. */
+  private readonly users = new Map<AbapConnection, number>();
+
+  /** Built connections replaced while a call still worked on them. */
+  private readonly retiring = new Set<AbapConnection>();
+
   constructor(options: {
     name: string;
     version?: string;
@@ -134,6 +152,9 @@ export abstract class BaseMcpServer extends McpServer {
     this.state = new InstanceState({
       idleMinutes: options.stateIdleMinutes,
       logger: stateLoggerOf(options),
+      // The idle bound's stop is a terminal disposal of what the state
+      // owns: its connections are closed whatever the undo answered (§6.4).
+      onIdleStop: () => this.idleStopped(),
     });
     this.systemType = options.systemType;
     this.systemContextResolver =
@@ -165,9 +186,37 @@ export abstract class BaseMcpServer extends McpServer {
     return this.state.holdsState();
   }
 
-  /** Undoes what the instance holds; awaited by every host before it lets the instance go. */
+  /**
+   * The state undo: undoes what the instance holds; callable again — each
+   * call retries what the state could not undo (the pool's retry and
+   * `shutdownState()` rely on it). It closes no connection: that is the
+   * terminal close (`terminalClose()`), which every terminal disposal runs
+   * after it, whatever it answered (spec §6.4, D51, D55).
+   */
   dispose(): Promise<void> {
     return this.state.dispose();
+  }
+
+  /**
+   * **The terminal close** (spec §6.4): `disconnect()` — the logoff — of
+   * every connection this instance owns (the one it built, held state's own,
+   * package lock sessions, fresh connections still open), each once; a
+   * failure logged in fixed words. An injected connection is the consumer's
+   * and is never closed. Run by every terminal disposal after the state undo,
+   * never conditional on it.
+   */
+  terminalClose(): Promise<void> {
+    return closeOwnedConnections(this);
+  }
+
+  /**
+   * After the idle bound's stop, whatever its undo answered: the connections
+   * held state owns are closed with a logoff. The instance itself lives on
+   * (stdio's, an SSE connection's): its own connection is not touched. A
+   * host whose instance ends with its state (the pool) closes all of them.
+   */
+  protected idleStopped(): Promise<void> {
+    return closeOwnedConnections(this, ['state']);
   }
 
   /** Dispose, settle, once more, settle — what a host awaits before letting the instance go; answers what is left. */
@@ -237,7 +286,15 @@ export abstract class BaseMcpServer extends McpServer {
     throwIfRequestAborted(signal);
     const resolved = await context.source.resolve(signal);
     let held = this.built;
-    if (!held || held.credential !== resolved.credential) {
+    if (
+      !held ||
+      held.credential !== resolved.credential ||
+      (held.ready !== undefined && isSpent(held.ready))
+    ) {
+      // A new credential, or a session SAP already lost (D56): the
+      // connection is replaced, and the replaced one ends with its logoff —
+      // once no call works on it any more (spec §6.4).
+      if (held) this.retire(held);
       held = this.buildConnection(resolved.credential, () =>
         createAbapConnection(resolved.settings, resolved.credential),
       );
@@ -247,25 +304,66 @@ export abstract class BaseMcpServer extends McpServer {
     return connection;
   }
 
+  /** A built connection replaced: ended now, or when its last call ends. */
+  private retire(entry: BuiltConnection): void {
+    if (this.built === entry) this.built = undefined;
+    entry.connection.then(
+      (connection) => {
+        if (this.users.get(connection)) this.retiring.add(connection);
+        else void endConnection(connection);
+      },
+      () => undefined, // a failed connect was ended where it failed
+    );
+  }
+
+  /** A call starts working on `connection`. */
+  private connectionInUse(connection: AbapConnection): void {
+    this.users.set(connection, (this.users.get(connection) ?? 0) + 1);
+  }
+
+  /** A call stops working on `connection`: a retired one with no call left ends. */
+  private connectionReleased(connection: AbapConnection): void {
+    const left = (this.users.get(connection) ?? 1) - 1;
+    if (left > 0) {
+      this.users.set(connection, left);
+      return;
+    }
+    this.users.delete(connection);
+    if (this.retiring.delete(connection)) void endConnection(connection);
+  }
+
   /** Connects what `create` builds for `credential`, kept as `built`. */
   private buildConnection(
     credential: IAuthProvider,
     create: () => AbapConnection,
   ): BuiltConnection {
-    const connecting = (async () => {
+    const entry: BuiltConnection = {
+      credential,
+      connection: Promise.resolve() as unknown as Promise<AbapConnection>,
+    };
+    entry.connection = (async () => {
       const connection = create();
+      // The instance's own from here on: it ends with a logoff (§6.4, D55).
+      own(connection, { owner: this, role: 'built' });
       // Establish session (CSRF token + cookies) before first request.
       // RFC needs this for the stateful session; HTTP needs it because some
       // SAP systems reject the very first request (403) when no session
       // cookie is present.
-      await connection.connect();
+      try {
+        await connection.connect();
+      } catch (error) {
+        // A failed connect is not kept, and still ends with its one
+        // `disconnect()` (connection 16 logs off a session it received).
+        await endConnection(connection);
+        throw error;
+      }
+      entry.ready = connection;
       return connection;
     })();
-    const entry: BuiltConnection = { credential, connection: connecting };
     this.built = entry;
     // A completed connect stays the instance's whoever still waits for it
     // (D32, D56); a failed one is not kept: the next call connects again.
-    connecting.catch(() => {
+    entry.connection.catch(() => {
       if (this.built === entry) this.built = undefined;
     });
     return entry;
@@ -297,11 +395,15 @@ export abstract class BaseMcpServer extends McpServer {
           type HandlerFnArgsOnly = (args: unknown) => Promise<unknown>;
 
           const runCall = async (args: unknown, signal: AbortSignal) => {
+            let inUse: AbapConnection | undefined;
             try {
               // Get connection from context (this.connectionContext), with
               // the request's signal: a cancelled call settles at once.
+              const connection = await this.getConnection(signal);
+              inUse = connection;
+              this.connectionInUse(connection);
               const context: HandlerContext = {
-                connection: await this.getConnection(signal),
+                connection,
                 logger: this.logger,
                 state: this.state,
                 debugger: () => this.debuggerFor(),
@@ -387,12 +489,15 @@ export abstract class BaseMcpServer extends McpServer {
                 isError: true;
                 content: { type: 'text'; text: string }[];
               };
+            } finally {
+              if (inUse !== undefined) this.connectionReleased(inUse);
             }
           };
 
           // Tracked from its entry, with its own request signal (`trackCall`).
+          const toolName = entry.toolDefinition.name;
           const wrappedHandler = (args: unknown, extra?: ToolCallExtra) =>
-            this.trackCall(extra, (signal) => runCall(args, signal));
+            this.trackCall(toolName, extra, (signal) => runCall(args, signal));
 
           // Convert JSON Schema to Zod if needed, otherwise pass as-is
           const zodSchema =
@@ -450,23 +555,36 @@ export abstract class BaseMcpServer extends McpServer {
    *
    * Each call has a request signal of its own (§5.1): aborted when the
    * request's `extra.signal` aborts (the client cancelled, its transport
-   * closed), when the call ends whatever its outcome (D4: the broker releases
-   * the party it attached only then), and by the process's shutdown through
-   * the registry of live calls, where the call is registered here, before
-   * anything else.
+   * closed) and when the call ends whatever its outcome (D4: the broker
+   * releases the party it attached only then). Nothing else aborts it: the
+   * registry of live calls, where the call is registered here before
+   * anything else, keeps its settlement for the shutdown and the instance
+   * close to await (D55). Once the process or this instance is latched, the
+   * call is refused here — the shutdown refusal, before any connection or
+   * handler (§6.4).
+   *
+   * The call runs as this instance's (`runAsOwner`): a connection it opens is
+   * this instance's, closed by its terminal close.
    */
   private trackCall<T>(
+    name: string,
     extra: ToolCallExtra | undefined,
     run: (signal: AbortSignal) => Promise<T>,
   ): Promise<T> {
     const controller = new AbortController();
-    const unregister = registerActiveTool(controller);
+    const unregister = registerActiveTool(controller, {
+      instance: this,
+      name,
+    });
+    if (unregister === undefined) {
+      return Promise.resolve(shutdownRefusalAnswer() as T);
+    }
     const requestSignal = extra?.signal;
     const onRequestAbort = () => controller.abort();
     if (requestSignal?.aborted) controller.abort();
     else requestSignal?.addEventListener('abort', onRequestAbort);
     this.state.callStarted();
-    const call = run(controller.signal);
+    const call = runAsOwner(this, () => run(controller.signal));
     this.inFlight.add(call);
     call
       .finally(() => {
@@ -489,13 +607,13 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private trackingRegistrations(): McpServer {
     const track =
-      (callback: (...callbackArgs: unknown[]) => unknown) =>
+      (name: string, callback: (...callbackArgs: unknown[]) => unknown) =>
       (...callbackArgs: unknown[]) => {
         // The SDK passes `extra` last: `(args, extra)` or `(extra)`.
         const extra = callbackArgs[callbackArgs.length - 1] as
           | ToolCallExtra
           | undefined;
-        return this.trackCall(extra, async (signal) => {
+        return this.trackCall(name, extra, async (signal) => {
           try {
             throwIfRequestAborted(signal);
             return await runWithRequestSignal(signal, async () =>
@@ -510,10 +628,12 @@ export abstract class BaseMcpServer extends McpServer {
       };
     const wrapLast = (registerArgs: unknown[]): unknown[] => {
       const last = registerArgs[registerArgs.length - 1];
+      const name =
+        typeof registerArgs[0] === 'string' ? registerArgs[0] : 'a tool';
       return typeof last === 'function'
         ? [
             ...registerArgs.slice(0, -1),
-            track(last as (...callbackArgs: unknown[]) => unknown),
+            track(name, last as (...callbackArgs: unknown[]) => unknown),
           ]
         : registerArgs;
     };
@@ -530,6 +650,23 @@ export abstract class BaseMcpServer extends McpServer {
         return typeof value === 'function' ? value.bind(target) : value;
       },
     });
+  }
+}
+
+/**
+ * Whether SAP already ended `connection`'s session: ended here, or the
+ * connection says it is no longer connected (connection 16: a lost session
+ * spends the instance). Such a connection is replaced, never reused (D56).
+ */
+function isSpent(connection: AbapConnection): boolean {
+  if (isEnded(connection)) return true;
+  const aware = connection as { isConnected?: () => boolean };
+  try {
+    return typeof aware.isConnected === 'function'
+      ? aware.isConnected() === false
+      : false;
+  } catch {
+    return false;
   }
 }
 

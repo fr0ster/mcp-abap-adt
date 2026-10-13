@@ -162,7 +162,12 @@ export async function launch(
     enableDnsRebindingProtection: config.enableDnsRebindingProtection,
   });
   installTransportShutdown({
-    stop: () => server.stop(),
+    stopListening: () => server.stopListening(),
+    lastStep: () => server.lastStep(),
+    shutdownTimeoutMs:
+      config.shutdownTimeout === undefined
+        ? undefined
+        : config.shutdownTimeout * 1000,
     exit: deps.exit,
     stderr: deps.stderr,
     processLike: deps.processLike,

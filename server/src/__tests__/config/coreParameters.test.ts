@@ -122,6 +122,8 @@ describe("core's help", () => {
     '--conf',
     '--state-idle-minutes',
     'MCP_STATE_IDLE_MINUTES',
+    '--shutdown-timeout',
+    'MCP_SHUTDOWN_TIMEOUT',
     'SAP_DEBUG_TERMINAL_ID',
     'SAP_DEBUG_IDE_ID',
   ])('lists %s', (name) => {
@@ -133,6 +135,33 @@ describe("core's help", () => {
     expect(block.replace(/\s+/g, ' ')).toContain(
       "First found: the destination's .env; the environment.",
     );
+  });
+});
+
+describe('--shutdown-timeout is a row of core (D33)', () => {
+  it('no default: absent unless given', () => {
+    expect(readCoreConfig([], {}).shutdownTimeout).toBeUndefined();
+  });
+
+  it('CLI, env and YAML reach the config, in seconds', () => {
+    expect(readCoreConfig(['--shutdown-timeout=5'], {}).shutdownTimeout).toBe(
+      5,
+    );
+    expect(
+      readCoreConfig([], { MCP_SHUTDOWN_TIMEOUT: '7' }).shutdownTimeout,
+    ).toBe(7);
+    expect(
+      readCoreConfig([], {}, { 'shutdown-timeout': 9 }).shutdownTimeout,
+    ).toBe(9);
+  });
+
+  it.each(['0', '1.5', 'abc', '86401'])('%s stops the start', async (value) => {
+    const { stderr, exits, served } = await start([
+      `--shutdown-timeout=${value}`,
+    ]);
+    expect(stderr).toContain('Invalid --shutdown-timeout');
+    expect(exits).toEqual([1]);
+    expect(served).toBe(0);
   });
 });
 
@@ -318,6 +347,7 @@ describe('the YAML template and validation come from the table', () => {
         'login-timeout',
         'mcp',
         'renewal',
+        'shutdown-timeout',
         'state-idle-minutes',
         'system-type',
         'unsafe',

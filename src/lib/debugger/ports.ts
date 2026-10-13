@@ -13,6 +13,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
+import { endConnection, own } from '../ownedConnections';
 import { openFreshConnection } from '../packageSessions';
 import { getRequestContext } from '../requestContext';
 import { ourClassExecutor, ourProgramExecutor } from '../strategies/resultSets';
@@ -47,16 +48,20 @@ async function openStateful(context: HandlerContext): Promise<IAbapConnection> {
   (
     connection as { setSessionType?: (t: 'stateful' | 'stateless') => void }
   ).setSessionType?.('stateful');
+  // Held state's own: closed at its stop, the idle bound's stop, the host's
+  // stop and the instance's terminal close, whichever comes first (§6.4).
+  own(connection, { role: 'state' });
   return connection;
 }
 
 /**
- * Closes a session's own connection. A failure goes back to the session,
- * which keeps the connection for the next stop and reports it — never
- * swallowed here.
+ * Closes a session's own connection: its one `disconnect()` — the logoff —,
+ * joined if the instance's terminal close already asked for it. connection
+ * 16 refuses a second `disconnect()`, so a failure is not retried: it is
+ * logged in fixed words.
  */
 async function closeOwn(connection: IAbapConnection): Promise<void> {
-  await (connection as { disconnect?: () => Promise<void> }).disconnect?.();
+  await endConnection(connection);
 }
 
 /**
@@ -91,9 +96,13 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
   return {
     openConnection: openStateful,
     closeConnection: closeOwn,
-    // The system freed this ABAP session itself (terminateDebugger); the next request
-    // on it would answer 400, and a logoff is a request. Nothing to send: forget it.
-    dropConnection: () => {},
+    // The system freed this ABAP session itself (terminateDebugger); its HTTP
+    // security session is still the server's, so it ends like every owned
+    // connection: its one `disconnect()` (connection 16 sends the logoff only
+    // while it holds a live session, and without the ended ABAP context).
+    dropConnection: (connection) => {
+      void endConnection(connection);
+    },
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
       new AbapDebugger(c, undefined, undefined, { onConflict }),
     requestUser: (context) => requestUserOf(context.connection),

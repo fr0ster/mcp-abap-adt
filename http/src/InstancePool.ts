@@ -19,13 +19,21 @@
  *
  * The pool knows `InstanceState` and nothing of what the state is.
  */
+import { errorClassOf, failureOf } from '@mcp-abap-adt/lib/auth';
 import type { InstanceState } from '@mcp-abap-adt/lib/state';
 
 export interface Poolable {
   readonly state: InstanceState;
   readonly stateHandle: string;
   holdsState(): boolean;
+  /** The state undo: callable again, each call retrying what is left. */
   dispose(): Promise<void>;
+  /**
+   * The terminal close (spec §6.4, D55): every connection the instance owns
+   * closed with a logoff. Run when the instance leaves the pool, after its
+   * undo, whatever the undo answered.
+   */
+  terminalClose?(): Promise<void>;
 }
 
 /** The `400` words of a batch carrying `state_handle`. */
@@ -80,7 +88,30 @@ interface Held<T> {
   unsubscribe: () => void;
 }
 
-const messageOf = (e: unknown) => (e instanceof Error ? e.message : String(e));
+/**
+ * What a failed undo is reported as: the state's own words of what it could
+ * not undo (`StateCleanupError.failures`, the parts' fixed words), else what
+ * the failure reader makes of it, else its class — never a thrown message.
+ */
+const failureWordsOf = (e: unknown): string => {
+  const failures = ownFailures(e);
+  if (failures !== undefined) return failures.join('; ');
+  return failureOf(e)?.message ?? errorClassOf(e);
+};
+
+function ownFailures(e: unknown): string[] | undefined {
+  if (e === null || typeof e !== 'object') return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(e, 'failures');
+    const value =
+      descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    return Array.isArray(value) && value.every((f) => typeof f === 'string')
+      ? (value as string[])
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export class InstancePool<T extends Poolable> {
   private readonly held = new Map<T, Held<T>>();
@@ -96,6 +127,8 @@ export class InstancePool<T extends Poolable> {
   private readonly retained = new Set<T>();
   private readonly active = new Set<Promise<unknown>>();
   private admitting = true;
+  /** Instances whose terminal close ran: they left the pool for good. */
+  private readonly closed = new WeakSet<T>();
   /**
    * What a failure is named by: an ordinal per instance. Never the handle — it
    * is a bearer secret, and these lines reach the log at shutdown.
@@ -241,11 +274,16 @@ export class InstancePool<T extends Poolable> {
         if (!instance.holdsState()) {
           this.drop(instance);
           this.retained.delete(instance);
+          // It left the pool: its connections end with a logoff (§3.8).
+          await this.terminalClose(instance);
         } else {
           this.retained.add(instance); // still finishing: owned until it empties
         }
       } catch (e) {
-        this.failed.set(instance, `${this.nameOf(instance)}: ${messageOf(e)}`);
+        this.failed.set(
+          instance,
+          `${this.nameOf(instance)}: ${failureWordsOf(e)}`,
+        );
         this.retained.add(instance); // fresh or held: kept for shutdown's retry
         if (!instance.holdsState()) {
           // Nothing left to route to: out of the index and the count; only
@@ -260,11 +298,25 @@ export class InstancePool<T extends Poolable> {
     return eviction;
   }
 
+  /** The terminal close of an instance leaving the pool, once. */
+  private async terminalClose(instance: T): Promise<void> {
+    if (this.closed.has(instance)) return;
+    this.closed.add(instance);
+    await instance.terminalClose?.();
+  }
+
+  /** Stops admission (shutdown, in the latch's tick): every later request is `503`. */
+  stopAdmitting(): void {
+    this.admitting = false;
+  }
+
   /**
    * Stop admission; let running requests and disposals finish; dispose what is
    * held or retained; wait until each has settled (an asynchronous part
    * finishes when its last event arrives — no timer); retry once what still
-   * holds; report what is still left.
+   * holds; report what is still left. Every instance it owned then leaves the
+   * pool through its terminal close — its connections closed with a logoff
+   * whatever its undo answered (§3.8, §6.4).
    */
   async shutdown(): Promise<string[]> {
     this.admitting = false;
@@ -290,6 +342,8 @@ export class InstancePool<T extends Poolable> {
         );
       }
     }
+    // Leaving for good: the logoffs are written whatever the undo answered.
+    await Promise.all(owned.map((instance) => this.terminalClose(instance)));
     return [...this.failed.values()];
   }
 }

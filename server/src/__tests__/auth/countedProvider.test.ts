@@ -161,38 +161,57 @@ describe('countedProvider', () => {
 });
 
 describe('ProviderGate.drained', () => {
-  it('resolves 0 at once when nothing runs', async () => {
-    await expect(new ProviderGate().drained(1_000)).resolves.toBe(0);
+  it('resolves at once when nothing runs', async () => {
+    await expect(new ProviderGate().drained()).resolves.toBeUndefined();
   });
 
-  it('resolves 0 when the count reaches zero before the deadline', async () => {
+  it('resolves when the count reaches zero — no deadline, no timer (D33)', async () => {
     const held = deferred<AuthOutcome>();
     const { inner } = fakeInner(() => held.promise);
     const gate = new ProviderGate();
     const p = countedProvider(inner, gate);
     const running = p.rejected(rejection);
     let settled = false;
-    const drained = gate.drained(30_000).then((n) => {
+    const drained = gate.drained().then(() => {
       settled = true;
-      return n;
     });
     await new Promise((r) => setImmediate(r));
     expect(settled).toBe(false);
     held.resolve(OK);
     await running;
-    await expect(drained).resolves.toBe(0);
+    await drained;
+    expect(settled).toBe(true);
   });
 
-  it('resolves at the deadline with the number still running', async () => {
+  it('holds no timer while it waits', async () => {
+    jest.useFakeTimers();
+    try {
+      const held = deferred<AuthOutcome>();
+      const { inner } = fakeInner(() => held.promise);
+      const gate = new ProviderGate();
+      const p = countedProvider(inner, gate);
+      const running = p.prepare();
+      void gate.drained();
+      expect(jest.getTimerCount()).toBe(0);
+      held.resolve(OK);
+      await running;
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  it("the shutdown's signal releases the wait (the forced close)", async () => {
     const held = deferred<AuthOutcome>();
     const { inner } = fakeInner(() => held.promise);
     const gate = new ProviderGate();
     const p = countedProvider(inner, gate);
-    const running = [p.prepare(), p.authorize(request)];
-    const started = Date.now();
-    await expect(gate.drained(50)).resolves.toBe(2);
-    expect(Date.now() - started).toBeGreaterThanOrEqual(40);
+    const running = p.prepare();
+    const forced = new AbortController();
+    const drained = gate.drained(forced.signal);
+    forced.abort();
+    await drained;
+    expect(gate.inFlight).toBe(1);
     held.resolve(OK);
-    await Promise.all(running);
+    await running;
   });
 });

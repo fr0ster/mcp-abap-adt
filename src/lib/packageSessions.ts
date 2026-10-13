@@ -27,12 +27,18 @@
  * D20): the factory's record of a connection the server built, or the host's
  * `freshConnection` for one it injected — never the connection's own
  * configuration. Without either the operation is refused.
+ *
+ * Every fresh connection is the server's from the moment it exists (D22,
+ * D55): recorded in the connection-ends registry (`ownedConnections.ts`) as
+ * the calling instance's, and ended with its one `disconnect()` — the logoff —
+ * when its operation ends, on every path, or by the instance's terminal close.
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ServerRefusal } from './auth/serverRefusal';
 import { createAbapConnection, siblingRecordOf } from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
 import type { HandlerContext } from './handlers/interfaces';
+import { endConnection, own, whenEnded } from './ownedConnections';
 
 type Logger = HandlerContext['logger'];
 
@@ -82,16 +88,21 @@ export async function openFreshConnection(
 ): Promise<IAbapConnection> {
   const record = siblingRecordOf(connection);
   if (record) {
-    return connectedOrClosed(
-      createAbapConnection(record.settings, record.credential, logger ?? null),
-      logger,
+    const built = createAbapConnection(
+      record.settings,
+      record.credential,
+      logger ?? null,
     );
+    own(built, { role: 'fresh' });
+    return connectedOrClosed(built, logger);
   }
   const factory = hostFactories.get(connection);
   if (!factory) throw new ServerRefusal('fresh_connection_unavailable');
   // Once handed over it is the server's (D22), treated exactly like a
   // connection the server built.
-  return connectedOrClosed(await factory(), logger);
+  const given = await factory();
+  own(given, { role: 'fresh' });
+  return connectedOrClosed(given, logger);
 }
 
 /**
@@ -115,21 +126,18 @@ async function connectedOrClosed(
 }
 
 /**
- * Closes a connection this process holds as its own; a failure to close is
- * only logged, in fixed words (D22).
+ * Closes a connection this process holds as its own — its one
+ * `disconnect()`, joined if another end already asked for it (D55); a failure
+ * to close is only logged, in fixed words (D22).
  */
 export async function closeQuietly(
   opened: IAbapConnection,
   logger: Logger,
   what: string,
 ): Promise<void> {
-  const closable = opened as { disconnect?: () => Promise<void> };
-  try {
-    if (typeof closable.disconnect !== 'function') return;
-    await closable.disconnect();
-  } catch {
+  await endConnection(opened, () => {
     logger?.warn(`${what}: could not close its own connection`);
-  }
+  });
 }
 
 /**
@@ -182,6 +190,14 @@ export async function connectionForPackageLock(
     connection: fresh,
     keep: (lockHandle) => {
       lockSessions.set(lockHandle, fresh);
+      // Held under its handle until the unlock — or the instance's terminal
+      // close, which logs it off and forgets it here (§6.4).
+      own(fresh, { role: 'lock' });
+      whenEnded(fresh, () => {
+        if (lockSessions.get(lockHandle) === fresh) {
+          lockSessions.delete(lockHandle);
+        }
+      });
     },
     drop: () => closeQuietly(fresh, logger, 'LockPackage'),
   };

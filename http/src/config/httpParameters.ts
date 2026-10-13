@@ -15,6 +15,7 @@ import {
   type ParameterValue,
   parameterSource,
   readParameters,
+  SHUTDOWN_TIMEOUT_ROW,
   SSE_OPTIONS_REMOVED,
   STATE_IDLE_ROW,
   SYSTEM_TYPE_ROW,
@@ -118,6 +119,7 @@ export function httpParameters(
       ...HTTP_ROWS,
       ...tlsRows('http'),
       STATE_IDLE_ROW,
+      SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
       transportRemoved('http'),
@@ -170,6 +172,7 @@ export function readHttpConfig(
     systemType: values.systemType as HttpConfig['systemType'],
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
     stateIdleMinutes: values.stateIdleMinutes as number,
+    shutdownTimeout: values.shutdownTimeout as number | undefined,
     host: values.host as string,
     port: values.port as number,
     httpPath: values.httpPath as string | undefined,

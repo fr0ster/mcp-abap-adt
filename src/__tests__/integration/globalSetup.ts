@@ -132,7 +132,7 @@ async function setUp(): Promise<void> {
     // Don't throw — let tests handle missing auth gracefully (skip)
   } finally {
     // Writes the session the login produced (unsafe store).
-    const report = await factory.settle(30_000);
+    const report = await factory.settle();
     if (report.notStored.length > 0) {
       console.log(
         `[globalSetup] Session not stored: ${report.notStored.join(', ')}`,

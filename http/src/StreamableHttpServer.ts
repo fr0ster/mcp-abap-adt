@@ -120,6 +120,8 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly externalApp?: IHttpApplication;
   private readonly version: string;
   private standaloneServer?: HttpServer | HttpsServer;
+  /** The listener stopped, until its last connections are closed after the last step. */
+  private stoppedListener?: HttpServer | HttpsServer;
   private readonly tls?: TlsConfig;
   private readonly allowedHosts?: string[];
   private readonly allowedOrigins?: string[];
@@ -385,20 +387,60 @@ export class StreamableHttpServer extends BaseMcpServer {
   }
 
   /**
-   * Stops taking connections (shutdown, step 1), then the pool: no request is
-   * admitted any more, the running ones finish, every instance that holds
-   * state is disposed and waited for (no timer). Rejects with what could not
-   * be undone. Embedded on an external app, there is no listener of its own
-   * to stop, but the pool is still ours to drain.
+   * The shutdown's first step, in the latch's tick (spec §6.4): the pool stops
+   * admitting — every later request is answered `503`.
    */
-  async stop(): Promise<void> {
+  beginShutdown(): void {
+    this.pool.stopAdmitting();
+  }
+
+  /** Stops taking connections. Embedded on an external app there is no listener of its own. */
+  stopListening(): void {
     const server = this.standaloneServer;
     if (server) {
       this.standaloneServer = undefined;
+      this.stoppedListener = server;
       server.close();
       server.closeIdleConnections();
     }
+  }
+
+  /**
+   * After the last step nothing is answered any more: the connections still
+   * open on the stopped listener (a client's idle keep-alive) are closed, so
+   * none keeps the process alive.
+   */
+  private closeLeftConnections(): void {
+    this.stoppedListener?.closeAllConnections();
+    this.stoppedListener = undefined;
+  }
+
+  /**
+   * The shutdown's last step, after every registered tool settled (D33,
+   * ruling 16): the pool's own shutdown — the requests and disposals still
+   * running awaited, every held or retained instance disposed, retried once,
+   * and closed with a logoff whatever its undo answered — answering one line
+   * per leftover, each instance by its ordinal, never its handle.
+   */
+  async lastStep(): Promise<string[]> {
     const failures = await this.pool.shutdown();
+    this.closeLeftConnections();
+    return failures.map(
+      (failure) => `[MCP] State not undone at shutdown: ${failure}`,
+    );
+  }
+
+  /**
+   * For a host that stops the server itself (embedded): admission stops, the
+   * listener closes, then the pool's shutdown (no timer). Rejects with what
+   * could not be undone. A launcher's shutdown awaits every registered tool
+   * between the two (lib's `installTransportShutdown`).
+   */
+  async stop(): Promise<void> {
+    this.beginShutdown();
+    this.stopListening();
+    const failures = await this.pool.shutdown();
+    this.closeLeftConnections();
     if (failures.length) {
       throw new Error(`state cleanup failed: ${failures.join('; ')}`);
     }
@@ -418,6 +460,15 @@ export class StreamableHttpServer extends BaseMcpServer {
 
       public useConnectionContext(context: ConnectionContext): void {
         this.setConnectionContext(context);
+      }
+
+      /**
+       * A pooled instance ends with its state: after the idle bound's stop,
+       * whatever its undo answered, every connection it owns is closed with
+       * a logoff (§3.8, §6.4) — not only the state's own.
+       */
+      protected override idleStopped(): Promise<void> {
+        return this.terminalClose();
       }
     }
     return new PerRequestServer(

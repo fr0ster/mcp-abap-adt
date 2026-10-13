@@ -54,6 +54,12 @@ export interface IServerConfig {
   systemTypeSource?: string;
 
   /**
+   * `--shutdown-timeout` in seconds (`MCP_SHUTDOWN_TIMEOUT`,
+   * `shutdown-timeout`): the forced close after this long; absent: none.
+   */
+  shutdownTimeout?: number;
+
+  /**
    * The idle bound on held state: it ends after this many minutes without a
    * tool call (`--state-idle-minutes`, `MCP_STATE_IDLE_MINUTES`,
    * `state-idle-minutes`). A whole number, at least 30; default 30.

@@ -144,6 +144,12 @@ crash during a shutdown forces it, and a second crash joins the forced close und
 process (`SIGKILL`, out of memory) cannot log off: SAP's idle timeout ends its sessions and locks,
 unless the user resumes or logs them off from a later process (below).
 
+**One main flow per instance** (D56): the registered tool wrapper runs the calls that work on
+the instance's connection one after another (`enterMainFlow`), whatever the client sends at once;
+a background run and a listed long read, on connections of their own, take no place in it. The
+wait has no timeout; a call whose signal aborts while it waits leaves at once and never reaches its
+tool, so a close never waits behind a queued call.
+
 **A connection is replaced only when SAP lost its session** (D56), or when a new credential
 arrives where the credential is the request's (http, sse) — never for a source that keeps its
 connection (`keepsConnection`: stdio, D13): `getConnection` builds a new instance for the next call, and the replaced one is logged

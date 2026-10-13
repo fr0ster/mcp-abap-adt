@@ -5,11 +5,9 @@ which do not. It is about protocol behaviour, not about session files.
 
 ## The window (D56)
 
-A tool's session is stateful only for **lock → write → unlock and activation**.
-Everything else — reads, searches, runs, where-used, checks — runs stateless.
-
-What is sent stateful today is narrower, and it is decided by
-`@mcp-abap-adt/adt-clients` (31.1), not by the server:
+**Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
+stateless.** Everything else — reads, searches, runs, where-used, checks — runs
+stateless too. It is decided by `@mcp-abap-adt/adt-clients` (31.1), not by the server:
 
 | Request | Session | Context cookie (`sap-contextid`) |
 |---|---|---|
@@ -22,7 +20,9 @@ What is sent stateful today is narrower, and it is decided by
 The write running outside the lock's context is what Eclipse does (an ADT capture of
 2026-08-31: every lock and unlock in the stateful "enqueue" session, the `PUT` and the
 reads around it stateless). An `UNLOCK` sent stateless releases nothing and still
-answers `200`, which is why it goes stateful.
+answers `200` (inferred from adt-clients' own comment on the message-class unlock, "an
+unlock sent that way does not reach the session holding the handles"; not measured here),
+which is why it goes stateful.
 
 ## How a request is marked
 
@@ -41,10 +41,18 @@ nothing on the wire: a tool cannot reach into the connection's session.
 
 ## Across tool calls
 
-- **Compact `HandlerLock` → `HandlerUpdate { lock_handle }` → `HandlerUnlock`**: the
-  lock stays in the session between the calls — the consumer's choice. Every call
-  between them is stateless; the `UNLOCK` reaches the lock's context. At the latest
-  the instance's logoff ends it (a logoff releases the session's locks).
+- **One main flow per instance**: the calls of one MCP session that work on its
+  connection run one after another, whatever the client sends at once — the server
+  enforces it, so no call is sent inside another call's window. A background run and
+  a listed long read, each on a connection of its own, are outside the order.
+- **Compact `HandlerLock` → `HandlerUpdate { lock_handle }` → `HandlerUnlock`**: on
+  stdio and SSE, where the connection lives across calls, the lock stays in the
+  session between the calls — the consumer's choice. Every call between them is
+  stateless; the `UNLOCK` reaches the lock's context. At the latest the instance's
+  logoff ends it (a logoff releases the session's locks). Over Streamable HTTP the
+  next request's credential retires the lock's connection and its logoff releases the
+  lock: lock, write and unlock in one call there (`HandlerUpdate` without a
+  `lock_handle`).
 - **A cancel does nothing to SAP**: no logoff, no new session.
 - **A reopen only when SAP lost the session**: stdio keeps its connection for the
   instance's life.
@@ -53,9 +61,11 @@ nothing on the wire: a tool cannot reach into the connection's session.
 
 ## Common pitfalls
 
-- **Two calls at once on one connection**: the session type is the connection's
-  while a `LOCK` or an `UNLOCK` is in flight, so a concurrent read goes stateful
-  (seen against the stand-in), and an `UNLOCK` could go stateless. Call write tools one at a time.
+- **Two calls at once on one connection**: the session type is the connection's while
+  a `LOCK` or an `UNLOCK` is in flight; a read sent alongside would go stateful and an
+  `UNLOCK` stateless (both seen against the stand-in without the main flow). The
+  server's main flow keeps the calls of one instance apart; code that shares a
+  connection outside it must do the same.
 - **A missing `lockHandle` or `corrNr`** on the write.
 
 Every site that changes a session type is listed in `tools/stateful-sites.json`

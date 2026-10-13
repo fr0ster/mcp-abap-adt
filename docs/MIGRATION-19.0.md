@@ -139,7 +139,8 @@ A tool not on the list takes no `timeout` and runs to its end — above all the 
 goes on in SAP whoever waits: the ABAP Unit and ATC runs (`Run*UnitTest`, `RunATC`,
 `GetUnitTestResult`, compact `HandlerUnitTestResult` / `HandlerCdsUnitTestResult`), the class and
 program runs (`RuntimeRunClass`, `RuntimeRunProgram`, compact `HandlerProfileRun`), activation and
-the debugger. A session is stateful only for lock → write → unlock and activation. A class or
+the debugger. Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
+stateless. A class or
 program run that may run long is started **in the background** instead (`background: true`, next
 section but one): it cannot be cut, so it gets no `timeout`.
 
@@ -293,23 +294,40 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
 - **No session of its own to be had** — an embedded server given a connection without
   `freshConnection` — refuses the start with the fresh-connection words, as the listed long reads.
 
-## Every transport: a tool's session is stateful only for lock → write → unlock and activation
+## Every transport: only LOCK and UNLOCK are sent stateful, and an instance's calls run one at a time
 
-A tool's ABAP session is stateful only for **lock → write → unlock and activation**; everything
-else runs stateless. On the wire that is the `LOCK` and the `UNLOCK` (adt-clients 31.1): the write
-under the lock and the activation go stateless, as Eclipse sends them. Nothing a tool does leaves
-the connection stateful after its window, so the next call — a read, a search, a run — never runs
-inside another call's lock session.
+**Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go stateless**, as
+Eclipse sends them (adt-clients 31.1 marks the two requests, each for itself). Everything else
+runs stateless.
+
+**One MCP session, one connection, one main flow.** The calls of one server instance that work on
+its connection run strictly one after another, whatever your client sends at once: the next call
+waits, with no timeout, until the previous one settled. So a call never runs inside another call's
+lock, and an `UNLOCK` is never sent outside its lock's session because another call ended its own.
+Where it matters: stdio (one instance for the process) and SSE (one instance per SSE connection).
+Over Streamable HTTP each request has its instance and connection, so its calls never met anyway.
+Outside the order, because they work on a connection of their own: a background run
+(`background: true`), a listed long read (on its fresh connection, `timeout` or not) and the
+debugger's own debuggee session. A call you cancel while it waits leaves the queue at once and
+never reaches SAP; a shutdown or an instance's close does not wait behind a queued call.
+
+What this means for you: a long call on the instance's connection — a unit-test or ATC run, a
+class or program run not sent to the background, an activation, a `DebugWait` with its
+`hold_seconds` — holds every other call of that session until it ends. Send a long run to the
+background where the tool offers it.
 
 - **`session_id` / `session_state` change nothing any more.** The tools that took them
   (compact `HandlerLock`, `HandlerUnlock`, `HandlerValidate`, `HandlerCheckRun`, the `Activate*`
   and `Check*` tools, `GetNodeStructure`, …) used to switch the shared connection to stateful for
   every request that followed, and left it so. They still accept the arguments and ignore them;
   `HandlerLock` still answers a `session_id` and `HandlerUnlock` still requires one, but it is sent
-  on no request. Nothing for you to change: a lock and its unlock meet in the instance's own
-  session.
-- **Compact `HandlerLock` keeps the lock until `HandlerUnlock`**, your choice: the calls in between
-  are stateless, and the instance's end (its logoff) releases a lock you never unlocked.
+  on no request.
+- **Compact `HandlerLock` keeps the lock until `HandlerUnlock` — on stdio and SSE**, where the
+  instance's connection lives across calls; the calls in between are stateless, and the instance's
+  end (its logoff) releases a lock you never unlocked. **Over Streamable HTTP it does not**: the
+  next request's credential retires the lock's connection, and that connection's logoff releases
+  the lock. Over HTTP, update with `HandlerUpdate` without a `lock_handle` — lock, write and unlock
+  in one call.
 - **The debugger's sessions are its own**, stateful for their life, and end with the debug session.
 - Every site that turns a session type is listed in `tools/stateful-sites.json`.
 
@@ -780,8 +798,12 @@ transport's options only:
   (`{ kind: 'built', source, keepsConnection: true }`, what stdio's `StdioServer` sets): a new
   credential object from `resolve` then does not replace it.
 - **`restoreSessionInConnection` is gone from `@mcp-abap-adt/lib/utils`.** It switched the
-  connection to stateful and never back; a stateful request is adt-clients' to mark, for the one
-  `LOCK` or `UNLOCK`. `sessionUtils`' `makeAdtRequestWithSession` / `makeAdtRequestStateless` (not
+  connection to stateful and never back, and overwrote the shared connection's
+  `sap-adt-connection-id` with the caller's `session_id` (`setSessionId`) for every request after;
+  a stateful request is adt-clients' to mark, for the one `LOCK` or `UNLOCK`.
+- **An instance's calls on its connection run one at a time** (`BaseMcpServer`'s main flow): a
+  subclass that calls a tool's handler itself, outside the registered wrapper, takes no place in
+  it. `sessionUtils`' `makeAdtRequestWithSession` / `makeAdtRequestStateless` (not
   exported) are gone too.
 - **`IAuthBrokerFactoryConfig.loginTimeoutStated?`** names the bound in D10's sentence (the
   launcher passes the form the user set, `` `--login-timeout=300` ``); absent, the sentence names

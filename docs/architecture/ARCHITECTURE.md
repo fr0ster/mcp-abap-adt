@@ -267,41 +267,48 @@ The dependency rule is a test (`src/__tests__/unit/packages/dependencyRule.test.
 lib, http and sse declare and reach no broker, stores or `interfaces-auth-broker`; http and sse
 never reach each other.
 
-#### The stateful window (D56)
+#### The stateful window and the main flow (D56)
 
-A tool's session is stateful only for the lock and the unlock (and, as decided,
-activation): the window D56 allows is **lock → write → unlock and activation**, and
-everything else runs stateless. What goes stateful on the wire today is narrower,
-and it is adt-clients' (31.1), not the server's: the `LOCK` alone and the `UNLOCK`
-alone, each inside `inStatefulSession` or a `try`/`finally` that sets the connection
-back to stateless whatever the request answered. The write under the lock goes
-stateless and outside the lock's context, as Eclipse sends it (the lock handle
-carries it); an activation goes stateless. The server itself turns no tool's
-session stateful: its one stateful site is the debugger's own session
-(`src/lib/debugger/ports.ts`), and the listed long tools and background runs set
-their own fresh connections stateless. Every site is a row of
-`tools/stateful-sites.json` with the window it opens and where it returns to
-stateless; `src/__tests__/unit/sources/statefulSites.test.ts` holds the scan of
-the server's sources and adt-clients' installed `dist` equal to it.
+**Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
+stateless.** Both requests are marked by adt-clients (31.1), not by the server: the
+`LOCK` alone and the `UNLOCK` alone, each inside `inStatefulSession` or a
+`try`/`finally` that sets the connection back to stateless whatever the request
+answered. The write under the lock goes outside the lock's context, as Eclipse sends
+it (the lock handle carries it). The server itself turns no tool's session stateful:
+its one stateful site is the debugger's own session (`src/lib/debugger/ports.ts`),
+and the listed long tools and background runs set their own fresh connections
+stateless. Every site is a row of `tools/stateful-sites.json` with the window it
+opens and where it returns to stateless; `src/__tests__/unit/sources/statefulSites.test.ts`
+holds the scan of the server's sources and adt-clients' installed `dist` equal to it.
 
-- **Compact's `HandlerLock`** leaves the window open across calls until
-  `HandlerUnlock` — the consumer's choice: the lock's ABAP context stays in the
-  session (its `sap-contextid` cookie is kept), the calls between run stateless and
-  outside it, and the `UNLOCK` reaches it. At the latest the instance's logoff ends
-  it: a logoff releases the session's locks.
+**One MCP session = one connector = one main flow.** The session type is the
+connection's (connection 17.1): adt-clients switches it with `setSessionType` around
+the request, and the connection reads it when the request is built, after an
+`await`. Two calls at once on one connection would cross — a read sent while another
+call's `LOCK` is in flight goes stateful, an `UNLOCK` whose credential is still
+being asked goes stateless once another call's window closed (both seen against the
+stand-in). So the server does not trust the client: the calls of an instance that
+work on its connection run strictly one after another (`BaseMcpServer.enterMainFlow`,
+in the registered tool wrapper). The next waits until the previous settled, with no
+timeout; a call cancelled while it waits leaves the queue at once and never reaches
+its tool; an instance's close and a shutdown do not wait behind a queued call.
+Outside the order, because they work on a connection of their own: a background run,
+a listed long read (its fresh connection) and the debugger's debuggee session. The
+connections that are shared this way are stdio's kept one and an SSE connection's;
+Streamable HTTP builds one per request.
+
+- **Compact's `HandlerLock`** keeps the lock across calls until `HandlerUnlock` —
+  the consumer's choice — where the connection lives across calls (stdio, SSE): the
+  lock's ABAP context stays in the session (its `sap-contextid` cookie is kept), the
+  calls between run stateless and outside it, and the `UNLOCK` reaches it. At the
+  latest the instance's logoff ends it: a logoff releases the session's locks. Over
+  Streamable HTTP the next request's credential retires the lock's connection, and
+  that connection's logoff releases the lock.
 - **A cancel does nothing to SAP.** A started tool runs to its end; nothing is
   logged off and no session is reopened because a request was cancelled.
 - **A reopen only when SAP already lost the session.** stdio keeps its connection
   for the instance's life; http builds one per request (a pooled instance too, from
   that request's headers), sse one per SSE connection.
-- **A shared connection's session type is the connection's.** adt-clients
-  switches it with `setSessionType` around the request, and the connection reads it
-  when the request is built — after an `await`. Two tool calls running at once on
-  one connection (stdio's kept one; HTTP serves one request at a time per instance)
-  can therefore cross: a read sent while another call's `LOCK` is in flight goes
-  stateful (seen against the stand-in), and, read from the code, an `UNLOCK` whose
-  request is built after another call's window closed would go stateless. Write tools are to be called one at a time (Known
-  Limitations).
 
 #### Composition Roots
 
@@ -761,12 +768,18 @@ For troubleshooting:
 
 ### Parallel Tool Calls
 
-MCP tool calls that modify SAP objects (Create, Update, Delete) must be executed **sequentially**, not in parallel. Each MCP server instance uses a single ABAP connection with one CSRF token and one HTTP session. Parallel write operations cause:
+**An instance runs its calls one at a time; the server enforces it.** Each MCP server
+instance uses a single ABAP connection, with one CSRF token, one HTTP session and one
+session type. Calls on it at once would cross — CSRF tokens, a read sent stateful
+inside another call's lock, an `UNLOCK` sent stateless — so the calls that work on the
+instance's connection run strictly one after another, whatever the client sends in
+parallel ("The stateful window and the main flow"); a background run and a listed long
+read, each on a connection of its own, are outside that order. A client may send calls
+in parallel; they are answered in turn.
 
-- **CSRF token conflicts** -- SAP ties CSRF tokens to HTTP sessions; concurrent requests invalidate each other's tokens.
-- **Session type race conditions** -- the session type is the connection's, set by adt-clients around a `LOCK` or an `UNLOCK` and read when a request is built: a read running while another call's `LOCK` is in flight goes stateful (seen against the stand-in), and, from the code, an `UNLOCK` built after another call's window closed would go stateless and release nothing ("The stateful window").
-- **Lock conflicts** -- SAP DDIC objects support only one lock per object; parallel locks on the same object will fail.
-
-Read-only operations (Read*, Search*, Get*) are safe to call in any order since they don't require CSRF tokens or session state changes.
-
-**For LLM clients**: configure the MCP client to send write tool calls one at a time. If the client batches multiple Create/Update calls in a single message, they must be serialized before reaching the server.
+- **A long call holds the session.** A unit-test or ATC run, a class or program run in
+  the foreground, an activation, a `DebugWait` with its `hold_seconds`: every other call
+  of that MCP session waits until it ends. Send a long run to the background where the
+  tool offers it.
+- **Lock conflicts** -- SAP DDIC objects support only one lock per object; two sessions
+  locking the same object conflict, and SAP's answer reaches the model as it is.

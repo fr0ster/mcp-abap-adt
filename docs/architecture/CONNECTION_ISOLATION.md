@@ -54,26 +54,29 @@ Values that belong to one request, such as the master language of created object
 4. **Renewal**: a `401` is put to the credential (`rejected`); a renewed token gets the request one more attempt. A header credential is fixed: nothing renews it
 5. **Shutdown**: on `SIGTERM`/`SIGINT` the transport stops accepting; core's factory waits for provider calls in flight and flushes its broker
 
-### The stateful window
+### The stateful window and the main flow
 
-A tool's session is stateful only for **lock → write → unlock and activation**
-(D56); everything else runs stateless. On the wire today (adt-clients 31.1) that is
-narrower still: the `LOCK` and the `UNLOCK`, each a request of its own, are sent
-stateful, and adt-clients sets the connection back to stateless in a `finally`
-whatever the request answered; the write under the lock and the activation go
-stateless. The server sets no tool's session stateful (`tools/stateful-sites.json`).
-Compact's `HandlerLock` leaves the lock in the session until `HandlerUnlock` (the
-consumer's choice), with every call between them stateless; the instance's logoff
-ends it at the latest.
+**Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
+stateless** (D56). adt-clients (31.1) marks the two requests, each a request of its
+own, and sets the connection back to stateless in a `finally` whatever the request
+answered. The server sets no tool's session stateful (`tools/stateful-sites.json`).
 
+**One MCP session = one connector = one main flow.** The calls of an instance that
+work on its connection run strictly one after another, whatever the client sends at
+once — the server enforces it. The shared connections are stdio's kept one and an SSE
+connection's; Streamable HTTP builds one per request. A background run and a listed
+long read work on a connection of their own and are outside the order.
+
+- **Compact's `HandlerLock`** leaves the lock in the session until `HandlerUnlock`
+  (the consumer's choice) where the connection lives across calls — stdio and SSE —
+  with every call between them stateless; the instance's logoff ends it at the
+  latest. Over Streamable HTTP the next request's credential retires the lock's
+  connection, and its logoff releases the lock.
 - **A cancel does nothing to SAP**: no logoff, no new session; the started tool runs
-  to its end.
+  to its end. A call cancelled while it waits for the flow never reaches SAP.
 - **A reopen only when SAP lost the session**: stdio never replaces its connection
   for a new provider; a lock held in the session would be left behind, or collide
   with the next one.
-- **One connection, one session type**: the session type is the connection's while
-  a `LOCK` or `UNLOCK` is in flight, so two calls at once on one connection (stdio)
-  can cross. Write tools are called one at a time.
 
 ### Benefits
 

@@ -35,7 +35,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerValidate',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Validate before create only. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).',
+    'Validate before create only. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).',
   inputSchema: compactValidateSchema,
 } as const;
 
@@ -44,6 +44,8 @@ type HandlerValidateArgs = {
   object_name: string;
   package_name?: string;
   description?: string;
+  super_package?: string;
+  superclass?: string;
   behavior_definition?: string;
   root_entity?: string;
   implementation_type?: string;
@@ -83,6 +85,8 @@ export async function handleHandlerValidate(
     object_type: lowType,
     package_name: args.package_name,
     description: args.description,
+    super_package: args.super_package,
+    superclass: args.superclass,
     behavior_definition: args.behavior_definition,
     root_entity: args.root_entity,
     implementation_type: args.implementation_type,

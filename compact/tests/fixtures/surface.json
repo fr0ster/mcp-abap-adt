@@ -128,7 +128,7 @@
   {
     "group": "compact",
     "name": "HandlerGet",
-    "inputs": "object_type*, part, package_name, class_name, interface_name, program_name, domain_name, data_element_name, table_name, structure_name, ddl_name, function_module_name, function_group_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, service_definition_name, service_binding_name, run_id, response_format, version",
+    "inputs": "object_type, part, package_name, class_name, interface_name, program_name, domain_name, data_element_name, table_name, structure_name, ddl_name, function_module_name, function_group_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, service_definition_name, service_binding_name, run_id, response_format, version",
     "available_in": "cloud, onprem"
   },
   {

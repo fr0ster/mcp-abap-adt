@@ -29,6 +29,7 @@ import {
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { connectionForPackageLock } from '../../../lib/packageSessions';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -63,6 +64,7 @@ export const TOOL_DEFINITION = {
           'data_element',
           'package',
           'behavior_definition',
+          'behavior_implementation',
           'metadata_extension',
         ],
       },
@@ -115,6 +117,7 @@ const VALID_TYPES = [
   'data_element',
   'package',
   'behavior_definition',
+  'behavior_implementation',
   'metadata_extension',
 ];
 
@@ -167,6 +170,30 @@ export async function handleLockObject(
   const desiredSessionId = session_id || generateSessionId();
   const objectName = object_name.toUpperCase();
   const client = createAdtClient(connection, logger);
+
+  // A package lock is held in a session of its own over RFC (a package can be
+  // saved only once per ABAP session), kept under its handle until the
+  // unlock; over HTTP the caller's connection serves.
+  const lockPackage = async () => {
+    const lockOn = await connectionForPackageLock(connection, logger);
+    try {
+      const locked = await createAdtClient(lockOn.connection, logger)
+        .getPackage(resultsFor(packageDocuments))
+        .lock(
+          {
+            packageName: objectName,
+            superPackage: (super_package as string).toUpperCase(),
+          },
+          { analyse: analyseLock },
+        );
+      if (locked.ok) lockOn.keep(locked.getResult().value);
+      else await lockOn.drop();
+      return locked;
+    } catch (error) {
+      await lockOn.drop();
+      throw error;
+    }
+  };
 
   return answer(
     { tool: 'LockObjectLow', detail: 'terse' },
@@ -226,14 +253,13 @@ export async function handleLockObject(
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
             .lock({ name: objectName }, { analyse: analyseLock });
+        case 'behavior_implementation':
+          // The implementation class's own lock, as the low tool sent it.
+          return client
+            .getBehaviorImplementation()
+            .lock({ className: objectName }, { analyse: analyseLock });
         case 'package':
-          return client.getPackage(resultsFor(packageDocuments)).lock(
-            {
-              packageName: objectName,
-              superPackage: (super_package as string).toUpperCase(),
-            },
-            { analyse: analyseLock },
-          );
+          return lockPackage();
         default:
           // Unreachable: objectType was already checked against VALID_TYPES.
           throw new Error(`Unsupported object_type: ${object_type}`);

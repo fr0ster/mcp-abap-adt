@@ -30,6 +30,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  connectionHoldingPackageLock,
+  releasePackageLockSession,
+} from '../../../lib/packageSessions';
 import { terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
@@ -63,6 +67,7 @@ export const TOOL_DEFINITION = {
           'data_element',
           'package',
           'behavior_definition',
+          'behavior_implementation',
           'metadata_extension',
         ],
       },
@@ -115,6 +120,7 @@ const VALID_TYPES = [
   'data_element',
   'package',
   'behavior_definition',
+  'behavior_implementation',
   'metadata_extension',
 ];
 
@@ -236,11 +242,17 @@ export async function handleUnlockObject(
               analyse: analyseException,
             });
         case 'package':
-          return client
+          // Sent on the session holding the lock, which is then released
+          // whatever the unlock answered.
+          return createAdtClient(
+            connectionHoldingPackageLock(connection, lock_handle),
+            logger,
+          )
             .getPackage(resultsFor(packageDocuments))
             .unlock({ packageName: objectName }, lock_handle, {
               analyse: analyseException,
-            });
+            })
+            .finally(() => releasePackageLockSession(lock_handle, logger));
         case 'behavior_definition':
           return client
             .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
@@ -251,6 +263,13 @@ export async function handleUnlockObject(
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
             .unlock({ name: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
+        case 'behavior_implementation':
+          // The implementation class's own unlock, pairing the lock.
+          return client
+            .getBehaviorImplementation()
+            .unlock({ className: objectName }, lock_handle, {
               analyse: analyseException,
             });
         default:

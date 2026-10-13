@@ -56,6 +56,13 @@
     "why": "force_new_connection: a delete in an ABAP session of its own"
   },
   {
+    "file": "src/handlers/common/low/handleLockObject.ts",
+    "function": "handleLockObject",
+    "site": "connectionForPackageLock",
+    "end": "lock not taken: drop() (endConnection); taken: kept under its handle until releasePackageLockSession (the unlock) \u2014 or the instance's terminal close, which ends it and forgets the handle",
+    "why": "RFC only: the lock session (role lock); over HTTP the caller's own connection serves and nothing new is made"
+  },
+  {
     "file": "src/handlers/package/low/handleLockPackage.ts",
     "function": "handleLockPackage",
     "site": "connectionForPackageLock",

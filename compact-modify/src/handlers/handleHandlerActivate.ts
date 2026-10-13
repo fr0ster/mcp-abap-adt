@@ -52,7 +52,7 @@ const ADT_TYPE_BY_COMPACT_TYPE: Partial<Record<CompactObjectType, string>> = {
  */
 const NEEDS_MORE_THAN_A_NAME: Partial<Record<CompactObjectType, string>> = {
   FUNCTION_MODULE:
-    'a function module is addressed under its function group, which this form does not take — use the batch form with objects[].parentName set to the group (name stays the module, type FUGR/FF), or ActivateFunctionModuleLow, which takes the group as its own argument',
+    'a function module is addressed under its function group, which this form does not take — use the batch form with objects[].parentName set to the group (name stays the module, type FUGR/FF)',
 };
 
 /** What `object_type` alone can be activated as, or undefined. */

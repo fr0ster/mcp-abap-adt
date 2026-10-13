@@ -44,6 +44,51 @@ export const compactCreateSchema = {
       description: 'Transport request id (if required by system).',
     },
     activate: { type: 'boolean', description: 'Activate object after create.' },
+    master_language: {
+      type: 'string',
+      description:
+        'Original language of the created object; the session language when absent.',
+    },
+    super_package: {
+      type: 'string',
+      description: 'Super package (PACKAGE create).',
+    },
+    package_type: {
+      type: 'string',
+      description: 'Package type (PACKAGE create).',
+    },
+    software_component: {
+      type: 'string',
+      description: 'Software component (PACKAGE create).',
+    },
+    transport_layer: {
+      type: 'string',
+      description: 'Transport layer (PACKAGE create).',
+    },
+    record_changes: {
+      type: 'boolean',
+      description: 'Record changes (PACKAGE create).',
+    },
+    application_component: {
+      type: 'string',
+      description: 'Application component (PACKAGE create).',
+    },
+    superclass: {
+      type: 'string',
+      description: 'Superclass name (CLASS create).',
+    },
+    final: {
+      type: 'boolean',
+      description: 'Mark the class final (CLASS create).',
+    },
+    abstract: {
+      type: 'boolean',
+      description: 'Mark the class abstract (CLASS create).',
+    },
+    create_protected: {
+      type: 'boolean',
+      description: 'Protected constructor (CLASS create).',
+    },
     program_type: { type: 'string', description: 'ABAP program type.' },
     application: { type: 'string', description: 'Domain application area.' },
     datatype: { type: 'string', description: 'ABAP data type.' },
@@ -150,10 +195,18 @@ export const compactCreateSchema = {
  */
 const readPartSchema = {
   type: 'string',
-  enum: ['source', 'metadata', 'urls', 'contents'],
+  enum: [
+    'source',
+    'metadata',
+    'urls',
+    'contents',
+    'object_structure',
+    'node_structure',
+    'virtual_folders',
+  ],
   default: 'source',
   description:
-    'Which aspect to read: the source, the ADT metadata document, the service and preview URLs, or the objects a package contains. A part this object type does not offer is refused, naming the parts it does.',
+    'Which aspect to read: the source, the ADT metadata document, the service and preview URLs, or the objects a package contains. A part this object type does not offer is refused, naming the parts it does. Three parts read the repository by ADT address and take no object_type: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions).',
 } as const;
 
 export const compactGetSchema = {
@@ -216,8 +269,59 @@ export const compactGetSchema = {
       description: 'Response format for SERVICE_BINDING reads.',
     },
     version: versionSchema,
+    object_adt_type: {
+      type: 'string',
+      description:
+        'ADT type code of the object (object_structure) or of the parent node (node_structure).',
+    },
+    object_name: {
+      type: 'string',
+      description:
+        'Object name (object_structure) or parent name (node_structure).',
+    },
+    node_id: {
+      type: 'string',
+      description: 'Node id to expand (node_structure); the root when absent.',
+    },
+    with_short_descriptions: {
+      type: 'boolean',
+      description: 'Include short descriptions (node_structure).',
+    },
+    object_search_pattern: {
+      type: 'string',
+      description: 'Object name pattern (virtual_folders).',
+    },
+    preselection: {
+      type: 'array',
+      description: 'Facet preselections (virtual_folders).',
+      items: {
+        type: 'object',
+        properties: {
+          facet: { type: 'string', description: 'Facet name.' },
+          values: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Facet values.',
+          },
+        },
+        required: ['facet', 'values'],
+      },
+    },
+    facet_order: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Facet order (virtual_folders).',
+    },
+    with_versions: {
+      type: 'boolean',
+      description: 'Include versions (virtual_folders).',
+    },
+    ignore_short_descriptions: {
+      type: 'boolean',
+      description: 'Leave out short descriptions (virtual_folders).',
+    },
   },
-  required: ['object_type'],
+  required: [],
 } as const;
 
 export const compactUpdateSchema = {
@@ -250,6 +354,20 @@ export const compactUpdateSchema = {
       description: 'Transport request id (if required by system).',
     },
     activate: { type: 'boolean', description: 'Activate object after update.' },
+    lock_handle: {
+      type: 'string',
+      description:
+        'Lock handle from HandlerLock: write under the lock already held, with no lock, unlock, check or activation of its own. Without it the update locks and unlocks itself.',
+    },
+    super_package: {
+      type: 'string',
+      description: 'Super package (PACKAGE update).',
+    },
+    properties: {
+      type: 'object',
+      description:
+        'DOMAIN or DATA_ELEMENT under lock_handle: further properties to change, by their property names.',
+    },
     description: {
       type: 'string',
       description: 'Human-readable object description.',
@@ -357,6 +475,12 @@ export const compactDeleteSchema = {
   type: 'object',
   properties: {
     object_type: commonObjectTypeSchema,
+    package_name: { type: 'string', description: 'ABAP package name.' },
+    force_new_connection: {
+      type: 'boolean',
+      description:
+        'PACKAGE: delete from a new connection, closed afterwards — for a package saved earlier through this connection.',
+    },
     class_name: { type: 'string', description: 'ABAP class name.' },
     program_name: { type: 'string', description: 'ABAP program name.' },
     domain_name: { type: 'string', description: 'ABAP domain name.' },
@@ -793,6 +917,55 @@ const compactLifecycleObjectSchema = {
   },
 } as const;
 
+/** The types a lock and an unlock are sent for. */
+const LOCKABLE_TYPES = [
+  'CLASS',
+  'PROGRAM',
+  'INTERFACE',
+  'FUNCTION_GROUP',
+  'FUNCTION_MODULE',
+  'TABLE',
+  'STRUCTURE',
+  'DDL',
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'PACKAGE',
+  'BEHAVIOR_DEFINITION',
+  'BEHAVIOR_IMPLEMENTATION',
+  'METADATA_EXTENSION',
+] as const;
+
+/** The types a syntax check is sent for. */
+const CHECKABLE_TYPES = [
+  'CLASS',
+  'PROGRAM',
+  'INTERFACE',
+  'FUNCTION_GROUP',
+  'FUNCTION_MODULE',
+  'TABLE',
+  'STRUCTURE',
+  'DDL',
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'PACKAGE',
+  'BEHAVIOR_DEFINITION',
+  'METADATA_EXTENSION',
+] as const;
+
+const lifecycleObjectSchema = (types: readonly string[]) =>
+  ({
+    object_type: {
+      type: 'string',
+      enum: types,
+      description: `Object type. Supported: ${types.join(', ')}.`,
+    },
+    object_name: {
+      type: 'string',
+      description:
+        'Object name. A function module is named GROUP|MODULE, its function group first.',
+    },
+  }) as const;
+
 export const compactValidateSchema = {
   type: 'object',
   properties: {
@@ -822,12 +995,20 @@ export const compactValidateSchema = {
     object_name: {
       type: 'string',
       description:
-        'Required object name. For SERVICE_BINDING this is the service binding name.',
+        'Required object name. For SERVICE_BINDING this is the service binding name; a function module is named GROUP|MODULE.',
     },
     package_name: {
       type: 'string',
       description:
         'Optional package context for validation (especially for create scenarios).',
+    },
+    super_package: {
+      type: 'string',
+      description: 'Super package of the package to validate (PACKAGE).',
+    },
+    superclass: {
+      type: 'string',
+      description: 'Superclass of the class to validate (CLASS).',
     },
     description: {
       type: 'string',
@@ -887,7 +1068,7 @@ export const compactValidateSchema = {
 export const compactLockSchema = {
   type: 'object',
   properties: {
-    ...compactLifecycleObjectSchema,
+    ...lifecycleObjectSchema(LOCKABLE_TYPES),
     super_package: {
       type: 'string',
       description: 'Super package context when relevant.',
@@ -922,7 +1103,7 @@ export const compactLockSchema = {
 export const compactUnlockSchema = {
   type: 'object',
   properties: {
-    ...compactLifecycleObjectSchema,
+    ...lifecycleObjectSchema(LOCKABLE_TYPES),
     lock_handle: {
       type: 'string',
       description: 'Lock handle returned by lock.',
@@ -957,12 +1138,17 @@ export const compactUnlockSchema = {
 export const compactCheckRunSchema = {
   type: 'object',
   properties: {
-    ...compactLifecycleObjectSchema,
+    ...lifecycleObjectSchema(CHECKABLE_TYPES),
     version: {
       type: 'string',
       enum: ['active', 'inactive'],
       default: 'active',
       description: 'Version to syntax-check.',
+    },
+    source_code: {
+      type: 'string',
+      description:
+        'Source to check instead of the saved one; nothing is saved. CLASS, STRUCTURE and DDL only.',
     },
     session_id: {
       type: 'string',

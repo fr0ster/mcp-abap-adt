@@ -31,6 +31,7 @@ export {
 } from '../../handlers/common/low/handleActivateObject.js';
 export { handleLockObject } from '../../handlers/common/low/handleLockObject.js';
 export { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject.js';
+export { handleUpdateUnderLock } from '../../handlers/common/low/handleUpdateUnderLock.js';
 export { handleCreateDataElement } from '../../handlers/data_element/high/handleCreateDataElement.js';
 export { handleDeleteDataElement } from '../../handlers/data_element/high/handleDeleteDataElement.js';
 export { handleUpdateDataElement } from '../../handlers/data_element/high/handleUpdateDataElement.js';
@@ -53,6 +54,7 @@ export { handleDeleteInterface } from '../../handlers/interface/high/handleDelet
 export { handleUpdateInterface } from '../../handlers/interface/high/handleUpdateInterface.js';
 export { handleDeleteMetadataExtension } from '../../handlers/metadata_extension/high/handleDeleteMetadataExtension.js';
 export { handleCreatePackage } from '../../handlers/package/high/handleCreatePackage.js';
+export { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage.js';
 export { handleCreateProgram } from '../../handlers/program/high/handleCreateProgram.js';
 export { handleDeleteProgram } from '../../handlers/program/high/handleDeleteProgram.js';
 export { handleUpdateProgram } from '../../handlers/program/high/handleUpdateProgram.js';

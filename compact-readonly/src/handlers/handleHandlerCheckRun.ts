@@ -30,7 +30,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerCheckRun',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).',
+    'CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks source that is not saved, for CLASS, STRUCTURE and DDL.',
   inputSchema: compactCheckRunSchema,
 } as const;
 
@@ -38,6 +38,7 @@ type HandlerCheckRunArgs = {
   object_type: CompactObjectType;
   object_name: string;
   version?: 'active' | 'inactive';
+  source_code?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -61,6 +62,7 @@ export async function handleHandlerCheckRun(
     object_name: args.object_name,
     object_type: lowType,
     version: args.version,
+    source_code: args.source_code,
     session_id: args.session_id,
     session_state: args.session_state,
   });

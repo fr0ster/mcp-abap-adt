@@ -25,8 +25,10 @@ import {
   ddlDocuments,
   domainDocuments,
   functionGroupDocuments,
+  functionModuleDocuments,
   interfaceDocuments,
   metadataExtensionDocuments,
+  packageDocuments,
   programDocuments,
   structureDocuments,
   tableDocuments,
@@ -60,14 +62,21 @@ export const TOOL_DEFINITION = {
           'program',
           'interface',
           'function_group',
+          'function_module',
           'table',
           'structure',
           'ddl',
           'domain',
           'data_element',
+          'package',
           'behavior_definition',
           'metadata_extension',
         ],
+      },
+      source_code: {
+        type: 'string',
+        description:
+          'Source to check instead of the saved one (class, structure, ddl only); nothing is saved.',
       },
       version: {
         type: 'string',
@@ -100,6 +109,7 @@ interface CheckObjectArgs {
   object_name: string;
   object_type: string;
   version?: string;
+  source_code?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -114,14 +124,19 @@ const VALID_TYPES = [
   'program',
   'interface',
   'function_group',
+  'function_module',
   'table',
   'structure',
   'ddl',
   'domain',
   'data_element',
+  'package',
   'behavior_definition',
   'metadata_extension',
 ];
+
+/** The types whose check can take source that is not saved. */
+const SOURCE_TYPES = ['class', 'structure', 'ddl'];
 
 export async function handleCheckObject(
   context: HandlerContext,
@@ -132,6 +147,7 @@ export async function handleCheckObject(
     object_name,
     object_type,
     version = 'active',
+    source_code,
     session_id,
     session_state,
   } = args as CheckObjectArgs;
@@ -153,6 +169,27 @@ export async function handleCheckObject(
     ? (version.toLowerCase() as 'active' | 'inactive')
     : 'active';
 
+  if (source_code !== undefined && !SOURCE_TYPES.includes(objectType)) {
+    return return_error(
+      new Error(`source_code is checked only for: ${SOURCE_TYPES.join(', ')}`),
+    );
+  }
+
+  // A function module is addressed under its group: GROUP|MODULE, as the
+  // lock takes it.
+  let functionGroupName: string | undefined;
+  let functionModuleName: string | undefined;
+  if (objectType === 'function_module') {
+    const [group, module] = object_name.toUpperCase().split('|');
+    if (!group || !module) {
+      return return_error(
+        new Error('Function module name must be in format GROUP|FM_NAME'),
+      );
+    }
+    functionGroupName = group;
+    functionModuleName = module;
+  }
+
   if (session_id && session_state) {
     await restoreSessionInConnection(connection, session_id, session_state);
   }
@@ -168,9 +205,13 @@ export async function handleCheckObject(
         case 'class':
           return client
             .getClass(resultsFor(classDocuments))
-            .check({ className: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+            .check(
+              { className: objectName, source: source_code },
+              checkVersion,
+              {
+                analyse: analyseException,
+              },
+            );
         case 'program':
           return client
             .getProgram(resultsFor(programDocuments))
@@ -198,13 +239,17 @@ export async function handleCheckObject(
         case 'structure':
           return client
             .getStructure(resultsFor(structureDocuments))
-            .check({ structureName: objectName }, checkVersion, {
-              analyse: analyseException,
-            });
+            .check(
+              { structureName: objectName, source: source_code },
+              checkVersion,
+              {
+                analyse: analyseException,
+              },
+            );
         case 'ddl':
           return client
             .getDdl(resultsFor(ddlDocuments))
-            .check({ ddlName: objectName }, checkVersion, {
+            .check({ ddlName: objectName, source: source_code }, checkVersion, {
               analyse: analyseException,
             });
         case 'domain':
@@ -229,6 +274,24 @@ export async function handleCheckObject(
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
             .check({ name: objectName }, checkVersion, {
+              analyse: analyseException,
+            });
+        case 'function_module':
+          return client
+            .getFunctionModule(resultsFor(functionModuleDocuments))
+            .check(
+              {
+                functionGroupName: functionGroupName as string,
+                functionModuleName: functionModuleName as string,
+              },
+              checkVersion,
+              { analyse: analyseException },
+            );
+        case 'package':
+          // A package check takes no version: the low tool sent none.
+          return client
+            .getPackage(resultsFor(packageDocuments))
+            .check({ packageName: objectName }, undefined, {
               analyse: analyseException,
             });
         default:

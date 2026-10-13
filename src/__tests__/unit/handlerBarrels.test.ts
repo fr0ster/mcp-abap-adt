@@ -65,15 +65,19 @@ describe("lib's read and write handler barrels", () => {
     // is why this number moves deliberately and in a commit that says so.
     // 15.1: search, where-used, table/SQL data and package contents joined, for
     // the compact facade's read half. 19.0.0: ReadTransportObjects joined, for
-    // `HandlerGet` with object_type TRANSPORT.
-    expect(read).toHaveLength(60);
+    // `HandlerGet` with object_type TRANSPORT. 19.0.0 (C14): the node-structure,
+    // virtual-folder and object-structure reads joined, for `HandlerGet`'s
+    // address parts, when the low set left the full binaries.
+    expect(read).toHaveLength(63);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the
     // two deprecated `…WithProfiling` runs (76 handlers). 19.0.0 added the
     // transport organizer's sort-and-compress and move-objects, for compact's
     // `HandlerTransportSortAndCompress` / `HandlerTransportMoveObjects` (78).
-    expect(write).toHaveLength(79);
+    // 19.0.0 (C14): the write under the caller's lock and the package delete,
+    // for compact's `HandlerUpdate` with lock_handle and `HandlerDelete` PACKAGE.
+    expect(write).toHaveLength(81);
   });
 
   it('share not one symbol', () => {

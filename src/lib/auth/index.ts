@@ -16,11 +16,9 @@ export { assertDestinationName } from './destinationName';
 export type { DestinationSystemContext } from './destinationSystemContext';
 export { errorClassOf, SettingsError } from './errors';
 export {
-  ADT_REQUEST_ABORTED,
   authenticationFailed,
   type FailureCode,
   failureOf,
-  REQUEST_ABORTED_WORDS,
   type ReadFailure,
   readerFailed,
   readGuarded,

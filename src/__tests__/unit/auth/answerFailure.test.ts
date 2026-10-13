@@ -19,12 +19,7 @@ import {
   failureLogFields,
   failureLogLine,
 } from '../../../lib/auth/answerFailure';
-import {
-  ADT_REQUEST_ABORTED,
-  failureOf,
-  REQUEST_ABORTED_WORDS,
-  type ReadFailure,
-} from '../../../lib/auth/failures';
+import { failureOf, type ReadFailure } from '../../../lib/auth/failures';
 import {
   CREDENTIALS_REQUIRED_WORDS,
   FRESH_CONNECTION_UNAVAILABLE_WORDS,
@@ -97,16 +92,6 @@ describe('the §7.3 answer, row by row', () => {
       message: 'Destination "d" cannot be used: issuedBy',
       hint: 'a hint',
       cause_kind: 'configuration',
-    });
-  });
-
-  it('ADT_REQUEST_ABORTED: request_aborted, fixed words, no kind, no hint', () => {
-    const payload = payloadOf(
-      read(Object.assign(new Error('aborted'), { code: ADT_REQUEST_ABORTED })),
-    );
-    expect(payload).toEqual({
-      error: 'request_aborted',
-      message: REQUEST_ABORTED_WORDS,
     });
   });
 

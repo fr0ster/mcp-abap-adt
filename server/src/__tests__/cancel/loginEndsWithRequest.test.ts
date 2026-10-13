@@ -28,7 +28,7 @@ it('a cancel during the login ends it aborted, frees the port, and the next requ
   await until(() => s.logins.length === 1);
   expect(s.logins).toEqual(['aborted']);
   await until(() => s.active() === 0);
-  expect(s.stderr.join('')).toContain('[MCP] request_aborted');
+  expect(await r1.done).toBe('cancelled');
   await bindsFree(s.browser.ports[0]);
   expect(s.tokens.grants).toEqual([]);
 

@@ -7,8 +7,7 @@
  * responsible person (`systeminformation`) on the connection it acquired. The
  * stand-in holds that request; the client cancels the call while it is held
  * — after the connection is ready — and the stand-in then answers. The tool
- * is never called: no probe request reaches the stand-in, and the call is
- * answered `request_aborted`. A control call, held and released the same way
+ * is never called: no probe request reaches the stand-in. A control call, held and released the same way
  * without a cancel, reaches its tool. Each case runs on a server of its own,
  * since the lookup is made once per connection.
  *
@@ -269,7 +268,6 @@ describe.each(Object.keys(SERVERS))('%s', (name) => {
       expect(standIn.requests.map((r) => r.url)).not.toContain(
         `${PROBE_PATH}never-reached`,
       );
-      expect(stderr.join('')).toContain('[MCP] request_aborted');
     } finally {
       await served.close();
     }

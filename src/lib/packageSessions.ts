@@ -33,19 +33,17 @@ import { ServerRefusal } from './auth/serverRefusal';
 import { createAbapConnection, siblingRecordOf } from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
 import type { HandlerContext } from './handlers/interfaces';
-import { currentRequestSignal } from './requestSignal';
 
 type Logger = HandlerContext['logger'];
 
 /**
  * The host's factory of fresh connections (spec §4.3, D20): a connection of
- * its own, built by the host with its credential, honouring `signal`. Once
- * returned it is the server's (D22): held for the operation or under a
- * package lock's handle, then closed with `disconnect()`.
+ * its own, built by the host with its credential. It receives no signal
+ * (D56): a fresh connection is made inside a started tool, which runs to its
+ * end. Once returned it is the server's (D22): held for the operation or
+ * under a package lock's handle, then closed with `disconnect()`.
  */
-export type FreshConnectionFactory = (options: {
-  signal?: AbortSignal;
-}) => Promise<IAbapConnection>;
+export type FreshConnectionFactory = () => Promise<IAbapConnection>;
 
 /** Injected connections whose host gave a fresh-connection factory. */
 const hostFactories = new WeakMap<object, FreshConnectionFactory>();
@@ -74,8 +72,8 @@ export function registerFreshConnectionFactory(
  *   same settings and the same credential object, connected here (closed if
  *   that fails);
  * - injected with the host's `freshConnection` → that factory, called with
- *   the current request's signal; what it returns is the server's (D22),
- *   connected here like the server's own;
+ *   no argument (D56); what it returns is the server's (D22), connected here
+ *   like the server's own;
  * - anything else → refused `fresh_connection_unavailable`, nothing sent.
  */
 export async function openFreshConnection(
@@ -93,10 +91,7 @@ export async function openFreshConnection(
   if (!factory) throw new ServerRefusal('fresh_connection_unavailable');
   // Once handed over it is the server's (D22), treated exactly like a
   // connection the server built.
-  return connectedOrClosed(
-    await factory({ signal: currentRequestSignal() }),
-    logger,
-  );
+  return connectedOrClosed(await factory(), logger);
 }
 
 /**

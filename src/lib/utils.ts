@@ -291,8 +291,8 @@ function withoutMcpErrorPrefixes(text: string): string {
 }
 
 export function return_error(error: any) {
-  // The failure reader first (§7.2): a chain failure, an aborted request or
-  // the server's own refusal is answered as §7.3 — never its message.
+  // The failure reader first (§7.2): a chain failure or the server's own
+  // refusal is answered as §7.3 — never its message.
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
 

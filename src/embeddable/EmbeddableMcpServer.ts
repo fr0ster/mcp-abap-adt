@@ -41,11 +41,10 @@ export interface EmbeddableMcpServerOptions {
    * A connection of its own for an operation that needs a new ABAP session:
    * RFC CreatePackage / LockPackage, DeletePackage with force_new_connection
    * (and a debug session's own connections). The connection is built by you,
-   * with its credential; honour `signal` — the request's — and the signal
-   * in each request's options. `signal` bounds the factory call only, not
-   * the life of the connection it returns: a package lock's and a debug
-   * session's connection outlive the request that opened them, so do not tie
-   * the connection to it. Once returned it is the server's: the server
+   * with its credential. The factory receives no signal: a fresh connection
+   * is made inside a started tool, which runs to its end. A package lock's
+   * and a debug session's connection outlive the request that opened them.
+   * Once returned it is the server's: the server
    * connects it (`connect()`), holds it for the operation (or under the
    * package lock's handle), and closes it with `disconnect()` like its own.
    * Without it those operations are refused (`fresh_connection_unavailable`);
@@ -53,9 +52,7 @@ export interface EmbeddableMcpServerOptions {
    * The latest injection of a connection object decides: the same object
    * injected again without a factory forgets the earlier one.
    */
-  freshConnection?: (options: {
-    signal?: AbortSignal;
-  }) => Promise<IAbapConnection>;
+  freshConnection?: () => Promise<IAbapConnection>;
 
   /**
    * Logger instance

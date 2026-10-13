@@ -257,7 +257,7 @@ describe('openFreshConnection', () => {
 
     expect(fresh).toBe(handed);
     expect(handed.connect).toHaveBeenCalledTimes(1);
-    expect(factory).toHaveBeenCalledWith({ signal: undefined });
+    expect(factory).toHaveBeenCalledWith();
     expect(opened).toHaveLength(0);
   });
 

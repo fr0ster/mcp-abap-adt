@@ -319,7 +319,6 @@ refusals is answered with `isError: true` and a JSON text:
 |---|---|---|---|---|
 | a failure of the authentication chain (a provider, the connection's refusal) | `authentication_failed` | its `kind` | its reason | its hint |
 | a destination the server cannot use | `destination_refused` | — (`cause_kind` when a chain error caused it) | `Destination "<name>" cannot be used: <fields>` | the chain error's hint, then one fixed hint per known field |
-| a request that was cancelled | `request_aborted` | — | fixed words | — |
 | the server's own refusal | `destination_refused`, `fresh_connection_unavailable`, `inspection_only`, `credentials_required` | — | fixed words | — |
 
 `server` is added when the server has its own sentence for the failure — for example under
@@ -330,7 +329,8 @@ query, the login's `state`. The diagnostics go to stderr only, as one line per f
 `diagnostics`).
 
 A tool failure that is not one of these — an ADT error, a `403` with SAP's text included — is
-answered as before.
+answered as before. So is an authentication failure inside a running tool: the handler answers
+it in the connection's own words, with its hint.
 
 ## Shutdown
 

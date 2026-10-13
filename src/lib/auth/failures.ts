@@ -23,19 +23,9 @@ import type {
 } from '@mcp-abap-adt/interfaces-auth';
 import { serverRefusalOf } from './serverRefusal';
 
-/**
- * connection's `ADT_REQUEST_ERROR.ABORTED` (D34): the code of a request the
- * caller's signal aborted. Held here until connection 15 exports it (C2).
- */
-export const ADT_REQUEST_ABORTED = 'ADT_REQUEST_ABORTED';
-
-/** The fixed words of an aborted request (D34). */
-export const REQUEST_ABORTED_WORDS = 'The request was cancelled.';
-
 /** What a failure answers as its `error` (spec §7.3). */
 export type FailureCode =
   | 'authentication_failed'
-  | 'request_aborted'
   | 'destination_refused'
   | 'fresh_connection_unavailable'
   | 'inspection_only'
@@ -113,31 +103,22 @@ export function authenticationFailed(error: IAuthProviderError): ReadFailure {
   };
 }
 
-/** Step 1 or 2 on one value: an `AuthProviderFailure`, or an error with a known `kind`. */
-function chainErrorIn(value: unknown): IAuthProviderError | undefined {
-  if (isAuthProviderFailure(value)) {
-    return readFailure(value, 'unfamiliar-error');
-  }
-  if (isAuthProviderErrorKind(readOwn(value, 'kind'))) {
-    return classify(value, 'unfamiliar-error');
-  }
-  return undefined;
-}
-
 /**
  * The chain error a thrown value is or carries:
  * 1. an `AuthProviderFailure`;
- * 2. an own `refusal` with a known `kind` (connection's `AuthRefusedError`);
- * 3b. an own `refusal` that is itself one of these (an `IAdtError`, or
- *     adt-clients' thrown error, carrying the connection's failure).
+ * 2. an own `refusal` with a known `kind` (connection's `AuthRefusedError`).
+ *
+ * Nothing else: interfaces-adt 16 has no `IAdtError.refusal`, so an auth
+ * failure inside a tool reaches the model with the connection's own words
+ * (D56, spec §7.2).
  */
 function chainErrorOf(thrown: unknown): IAuthProviderError | undefined {
   if (isAuthProviderFailure(thrown)) {
     return readFailure(thrown, 'unfamiliar-error');
   }
   const refusal = readOwn(thrown, 'refusal');
-  if (refusal === undefined) return undefined;
-  return chainErrorIn(refusal) ?? chainErrorIn(readOwn(refusal, 'refusal'));
+  if (!isAuthProviderErrorKind(readOwn(refusal, 'kind'))) return undefined;
+  return classify(refusal, 'unfamiliar-error');
 }
 
 /**
@@ -148,9 +129,6 @@ export function failureOf(thrown: unknown): ReadFailure | undefined {
   try {
     const chain = chainErrorOf(thrown);
     if (chain !== undefined) return authenticationFailed(chain);
-    if (readOwn(thrown, 'code') === ADT_REQUEST_ABORTED) {
-      return { error: 'request_aborted', message: REQUEST_ABORTED_WORDS };
-    }
     const own = serverRefusalOf(thrown);
     if (own !== undefined) return { error: own.code, message: own.words };
     return undefined;

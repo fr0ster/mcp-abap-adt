@@ -10,11 +10,7 @@ import {
   render,
 } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
-import {
-  ADT_REQUEST_ABORTED,
-  failureOf,
-  REQUEST_ABORTED_WORDS,
-} from '../../../lib/auth/failures';
+import { failureOf } from '../../../lib/auth/failures';
 import {
   INSPECTION_ONLY_WORDS,
   ServerRefusal,
@@ -51,17 +47,14 @@ describe('failureOf', () => {
     expect(logFields(read?.authError as never).kind).toBe('connection');
   });
 
-  it("3. an own code 'ADT_REQUEST_ABORTED': request_aborted in fixed words", () => {
+  it("no step 3 (D56): an own code 'ADT_REQUEST_ABORTED' is not a failure it knows", () => {
     const thrown = Object.assign(new Error('socket hang up at x'), {
-      code: ADT_REQUEST_ABORTED,
+      code: 'ADT_REQUEST_ABORTED',
     });
-    expect(failureOf(thrown)).toEqual({
-      error: 'request_aborted',
-      message: REQUEST_ABORTED_WORDS,
-    });
+    expect(failureOf(thrown)).toBeUndefined();
   });
 
-  it('3b. a value with an own refusal that is a chain error (an IAdtError)', () => {
+  it('2. any value with an own refusal that is a chain error', () => {
     const error = authError['credential-refused']({
       credential: 'user-password',
     });
@@ -76,21 +69,20 @@ describe('failureOf', () => {
     expect(read?.message).toBe(error.reason);
   });
 
-  it("3b. a value with an own refusal that is the connection's AuthRefusedError", () => {
+  it("no step 3b (D56): a refusal that only carries the connection's AuthRefusedError is not read", () => {
     const refusal = refusedAgain('logon');
     const adtError = {
       origin: 'refusal',
       refusal: new AuthRefusedError(refusal, 'logon'),
     };
-    expect(failureOf(adtError)?.kind).toBe('connection');
+    expect(failureOf(adtError)).toBeUndefined();
   });
 
-  it('3b. a value with an own refusal that is an AuthProviderFailure', () => {
+  it('no step 3b (D56): a refusal that is an AuthProviderFailure is not read', () => {
     const error = authError['renewal-declined']({ trigger: 'expired' });
-    const read = failureOf({
-      refusal: new AuthProviderFailure(error),
-    });
-    expect(read?.kind).toBe('renewal-declined');
+    expect(
+      failureOf({ refusal: new AuthProviderFailure(error) }),
+    ).toBeUndefined();
   });
 
   it("4. the server's own refusals: their code and words", () => {

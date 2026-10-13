@@ -51,13 +51,20 @@ Setting it reads nothing and sends nothing.
 
 - **Injected:** the connection as given. There is no `resolve`, no `connect()` and no wrap.
 - **Built:** the source resolves the settings and the credential with the request's `signal`.
-  `createAbapConnection(settings, credential)` builds the connection, and it is connected once per
+  `createAbapConnection(settings, credential)` builds the connection — connection's
+  `createConnection({ system, transport, … })`, with the system and the wire stated from the
+  settings — and it is connected once per
   credential object. It is kept while the source answers the same credential object. The
   credential renews itself, since a `401` reaches its `rejected()`.
 - **A shared connect:** every caller that asks while a connect runs shares it. Each caller's wait
-  races its own signal: a cancelled caller settles at once with `request_aborted`, while the
-  connect runs on for the others. If no caller is left waiting when the connect succeeds, that
-  late connection is disconnected and not kept.
+  races its own signal: a cancelled caller settles at once, while the connect runs on for the
+  others. A connect that succeeds after every caller cancelled is still the instance's connection:
+  kept, used by the next call, and closed only by the instance's terminal close. A cancel causes no
+  logoff.
+- **Nothing in the chain takes a signal.** connection 16, interfaces-adt-connection 3,
+  interfaces-adt 16 and adt-clients 31 have no request signal: the request's signal ends only the
+  server's own waits (the connect, the provider, the login, the system lookup) and keeps a call
+  whose tool has not started from reaching it. A started tool runs to its end.
 
 ### The tool wrapper
 
@@ -71,15 +78,15 @@ same way.
    `abortActiveTools()`) at its entry, before any connection is built.
 2. **The handler's context.** The wrapper builds a `HandlerContext`: `{ connection, logger, state,
    debugger }`, where `connection` comes from `getConnection(signal)`.
-3. **The request signal scope.** The handler runs inside `runWithRequestSignal(signal, …)`, so
-   anything that sends for the call reads `currentRequestSignal()`. A call whose signal aborted
-   before its tool starts never reaches the tool and is answered `request_aborted`. The
+3. **The request signal scope.** The handler runs inside `runWithRequestSignal(signal, …)`;
+   `currentRequestSignal()` reads it. Nothing sent to SAP carries it. A call whose signal aborted
+   before its tool starts never reaches the tool. The
    responsible person and master system the call lacks are resolved first, from the destination's
    `.env`, the request's headers and, on ABAP Cloud, the system.
 4. **The answer.** A failure is read by `readFailure(thrown)`, which is lib's `failureOf`; core
    reads the destination layer's failures first. A failure it knows is answered as JSON `{ error,
-   kind?, message, hint?, … }`: `authentication_failed`, `destination_refused`,
-   `request_aborted`, or one of the server's own refusals (`inspection_only`,
+   kind?, message, hint?, … }`: `authentication_failed`, `destination_refused`, or one of the
+   server's own refusals (`inspection_only`,
    `fresh_connection_unavailable`, `credentials_required`). Anything else goes through
    `return_error`.
 
@@ -149,8 +156,8 @@ const server = new EmbeddableMcpServer({
   connection,                                  // used as given
   exposition: ['readonly', 'high'],
   systemType: 'onprem',
-  // Build a new connection with its own credential; honour the signal.
-  freshConnection: async ({ signal }) => buildMyConnection({ signal }),
+  // Build a new connection with its own credential; it receives no signal.
+  freshConnection: async () => buildMyConnection(),
 });
 await server.connect(transport);
 ```
@@ -179,7 +186,7 @@ configuration.
   | The connection | A fresh one comes from |
   |---|---|
   | built by the server (`createAbapConnection`: a destination, `x-sap-*` headers, a `SapConfig`) | the factory's record: the same settings and the same credential object |
-  | injected, with `freshConnection` | `await freshConnection({ signal })`: the consumer's factory, given the current request's signal |
+  | injected, with `freshConnection` | `await freshConnection()`: the consumer's factory, called with no argument |
   | injected without it, or set through `setAbapConnectionOverride` | refused with `fresh_connection_unavailable`: "This operation needs an ABAP session of its own; the connection was given by the host, which supplied no fresh-connection factory (`freshConnection`)". Nothing is sent. |
 
   The registry is a `WeakMap`, so a connection the host drops is not kept. The latest injection of
@@ -193,14 +200,10 @@ configuration.
   - it closes it with `disconnect()` when the operation, the lock or the debug session ends, and a
     failed close is logged in fixed words.
 
-  What the consumer keeps is what it built into the connection: its credential, and its honouring
-  of the signal.
-- **The signal bounds the factory call only.** `signal` is the signal of the MCP request the
-  operation serves. It aborts when the client cancels the request or the call ends. A factory that
-  waits (a token, a pool) should end that wait when the signal aborts. The signal does **not**
-  bound the life of the connection the factory returns. A package lock's connection and a debug
-  session's connection outlive the request that opened them, so do not tie the connection to the
-  signal. Honour the signal each request passes in its own options instead.
+  What the consumer keeps is what it built into the connection: its credential.
+- **The factory receives no signal.** A fresh connection is made inside a started tool, which runs
+  to its end, and nothing in the chain takes a signal (connection 16). A package lock's connection
+  and a debug session's connection outlive the request that opened them.
 - **`DeletePackage` no longer falls back** to the caller's connection when no fresh connection can
   be had (D21). The refusal is the answer, never a delete on the session the caller asked to avoid.
 

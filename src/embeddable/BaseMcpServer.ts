@@ -54,13 +54,12 @@ interface ToolCallExtra {
 
 /**
  * A connection being built, shared by every call that asks for it while it
- * is (D13, D32): `waiting` counts the calls still waiting for it, so a
- * connect that completes after all of them left is known to be nobody's.
+ * is (D13, D32). A connect that completes after every caller left is still
+ * the instance's (D56): kept, used by the next call.
  */
 interface BuiltConnection {
   credential: IAuthProvider;
   connection: Promise<AbapConnection>;
-  waiting: number;
 }
 
 /**
@@ -220,9 +219,11 @@ export abstract class BaseMcpServer extends McpServer {
    *
    * The connect is shared by every call that asks while it runs, and each
    * caller's wait races its own signal (D32): a cancelled caller settles at
-   * once with `request_aborted`, the connect runs on for the others, its late
-   * rejection is handled, and a late success that no caller is left waiting
-   * for is disconnected and not kept.
+   * once, the connect runs on for the others, its late rejection is handled,
+   * and a late success is the instance's connection — kept and used by the
+   * next call even when every caller that waited for it cancelled (D56: a
+   * cancel causes no logoff). It is closed only by the instance's terminal
+   * close (spec §6.4).
    */
   protected async getConnection(signal: AbortSignal): Promise<AbapConnection> {
     const context = this.connectionContext;
@@ -241,13 +242,7 @@ export abstract class BaseMcpServer extends McpServer {
         createAbapConnection(resolved.settings, resolved.credential),
       );
     }
-    held.waiting += 1;
-    let connection: AbapConnection;
-    try {
-      connection = await raceRequestSignal(held.connection, signal);
-    } finally {
-      held.waiting -= 1;
-    }
+    const connection = await raceRequestSignal(held.connection, signal);
     this.systemContexts.set(connection, resolved.systemContext);
     return connection;
   }
@@ -266,31 +261,13 @@ export abstract class BaseMcpServer extends McpServer {
       await connection.connect();
       return connection;
     })();
-    const entry: BuiltConnection = {
-      credential,
-      connection: connecting,
-      waiting: 0,
-    };
+    const entry: BuiltConnection = { credential, connection: connecting };
     this.built = entry;
-    // Settled before any caller's own continuation runs: these reactions are
-    // registered first.
-    connecting.then(
-      (connection) => {
-        // Every caller left before it was connected: it is nobody's (RF1).
-        if (entry.waiting > 0) return;
-        if (this.built === entry) this.built = undefined;
-        // Its logoff is dispatched; a disconnect never throws, and nothing
-        // waits for it.
-        const closable = connection as { disconnect?: () => Promise<void> };
-        if (typeof closable.disconnect === 'function') {
-          closable.disconnect().catch(() => undefined);
-        }
-      },
-      () => {
-        // A failed connect is not kept: the next call connects again.
-        if (this.built === entry) this.built = undefined;
-      },
-    );
+    // A completed connect stays the instance's whoever still waits for it
+    // (D32, D56); a failed one is not kept: the next call connects again.
+    connecting.catch(() => {
+      if (this.built === entry) this.built = undefined;
+    });
     return entry;
   }
 
@@ -396,9 +373,9 @@ export abstract class BaseMcpServer extends McpServer {
 
               return { content };
             } catch (error) {
-              // The failure reader first (§7.2): a chain failure, an aborted
-              // request or the server's own refusal is answered as §7.3, its
-              // diagnostics on stderr only.
+              // The failure reader first (§7.2): a chain failure or the
+              // server's own refusal is answered as §7.3, its diagnostics on
+              // stderr only.
               // The reader may be an override or a host's: guarded, so its
               // own throw answers fixed words, never itself.
               const read = readGuarded((t) => this.readFailure(t), error);
@@ -508,7 +485,7 @@ export abstract class BaseMcpServer extends McpServer {
    * callback given to `registerTool` (or the older `tool`) is tracked like
    * the tools of a handler group — its request signal, the registry of live
    * calls, the request signal scope — and a call whose signal aborted before
-   * the tool starts is answered `request_aborted` without reaching it (D5).
+   * the tool starts ends without reaching it (D5).
    */
   private trackingRegistrations(): McpServer {
     const track =

@@ -6,14 +6,16 @@
  * `DeletePackage` with `force_new_connection`, need an ABAP session of their
  * own. On an injected connection — here one whose configuration names RFC and
  * holds no usable credential, so nothing could be built from it — that session
- * is the host's `freshConnection` factory's: it is called with the request's
- * signal, the operation runs on what it returns, and the server disconnects
- * it when the operation (or the lock) ends. No credential provider and no
+ * is the host's `freshConnection` factory's: it is called with no argument —
+ * no signal (D56: a fresh connection is made inside a started tool, which
+ * runs to its end) —, the operation runs on what it returns, and the server
+ * disconnects it when the operation (or the lock) ends. No credential provider and no
  * connection is built by the server. Without the factory the operation is
  * refused `fresh_connection_unavailable` in fixed words, and nothing is sent.
  *
  * Every call goes through an `EmbeddableMcpServer` and an MCP client, so the
- * signal the factory receives is the one the tool wrapper set for the request.
+ * factory is called inside the request's scope, where the tool wrapper set
+ * the request's signal — and still receives none.
  */
 
 /** Every credential provider the server constructs, by class. */
@@ -97,24 +99,23 @@ function rfcConnection(): RecordingConnection & {
 }
 
 interface Factory {
-  (options: { signal?: AbortSignal }): Promise<IAbapConnection>;
-  signals: Array<AbortSignal | undefined>;
+  (): Promise<IAbapConnection>;
+  /** The arguments of each call, as the server passed them. */
+  calls: unknown[][];
   made: ReturnType<typeof rfcConnection>[];
 }
 
-/** The host's factory: records each call's signal and what it handed over. */
+/** The host's factory: records each call's arguments and what it handed over. */
 function hostFactory(): Factory {
-  const signals: Array<AbortSignal | undefined> = [];
+  const calls: unknown[][] = [];
   const made: ReturnType<typeof rfcConnection>[] = [];
-  const factory = async (options: {
-    signal?: AbortSignal;
-  }): Promise<IAbapConnection> => {
-    signals.push(options.signal);
+  const factory = async (...args: unknown[]): Promise<IAbapConnection> => {
+    calls.push(args);
     const fresh = rfcConnection();
     made.push(fresh);
     return fresh;
   };
-  return Object.assign(factory, { signals, made });
+  return Object.assign(factory, { calls, made });
 }
 
 let previousType: string | undefined;
@@ -135,9 +136,7 @@ afterEach(() => {
 
 async function served(
   injected: IAbapConnection,
-  freshConnection?:
-    | Factory
-    | ((o: { signal?: AbortSignal }) => Promise<IAbapConnection>),
+  freshConnection?: () => Promise<IAbapConnection>,
 ): Promise<Client> {
   const server = new EmbeddableMcpServer({
     connection: injected as unknown as AbapConnection,
@@ -184,7 +183,7 @@ const OPERATIONS: Array<[string, string, Record<string, unknown>]> = [
 
 describe('with the host’s freshConnection', () => {
   it.each(OPERATIONS)(
-    '%s runs on the factory’s connection, called with the request’s signal',
+    '%s runs on the factory’s connection, the factory called with no argument',
     async (_label, tool, args) => {
       const injected = rfcConnection();
       const factory = hostFactory();
@@ -192,8 +191,7 @@ describe('with the host’s freshConnection', () => {
 
       await client.callTool({ name: tool, arguments: args });
 
-      expect(factory.signals).toHaveLength(1);
-      expect(factory.signals[0]).toBeInstanceOf(AbortSignal);
+      expect(factory.calls).toEqual([[]]);
       expect(factory.made).toHaveLength(1);
       const fresh = factory.made[0];
       expect(fresh.connect).toHaveBeenCalledTimes(1);
@@ -249,46 +247,6 @@ describe('with the host’s freshConnection', () => {
     expect(injected.requests).toHaveLength(0);
     await client.close();
   });
-
-  it('the factory’s signal is the request’s: it aborts when the client cancels the call', async () => {
-    let received: AbortSignal | undefined;
-    let called!: () => void;
-    const reached = new Promise<void>((resolve) => {
-      called = resolve;
-    });
-    const fresh = rfcConnection();
-    const factory = (options: { signal?: AbortSignal }) => {
-      received = options.signal;
-      called();
-      return new Promise<IAbapConnection>((resolve, reject) => {
-        options.signal?.addEventListener('abort', () =>
-          reject(new Error('the host gave up')),
-        );
-        if (!options.signal) resolve(fresh);
-      });
-    };
-    const client = await served(rfcConnection(), factory);
-    const controller = new AbortController();
-    const done = client
-      .callTool(
-        { name: 'CreatePackageLow', arguments: OPERATIONS[1][2] },
-        undefined,
-        { signal: controller.signal },
-      )
-      .catch((error: unknown) => error);
-
-    await Promise.race([reached, done]);
-    expect(received).toBeInstanceOf(AbortSignal);
-    expect(received?.aborted).toBe(false);
-    controller.abort();
-    await done;
-    for (let turn = 0; turn < 100 && !received?.aborted; turn += 1) {
-      await new Promise((resolve) => setImmediate(resolve));
-    }
-    expect(received?.aborted).toBe(true);
-    expect(fresh.requests).toHaveLength(0);
-    await client.close();
-  });
 });
 
 describe('a handed-over connection that cannot connect', () => {
@@ -324,7 +282,7 @@ describe('the same connection injected again', () => {
     expect(JSON.parse(textOf(result)).error).toBe(
       'fresh_connection_unavailable',
     );
-    expect(factory.signals).toHaveLength(0);
+    expect(factory.calls).toHaveLength(0);
     expect(injected.requests).toHaveLength(0);
     await first.close();
     await second.close();
@@ -342,8 +300,8 @@ describe('the same connection injected again', () => {
       arguments: OPERATIONS[1][2],
     });
 
-    expect(earlier.signals).toHaveLength(0);
-    expect(later.signals).toHaveLength(1);
+    expect(earlier.calls).toHaveLength(0);
+    expect(later.calls).toEqual([[]]);
     await first.close();
     await second.close();
   });
@@ -389,7 +347,7 @@ describe('a debug session’s own connection', () => {
     );
   }
 
-  it('comes from the host’s factory, with the request’s signal, stateful and connected', async () => {
+  it('comes from the host’s factory, called with no argument, stateful and connected', async () => {
     const injected = rfcConnection();
     const factory = hostFactory();
     const client = await served(injected, factory);
@@ -398,7 +356,7 @@ describe('a debug session’s own connection', () => {
     const own = await openForDebugSession(injected, request.signal);
 
     expect(own).toBe(factory.made[0]);
-    expect(factory.signals).toEqual([request.signal]);
+    expect(factory.calls).toEqual([[]]);
     expect(factory.made[0].connect).toHaveBeenCalledTimes(1);
     expect(factory.made[0].setSessionType).toHaveBeenCalledWith('stateful');
     expect(injected.requests).toHaveLength(0);

@@ -13,6 +13,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
+import * as activeToolsModule from '../../../lib/activeTools';
 import { activeTools } from '../../../lib/activeTools';
 import type { IHandlersRegistry } from '../../../lib/handlers/interfaces';
 import { currentRequestSignal } from '../../../lib/requestSignal';
@@ -52,14 +53,22 @@ async function until(done: () => boolean): Promise<void> {
   throw new Error('the condition never held');
 }
 
-let stderr: string[];
+/** How many tracked calls have ended on the server since the test began. */
+let ended: number;
 
 beforeEach(() => {
-  stderr = [];
-  jest.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
-    stderr.push(String(chunk));
-    return true;
-  });
+  ended = 0;
+  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  const register = activeToolsModule.registerActiveTool;
+  jest
+    .spyOn(activeToolsModule, 'registerActiveTool')
+    .mockImplementation((controller) => {
+      const remove = register(controller);
+      return () => {
+        ended += 1;
+        remove();
+      };
+    });
 });
 
 afterEach(() => {
@@ -105,7 +114,8 @@ it('a cancelled call never reaches a tool its own registry registered', async ()
     params: { requestId: 2, reason: 'the client cancelled' },
   });
   await Promise.all([sent, cancelled]);
-  await until(() => stderr.join('').includes('[MCP] request_aborted'));
+  // The call ended on the server, without reaching its tool.
+  await until(() => ended === 1);
   await until(() => activeTools().length === 0);
   expect(reached).not.toHaveBeenCalled();
   await server.close();

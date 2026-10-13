@@ -5,17 +5,15 @@
  * Its own `AsyncLocalStorage` — not the system-context request scope
  * (`requestContext.ts`), which stdio does not enter and whose presence
  * changes what `getEffectiveSystemContext` answers. The tool wrapper runs
- * the handler inside `runWithRequestSignal(signal, …)`; whatever sends a
- * request for that call reads `currentRequestSignal()` when it sends.
+ * the handler inside `runWithRequestSignal(signal, …)`. It is for the
+ * server's own waits (D32) and D5's check only: nothing sent to SAP carries
+ * it, and no `freshConnection` factory receives it (D55, D56).
  *
- * Also here: what a cancelled request ends with — connection's
- * `ADT_REQUEST_ABORTED` code, answered `request_aborted` in fixed words
- * (D34) — and the race a server's own wait runs against the request's signal
- * (D32).
+ * Also here: what a cancelled request ends with, and the race a server's own
+ * wait runs against the request's signal (D32).
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { ADT_REQUEST_ABORTED } from './auth/failures';
 
 const scope = new AsyncLocalStorage<AbortSignal>();
 
@@ -30,14 +28,11 @@ export function currentRequestSignal(): AbortSignal | undefined {
 }
 
 /**
- * What a cancelled request ends with: an error whose own `code` is
- * connection's `ADT_REQUEST_ABORTED`, which the failure reader answers
- * `request_aborted` in fixed words (D34). It carries nothing else — no
- * reason, no cause.
+ * What a cancelled request ends with: the server's own error, in fixed words.
+ * It carries nothing else — no code, no reason, no cause. (D56: there is no
+ * `request_aborted` answer; connection 16 has no aborted-request code.)
  */
 export class RequestAbortedError extends Error {
-  readonly code = ADT_REQUEST_ABORTED;
-
   constructor() {
     super('The request was cancelled.');
     this.name = 'RequestAbortedError';

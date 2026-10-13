@@ -11,13 +11,8 @@
  */
 
 import {
-  AdtCloudConnector,
-  AdtOnPremConnector,
-  CloudHttpTransport,
+  createConnection,
   type ILogger,
-  OnPremHttpTransport,
-  RfcTransport,
-  rfcConversationFrom,
   type SapConfig,
 } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -310,45 +305,46 @@ export function createAbapConnection(
   logger?: ILogger | null,
   sessionId?: string,
 ): IAbapConnection {
-  const transportOptions = { client: settings.client, baseUrl: settings.url };
-
+  // connection's `createConnection` with the system and the wire stated: the
+  // choice is this server's, made from the settings as before; the connector
+  // and its transport are connection's (connection 16).
+  const common = {
+    config: settings,
+    credential,
+    logger,
+    ...(sessionId !== undefined ? { sessionId } : {}),
+  };
   const built = ((): IAbapConnection => {
     if (resolveSystemKind(settings) === 'cloud') {
       return withHttpWireLog(
-        new AdtCloudConnector(
-          settings,
-          credential,
-          new CloudHttpTransport(() => ({}), logger, transportOptions),
-          logger,
-          sessionId,
-        ) as unknown as IAbapConnection,
+        createConnection({
+          ...common,
+          system: 'cloud',
+          transport: 'http',
+          wireLogger: logger,
+        }),
       );
     }
 
     if (settings.connectionType === 'rfc') {
-      return new AdtOnPremConnector(
-        settings,
-        credential,
-        new RfcTransport(
-          rfcConversationFrom(settings),
-          wireLogger(logger),
-          rfcWireOptions(),
-        ),
-        logger,
-        sessionId,
-      ) as unknown as IAbapConnection;
+      return createConnection({
+        ...common,
+        system: 'onprem',
+        transport: 'rfc',
+        wireLogger: wireLogger(logger),
+        rfc: rfcWireOptions(),
+      });
     }
 
     // TLS material reaches the wire through the logon, not through the
     // transport's options.
     return withHttpWireLog(
-      new AdtOnPremConnector(
-        settings,
-        credential,
-        new OnPremHttpTransport(() => ({}), logger, transportOptions),
-        logger,
-        sessionId,
-      ) as unknown as IAbapConnection,
+      createConnection({
+        ...common,
+        system: 'onprem',
+        transport: 'http',
+        wireLogger: logger,
+      }),
     );
   })();
 

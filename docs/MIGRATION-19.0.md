@@ -199,7 +199,10 @@ packages, each with one binary and its transport's options only:
   form you set it).
 - **A cancelled request does not reach its tool**, on every transport: once its client cancels
   it (or closes its connection), its waits end — a shared connect or login goes on for the other
-  requests waiting for it — and the call is answered `request_aborted`.
+  requests waiting for it — and its tool is never called. A tool already running runs to its end,
+  and a cancel does nothing to SAP: no logoff, no new session. A connect that completes after
+  every request waiting for it was cancelled is kept as the server's connection and used by the
+  next request.
 - **`npm run auth` is gone.** Write a `.env` with `mcp-auth` from
   `@mcp-abap-adt/auth-broker-cli`: `npm install -g @mcp-abap-adt/auth-broker-cli`, then
   `mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap` (`--type xsuaa` for an
@@ -215,8 +218,7 @@ packages, each with one binary and its transport's options only:
 - **A tool call that fails on authentication answers JSON** (`isError: true`): `{ error, kind?,
   message, hint?, cause_kind?, server? }`. `error` is `authentication_failed` for a failure of the
   auth chain (`kind`, `message` and `hint` are the chain's), `destination_refused` for a destination
-  the server cannot use, `request_aborted` for a cancelled request, or one of the server's own
-  refusals (`inspection_only`, `fresh_connection_unavailable`, `credentials_required`). The words are
+  the server cannot use, or one of the server's own refusals (`inspection_only`, `fresh_connection_unavailable`, `credentials_required`). The words are
   no longer a plain line of text, and no error's message, diagnostics or facts beyond `kind` are in
   them; the diagnostics go to stderr as auth-errors' `logFields`. See
   [What an MCP client sees](user-guide/AUTHENTICATION.md#what-an-mcp-client-sees-when-a-tool-call-fails-on-authentication).
@@ -226,6 +228,17 @@ packages, each with one binary and its transport's options only:
 
 ## Embedders
 
+- **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **16**,
+  `@mcp-abap-adt/interfaces-adt-connection` **3**, `@mcp-abap-adt/interfaces-adt` **16**,
+  `@mcp-abap-adt/adt-clients` **31** (and `@mcp-abap-adt/adt-strategies` 0.11). None of them takes a
+  signal: `IAbapRequestOptions.signal` and `IAdtClientOptions.signal` are gone, there is no
+  `ADT_REQUEST_ERROR` / `ADT_REQUEST_ABORTED`, and `IAdtError` has no `refusal` — an
+  authentication failure inside a tool reaches the model with the connection's own words. A
+  connection's `disconnect()` resolves once its logoff is written, not answered; one instance is
+  one SAP session, so a second `disconnect()`, or a `connect()` after it, rejects. A connection you
+  inject, or return from `freshConnection`, is used on these contracts; move your own connection
+  to them when you move to lib 19. The server builds its own connections with connection's
+  `createConnection({ system, transport, … })`.
 - **`AuthBrokerFactory` left `@mcp-abap-adt/lib/auth`.** It is now
   `@mcp-abap-adt/core/auth`, with `IAuthBrokerFactoryConfig`: import both from there.
 - **`IAuthBrokerFactoryConfig`** takes `browser?: IBrowser` (build it with `browserOf(browserFor(
@@ -236,8 +249,9 @@ packages, each with one binary and its transport's options only:
   `loginTimeoutMs?` (`--login-timeout` in milliseconds; absent: no bound).
 - **Each tool call has a request signal** (`BaseMcpServer`): aborted when the MCP request's
   `extra.signal` aborts, and when the call ends. The handler runs inside the request
-  signal scope — `currentRequestSignal()` reads it — and a call cancelled before its tool starts is
-  answered `request_aborted` (`RequestAbortedError`) without reaching it; the tools a registry
+  signal scope — `currentRequestSignal()` reads it; nothing sent to SAP carries it — and a call
+  cancelled before its tool starts ends with `RequestAbortedError` without reaching it (there is no
+  `request_aborted` answer); the tools a registry
   registers itself (`registerAllTools`) are tracked the same way. A
   `ConnectionSource.resolve(signal)` gets it and should race its own waits against it
   (`raceRequestSignal(work, signal)`). Live calls are listed by `activeTools()` and aborted by
@@ -256,8 +270,7 @@ packages, each with one binary and its transport's options only:
 - **`describeAuthError` is gone; read a failure with `failureOf(thrown)`** from
   `@mcp-abap-adt/lib/auth`: structural (no `instanceof`, no `message`, no `name`), total, it answers
   a `ReadFailure` (`error`, `kind?`, `message`, `hint?`, …) for a chain failure
-  (`AuthProviderFailure`, connection's `AuthRefusedError`, an `IAdtError` carrying a `refusal`), an
-  aborted request (`code: 'ADT_REQUEST_ABORTED'`) or a `ServerRefusal`, else `undefined`.
+  (`AuthProviderFailure`, connection's `AuthRefusedError`) or a `ServerRefusal`, else `undefined`.
   `answerFailure(read)` renders the §7.3 JSON, `failureLogLine(where, read)` the stderr line,
   `answerRead(read)` both; `readGuarded(reader, thrown)` answers auth-errors' fixed `unknown`
   words when a reader you do not own throws. The
@@ -271,8 +284,7 @@ packages, each with one binary and its transport's options only:
   throws `ServerRefusal('destination_refused', …)`. `ServerRefusal` takes
   `destination_refused` with its words, and `fresh_connection_unavailable` /
   `credentials_required` with fixed ones.
-- **`EmbeddableMcpServer` takes `freshConnection?: (options: { signal?: AbortSignal }) =>
-  Promise<IAbapConnection>`.** Some operations need an ABAP session of their own: `CreatePackage`
+- **`EmbeddableMcpServer` takes `freshConnection?: () => Promise<IAbapConnection>`.** Some operations need an ABAP session of their own: `CreatePackage`
   (high and low) and `LockPackage` over RFC, `DeletePackage` with `force_new_connection`, and a
   debug session's own connections. On an injected connection, these now take that session from
   your factory, and from nowhere else. 18.x rebuilt one from the injected connection's
@@ -284,11 +296,9 @@ packages, each with one binary and its transport's options only:
   - **Once your factory returns a connection, it is the server's.** The server calls `connect()` on
     it, holds it for the operation (or under the package lock's handle until the unlock), and closes
     it with `disconnect()`. Build the connection with its own credential.
-  - **Honour `signal`.** It is the request's signal, so end your factory's waits when it aborts. It
-    bounds the factory call only, not the life of the connection you return: a package lock's
-    connection and a debug session's connection outlive the request that opened them, so do not
-    tie the connection to it. The returned connection should honour the signal in each request's
-    options.
+  - **The factory receives no signal.** It is called with no argument: a fresh connection is made
+    inside a started tool, which runs to its end. A package lock's connection and a debug session's
+    connection outlive the request that opened them.
   - **The latest injection of a connection object decides.** Injecting the same object again
     without `freshConnection` clears the earlier factory.
 - **`credentialFromSapConfig` refuses instead of guessing** (`setSapConfigOverride`,

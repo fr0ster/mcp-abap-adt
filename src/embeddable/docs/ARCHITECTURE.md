@@ -105,6 +105,10 @@ system. `idle()` resolves when every tool call of the instance has settled.
 
 ### How an instance ends (D51, D55)
 
+Of this machinery the embeddable entry exports `closeInstance` (with `ClosableInstance`) and
+`activeTools()`; the latch, the settlement, the shutdown sentence and the shutdown sequence are
+the launchers', reached through `@mcp-abap-adt/lib/state`.
+
 **The rule: every connection the server owns ends with `disconnect()`** — the logoff, which
 releases the locks its SAP session holds. On connection 16 it resolves once the logoff is
 **written**, not answered; it is called once per connection (a second call rejects), so every end
@@ -123,7 +127,8 @@ Ending an instance has two parts, kept apart:
   words. Every terminal disposal runs it after the undo was tried, **never conditional on the undo
   succeeding**: a failed undo is reported, never a reason to keep a session — or a lock — open.
 
-**The instance close** (`closeInstance(instance)`, `src/lib/instanceClose.ts`), one promise per
+**The instance close** (`closeInstance(instance)`, `src/lib/instanceClose.ts`; on the embeddable
+entry, for an embedder closing its own instance), one promise per
 instance: `latch(instance)` in the tick it begins; await `settled(instance)` (none aborted); the
 state undo; the terminal close, whatever the undo answered; the MCP server and its transport
 closed. An SSE close, SSE's shutdown and core's shutdown use it; the pool runs the undo and the
@@ -131,7 +136,8 @@ terminal close when an instance leaves it.
 
 **The forced close** (`forceClose()`): the logoff of every connection the process owns, joined
 where one is under way, awaiting nothing that waits on a tool, a request, an instance close or a
-state undo. The launchers use it for both escapes (a second signal, `--shutdown-timeout`) and for
+state undo. It does await each logoff to its **write** (connection 16's `disconnect()`): a write
+that never completes keeps the process until it is killed (`SIGKILL`). The launchers use it for both escapes (a second signal, `--shutdown-timeout`) and for
 a crash outside a tool (`uncaughtException`, `unhandledRejection`, registered beside the signals
 in lib's `shutdownSequence.ts`): one fixed-words line naming the failure by its class, exit `1`; a
 crash during a shutdown forces it, and a second crash joins the forced close under way. A killed
@@ -140,8 +146,10 @@ process (`SIGKILL`, out of memory) cannot log off: SAP's idle timeout ends its s
 **A connection is replaced only when SAP lost its session** (D56), or when a new credential
 arrives: `getConnection` builds a new instance for the next call, and the replaced one is logged
 off once no call works on it any more — each call's use is counted when `getConnection` hands the
-connection out, before any await, and ends with `connectionReleased(connection)` (the tool wrapper
-calls it; a host that calls `getConnection` itself calls it too). A cancelled call causes no
+connection out, before any await, and ends with `connectionReleased(connection)` — called
+**exactly once per `getConnection`** (the tool wrapper calls it; a subclass that calls
+`getConnection` itself calls it too; a missing release keeps a replaced connection open until the
+terminal close, a second one ends it under another call). A cancelled call causes no
 logoff. The forced close also awaits, to its write, every logoff an orderly end already began.
 
 ## The servers

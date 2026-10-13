@@ -220,7 +220,9 @@ packages, each with one binary and its transport's options only:
 - **Ending the waiting early**: a second `SIGTERM` / `SIGINT`, or **`--shutdown-timeout=<seconds>`**
   (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; 1-86400, no default). Either is the forced
   close: no more waiting on a tool, a state undo or a session write; every ADT session is still
-  logged off; exit `1` with a line per tool still running and the step that was cut short. What it
+  logged off; exit `1` with a line per tool still running and the step that was cut short. The
+  forced close does wait for each logoff to be written: a logoff whose write never completes (a
+  system that never takes the bytes) keeps the process until it is killed (`SIGKILL`). What it
   costs: a tool cut short mid-write, a session write lost — a discarded refresh token can come
   back on the next start.
 - **A crash outside a tool logs off too** (every binary): an uncaught exception or an unhandled
@@ -295,21 +297,22 @@ packages, each with one binary and its transport's options only:
   registers itself (`registerAllTools`) are tracked the same way. A
   `ConnectionSource.resolve(signal)` gets it and should race its own waits against it
   (`raceRequestSignal(work, signal)`). All of these come from `@mcp-abap-adt/lib/embeddable`.
-- **The registry of live calls aborts nothing** (`@mcp-abap-adt/lib/embeddable`): `activeTools()`
-  lists the calls of every instance, `settled(instance?)` waits for them, `latch(instance?)` makes
-  every later call of the process (or of one instance) answer the shutdown refusal before any
-  connection, `pending()` names what still runs. Nothing aborts a call that runs: a tool already
-  running runs to its end, and a cancelled call ends only its waits.
+- **Nothing aborts a call that runs.** `activeTools()` (`@mcp-abap-adt/lib/embeddable`) lists the
+  calls of every instance; a tool already running runs to its end, and a cancelled call ends only
+  its waits. The process's shutdown machinery (the latch, the settlement, the shutdown sequence) is
+  the launchers', not the embeddable entry's.
 - **Ending an instance has two parts.** `BaseMcpServer.dispose()` stays the state undo — callable
   again, each call retrying what is left — and closes no connection. Beside it,
-  **`terminalClose()`** (lib's `closeOwnedConnections(instance)`) closes every connection the
-  instance owns — the one it built, held state's own, package lock sessions, fresh connections
-  still open — each with its one `disconnect()` (the logoff, which releases its SAP locks),
-  whatever the undo answered; a connection you injected is never closed. A host that lets an
-  instance go runs both; **`closeInstance(instance)`** runs the whole close in order (the
-  instance's latch, its calls settle, the undo, the terminal close, the MCP server's close), once
-  per instance. `forceClose()` logs off every connection the process owns without waiting on
-  anything else, for a host's own escape.
+  **`terminalClose()`** closes every connection the instance owns — the one it built, held
+  state's own, package lock sessions, fresh connections still open — each with its one
+  `disconnect()` (the logoff, which releases its SAP locks), whatever the undo answered; a
+  connection you injected is never closed. To let your own instance go, call
+  **`closeInstance(instance)`** (`@mcp-abap-adt/lib/embeddable`): it runs the whole close in order
+  (no new call of the instance, its calls settle, the undo, the terminal close, the MCP server's
+  close), once per instance, and answers what the undo could not undo.
+- **`connectionReleased(connection)`**: a subclass that calls `getConnection` itself calls it
+  exactly once per `getConnection` when its work on the connection is done; a connection replaced
+  meanwhile is logged off only then.
 - **The server replaces its connection only when SAP lost its session** (or a new credential
   arrives): the next call gets a new connection instance, the spent one is logged off; the call
   that met the loss gets the connection's error as it is.

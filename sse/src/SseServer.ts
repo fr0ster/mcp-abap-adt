@@ -7,11 +7,7 @@ import type {
   IHttpApplication,
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
-import {
-  BaseMcpServer,
-  closeInstance,
-  isLatched,
-} from '@mcp-abap-adt/lib/embeddable';
+import { BaseMcpServer, closeInstance } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
@@ -28,6 +24,7 @@ import {
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
 import {
+  isLatched,
   parseStateIdleMinutes,
   type StateLogger,
   stateLoggerOf,

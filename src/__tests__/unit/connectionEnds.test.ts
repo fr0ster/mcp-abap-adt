@@ -216,7 +216,7 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     expect(built[1]?.disconnects).toBe(1);
   });
 
-  it('a new credential replaces it with no call on it: the replaced one ends at once, once', async () => {
+  it('a new credential after the last call on the old connection was released: the old one is logged off at the replacement, once', async () => {
     const server = serve([provider(), provider()]);
     const first = await server.connection();
     server.done(first);

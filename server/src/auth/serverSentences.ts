@@ -5,7 +5,7 @@
  */
 
 import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
-import { SHUTDOWN_SENTENCE } from '@mcp-abap-adt/lib/embeddable';
+import { SHUTDOWN_SENTENCE } from '@mcp-abap-adt/lib/state';
 
 /** How the provider renews (`--renewal`, D11). */
 export type RenewalMode = 'refresh-then-login' | 'refresh-only';

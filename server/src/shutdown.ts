@@ -38,10 +38,12 @@ import { errorClassOf } from '@mcp-abap-adt/lib/auth';
 import {
   type ClosableInstance,
   closeInstance,
+} from '@mcp-abap-adt/lib/embeddable';
+import {
   installShutdownSequence,
   type ShutdownProcess,
   settled,
-} from '@mcp-abap-adt/lib/embeddable';
+} from '@mcp-abap-adt/lib/state';
 import type { SettleReport } from './auth/IAuthBrokerFactory.js';
 
 export type { ShutdownProcess };

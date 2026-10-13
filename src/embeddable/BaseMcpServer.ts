@@ -278,6 +278,9 @@ export abstract class BaseMcpServer extends McpServer {
    * next call even when every caller that waited for it cancelled (D56: a
    * cancel causes no logoff). It is closed only by the instance's terminal
    * close (spec §6.4).
+   *
+   * Every connection it returns is a use the caller must end with exactly
+   * one `connectionReleased(connection)`.
    */
   protected async getConnection(signal: AbortSignal): Promise<AbapConnection> {
     const context = this.connectionContext;
@@ -321,9 +324,11 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * A call is done with the connection `getConnection` handed it: a
-   * replaced one with no call left ends with its logoff. The tool wrapper
-   * calls it when a call ends; a host that calls `getConnection` itself
-   * calls it too, else a replaced connection ends only at the terminal close.
+   * replaced one with no call left ends with its logoff. Called **exactly
+   * once per `getConnection`** that returned a connection: the tool wrapper
+   * does; a subclass that calls `getConnection` itself does too. A missing
+   * release keeps a replaced connection open until the terminal close; a
+   * second one would end it under another call.
    */
   protected connectionReleased(connection: AbapConnection): void {
     const entry = this.entries.get(connection);

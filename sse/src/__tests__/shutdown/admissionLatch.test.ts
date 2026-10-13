@@ -6,7 +6,7 @@
  * compact: the A7 parity suite.)
  */
 
-import { SHUTDOWN_SENTENCE } from '@mcp-abap-adt/lib/embeddable';
+import { SHUTDOWN_SENTENCE } from '@mcp-abap-adt/lib/state';
 import {
   isLockOf,
   isUnlockOf,

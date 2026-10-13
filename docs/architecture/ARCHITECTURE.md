@@ -298,7 +298,10 @@ Every send on the instance's connection is inside the order: the identity lookup
 debugger's request user go through `onMainConnection` — directly from a call that
 already holds the flow (an `AsyncLocalStorage` mark), on the connection that call holds,
 else in turn, on the connection taken inside the flow (so a session the call ahead lost
-is already replaced); the send is handed its connection and captures none. Outside the order,
+is already replaced); the send is handed its connection and captures none. A caller
+already known — the user SAP named for the credential, or the identity the owner keeps
+for the current connection — is answered at once, without entering the flow, so a
+background run or a leftover-session tool never waits for a lookup it does not send. Outside the order,
 because they work on a connection of their own: a background run, a listed long read
 (its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one

@@ -158,7 +158,9 @@ handlers as `HandlerContext.onMainConnection(send)` — directly from a call tha
 the connection that call holds, else in turn, on the connection `getConnection` hands inside the
 flow (a session the call ahead lost already replaced), given back when the send is done. `send` is
 handed that connection and must capture none of its own (`context.connection` may be the spent
-one). The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
+one). A caller already known is answered without entering the flow: the backend user SAP named is
+kept per credential object (a host's injected connection for its own), not per connection, and the
+leftover tools read the identity the owner keeps for the current connection. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
 reaches its tool. An embedder's own registry that is not a `CompositeHandlersRegistry`
 (`registerAllTools(trackingRegistrations())`) gets no main-flow queue: its tools take no place in
 the flow. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the flow, a queued call

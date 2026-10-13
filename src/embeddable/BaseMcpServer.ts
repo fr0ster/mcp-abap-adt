@@ -215,8 +215,16 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly backgroundRuns: IBackgroundRuns | undefined;
 
-  /** The backend user SAP answered for a connection (a token credential names none). */
-  private readonly sapUsers = new WeakMap<object, string>();
+  /**
+   * The backend user SAP answered for a caller (a token credential names
+   * none), keyed by what identifies the caller's session and not by a
+   * connection the main flow hands out: the credential object a built
+   * source resolved (one credential, one SAP user — a replaced connection on
+   * the same credential is the same user), or the host's injected
+   * connection (the host's, never replaced). A known user is answered
+   * without entering the flow.
+   */
+  private readonly callerUsers = new WeakMap<object, string>();
 
   constructor(options: {
     name: string;
@@ -1186,7 +1194,7 @@ export abstract class BaseMcpServer extends McpServer {
       return {
         url: withoutTrailingSlashes(url.trim()),
         client: '',
-        user: await this.sapUserOf(signal),
+        user: await this.sapUserOf(signal, context.connection),
       };
     }
     const resolved = await this.resolveCaller(signal);
@@ -1200,25 +1208,38 @@ export abstract class BaseMcpServer extends McpServer {
       .trim()
       .toUpperCase();
     if (stated !== '') return { url, client, user: stated };
-    return { url, client, user: await this.sapUserOf(signal) };
+    return {
+      url,
+      client,
+      user: await this.sapUserOf(signal, resolved.credential),
+    };
   }
 
   /**
-   * The backend user SAP answers for the instance's session, asked once per
-   * connection — on the connection the main flow hands the send.
+   * The backend user SAP answers for the caller `key` names (see
+   * `callerUsers`): a known one at once, without entering the main flow;
+   * else asked once, on the connection the main flow hands the send.
    */
-  private async sapUserOf(signal: AbortSignal): Promise<string> {
-    const user = await this.onMainConnection(signal, async (connection) => {
-      const known = this.sapUsers.get(connection);
-      if (known !== undefined) return known;
-      const asked = await systemUserOf(connection);
-      if (asked !== undefined) this.sapUsers.set(connection, asked);
-      return asked;
-    });
+  private async sapUserOf(signal: AbortSignal, key: object): Promise<string> {
+    const user = await this.callerUserOf(signal, key);
     if (user === undefined) {
       throw new ServerRefusal('background_run_caller_unknown');
     }
     return user;
+  }
+
+  /** `sapUserOf`'s lookup: `undefined` when SAP names no user. */
+  private async callerUserOf(
+    signal: AbortSignal,
+    key: object,
+  ): Promise<string | undefined> {
+    const known = this.callerUsers.get(key);
+    if (known !== undefined) return known;
+    const asked = await this.onMainConnection(signal, (connection) =>
+      systemUserOf(connection),
+    );
+    if (asked !== undefined) this.callerUsers.set(key, asked);
+    return asked;
   }
 
   /**
@@ -1306,15 +1327,33 @@ export abstract class BaseMcpServer extends McpServer {
         identity: withUser(session.destination, session.user),
       };
     }
-    // On the connection the main flow hands the send: built with its
+    // A known identity is answered without entering the main flow: the one
+    // the owner keeps for the instance's current connection (read, nothing
+    // sent), or the user SAP already named for this credential.
+    const current = this.built?.ready;
+    const kept =
+      current !== undefined && !isSpent(current)
+        ? owner.identityOf(current)
+        : undefined;
+    if (kept !== undefined) return { owner, resolved, identity: kept };
+    const known = this.callerUsers.get(resolved.credential);
+    if (known !== undefined) {
+      return {
+        owner,
+        resolved,
+        identity: withUser(session.destination, known),
+      };
+    }
+    // Else on the connection the main flow hands the send: built with its
     // logon when the instance holds none yet, replaced when the call ahead
     // lost its session.
-    const identity = await this.onMainConnection(
-      signal,
-      async (connection) =>
-        owner.identityOf(connection) ??
-        withUser(session.destination, await systemUserOf(connection)),
-    );
+    const identity = await this.onMainConnection(signal, async (connection) => {
+      const tracked = owner.identityOf(connection);
+      if (tracked !== undefined) return tracked;
+      const user = await systemUserOf(connection);
+      if (user !== undefined) this.callerUsers.set(resolved.credential, user);
+      return withUser(session.destination, user);
+    });
     return { owner, resolved, identity };
   }
 

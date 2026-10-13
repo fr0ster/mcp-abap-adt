@@ -836,7 +836,7 @@ contract feature. What a signal closes depends on what the consumer let go of:
 | **cancels a call** (`notifications/cancelled`, or the request's `extra.signal` otherwise) | its waits — the login, `connect()`, `getProvider`'s build, its wait on the system-context lookup (D32, D44); a request whose tool has not started never reaches it (D5) | a tool already running runs to the end and answers (§5.2); **nothing is done to SAP** — no logoff, no reopen while the instance lives (D56): a reopen would drop locks under the LLM or leave them in the old session the new one collides with; the session and its connection live on |
 | **closes its transport** — an SSE connection (D51), stdio's stdin (its `end` / `close` starts the shutdown, M7, §6.4), an HTTP instance the pool releases (§3.8) | the instance stops admitting calls (its latch), awaits the running ones, then closes every connection it owns with `disconnect()` — the logoff (§6.4) | nothing of that instance |
 | **shuts the process down** (`SIGTERM` / `SIGINT`) | the same for every instance (§6.4); `--shutdown-timeout` or a second signal ends the waiting, and the logoff is still sent | nothing |
-| **gives a listed long tool a `timeout`** (§5.8) | that tool's wait, and its own connection, closed with a logoff — SAP finishes the request and closes the session | the instance, its connections and every other call |
+| **gives a listed long tool a `timeout`** (§5.8) | that tool's wait only — the request runs on to SAP's answer on its own connection, which is then closed with a logoff (measured: a logoff or a closed socket would kill a running request) | the instance, its connections and every other call |
 
 **Logoff happens only at an instance's end** — pool eviction, the idle bound, a stop tool, an SSE
 close, stdin's end, shutdown — and at the end of a connection made for one operation (a fresh
@@ -1008,12 +1008,22 @@ user** (e.g. where-used, `GetWhereUsed`, and the like).
 - **Each listed long call runs stateless on its own connection** — the server's fresh-connection
   path (`openFreshConnection`, §4.3) — not the instance's, so nothing the instance holds is
   touched.
-- **When the call ends, or its timeout fires**, that connection is closed with `disconnect()` — the
-  logoff (connection 16: resolved once written); SAP finishes the request and closes the session;
-  nothing else is affected. The timer is the call's own, cleared when the call settles: **no timer
-  is left pending** after a call that finished (as the login bound, §5.6). The timed-out answer
-  says, in fixed words, that the wait was ended by its `timeout` and that SAP finishes the request
-  on its own.
+- **A timeout ends only the wait — never the request.** Measured on E19 (2026-10-13, a `$TMP`
+  class run that waits 60 s and then writes and commits): logging the request's own stateless
+  session off, or closing its socket, while the request runs **kills it — the write is lost**; a
+  client that keeps waiting gets it written. So when the `timeout` fires, the call answers at once,
+  in fixed words, that the wait was ended by its `timeout` and that the request is still running in
+  SAP (with the `worklist_id` / `run_id` where the tool already holds one at that moment), and
+  **the request goes on**: its socket and its own connection stay open until SAP answers. The
+  answer that then arrives is not delivered to anyone; **only after it** is that connection closed
+  with `disconnect()` — the logoff (connection 16: resolved once written). A call that finishes
+  within its `timeout` closes its connection the same way, after its answer. The timer is the
+  call's own, cleared when the call settles: **no timer is left pending** after a call that
+  finished (as the login bound, §5.6).
+- **Such a connection is owned** (§6.4's list, `tools/connection-ends.json`): the orderly
+  shutdown waits for its request to be answered before its logoff (the request may write); the
+  forced close logs it off at once — which cuts the request (the user's escape, as for a running
+  tool).
 - **The tool description** advises a `timeout` below the MCP client's own request limit (the
   TypeScript SDK's client cancels at 60 s by default), and says that a cancel does nothing to SAP.
 - **No connection to make one from**: on an injected connection without `freshConnection`, a

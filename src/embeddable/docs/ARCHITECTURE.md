@@ -196,9 +196,10 @@ tools; the server decides nothing by itself (session-resume spec).
   (`takeAsBuilt`: the previous one retired, ended after its last call) and the file this
   process's (`adopt`, same handle). SAP's "gone" — `401`, a redirect, an answer not the session's —
   ends the spent connection and deletes the file; any other failure keeps it.
-- **Logoff** builds a connection on the session (role `fresh`) and ends it at once: connection 17
-  sends the ICF logoff without `sap-contextid` and without a credential. A session SAP already
-  ended answers the first request; nothing is logged off and the file is deleted.
+- **Logoff** builds a connection on the session (role `fresh`) and disconnects it without
+  `connect()` (connection 17.1): one request, the ICF logoff, with the session's cookies but no
+  `sap-contextid`, no credential (its `prepare()` is never called) and no CSRF fetch before it;
+  resolved once written, its answer not read. Then the claimed file is deleted.
 
 ## The servers
 

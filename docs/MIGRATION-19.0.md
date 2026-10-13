@@ -165,7 +165,7 @@ is for finishing a write or an unlock:
 |---|---|---|
 | `ListLeftoverSessions` | `HandlerLeftoverSessionList` | your sessions a killed process left: `handle`, `role`, `destination` (`url`, `client`, `system`), `user`, `written_at` — never a cookie |
 | `ResumeLeftoverSession` `{ handle }` | `HandlerLeftoverSessionResume` | role `built` only: this server's connection is built on that session instead of logging on, so its locks and their `lock_handle`s work again; the file is this process's from then on. A session this server held before is logged off once no call uses it. SAP answering that the session is gone (`401`, a redirect, another session) is the answer, as SAP gave it (`state: "gone"`, `sap.status`), and the file is deleted |
-| `LogoffLeftoverSession` `{ handle }` | `HandlerLeftoverSessionLogoff` | any role: the platform's ICF logoff with the session's cookies and no credential (every lock of the session is released), then the file is deleted; a session SAP had already ended answers `state: "already_ended"` and its file is deleted too |
+| `LogoffLeftoverSession` `{ handle }` | `HandlerLeftoverSessionLogoff` | any role: one request — the platform's ICF logoff with the session's cookies, no credential, no discovery or CSRF fetch before it (connection 17.1's `disconnect()` without `connect()`); every lock of the session is released. It answers `state: "logged_off"` once the logoff is written — SAP's answer is not read, so a session that had already ended is answered the same — and the file is deleted |
 
 - **Only your own.** A file is yours when its destination and backend user equal what your request
   resolved. Someone else's file, an unknown handle and a file whose process still runs (process id
@@ -409,7 +409,7 @@ packages, each with one binary and its transport's options only:
 
 ## Embedders
 
-- **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **17**,
+- **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **17.1**,
   `@mcp-abap-adt/interfaces-adt-connection` **3**, `@mcp-abap-adt/interfaces-adt` **16**,
   `@mcp-abap-adt/adt-clients` **31.1** (and `@mcp-abap-adt/adt-strategies` 0.11). None of them takes a
   signal: `IAbapRequestOptions.signal` and `IAdtClientOptions.signal` are gone, there is no

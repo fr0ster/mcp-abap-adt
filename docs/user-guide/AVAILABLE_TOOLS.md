@@ -5772,7 +5772,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="logoffleftoversession-session-leftover-session"></a>
 #### LogoffLeftoverSession (Session / Leftover Session)
-**Description:** [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. No credential is sent with the logoff. The session record is deleted afterwards; a session SAP had already ended is reported as such.
+**Description:** [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, with no credential. The session record is deleted afterwards.
 
 **Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
 

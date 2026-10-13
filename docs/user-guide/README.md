@@ -94,7 +94,8 @@ transport, three tools act on **your** leftover sessions, and nothing else does:
   the record is deleted. Useful on stdio and SSE: over Streamable HTTP each request has an
   instance of its own, so a resumed session lives for that one request and is logged off with it.
 - `LogoffLeftoverSession { handle }` (compact `HandlerLeftoverSessionLogoff`) — logs the session off
-  (every lock in it is released), with no credential, and deletes the record.
+  (every lock in it is released) — one request, the logoff, with no credential and nothing sent
+  before it — and deletes the record.
 
 A record is yours when its destination and SAP user equal those of your request: the
 destination's `SAP_USERNAME` or `x-sap-login`, or — for a token credential, which names none — the

@@ -19,17 +19,15 @@ export type ResumeOutcome =
   /** SAP answered that the session is gone: its file is deleted. */
   | { handle: string; state: 'gone'; sap: SapAnswer };
 
-export type LogoffOutcome =
-  | { handle: string; state: 'logged_off' }
-  /** SAP answered that the session had already ended: its file is deleted. */
-  | { handle: string; state: 'already_ended'; sap: SapAnswer };
+/** The logoff was written (its answer is not read); the file is deleted. */
+export type LogoffOutcome = { handle: string; state: 'logged_off' };
 
 export interface LeftoverSessionTools {
   /** The caller's leftover sessions. */
   list(): Promise<LeftoverListing[]>;
   /** Builds this instance's connection on the session instead of logging on. */
   resume(handle: string): Promise<ResumeOutcome>;
-  /** The ICF logoff with the session's cookies, then its file deleted. */
+  /** The ICF logoff with the session's cookies, and nothing else; then its file deleted. */
   logoff(handle: string): Promise<LogoffOutcome>;
 }
 

@@ -636,7 +636,7 @@ per request.
 
 **Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)
 
-**Description:** Logs off a leftover SAP session (any role), releasing every lock it holds; no credential is sent. Its record is deleted afterwards; a session SAP had already ended is reported as such.
+**Description:** Logs off a leftover SAP session (any role), releasing every lock it holds; only the logoff is sent, with no credential. Its record is deleted afterwards.
 
 **Available in:** all
 

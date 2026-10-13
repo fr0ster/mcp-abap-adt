@@ -9,6 +9,7 @@
  * session's cookies and no `Authorization`, then deletes the file.
  */
 
+import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { LEFTOVER_SESSION_NOT_AVAILABLE_WORDS } from '../../../lib/auth/serverRefusal';
 import { isLogoff, PROBE_PATH } from '../../helpers/adtStandIn';
 import {
@@ -183,18 +184,28 @@ describe('LogoffLeftoverSession', () => {
     expect(stand.files()).toEqual([]);
   });
 
-  it('a session SAP already ended: reported, nothing logged off, the file deleted', async () => {
+  it('sends exactly one request — the logoff: no discovery, no CSRF fetch, no credential, no prepare()', async () => {
+    stand = await leftoverStand();
+    const { handle } = await stand.leftover();
+    const prepare = jest.spyOn(BasicAuthProvider.prototype, 'prepare');
+    const from = stand.standIn.requests.length;
+    const answer = await stand.call('LogoffLeftoverSession', { handle });
+    expect(json(answer.text)).toEqual({ handle, state: 'logged_off' });
+    await until(() => stand.standIn.logoffs() === 1);
+    const sent = stand.standIn.requests.slice(from);
+    expect(sent).toHaveLength(1);
+    expect(isLogoff(sent[0]?.url ?? '')).toBe(true);
+    expect(sent[0]?.authorization).toBeUndefined();
+    expect(prepare).not.toHaveBeenCalled();
+    expect(stand.files()).toEqual([]);
+  });
+
+  it('a session SAP already ended gets the logoff too; its answer is not read, and the file is deleted', async () => {
     stand = await leftoverStand();
     const { handle, session } = await stand.leftover();
     stand.standIn.answer((r) => r.session === session, 401);
     const answer = await stand.call('LogoffLeftoverSession', { handle });
-    expect(answer.isError).toBe(false);
-    expect(json(answer.text)).toMatchObject({
-      handle,
-      state: 'already_ended',
-      sap: { status: 401 },
-    });
-    expect(stand.standIn.logoffs()).toBe(0);
+    expect(json(answer.text)).toEqual({ handle, state: 'logged_off' });
     expect(stand.files()).toEqual([]);
   });
 });

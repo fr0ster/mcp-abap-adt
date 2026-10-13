@@ -5,7 +5,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'LogoffLeftoverSession',
   description:
-    '[session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. No credential is sent with the logoff. The session record is deleted afterwards; a session SAP had already ended is reported as such.',
+    '[session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, with no credential. The session record is deleted afterwards.',
   inputSchema: {
     type: 'object',
     properties: {

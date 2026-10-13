@@ -904,10 +904,11 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * Logoff (any role): the platform's ICF logoff with the session's cookies
-   * and no credential, then the file deleted. connection 17 sends it from an
-   * instance built on the session — one request in that session first, the
-   * CSRF fetch, also without the credential; a session SAP already ended
-   * answers that request, nothing is logged off, and the file is deleted.
+   * and no credential, then the file deleted. connection 17.1 sends it from
+   * an instance built on the session and disconnected without `connect()`:
+   * the logoff and nothing else — no CSRF fetch before it, the credential's
+   * `prepare()` never called — resolving once it is written. Its answer is
+   * not read, so whether the session still lived is SAP's to know.
    */
   private async logoffLeftover(
     handle: string,
@@ -928,16 +929,6 @@ export abstract class BaseMcpServer extends McpServer {
       );
       // For this one operation: ended here, or by the instance's close.
       own(connection, { owner: this, role: 'fresh' });
-      try {
-        await connection.connect();
-      } catch (error) {
-        await endConnection(connection);
-        const sap = sapAnswerOf(error);
-        if (sap === undefined || !sessionGone(sap.status)) throw error;
-        owner.forget(claimed);
-        settled = true;
-        return { handle: claimed.handle, state: 'already_ended', sap };
-      }
       let failed = false;
       await endConnection(connection, () => {
         failed = true;

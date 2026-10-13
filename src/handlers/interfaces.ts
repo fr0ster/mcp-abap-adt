@@ -32,8 +32,12 @@ export interface HandlerContext {
   backgroundRuns?: BackgroundRunTools;
   /**
    * Sends on the instance's connection through its main flow: directly from a
-   * call that holds it, else in turn. For a tool outside the flow (the
+   * call that holds it, else in turn. `send` is handed the connection to send
+   * on — the holding call's, or the one taken inside the flow (a session lost
+   * by the call ahead already replaced) — and must capture none of its own. For a tool outside the flow (the
    * debugger's) that still asks something of the instance's connection.
    */
-  onMainConnection?: <T>(send: () => Promise<T>) => Promise<T>;
+  onMainConnection?: <T>(
+    send: (connection: IAbapConnection) => Promise<T>,
+  ) => Promise<T>;
 }

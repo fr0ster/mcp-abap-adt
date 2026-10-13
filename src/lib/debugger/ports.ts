@@ -49,8 +49,9 @@ function onMain<T>(
   context: HandlerContext,
   send: (connection: IAbapConnection) => Promise<T>,
 ): Promise<T> {
-  const run = () => send(context.connection);
-  return context.onMainConnection ? context.onMainConnection(run) : run();
+  return context.onMainConnection
+    ? context.onMainConnection(send)
+    : send(context.connection);
 }
 
 async function openStateful(context: HandlerContext): Promise<IAbapConnection> {

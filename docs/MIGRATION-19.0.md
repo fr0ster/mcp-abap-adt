@@ -308,7 +308,8 @@ Where it matters: stdio (one instance for the process) and SSE (one instance per
 Over Streamable HTTP each request has its instance and connection, so its calls never met anyway.
 Every send a call makes on the instance's connection is inside the order — also the
 `systeminformation` lookup a background run, a leftover-session tool or the debugger makes for its
-caller's user (run directly when the call that makes it already holds the flow); the connect's own
+caller's user (run directly when the call that makes it already holds the flow, else on the
+connection taken in its turn, so a session lost ahead of it is already replaced); the connect's own
 sends (its session record, the ABAP Cloud system lookup) come before any tool can use the
 connection. An embedder's own registry that is not a `CompositeHandlersRegistry` (it registers its
 tools itself) gets no main-flow queue. Outside the order, because they work

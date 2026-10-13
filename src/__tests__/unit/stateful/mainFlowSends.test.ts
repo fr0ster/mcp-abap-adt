@@ -188,7 +188,7 @@ it('a lookup from inside a call that holds the flow runs directly, without waiti
         LookupInside: async (context, _args) => {
           const send = context.onMainConnection;
           if (!send) throw new Error('no onMainConnection');
-          const user = await send(() => systemUserOf(context.connection));
+          const user = await send((connection) => systemUserOf(connection));
           return text(user ?? 'none');
         },
       }),

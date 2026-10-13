@@ -296,7 +296,9 @@ main-flow queue. A shutdown or an instance's close lets the running call and eve
 Every send on the instance's connection is inside the order: the identity lookups
 (`systeminformation`) of the background-run and leftover-session tools and the
 debugger's request user go through `onMainConnection` — directly from a call that
-already holds the flow (an `AsyncLocalStorage` mark), else in turn. Outside the order,
+already holds the flow (an `AsyncLocalStorage` mark), on the connection that call holds,
+else in turn, on the connection taken inside the flow (so a session the call ahead lost
+is already replaced); the send is handed its connection and captures none. Outside the order,
 because they work on a connection of their own: a background run, a listed long read
 (its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one

@@ -154,8 +154,11 @@ and only a tool the guard refuses for want of a responsible asks again from insi
 `retryLookup`, refused `system_lookup_failed` when that fails too); the wrapper reads it
 (`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
 outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
-handlers as `HandlerContext.onMainConnection` — directly from a call that holds the flow, else in
-turn. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
+handlers as `HandlerContext.onMainConnection(send)` — directly from a call that holds the flow, on
+the connection that call holds, else in turn, on the connection `getConnection` hands inside the
+flow (a session the call ahead lost already replaced), given back when the send is done. `send` is
+handed that connection and must capture none of its own (`context.connection` may be the spent
+one). The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
 reaches its tool. An embedder's own registry that is not a `CompositeHandlersRegistry`
 (`registerAllTools(trackingRegistrations())`) gets no main-flow queue: its tools take no place in
 the flow. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the flow, a queued call

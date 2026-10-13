@@ -64,8 +64,9 @@ describe("lib's read and write handler barrels", () => {
     // and the preview-URL tool joined them when `HandlerGet` gained `part`, which
     // is why this number moves deliberately and in a commit that says so.
     // 15.1: search, where-used, table/SQL data and package contents joined, for
-    // the compact facade's read half.
-    expect(read).toHaveLength(59);
+    // the compact facade's read half. 19.0.0: ReadTransportObjects joined, for
+    // `HandlerGet` with object_type TRANSPORT.
+    expect(read).toHaveLength(60);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the

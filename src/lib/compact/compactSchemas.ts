@@ -203,6 +203,11 @@ export const compactGetSchema = {
       type: 'string',
       description: 'Service binding name.',
     },
+    transport_number: {
+      type: 'string',
+      description:
+        'Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own.',
+    },
     run_id: { type: 'string', description: 'Unit test run id.' },
     response_format: {
       type: 'string',

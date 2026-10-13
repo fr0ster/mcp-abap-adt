@@ -206,6 +206,9 @@ packages, each with one binary and its transport's options only:
 - **Two transport tools join `rw`** (25 → 27): `HandlerTransportSortAndCompress` (the full set's
   `SortAndCompressTransportTask`) and `HandlerTransportMoveObjects` (`MoveTransportObjects`) — the
   same handlers, the same parameters without `detail`.
+- **`HandlerGet` reads a transport** (`object_type: TRANSPORT`, `transport_number`): the full set's
+  `ReadTransportObjects`, the objects of a request or task, each with the `position` that
+  `HandlerTransportMoveObjects` takes. The two transport writes name it in their answers' `confirm_with`.
 - `@mcp-abap-adt/compact-http` and `@mcp-abap-adt/compact-sse` do not depend on
   `@mcp-abap-adt/core`: neither the auth broker nor the stores are installed with them.
 

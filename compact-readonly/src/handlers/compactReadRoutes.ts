@@ -41,6 +41,7 @@ import {
   handleGetStructure,
   handleGetTable,
   handleGetUnitTest,
+  handleReadTransportObjects,
 } from '@mcp-abap-adt/lib/handlers/read';
 
 export const compactReadRouterMap: CompactRouterMap = {
@@ -53,7 +54,9 @@ export const compactReadRouterMap: CompactRouterMap = {
   DATA_ELEMENT: {
     get: handleGetDataElement as unknown as CompactHandler,
   },
-  TRANSPORT: {},
+  TRANSPORT: {
+    get: handleReadTransportObjects as unknown as CompactHandler,
+  },
   TABLE: {
     get: handleGetTable as unknown as CompactHandler,
   },

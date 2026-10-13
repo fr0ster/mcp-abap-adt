@@ -67,11 +67,13 @@ describe('the parts a compact read can answer', () => {
   });
 
   it('says "nothing" when the type has no readable part at all', async () => {
-    // Measured, not assumed: the compact read map has no `get` for a transport —
-    // the CRUD matrix gives it `create` only — so there is nothing to offer, and
+    // Measured, not assumed: the compact read map has no `get` for a runtime
+    // dump — the CRUD matrix gives it nothing — so there is nothing to offer, and
     // saying that beats listing parts which do not exist either.
-    expect(await refusalOf({ object_type: 'TRANSPORT', part: 'urls' })).toMatch(
-      /part=urls is not available[\s\S]*TRANSPORT[\s\S]*offers: nothing/,
+    expect(
+      await refusalOf({ object_type: 'RUNTIME_DUMP', part: 'urls' }),
+    ).toMatch(
+      /part=urls is not available[\s\S]*RUNTIME_DUMP[\s\S]*offers: nothing/,
     );
   });
 

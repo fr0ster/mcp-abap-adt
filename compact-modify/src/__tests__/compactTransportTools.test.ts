@@ -61,6 +61,23 @@ const OBJECTS = [
   },
 ];
 
+/**
+ * The full tool's answer as compact words it: the one sentence that names the
+ * full set's read names `HandlerGet` with `object_type: TRANSPORT` instead.
+ */
+function asCompact(answer: { content: { type: string; text: string }[] }) {
+  return {
+    ...answer,
+    content: answer.content.map((part) => ({
+      ...part,
+      text: part.text.replaceAll(
+        'ReadTransportObjects',
+        'HandlerGet with object_type TRANSPORT',
+      ),
+    })),
+  };
+}
+
 /** The full tool's schema without `detail`, which compact does not offer. */
 function withoutDetail(schema: {
   properties: Record<string, unknown>;
@@ -115,7 +132,12 @@ describe('the compact transport sort and move tools', () => {
       `/sap/bc/adt/cts/transportrequests/${SOURCE}/sortandcompress`,
     );
     expect(compact.sent).toEqual(full.sent);
-    expect(compactAnswer).toEqual(fullAnswer);
+    expect(JSON.stringify(fullAnswer)).toContain('ReadTransportObjects');
+    expect(JSON.stringify(compactAnswer)).not.toContain('ReadTransportObjects');
+    expect(JSON.stringify(compactAnswer)).toContain(
+      `HandlerGet with object_type TRANSPORT on ${SOURCE}`,
+    );
+    expect(compactAnswer).toEqual(asCompact(fullAnswer));
     expect(compactAnswer.isError).toBe(false);
   });
 
@@ -138,8 +160,19 @@ describe('the compact transport sort and move tools', () => {
     expect(compact.sent[0]?.method).toBe('POST');
     expect(String(compact.sent[0]?.data)).toContain(TARGET);
     expect(compact.sent).toEqual(full.sent);
-    expect(compactAnswer).toEqual(fullAnswer);
+    expect(JSON.stringify(compactAnswer)).not.toContain('ReadTransportObjects');
+    expect(JSON.stringify(compactAnswer)).toContain(
+      `HandlerGet with object_type TRANSPORT on ${SOURCE} and on ${TARGET}`,
+    );
+    expect(compactAnswer).toEqual(asCompact(fullAnswer));
     expect(compactAnswer.isError).toBe(false);
+  });
+
+  it('name HandlerGet, not the full read, in their descriptions', () => {
+    for (const tool of [CompactSort, CompactMove]) {
+      expect(tool.description).not.toContain('ReadTransportObjects');
+      expect(tool.description).toContain('HandlerGet');
+    }
   });
 
   it('refuse a missing argument in the full tools’ words, sending nothing', async () => {

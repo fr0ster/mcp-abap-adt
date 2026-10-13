@@ -64,7 +64,7 @@ V2 server supports flexible handler set configuration through the `--exposition`
      - `UNIT_TEST`: `run`, `status`, `result`
      - `CDS_UNIT_TEST`: `status`, `result`
      - `SERVICE_BINDING`: `list_types`, `validate`
-     - `TRANSPORT`: `create_transport`
+     - `TRANSPORT`: `create_transport`, and read through `HandlerGet` (the objects of a request or task, each with its `position`)
      - `CLASS` / `PROGRAM`: `runProfiling`
      - `RUNTIME_PROFILE`: `viewProfiles`, `viewProfile`
      - `RUNTIME_DUMP`: `viewDumps`, `viewDump`

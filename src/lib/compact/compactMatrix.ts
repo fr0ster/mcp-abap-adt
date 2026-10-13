@@ -9,7 +9,7 @@ export const COMPACT_CRUD_MATRIX: Record<
   PACKAGE: ['create', 'get'],
   DOMAIN: ['create', 'get', 'update', 'delete'],
   DATA_ELEMENT: ['create', 'get', 'update', 'delete'],
-  TRANSPORT: ['create'],
+  TRANSPORT: ['create', 'get'],
   TABLE: ['create', 'get', 'update', 'delete'],
   STRUCTURE: ['create', 'get', 'update', 'delete'],
   DDL: ['create', 'get', 'update', 'delete'],

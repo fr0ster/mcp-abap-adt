@@ -69,6 +69,7 @@ export { handleRuntimeListProfilerTraceFiles } from '../../handlers/system/reado
 export { handleGetTable } from '../../handlers/table/high/handleGetTable.js';
 export { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';
 export { handleReadTable } from '../../handlers/table/readonly/handleReadTable.js';
+export { handleReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects.js';
 export { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest.js';
 export { handleGetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult.js';
 export { handleGetCdsUnitTestStatus } from '../../handlers/unit_test/high/handleGetCdsUnitTestStatus.js';

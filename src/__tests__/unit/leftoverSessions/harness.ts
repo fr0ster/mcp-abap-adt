@@ -123,16 +123,8 @@ export async function leftoverStand(
   });
   const user = options.user ?? 'LEFT_USER';
   if (options.token !== undefined) {
-    const tokenUser = options.token.tokenUser;
-    const isInfo = (r: { url: string }) =>
-      r.url.startsWith('/sap/bc/adt/core/http/systeminformation');
-    if (tokenUser === undefined) standIn.answer(isInfo, 404);
-    else {
-      standIn.body(
-        isInfo,
-        JSON.stringify({ systemID: 'SID', userName: tokenUser }),
-      );
-    }
+    // The token's SAP user, switchable later (`standIn.systemInformation`).
+    standIn.systemInformation(options.token.tokenUser ?? null);
     server.use({
       settings: { url: standIn.url, client: '100', authType: 'jwt' },
       credential: TokenAuthProvider.fixed('placeholder.token.sig'),

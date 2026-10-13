@@ -426,7 +426,12 @@ export abstract class BaseMcpServer extends McpServer {
       // replaced, and the replaced one ends with its logoff — once no call
       // works on it any more (spec §6.4). A source that keeps its connection
       // (stdio) is never reopened for a new credential (D13).
-      if (held) this.retire(held);
+      if (held) {
+        this.retire(held);
+        // A renewable credential may log on again as another SAP user: the
+        // user SAP named for it is asked again on the replacement.
+        this.callerUsers.delete(held.credential);
+      }
       held = this.buildConnection(
         resolved.credential,
         () => createAbapConnection(resolved.settings, resolved.credential),
@@ -1330,7 +1335,14 @@ export abstract class BaseMcpServer extends McpServer {
     // A known identity is answered without entering the main flow: the one
     // the owner keeps for the instance's current connection (read, nothing
     // sent), or the user SAP already named for this credential.
-    const current = this.built?.ready;
+    // Only a connection built for this call's own credential: over HTTP a
+    // pooled instance reached with another request's credential still holds
+    // the previous caller's connection, whose identity is not this caller's.
+    const built = this.built;
+    const current =
+      built !== undefined && built.credential === resolved.credential
+        ? built.ready
+        : undefined;
     const kept =
       current !== undefined && !isSpent(current)
         ? owner.identityOf(current)
@@ -1349,7 +1361,12 @@ export abstract class BaseMcpServer extends McpServer {
     // lost its session.
     const identity = await this.onMainConnection(signal, async (connection) => {
       const tracked = owner.identityOf(connection);
-      if (tracked !== undefined) return tracked;
+      if (tracked !== undefined) {
+        // The connection was built for this credential: its user is the
+        // credential's, kept for the next caller.
+        this.callerUsers.set(resolved.credential, tracked.user);
+        return tracked;
+      }
       const user = await systemUserOf(connection);
       if (user !== undefined) this.callerUsers.set(resolved.credential, user);
       return withUser(session.destination, user);
@@ -1490,7 +1507,10 @@ export abstract class BaseMcpServer extends McpServer {
     connection: AbapConnection,
   ): void {
     const previous = this.built;
-    if (previous) this.retire(previous);
+    if (previous) {
+      this.retire(previous);
+      this.callerUsers.delete(previous.credential);
+    }
     this.built = {
       credential: resolved.credential,
       connection: Promise.resolve(connection),

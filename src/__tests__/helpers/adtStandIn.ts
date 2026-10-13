@@ -60,6 +60,12 @@ export interface AdtStandIn {
     text: string,
     headers?: Record<string, string>,
   ): void;
+  /**
+   * From now on `systeminformation` answers this user (and system id), as a
+   * session of that SAP user would; a later call switches the user. `null`:
+   * the endpoint is absent (`404`). Takes precedence over `body`.
+   */
+  systemInformation(user: string | null, systemId?: string): void;
   /** The logoffs received so far: `disconnect()` reached the system. */
   logoffs(): number;
   /** The sessions logged off so far, in order. */
@@ -117,6 +123,8 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     headers?: Record<string, string>;
   }> = [];
   let sessions = 0;
+  /** What `systemInformation` set: the user, or `null` for a `404`. */
+  let systemInfo: { user: string | null; systemId: string } | undefined;
   const server = http.createServer((req, res) => {
     const carried = sessionOf(req.headers.cookie);
     const session = carried ?? `session-${++sessions}`;
@@ -141,6 +149,28 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       if (refusing) {
         res.writeHead(401, { 'content-type': 'text/plain' });
         res.end('');
+        return;
+      }
+      if (
+        systemInfo !== undefined &&
+        request.url.startsWith('/sap/bc/adt/core/http/systeminformation')
+      ) {
+        if (systemInfo.user === null) {
+          res.writeHead(404, { 'content-type': 'text/plain' });
+          res.end('');
+          return;
+        }
+        res.writeHead(200, {
+          'content-type': 'text/plain',
+          'x-csrf-token': 'csrf-placeholder',
+          'set-cookie': [`${SESSION_COOKIE}=${session}; path=/`],
+        });
+        res.end(
+          JSON.stringify({
+            systemID: systemInfo.systemId,
+            userName: systemInfo.user,
+          }),
+        );
         return;
       }
       const given = answers.find((a) => !a.used && a.match(request));
@@ -204,6 +234,9 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     },
     body: (match, text, headers) => {
       bodies.push({ match, text, headers });
+    },
+    systemInformation: (user, systemId = 'SID') => {
+      systemInfo = { user, systemId };
     },
     logoffs: () => requests.filter((r) => isLogoff(r.url)).length,
     loggedOff: () =>

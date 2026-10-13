@@ -43,8 +43,9 @@ nothing on the wire: a tool cannot reach into the connection's session.
 
 - **One main flow per instance**: the calls of one MCP session that work on its
   connection run one after another, whatever the client sends at once — the server
-  enforces it, so no call is sent inside another call's window. A background run and
-  a listed long read, each on a connection of its own, are outside the order.
+  enforces it, so no call is sent inside another call's window. Every send on the
+  instance's connection is in the order; a background run, a listed long read and the
+  debugger tools that work on the debugger's own connections are outside it.
 - **Compact `HandlerLock` → `HandlerUpdate { lock_handle }` → `HandlerUnlock`**: on
   stdio and SSE, where the connection lives across calls, the lock stays in the
   session between the calls — the consumer's choice. Every call between them is

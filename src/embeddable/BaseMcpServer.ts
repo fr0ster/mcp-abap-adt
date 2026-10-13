@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
@@ -35,6 +36,7 @@ import {
   createDebuggerInstance,
   type DebuggerInstance,
 } from '../lib/debugger/DebuggerInstance.js';
+import { isDebuggerOwnConnectionTool } from '../lib/debugger/ownConnectionTools.js';
 import type {
   IHandlersRegistry,
   SapEnvironment,
@@ -126,6 +128,14 @@ interface BuiltConnection {
   /** Replaced: it ends with its logoff once no call works on it. */
   retired: boolean;
 }
+
+/**
+ * The instances whose main flow the current async context holds: a call that
+ * entered its instance's flow runs inside it, so a send on the instance's
+ * connection made from within (an identity lookup) runs directly instead of
+ * queueing behind itself.
+ */
+const heldFlows = new AsyncLocalStorage<ReadonlySet<object>>();
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -440,6 +450,33 @@ export abstract class BaseMcpServer extends McpServer {
     );
   }
 
+  /** Runs `fn` with this instance's flow marked held, when `holds`. */
+  private inHeldFlow<T>(holds: boolean, fn: () => T): T {
+    if (!holds) return fn();
+    const held = new Set(heldFlows.getStore() ?? []);
+    held.add(this);
+    return heldFlows.run(held, fn);
+  }
+
+  /**
+   * A send on the instance's connection made outside a tool's own run — an
+   * identity lookup (`systeminformation`) of the leftover-session or
+   * background-run tools, or of the debugger: inside a call that holds the
+   * flow it runs directly; outside, it takes its turn in the main flow.
+   */
+  protected async onMainConnection<T>(
+    signal: AbortSignal,
+    send: () => Promise<T>,
+  ): Promise<T> {
+    if (heldFlows.getStore()?.has(this)) return send();
+    const leave = await this.enterMainFlow(signal);
+    try {
+      return await this.inHeldFlow(true, send);
+    } finally {
+      leave();
+    }
+  }
+
   /**
    * A call is done with the connection `getConnection` handed it: a
    * replaced one with no call left ends with its logoff. Called **exactly
@@ -570,17 +607,22 @@ export abstract class BaseMcpServer extends McpServer {
               // settled, whatever the client sends at once. Entered after the
               // connection is ready, so concurrent callers still share one
               // connect() (D32). A background run and a listed long read work
-              // on a connection of their own and take no place in it.
+              // on a connection of their own and take no place in it; so do the
+              // debugger tools whose SAP work is on the debugger's own
+              // connections — their sends on this one (`onMainConnection`)
+              // still take their turn.
               const ownConnection =
                 runsInBackground ||
                 (isLongTool(entry.toolDefinition.name) &&
-                  isLongRead(entry.toolDefinition.name, args));
+                  isLongRead(entry.toolDefinition.name, args)) ||
+                isDebuggerOwnConnectionTool(entry.toolDefinition.name);
               if (!ownConnection) leaveFlow = await this.enterMainFlow(signal);
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,
                 state: this.state,
                 debugger: () => this.debuggerFor(),
+                onMainConnection: (send) => this.onMainConnection(signal, send),
                 ...(this.leftoverSessions !== undefined
                   ? { sessionFiles: this.leftoverSessions }
                   : {}),
@@ -599,19 +641,22 @@ export abstract class BaseMcpServer extends McpServer {
               // a call whose signal aborted before its tool starts — after
               // the connection is ready, after the system lookup — never
               // reaches the tool (D5).
+              const holdsFlow = leaveFlow !== undefined;
               const resolved = <T>(fn: () => Promise<T>) =>
-                runWithRequestSignal(signal, () =>
-                  withDestinationSystemContext(
-                    this.systemContexts.get(context.connection),
-                    () =>
-                      withResolvedSystemContext(
-                        context.connection,
-                        () => {
-                          throwIfRequestAborted(signal);
-                          return fn();
-                        },
-                        this.systemContextResolver,
-                      ),
+                this.inHeldFlow(holdsFlow, () =>
+                  runWithRequestSignal(signal, () =>
+                    withDestinationSystemContext(
+                      this.systemContexts.get(context.connection),
+                      () =>
+                        withResolvedSystemContext(
+                          context.connection,
+                          () => {
+                            throwIfRequestAborted(signal);
+                            return fn();
+                          },
+                          this.systemContextResolver,
+                        ),
+                    ),
                   ),
                 );
               let handlerPromise: Promise<unknown>;
@@ -951,7 +996,7 @@ export abstract class BaseMcpServer extends McpServer {
       return {
         url: withoutTrailingSlashes(url.trim()),
         client: '',
-        user: await this.sapUserOf(context.connection),
+        user: await this.sapUserOf(context.connection, signal),
       };
     }
     const resolved = await this.resolveCaller(signal);
@@ -966,21 +1011,26 @@ export abstract class BaseMcpServer extends McpServer {
       .toUpperCase();
     if (stated !== '') return { url, client, user: stated };
     if (connection !== undefined) {
-      return { url, client, user: await this.sapUserOf(connection) };
+      return { url, client, user: await this.sapUserOf(connection, signal) };
     }
     const own = await this.getConnection(signal);
     try {
-      return { url, client, user: await this.sapUserOf(own) };
+      return { url, client, user: await this.sapUserOf(own, signal) };
     } finally {
       this.connectionReleased(own);
     }
   }
 
   /** The backend user SAP answers for `connection`'s session, asked once per connection. */
-  private async sapUserOf(connection: AbapConnection): Promise<string> {
+  private async sapUserOf(
+    connection: AbapConnection,
+    signal: AbortSignal,
+  ): Promise<string> {
     const known = this.sapUsers.get(connection);
     if (known !== undefined) return known;
-    const user = await systemUserOf(connection);
+    const user = await this.onMainConnection(signal, () =>
+      systemUserOf(connection),
+    );
     if (user === undefined) {
       throw new ServerRefusal('background_run_caller_unknown');
     }
@@ -1077,7 +1127,10 @@ export abstract class BaseMcpServer extends McpServer {
     try {
       const identity =
         owner.identityOf(connection) ??
-        withUser(session.destination, await systemUserOf(connection));
+        withUser(
+          session.destination,
+          await this.onMainConnection(signal, () => systemUserOf(connection)),
+        );
       return { owner, resolved, identity };
     } finally {
       this.connectionReleased(connection);

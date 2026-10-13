@@ -64,8 +64,12 @@ answered. The server sets no tool's session stateful (`tools/stateful-sites.json
 **One MCP session = one connector = one main flow.** The calls of an instance that
 work on its connection run strictly one after another, whatever the client sends at
 once — the server enforces it. The shared connections are stdio's kept one and an SSE
-connection's; Streamable HTTP builds one per request. A background run and a listed
-long read work on a connection of their own and are outside the order.
+connection's; Streamable HTTP builds one per request. Every send on the instance's
+connection is inside the order (identity lookups included); a background run, a listed
+long read and the debugger tools that work on the debugger's own connections are
+outside it. A long call on the main connection holds the flow; `background: true` or a
+tool on its own connection does not. A queued call that meets a session the call ahead
+found lost gets that error as it is.
 
 - **Compact's `HandlerLock`** leaves the lock in the session until `HandlerUnlock`
   (the consumer's choice) where the connection lives across calls — stdio and SSE —

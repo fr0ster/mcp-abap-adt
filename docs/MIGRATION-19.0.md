@@ -306,15 +306,20 @@ waits, with no timeout, until the previous one settled. So a call never runs ins
 lock, and an `UNLOCK` is never sent outside its lock's session because another call ended its own.
 Where it matters: stdio (one instance for the process) and SSE (one instance per SSE connection).
 Over Streamable HTTP each request has its instance and connection, so its calls never met anyway.
-Outside the order, because they work on a connection of their own: a background run
-(`background: true`), a listed long read (on its fresh connection, `timeout` or not) and the
-debugger's own debuggee session. A call you cancel while it waits leaves the queue at once and
-never reaches SAP; a shutdown or an instance's close does not wait behind a queued call.
+Every send on the instance's connection is inside the order — also the `systeminformation`
+lookup a background run, a leftover-session tool or the debugger makes for its caller's user (run
+directly when the call that makes it already holds the flow). Outside the order, because they work
+on a connection of their own: a background run (`background: true`), a listed long read (on its
+fresh connection, `timeout` or not) and the debugger tools whose SAP work is on the debugger's own connections (`DebugWait`, `AmdpDebugWait`, `HandlerDebugWait`, `DebugStep`, `DebugStepToLine`, `AmdpDebugStep`, `HandlerDebugStep`, the start and take-over tools). A call you cancel while it waits leaves the queue at
+once and never reaches SAP; a shutdown or an instance's close does not wait behind a queued call. A
+queued call that meets a session the call ahead of it found lost gets that error as it is; the next
+call gets a new connection.
 
-What this means for you: a long call on the instance's connection — a unit-test or ATC run, a
-class or program run not sent to the background, an activation, a `DebugWait` with its
-`hold_seconds` — holds every other call of that session until it ends. Send a long run to the
-background where the tool offers it.
+**A long call on the main connection holds the flow; `background: true` or a tool on its own
+connection does not.** A unit-test run (and `HandlerGet`'s `UNIT_TEST` polling), `RunATC` with
+`wait`, a class or program run or a profiling run in the foreground, an activation — and the
+creates and updates that activate — hold every other call of that session until they end, by
+design. Send a long run to the background where the tool offers it.
 
 - **`session_id` / `session_state` change nothing any more.** The tools that took them
   (compact `HandlerLock`, `HandlerUnlock`, `HandlerValidate`, `HandlerCheckRun`, the `Activate*`

@@ -292,10 +292,18 @@ work on its connection run strictly one after another (`BaseMcpServer.enterMainF
 in the registered tool wrapper). The next waits until the previous settled, with no
 timeout; a call cancelled while it waits leaves the queue at once and never reaches
 its tool; an instance's close and a shutdown do not wait behind a queued call.
-Outside the order, because they work on a connection of their own: a background run,
-a listed long read (its fresh connection) and the debugger's debuggee session. The
-connections that are shared this way are stdio's kept one and an SSE connection's;
-Streamable HTTP builds one per request.
+Every send on the instance's connection is inside the order: the identity lookups
+(`systeminformation`) of the background-run and leftover-session tools and the
+debugger's request user go through `onMainConnection` — directly from a call that
+already holds the flow (an `AsyncLocalStorage` mark), else in turn. Outside the order,
+because they work on a connection of their own: a background run, a listed long read
+(its fresh connection) and the debugger tools whose SAP work is on the debugger's own connections (`DebugWait`, `AmdpDebugWait`, `HandlerDebugWait`, `DebugStep`, `DebugStepToLine`, `AmdpDebugStep`, `HandlerDebugStep`, the start and take-over tools) (`src/lib/debugger/ownConnectionTools.ts`). The flow
+is entered after the connection is ready, so concurrent callers still share one
+`connect()`; a queued call that meets a session the call ahead found lost gets that
+error as it is. The connections that are shared this way are stdio's kept one and an
+SSE connection's; Streamable HTTP builds one per request. Not yet in the flow: the
+ABAP Cloud system-context lookup (`withResolvedSystemContext`, once per connection,
+memoised across callers) made for a call outside the order.
 
 - **Compact's `HandlerLock`** keeps the lock across calls until `HandlerUnlock` —
   the consumer's choice — where the connection lives across calls (stdio, SSE): the
@@ -773,13 +781,13 @@ instance uses a single ABAP connection, with one CSRF token, one HTTP session an
 session type. Calls on it at once would cross — CSRF tokens, a read sent stateful
 inside another call's lock, an `UNLOCK` sent stateless — so the calls that work on the
 instance's connection run strictly one after another, whatever the client sends in
-parallel ("The stateful window and the main flow"); a background run and a listed long
-read, each on a connection of its own, are outside that order. A client may send calls
-in parallel; they are answered in turn.
+parallel ("The stateful window and the main flow"); a background run, a listed long
+read and the debugger tools that work on the debugger's own connections are outside
+that order. A client may send calls in parallel; they are answered in turn.
 
-- **A long call holds the session.** A unit-test or ATC run, a class or program run in
-  the foreground, an activation, a `DebugWait` with its `hold_seconds`: every other call
-  of that MCP session waits until it ends. Send a long run to the background where the
-  tool offers it.
+- **A long call on the main connection holds the flow; `background: true` or a tool on
+  its own connection does not.** A unit-test or ATC run, a class or program run or a
+  profiling run in the foreground, an activation and the creates and updates that
+  activate: every other call of that MCP session waits until it ends, by design.
 - **Lock conflicts** -- SAP DDIC objects support only one lock per object; two sessions
   locking the same object conflict, and SAP's answer reaches the model as it is.

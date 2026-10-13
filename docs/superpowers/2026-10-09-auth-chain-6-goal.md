@@ -119,9 +119,8 @@ never hides one and never guesses one.
     ABAP: the most the server can do is a logoff and closing a connector. A
     cancelled call causes no logoff and no reopen while the instance lives; a
     session is reopened only when SAP already lost it.
-  - **Stateful only where SAP needs it.** A tool's session is stateful only
-    for lock → write → unlock and for activation; everything else runs
-    stateless.
+  - **Stateful only where SAP needs it.** Only LOCK and UNLOCK are sent
+    stateful; everything else runs stateless.
   - **Long tools named in a list take a `timeout`.** The list is explicit
     and decided tool by tool by the user — not a category. A listed tool
     takes an optional `timeout`, with no default, and runs on its own

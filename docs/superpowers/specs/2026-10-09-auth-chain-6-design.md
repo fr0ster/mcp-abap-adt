@@ -975,9 +975,14 @@ puts it on the list.
 **One MCP session = one connector = one main flow (the owner's ruling on C15's F2).** The calls of
 an instance that work on its connection run strictly one after another, whatever the client sends
 at once: the next waits, with no timeout, until the previous settled; a call whose signal aborts
-while it waits leaves the queue at once and never reaches its tool. Only work on a connection of
-its own — a background run, a listed long read on its fresh connection, the debugger's own
-debuggee session — is outside that order. The server enforces it and does not trust the client
+while it waits leaves the queue at once and never reaches its tool. Every send on the instance's
+connection is inside the order, the identity lookups (`systeminformation`) of the background-run,
+leftover-session and debugger tools included — directly from a call that already holds the flow.
+Only work on a connection of its own — a background run, a listed long read on its fresh
+connection, the debugger tools whose SAP work is on the debugger's own connections (the waits,
+steps, starts and take-over) — is outside that order. A long call on the main connection holds
+the flow by design; `background: true` or a tool on its own connection does not. A queued call
+that meets a session the call ahead found lost gets that error as it is. The server enforces it and does not trust the client
 (`BaseMcpServer.enterMainFlow`), on every transport; the instance's end does not wait behind a
 queued call (the running call ends, the queued ones settle, the close goes on).
 

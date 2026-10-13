@@ -146,9 +146,13 @@ unless the user resumes or logs them off from a later process (below).
 
 **One main flow per instance** (D56): the registered tool wrapper runs the calls that work on
 the instance's connection one after another (`enterMainFlow`), whatever the client sends at once;
-a background run and a listed long read, on connections of their own, take no place in it. The
-wait has no timeout; a call whose signal aborts while it waits leaves at once and never reaches its
-tool, so a close never waits behind a queued call.
+a background run, a listed long read and the debugger tools that work on the debugger's own
+connections (`ownConnectionTools.ts`) take no place in it. A send on the instance's connection made
+outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
+handlers as `HandlerContext.onMainConnection` — directly from a call that holds the flow, else in
+turn. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
+reaches its tool, so a close never waits behind a queued call. A queued call that meets a session
+the call ahead found lost gets that error as it is.
 
 **A connection is replaced only when SAP lost its session** (D56), or when a new credential
 arrives where the credential is the request's (http, sse) — never for a source that keeps its

@@ -30,4 +30,10 @@ export interface HandlerContext {
    * host's strategy and the call's caller; absent where the host gave none.
    */
   backgroundRuns?: BackgroundRunTools;
+  /**
+   * Sends on the instance's connection through its main flow: directly from a
+   * call that holds it, else in turn. For a tool outside the flow (the
+   * debugger's) that still asks something of the instance's connection.
+   */
+  onMainConnection?: <T>(send: () => Promise<T>) => Promise<T>;
 }

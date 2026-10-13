@@ -41,6 +41,18 @@ export async function requestUserOf(
   return user.trim().toUpperCase();
 }
 
+/**
+ * The request user's lookup goes on the instance's connection, so it takes
+ * its turn in the instance's main flow (`onMainConnection`).
+ */
+function onMain<T>(
+  context: HandlerContext,
+  send: (connection: IAbapConnection) => Promise<T>,
+): Promise<T> {
+  const run = () => send(context.connection);
+  return context.onMainConnection ? context.onMainConnection(run) : run();
+}
+
 async function openStateful(context: HandlerContext): Promise<IAbapConnection> {
   const connection = await openFreshConnection(
     context.connection,
@@ -121,7 +133,7 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
     },
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
       new AbapDebugger(c, undefined, undefined, { onConflict }),
-    requestUser: (context) => requestUserOf(context.connection),
+    requestUser: (context) => onMain(context, requestUserOf),
     run,
   };
 }
@@ -131,7 +143,7 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
     openConnection: openStateful,
     closeConnection: closeOwn,
     amdpDebugger: (c) => new AmdpDebugger(c),
-    requestUser: (context) => requestUserOf(context.connection),
+    requestUser: (context) => onMain(context, requestUserOf),
     run,
   };
 }

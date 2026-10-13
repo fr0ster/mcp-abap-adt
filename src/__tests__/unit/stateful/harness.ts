@@ -105,6 +105,8 @@ export async function statefulStand(
   options: {
     /** The credential the connection presents; basic by default. */
     credential?: (basic: IAuthProvider) => IAuthProvider;
+    /** Groups served beside the shipped tools (a case's own tools). */
+    groups?: IHandlerGroup[];
   } = {},
 ): Promise<StatefulStand> {
   const standIn = await adtStandIn();
@@ -121,7 +123,10 @@ export async function statefulStand(
   await connection.connect();
   const server = new EmbeddableMcpServer({
     connection: connection as never,
-    handlersRegistry: new CompositeHandlersRegistry(tools.map(oneToolGroup)),
+    handlersRegistry: new CompositeHandlersRegistry([
+      ...tools.map(oneToolGroup),
+      ...(options.groups ?? []),
+    ]),
     systemType: 'onprem',
     logger: silent,
   });

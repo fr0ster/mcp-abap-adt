@@ -32,7 +32,14 @@ import type {
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
 import { registryForExposition } from '../../../lib/handlers/registry/expositionRegistry';
-import { compactToolSetOf, registryOf } from '../../../lib/toolSet';
+import {
+  compactReadOnlyToolSetOf,
+  compactToolSetOf,
+  fullReadOnlyToolSet,
+  fullToolSet,
+  registryOf,
+  type ToolSet,
+} from '../../../lib/toolSet';
 import { adtStandIn } from '../../helpers/adtStandIn';
 import { clientOf, isClassRun, shippedGroups, silent, until } from './harness';
 
@@ -202,17 +209,29 @@ describe('where the background-run tools are served: beside the run tools', () =
     for (const name of FULL) expect(tools.includes(name)).toBe(served);
   });
 
-  const compact = compactToolSetOf({
-    readOnly: compactReadOnlyEntries,
-    modify: compactModifyEntries,
+  // The binary fixes its set (C23): the four kinds of binary.
+  it.each<[string, ToolSet, boolean]>([
+    ['core', fullToolSet, true],
+    ['core-ro', fullReadOnlyToolSet, false],
+  ])('%s: served %s', (_kind, set, served) => {
+    const tools = namesOf(registryOf(set).getHandlerGroups());
+    for (const name of FULL) expect(tools.includes(name)).toBe(served);
+    expect(set.backgroundRuns).toBe(served);
   });
-  it.each<[string[], boolean]>([
-    [['ro'], false],
-    [['ro', 'debug'], false],
-    [['rw'], true],
-    [['rw', 'debug'], true],
-  ])('compact %j: served %s, as HandlerProfileRun is', (exposition, served) => {
-    const tools = namesOf(registryOf(compact, exposition).getHandlerGroups());
+
+  it.each<[string, ToolSet, boolean]>([
+    ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries), false],
+    [
+      'compact',
+      compactToolSetOf({
+        readOnly: compactReadOnlyEntries,
+        modify: compactModifyEntries,
+      }),
+      true,
+    ],
+  ])('%s: served %s, as HandlerProfileRun is', (_kind, set, served) => {
+    const tools = namesOf(registryOf(set).getHandlerGroups());
+    expect(set.backgroundRuns).toBe(served);
     expect(tools.includes('HandlerProfileRun')).toBe(served);
     for (const name of COMPACT) expect(tools.includes(name)).toBe(served);
   });

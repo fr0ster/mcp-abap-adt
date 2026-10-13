@@ -211,9 +211,11 @@ const AUTH_BROKER_REMOVED = {
 };
 
 /**
- * core's table for a tool set: its rows, the shared rows with the set's
- * `--exposition` row, and what it refuses. `mcp-abap-adt-compact` is this
- * table with the compact set's row, nothing else (spec §10.1).
+ * core's table for a tool set: its rows, the shared rows, and what it
+ * refuses — the set's removed `--exposition` among them, naming the stdio
+ * binary its words asked for. `mcp-abap-adt-ro`, `mcp-abap-adt-compact` and
+ * `mcp-abap-adt-compact-ro` are this table with their own set, nothing else
+ * (spec §10.1, C23).
  */
 export function coreParameters(
   toolSet: ToolSet,
@@ -223,7 +225,6 @@ export function coreParameters(
     program,
     rows: [
       CONF_ROW,
-      toolSet.expositionRow,
       SYSTEM_TYPE_ROW,
       ...CORE_ROWS,
       LOGIN_TIMEOUT_ROW,
@@ -231,6 +232,7 @@ export function coreParameters(
       SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
+      toolSet.expositionRemoved('stdio'),
       transportRemoved('stdio'),
       ALLOW_DESTINATION_HEADER_REMOVED,
       AUTH_BROKER_REMOVED,
@@ -302,8 +304,8 @@ const str = (v: ParameterValue | undefined): string | undefined =>
  * core's configuration from the arguments (without the program's own two),
  * the environment and the loaded config file, read by core's table for
  * `toolSet` (the full set unless a sibling command passes its own). A removed
- * parameter, an invalid value or an exposition the set does not serve throws
- * a `ParameterRefusal` in its words.
+ * parameter (`--exposition` among them) or an invalid value throws a
+ * `ParameterRefusal` in its words.
  */
 export function readCoreConfig(
   argv: readonly string[],
@@ -328,7 +330,6 @@ export function readCoreConfig(
   });
 
   return {
-    exposition: toolSet.exposition(values.exposition, argv, 'stdio'),
     configFile: str(values.configFile),
     systemType: values.systemType as CoreConfig['systemType'],
     // Not written to process.env here: the env file's SAP_SYSTEM_TYPE joins

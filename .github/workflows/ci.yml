@@ -62,6 +62,26 @@ jobs:
       - name: Run Biome lint (compact-sse)
         run: npm --prefix compact-sse run lint:check
 
+      # The six read-only packages (C23); their suites run in the root
+      # `npm test` (its Jest roots name them).
+      - name: Run Biome lint (core-ro)
+        run: npm --prefix core-ro run lint:check
+
+      - name: Run Biome lint (http-ro)
+        run: npm --prefix http-ro run lint:check
+
+      - name: Run Biome lint (sse-ro)
+        run: npm --prefix sse-ro run lint:check
+
+      - name: Run Biome lint (compact-ro)
+        run: npm --prefix compact-ro run lint:check
+
+      - name: Run Biome lint (compact-http-ro)
+        run: npm --prefix compact-http-ro run lint:check
+
+      - name: Run Biome lint (compact-sse-ro)
+        run: npm --prefix compact-sse-ro run lint:check
+
       - name: Build project
         run: npm run build
 
@@ -147,7 +167,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high
 
-      # All ten packages. 10.0.0 split them: the repository root is
+      # All sixteen packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
       # one carrying the `mcp-abap-adt` binary. `npm pack` at the root produces
       # `mcp-abap-adt-lib-*.tgz`, so the install step below looked for a file
@@ -161,7 +181,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
           npm pack
-          npm pack ./background-runs-memory ./compact-readonly-entries ./compact-modify ./http ./sse ./server ./compact ./compact-http ./compact-sse
+          npm pack ./background-runs-memory ./compact-readonly-entries ./compact-modify ./http ./sse ./server ./compact ./compact-http ./compact-sse ./core-ro ./http-ro ./sse-ro ./compact-ro ./compact-http-ro ./compact-sse-ro
 
       # **Both tarballs in one install, or this step cannot pass a release.**
       # `core` depends on `lib` by range, so installing the core tarball alone
@@ -204,7 +224,7 @@ jobs:
           node -e "const {readFileSync,existsSync}=require('node:fs');
             const nm='node_modules/@mcp-abap-adt/';
             const pkg=n=>JSON.parse(readFileSync(nm+n+'/package.json','utf8'));
-            const ours=['lib','background-runs-memory','http','sse','core','compact','compact-http','compact-sse','compact-readonly-entries','compact-modify'];
+            const ours=['lib','background-runs-memory','http','sse','core','compact','compact-http','compact-sse','compact-readonly-entries','compact-modify','core-ro','http-ro','sse-ro','compact-ro','compact-http-ro','compact-sse-ro'];
             let bad=0;
             for (const p of ours) for (const d of Object.keys(pkg(p).dependencies||{})) {
               const n=d.replace('@mcp-abap-adt/','');
@@ -216,9 +236,11 @@ jobs:
             }
             if (bad) process.exit(1);
             console.log(ours.map(p=>p+' '+pkg(p).version).join(', ')+': every sibling is the one built here');"
-          # The six bins: each answers its version and its help.
+          # The twelve bins: each answers its version and its help.
           for bin in mcp-abap-adt mcp-abap-adt-http mcp-abap-adt-sse \
-            mcp-abap-adt-compact mcp-abap-adt-compact-http mcp-abap-adt-compact-sse; do
+            mcp-abap-adt-compact mcp-abap-adt-compact-http mcp-abap-adt-compact-sse \
+            mcp-abap-adt-ro mcp-abap-adt-http-ro mcp-abap-adt-sse-ro \
+            mcp-abap-adt-compact-ro mcp-abap-adt-compact-http-ro mcp-abap-adt-compact-sse-ro; do
             ./node_modules/.bin/$bin --version
             ./node_modules/.bin/$bin --help
           done

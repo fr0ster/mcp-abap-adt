@@ -11,9 +11,8 @@ import type { TOOL_DEFINITION as Step } from '../../../lib/compact/debug/handleH
 import type { TOOL_DEFINITION as View } from '../../../lib/compact/debug/handleHandlerDebugView';
 import type { TOOL_DEFINITION as Wait } from '../../../lib/compact/debug/handleHandlerDebugWait';
 import {
+  compactReadOnlyToolSetOf,
   compactToolSetOf,
-  parseCompactDebug,
-  parseCompactExposition,
 } from '../../../lib/toolSet';
 
 const compactToolSet = compactToolSetOf({
@@ -48,43 +47,17 @@ describe('compact debug', () => {
       'HandlerDebugWait',
     ]);
   });
-  it('--exposition takes debug beside ro or rw', () => {
-    expect(parseCompactExposition(['--exposition=ro,debug'])).toBe('ro');
-    expect(parseCompactDebug(['--exposition=ro,debug'])).toBe(true);
-    expect(() => parseCompactExposition(['--exposition=debug'])).toThrow(
-      /debug.*alone.*add 'ro' or 'rw'/,
-    );
-    expect(() => parseCompactExposition(['--exposition', 'debug'])).toThrow(
-      /add 'ro' or 'rw'/,
-    );
-    expect(parseCompactExposition(['--exposition=debug,ro,rw'])).toBe('rw');
-    expect(parseCompactDebug(['--exposition=rw'])).toBe(false);
-    expect(parseCompactDebug([])).toBe(false);
-    expect(() => parseCompactExposition(['--exposition=high'])).toThrow();
-    expect(() => parseCompactExposition(['--exposition=ro,high'])).toThrow();
-    expect(() => parseCompactDebug(['--exposition='])).toThrow(/no value/);
-  });
-  it('the debug group is in the compact tool set, beside its half of the facade', () => {
-    const names = (argv: string[]) =>
-      compactToolSet
-        .groups(
-          { connection: undefined } as never,
-          compactToolSet.exposition(undefined, argv, 'stdio'),
-        )
-        .map((g) => g.getName());
-    expect(names(['--exposition=ro,debug'])).toEqual([
-      'CompactReadOnlyHandlers',
+  it('the debug group is in the compact tool set, always, and in no compact -ro set', () => {
+    const names = (set: typeof compactToolSet) =>
+      set.groups({ connection: undefined } as never).map((g) => g.getName());
+    expect(names(compactToolSet)).toEqual([
+      'CompactHandlers',
       'CompactDebugHandlers',
-      'CompactLeftoverSessionHandlers',
-    ]);
-    expect(names(['--exposition=rw'])).toEqual([
-      'CompactHandlers',
       'CompactBackgroundRunHandlers',
       'CompactLeftoverSessionHandlers',
     ]);
-    expect(names([])).toEqual([
-      'CompactHandlers',
-      'CompactBackgroundRunHandlers',
+    expect(names(compactReadOnlyToolSetOf(compactReadOnlyEntries))).toEqual([
+      'CompactReadOnlyHandlers',
       'CompactLeftoverSessionHandlers',
     ]);
   });

@@ -3,7 +3,7 @@
  *
  * `@mcp-abap-adt/http`'s `main` with `compactToolSet` — the two halves' entry
  * builders composed by lib's `compactToolSetOf` — and this command's name and
- * version. Nothing else: http's table with the compact `--exposition` row, and
+ * version. Nothing else: http's table, and
  * http's credentials, cancellation, failures and shutdown. It depends on lib,
  * http and the two halves only: never on core, so neither the auth broker nor
  * the stores are installed with it.
@@ -14,7 +14,7 @@ import { main as httpMain } from '@mcp-abap-adt/http/launcher';
 import { type LauncherEdges, processEdges } from '@mcp-abap-adt/lib/config';
 import { compactToolSetOf, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 
-/** The compact tool set: `ro` / `rw` (default), `debug` beside either. */
+/** The compact tool set: both halves, the debugger, the leftover sessions and background runs. */
 export const compactToolSet: ToolSet = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
   modify: compactModifyEntries,

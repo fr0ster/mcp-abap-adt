@@ -5,8 +5,9 @@
  *
  * Starts the server in THIS process so stdin/stdout stay wired to the MCP protocol
  * with no intermediate layer, exactly as `mcp-abap-adt` does: core's `main` with the
- * compact tool set — 27 tools with `rw`, the 16 that change nothing with `ro`, and
- * four debug verbs beside either with `debug`.
+ * compact tool set: the 27 compact tools, the four debugger verbs, the leftover
+ * sessions and background runs. The 16 that change nothing alone are
+ * `mcp-abap-adt-compact-ro` (@mcp-abap-adt/compact-ro).
  */
 const { main } = require('../dist/launcher.js');
 const { launcherFailedLine } = require('@mcp-abap-adt/core/launcher');

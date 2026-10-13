@@ -9,7 +9,14 @@ import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type { HandlerSet } from '../../../lib/config/IServerConfig';
 import { registryForExposition } from '../../../lib/handlers/registry/expositionRegistry';
-import { compactToolSetOf, registryOf } from '../../../lib/toolSet';
+import {
+  compactReadOnlyToolSetOf,
+  compactToolSetOf,
+  fullReadOnlyToolSet,
+  fullToolSet,
+  registryOf,
+  type ToolSet,
+} from '../../../lib/toolSet';
 
 const FULL = [
   'ListLeftoverSessions',
@@ -25,7 +32,7 @@ const COMPACT = [
 const leftoverOf = (tools: string[], names: string[]) =>
   tools.filter((t) => names.includes(t));
 
-describe('the full binaries', () => {
+describe('the object-oriented handler sets an embedder combines', () => {
   it.each<[HandlerSet[], string[]]>([
     [['readonly'], ['ListLeftoverSessions', 'LogoffLeftoverSession']],
     [
@@ -43,21 +50,38 @@ describe('the full binaries', () => {
   });
 });
 
-describe('the compact binaries', () => {
-  const compact = compactToolSetOf({
-    readOnly: compactReadOnlyEntries,
-    modify: compactModifyEntries,
-  });
-  it.each<[string[], string[]]>([
-    [['ro'], ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff']],
+/** The binary fixes its set (C23): the resume only in a write binary. */
+describe('the binaries', () => {
+  it.each<[string, ToolSet, string[]]>([
+    ['core', fullToolSet, FULL],
     [
-      ['ro', 'debug'],
+      'core-ro',
+      fullReadOnlyToolSet,
+      ['ListLeftoverSessions', 'LogoffLeftoverSession'],
+    ],
+  ])('%s serves %j', (_kind, set, expected) => {
+    const tools = registryOf(set)
+      .getHandlerGroups()
+      .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
+    expect(leftoverOf(tools, FULL)).toEqual(expected);
+  });
+
+  it.each<[string, ToolSet, string[]]>([
+    [
+      'compact-ro',
+      compactReadOnlyToolSetOf(compactReadOnlyEntries),
       ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'],
     ],
-    [['rw'], COMPACT],
-    [['rw', 'debug'], COMPACT],
-  ])('%j serves %j', (exposition, expected) => {
-    const tools = registryOf(compact, exposition)
+    [
+      'compact',
+      compactToolSetOf({
+        readOnly: compactReadOnlyEntries,
+        modify: compactModifyEntries,
+      }),
+      COMPACT,
+    ],
+  ])('%s serves %j', (_kind, set, expected) => {
+    const tools = registryOf(set)
       .getHandlerGroups()
       .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
     expect(leftoverOf(tools, COMPACT)).toEqual(expected);

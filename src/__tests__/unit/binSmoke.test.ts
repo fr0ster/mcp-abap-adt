@@ -89,7 +89,7 @@ describe('the published bins start from an installed package', () => {
       rmSync(workdir, { recursive: true, force: true });
   });
 
-  it('answers --version and --help from each of the six bins, each with its own package', () => {
+  it('answers --version and --help from each of the twelve bins, each with its own package', () => {
     if (process.env.SKIP_BIN_SMOKE === 'true') {
       console.log('[bin-smoke] skipped by SKIP_BIN_SMOKE');
       return;
@@ -97,7 +97,7 @@ describe('the published bins start from an installed package', () => {
 
     workdir = mkdtempSync(join(tmpdir(), 'mcp-bin-smoke-'));
 
-    // Pack all ten, because each depends on the others by version and the
+    // Pack all sixteen, because each depends on the others by version and the
     // versions being released are not on the registry yet. Every bin is a
     // chance to ship a launcher that cannot find its own manifest.
     installPackedRelease(workdir, [
@@ -111,6 +111,12 @@ describe('the published bins start from an installed package', () => {
       'compact',
       'compact-http',
       'compact-sse',
+      'core-ro',
+      'http-ro',
+      'sse-ro',
+      'compact-ro',
+      'compact-http-ro',
+      'compact-sse-ro',
     ]);
 
     const bin = installedFile(workdir, 'core', 'bin', 'mcp-abap-adt.js');
@@ -127,7 +133,7 @@ describe('the published bins start from an installed package', () => {
       'mcp-abap-adt-compact.js',
     );
 
-    // The six bins: each answers ITS package's version — a launcher that
+    // The twelve bins: each answers ITS package's version — a launcher that
     // reports a sibling's manifest reads as the truth — and its own help,
     // whose USAGE names it.
     for (const [pkg, binName, manifest] of [
@@ -137,6 +143,12 @@ describe('the published bins start from an installed package', () => {
       ['compact', 'mcp-abap-adt-compact', 'compact'],
       ['compact-http', 'mcp-abap-adt-compact-http', 'compact-http'],
       ['compact-sse', 'mcp-abap-adt-compact-sse', 'compact-sse'],
+      ['core-ro', 'mcp-abap-adt-ro', 'core-ro'],
+      ['http-ro', 'mcp-abap-adt-http-ro', 'http-ro'],
+      ['sse-ro', 'mcp-abap-adt-sse-ro', 'sse-ro'],
+      ['compact-ro', 'mcp-abap-adt-compact-ro', 'compact-ro'],
+      ['compact-http-ro', 'mcp-abap-adt-compact-http-ro', 'compact-http-ro'],
+      ['compact-sse-ro', 'mcp-abap-adt-compact-sse-ro', 'compact-sse-ro'],
     ] as const) {
       const installed = installedFile(workdir, pkg, 'bin', `${binName}.js`);
       expect(existsSync(installed)).toBe(true);
@@ -169,5 +181,17 @@ describe('the published bins start from an installed package', () => {
     expect(serverInfoVersion(compactBin, workdir)).toBe(
       version('compact/package.json'),
     );
+    // The stdio -ro bins too: each its own package's version.
+    for (const [pkg, binName] of [
+      ['core-ro', 'mcp-abap-adt-ro'],
+      ['compact-ro', 'mcp-abap-adt-compact-ro'],
+    ] as const) {
+      expect(
+        serverInfoVersion(
+          installedFile(workdir, pkg, 'bin', `${binName}.js`),
+          workdir,
+        ),
+      ).toBe(version(`${pkg}/package.json`));
+    }
   });
 });

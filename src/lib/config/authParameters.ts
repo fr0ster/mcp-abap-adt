@@ -82,13 +82,6 @@ export interface Parameter {
   readonly section: string;
   /** The help sentence(s). */
   readonly help: string;
-  /**
-   * The CLI form is read by the row's owner, not by the table: a tool set's
-   * `--exposition`, whose own reader keeps its rules (the last flag wins, an
-   * empty one refused in its words). The table reads the environment and
-   * YAML forms only; the help and the template still show the row.
-   */
-  readonly cliReadByOwner?: true;
 }
 
 /**
@@ -110,8 +103,15 @@ export interface RemovedParameter {
   readonly env?: readonly string[];
   /** Top-level YAML keys. */
   readonly yaml?: readonly string[];
-  /** The refusal, given the form the user used (`--sse-port`, `MCP_SSE_PORT`, `sse (config file)`). */
-  readonly words: (form: string) => string;
+  /**
+   * The refusal, given the form the user used (`--sse-port`, `MCP_SSE_PORT`,
+   * `sse (config file)`) and the value it carried, as given: the text after
+   * `=` or the next argument (CLI), the variable's value (env), the key's
+   * value (YAML); `undefined` when the form carried none. Most refusals read
+   * the form alone; a removed `--exposition` names the binary its words ask
+   * for.
+   */
+  readonly words: (form: string, value?: unknown) => string;
 }
 
 export interface ParameterTable {
@@ -151,6 +151,7 @@ function yamlAt(
 
 interface RemovedHit {
   readonly form: string;
+  readonly value: unknown;
   readonly removed: RemovedParameter;
 }
 
@@ -162,7 +163,13 @@ function removedYamlHits(
   const found: RemovedHit[] = [];
   for (const removed of table.removed) {
     for (const key of removed.yaml ?? []) {
-      if (key in yaml) found.push({ form: `${key} (config file)`, removed });
+      if (key in yaml) {
+        found.push({
+          form: `${key} (config file)`,
+          value: (yaml as Record<string, unknown>)[key],
+          removed,
+        });
+      }
     }
   }
   return found;
@@ -175,7 +182,8 @@ function removedHit(
   env: NodeJS.ProcessEnv,
   yaml?: Record<string, unknown> | null,
 ): RemovedHit | undefined {
-  for (const arg of argv) {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
     if (!arg.startsWith('--')) continue;
     const name = argName(arg);
     for (const removed of table.removed) {
@@ -183,13 +191,23 @@ function removedHit(
         removed.cli?.includes(name) ||
         removed.cliPrefixes?.some((prefix) => name.startsWith(prefix))
       ) {
-        return { form: name, removed };
+        // `--x=v` carries `v`; `--x v` the next argument unless it is a flag.
+        const next = argv[index + 1];
+        const value =
+          arg.length > name.length
+            ? arg.slice(name.length + 1)
+            : next !== undefined && !next.startsWith('-')
+              ? next
+              : undefined;
+        return { form: name, value, removed };
       }
     }
   }
   for (const removed of table.removed) {
     for (const name of removed.env ?? []) {
-      if (env[name] !== undefined) return { form: name, removed };
+      if (env[name] !== undefined) {
+        return { form: name, value: env[name], removed };
+      }
     }
   }
   return removedYamlHits(table, yaml)[0];
@@ -203,7 +221,7 @@ export function refuseRemovedParameters(
   yaml?: Record<string, unknown> | null,
 ): void {
   const hit = removedHit(table, argv, env, yaml);
-  if (hit) throw new ParameterRefusal(hit.removed.words(hit.form));
+  if (hit) throw new ParameterRefusal(hit.removed.words(hit.form, hit.value));
 }
 
 function nameIn(p: Parameter, source: Source, cliName?: string): string {
@@ -335,7 +353,7 @@ function readRow(
   env: NodeJS.ProcessEnv,
   yaml?: Record<string, unknown> | null,
 ): { value: ParameterValue; source: string } | undefined {
-  const cli = p.cliReadByOwner ? undefined : readCli(p, argv);
+  const cli = readCli(p, argv);
   const sources: [Source, unknown, string | undefined][] = [
     ['cli', cli?.raw, cli?.name],
     ['env', p.env === undefined ? undefined : env[p.env], undefined],
@@ -428,7 +446,7 @@ export function validateYamlParameters(
   yaml: Record<string, unknown>,
 ): string[] {
   const errors: string[] = removedYamlHits(table, yaml).map(
-    ({ form, removed }) => removed.words(form),
+    ({ form, value, removed }) => removed.words(form, value),
   );
   errors.push(
     ...findSecretYamlKeys(yaml).map(
@@ -622,18 +640,6 @@ export const CONF_ROW: Parameter = {
   valueHint: '=<path>',
   section: 'OPTIONS',
   help: 'Path to the YAML config file. If the file does not exist, a template of this binary is written there and the start ends. Command-line arguments and the environment override its values',
-};
-
-/** `--exposition`: the tool sets (validated by the launcher, which knows its vocabulary). */
-export const EXPOSITION_ROW: Parameter = {
-  key: 'exposition',
-  cli: '--exposition',
-  yaml: 'exposition',
-  kind: 'list',
-  default: ['readonly', 'high'],
-  valueHint: '=<sets>',
-  section: 'OPTIONS',
-  help: 'The tool sets to serve, comma-separated (see HANDLER EXPOSITION)',
 };
 
 /** `--system-type` / `SAP_SYSTEM_TYPE`. */

@@ -146,12 +146,13 @@ function page(entries) {
   md += '- Read-only half: `@mcp-abap-adt/compact-readonly-entries`\n';
   md += '- Modifying half: `@mcp-abap-adt/compact-modify`\n';
   md +=
-    '- Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`\n';
+    '- Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary\n';
   md +=
-    '- Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff with every exposition, the resume beside `rw` only\n';
+    '- Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff in every binary, the resume in the write binaries only\n';
   md +=
-    '- Background-run tools: `@mcp-abap-adt/lib`, beside `rw` (where `HandlerProfileRun` is)\n';
-  md += '- Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)\n\n';
+    '- Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)\n';
+  md +=
+    '- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`)\n\n';
   md += '## How it works\n\n';
   md +=
     'One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with\n';
@@ -165,12 +166,14 @@ function page(entries) {
     md += `### ${tool.name}\n\n`;
     md +=
       half === 'debug'
-        ? '**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)\n\n'
+        ? '**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)\n\n'
         : half === 'background'
-          ? '**Half:** background-run tools of `@mcp-abap-adt/lib` (beside `rw`, where `HandlerProfileRun` is)\n\n'
+          ? '**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)\n\n'
           : half === 'session'
-          ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff with every exposition, the resume beside `rw`)\n\n'
-          : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
+          ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff in every binary, the resume in the write binaries)\n\n'
+          : half === 'readonly'
+            ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
+            : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
     const available = tool.available_in
       ? [...tool.available_in].sort().join(', ')
@@ -203,12 +206,12 @@ function main() {
       .compactModifyEntries(context)
       .map((entry) => ({ half: 'modify', entry })),
     // The debugger verbs live in lib (`src/lib/compact/debug`), served by
-    // the compact binaries with `debug` in their exposition.
+    // the compact write binaries (C23).
     ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
       .compactDebugEntries()
       .map((entry) => ({ half: 'debug', entry })),
     // The background-run tools live in lib (`src/lib/compact/backgroundRuns`),
-    // served by the compact binaries beside `rw`.
+    // served by the compact write binaries.
     ...requireFresh(
       '.',
       path.join('lib', 'compact', 'backgroundRuns', 'group.js'),
@@ -216,7 +219,7 @@ function main() {
       .compactBackgroundRunEntries()
       .map((entry) => ({ half: 'background', entry })),
     // The leftover-session tools live in lib (`src/lib/compact/session`),
-    // served by the compact binaries beside every exposition.
+    // served by every compact binary (the resume by the write ones).
     ...requireFresh('.', path.join('lib', 'compact', 'session', 'group.js'))
       .compactLeftoverSessionEntries()
       .map((entry) => ({ half: 'session', entry })),

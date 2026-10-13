@@ -21,12 +21,18 @@ const manifests = {
   'background-runs-memory': json('background-runs-memory/package.json'),
   'compact-readonly-entries': json('compact-readonly-entries/package.json'),
   'compact-modify': json('compact-modify/package.json'),
+  'core-ro': json('core-ro/package.json'),
+  'http-ro': json('http-ro/package.json'),
+  'sse-ro': json('sse-ro/package.json'),
+  'compact-ro': json('compact-ro/package.json'),
+  'compact-http-ro': json('compact-http-ro/package.json'),
+  'compact-sse-ro': json('compact-sse-ro/package.json'),
 };
 const version: string = manifests.lib.version;
 const major = version.split('.')[0];
 
 describe('release metadata names the version npm will carry', () => {
-  it('the six packages are released together', () => {
+  it('the twelve packages are released together', () => {
     for (const [name, manifest] of Object.entries(manifests)) {
       expect(`${name} ${manifest.version}`).toBe(`${name} ${version}`);
     }
@@ -57,11 +63,15 @@ describe('release metadata names the version npm will carry', () => {
     }
   });
 
-  // The MCP Registry: one entry per server package, published separately
-  // (`mcp-publisher publish server.json`, `… server-compact.json`).
+  // The MCP Registry: one entry per stdio server package, published
+  // separately (`mcp-publisher publish server.json`, `… server-compact.json`,
+  // `… server-ro.json`, `… server-compact-ro.json`) — a different tool list is
+  // a different server.
   describe.each([
     ['server.json', manifests.core],
     ['server-compact.json', manifests.compact],
+    ['server-ro.json', manifests['core-ro']],
+    ['server-compact-ro.json', manifests['compact-ro']],
   ])('%s', (file, manifest) => {
     const entry = json(file);
 

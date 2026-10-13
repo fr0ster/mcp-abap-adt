@@ -10,8 +10,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   generateYamlConfigTemplate,
+  ParameterRefusal,
   readStartupConfig,
-  validateExposition,
   validateYamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
@@ -118,7 +118,6 @@ describe("core's help", () => {
     'MCP_LOGIN_TIMEOUT',
     '--connection-type',
     '--system-type',
-    '--exposition',
     '--conf',
     '--state-idle-minutes',
     'MCP_STATE_IDLE_MINUTES',
@@ -189,11 +188,30 @@ describe('--state-idle-minutes is a row of core', () => {
   });
 });
 
-describe('--exposition', () => {
-  it('readonly,debug is accepted', () => {
-    const { exposition } = readCoreConfig(['--exposition=readonly,debug'], {});
-    expect(exposition).toEqual(['readonly', 'debug']);
-    expect(() => validateExposition(exposition ?? [])).not.toThrow();
+// The binary fixes its tool set (C23): the flag and the YAML key are gone,
+// each word answered with the binary of this transport that serves it.
+describe('--exposition is gone', () => {
+  it('the flag stops the start, naming the binary its words ask for', () => {
+    expect(() => readCoreConfig(['--exposition=readonly'], {})).toThrow(
+      new ParameterRefusal(
+        '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`)',
+      ),
+    );
+    expect(() =>
+      readCoreConfig(['--exposition', 'readonly,high,debug'], {}),
+    ).toThrow(
+      new ParameterRefusal(
+        '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the high tools are served, beside the readonly ones, by `mcp-abap-adt` (`@mcp-abap-adt/core`)',
+      ),
+    );
+  });
+
+  it('in the config file too, and the help lists no such option', () => {
+    expect(() => readCoreConfig([], {}, { exposition: 'readonly' })).toThrow(
+      new ParameterRefusal(
+        'exposition (config file) is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`)',
+      ),
+    );
   });
 });
 
@@ -329,7 +347,6 @@ describe('the YAML template and validation come from the table', () => {
     expect(validateYamlConfig(CORE_PARAMETERS, parsed).errors).toEqual([]);
     const config = readCoreConfig([], {}, parsed);
     expect(config.stateIdleMinutes).toBe(30);
-    expect(config.exposition).toEqual(['readonly', 'high']);
     expect(config.mcpDestination).toBeUndefined();
   });
 
@@ -343,7 +360,6 @@ describe('the YAML template and validation come from the table', () => {
         'connection-type',
         'env',
         'env-path',
-        'exposition',
         'login-timeout',
         'mcp',
         'renewal',

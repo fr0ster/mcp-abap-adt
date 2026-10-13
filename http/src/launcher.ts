@@ -36,11 +36,12 @@ import { StreamableHttpServer } from './StreamableHttpServer.js';
  * What a command passes http's launcher (spec §3.5, D37, D49): the tools it
  * serves, and its own name and version — nothing else. Everything the
  * launcher does is http's, the same for any tool set:
- * `mcp-abap-adt-http` passes `fullToolSet`, `mcp-abap-adt-compact-http` the
- * compact set.
+ * `mcp-abap-adt-http` passes `fullToolSet`, `mcp-abap-adt-http-ro`
+ * `fullReadOnlyToolSet`, `mcp-abap-adt-compact-http` and
+ * `mcp-abap-adt-compact-http-ro` the compact sets.
  */
 export interface HttpLauncherOptions {
-  /** The tools served, and the `--exposition` they are chosen by. */
+  /** The tools served: fixed by the command, never by a flag. */
   toolSet: ToolSet;
   /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
   program: string;
@@ -69,7 +70,7 @@ CREDENTIALS (each request's headers; nothing is stored, shared or cached):
     x-sap-responsible              Responsible of created objects
     x-sap-master-system            Master system of created objects
     x-sap-language                 Master/original language for created objects
-    x-sap-debug-terminal-id        The debugger's terminal id (with --exposition=...,debug)
+    x-sap-debug-terminal-id        The debugger's terminal id (where the debugger is served)
     x-sap-debug-ide-id             The debugger's IDE id
     x-sap-debug-breakpoint-conflict  replace (default) or refuse-if-held: whether a take-over
                                    of the debugger, and every later change of its breakpoints,
@@ -83,7 +84,7 @@ CREDENTIALS (each request's headers; nothing is stored, shared or cached):
   A health check answers GET /mcp/health.
 `;
 
-/** http's help: its own table with the tool set's exposition row, the set's exposition, the headers. */
+/** http's help: its own table, the set's TOOLS section, the headers. */
 export function httpHelp(
   options: { toolSet?: ToolSet; program?: string } = {},
 ): string {
@@ -93,9 +94,9 @@ export function httpHelp(
     description:
       "  MCP server for SAP ABAP systems via ADT, over Streamable HTTP: credentials only from\n  each request's x-sap-* headers. stdio (destinations, logins) is mcp-abap-adt, SSE\n  mcp-abap-adt-sse; a binary is its transport.",
     sections: [
-      toolSet.expositionHelp('http'),
+      toolSet.toolsHelp('http'),
       HELP_SECTIONS,
-      `\nEXAMPLES:\n${toolSet.expositionExamples(program)}`,
+      `\nEXAMPLES:\n  # Listen on port 3000\n  ${program} --port=3000\n`,
     ],
   });
 }
@@ -113,8 +114,8 @@ export async function main(
   ) {
     return undefined;
   }
-  // http's own table with the set's exposition row: an option of another
-  // binary, --transport, or an exposition the set does not serve stops here.
+  // http's own table: an option of another binary, --transport, or the
+  // removed --exposition stops here.
   const config = readStartupConfig(
     httpParameters(options.toolSet, options.program),
     argv,
@@ -139,40 +140,32 @@ export async function launch(
   // The connector and the tool filter read the system kind from the
   // environment (`resolveSystemKind`).
   if (config.systemType) process.env.SAP_SYSTEM_TYPE = config.systemType;
-  // The tool set's groups for the exposition read (a config made by hand
-  // without one: the set's default).
-  const exposition =
-    config.exposition ??
-    options.toolSet.exposition(
-      options.toolSet.expositionRow.default,
-      [],
-      'http',
-    );
-  const server = new StreamableHttpServer(
-    registryOf(options.toolSet, exposition),
-    {
-      version: options.version,
-      stateIdleMinutes: config.stateIdleMinutes,
-      // The state's lines go to stderr whatever the transport logger says.
-      stateLogger: stderrStateLogger,
-      host: config.host,
-      port: config.port,
-      enableJsonResponse: config.httpJsonResponse || undefined,
-      path: config.httpPath,
-      logger: noopLogger,
-      tls: config.tls,
-      allowedHosts: config.allowedHosts,
-      allowedOrigins: config.allowedOrigins,
-      enableDnsRebindingProtection: config.enableDnsRebindingProtection,
-      // The process's runtime session files: the platform's config dir (or
-      // AUTH_BROKER_PATH's first entry) — this binary takes no
-      // --auth-broker-path.
-      leftoverSessions: new LeftoverSessions({ directory: runtimeDirectory() }),
-      // Background runs of the run tools, kept in this process's memory
-      // and handed to every instance; they end with the process.
+  const server = new StreamableHttpServer(registryOf(options.toolSet), {
+    version: options.version,
+    stateIdleMinutes: config.stateIdleMinutes,
+    // The state's lines go to stderr whatever the transport logger says.
+    stateLogger: stderrStateLogger,
+    host: config.host,
+    port: config.port,
+    enableJsonResponse: config.httpJsonResponse || undefined,
+    path: config.httpPath,
+    logger: noopLogger,
+    tls: config.tls,
+    allowedHosts: config.allowedHosts,
+    allowedOrigins: config.allowedOrigins,
+    enableDnsRebindingProtection: config.enableDnsRebindingProtection,
+    // The process's runtime session files: the platform's config dir (or
+    // AUTH_BROKER_PATH's first entry) — this binary takes no
+    // --auth-broker-path.
+    leftoverSessions: new LeftoverSessions({ directory: runtimeDirectory() }),
+    // Background runs of the run tools, kept in this process's memory
+    // and handed to every instance; they end with the process.
+    // Only where the set serves them: a -ro command has none, so a
+    // run's `background: true` is refused.
+    ...(options.toolSet.backgroundRuns && {
       backgroundRuns: new InMemoryBackgroundRuns(),
-    },
-  );
+    }),
+  });
   installTransportShutdown({
     begin: () => server.beginShutdown(),
     stopListening: () => server.stopListening(),

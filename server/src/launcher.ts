@@ -165,7 +165,7 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    environment; on a cloud system, the system id.
                                    Otherwise left out of the request, never refused
                                    The environment is read once: later changes are not picked up
-    SAP_DEBUG_TERMINAL_ID          The debugger's terminal id and IDE id (with --exposition=...,debug),
+    SAP_DEBUG_TERMINAL_ID          The debugger's terminal id and IDE id (where the debugger is served),
     SAP_DEBUG_IDE_ID               each on its own. First found: the destination's .env; the
                                    environment. Else random per instance. A shared IDE id shares
                                    the user's catches without the system's listener conflict
@@ -185,9 +185,8 @@ GENERATING A .ENV:
   A jwt .env must state SAP_GRANT_TYPE.
 `;
 
-/** The examples of core's help: stdio only. */
-/** The examples of core's help: stdio only, under the command's own name and its set's words. */
-function examples(program: string, toolSet: ToolSet): string {
+/** The examples of core's help: stdio only, under the command's own name. */
+function examples(program: string): string {
   return `
 EXAMPLES:
   # A named destination (for MCP clients)
@@ -206,16 +205,16 @@ EXAMPLES:
   # Explicit system type (tools default to cloud; the connector to cloud for a jwt, else onprem)
   ${program} --env-path=<system>.env --system-type=onprem
 
-${toolSet.expositionExamples(program)}
   # A YAML config file (a template is written when it does not exist)
   ${program} --conf=my-config.yaml
 `;
 }
 
 /**
- * core's help: its own table (no HTTP or SSE option) with the tool set's
- * `--exposition` row, the set's exposition section, the environment. A
- * sibling command (`mcp-abap-adt-compact`) passes its own set and name.
+ * core's help: its own table (no HTTP or SSE option), the set's TOOLS
+ * section, the environment. A sibling command (`mcp-abap-adt-ro`,
+ * `mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`) passes its own set and
+ * name.
  */
 export function coreHelp(
   options: { toolSet?: ToolSet; program?: string } = {},
@@ -227,11 +226,7 @@ export function coreHelp(
       '  MCP server for SAP ABAP systems via ADT (ABAP Development Tools), over stdio:\n' +
       '  one destination through the auth broker. Streamable HTTP is mcp-abap-adt-http,\n' +
       '  SSE mcp-abap-adt-sse; a binary is its transport.',
-    sections: [
-      toolSet.expositionHelp('stdio'),
-      V2_HELP_SECTIONS,
-      examples(program, toolSet),
-    ],
+    sections: [toolSet.toolsHelp('stdio'), V2_HELP_SECTIONS, examples(program)],
   });
 }
 
@@ -240,10 +235,11 @@ export function coreHelp(
  * serves, and its own name and version — nothing else. Everything the
  * launcher does — options, the destination, credentials, cancellation,
  * failures, shutdown — is stdio's, the same for any tool set:
- * `mcp-abap-adt` passes `fullToolSet`, `mcp-abap-adt-compact` the compact set.
+ * `mcp-abap-adt` passes `fullToolSet`, `mcp-abap-adt-ro` `fullReadOnlyToolSet`,
+ * `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` the compact sets.
  */
 export interface LauncherOptions {
-  /** The tools served, and the `--exposition` they are chosen by. */
+  /** The tools served: fixed by the command, never by a flag. */
   toolSet: ToolSet;
   /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
   program: string;
@@ -271,8 +267,8 @@ export async function main(
     return;
   }
 
-  // core's own table with the set's exposition row: an option of another
-  // binary, --transport, or an exposition the set does not serve stops here.
+  // core's own table: an option of another binary, --transport, or the
+  // removed --exposition stops here.
   const config = readStartupConfig(
     coreParameters(options.toolSet, options.program),
     argv,
@@ -553,17 +549,8 @@ export async function launch(
   if (systemType) process.env.SAP_SYSTEM_TYPE = systemType;
   config = { ...config, connectionType, systemType };
 
-  // The tool set's groups for the exposition read (a config made by hand
-  // without one: the set's default).
-  const handlersRegistry = registryOf(
-    options.toolSet,
-    config.exposition ??
-      options.toolSet.exposition(
-        options.toolSet.expositionRow.default,
-        [],
-        'stdio',
-      ),
-  );
+  // The command's tool set: fixed by the command, never by a flag.
+  const handlersRegistry = registryOf(options.toolSet);
 
   // The browser of a login, mapped by the platform (D9); a choice that
   // cannot be served stops the start before anything is read.
@@ -644,8 +631,11 @@ export async function launch(
         directory: runtimeDirectory(getPlatformPaths(config.authBrokerPath)[0]),
       }),
       // Background runs of the run tools, kept in this process's memory;
-      // they end with the process.
-      backgroundRuns: new InMemoryBackgroundRuns(),
+      // they end with the process. Only where the set serves them: a -ro
+      // command has none, so a run's `background: true` is refused.
+      ...(options.toolSet.backgroundRuns && {
+        backgroundRuns: new InMemoryBackgroundRuns(),
+      }),
       stateIdleMinutes: config.stateIdleMinutes,
       stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,

@@ -3,7 +3,7 @@
  *
  * `@mcp-abap-adt/sse`'s `main` with `compactToolSet` — the two halves' entry
  * builders composed by lib's `compactToolSetOf` — and this command's name and
- * version. Nothing else: sse's table with the compact `--exposition` row, and
+ * version. Nothing else: sse's table, and
  * sse's credentials, cancellation, failures and shutdown. It depends on lib,
  * sse and the two halves only: never on core, so neither the auth broker nor
  * the stores are installed with it.
@@ -14,7 +14,7 @@ import { type LauncherEdges, processEdges } from '@mcp-abap-adt/lib/config';
 import { compactToolSetOf, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { main as sseMain } from '@mcp-abap-adt/sse/launcher';
 
-/** The compact tool set: `ro` / `rw` (default), `debug` beside either. */
+/** The compact tool set: both halves, the debugger, the leftover sessions and background runs. */
 export const compactToolSet: ToolSet = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
   modify: compactModifyEntries,

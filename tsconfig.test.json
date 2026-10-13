@@ -49,7 +49,13 @@
       "@mcp-abap-adt/sse/launcher": ["./sse/src/launcher.ts"],
       "@mcp-abap-adt/compact/launcher": ["./compact/src/launcher.ts"],
       "@mcp-abap-adt/compact-http/launcher": ["./compact-http/src/launcher.ts"],
-      "@mcp-abap-adt/compact-sse/launcher": ["./compact-sse/src/launcher.ts"]
+      "@mcp-abap-adt/compact-sse/launcher": ["./compact-sse/src/launcher.ts"],
+      "@mcp-abap-adt/core-ro/launcher": ["./core-ro/src/launcher.ts"],
+      "@mcp-abap-adt/http-ro/launcher": ["./http-ro/src/launcher.ts"],
+      "@mcp-abap-adt/sse-ro/launcher": ["./sse-ro/src/launcher.ts"],
+      "@mcp-abap-adt/compact-ro/launcher": ["./compact-ro/src/launcher.ts"],
+      "@mcp-abap-adt/compact-http-ro/launcher": ["./compact-http-ro/src/launcher.ts"],
+      "@mcp-abap-adt/compact-sse-ro/launcher": ["./compact-sse-ro/src/launcher.ts"]
     }
   },
   "include": [
@@ -59,6 +65,12 @@
     "compact/src/**/*",
     "compact-http/src/**/*",
     "compact-sse/src/**/*",
+    "core-ro/src/**/*",
+    "http-ro/src/**/*",
+    "sse-ro/src/**/*",
+    "compact-ro/src/**/*",
+    "compact-http-ro/src/**/*",
+    "compact-sse-ro/src/**/*",
     "src/__tests__/**/*",
     "src/lib/servers/v2/__tests__/**/*",
     "scripts/lib/**/*",

@@ -104,12 +104,8 @@ environment:
     enabled: false
     transport: "stdio"
     mcp_destination: ""                      # MCP destination (optional, for hard mode)
-    exposition: "readonly,high"              # tool surface the spawned server serves.
-                                             # "high" and "low" are mutually exclusive —
-                                             # the launcher refuses the pair — so one run
-                                             # covers one tier: use "readonly,low" for low.
     launch_http: false                       # http only: launch the server binary on a free
-                                             # port with this destination and exposition,
+                                             # port with this destination,
                                              # instead of connecting to http_url.
 
 # ============================================================================

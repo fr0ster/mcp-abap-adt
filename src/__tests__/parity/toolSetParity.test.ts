@@ -45,15 +45,20 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { load } from 'js-yaml';
 import * as compactStdio from '../../../compact/src/launcher';
 import * as compactHttp from '../../../compact-http/src/launcher';
+import * as compactHttpRo from '../../../compact-http-ro/src/launcher';
+import * as compactRo from '../../../compact-ro/src/launcher';
 import * as compactSse from '../../../compact-sse/src/launcher';
+import * as compactSseRo from '../../../compact-sse-ro/src/launcher';
+import * as coreRo from '../../../core-ro/src/launcher';
 import { HTTP_VERSION } from '../../../http/src/httpVersion';
 import { main as httpMain } from '../../../http/src/launcher';
+import * as httpRo from '../../../http-ro/src/launcher';
 import { CORE_VERSION } from '../../../server/src/coreVersion';
 import { main as coreMain } from '../../../server/src/launcher';
 import { main as sseMain } from '../../../sse/src/launcher';
 import { SSE_VERSION } from '../../../sse/src/sseVersion';
+import * as sseRo from '../../../sse-ro/src/launcher';
 import { activeTools, resetProcessLatchForTests } from '../../lib/activeTools';
-import { parametersHelp } from '../../lib/config/authParameters';
 import {
   CREDENTIALS_REQUIRED_WORDS,
   DESTINATIONS_ONLY_STDIO_WORDS,
@@ -67,7 +72,11 @@ import {
 } from '../helpers/adtStandIn';
 
 type TransportName = 'stdio' | 'http' | 'sse';
-type SetName = 'full' | 'compact';
+type SetName = 'full' | 'full-ro' | 'compact' | 'compact-ro';
+
+/** The two families of sets: a `-ro` set reads as its write set does. */
+const familyOf = (set: SetName): 'full' | 'compact' =>
+  set.startsWith('full') ? 'full' : 'compact';
 
 /** What a test gives `main` in place of the process. */
 interface Edges {
@@ -87,8 +96,8 @@ interface Launcher {
 }
 
 /**
- * The six launchers: the full ones as their bins call them, the compact ones
- * through their own packages.
+ * The twelve launchers (C23): the full ones as their bins call them, the
+ * others through their own packages.
  */
 const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
   stdio: {
@@ -105,10 +114,20 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
       toolSet: fullToolSet,
       program: 'mcp-abap-adt',
     },
+    'full-ro': {
+      main: (edges) => coreRo.main(edges),
+      toolSet: coreRo.readOnlyToolSet,
+      program: 'mcp-abap-adt-ro',
+    },
     compact: {
       main: (edges) => compactStdio.main(edges),
       toolSet: compactStdio.compactToolSet,
       program: 'mcp-abap-adt-compact',
+    },
+    'compact-ro': {
+      main: (edges) => compactRo.main(edges),
+      toolSet: compactRo.readOnlyToolSet,
+      program: 'mcp-abap-adt-compact-ro',
     },
   },
   http: {
@@ -125,10 +144,20 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
       toolSet: fullToolSet,
       program: 'mcp-abap-adt-http',
     },
+    'full-ro': {
+      main: (edges) => httpRo.main(edges),
+      toolSet: httpRo.readOnlyToolSet,
+      program: 'mcp-abap-adt-http-ro',
+    },
     compact: {
       main: (edges) => compactHttp.main(edges),
       toolSet: compactHttp.compactToolSet,
       program: 'mcp-abap-adt-compact-http',
+    },
+    'compact-ro': {
+      main: (edges) => compactHttpRo.main(edges),
+      toolSet: compactHttpRo.readOnlyToolSet,
+      program: 'mcp-abap-adt-compact-http-ro',
     },
   },
   sse: {
@@ -145,10 +174,20 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
       toolSet: fullToolSet,
       program: 'mcp-abap-adt-sse',
     },
+    'full-ro': {
+      main: (edges) => sseRo.main(edges),
+      toolSet: sseRo.readOnlyToolSet,
+      program: 'mcp-abap-adt-sse-ro',
+    },
     compact: {
       main: (edges) => compactSse.main(edges),
       toolSet: compactSse.compactToolSet,
       program: 'mcp-abap-adt-compact-sse',
+    },
+    'compact-ro': {
+      main: (edges) => compactSseRo.main(edges),
+      toolSet: compactSseRo.readOnlyToolSet,
+      program: 'mcp-abap-adt-compact-sse-ro',
     },
   },
 };
@@ -164,7 +203,7 @@ const readCall = (
   set: SetName,
   className = 'ZCL_PARITY',
 ): { name: string; arguments: Record<string, unknown> } =>
-  set === 'full'
+  familyOf(set) === 'full'
     ? {
         name: 'GetWhereUsed',
         arguments: { object_name: className, object_type: 'class' },
@@ -175,7 +214,9 @@ const readCall = (
       };
 const READ_CALL: Record<SetName, ReturnType<typeof readCall>> = {
   full: readCall('full'),
+  'full-ro': readCall('full-ro'),
   compact: readCall('compact'),
+  'compact-ro': readCall('compact-ro'),
 };
 
 /** The `Authorization` headers of the stand-in's requests naming `className`. */
@@ -211,12 +252,6 @@ function eventReader(body: ReadableStream<Uint8Array>) {
     }
   };
 }
-
-/** The exposition with the debugger, in each set's words. */
-const DEBUG_EXPOSITION: Record<SetName, string> = {
-  full: '--exposition=readonly,debug',
-  compact: '--exposition=ro,debug',
-};
 
 /** An option of another binary, refused by each transport's table. */
 const OTHER_OPTION: Record<TransportName, string> = {
@@ -338,19 +373,9 @@ async function freePort(): Promise<number> {
   return port;
 }
 
-/** The exposition row's own lines in a help text. */
-function rowHelpOf(toolSet: ToolSet): string {
-  const section = parametersHelp({
-    program: 'x',
-    rows: [toolSet.expositionRow],
-    removed: [],
-  });
-  return section.slice('OPTIONS:\n'.length);
-}
-
 /**
- * The help, with what is the binary's own — its name, its exposition's row,
- * section and examples — set aside.
+ * The help, with what is the binary's own — its name and its TOOLS section —
+ * set aside.
  */
 async function helpOf(
   launcher: Launcher,
@@ -360,19 +385,15 @@ async function helpOf(
   expect(exits).toEqual([0]);
   return stderr
     .join('\n')
-    .split(launcher.toolSet.expositionExamples(launcher.program))
-    .join('<exposition examples>')
+    .split(launcher.toolSet.toolsHelp(transportName))
+    .join('<tools section>')
     .split(`USAGE:\n  ${launcher.program} [options]`)
     .join('USAGE:\n  <program> [options]')
     .split(`\n  ${launcher.program} `)
-    .join('\n  <program> ')
-    .split(rowHelpOf(launcher.toolSet))
-    .join('<exposition row>')
-    .split(launcher.toolSet.expositionHelp(transportName))
-    .join('<exposition section>');
+    .join('\n  <program> ');
 }
 
-/** The `--conf` template's keys and values, but for the exposition. */
+/** The `--conf` template's keys and values: the same for every set (no exposition). */
 async function templateOf(
   launcher: Launcher,
 ): Promise<{ exits: number[]; values: Record<string, unknown> }> {
@@ -380,10 +401,7 @@ async function templateOf(
   const { exits } = await run(launcher, [`--conf=${file}`]);
   const values = load(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
   fs.rmSync(file);
-  expect(values.exposition).toEqual(
-    (launcher.toolSet.expositionRow.default as string[]).join(','),
-  );
-  delete values.exposition;
+  expect(values.exposition).toBeUndefined();
   return { exits, values };
 }
 
@@ -477,18 +495,8 @@ async function serveStdio(launcher: Launcher, set: SetName) {
   await inspection.client.close();
   const inspectionExit = await inspection.started.stop();
 
-  const debug = await connect([
-    `--env-path=${envFile}`,
-    '--system-type=onprem',
-    DEBUG_EXPOSITION[set],
-  ]);
-  const debugTools = await names(debug.client);
-  await debug.client.close();
-  await debug.started.stop();
-
   return {
     tools,
-    debugTools,
     observed: {
       credential: calls.presented,
       answered: calls.answered,
@@ -536,7 +544,6 @@ async function serveHttpLike(
         : `http://127.0.0.1:${port}/sse`,
   });
   const { listen, endpoint } = at(await freePort());
-  const debugAt = at(await freePort());
 
   const clientWith = async (
     headers: Record<string, string>,
@@ -616,19 +623,8 @@ async function serveHttpLike(
     transportName === 'sse' ? await ssePosts(endpoint, set) : undefined;
   const exit = await started.stop();
 
-  const debugStart = await run(launcher, [
-    ...debugAt.listen,
-    '--system-type=onprem',
-    DEBUG_EXPOSITION[set],
-  ]);
-  const debugClient = await clientWith(basicHeaders(), debugAt.endpoint);
-  const debugTools = await names(debugClient);
-  await debugClient.close();
-  await debugStart.stop();
-
   return {
     tools,
-    debugTools,
     observed: {
       basic,
       token,
@@ -692,7 +688,6 @@ async function observe(transportName: TransportName, set: SetName) {
       : await serveHttpLike(transportName, launcher, set);
   return {
     tools: served.tools,
-    debugTools: served.debugTools,
     observed: {
       help: await helpOf(launcher, transportName),
       template: await templateOf(launcher),
@@ -730,16 +725,20 @@ const COMPACT_DEBUG = [
 ];
 
 describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s: full and compact differ only in their tools',
+  '%s: the four binaries differ only in their tools',
   (transportName) => {
-    jest.setTimeout(120_000);
+    jest.setTimeout(240_000);
 
-    it('observes the same behaviour through both launchers', async () => {
+    it('observes the same behaviour through the four launchers', async () => {
       const full = await observe(transportName, 'full');
+      const fullRo = await observe(transportName, 'full-ro');
       const compact = await observe(transportName, 'compact');
+      const compactRo = await observe(transportName, 'compact-ro');
 
-      // Everything but the tools is the transport's, the same for both sets.
+      // Everything but the tools is the transport's, the same for every set.
+      expect(fullRo.observed).toEqual(full.observed);
       expect(compact.observed).toEqual(full.observed);
+      expect(compactRo.observed).toEqual(full.observed);
 
       // What was observed is the transport's behaviour, not two empty answers.
       const served = full.observed.served as Record<string, unknown>;
@@ -794,63 +793,244 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       expect(full.observed.otherBinary.exits).toEqual([1]);
       expect(full.observed.template.exits).toEqual([0]);
 
-      // The tools: the object-oriented surface, and the compact facade.
+      // The tools: the object-oriented surface, and the compact facade —
+      // each binary's list is fixed by the binary (C23).
       expect(full.tools).toContain('GetClass');
       expect(full.tools).not.toContain('HandlerGet');
-      // The 27 of rw, the three background-run tools beside the run tool,
-      // and the three leftover-session tools.
-      expect(compact.tools).toHaveLength(27 + 3 + 3);
-      expect(compact.tools).toEqual(expect.arrayContaining(COMPACT_RW));
       expect(compact.tools).not.toContain('GetClass');
-
-      // With debug in the exposition, the debugger's tools on each.
-      expect(full.debugTools).toEqual(
-        expect.arrayContaining(['DebugStartListener', 'DebugStop']),
+      // core: the debugger, high, background runs and the resume, always.
+      expect(full.tools).toEqual(
+        expect.arrayContaining([
+          'DebugStartListener',
+          'DebugStop',
+          'CreateClass',
+          'GetBackgroundRun',
+          'ResumeLeftoverSession',
+        ]),
       );
-      expect(full.tools).not.toContain('DebugStartListener');
-      expect(compact.debugTools).toEqual(expect.arrayContaining(COMPACT_DEBUG));
-      expect(compact.debugTools).toHaveLength(16 + 4 + 2);
-      expect(compact.tools).not.toContain('HandlerDebugStart');
+      // core-ro: the readonly tools with system and search, the list and
+      // the logoff; no write, debugger, background run or resume.
+      expect(fullRo.tools).toHaveLength(69);
+      expect(fullRo.tools).toEqual(
+        expect.arrayContaining([
+          'ReadClass',
+          'GetWhereUsed',
+          'SearchObject',
+          'ListLeftoverSessions',
+          'LogoffLeftoverSession',
+        ]),
+      );
+      for (const name of [
+        'CreateClass',
+        'DebugStartListener',
+        'GetBackgroundRun',
+        'ResumeLeftoverSession',
+      ]) {
+        expect({ name, served: fullRo.tools.includes(name) }).toEqual({
+          name,
+          served: false,
+        });
+      }
+      // compact: the 27, the four debugger verbs, the three background-run
+      // tools beside the run tool, and the three leftover-session tools.
+      expect(compact.tools).toHaveLength(27 + 4 + 3 + 3);
+      expect(compact.tools).toEqual(
+        expect.arrayContaining([...COMPACT_RW, ...COMPACT_DEBUG]),
+      );
+      // compact-ro: the 16 that change nothing, the list and the logoff.
+      expect(compactRo.tools).toHaveLength(16 + 2);
+      expect(compactRo.tools).toContain('HandlerGet');
+      for (const name of [
+        ...COMPACT_RW.filter((n) => n !== 'HandlerGet'),
+        ...COMPACT_DEBUG,
+        'HandlerBackgroundRunGet',
+        'HandlerLeftoverSessionResume',
+      ]) {
+        expect({ name, served: compactRo.tools.includes(name) }).toEqual({
+          name,
+          served: false,
+        });
+      }
+    });
+  },
+);
+
+const SETS: readonly SetName[] = ['full', 'full-ro', 'compact', 'compact-ro'];
+
+/** Each transport's binaries, by set, as the help and the refusals name them. */
+const BINARIES_OF: Record<
+  TransportName,
+  Record<SetName, { bin: string; pkg: string }>
+> = {
+  stdio: {
+    full: { bin: 'mcp-abap-adt', pkg: '@mcp-abap-adt/core' },
+    'full-ro': { bin: 'mcp-abap-adt-ro', pkg: '@mcp-abap-adt/core-ro' },
+    compact: { bin: 'mcp-abap-adt-compact', pkg: '@mcp-abap-adt/compact' },
+    'compact-ro': {
+      bin: 'mcp-abap-adt-compact-ro',
+      pkg: '@mcp-abap-adt/compact-ro',
+    },
+  },
+  http: {
+    full: { bin: 'mcp-abap-adt-http', pkg: '@mcp-abap-adt/http' },
+    'full-ro': { bin: 'mcp-abap-adt-http-ro', pkg: '@mcp-abap-adt/http-ro' },
+    compact: {
+      bin: 'mcp-abap-adt-compact-http',
+      pkg: '@mcp-abap-adt/compact-http',
+    },
+    'compact-ro': {
+      bin: 'mcp-abap-adt-compact-http-ro',
+      pkg: '@mcp-abap-adt/compact-http-ro',
+    },
+  },
+  sse: {
+    full: { bin: 'mcp-abap-adt-sse', pkg: '@mcp-abap-adt/sse' },
+    'full-ro': { bin: 'mcp-abap-adt-sse-ro', pkg: '@mcp-abap-adt/sse-ro' },
+    compact: {
+      bin: 'mcp-abap-adt-compact-sse',
+      pkg: '@mcp-abap-adt/compact-sse',
+    },
+    'compact-ro': {
+      bin: 'mcp-abap-adt-compact-sse-ro',
+      pkg: '@mcp-abap-adt/compact-sse-ro',
+    },
+  },
+};
+
+const GONE = 'is gone (19.0.0): the binary fixes its tool set, so remove it';
+
+/**
+ * The binary fixes the tool set (C23): `--exposition` and the config file's
+ * `exposition` stop each of the twelve binaries with the sentence of the
+ * word, naming the binary of its own transport — through the binary, not
+ * only the table.
+ */
+describe.each<TransportName>(['stdio', 'http', 'sse'])(
+  '%s: --exposition and the config file’s exposition stop every binary',
+  (transportName) => {
+    jest.setTimeout(60_000);
+    const b = BINARIES_OF[transportName];
+    const named = (set: SetName) => `\`${b[set].bin}\` (\`${b[set].pkg}\`)`;
+
+    const conf = (exposition: string) => {
+      const file = path.join(workdir, 'exposition.yaml');
+      fs.writeFileSync(file, `exposition: ${exposition}\n`);
+      return `--conf=${file}`;
+    };
+
+    it.each(SETS)('%s', async (set) => {
+      const launcher = LAUNCHERS[transportName][set];
+      expect(await refusalOf(launcher, ['--exposition=readonly'])).toEqual({
+        stderr: [
+          `[MCP] --exposition ${GONE}; the readonly tools alone (with system and search) are served by ${named('full-ro')}`,
+        ],
+        exits: [1],
+      });
+      expect(await refusalOf(launcher, ['--exposition', 'ro,debug'])).toEqual({
+        stderr: [
+          familyOf(set) === 'full'
+            ? `[MCP] --exposition ${GONE}; the debugger is always served by ${named('full')}, and by no -ro binary`
+            : `[MCP] --exposition ${GONE}; the compact debugger is always served by ${named('compact')}, and by no -ro binary`,
+        ],
+        exits: [1],
+      });
+      expect(await refusalOf(launcher, ['--exposition=rw'])).toEqual({
+        stderr: [
+          `[MCP] --exposition ${GONE}; all compact tools are served by ${named('compact')}`,
+        ],
+        exits: [1],
+      });
+      // The config file: refused before anything starts, naming the file.
+      const fromFile = await refusalOf(launcher, [conf('readonly,high')]);
+      expect(fromFile.exits).toEqual([1]);
+      expect(fromFile.stderr.join('\n')).toContain(
+        'exposition.yaml is refused',
+      );
+      expect(fromFile.stderr.join('\n')).toContain(
+        `exposition (config file) ${GONE}; the high tools are served, beside the readonly ones, by ${named('full')}`,
+      );
     });
   },
 );
 
 describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s compact: --exposition and the config file’s exposition are compact’s',
+  '%s: each binary’s help names its own tools and the other binaries of its transport',
+  (transportName) => {
+    const b = BINARIES_OF[transportName];
+
+    it.each(SETS)('%s', async (set) => {
+      const launcher = LAUNCHERS[transportName][set];
+      expect(launcher.program).toBe(b[set].bin);
+      const help = (await run(launcher, ['--help'])).stderr.join('\n');
+      expect(help).toContain(
+        `\nTOOLS:\n  ${b[set].bin} serves one fixed tool set`,
+      );
+      expect(help).not.toContain('--exposition=');
+      // The write binary names its -ro one, and the -ro one its write one.
+      const pair: SetName =
+        set === 'full'
+          ? 'full-ro'
+          : set === 'full-ro'
+            ? 'full'
+            : set === 'compact'
+              ? 'compact-ro'
+              : 'compact';
+      expect(help).toContain(`npm i -g ${b[pair].pkg}, then ${b[pair].bin}\n`);
+      for (const other of ['stdio', 'http', 'sse'] as const) {
+        if (other === transportName) continue;
+        for (const binary of Object.values(BINARIES_OF[other])) {
+          expect(help).not.toContain(`npm i -g ${binary.pkg},`);
+        }
+      }
+    });
+  },
+);
+
+/**
+ * A `-ro` binary's launcher creates no background-run store (C23): its run
+ * tools (`RuntimeRunClass` is a system tool) refuse `background: true` in
+ * fixed words before anything reaches the system; the write binary's start a
+ * run. On each transport, through the binary.
+ */
+describe.each<TransportName>(['stdio', 'http', 'sse'])(
+  '%s: a -ro binary serves no background run',
   (transportName) => {
     jest.setTimeout(60_000);
-    const launcher = LAUNCHERS[transportName].compact;
 
-    const listen = async () => {
-      const port = await freePort();
-      return transportName === 'http'
-        ? ['--host=127.0.0.1', `--port=${port}`]
-        : transportName === 'sse'
-          ? ['--sse-host=127.0.0.1', `--sse-port=${port}`]
-          : [];
-    };
-
-    const conf = (exposition: string) => {
-      const file = path.join(workdir, 'compact.yaml');
-      fs.writeFileSync(file, `exposition: ${exposition}\n`);
-      return `--conf=${file}`;
-    };
-
-    /** The tools a start with `argv` serves (a listener of its own for HTTP and SSE). */
-    const servedTools = async (argv: string[]): Promise<string[]> => {
-      const at = await listen();
+    /** One `RuntimeRunClass` call with `background: true` through `set`'s binary. */
+    const backgroundCall = async (set: SetName) => {
+      const launcher = LAUNCHERS[transportName][set];
       const client = new Client({ name: 'parity', version: '1.0.0' });
       open.clients.push(client);
       let started: Run;
       if (transportName === 'stdio') {
+        const envFile = path.join(workdir, 'background.env');
+        fs.writeFileSync(
+          envFile,
+          [
+            `SAP_URL=${standIn.url}`,
+            'SAP_CLIENT=100',
+            'SAP_AUTH_TYPE=basic',
+            'SAP_USERNAME=PARITY_USER',
+            'SAP_PASSWORD=parity-password',
+            '',
+          ].join('\n'),
+        );
         const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-        started = await run(launcher, [...at, ...argv], serverSide);
-        expect(started.exits).toEqual([]);
+        started = await run(
+          launcher,
+          [`--env-path=${envFile}`, '--system-type=onprem'],
+          serverSide,
+        );
         await client.connect(clientSide);
       } else {
-        started = await run(launcher, [...at, ...argv]);
-        expect(started.exits).toEqual([]);
-        const port = at[1].slice(at[1].indexOf('=') + 1);
+        const port = await freePort();
+        started = await run(launcher, [
+          ...(transportName === 'http'
+            ? ['--host=127.0.0.1', `--port=${port}`]
+            : ['--sse-host=127.0.0.1', `--sse-port=${port}`]),
+          '--system-type=onprem',
+        ]);
         const url =
           transportName === 'http'
             ? `http://127.0.0.1:${port}/mcp/stream/http`
@@ -866,134 +1046,30 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
               }),
         );
       }
-      const tools = await names(client);
+      const from = standIn.requests.length;
+      const answer = outcomeOf(
+        await client.callTool({
+          name: 'RuntimeRunClass',
+          arguments: { class_name: 'ZCL_PARITY_RUN', background: true },
+        }),
+      );
+      const reached = standIn.requests.length - from;
       await client.close();
       await started.stop();
-      return tools;
+      return { answer, reached };
     };
 
-    it('exposition: ro serves the 16 that change nothing, and the leftover-session list and logoff', async () => {
-      const tools = await servedTools([conf('ro')]);
-      expect(tools).toHaveLength(16 + 2);
-      expect(tools).not.toContain('HandlerLeftoverSessionResume');
-      expect(tools).toContain('HandlerGet');
-      expect(tools).not.toContain('HandlerCreate');
-    });
-
-    // 17.x's rule (PR #247): the last --exposition flag wins, and an empty
-    // one is refused in compact's words — through the binary, not only the parser.
-    it('the last flag wins: --exposition=readonly --exposition=ro serves ro', async () => {
-      const tools = await servedTools([
-        '--exposition=readonly',
-        '--exposition=ro',
-      ]);
-      expect(tools).toHaveLength(16 + 2);
-      expect(tools).not.toContain('HandlerCreate');
-    });
-
-    it('the last flag wins: --exposition=debug --exposition=ro,debug serves ro,debug', async () => {
-      const tools = await servedTools([
-        '--exposition=debug',
-        '--exposition=ro,debug',
-      ]);
-      expect(tools).toHaveLength(16 + 4 + 2);
-      expect(tools).toEqual(expect.arrayContaining(COMPACT_DEBUG));
-    });
-
-    it('a bare --exposition is refused in compact’s empty-value words', async () => {
-      const { stderr, exits } = await run(launcher, [
-        ...(await listen()),
-        '--exposition',
-      ]);
-      expect(exits).toEqual([1]);
-      expect(stderr).toEqual([
-        "[MCP] --exposition was given no value. This command takes 'ro' (the 16 tools that change nothing) or 'rw' (all 27), and 'debug' beside either. An empty value is refused rather than defaulted: an unset shell variable must not silently open the write tools.",
-      ]);
-    });
-
-    it('a set of the full binaries is refused in compact’s words, naming the file', async () => {
-      const { stderr, exits } = await run(launcher, [
-        ...(await listen()),
-        conf('readonly,high'),
-      ]);
-      expect(exits).toEqual([1]);
-      const words = stderr.join('\n');
-      expect(words).toContain('compact.yaml is refused');
-      expect(words).toContain(
-        "--exposition=readonly is not a compact set. This command takes 'ro'",
-      );
-    });
-
-    it('the --conf template writes compact’s exposition, and help lists its words', async () => {
-      const file = path.join(workdir, 'template.yaml');
-      await run(launcher, [`--conf=${file}`]);
-      const template = fs.readFileSync(file, 'utf8');
-      expect((load(template) as Record<string, unknown>).exposition).toBe('rw');
-      expect(template).toContain('ro (the 16 tools that change nothing)');
-      expect(template).not.toContain('readonly,high');
-      const { stderr } = await run(launcher, ['--help']);
-      expect(stderr.join('\n')).toContain('--exposition=<ro|rw>[,debug]');
-    });
-  },
-);
-
-/** Each transport's compact binary, as the full binary of that transport names it (D49). */
-const COMPACT_OF: Record<TransportName, { bin: string; pkg: string }> = {
-  stdio: { bin: 'mcp-abap-adt-compact', pkg: '@mcp-abap-adt/compact' },
-  http: { bin: 'mcp-abap-adt-compact-http', pkg: '@mcp-abap-adt/compact-http' },
-  sse: { bin: 'mcp-abap-adt-compact-sse', pkg: '@mcp-abap-adt/compact-sse' },
-};
-
-describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s: each binary’s exposition words and examples are its own',
-  (transportName) => {
-    const full = LAUNCHERS[transportName].full;
-    const compact = LAUNCHERS[transportName].compact;
-    const { bin, pkg } = COMPACT_OF[transportName];
-
-    it('the full binary refuses compact naming its transport’s compact binary', async () => {
-      expect(await refusalOf(full, ['--exposition=compact'])).toEqual({
-        stderr: [
-          `[MCP] Invalid exposition: 'compact' is served by ${pkg}, which is its own command with the compact tool list as its default. Install it and run \`${bin}\`, or drop \`compact\` from this exposition.`,
-        ],
-        exits: [1],
+    it('full-ro refuses background: true before the system; full does not refuse it so', async () => {
+      const ro = await backgroundCall('full-ro');
+      expect(ro).toEqual({
+        answer: expect.objectContaining({
+          ok: false,
+          error: 'background_runs_unavailable',
+        }),
+        reached: 0,
       });
-    });
-
-    it('the full binary refuses ro (and any unknown word), never dropping it', async () => {
-      expect(await refusalOf(full, ['--exposition=ro'])).toEqual({
-        stderr: [
-          `[MCP] Invalid exposition: 'ro' is not a set of this command, which takes readonly, high and debug, comma-separated. 'ro' and 'rw' are the sets of \`${bin}\` (${pkg}).`,
-        ],
-        exits: [1],
-      });
-      expect(await refusalOf(full, ['--exposition=readonly,search'])).toEqual({
-        stderr: [
-          "[MCP] Invalid exposition: 'search' is not a set of this command, which takes readonly, high and debug, comma-separated.",
-        ],
-        exits: [1],
-      });
-    });
-
-    it('the full help names its transport’s compact binary and shows the full sets', async () => {
-      const help = (await run(full, ['--help'])).stderr.join('\n');
-      expect(help).toContain(`npm i -g ${pkg}\n`);
-      expect(help).toContain(`\n                                     ${bin}\n`);
-      expect(help).toContain(`  ${full.program} --exposition=readonly\n`);
-      for (const other of Object.values(COMPACT_OF)) {
-        if (other.pkg !== pkg) {
-          expect(help).not.toContain(`npm i -g ${other.pkg}\n`);
-          expect(help).not.toContain(`${other.bin}\n`);
-        }
-      }
-    });
-
-    it('the compact help shows its own examples, never the full binary’s', async () => {
-      const help = (await run(compact, ['--help'])).stderr.join('\n');
-      expect(help).toContain(`  ${compact.program} --exposition=ro\n`);
-      expect(help).toContain(`  ${compact.program} --exposition=rw,debug\n`);
-      expect(help).not.toContain('--exposition=readonly');
-      expect(help).not.toContain(`  ${full.program} --`);
+      const full = await backgroundCall('full');
+      expect(full.answer.error).not.toBe('background_runs_unavailable');
     });
   },
 );

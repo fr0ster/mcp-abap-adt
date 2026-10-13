@@ -29,6 +29,12 @@ const PACKAGES = [
   'server/src',
   'http/src',
   'sse/src',
+  'core-ro/src',
+  'http-ro/src',
+  'sse-ro/src',
+  'compact-ro/src',
+  'compact-http-ro/src',
+  'compact-sse-ro/src',
 ];
 
 /** What a creation site is, as the scan names it. */

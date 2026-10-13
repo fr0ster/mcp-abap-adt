@@ -8,7 +8,6 @@ export {
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
   DESTINATIONS_ELSEWHERE,
-  EXPOSITION_ROW,
   findSecretYamlKeys,
   generateHelp,
   HTTP_ELSEWHERE,
@@ -41,11 +40,15 @@ export {
   validateYamlParameters,
 } from './authParameters.js';
 export {
-  COMPACT_BINARIES,
-  expositionHelp,
+  BINARIES,
+  type Binary,
+  decidingWord,
+  expositionGoneWords,
+  expositionRemoved,
+  LOW_SET_GONE,
   type ServedTransport,
-  toHandlerSets,
-} from './exposition.js';
+  type ToolSetKind,
+} from './binaries.js';
 export type { HandlerSet, IServerConfig, TlsConfig } from './IServerConfig.js';
 export {
   answerVersionOrHelp,
@@ -55,10 +58,6 @@ export {
   type StartupEdges,
 } from './startup.js';
 export { readStateIdleMinutes } from './stateIdleMinutes.js';
-export {
-  expositionProblem,
-  validateExposition,
-} from './validateExposition.js';
 export {
   type ConfigurationRead,
   generateConfigTemplateIfNeeded,

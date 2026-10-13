@@ -4,12 +4,13 @@
  * The same server as `mcp-abap-adt`, a different decomposition of its tool
  * list: core's `main` with `compactToolSet` — the two halves' entry builders
  * composed by lib's `compactToolSetOf` — and this command's name and version.
- * Nothing else: core's table with the compact `--exposition` row, core's
+ * Nothing else: core's table, core's
  * destination, credentials, cancellation, failures and shutdown.
  *
  * **Why a command at all**, rather than a flag on the first one: the host this is
  * for cannot build a retrieval pipeline and must be handed a tool list short by
- * construction. `core` refuses `--exposition=compact` and says to install this.
+ * construction. A binary fixes its tool set (C23): `mcp-abap-adt-compact-ro` serves
+ * the half that changes nothing.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
@@ -20,7 +21,7 @@ import {
 import { processEdges } from '@mcp-abap-adt/lib/config';
 import { compactToolSetOf, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 
-/** The compact tool set: `ro` / `rw` (default), `debug` beside either. */
+/** The compact tool set: both halves, the debugger, the leftover sessions and background runs. */
 export const compactToolSet: ToolSet = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
   modify: compactModifyEntries,

@@ -107,7 +107,10 @@ describe('the compact capability split holds across the packages', () => {
     // The manifest is the other half of the same promise: a package that cannot
     // import a write route must not be able to install one either.
     const manifest = JSON.parse(
-      readFileSync(join(REPO, 'compact-readonly-entries', 'package.json'), 'utf8'),
+      readFileSync(
+        join(REPO, 'compact-readonly-entries', 'package.json'),
+        'utf8',
+      ),
     ) as { dependencies?: Record<string, string> };
     expect(Object.keys(manifest.dependencies ?? {})).toEqual([
       '@mcp-abap-adt/lib',

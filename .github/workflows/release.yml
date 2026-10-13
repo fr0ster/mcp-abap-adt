@@ -53,6 +53,26 @@ jobs:
       - name: Run Biome lint (compact-sse)
         run: npm --prefix compact-sse run lint:check
 
+      # The six read-only packages (C23); their suites run in the root
+      # `npm test` (its Jest roots name them).
+      - name: Run Biome lint (core-ro)
+        run: npm --prefix core-ro run lint:check
+
+      - name: Run Biome lint (http-ro)
+        run: npm --prefix http-ro run lint:check
+
+      - name: Run Biome lint (sse-ro)
+        run: npm --prefix sse-ro run lint:check
+
+      - name: Run Biome lint (compact-ro)
+        run: npm --prefix compact-ro run lint:check
+
+      - name: Run Biome lint (compact-http-ro)
+        run: npm --prefix compact-http-ro run lint:check
+
+      - name: Run Biome lint (compact-sse-ro)
+        run: npm --prefix compact-sse-ro run lint:check
+
       - name: Build project
         run: npm run build
 

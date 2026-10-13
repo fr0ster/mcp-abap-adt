@@ -20,7 +20,7 @@ const SCANNED: ReadonlyArray<[string, readonly string[] | undefined]> = [
   ['src/lib/auth/destinationName.ts', undefined],
   ['src/lib/config/authParameters.ts', undefined],
   ['src/lib/config/yamlConfig.ts', undefined],
-  ['src/lib/config/exposition.ts', undefined],
+  ['src/lib/config/binaries.ts', undefined],
   ['src/lib/config/startup.ts', undefined],
   ['server/src/config/coreParameters.ts', undefined],
   ['http/src/config/httpParameters.ts', undefined],

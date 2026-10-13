@@ -30,6 +30,12 @@ const PACKAGES = [
   'server/src',
   'http/src',
   'sse/src',
+  'core-ro/src',
+  'http-ro/src',
+  'sse-ro/src',
+  'compact-ro/src',
+  'compact-http-ro/src',
+  'compact-sse-ro/src',
 ];
 
 /** The reads that took a fixed deadline before, file by file. */

@@ -11,8 +11,8 @@
  * (`HandlerUnitTestRun`, `HandlerProfileRun`).
  *
  * A consumer that wants the whole compact surface takes this group beside the
- * read-only one, which is what `CompactHandlersGroup` does and what
- * `--exposition=compact` serves.
+ * read-only one, which is what `CompactHandlersGroup` does and what the compact
+ * binaries serve.
  */
 
 import type { HandlerContext, HandlerEntry } from '@mcp-abap-adt/lib/handlers';

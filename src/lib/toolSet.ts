@@ -5,115 +5,182 @@
  * core's, http's and sse's `main({ toolSet, program, version })` take a
  * `ToolSet` and nothing else of the tools: everything a launcher does —
  * options, credentials, cancellation, failures, shutdown — is its transport's,
- * the same for any set. The full binaries pass {@link fullToolSet}; each
- * compact binary passes `compactToolSetOf` with the two halves' entry builders,
- * so full and compact cannot fork on any transport.
+ * the same for any set.
+ *
+ * **The binary fixes the tool set** (C23, the owner's decision). There are
+ * four sets, one per kind of binary, each served on stdio, Streamable HTTP
+ * and SSE:
+ *
+ * | Set | Binaries | Tools |
+ * |---|---|---|
+ * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, the leftover sessions (list, resume, logoff), background runs |
+ * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), the leftover-session list and logoff |
+ * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, the leftover sessions, background runs |
+ * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half, the leftover-session list and logoff |
+ *
+ * No `-ro` set serves the debugger, a background run or the resume. There is
+ * no `--exposition`: each set refuses it (and its YAML key) as a removed
+ * parameter, naming the binary its words asked for.
  */
 
 import { CompactBackgroundRunHandlersGroup } from './compact/backgroundRuns/group';
 import { CompactDebugHandlersGroup } from './compact/debug/group';
 import {
-  COMPACT_EXPOSITION_HELP,
-  COMPACT_EXPOSITION_ROW,
-  compactExpositionOf,
-  compactExpositionValues,
-} from './compact/exposition';
-import {
   type CompactEntryBuilder,
   CompactHandlersGroup,
 } from './compact/group';
 import { CompactLeftoverSessionHandlersGroup } from './compact/session/group';
+import type { RemovedParameter } from './config/authParameters';
 import {
-  EXPOSITION_ROW,
-  type Parameter,
-  ParameterRefusal,
-  type ParameterValue,
-} from './config/authParameters';
-import {
-  expositionHelp,
+  BINARIES,
+  expositionRemoved,
   type ServedTransport,
-  toHandlerSets,
-} from './config/exposition';
-import { expositionProblem } from './config/validateExposition';
+  type ToolSetKind,
+} from './config/binaries';
+import { LeftoverSessionHandlersGroup } from './handlers/groups/LeftoverSessionHandlersGroup.js';
+import { ReadOnlyHandlersGroup } from './handlers/groups/ReadOnlyHandlersGroup.js';
+import { SearchHandlersGroup } from './handlers/groups/SearchHandlersGroup.js';
+import { SystemHandlersGroup } from './handlers/groups/SystemHandlersGroup.js';
+import { ReadVsGetDedupStrategy } from './handlers/groups/strategies/index.js';
 import type { HandlerContext, IHandlerGroup } from './handlers/interfaces';
-
-export type { ServedTransport } from './config/exposition';
-
 import { CompositeHandlersRegistry } from './handlers/registry/CompositeHandlersRegistry';
 import {
   expositionGroups,
   noConnectionContext,
 } from './handlers/registry/expositionRegistry';
 
-/**
- * The groups a server serves, given the base context and the exposition; and
- * the exposition's words, default and help.
- */
+export {
+  BINARIES,
+  type Binary,
+  expositionGoneWords,
+  LOW_SET_GONE,
+  type ServedTransport,
+  type ToolSetKind,
+} from './config/binaries';
+
+/** The tools a binary serves: fixed by the binary, never by a flag. */
 export interface ToolSet {
+  /** Which of the four kinds of binary serves this set. */
+  readonly kind: ToolSetKind;
   /**
-   * The `--exposition` row of a binary's table: its help line, its default
-   * (also the `--conf` template's value) and the config file's validation.
+   * Whether the set serves the background-run tools. The launcher hands the
+   * server instance a background-run store only then; without one, a run
+   * tool's `background: true` is refused (`background_runs_unavailable`).
    */
-  readonly expositionRow: Parameter;
-  /** The HANDLER EXPOSITION section of the `--help` of a binary serving `transport`. */
-  expositionHelp(transport: ServedTransport): string;
-  /** The `--exposition` lines of the EXAMPLES section of `program`'s help. */
-  expositionExamples(program: string): string;
+  readonly backgroundRuns: boolean;
+  /** The TOOLS section of the `--help` of a binary serving `transport`. */
+  toolsHelp(transport: ServedTransport): string;
   /**
-   * The exposition a run serves. `read` is what the binary's table read for
-   * the row — the CLI form (unless the row leaves it to the set), else the
-   * config file's, else the row's default; `argv` the arguments as given, for
-   * a set that reads its flag itself; `transport` the binary's, for words
-   * that name another binary. A value the set does not serve throws a
-   * `ParameterRefusal` in fixed words.
+   * The removed `--exposition` (and YAML `exposition`) of a binary serving
+   * `transport`: any value stops the start, naming the binary to use instead.
    */
-  exposition(
-    read: ParameterValue | undefined,
-    argv: readonly string[],
-    transport: ServedTransport,
-  ): readonly string[];
-  /** The groups for an exposition `exposition()` answered, built against `context`, in registration order. */
-  groups(
-    context: HandlerContext,
-    exposition: readonly string[],
-  ): IHandlerGroup[];
+  expositionRemoved(transport: ServedTransport): RemovedParameter;
+  /** The groups, built against `context`, in registration order. */
+  groups(context: HandlerContext): IHandlerGroup[];
 }
 
 /** The registry a launcher serves: `toolSet`'s groups against a context with no connection yet. */
-export function registryOf(
-  toolSet: ToolSet,
-  exposition: readonly string[],
-): CompositeHandlersRegistry {
-  return new CompositeHandlersRegistry(
-    toolSet.groups(noConnectionContext(), exposition),
-  );
+export function registryOf(toolSet: ToolSet): CompositeHandlersRegistry {
+  return new CompositeHandlersRegistry(toolSet.groups(noConnectionContext()));
 }
 
-const listOf = (value: ParameterValue | undefined): string[] | undefined =>
-  Array.isArray(value) ? [...value] : undefined;
+/** `npm i -g <pkg>`, then `<bin>`: how a help names another binary. */
+const install = (transport: ServedTransport, kind: ToolSetKind): string => {
+  const { bin, pkg } = BINARIES[transport][kind];
+  return `npm i -g ${pkg}, then ${bin}`;
+};
+
+/** The TOOLS section: what this binary serves, and where the rest is. */
+function toolsSection(
+  transport: ServedTransport,
+  kind: ToolSetKind,
+  served: readonly string[],
+  elsewhere: ReadonlyArray<readonly [string, ToolSetKind]>,
+): string {
+  const { bin } = BINARIES[transport][kind];
+  return `
+TOOLS:
+  ${bin} serves one fixed tool set; the binary chooses it, not a flag
+  (--exposition is gone in 19.0.0, and passing it stops the start):
+${served.map((line) => `    - ${line}`).join('\n')}
+
+${elsewhere.map(([what, other]) => `  ${what}: ${install(transport, other)}`).join('\n')}
+
+  For details: docs/user-guide/HANDLERS_MANAGEMENT.md
+`;
+}
+
+const READONLY_LINE =
+  'readonly: Get*, Read*, List* (read operations), with search and system';
+const DEBUG_LINE =
+  'debug: the debugger tools; a breakpoint or a listener catches every request of the connected SAP user';
 
 /**
  * The object-oriented tool set of `mcp-abap-adt`, `mcp-abap-adt-http` and
- * `mcp-abap-adt-sse`: readonly (with system), high, debug, and search —
- * `readonly,high` by default. `compact` is refused, and `low` with D56's
- * sentence: the low set left these binaries in 19.0.0, compact is its analogue.
+ * `mcp-abap-adt-sse`: readonly (with system and search), high, debug, the
+ * leftover sessions (list, resume, logoff) and the background runs.
  */
 export const fullToolSet: ToolSet = {
-  expositionRow: EXPOSITION_ROW,
-  expositionHelp: (transport) => expositionHelp(transport),
-  expositionExamples: (program) =>
-    `  # Readonly tools only (with search and system)\n  ${program} --exposition=readonly\n\n` +
-    `  # The debugger beside the default sets\n  ${program} --exposition=readonly,high,debug\n`,
-  exposition(read, _argv, transport) {
-    // Every word is checked before any is dropped: an unknown one is refused.
-    const words = listOf(read) ?? [];
-    const problem = expositionProblem(words, transport);
-    if (problem !== undefined) throw new ParameterRefusal(problem);
-    return toHandlerSets(words);
-  },
-  groups(context, exposition) {
-    return expositionGroups(exposition, context);
-  },
+  kind: 'core',
+  backgroundRuns: true,
+  toolsHelp: (transport) =>
+    toolsSection(
+      transport,
+      'core',
+      [
+        READONLY_LINE,
+        'high: Create*, Update*, Delete*, Activate* (each a whole workflow via ADT)',
+        DEBUG_LINE,
+        'the leftover SAP sessions of an ended process: list, resume, log off',
+        'background runs of RuntimeRunClass and RuntimeRunProgram: read, list, discard',
+      ],
+      [
+        ['The readonly tools alone', 'core-ro'],
+        [
+          'The compact tools (one per operation; the low set is gone)',
+          'compact',
+        ],
+      ],
+    ),
+  expositionRemoved: (transport) => expositionRemoved('core', transport),
+  // The writing groups first, so their names feed the readonly dedup; the
+  // background-run tools beside the run tools; every leftover-session tool.
+  groups: (context) => expositionGroups(['readonly', 'high', 'debug'], context),
+};
+
+/**
+ * The read-only object-oriented tool set of `mcp-abap-adt-ro`,
+ * `mcp-abap-adt-http-ro` and `mcp-abap-adt-sse-ro`: readonly (with system and
+ * search), and the leftover-session list and logoff. No high, no debugger, no
+ * background run, no resume.
+ */
+export const fullReadOnlyToolSet: ToolSet = {
+  kind: 'core-ro',
+  backgroundRuns: false,
+  toolsHelp: (transport) =>
+    toolsSection(
+      transport,
+      'core-ro',
+      [
+        READONLY_LINE,
+        'the leftover SAP sessions of an ended process: list, log off',
+      ],
+      [
+        ['The write, debugger and background-run tools', 'core'],
+        ['The compact tools that change nothing', 'compact-ro'],
+      ],
+    ),
+  expositionRemoved: (transport) => expositionRemoved('core', transport),
+  groups: (context) => [
+    new ReadOnlyHandlersGroup(
+      context,
+      new Set<string>(),
+      new ReadVsGetDedupStrategy(),
+    ),
+    new SystemHandlersGroup(context),
+    new SearchHandlersGroup(context),
+    new LeftoverSessionHandlersGroup(context, { resume: false }),
+  ],
 };
 
 /** The two halves of the compact facade, as their packages build them. */
@@ -125,12 +192,11 @@ export interface CompactHalves {
 }
 
 /**
- * The compact tool set, composed of the two halves' entry builders: `ro` the
- * read-only half, `rw` (the default) both, `debug` beside either the four
- * debugger verbs — and no search, so the list is short by construction. The
- * leftover-session list and logoff are served beside every exposition, the
- * resume beside `rw` only; the background-run tools beside `rw` only, where
- * the run tool is.
+ * The compact tool set of `mcp-abap-adt-compact`, `-compact-http` and
+ * `-compact-sse`, composed of the two halves' entry builders: both halves in
+ * one group, the four debugger verbs, the background-run tools beside the
+ * run tool and every leftover-session tool — and no search, so the list is
+ * short by construction.
  *
  * Every group is a real `BaseHandlerGroup`, never an object literal wrapping
  * the entries: the launcher sets the per-request context on the group that
@@ -141,54 +207,67 @@ export interface CompactHalves {
  */
 export function compactToolSetOf(halves: CompactHalves): ToolSet {
   return {
-    expositionRow: COMPACT_EXPOSITION_ROW,
-    expositionHelp: () => COMPACT_EXPOSITION_HELP,
-    expositionExamples: (program) =>
-      `  # The 16 tools that change nothing\n  ${program} --exposition=ro\n\n` +
-      `  # All 25, and the four debugger verbs\n  ${program} --exposition=rw,debug\n`,
-    exposition(read, argv) {
-      // The flag is read here alone (the row leaves its CLI form to the set),
-      // the last one winning and an empty one refused; without it, the config
-      // file's value (already read by the row's parser), else the default.
-      const flagged = compactExpositionValues(argv);
-      if (flagged !== undefined) return compactExpositionOf(flagged);
-      return compactExpositionOf(listOf(read) ?? ['rw']);
-    },
-    groups(context, exposition) {
-      const half =
-        exposition[0] === 'ro'
-          ? new CompactHandlersGroup(
-              context,
-              [halves.readOnly],
-              'CompactReadOnlyHandlers',
-            )
-          : new CompactHandlersGroup(context, [halves.readOnly, halves.modify]);
-      // Every exposition: the user's own leftover sessions.
-      // The resume only beside rw: in ro, the list and the logoff.
-      const leftover = new CompactLeftoverSessionHandlersGroup(context, {
-        resume: exposition[0] !== 'ro',
-      });
-      // Beside the run tool (HandlerProfileRun, rw only): its background
-      // runs, read, listed and discarded.
-      const background =
-        exposition[0] !== 'ro'
-          ? [new CompactBackgroundRunHandlersGroup(context)]
-          : [];
-      return exposition.includes('debug')
-        ? [
-            half,
-            new CompactDebugHandlersGroup(context),
-            ...background,
-            leftover,
-          ]
-        : [half, ...background, leftover];
-    },
+    kind: 'compact',
+    backgroundRuns: true,
+    toolsHelp: (transport) =>
+      toolsSection(
+        transport,
+        'compact',
+        [
+          'the compact tools, one per operation with the object in object_type: HandlerGet, HandlerCreate, HandlerUpdate, HandlerDelete, HandlerActivate, HandlerLock, ...',
+          'the compact debugger: HandlerDebugStart, ...Wait, ...View, ...Step; they catch every request of the connected SAP user',
+          'the leftover SAP sessions of an ended process: list, resume, log off',
+          'background runs of HandlerProfileRun: read, list, discard',
+        ],
+        [
+          ['The compact tools that change nothing', 'compact-ro'],
+          ['The object-oriented tools (readonly, high, debug)', 'core'],
+        ],
+      ),
+    expositionRemoved: (transport) => expositionRemoved('compact', transport),
+    groups: (context) => [
+      new CompactHandlersGroup(context, [halves.readOnly, halves.modify]),
+      new CompactDebugHandlersGroup(context),
+      // Beside the run tool (HandlerProfileRun): its background runs, read,
+      // listed and discarded.
+      new CompactBackgroundRunHandlersGroup(context),
+      new CompactLeftoverSessionHandlersGroup(context, { resume: true }),
+    ],
   };
 }
 
-export {
-  type CompactExposition,
-  parseCompactDebug,
-  parseCompactExposition,
-} from './compact/exposition';
+/**
+ * The read-only compact tool set of `mcp-abap-adt-compact-ro`,
+ * `-compact-http-ro` and `-compact-sse-ro`: the half that changes nothing
+ * (`compactReadOnlyEntries` of `@mcp-abap-adt/compact-readonly-entries`), and
+ * the leftover-session list and logoff. No modify half, no debugger, no
+ * background run, no resume.
+ */
+export function compactReadOnlyToolSetOf(
+  readOnly: CompactEntryBuilder,
+): ToolSet {
+  return {
+    kind: 'compact-ro',
+    backgroundRuns: false,
+    toolsHelp: (transport) =>
+      toolsSection(
+        transport,
+        'compact-ro',
+        [
+          'the compact tools that change nothing, one per operation with the object in object_type: HandlerGet, HandlerSearch, HandlerWhereUsed, ...; no create, update, delete, activate, lock, unlock, unit-test run or profiler run',
+          'the leftover SAP sessions of an ended process: list, log off',
+        ],
+        [
+          ['All compact tools, the debugger and background runs', 'compact'],
+          ['The object-oriented readonly tools', 'core-ro'],
+        ],
+      ),
+    expositionRemoved: (transport) => expositionRemoved('compact', transport),
+    groups: (context) => [
+      new CompactHandlersGroup(context, [readOnly], 'CompactReadOnlyHandlers'),
+      new CompactLeftoverSessionHandlersGroup(context, { resume: false }),
+    ],
+  };
+}
+
 export type { CompactEntryBuilder } from './compact/group';

@@ -39,21 +39,32 @@ describe('mcp-abap-adt-compact-sse', () => {
     });
   });
 
-  it('names itself in USAGE, and lists the compact exposition', async () => {
+  it('names itself in USAGE, and lists its tools, not an exposition', async () => {
     const { stderr, exits } = await stopped(['--help']);
     expect(exits).toEqual([0]);
     expect(stderr.join('\n')).toContain(
       'USAGE:\n  mcp-abap-adt-compact-sse [options]',
     );
-    expect(stderr.join('\n')).toContain('--exposition=<ro|rw>[,debug]');
+    expect(stderr.join('\n')).toContain(
+      '\nTOOLS:\n  mcp-abap-adt-compact-sse serves one fixed tool set',
+    );
+    expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the compact tool set: rw by default, 27 tools, the three background-run tools and the three leftover-session tools', () => {
-    const exposition = compactToolSet.exposition(undefined, [], 'stdio');
-    expect(exposition).toEqual(['rw']);
+  it('serves the compact tool set: the 27 tools, the four debugger verbs, the three background-run tools and the three leftover-session tools', () => {
     const tools = compactToolSet
-      .groups({ connection: undefined as never, logger: undefined }, exposition)
+      .groups({ connection: undefined as never, logger: undefined })
       .flatMap((group) => group.getHandlers());
-    expect(tools).toHaveLength(33);
+    expect(tools).toHaveLength(37);
+  });
+
+  it('stops on --exposition, naming the binary its words ask for', async () => {
+    expect(await stopped(['--exposition=ro'])).toEqual({
+      stdout: [],
+      stderr: [
+        `[MCP] --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the compact tools that change nothing are served by \`mcp-abap-adt-compact-sse-ro\` (\`@mcp-abap-adt/compact-sse-ro\`)`,
+      ],
+      exits: [1],
+    });
   });
 });

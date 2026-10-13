@@ -18,6 +18,9 @@
  * - http reaches no sse and sse no http; neither reaches core;
  * - compact-http and compact-sse reach no core (nor compact), and each
  *   reaches exactly its own transport package (D49);
+ * - the six read-only packages (C23) reach lib, their own transport's
+ *   package and — a compact one — the half that changes nothing, and never
+ *   the modifying half or another transport;
  * - every package a file of a package imports is declared in that package's
  *   own published dependencies, so a packed install resolves it — and, for
  *   core, http and sse, present in the root manifest, so the root install
@@ -60,6 +63,12 @@ const TRANSPORTS = [
   '@mcp-abap-adt/compact',
   '@mcp-abap-adt/compact-http',
   '@mcp-abap-adt/compact-sse',
+  '@mcp-abap-adt/core-ro',
+  '@mcp-abap-adt/http-ro',
+  '@mcp-abap-adt/sse-ro',
+  '@mcp-abap-adt/compact-ro',
+  '@mcp-abap-adt/compact-http-ro',
+  '@mcp-abap-adt/compact-sse-ro',
 ];
 const HALVES = [
   '@mcp-abap-adt/compact-readonly-entries',
@@ -81,6 +90,34 @@ const compactOver = (
   ],
   ...(chainState === 'through core' && { undeclared: CHAIN_STATE }),
   required: ['@mcp-abap-adt/lib', transport, ...HALVES],
+});
+
+/**
+ * A read-only package (C23): lib and `transport` only — and, for a compact
+ * one, the half that changes nothing, never the modifying half — and no
+ * other transport.
+ */
+const readOnlyOver = (
+  name: string,
+  dir: string,
+  transport: string,
+  chainState: 'forbidden' | 'through core',
+  compact: boolean,
+): Row => ({
+  name,
+  dir,
+  forbidden: [
+    ...(chainState === 'forbidden' ? CHAIN_STATE : []),
+    ...TRANSPORTS.filter((t) => t !== transport && t !== name),
+    '@mcp-abap-adt/compact-modify',
+    ...(compact ? [] : ['@mcp-abap-adt/compact-readonly-entries']),
+  ],
+  ...(chainState === 'through core' && { undeclared: CHAIN_STATE }),
+  required: [
+    '@mcp-abap-adt/lib',
+    transport,
+    ...(compact ? ['@mcp-abap-adt/compact-readonly-entries'] : []),
+  ],
 });
 
 /** The packages the rule covers. */
@@ -132,6 +169,49 @@ const PACKAGES: Row[] = [
     '@mcp-abap-adt/sse',
     'forbidden',
   ),
+  // The six read-only packages (C23): each over its transport's launcher.
+  readOnlyOver(
+    '@mcp-abap-adt/core-ro',
+    'core-ro',
+    '@mcp-abap-adt/core',
+    'through core',
+    false,
+  ),
+  readOnlyOver(
+    '@mcp-abap-adt/http-ro',
+    'http-ro',
+    '@mcp-abap-adt/http',
+    'forbidden',
+    false,
+  ),
+  readOnlyOver(
+    '@mcp-abap-adt/sse-ro',
+    'sse-ro',
+    '@mcp-abap-adt/sse',
+    'forbidden',
+    false,
+  ),
+  readOnlyOver(
+    '@mcp-abap-adt/compact-ro',
+    'compact-ro',
+    '@mcp-abap-adt/core',
+    'through core',
+    true,
+  ),
+  readOnlyOver(
+    '@mcp-abap-adt/compact-http-ro',
+    'compact-http-ro',
+    '@mcp-abap-adt/http',
+    'forbidden',
+    true,
+  ),
+  readOnlyOver(
+    '@mcp-abap-adt/compact-sse-ro',
+    'compact-sse-ro',
+    '@mcp-abap-adt/sse',
+    'forbidden',
+    true,
+  ),
 ];
 
 /** Every package of this repository, by name: how a sibling import is followed. */
@@ -146,6 +226,12 @@ const SIBLING_DIRS = [
   'compact-sse',
   'compact-readonly-entries',
   'compact-modify',
+  'core-ro',
+  'http-ro',
+  'sse-ro',
+  'compact-ro',
+  'compact-http-ro',
+  'compact-sse-ro',
 ];
 
 interface Manifest {
@@ -470,6 +556,27 @@ describe('no transport reaches another by a relative path, tests included', () =
     ['compact/src', ['http', 'sse', 'compact-http', 'compact-sse']],
     ['compact-http/src', ['server', 'sse', 'compact', 'compact-sse']],
     ['compact-sse/src', ['server', 'http', 'compact', 'compact-http']],
+    ['core-ro/src', ['http', 'sse', 'compact', 'compact-http', 'compact-sse']],
+    [
+      'http-ro/src',
+      ['server', 'sse', 'compact', 'compact-http', 'compact-sse'],
+    ],
+    [
+      'sse-ro/src',
+      ['server', 'http', 'compact', 'compact-http', 'compact-sse'],
+    ],
+    [
+      'compact-ro/src',
+      ['http', 'sse', 'compact', 'compact-http', 'compact-sse'],
+    ],
+    [
+      'compact-http-ro/src',
+      ['server', 'sse', 'compact', 'compact-http', 'compact-sse'],
+    ],
+    [
+      'compact-sse-ro/src',
+      ['server', 'http', 'compact', 'compact-http', 'compact-sse'],
+    ],
   ])('%s', (dir, others) => {
     const crossings: string[] = [];
     for (const file of sources(dir)) {

@@ -821,11 +821,12 @@ function generateMarkdown(tools) {
   md += `- Session tools: ${summary.session}\n\n`;
 
   md += `## Handler Sets\n\n`;
-  md += `- \`readonly\` -> [Read-Only Group](#read-only-group)\n`;
-  md += `- \`high\` -> [High-Level Group](#high-level-group)\n`;
-  md += `- \`debug\` (opt-in) -> [Debug Group](#debug-group)\n`;
-  md += `- every exposition -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume beside \`high\` only)\n`;
-  md += `- \`compact\` -> [High-Level / Compact](#high-level-compact)\n\n`;
+  md += `The binary fixes its tool set (19.0.0); there is no \`--exposition\`.\n\n`;
+  md += `- \`readonly\` -> [Read-Only Group](#read-only-group): \`mcp-abap-adt\` and \`mcp-abap-adt-ro\` (and \`-http\`, \`-sse\`, each with its \`-ro\`)\n`;
+  md += `- \`high\` -> [High-Level Group](#high-level-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`\n`;
+  md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
+  md += `- every binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume in the write binaries only)\n`;
+  md += `- compact -> [High-Level / Compact](#high-level-compact): \`mcp-abap-adt-compact\` and \`mcp-abap-adt-compact-ro\` (and \`-compact-http\`, \`-compact-sse\`, each with its \`-ro\`)\n\n`;
 
   md += `## Navigation\n\n`;
   md += `- [Compact Set](#high-level-compact)\n`;

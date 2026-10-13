@@ -28,7 +28,7 @@ names, CLI prefixes, top-level YAML keys, and the env names of a parameter that 
 
 ### The shared rows
 
-In every binary's table: `CONF_ROW` (`--conf` / `--config`), `EXPOSITION_ROW` (`--exposition`),
+In every binary's table: `CONF_ROW` (`--conf` / `--config`),
 `SYSTEM_TYPE_ROW` (`--system-type` / `SAP_SYSTEM_TYPE`), `STATE_IDLE_ROW`
 (`--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, the idle bound on held
 state). In http's and sse's: `tlsRows('http' | 'sse')` (`--tls-cert` / `--tls-key` / `--tls-ca`,
@@ -37,7 +37,11 @@ state). In http's and sse's: `tlsRows('http' | 'sse')` (`--tls-cert` / `--tls-ke
 The shared removed parameters: `transportRemoved('stdio' | 'http' | 'sse')` (`--transport`,
 `MCP_TRANSPORT`, YAML `transport`, with the D39 sentence of `TRANSPORT_GONE`),
 `SSE_OPTIONS_REMOVED`, `HTTP_OPTIONS_REMOVED`, `TLS_OPTIONS_REMOVED`,
-`DESTINATION_OPTIONS_REMOVED`.
+`DESTINATION_OPTIONS_REMOVED`, and the tool set's `expositionRemoved(transport)`: the binary
+fixes its tool set (`binaries.ts`, C23), so `--exposition` and YAML `exposition` stop the start
+with `expositionGoneWords`, one sentence per word, naming the binary of the same transport that
+serves what the words asked for. A removed parameter's `words(form, value)` receives the value the
+form carried.
 
 ### The config file (`yamlConfig.ts`) and the start (`startup.ts`)
 

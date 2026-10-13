@@ -1,6 +1,5 @@
 import { load } from 'js-yaml';
 import {
-  EXPOSITION_ROW,
   type ParameterTable,
   STATE_IDLE_ROW,
   tlsRows,
@@ -14,7 +13,7 @@ import {
 /** A table of lib's shared rows: the secret check holds for every binary's. */
 const TABLE: ParameterTable = {
   program: 'any-binary',
-  rows: [EXPOSITION_ROW, ...tlsRows('http'), STATE_IDLE_ROW],
+  rows: [...tlsRows('http'), STATE_IDLE_ROW],
   removed: [],
 };
 const validateYamlConfig = (config: YamlConfig) => validateTable(TABLE, config);

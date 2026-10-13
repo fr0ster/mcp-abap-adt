@@ -99,9 +99,11 @@ export const SSE_ROWS: readonly Parameter[] = [
 ];
 
 /**
- * sse's table for a tool set: its rows, the shared rows with the set's
- * `--exposition` row, and what it refuses. `mcp-abap-adt-compact-sse` is
- * this table with the compact set's row, nothing else (spec §10.1).
+ * sse's table for a tool set: its rows, the shared rows, and what it
+ * refuses — the set's removed `--exposition` among them, naming the sse
+ * binary its words asked for. `mcp-abap-adt-sse-ro`, `mcp-abap-adt-compact-sse`
+ * and `mcp-abap-adt-compact-sse-ro` are this table with their own set,
+ * nothing else (spec §10.1, C23).
  */
 export function sseParameters(
   toolSet: ToolSet,
@@ -111,7 +113,6 @@ export function sseParameters(
     program,
     rows: [
       CONF_ROW,
-      toolSet.expositionRow,
       SYSTEM_TYPE_ROW,
       ...SSE_ROWS,
       ...tlsRows('sse'),
@@ -119,6 +120,7 @@ export function sseParameters(
       SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
+      toolSet.expositionRemoved('sse'),
       transportRemoved('sse'),
       DESTINATION_OPTIONS_REMOVED,
       HTTP_OPTIONS_REMOVED,
@@ -164,7 +166,6 @@ export function readSseConfig(
   const table = sseParameters(toolSet);
   const values = readParameters(table, argv, env, yaml);
   return {
-    exposition: toolSet.exposition(values.exposition, argv, 'sse'),
     configFile: values.configFile as string | undefined,
     systemType: values.systemType as SseConfig['systemType'],
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),

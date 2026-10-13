@@ -102,9 +102,11 @@ export const HTTP_ROWS: readonly Parameter[] = [
 ];
 
 /**
- * http's table for a tool set: its rows, the shared rows with the set's
- * `--exposition` row, and what it refuses. `mcp-abap-adt-compact-http` is
- * this table with the compact set's row, nothing else (spec §10.1).
+ * http's table for a tool set: its rows, the shared rows, and what it
+ * refuses — the set's removed `--exposition` among them, naming the http
+ * binary its words asked for. `mcp-abap-adt-http-ro`, `mcp-abap-adt-compact-http`
+ * and `mcp-abap-adt-compact-http-ro` are this table with their own set,
+ * nothing else (spec §10.1, C23).
  */
 export function httpParameters(
   toolSet: ToolSet,
@@ -114,7 +116,6 @@ export function httpParameters(
     program,
     rows: [
       CONF_ROW,
-      toolSet.expositionRow,
       SYSTEM_TYPE_ROW,
       ...HTTP_ROWS,
       ...tlsRows('http'),
@@ -122,6 +123,7 @@ export function httpParameters(
       SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
+      toolSet.expositionRemoved('http'),
       transportRemoved('http'),
       DESTINATION_OPTIONS_REMOVED,
       SSE_OPTIONS_REMOVED,
@@ -167,7 +169,6 @@ export function readHttpConfig(
   const table = httpParameters(toolSet);
   const values = readParameters(table, argv, env, yaml);
   return {
-    exposition: toolSet.exposition(values.exposition, argv, 'http'),
     configFile: values.configFile as string | undefined,
     systemType: values.systemType as HttpConfig['systemType'],
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),

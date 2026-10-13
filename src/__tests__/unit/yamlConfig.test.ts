@@ -11,7 +11,6 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  EXPOSITION_ROW,
   ParameterRefusal,
   type ParameterTable,
   tlsRows,
@@ -28,7 +27,14 @@ import {
 const TABLE: ParameterTable = {
   program: 'test-binary',
   rows: [
-    EXPOSITION_ROW,
+    {
+      key: 'items',
+      cli: '--items',
+      yaml: 'items',
+      kind: 'list',
+      section: 'TEST',
+      help: 'A list',
+    },
     {
       key: 'port',
       cli: '--http-port',
@@ -73,15 +79,15 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
     expect(config?.http?.host).toBe('127.0.0.1');
   });
 
-  it('parses a YAML array (exposition) into a string[]', () => {
+  it('parses a YAML array into a string[]', () => {
     const file = writeTempYaml(
       'array.yaml',
-      ['exposition:', '  - readonly', '  - high', '  - low'].join('\n'),
+      ['items:', '  - readonly', '  - high', '  - low'].join('\n'),
     );
 
     const config = loadYamlConfig(TABLE, file);
 
-    expect(config?.exposition).toEqual(['readonly', 'high', 'low']);
+    expect(config?.items).toEqual(['readonly', 'high', 'low']);
   });
 
   it('returns null when the config file does not exist', () => {

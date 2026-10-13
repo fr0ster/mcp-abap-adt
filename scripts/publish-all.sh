@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the ten packages of this repository to npm, in dependency order.
+# Publish the sixteen packages of this repository to npm, in dependency order.
 #
 # Usage: npm run release:publish            (add --dry-run to rehearse)
 #
@@ -28,6 +28,9 @@ done
 # can build until the library has; background-runs-memory depends on lib, and
 # core, http and sse depend on it; compact depends on core, compact-http on
 # http and compact-sse on sse. core, http and sse do not depend on one another.
+# The six read-only packages (C23) come last: core-ro and compact-ro depend on
+# core, http-ro and compact-http-ro on http, sse-ro and compact-sse-ro on sse,
+# and the compact ones on compact-readonly-entries.
 PACKAGES=(
   "."
   "./background-runs-memory"
@@ -39,6 +42,12 @@ PACKAGES=(
   "./compact"
   "./compact-http"
   "./compact-sse"
+  "./core-ro"
+  "./http-ro"
+  "./sse-ro"
+  "./compact-ro"
+  "./compact-http-ro"
+  "./compact-sse-ro"
 )
 
 PUBLISHED=0

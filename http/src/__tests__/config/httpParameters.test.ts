@@ -10,8 +10,8 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   generateYamlConfigTemplate,
+  ParameterRefusal,
   readStartupConfig,
-  validateExposition,
   validateYamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
@@ -127,7 +127,6 @@ describe("http's help", () => {
     '--tls-ca',
     'MCP_TLS_CERT',
     '--system-type',
-    '--exposition',
     '--conf',
     '--state-idle-minutes',
     'MCP_STATE_IDLE_MINUTES',
@@ -286,11 +285,30 @@ describe('the Streamable HTTP rows', () => {
   });
 });
 
-describe('--exposition', () => {
-  it('readonly,debug is accepted', () => {
-    const { exposition } = readHttpConfig(['--exposition=readonly,debug'], {});
-    expect(exposition).toEqual(['readonly', 'debug']);
-    expect(() => validateExposition(exposition ?? [])).not.toThrow();
+// The binary fixes its tool set (C23): the flag and the YAML key are gone,
+// each word answered with the binary of this transport that serves it.
+describe('--exposition is gone', () => {
+  it('the flag stops the start, naming the binary its words ask for', () => {
+    expect(() => readHttpConfig(['--exposition=readonly'], {})).toThrow(
+      new ParameterRefusal(
+        '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`)',
+      ),
+    );
+    expect(() =>
+      readHttpConfig(['--exposition', 'readonly,high,debug'], {}),
+    ).toThrow(
+      new ParameterRefusal(
+        '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the high tools are served, beside the readonly ones, by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)',
+      ),
+    );
+  });
+
+  it('in the config file too, and the help lists no such option', () => {
+    expect(() => readHttpConfig([], {}, { exposition: 'readonly' })).toThrow(
+      new ParameterRefusal(
+        'exposition (config file) is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`)',
+      ),
+    );
   });
 });
 
@@ -415,19 +433,12 @@ describe('the YAML template and validation come from the table', () => {
       host: '127.0.0.1',
       port: 3000,
       stateIdleMinutes: 30,
-      exposition: ['readonly', 'high'],
     });
   });
 
   it('holds http rows under http, and no other binary keys', () => {
     expect(Object.keys(parsed).sort()).toEqual(
-      [
-        'exposition',
-        'http',
-        'shutdown-timeout',
-        'state-idle-minutes',
-        'system-type',
-      ].sort(),
+      ['http', 'shutdown-timeout', 'state-idle-minutes', 'system-type'].sort(),
     );
     expect(Object.keys(parsed.http as object).sort()).toEqual(
       [

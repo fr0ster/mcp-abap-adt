@@ -1,7 +1,8 @@
 /**
- * The groups of the full tool set for an exposition: the group building every
- * launcher shares (core, http, sse) through `fullToolSet`
- * (`@mcp-abap-adt/lib/tool-set`), so none copies it and none imports another's.
+ * The groups of the object-oriented handler sets: `fullToolSet`
+ * (`@mcp-abap-adt/lib/tool-set`) builds core's, http's and sse's from
+ * `readonly,high,debug`, so none copies it and none imports another's; an
+ * embedder may build any other combination.
  */
 
 import type { HandlerSet } from '../../config/IServerConfig.js';

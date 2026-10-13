@@ -37,11 +37,12 @@ import { SseServer } from './SseServer.js';
  * What a command passes sse's launcher (spec §3.5, D37, D49): the tools it
  * serves, and its own name and version — nothing else. Everything the
  * launcher does is sse's, the same for any tool set:
- * `mcp-abap-adt-sse` passes `fullToolSet`, `mcp-abap-adt-compact-sse` the
- * compact set.
+ * `mcp-abap-adt-sse` passes `fullToolSet`, `mcp-abap-adt-sse-ro`
+ * `fullReadOnlyToolSet`, `mcp-abap-adt-compact-sse` and
+ * `mcp-abap-adt-compact-sse-ro` the compact sets.
  */
 export interface SseLauncherOptions {
-  /** The tools served, and the `--exposition` they are chosen by. */
+  /** The tools served: fixed by the command, never by a flag. */
   toolSet: ToolSet;
   /** The command's own name: USAGE in `--help`, the `--conf` template's header. */
   program: string;
@@ -72,7 +73,7 @@ routed by its sessionId alone, and its own x-sap-* headers are not read):
     x-sap-responsible              Responsible of created objects
     x-sap-master-system            Master system of created objects
     x-sap-language                 Master/original language for created objects
-    x-sap-debug-terminal-id        The debugger's terminal id (with --exposition=...,debug)
+    x-sap-debug-terminal-id        The debugger's terminal id (where the debugger is served)
     x-sap-debug-ide-id             The debugger's IDE id
     x-sap-debug-breakpoint-conflict  replace (default) or refuse-if-held: whether a take-over
                                    of the debugger, and every later change of its breakpoints,
@@ -86,7 +87,7 @@ routed by its sessionId alone, and its own x-sap-* headers are not read):
   A health check answers GET /mcp/health.
 `;
 
-/** sse's help: its own table with the tool set's exposition row, the set's exposition, the headers. */
+/** sse's help: its own table, the set's TOOLS section, the headers. */
 export function sseHelp(
   options: { toolSet?: ToolSet; program?: string } = {},
 ): string {
@@ -96,9 +97,9 @@ export function sseHelp(
     description:
       '  MCP server for SAP ABAP systems via ADT, over HTTP+SSE: credentials only from the\n  x-sap-* headers of the GET that opens each SSE connection. stdio (destinations,\n  logins) is mcp-abap-adt, Streamable HTTP mcp-abap-adt-http; a binary is its transport.',
     sections: [
-      toolSet.expositionHelp('sse'),
+      toolSet.toolsHelp('sse'),
       HELP_SECTIONS,
-      `\nEXAMPLES:\n${toolSet.expositionExamples(program)}`,
+      `\nEXAMPLES:\n  # Listen on port 3000\n  ${program} --sse-port=3000\n`,
     ],
   });
 }
@@ -116,8 +117,8 @@ export async function main(
   ) {
     return undefined;
   }
-  // sse's own table with the set's exposition row: an option of another
-  // binary, --transport, or an exposition the set does not serve stops here.
+  // sse's own table: an option of another binary, --transport, or the
+  // removed --exposition stops here.
   const config = readStartupConfig(
     sseParameters(options.toolSet, options.program),
     argv,
@@ -142,16 +143,7 @@ export async function launch(
   // The connector and the tool filter read the system kind from the
   // environment (`resolveSystemKind`).
   if (config.systemType) process.env.SAP_SYSTEM_TYPE = config.systemType;
-  // The tool set's groups for the exposition read (a config made by hand
-  // without one: the set's default).
-  const exposition =
-    config.exposition ??
-    options.toolSet.exposition(
-      options.toolSet.expositionRow.default,
-      [],
-      'sse',
-    );
-  const server = new SseServer(registryOf(options.toolSet, exposition), {
+  const server = new SseServer(registryOf(options.toolSet), {
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,
     // The state's lines go to stderr whatever the transport logger says.
@@ -171,7 +163,11 @@ export async function launch(
     leftoverSessions: new LeftoverSessions({ directory: runtimeDirectory() }),
     // Background runs of the run tools, kept in this process's memory and
     // handed to every SSE session's instance; they end with the process.
-    backgroundRuns: new InMemoryBackgroundRuns(),
+    // Only where the set serves them: a -ro command has none, so a run's
+    // `background: true` is refused.
+    ...(options.toolSet.backgroundRuns && {
+      backgroundRuns: new InMemoryBackgroundRuns(),
+    }),
   });
   installTransportShutdown({
     stopListening: () => server.stopListening(),

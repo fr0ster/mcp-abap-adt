@@ -100,6 +100,12 @@ package.json
 !/compact/package.json
 !/compact-http/package.json
 !/compact-sse/package.json
+!/core-ro/package.json
+!/http-ro/package.json
+!/sse-ro/package.json
+!/compact-ro/package.json
+!/compact-http-ro/package.json
+!/compact-sse-ro/package.json
 .npm-cache/**
 SAP_ADT.json
 dev.json

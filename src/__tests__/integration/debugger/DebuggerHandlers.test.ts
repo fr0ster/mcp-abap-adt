@@ -14,8 +14,8 @@
  * `MEASURE <case> | <asked> | <answered>`, and each timed call one line
  * `TIMING <step> <ms>`, on stderr. Times are measured, never asserted.
  *
- * Hard mode (`integration_hard_mode.enabled: true`, exposition including
- * `debug`) runs the ABAP chain through the MCP server — stdio, or Streamable
+ * Hard mode (`integration_hard_mode.enabled: true`; core serves `debug`
+ * always) runs the ABAP chain through the MCP server — stdio, or Streamable
  * HTTP where every call is its own request carrying `state_handle`. The cases
  * that drive SAP or the instance directly skip there.
  *

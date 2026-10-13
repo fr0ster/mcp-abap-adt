@@ -1,6 +1,7 @@
 /**
  * What every binary's configuration holds: the values of lib's shared rows
- * (`--exposition`, `--system-type`, `--conf`, `--state-idle-minutes`).
+ * (`--system-type`, `--conf`, `--state-idle-minutes`). The tools are not
+ * among them: the binary fixes its tool set (C23).
  *
  * The transport, HTTP, SSE and destination fields are not here (D38): each
  * belongs to the package that reads it — core's `CoreConfig` (the
@@ -19,23 +20,14 @@ export interface TlsConfig {
 }
 
 /**
- * The handler sets a configuration may name.
- *
- * `compact` is still a member and is deliberately NOT served here: the facade is
- * `@mcp-abap-adt/compact`, its own command. Keeping the value means a configuration
- * that asks for it is recognised and refused with that pointer
- * (`validateExposition`) rather than parsed as a typo or silently ignored.
+ * The object-oriented handler sets an embedder may combine
+ * (`registryForExposition`, `expositionGroups`). The binaries take no set: each
+ * fixes its own (C23). `compact` is not served by these groups: the facade is
+ * the compact binaries'.
  */
 export type HandlerSet = 'readonly' | 'high' | 'compact' | 'debug';
 
 export interface IServerConfig {
-  /**
-   * The exposition served (`--exposition`), in the words of the binary's tool
-   * set (`ToolSet.exposition`): `readonly,high` by default for the full set,
-   * `rw` for the compact one.
-   */
-  exposition?: readonly string[];
-
   /** Path to YAML config file (`--conf`). */
   configFile?: string;
 

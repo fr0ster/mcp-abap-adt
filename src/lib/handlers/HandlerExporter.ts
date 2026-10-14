@@ -82,8 +82,10 @@ export interface HandlerExporterOptions {
    * system. Its answer wins over anything configured: `null` means the
    * system has no such function (an on-premise `404`) — the configuration
    * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
-   * `x-sap-url`) stands; a non-null answer is the system's — nothing
-   * configured counts. It is asked before each wrapped handler runs, as the
+   * `x-sap-url`) stands, when the call states a user (the connection's
+   * `SAP_USERNAME`, else the request scope's login); with none the wrapped
+   * handler throws `system_user_unknown` and does not run. A non-null answer
+   * is the system's — nothing configured counts. It is asked before each wrapped handler runs, as the
    * server asks before a tool: an answer that names no user (`{}` included)
    * is `system_without_user`, a resolver that throws `system_lookup_failed`
    * (the shipped one's ABAP Cloud `404` `cloud_without_systeminformation`,

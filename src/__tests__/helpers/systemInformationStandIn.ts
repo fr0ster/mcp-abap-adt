@@ -1,8 +1,6 @@
 /**
- * A stand-in connection for an on-premise system without the
- * `systeminformation` function: its lookup fails with a `404`, so the
- * server runs with the configuration. For tests whose subject is not the
- * system lookup.
+ * Stand-ins for the `systeminformation` lookup, for tests whose subject is
+ * not the system lookup.
  */
 
 const SYSTEM_INFORMATION = '/sap/bc/adt/core/http/systeminformation';
@@ -14,12 +12,16 @@ export function notFound(): Error {
   });
 }
 
+/** The user and system id `withSystemInformation`'s system names. */
+export const STAND_IN_SYSTEM = { user: 'STAND_IN_USER', systemId: 'SIN' };
+
 /**
  * `connection` (a plain object when none is given) whose
- * `makeAdtRequest` answers `systeminformation` with a `404`; any other
- * request goes to its own `makeAdtRequest`, if it has one.
+ * `makeAdtRequest` answers `systeminformation` as a valid system does —
+ * naming its user (`STAND_IN_SYSTEM`); any other request goes to its own
+ * `makeAdtRequest`, if it has one, else is a `404`.
  */
-export function withoutSystemInformation<T extends object>(
+export function withSystemInformation<T extends object>(
   connection: T = {} as T,
 ): T {
   const own = (connection as { makeAdtRequest?: (o: unknown) => unknown })
@@ -27,7 +29,13 @@ export function withoutSystemInformation<T extends object>(
   return Object.assign(connection, {
     makeAdtRequest: async (options: { url?: string }) => {
       if (String(options?.url ?? '').startsWith(SYSTEM_INFORMATION)) {
-        throw notFound();
+        return {
+          status: 200,
+          data: {
+            userName: STAND_IN_SYSTEM.user,
+            systemID: STAND_IN_SYSTEM.systemId,
+          },
+        };
       }
       if (own) return own.call(connection, options);
       throw notFound();

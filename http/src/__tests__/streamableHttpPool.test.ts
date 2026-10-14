@@ -16,7 +16,7 @@ import type { InstanceState, StatePart } from '@mcp-abap-adt/lib/state';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { withoutSystemInformation } from '../../../src/__tests__/helpers/noSystemInformation';
+import { withSystemInformation } from '../../../src/__tests__/helpers/systemInformationStandIn';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 /** Every request carries its own credentials: the server takes them from nowhere else (D39). */
@@ -145,7 +145,7 @@ describe.each([
       jest.spyOn(console, 'error').mockImplementation(() => {});
       jest
         .spyOn(BaseMcpServer.prototype as never, 'getConnection')
-        .mockResolvedValue(withoutSystemInformation() as never);
+        .mockResolvedValue(withSystemInformation() as never);
       previousType = process.env.SAP_SYSTEM_TYPE;
       process.env.SAP_SYSTEM_TYPE = 'onprem'; // the stub's lookup answers 404
       currentGate = gate();
@@ -299,7 +299,7 @@ describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secre
     jest.spyOn(console, 'error').mockImplementation(() => {});
     jest
       .spyOn(BaseMcpServer.prototype as never, 'getConnection')
-      .mockResolvedValue(withoutSystemInformation() as never);
+      .mockResolvedValue(withSystemInformation() as never);
     previousType = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = 'onprem';
     server = new StreamableHttpServer(probes, {

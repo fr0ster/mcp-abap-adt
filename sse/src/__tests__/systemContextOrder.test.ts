@@ -4,8 +4,11 @@
  * (a 404). Each its own variable first: the opening request's
  * `x-sap-responsible` / `x-sap-master-system` headers; the process
  * environment. Then, for the responsible only, the login: the opening
- * request's `x-sap-login`, the process `SAP_USERNAME`. Each session sees its
- * own values — two concurrent sessions never see each other's.
+ * request's `x-sap-login`. Each session sees its own values — two
+ * concurrent sessions never see each other's. Such a system names no user,
+ * so the session must state one (`x-sap-login` of a basic connection): one
+ * that states none is refused `system_user_unknown` before its tool, and its
+ * next call asks again.
  */
 
 import type { Server } from 'node:http';
@@ -14,11 +17,16 @@ import type { AddressInfo } from 'node:net';
 // The connector, without a wire: an on-premise system without
 // systeminformation (its lookup answers 404), so the configured order below
 // applies — where the system names its user, its answer wins over all of it.
+// Each lookup is counted.
+const mockLookups = { count: 0 };
 jest.mock('../../../src/lib/connectionFactory', () => ({
   ...jest.requireActual('../../../src/lib/connectionFactory'),
   createAbapConnection: () => ({
     connect: async () => {},
-    makeAdtRequest: async () => {
+    makeAdtRequest: async (options: { url?: string }) => {
+      if (String(options?.url ?? '').includes('systeminformation')) {
+        mockLookups.count += 1;
+      }
       throw Object.assign(new Error('Request failed with status code 404'), {
         response: { status: 404 },
       });
@@ -73,10 +81,17 @@ const whoAmI: IHandlerGroup = {
 };
 const registry = new CompositeHandlersRegistry([whoAmI]);
 
-/** A token connection: the credential every session must open with, stating no login. */
+/** A token connection: a credential stating no login. */
 const TOKEN = {
   'x-sap-url': 'https://system.example.invalid',
   'x-sap-jwt-token': 'token-placeholder',
+};
+
+/** A basic connection: its `x-sap-login` states the user. */
+const BASIC = {
+  'x-sap-url': 'https://system.example.invalid',
+  'x-sap-login': 'HEADER_LOGIN',
+  'x-sap-password': 'placeholder-password',
 };
 
 async function listen(
@@ -158,6 +173,16 @@ describe('SseServer: responsible and master system per session', () => {
     headers: Record<string, string>,
     delayMs = 0,
   ): Promise<Seen> {
+    const answer = await (await session(headers))(delayMs);
+    return JSON.parse(answer.text);
+  }
+
+  /** Opens a session with these headers; each call answers its result. */
+  async function session(
+    headers: Record<string, string>,
+  ): Promise<
+    (delayMs?: number) => Promise<{ text: string; isError: boolean }>
+  > {
     const controller = new AbortController();
     controllers.push(controller);
     const res = await fetch(`${baseUrl}/sse`, {
@@ -182,53 +207,78 @@ describe('SseServer: responsible and master system per session', () => {
       }
     };
     const endpoint = await nextData('endpoint');
-    await fetch(new URL(endpoint, baseUrl), {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(call(1, delayMs)),
-    });
-    const message = JSON.parse(await nextData('message'));
-    return JSON.parse(message.result.content[0].text);
+    let id = 1;
+    return async (delayMs = 0) => {
+      await fetch(new URL(endpoint, baseUrl), {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(call(id++, delayMs)),
+      });
+      const message = JSON.parse(await nextData('message'));
+      return {
+        text: message.result.content[0].text,
+        isError: message.result.isError === true,
+      };
+    };
   }
 
   it('the opening headers win over the process environment', async () => {
     await expect(
-      ask({ ...TOKEN, 'x-sap-responsible': 'HEADER_USER' }),
+      ask({ ...BASIC, 'x-sap-responsible': 'HEADER_USER' }),
     ).resolves.toEqual({
       responsible: 'HEADER_USER',
       masterSystem: 'PROCESS_SYS',
     });
-    await expect(ask(TOKEN)).resolves.toEqual({
+    await expect(ask(BASIC)).resolves.toEqual({
       responsible: 'PROCESS_USER',
       masterSystem: 'PROCESS_SYS',
     });
   });
 
-  it('the login: x-sap-login of a basic connection, else the process SAP_USERNAME', async () => {
+  it('the login: x-sap-login of a basic connection', async () => {
     delete process.env.SAP_RESPONSIBLE;
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-    await expect(
-      ask({
-        'x-sap-url': 'https://system.example.invalid',
-        'x-sap-login': 'HEADER_LOGIN',
-        'x-sap-password': 'placeholder-password',
-      }),
-    ).resolves.toEqual({
+    await expect(ask(BASIC)).resolves.toEqual({
       responsible: 'HEADER_LOGIN',
-      masterSystem: 'PROCESS_SYS',
-    });
-    await expect(
-      ask({ ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' }),
-    ).resolves.toEqual({
-      responsible: 'PROCESS_LOGIN',
       masterSystem: 'PROCESS_SYS',
     });
   });
 
+  it.each([
+    ['a token connection', TOKEN],
+    [
+      'a token connection with x-sap-login (it logs nobody on)',
+      { ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' },
+    ],
+  ])(
+    '%s states no user: system_user_unknown, the tool not run, and the next call on the session asks again',
+    async (_case, headers) => {
+      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+      const before = mockLookups.count;
+      const next = await session(headers);
+      for (let i = 0; i < 2; i += 1) {
+        const answer = await next();
+        expect(answer.isError).toBe(true);
+        expect(JSON.parse(answer.text)).toMatchObject({
+          error: 'system_user_unknown',
+        });
+      }
+      expect(mockLookups.count - before).toBe(2);
+    },
+  );
+
+  it('a session that states its user asks once, and every call runs', async () => {
+    const before = mockLookups.count;
+    const next = await session(BASIC);
+    expect((await next()).isError).toBe(false);
+    expect((await next()).isError).toBe(false);
+    expect(mockLookups.count - before).toBe(1);
+  });
+
   it('two concurrent sessions each see their own', async () => {
     const [a, b] = await Promise.all([
-      ask({ ...TOKEN, 'x-sap-responsible': 'FIRST' }, 60),
-      ask({ ...TOKEN, 'x-sap-master-system': 'HDR' }, 0),
+      ask({ ...BASIC, 'x-sap-responsible': 'FIRST' }, 60),
+      ask({ ...BASIC, 'x-sap-master-system': 'HDR' }, 0),
     ]);
     expect(a).toEqual({ responsible: 'FIRST', masterSystem: 'PROCESS_SYS' });
     expect(b).toEqual({ responsible: 'PROCESS_USER', masterSystem: 'HDR' });

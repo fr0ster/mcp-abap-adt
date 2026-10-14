@@ -29,7 +29,7 @@ import {
 import { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { return_error } from '../../../lib/utils';
-import { withoutSystemInformation } from '../../helpers/noSystemInformation';
+import { withSystemInformation } from '../../helpers/systemInformationStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
 
 const ALLOWED_KEYS = [
@@ -264,7 +264,7 @@ describe('the answer sites read the failure first (§7.2)', () => {
     const server = new McpServer({ name: 'group-test', version: '1.0.0' });
     new CompositeHandlersRegistry([
       new Group({
-        connection: withoutSystemInformation() as never,
+        connection: withSystemInformation() as never,
         logger: undefined as never,
       }),
     ]).registerAllTools(server);

@@ -18,7 +18,7 @@ import { TOOL_DEFINITION as VirtualFolders } from '../../../handlers/system/low/
 import { TOOL_DEFINITION as CompactStart } from '../../../lib/compact/debug/handleHandlerDebugStart';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
-import { withoutSystemInformation } from '../../helpers/noSystemInformation';
+import { withSystemInformation } from '../../helpers/systemInformationStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
 
 // The system kind is required: the stand-in's is stated for every case.
@@ -56,7 +56,7 @@ class BoundaryServer extends BaseMcpServer {
     );
   }
   protected async getConnection(): Promise<any> {
-    return withoutSystemInformation();
+    return withSystemInformation();
   }
 }
 

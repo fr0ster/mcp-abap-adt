@@ -507,8 +507,10 @@ describe('cloud', () => {
           'adtcore:responsible="CB_USER"',
         );
       } else {
+        // No user stated (no login in the scope, none in the connection):
+        // refused before the tool.
         expect(lookup).toHaveBeenCalledTimes(1);
-        expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
+        expect(textOf(result)).toContain('system_user_unknown');
         expect(connection.requests).toEqual([]);
       }
     },
@@ -574,7 +576,11 @@ describe('on-premise, through the server', () => {
       ],
     },
   ]);
-  const create = async () => {
+  // The request's login (`x-sap-login`): what an on-premise system without
+  // the function needs stated.
+  const create = async (
+    scope: { login?: string } = { login: 'LOGIN_PLACEHOLDER' },
+  ) => {
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -589,7 +595,9 @@ describe('on-premise, through the server', () => {
         >;
       }
     )._registeredTools;
-    const result = await tools.CreateMessageClass.handler(MSAG_ARGS);
+    const result = await runWithRequestContext(scope, () =>
+      tools.CreateMessageClass.handler(MSAG_ARGS),
+    );
     return { connection, result };
   };
   const status = (code: number) =>
@@ -630,6 +638,14 @@ describe('on-premise, through the server', () => {
     expect(createBody(connection)).toContain(
       'adtcore:responsible="LOGIN_PLACEHOLDER"',
     );
+  });
+
+  it('without the function (404) and no user stated (only the process configuration): system_user_unknown, nothing sent', async () => {
+    lookup.mockRejectedValue(status(404));
+    const first = await create({});
+    expect(textOf(first.result)).toContain('system_user_unknown');
+    expect(first.connection.requests).toEqual([]);
+    expect(lookup).toHaveBeenCalledTimes(1);
   });
 
   it('an answer without a user: system_without_user, nothing configured stands in, nothing sent', async () => {

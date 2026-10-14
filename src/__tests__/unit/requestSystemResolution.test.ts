@@ -91,6 +91,18 @@ function onPremConn(): IAbapConnection {
   );
 }
 
+/** On-premise, its parameters stating the user (`SAP_USERNAME`). */
+function onPremUserConn(): IAbapConnection {
+  return built(
+    {
+      url: 'https://system.example.invalid',
+      authType: 'basic',
+      username: 'STATED',
+    },
+    'onprem',
+  );
+}
+
 /** A connection the factory did not build (an embedder's own). */
 function foreignConn(url: string): IAbapConnection {
   return { getBaseUrl: async () => url } as unknown as IAbapConnection;
@@ -327,7 +339,7 @@ describe('withResolvedSystemContext', () => {
     lookup.mockRejectedValue(
       Object.assign(new Error('placeholder'), { response: { status: 404 } }),
     );
-    const conn = onPremConn();
+    const conn = onPremUserConn();
     await runWithRequestContext(
       { responsible: 'ALICE', masterSystem: 'SID' },
       () =>
@@ -339,6 +351,59 @@ describe('withResolvedSystemContext', () => {
       responsible: 'ALICE',
       masterSystem: 'SID',
     });
+  });
+
+  it('on-premise without the function (404), no user stated: system_user_unknown, fn never runs, and the next call asks again', async () => {
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
+    const conn = onPremConn();
+    const fn = jest.fn();
+    for (let i = 0; i < 2; i += 1) {
+      await expect(
+        runWithRequestContext({ responsible: 'ALICE' }, () =>
+          withResolvedSystemContext(conn, fn),
+        ),
+      ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
+    }
+    expect(fn).not.toHaveBeenCalled();
+    expect(lookup).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
+  });
+
+  it.each([
+    ['blank', '   '],
+    ['empty', ''],
+  ])(
+    'on-premise without the function (404), a %s login: system_user_unknown',
+    async (_case, login) => {
+      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+      lookup.mockRejectedValue(
+        Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+      );
+      const fn = jest.fn();
+      await expect(
+        runWithRequestContext({ login }, () =>
+          withResolvedSystemContext(onPremConn(), fn),
+        ),
+      ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
+      expect(fn).not.toHaveBeenCalled();
+      warn.mockRestore();
+    },
+  );
+
+  it("on-premise without the function (404), the request's login states the user: fn runs", async () => {
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
+    const fn = jest.fn(async () => 'ran');
+    await expect(
+      runWithRequestContext({ login: 'HEADER_USER' }, () =>
+        withResolvedSystemContext(onPremConn(), fn),
+      ),
+    ).resolves.toBe('ran');
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 
   it.each([
@@ -447,7 +512,7 @@ describe('withResolvedSystemContext', () => {
     );
     const result = await runWithRequestContext(
       { responsible: undefined, masterSystem: undefined },
-      () => withResolvedSystemContext(onPremConn(), seen),
+      () => withResolvedSystemContext(onPremUserConn(), seen),
     );
     expect(result.responsible).toBeUndefined();
     expect(result.masterSystem).toBeUndefined();
@@ -632,6 +697,17 @@ describe('HandlerExporter.getHandlerEntries', () => {
         'system_lookup_failed',
       ],
       [
+        'an on-premise 404 with no user stated',
+        onPremConn,
+        () =>
+          lookup.mockRejectedValue(
+            Object.assign(new Error('placeholder'), {
+              response: { status: 404 },
+            }),
+          ),
+        'system_user_unknown',
+      ],
+      [
         'a cloud 404',
         cloudConn,
         () =>
@@ -660,7 +736,7 @@ describe('HandlerExporter.getHandlerEntries', () => {
       lookup.mockRejectedValue(
         Object.assign(new Error('placeholder'), { response: { status: 404 } }),
       );
-      const { call, ran } = callOn(onPremConn());
+      const { call, ran } = callOn(onPremUserConn());
       const result = await runWithRequestContext(
         { responsible: 'ALICE', masterSystem: 'SID' },
         call,
@@ -855,7 +931,7 @@ describe('BaseMcpServer.registerHandlers', () => {
       Object.assign(new Error('placeholder'), { response: { status: 404 } }),
     );
     const server = new EmbeddableMcpServer({
-      connection: onPremConn() as never,
+      connection: onPremUserConn() as never,
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
       systemType: 'cloud',
     });
@@ -866,6 +942,30 @@ describe('BaseMcpServer.registerHandlers', () => {
     };
     expect(result.isError).toBeUndefined();
     expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
+  it('an injected on-premise connection, a 404, no user stated: system_user_unknown, the tool does not run, the next call asks again', async () => {
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
+    const group = new ReportingGroup({ connection: {} as never });
+    const server = new EmbeddableMcpServer({
+      connection: onPremConn() as never,
+      handlersRegistry: new CompositeHandlersRegistry([group]),
+      systemType: 'onprem',
+    });
+    for (let i = 0; i < 2; i += 1) {
+      const result = (await callTool(server, 'Report')) as {
+        isError?: boolean;
+        content: Array<{ text: string }>;
+      };
+      expect(result.isError).toBe(true);
+      expect(result.content[0]?.text).toContain('system_user_unknown');
+    }
+    expect(group.observed).toBeUndefined();
+    expect(lookup).toHaveBeenCalledTimes(2);
+    warn.mockRestore();
   });
 
   it('systemContextResolver: null disables resolution', async () => {

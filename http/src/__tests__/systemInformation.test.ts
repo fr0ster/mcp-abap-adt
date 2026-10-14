@@ -1,8 +1,10 @@
 /**
  * Over Streamable HTTP every call's system context comes from
  * `systeminformation`, asked before its tool — on ABAP Cloud and on-premise
- * alike. On-premise a `404` is the function unavailable, and the
- * configuration applies; on ABAP Cloud, and for any other failure on both
+ * alike, once per destination (the request's credential and its system).
+ * On-premise a `404` is the function unavailable, and the configuration
+ * applies when the request states a user (`x-sap-login`); with none the call
+ * is `system_user_unknown`; on ABAP Cloud, and for any other failure on both
  * kinds, the call is refused. An answer that names no
  * user — the field missing or blank, a body that is no JSON, JSON that is no
  * object — is `system_without_user`; on ABAP Cloud a `404` is
@@ -82,6 +84,16 @@ it.each([405, 501, 500])(
   },
 );
 
+it('each request is its own destination (its own credential): each asks its own lookup', async () => {
+  s.standIn.body(
+    isLookup,
+    JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
+  );
+  expect((await s.call('ProbeAdt', { id: 'FIRST' })).isError).toBe(false);
+  expect((await s.call('ProbeAdt', { id: 'SECOND' })).isError).toBe(false);
+  expect(s.standIn.requests.filter(isLookup)).toHaveLength(2);
+});
+
 it('systeminformation naming its user: the tool runs', async () => {
   s.standIn.body(
     isLookup,
@@ -110,7 +122,27 @@ describe('on-premise: asked the same way; settings only without the function', (
     );
   });
 
-  it('systeminformation answered 404 (the function unavailable): the tool runs with the configuration', async () => {
+  it('systeminformation answered 404, a token connection stating no user: system_user_unknown, the tool not run, the next call asks again', async () => {
+    s.standIn.answer(isLookup, 404);
+    const token = {
+      'x-sap-url': s.standIn.url,
+      'x-sap-client': '100',
+      'x-sap-jwt-token': 'token-placeholder',
+    };
+    for (const id of ['NO_USER_ONE', 'NO_USER_TWO']) {
+      const answer = await s.call('ProbeAdt', { id }, token);
+      expect(answer.isError).toBe(true);
+      expect(JSON.parse(answer.text)).toEqual({
+        error: 'system_user_unknown',
+        message:
+          'the system has no systeminformation and the call states no user: set SAP_USERNAME (the destination or the environment), or send x-sap-login with x-sap-url, so the session user is known; the tool did not run',
+      });
+    }
+    expect(s.standIn.requests.filter(isLookup)).toHaveLength(2);
+    expect(s.standIn.requests.some(isProbe)).toBe(false);
+  });
+
+  it('systeminformation answered 404 (the function unavailable), x-sap-login states the user: the tool runs with the configuration', async () => {
     s.standIn.answer(isLookup, 404);
     const answer = await s.call('ProbeAdt', { id: 'ONPREM_ABSENT' });
     expect(answer.isError).toBe(false);

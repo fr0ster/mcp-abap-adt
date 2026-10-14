@@ -327,6 +327,25 @@ describe('ABAP Cloud: the system information at the start', () => {
     expect(stand.standIn.requests.filter(isLookup)).toEqual([]);
   });
 
+  it('a gone leftover whose file carries it: the new session asks none — the same destination — and the create reads the file’s', async () => {
+    stand = await leftoverStand({ extra: [needsResponsible] });
+    const { handle, session } = await stand.leftover({
+      system: { responsible: 'FILE_USER', masterSystem: 'FIL' },
+    });
+    stand.standIn.answer((r) => r.session === session, 401);
+    stand.standIn.body(
+      isLookup,
+      JSON.stringify({ userName: 'OTHER_USER', systemID: 'OTH' }),
+    );
+    expect(await stand.start()).toEqual({ session: 'new', handle });
+    expect(stand.file(handle)).toMatchObject({
+      system: { responsible: 'FILE_USER', master_system: 'FIL' },
+    });
+    const created = await stand.call('NeedsResponsible');
+    expect(created).toEqual({ text: 'FILE_USER', isError: false });
+    expect(stand.standIn.requests.filter(isLookup)).toEqual([]);
+  });
+
   it('a leftover whose file carries none: asked at the start, in the resumed session', async () => {
     stand = await leftoverStand();
     stand.standIn.body(

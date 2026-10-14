@@ -23,7 +23,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { errorClassOf } from './auth/errors';
 import { failureOf, readGuarded } from './auth/failures';
 import { ServerRefusal } from './auth/serverRefusal';
-import { systemKindOf } from './connectionFactory';
+import { siblingRecordOf, systemKindOf } from './connectionFactory';
 import { logger } from './logger';
 import { getRequestContext, runWithRequestContext } from './requestContext';
 import { getEffectiveSystemContext } from './systemContext';
@@ -143,10 +143,23 @@ export class CloudWithoutSystemInformationError extends Error {
 }
 
 /**
+ * An on-premise system without `systeminformation` (a `404`) whose call
+ * states no user — neither the connection's parameters (`SAP_USERNAME`) nor
+ * the request's headers (`x-sap-login`): who the session is cannot be known.
+ */
+export class SystemUserUnknownError extends Error {
+  constructor() {
+    super('the system has no systeminformation and no user is stated');
+    this.name = 'SystemUserUnknownError';
+  }
+}
+
+/**
  * The server's refusal for a system whose answer disqualifies it — no user
  * (`system_without_user`), an ABAP Cloud system without the function
- * (`cloud_without_systeminformation`) — with its fixed warning; `undefined`
- * for any other failure.
+ * (`cloud_without_systeminformation`), an on-premise system without it
+ * whose call states no user (`system_user_unknown`) — with its fixed
+ * warning; `undefined` for any other failure.
  */
 export function invalidSystemRefusal(
   error: unknown,
@@ -163,6 +176,12 @@ export function invalidSystemRefusal(
       'The ABAP Cloud system answered without systeminformation: not a valid ABAP Cloud system',
     );
     return new ServerRefusal('cloud_without_systeminformation');
+  }
+  if (error instanceof SystemUserUnknownError) {
+    warn?.(
+      'The system has no systeminformation and the call states no user: the session user is unknown',
+    );
+    return new ServerRefusal('system_user_unknown');
   }
   return undefined;
 }
@@ -261,6 +280,43 @@ export function resolveOnce(
 }
 
 /**
+ * The user a call on `connection` states: the connection's parameters
+ * (`SAP_USERNAME`, the factory's record of how it was built), else the
+ * login the request's headers carry (`x-sap-login`, `stated`); `undefined`
+ * when neither names one (absent or blank).
+ */
+export function statedUserOf(
+  connection: object,
+  stated: string | undefined,
+): string | undefined {
+  const user = siblingRecordOf(connection)?.settings.username ?? stated ?? '';
+  return user.trim() === '' ? undefined : user;
+}
+
+/**
+ * `connection`'s system information for a call about to run on it — the
+ * rule every path that asks before a handler applies (the server's,
+ * `HandlerExporter`'s, the stdio start's): one lookup per connection
+ * (`resolveOnce`) through `requiringUser`, and an on-premise `404` (`null`)
+ * admits the call only when it states a user (`statedUser`, see
+ * `statedUserOf`) — else `SystemUserUnknownError`, and the `null` is not
+ * kept: the next call asks again.
+ */
+export async function resolveForCall(
+  resolver: SystemContextResolver,
+  connection: IAbapConnection,
+  statedUser: string | undefined,
+): Promise<ResolvedSystemContext> {
+  const checked = requiringUser(resolver);
+  const system = await resolveOnce(checked, connection);
+  if (system === null && (statedUser ?? '').trim() === '') {
+    memo.get(checked)?.delete(connection);
+    throw new SystemUserUnknownError();
+  }
+  return system;
+}
+
+/**
  * Run `fn` with the responsible person, login and master system a
  * destination's own `.env` states. `SAP_RESPONSIBLE` and `SAP_MASTER_SYSTEM`
  * enter for the keys the request scope does not carry: the request's headers
@@ -330,10 +386,12 @@ export function withDestinationSystemContext<T>(
  * system names (`ResolvedSystemContext`). `fn` runs unchanged when there is
  * no resolver, no connection, or the context was already applied around this
  * call; with the configured values when the system has no
- * `systeminformation` function on-premise (a `404`). A lookup that fails, or
- * an answer that names no user (`requiringUser`), is the call's error
- * (`systemLookupRefusal`): `fn` does not run, and nothing failed is kept —
- * the next call asks again.
+ * `systeminformation` function on-premise (a `404`) — when the call states
+ * a user (the connection's `SAP_USERNAME`, else the request scope's login).
+ * A lookup that fails, an answer that names no user (`requiringUser`), or
+ * an on-premise `404` with no user stated (`system_user_unknown`), is the
+ * call's error (`systemLookupRefusal`): `fn` does not run, and nothing
+ * failed is kept — the next call asks again.
  */
 export async function withResolvedSystemContext<T>(
   connection: IAbapConnection | null | undefined,
@@ -345,7 +403,11 @@ export async function withResolvedSystemContext<T>(
   const effective = getEffectiveSystemContext();
   let resolved: ResolvedSystemContext;
   try {
-    resolved = await resolveOnce(requiringUser(resolver), connection);
+    resolved = await resolveForCall(
+      resolver,
+      connection,
+      statedUserOf(connection, getRequestContext()?.login),
+    );
   } catch (error) {
     throw systemLookupRefusal(error, (message) => logger.warn(message));
   }

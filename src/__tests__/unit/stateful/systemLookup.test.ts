@@ -409,6 +409,79 @@ it('ABAP Cloud, the lookup refused: a tool outside the flow is refused before it
   }
 });
 
+it('a replacement after a lost session asks no lookup: the same credential on the same system (the destination) answers the same', async () => {
+  const standIn = await adtStandIn();
+  standIn.body(
+    isLookup,
+    JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
+  );
+  const s = await builtStand(standIn, 'cloud');
+  type Sender = { makeAdtRequest(o: object): Promise<unknown> };
+  const losing: HandlerEntry = {
+    toolDefinition: {
+      name: 'LoseSession',
+      description: 'LoseSession',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    handler: (async (
+      context: { connection: Sender & { isConnected?: () => boolean } },
+      _args: unknown,
+    ) => {
+      await context.connection.makeAdtRequest({
+        url: '/sap/bc/adt/probe/lose',
+        method: 'GET',
+        timeout: 10_000,
+      });
+      context.connection.isConnected = () => false;
+      return { content: [{ type: 'text', text: 'lost' }] };
+    }) as never,
+  } as unknown as HandlerEntry;
+  const responsible: HandlerEntry = {
+    toolDefinition: {
+      name: 'Responsible',
+      description: 'Responsible',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    handler: (async (context: { connection: Sender }, _args: unknown) => {
+      const { responsible: user } = requireSystemContextForCreate();
+      await context.connection.makeAdtRequest({
+        url: `/sap/bc/adt/probe/after/${user}`,
+        method: 'GET',
+        timeout: 10_000,
+      });
+      return { content: [{ type: 'text', text: user }] };
+    }) as never,
+  } as unknown as HandlerEntry;
+  s.register({
+    getName: () => 'lose-and-read',
+    getHandlers: () => [losing, responsible],
+    registerHandlers: () => {},
+  } as unknown as IHandlerGroup);
+  try {
+    expect((await s.call('LoseSession', {})).isError).toBeFalsy();
+    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    // SAP would now name another user: never asked, the destination's kept.
+    standIn.body(
+      isLookup,
+      JSON.stringify({ userName: 'OTHER_USER', systemID: 'OTH' }),
+    );
+    const after = await s.call('Responsible', {});
+    expect(after.isError).toBeFalsy();
+    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    const lost = standIn.requests.find((r) =>
+      r.url.endsWith('/probe/lose'),
+    )?.session;
+    const replaced = standIn.requests.find((r) =>
+      r.url.endsWith('/probe/after/CLOUD_USER'),
+    )?.session;
+    expect(replaced).toBeDefined();
+    expect(replaced).not.toBe(lost);
+  } finally {
+    await s.close();
+    await standIn.close();
+  }
+});
+
 it('ABAP Cloud: a tool outside the flow that waits for its turn to ask is given the replacement of a connection the call ahead lost', async () => {
   const standIn = await adtStandIn();
   standIn.body(

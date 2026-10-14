@@ -223,7 +223,12 @@ describe('setConnectionContext({ kind: built, source })', () => {
       process.env.SAP_RESPONSIBLE = 'USER_FROM_PROCESS';
       const server = new TestServer();
       server.fromSource(
-        sourceOf(fakeProvider(), { responsible: 'USER_OF_DESTINATION' }),
+        // The login states the user an on-premise system without the
+        // function needs; the stated responsible wins over it.
+        sourceOf(fakeProvider(), {
+          responsible: 'USER_OF_DESTINATION',
+          login: 'LOGIN_OF_DESTINATION',
+        }),
       );
       await expect(server.report()).resolves.toEqual({
         responsible: 'USER_OF_DESTINATION',

@@ -44,10 +44,14 @@ export interface HttpStand {
   stderr: string[];
   /** Resolves with the first exit code. */
   exited: Promise<number>;
-  /** A `tools/call` over HTTP: its status and its answer's text. */
+  /**
+   * A `tools/call` over HTTP: its status and its answer's text. `headers`
+   * replace the basic connection's (`basicHeaders`).
+   */
   call(
     name: string,
     args: Record<string, unknown>,
+    headers?: Record<string, string>,
   ): Promise<{ status: number; text: string; isError: boolean }>;
   /** Index of the first request whose url `match` accepts; -1 if none. */
   indexOf(match: (url: string) => boolean): number;
@@ -117,13 +121,13 @@ export async function httpStand(
     exits,
     stderr,
     exited,
-    call: async (name, args) => {
+    call: async (name, args, headers) => {
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
           accept: 'application/json, text/event-stream',
-          ...basicHeaders(standIn.url),
+          ...(headers ?? basicHeaders(standIn.url)),
         },
         body: JSON.stringify({
           jsonrpc: '2.0',

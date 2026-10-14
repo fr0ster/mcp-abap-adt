@@ -74,6 +74,7 @@ import {
   runAsOwner,
 } from '../lib/ownedConnections.js';
 import { freshConnectionAvailable } from '../lib/packageSessions.js';
+import { getRequestContext } from '../lib/requestContext.js';
 import {
   raceRequestSignal,
   runWithRequestSignal,
@@ -84,9 +85,9 @@ import {
   invalidSystemRefusal,
   isShippedResolver,
   type ResolvedSystemContext,
-  requiringUser,
-  resolveOnce,
+  resolveForCall,
   type SystemContextResolver,
+  statedUserOf,
   systemContextResolverFor,
   systemLookupRefusal,
   withDestinationSystemContext,
@@ -513,26 +514,18 @@ export abstract class BaseMcpServer extends McpServer {
       // ends with its logoff — once no call works on it any more (spec §6.4).
       // stdio's source answers the same provider for the process's life, so
       // only a lost session replaces its connection (D13).
-      // The system a replaced connection of the same credential was looked
-      // up with is the replacement's too: the same user on the same system
-      // (stdio: fixed for the process).
-      const known =
-        held !== undefined &&
-        held.credential === resolved.credential &&
-        held.ready !== undefined
-          ? this.systems.get(held.ready)
-          : undefined;
+      // The system information is the destination's — the credential and
+      // the target system it was asked for — not the session's: a
+      // replacement for the same ones knows it at birth (`buildConnection`)
+      // and asks nothing; another credential (http: another request's
+      // headers) is another destination, asked on its first call.
       if (held) {
         this.retire(held);
         // A cached caller user is valid only for the connection it was asked
         // on: asked again on the replacement.
         this.forgetCallers();
       }
-      held = this.buildConnection(
-        resolved.credential,
-        () => this.logOn(resolved),
-        known,
-      );
+      held = this.buildConnection(resolved, () => this.logOn(resolved));
     }
     // This call is the entry's user from now on — counted before the await,
     // so a replacement in between cannot end the connection under it.
@@ -591,11 +584,52 @@ export abstract class BaseMcpServer extends McpServer {
   private readonly systems = new WeakMap<object, ResolvedSystemContext>();
 
   /**
-   * Keeps `system` as `connection`'s system information, and in its runtime
-   * file when the instance keeps one (a resume then needs no lookup).
+   * The system information known per destination: the resolved credential
+   * object, then the target system (`targetOf`). The same credential on the
+   * same system answers the same, whichever session asked: a new session of
+   * them is never asked again.
+   */
+  private readonly destinationSystems = new WeakMap<
+    IAuthProvider,
+    Map<string, ResolvedSystemContext>
+  >();
+
+  /** The destination each built connection was born for (`buildConnection`). */
+  private readonly destinationOf = new WeakMap<object, Destination>();
+
+  /** `destination`'s system information, when already known. */
+  private destinationSystem(
+    destination: Destination,
+  ): ResolvedSystemContext | undefined {
+    return this.destinationSystems
+      .get(destination.credential)
+      ?.get(destination.target);
+  }
+
+  /** Keeps `system` as `destination`'s system information. */
+  private knowDestinationSystem(
+    destination: Destination,
+    system: ResolvedSystemContext,
+  ): void {
+    let targets = this.destinationSystems.get(destination.credential);
+    if (targets === undefined) {
+      targets = new Map();
+      this.destinationSystems.set(destination.credential, targets);
+    }
+    targets.set(destination.target, system);
+  }
+
+  /**
+   * Keeps `system` as `connection`'s system information — and its
+   * destination's (credential and target system), so a new session of the
+   * same ones needs no lookup — and in its runtime file when the instance
+   * keeps one (a resume then needs no lookup).
    */
   private knowSystem(connection: object, system: ResolvedSystemContext): void {
     this.systems.set(connection, system);
+    const destination = this.destinationOf.get(connection);
+    if (destination !== undefined)
+      this.knowDestinationSystem(destination, system);
     if (system !== null)
       this.leftoverSessions?.describeSystem(connection, system);
   }
@@ -608,21 +642,31 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * `connection`'s system information, asked when it has none —
    * `systeminformation`, on every kind of system (an on-premise `404`
-   * answers `null`: the configuration applies). A
+   * answers `null`: the configuration applies, when the call states a user
+   * — the connection's `SAP_USERNAME`, else the request's `x-sap-login`). A
    * failure is the caller's: an answer that names no user (an invalid
-   * system, `requiringUser`) the server's `system_without_user`, a chain
+   * system, `requiringUser`) the server's `system_without_user`, an
+   * on-premise `404` with no user stated `system_user_unknown`, a chain
    * failure as it is, any other the server's `system_lookup_failed`. Nothing
    * failed is kept, so the next caller asks again. Concurrent askers share
-   * one request (`resolveOnce`).
+   * one request (`resolveForCall`).
    */
   private async requireSystem(connection: AbapConnection): Promise<void> {
     const resolver = this.systemContextResolver;
     if (resolver === null || this.systems.has(connection)) return;
-    const asked = resolveOnce(requiringUser(resolver), connection).then(
-      (system) => {
-        this.knowSystem(connection, system);
-      },
-    );
+    // The user a call states: a built connection's destination's (its
+    // settings' `SAP_USERNAME`, else its source's login — `x-sap-login`);
+    // a host's connection's parameters, else the request scope's login.
+    const destination = this.destinationOf.get(connection);
+    const asked = resolveForCall(
+      resolver,
+      connection,
+      destination !== undefined
+        ? destination.user
+        : statedUserOf(connection, getRequestContext()?.login),
+    ).then((system) => {
+      this.knowSystem(connection, system);
+    });
     try {
       // Awaited whatever the signal says: the lookup is a send on the
       // instance's connection, and the call — its turn in the main flow, its
@@ -801,17 +845,25 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * The instance's connection is born: `birth` makes it — a logon
    * (`logOn`), or a leftover session taken up at a stdio start
-   * (`resumedSession`) — and it is kept as `built` for `credential`. The
-   * system information `known` (a replaced connection's) is its own too;
-   * without it the first tool call asks (`systemBeforeTool`). Set as
+   * (`resumedSession`) — and it is kept as `built` for `credential`. Its
+   * system information is its destination's (`destinationSystem`) when
+   * already known for the same credential and target system — a
+   * replacement after a lost session, a new logon after a gone leftover
+   * (the file's) — else asked by its first tool call (`systemBeforeTool`).
+   * Set as
    * `built` in the turn it is called, so every call that asks for a
    * connection meanwhile waits for this one.
    */
   private buildConnection(
-    credential: IAuthProvider,
+    resolved: ResolvedConnection,
     birth: () => Promise<AbapConnection>,
-    known?: ResolvedSystemContext,
   ): BuiltConnection {
+    const credential = resolved.credential;
+    const destination: Destination = {
+      credential,
+      target: targetOf(resolved.settings),
+      user: resolved.settings.username ?? resolved.systemContext?.login,
+    };
     const entry: BuiltConnection = {
       credential,
       connection: Promise.resolve() as unknown as Promise<AbapConnection>,
@@ -820,7 +872,15 @@ export abstract class BaseMcpServer extends McpServer {
     };
     entry.connection = (async () => {
       const connection = await birth();
-      if (known !== undefined) this.knowSystem(connection, known);
+      this.destinationOf.set(connection, destination);
+      const born = this.systems.get(connection);
+      if (this.systems.has(connection)) {
+        // The birth knew it (a leftover's file): its destination's.
+        this.knowDestinationSystem(destination, born ?? null);
+      } else {
+        const known = this.destinationSystem(destination);
+        if (known !== undefined) this.knowSystem(connection, known);
+      }
       entry.ready = connection;
       return connection;
     })();
@@ -996,10 +1056,10 @@ export abstract class BaseMcpServer extends McpServer {
     const outcome: { session?: 'picked_up' | 'new' } = {};
     const entry =
       claimed !== undefined && owner !== undefined && identity !== undefined
-        ? this.buildConnection(resolved.credential, () =>
+        ? this.buildConnection(resolved, () =>
             this.resumedSession(resolved, owner, claimed, identity, outcome),
           )
-        : this.buildConnection(resolved.credential, () => this.logOn(resolved));
+        : this.buildConnection(resolved, () => this.logOn(resolved));
     const connection = await entry.connection;
     this.systemContexts.set(connection, resolved.systemContext);
     try {
@@ -1988,6 +2048,37 @@ function sessionGone(status: number): boolean {
 }
 
 /** `url` without its trailing slashes. Plain code. */
+/**
+ * A destination: the resolved credential object and the target system its
+ * settings point at (`targetOf`) — what `systeminformation` answers for.
+ */
+interface Destination {
+  credential: IAuthProvider;
+  target: string;
+  /**
+   * The user it states — its settings' `SAP_USERNAME`, else its source's
+   * login (`x-sap-login`); what an on-premise system without
+   * `systeminformation` needs. Not part of the key.
+   */
+  user: string | undefined;
+}
+
+/**
+ * The target system settings point at, as a key: the URL (no trailing
+ * slash), the client and the wire.
+ */
+function targetOf(settings: {
+  url?: string;
+  client?: string;
+  connectionType?: string;
+}): string {
+  return JSON.stringify([
+    withoutTrailingSlashes((settings.url ?? '').trim()),
+    (settings.client ?? '').trim(),
+    settings.connectionType ?? 'http',
+  ]);
+}
+
 function withoutTrailingSlashes(url: string): string {
   let end = url.length;
   while (end > 0 && url[end - 1] === '/') end -= 1;

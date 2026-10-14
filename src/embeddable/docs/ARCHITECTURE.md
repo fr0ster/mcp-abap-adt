@@ -182,8 +182,9 @@ unless a later stdio process of the same destination starts on it, or the user l
 the instance's connection one after another (`enterMainFlow`), whatever the client sends at once;
 a background run, a listed long read and the debugger tools that work on the debugger's own
 connections (`ownConnectionTools.ts`: every `Debug*`, `AmdpDebug*`, `HandlerDebug*` tool) take no
-place in it. The system-context lookup is asked once per connection, on ABAP Cloud and on-premise
-alike, before a tool runs on it, never after — no tool runs twice: on stdio at the start (`bornAtStart` →
+place in it. The system-context lookup is asked once per destination (the resolved credential and its
+target system: a new session of them — a replacement after a lost session, a new logon after a gone
+leftover — keeps the answer), on ABAP Cloud and on-premise alike, before a tool runs on it, never after — no tool runs twice: on stdio at the start (`bornAtStart` →
 `requireSystem`, or the leftover session's file), a failure ending the process; elsewhere by the
 first call on a connection without it (`systemBeforeTool` → `requireSystem`), inside the flow — a
 call outside the flow takes a turn in it for the lookup alone — its failure that call's answer (an
@@ -191,7 +192,7 @@ answer that names no user `system_without_user` — `requiringUser`: not a valid
 this server —, an ABAP Cloud `404` `cloud_without_systeminformation` — every ABAP Cloud system
 has the function, so the destination is not a valid one —, a chain failure as it is, else — any
 other status but a `2xx`; on-premise a `404` is the function unavailable and the configuration
-applies — `system_lookup_failed`; one mapping, `systemLookupRefusal`, shared with
+applies when the call states a user, else `system_user_unknown` (`resolveForCall`) — `system_lookup_failed`; one mapping, `systemLookupRefusal`, shared with
 `withResolvedSystemContext`, so `HandlerExporter`'s handlers refuse the same way and do not run), the tool not run, nothing
 failed kept, so the next call asks again. The lookup is awaited to its end whatever the call's
 signal says: the call's turn and its tracking last until it settled, so the next request on the

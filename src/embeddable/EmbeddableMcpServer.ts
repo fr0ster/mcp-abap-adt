@@ -143,8 +143,10 @@ export interface EmbeddableMcpServerOptions {
    * system. Its answer wins over anything configured: `null` means the
    * system has no such function (an on-premise `404`) — the configuration
    * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
-   * `x-sap-url`) stands; a non-null answer is the system's, and nothing
-   * configured counts. A non-null answer must name the user (`responsible`,
+   * `x-sap-url`) stands, when the call states a user (the connection's
+   * `SAP_USERNAME`, else the request scope's login); with none the call
+   * fails with `system_user_unknown`. A non-null answer is the system's,
+   * and nothing configured counts. A non-null answer must name the user (`responsible`,
    * a non-blank string): one that does not — `{}` included — is not a valid
    * ABAP system for this server, and the call fails with
    * `system_without_user`. A resolver that throws fails that call with

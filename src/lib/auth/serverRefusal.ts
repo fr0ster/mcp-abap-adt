@@ -109,12 +109,14 @@ export const CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS =
   'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run';
 
 /**
- * The stdio start on an on-premise system without `systeminformation` (a
- * `404`), whose connection states no user: the user is unknown, so the
- * process ends before its transport opens. Only the start asks.
+ * A call on an on-premise system without `systeminformation` (a `404`) that
+ * states no user — neither the connection's parameters (`SAP_USERNAME`) nor
+ * the request's headers (`x-sap-login`): the session user is unknown, so the
+ * tool does not run, and the next call asks again. The stdio start ends with
+ * its own words (the launcher's).
  */
 export const SYSTEM_USER_UNKNOWN_WORDS =
-  'the system has no systeminformation and the connection states no user: set SAP_USERNAME (the destination or the environment), so the session user is known; the server did not start';
+  'the system has no systeminformation and the call states no user: set SAP_USERNAME (the destination or the environment), or send x-sap-login with x-sap-url, so the session user is known; the tool did not run';
 
 /**
  * The fixed words of a connection refused because its instance is closed

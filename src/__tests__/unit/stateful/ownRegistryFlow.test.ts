@@ -24,7 +24,7 @@ import { z } from 'zod';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { DEBUGGER_OWN_CONNECTION_TOOLS } from '../../../lib/debugger/ownConnectionTools';
 import type { IHandlersRegistry } from '../../../lib/handlers/interfaces';
-import { notFound } from '../../helpers/noSystemInformation';
+import { STAND_IN_SYSTEM } from '../../helpers/systemInformationStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
 
 jest.setTimeout(30_000);
@@ -55,10 +55,16 @@ function heldConnection(log: Log) {
   const connection = {
     async makeAdtRequest(options: { url: string }) {
       const id = options.url;
-      // An on-premise system without systeminformation: the lookup before
-      // the first tool answers 404 at once, and the configuration applies.
+      // A valid system: the lookup before the first tool answers at once,
+      // naming its user.
       if (id.startsWith('/sap/bc/adt/core/http/systeminformation')) {
-        throw notFound();
+        return {
+          status: 200,
+          data: {
+            userName: STAND_IN_SYSTEM.user,
+            systemID: STAND_IN_SYSTEM.systemId,
+          },
+        };
       }
       log.push(`start ${id}`);
       arrival(id);

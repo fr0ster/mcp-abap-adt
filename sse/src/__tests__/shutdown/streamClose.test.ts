@@ -106,13 +106,6 @@ it("SAP answers the tool's main-connection request after the close: its next ste
   expect(s.connects()).toBe(1);
 
   const written: string[] = [];
-  const stderr = jest
-    .spyOn(process.stderr, 'write')
-    .mockImplementation((chunk: unknown) => {
-      written.push(String(chunk));
-      return true;
-    });
-  const written: string[] = [];
   stderrSpy = jest
     .spyOn(process.stderr, 'write')
     .mockImplementation((chunk: unknown) => {
@@ -128,7 +121,8 @@ it("SAP answers the tool's main-connection request after the close: its next ste
   expect(s.connects()).toBe(1);
   expect(s.indexOf((url) => url.startsWith(listenUrl('M')))).toBe(-1);
   expect(ownedConnections()).toEqual([]);
-  expect(s.standIn.logoffs()).toBe(s.connects()); // The server keeps running: the refusal is the instance's own, neither an
+  expect(s.standIn.logoffs()).toBe(s.connects());
+  // The server keeps running: the refusal is the instance's own, neither an
   // authentication failure nor a shutdown.
   const lines = written.join('');
   expect(lines).toContain('[MCP] instance_closed');

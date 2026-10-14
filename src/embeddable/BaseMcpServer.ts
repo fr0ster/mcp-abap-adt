@@ -31,10 +31,7 @@ import {
   readBackground,
   withoutBackground,
 } from '../lib/backgroundRuns/tools.js';
-import {
-  createAbapConnection,
-  systemKindOf,
-} from '../lib/connectionFactory.js';
+import { createAbapConnection } from '../lib/connectionFactory.js';
 import {
   createDebuggerInstance,
   type DebuggerInstance,

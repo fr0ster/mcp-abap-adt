@@ -42,6 +42,9 @@ afterEach(async () => {
 
 const connects = () =>
   s.standIn.requests.filter((r) => r.url.includes('discovery')).length;
+/** How many instances the server's pool holds. */
+const poolSize = () =>
+  (s.mcp as unknown as { pool: { size(): number } }).pool.size();
 const indexOfStop = (id: string) =>
   s.standIn.requests.findIndex((r) => r.url.startsWith(stopUrl(id)));
 
@@ -92,18 +95,28 @@ it('an instance emptied by its stop tool leaves the pool with its connections di
 });
 
 describe('the idle bound (fake time)', () => {
-  it('an instance evicted by the idle bound has its connections disconnected', async () => {
+  it('an instance evicted by the idle bound has its connections disconnected and leaves the pool: its handle reaches it no more', async () => {
     s = await httpStand({ stateIdleMinutes: 30 });
     jest.useFakeTimers({
       advanceTimers: true,
       doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
     });
-    await s.call('HoldState', { id: 'P' });
+    const held = await s.call('HoldState', { id: 'P' });
+    expect(poolSize()).toBe(1);
     jest.advanceTimersByTime(30 * 60_000);
     jest.useRealTimers();
     await until(() => indexOfStop('P') >= 0);
     await until(() => ownedConnections().length === 0);
     await until(() => s.standIn.logoffs() === connects());
+    await until(() => poolSize() === 0);
+    // The handle now reaches a new instance, which holds no such state.
+    const stopped = await s.call('StopState', { state_handle: held.text });
+    expect(stopped.isError).toBe(true);
+    expect(stopped.text).not.toBe('stopped');
+    // No second stop: the evicted instance's state was not reached again.
+    expect(
+      s.standIn.requests.filter((r) => r.url.startsWith(stopUrl('P'))),
+    ).toHaveLength(1);
   });
 
   it("the bound's stop whose undo fails: reported on the state logger, every connection still logged off", async () => {

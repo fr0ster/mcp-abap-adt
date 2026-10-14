@@ -642,6 +642,27 @@ export async function launch(
     }),
   );
 
+  // The start is tracked, and the shutdown (D33) installed, before anything
+  // is read: a signal or the client closing stdin during the startup check
+  // is latched like one later — latch, every owned connection logged off at
+  // once and the running tools interrupted, the MCP server closed (none yet
+  // is nothing to close), then the gate, the logins, the drain and the
+  // flush. A shutdown during the start ends it with exit 1.
+  const birth = startBirth();
+  installShutdown({
+    factory,
+    instance: { close: async () => activeServer?.close() },
+    onStdinEnd: true,
+    exit: deps.exit,
+    stderr: deps.stderr,
+    processLike: deps.processLike,
+    shutdownTimeoutMs:
+      config.shutdownTimeout === undefined
+        ? undefined
+        : config.shutdownTimeout * 1000,
+    birth,
+  });
+
   // --mcp=X → X; an --env file → default; neither → none (one destination either way).
   const destination = factory.defaultDestination;
   if (destination) {
@@ -657,6 +678,8 @@ export async function launch(
         deps.platform ?? process.platform,
       );
     } catch (error) {
+      // A shutdown began meanwhile: its exit 1 is the process's one exit.
+      if (birth.shutdownBegan()) return;
       deps.stderr(
         `[MCP] ${startupWords(error, destination, factory, deps.platform ?? process.platform)}`,
       );
@@ -664,6 +687,9 @@ export async function launch(
       return;
     }
   }
+  // The shutdown began during the check: no connector is born, no transport
+  // opens.
+  if (birth.shutdownBegan()) return;
 
   if (!destination) {
     // Inspection-only mode: no connection parameters provided
@@ -698,23 +724,6 @@ export async function launch(
     },
   );
   activeServer = server;
-  const birth = startBirth();
-  // The shutdown (D33) — a signal, or the client closing stdin: latch, every
-  // owned connection logged off at once and the running tools interrupted,
-  // the MCP server closed, then the gate, the logins, the drain and the flush.
-  installShutdown({
-    factory,
-    instance: server,
-    onStdinEnd: true,
-    exit: deps.exit,
-    stderr: deps.stderr,
-    processLike: deps.processLike,
-    shutdownTimeoutMs:
-      config.shutdownTimeout === undefined
-        ? undefined
-        : config.shutdownTimeout * 1000,
-    birth,
-  });
   // The connection is born before the transport opens: nothing to retry,
   // the process ends with what failed. A shutdown during the birth (stdin
   // closed, a signal) ends it, and its exit — 1, the start failed — is the

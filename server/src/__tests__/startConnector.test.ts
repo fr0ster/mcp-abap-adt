@@ -38,6 +38,7 @@ import {
 import { latch, resetProcessLatchForTests } from '../../../src/lib/activeTools';
 import type { KnownSystem } from '../../../src/lib/leftoverSessions/LeftoverSessions';
 import { ownedConnections } from '../../../src/lib/ownedConnections';
+import { AuthBrokerFactory } from '../auth';
 import { readCoreConfig } from '../config/coreParameters';
 import {
   launch,
@@ -366,6 +367,49 @@ it.each<['the end of stdin' | 'a signal', 'onprem' | 'cloud']>([
     expect(s.stderr).toContain(SHUTDOWN_BEFORE_START_LINE);
     expect(s.opened()).toBe(0);
     expect(standIn.requests.filter(isLookup)).toEqual([]);
+    expect(ownedConnections()).toEqual([]);
+  },
+);
+
+it.each<['the end of stdin' | 'a signal']>([
+  ['the end of stdin'],
+  ['a signal'],
+])(
+  'the shutdown (%s) while the startup check is still reading: the process exits 1 once, no logon, and the transport never opens',
+  async (trigger) => {
+    // The check's first read, held: the start is still before its logon.
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let reading: () => void = () => {};
+    const arrived = new Promise<void>((resolve) => {
+      reading = resolve;
+    });
+    const settingsFor = AuthBrokerFactory.prototype.settingsFor;
+    jest
+      .spyOn(AuthBrokerFactory.prototype, 'settingsFor')
+      .mockImplementation(async function (this: AuthBrokerFactory, ...args) {
+        reading();
+        await gate;
+        return settingsFor.apply(this, args);
+      });
+    const requestsBefore = standIn.requests.length;
+    const s = await start({
+      atBirth: async (shutdown, signal) => {
+        await arrived;
+        if (trigger === 'a signal') signal('SIGTERM');
+        else shutdown();
+        // Let the shutdown run its first steps before the read answers.
+        await new Promise((r) => setTimeout(r, 20));
+        release();
+      },
+    });
+    await exited(s.exits);
+    expect(s.exits).toEqual([1]);
+    expect(s.stderr).toContain(SHUTDOWN_BEFORE_START_LINE);
+    expect(s.opened()).toBe(0);
+    expect(standIn.requests.length).toBe(requestsBefore);
     expect(ownedConnections()).toEqual([]);
   },
 );

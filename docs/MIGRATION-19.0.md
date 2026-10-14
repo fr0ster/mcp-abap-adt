@@ -362,9 +362,10 @@ stream — and **at the process shutdown** (a signal), the running tools are int
 queued in the order never start, and every ADT session the instance owns is logged off **at once**:
 its connection, the debugger's, a long read's own. Nothing waits for a running tool; the logoff is
 what releases its locks, a running tool's later requests fail against the ended session, and
-nobody reads their answer. Over Streamable HTTP a client that drops its request closes nothing:
-the request's tool runs to its end, and its instance ends as the pool says (after its work, or at
-its state's stop or idle bound). Once in the order,
+nobody reads their answer. Over Streamable HTTP a client that drops its request closes nothing
+and ends no call: an admitted call — waiting for its connection, its system lookup or its turn in
+the order, or running — runs to its end, its tool exactly once, and its instance ends as the pool
+says (after its work, or at its state's stop or idle bound). Once in the order,
 a queued call checks its connection again: when the call ahead found the session lost, it takes the
 replacement connection before its tool runs, so only the call that met the loss fails (it is not
 retried). On stdio the connection is born at the start, before the transport opens, so no call
@@ -633,8 +634,9 @@ first; a function module, service definition or service binding activates throug
   ends (its stop tool or the idle bound). An instance whose undo fails is kept for a retry, its
   sessions open, until a later undo succeeds or shutdown — which logs them off whatever the undo
   answered (the idle bound's stop logs a pooled instance off even when its undo failed).
-- **A client that drops its request closes nothing.** Its tool runs to its end (there is no
-  per-call cancel against ABAP); a request's instance that holds nothing is disposed after that
+- **A client that drops its request closes nothing.** An admitted call runs to its end — one
+  still waiting for its connection, its system lookup or its turn in the order goes on and runs
+  its tool once; nobody reads its answer (there is no per-call cancel against ABAP); a request's instance that holds nothing is disposed after that
   work, its session logged off then; a pooled instance keeps its state and its sessions until its
   stop tool or the idle bound.
 - **Shutdown logs off at once** (no 30-second deadline, and no wait for a running tool):
@@ -833,9 +835,9 @@ transport's options only:
   in the queue, its connect, login and system lookup run on, its tool runs, and the MCP SDK sends
   no answer to the cancelled request. When the client closes its connection (stdio, SSE), the
   call is interrupted and its sessions are logged off at once — a request it already sent (its
-  connect, the system lookup) is not waited for. Over Streamable HTTP a dropped request ends the
-  call's waits (its tool is never called if it had not started), sends nothing and closes
-  nothing.
+  connect, the system lookup) is not waited for. Over Streamable HTTP a dropped request ends no
+  call and closes nothing: an admitted call — waiting for its connection, its system lookup or
+  its turn, or running — runs to its end, its tool once.
 - **`npm run auth` is gone.** Write a `.env` with `mcp-auth` from
   `@mcp-abap-adt/auth-broker-cli`: `npm install -g @mcp-abap-adt/auth-broker-cli`, then
   `mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap` (`--type xsuaa` for an
@@ -888,7 +890,9 @@ transport's options only:
   (`promptLogger(stderr, diagnostics)`), `renewal?: 'refresh-then-login' | 'refresh-only'`, and
   `loginTimeoutMs?` (`--login-timeout` in milliseconds; absent: no bound).
 - **Each tool call has a request signal** (`BaseMcpServer`): aborted when the session ends — the
-  instance's transport closed — and when the call ends; never by a client's cancel (the MCP
+  instance's transport closed; a host that connects a transport per request (as Streamable HTTP
+  does) passes `transportCloseEndsSession: false`, and its transport's close aborts nothing —, at
+  the instance's close (`closeInstance`) and the process shutdown, and when the call ends; never by a client's cancel (the MCP
   request's `extra.signal`, which the SDK aborts for a cancel too, is not read). The handler runs
   inside the request signal scope — `currentRequestSignal()` reads it; nothing sent to SAP
   carries it — and a call whose session ended before its tool starts ends with

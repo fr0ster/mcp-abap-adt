@@ -297,7 +297,8 @@ shutdown, the running calls are interrupted, the queued ones never start, and ev
 connection the instance owns is logged off at once (`closeInstance`, `logOffAtOnce`):
 nothing waits for a running tool or a request in flight — the logoff releases the locks,
 and a tool's later requests fail against the ended session. Over Streamable HTTP a
-dropped request closes nothing: its tool runs to its end, and the pool ends its
+dropped request closes nothing and ends no call: an admitted call — waiting for its
+connection, its system lookup or its turn, or running — runs to its end, and the pool ends its
 instance as before. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
 main-flow queue.
 Every send on the instance's connection is inside the order: the identity lookups

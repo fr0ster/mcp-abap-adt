@@ -380,8 +380,11 @@ await server.start(); // standalone, or registers its routes on `app` (registerR
   close. One whose undo failed is kept for a retry (it has not left); when it leaves, the terminal
   close runs whatever the retry answered. After the idle bound's stop a pooled instance's
   connections are closed even when the undo failed.
-- **A dropped request** closes nothing: its tool runs to its end, and its instance leaves the pool
-  as above (after its work when it holds nothing; a pooled instance at its state's end).
+- **A dropped request** closes nothing and ends no call: each instance is built with
+  `transportCloseEndsSession: false`, so the request transport's close aborts no call signal — an
+  admitted call waiting for its connection, its system lookup or its turn in the order, or
+  running, runs to its end, its tool once — and its instance leaves the pool as above (after its
+  work when it holds nothing; a pooled instance at its state's end).
 - **Shutdown** (`beginShutdown()`, `stopListening()`, `releaseConnections()`, driven by lib's
   `installTransportShutdown`): the pool stops admitting (`503`) in the latch's tick, the listener
   closes, every connection of the process is logged off at once and every running tool

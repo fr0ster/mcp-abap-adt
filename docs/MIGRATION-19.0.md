@@ -212,8 +212,9 @@ still lives.
 
 **Security: the files are bearer secrets.** The cookies in a file act as that SAP user for as long
 as the session lives — anyone who can read the file can work in the session, the locks it holds
-included. The directory is created `0700` (an existing one is narrowed to `0700`) and each file
-`0600`, owner-only; on Windows the directory's own ACL applies — keep it in your profile. Keep the
+included. On Linux and macOS the directory is created `0700` (an existing one is narrowed to
+`0700`) and each file `0600`, owner-only; on Windows Node cannot set these modes, so the ACL the
+directory inherits applies — keep it in your profile. Keep the
 directory out of backups, synchronised folders and container images, and do not share it between
 OS users. The server never logs a file's content and never shows a cookie to the model.
 

@@ -1,7 +1,9 @@
 /**
  * The runtime files (session-resume spec): one per owned HTTP connection
  * holding a session — the instance's own (`built`) and each debugger
- * connection — in a `0700` directory, `0600` each; written after
+ * connection — in a `0700` directory, `0600` each (POSIX; on Windows Node's
+ * `chmod` sets only the read-only flag, so the directory's ACL applies and
+ * the modes are not checked there); written after
  * `connect()`, rewritten when a request changed the session's cookies, and
  * deleted once that connection's logoff is written: the terminal close, a
  * replacement, the forced close (the crash path's). A logoff that was not
@@ -47,14 +49,21 @@ afterEach(async () => {
 
 const mode = (file: string) => fs.statSync(file).mode & 0o777;
 
+// POSIX modes exist only off Windows, where Node's `chmod` sets the read-only
+// flag alone; there the directory's ACL is what protects the files.
+const onPosix = process.platform !== 'win32';
+const posixIt = onPosix ? it : it.skip;
+
 it('the instance’s connection: written after connect, 0600 in a 0700 directory', async () => {
   stand = await leftoverStand();
   expect(stand.files()).toEqual([]);
   await stand.call('ProbeAdt', { id: 'first' });
   const [handle] = stand.files();
   expect(handle).toMatch(/^[0-9a-f]{32}$/);
-  expect(mode(stand.dir)).toBe(0o700);
-  expect(mode(path.join(stand.dir, handle ?? ''))).toBe(0o600);
+  if (onPosix) {
+    expect(mode(stand.dir)).toBe(0o700);
+    expect(mode(path.join(stand.dir, handle ?? ''))).toBe(0o600);
+  }
   expect(stand.file(handle ?? '')).toEqual({
     format: 1,
     pid: OUR_PID,
@@ -72,13 +81,16 @@ it('the instance’s connection: written after connect, 0600 in a 0700 directory
   });
 });
 
-it('a directory that exists with wider rights is narrowed to 0700', async () => {
-  stand = await leftoverStand();
-  fs.mkdirSync(stand.dir, { mode: 0o755 });
-  fs.chmodSync(stand.dir, 0o755);
-  await stand.call('ProbeAdt', { id: 'first' });
-  expect(mode(stand.dir)).toBe(0o700);
-});
+posixIt(
+  'POSIX only: a directory that exists with wider rights is narrowed to 0700',
+  async () => {
+    stand = await leftoverStand();
+    fs.mkdirSync(stand.dir, { mode: 0o755 });
+    fs.chmodSync(stand.dir, 0o755);
+    await stand.call('ProbeAdt', { id: 'first' });
+    expect(mode(stand.dir)).toBe(0o700);
+  },
+);
 
 it('rewritten when a request changed the cookies (a stateful context)', async () => {
   stand = await leftoverStand();

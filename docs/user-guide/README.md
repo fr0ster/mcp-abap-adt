@@ -130,8 +130,9 @@ user SAP answers for the session. A session of a server still running is never s
 server's liveness is read by its process id alone, so a reused id hides a record until that other
 process ends. Two servers never act on one record at once: the first to claim it acts, the other
 answers that it is not available. The records hold
-the session's cookies, which act as you while the session lives: the directory is owner-only
-(`0700`, files `0600`) — keep it out of backups and shared folders. Details:
+the session's cookies, which act as you while the session lives: on Linux and macOS the directory
+is owner-only (`0700`, files `0600`); on Windows the directory's inherited ACL applies, so keep it
+in your own profile — and everywhere keep it out of backups and shared folders. Details:
 [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-leftover-sap-sessions-of-a-killed-process).
 
 ## Package Tree Output

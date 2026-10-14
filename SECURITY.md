@@ -81,8 +81,12 @@ http:            # or sse:
   later by their user (the leftover-session tools). Each file is deleted once its
   session's logoff is written.
   - **A runtime file is a bearer secret.** Its cookies act as that SAP user for
-    as long as the session lives, locks included. The directory is created
-    `0700` and each file `0600`, owner-only; keep the directory out of backups,
+    as long as the session lives, locks included. On Linux and macOS the
+    directory is created `0700` and each file `0600`, owner-only. On Windows
+    Node cannot set these modes (`chmod` changes only the read-only flag): the
+    files get the ACL the directory inherits, so keep it in your own profile
+    (the default `Documents\mcp-abap-adt`) and do not move it to a folder
+    other accounts can read. Everywhere: keep the directory out of backups,
     synchronised folders and images, and do not share it between OS users.
   - The tools act only on files whose destination and SAP user match the
     caller's request; any other handle is answered as unknown. On a shared HTTP

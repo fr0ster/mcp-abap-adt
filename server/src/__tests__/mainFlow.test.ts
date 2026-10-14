@@ -6,7 +6,10 @@
  * aborted), and the process exits `0` with the session logged off.
  */
 
-import { isLockOf, isUnlockOf } from '../../../src/__tests__/helpers/shutdownTools';
+import {
+  isLockOf,
+  isUnlockOf,
+} from '../../../src/__tests__/helpers/shutdownTools';
 import { stand, until } from './helpers/loginStand';
 
 jest.setTimeout(30_000);

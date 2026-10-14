@@ -325,7 +325,8 @@ export function withDestinationSystemContext<T>(
 /**
  * What a host's connection (one the factory did not build) states for its
  * parameters, as the call that makes them sees it: the stated responsible,
- * the login (`statedUserOf`; else the process's `SAP_USERNAME`), the master
+ * the login (`statedUserOf`: what the connection or its request scope states,
+ * never the process's environment), the master
  * system, the kind (`systemType`: the stated one).
  */
 export function statedCallOf(
@@ -336,9 +337,7 @@ export function statedCallOf(
   return {
     kind: systemKindOf(connection, process.env, systemType),
     responsible: statedResponsibleOf(),
-    login:
-      statedUserOf(connection, getRequestContext()?.login) ??
-      statedUserOf({}, process.env.SAP_USERNAME),
+    login: statedUserOf(connection, getRequestContext()?.login),
     masterSystem: stated.masterSystem,
     warn: (message) => logger.warn(message),
   };

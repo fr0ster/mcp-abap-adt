@@ -21,25 +21,35 @@ describe('the request user, no rules', () => {
       expect(requestUserOf()).toBe('RESP_USER');
     });
   });
-  it('no responsible: the scope login before the process login', async () => {
-    process.env.SAP_USERNAME = 'processlogin';
-    expect(requestUserOf()).toBe('PROCESSLOGIN');
+  it('no responsible: the scope login; both: the responsible', async () => {
     await runWithRequestContext({ login: 'scopelogin' }, async () => {
       expect(requestUserOf()).toBe('SCOPELOGIN');
     });
+    await runWithRequestContext(
+      { login: 'scopelogin', responsible: 'resp_user' },
+      async () => {
+        expect(requestUserOf()).toBe('RESP_USER');
+      },
+    );
+  });
+  it('the process SAP_USERNAME is no login: system_user_unknown', () => {
+    process.env.SAP_USERNAME = 'processlogin';
+    expect(() => requestUserOf()).toThrow(
+      expect.objectContaining({ serverRefusal: 'system_user_unknown' }),
+    );
   });
   it('neither: system_user_unknown', () => {
-    delete process.env.SAP_USERNAME;
     expect(() => requestUserOf()).toThrow(
       expect.objectContaining({ serverRefusal: 'system_user_unknown' }),
     );
   });
   it('the live ports ask the stated value, not the connection', async () => {
-    process.env.SAP_USERNAME = 'processlogin';
     const conn = recordingConnection([]);
-    await expect(
-      liveDebugPorts().requestUser({ connection: conn as never }),
-    ).resolves.toBe('PROCESSLOGIN');
+    await runWithRequestContext({ login: 'scopelogin' }, async () => {
+      await expect(
+        liveDebugPorts().requestUser({ connection: conn as never }),
+      ).resolves.toBe('SCOPELOGIN');
+    });
     expect(conn.requests).toHaveLength(0);
   });
 });

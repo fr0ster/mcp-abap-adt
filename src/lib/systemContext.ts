@@ -71,6 +71,20 @@ export function getStatedSystemContext(): IAdtSystemContext {
 }
 
 /**
+ * The system context a create sends: `getStatedSystemContext`, its
+ * responsible, when none is stated, the login the request scope states
+ * (the value the debugger's request user and a background run's caller
+ * take). No login stated either: the responsible stays empty, and the
+ * change is refused. The process environment's `SAP_USERNAME` is never read.
+ */
+export function getCreateSystemContext(): IAdtSystemContext {
+  const ctx = getStatedSystemContext();
+  if (ctx.responsible?.trim()) return ctx;
+  const login = getRequestContext()?.login;
+  return login?.trim() ? { ...ctx, responsible: login } : ctx;
+}
+
+/**
  * Set system context explicitly (safe, no HTTP requests).
  * Use this when system info is known upfront (e.g., from BTP destination metadata).
  */

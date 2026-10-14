@@ -25,6 +25,7 @@ import {
 } from '../../../lib/handlers/HandlerExporter';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { runWithRequestContext } from '../../../lib/requestContext';
 import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import {
   getStatedSystemContext,
@@ -230,32 +231,36 @@ describe('a resolver and no rules: the information applied, nothing refused', ()
 });
 
 describe('a background run’s caller: the stated value', () => {
-  it('the stated responsible, else the login; none: system_user_unknown — nothing looked up', async () => {
-    const list = async () => {
-      const { connection, lookups } = recorded(NAMED);
-      const strategy = new InMemoryBackgroundRuns();
-      const listed = jest.spyOn(strategy, 'list');
-      const server = new EmbeddableMcpServer({
-        connection: connection as never,
-        handlersRegistry: shippedGroups(),
-        backgroundRuns: strategy,
-      });
-      const result = (await callTool(server, 'ListBackgroundRuns')) as {
-        isError?: boolean;
-        content: { text: string }[];
-      };
-      expect(lookups()).toBe(0);
-      return { result, user: listed.mock.calls.at(-1)?.[0].user };
+  const list = async (scope: { login?: string; responsible?: string }) => {
+    const { connection, lookups } = recorded(NAMED);
+    const strategy = new InMemoryBackgroundRuns();
+    const listed = jest.spyOn(strategy, 'list');
+    const server = new EmbeddableMcpServer({
+      connection: connection as never,
+      handlersRegistry: shippedGroups(),
+      backgroundRuns: strategy,
+    });
+    const result = (await runWithRequestContext(scope, () =>
+      callTool(server, 'ListBackgroundRuns'),
+    )) as {
+      isError?: boolean;
+      content: { text: string }[];
     };
-    process.env.SAP_USERNAME = 'login_user';
-    expect((await list()).user).toBe('LOGIN_USER');
-    process.env.SAP_RESPONSIBLE = 'resp_user';
-    systemContextFromConfiguration();
-    expect((await list()).user).toBe('RESP_USER');
-    delete process.env.SAP_USERNAME;
-    delete process.env.SAP_RESPONSIBLE;
-    resetSystemContextCache();
-    const none = await list();
+    expect(lookups()).toBe(0);
+    return { result, user: listed.mock.calls.at(-1)?.[0].user };
+  };
+
+  it.each([
+    ['responsible only', { responsible: 'resp_user' }, 'RESP_USER'],
+    ['login only', { login: 'login_user' }, 'LOGIN_USER'],
+    ['both', { responsible: 'resp_user', login: 'login_user' }, 'RESP_USER'],
+  ])('%s: nothing looked up', async (_case, scope, expected) => {
+    expect((await list(scope)).user).toBe(expected);
+  });
+
+  it('neither stated: system_user_unknown — the process SAP_USERNAME does not stand in', async () => {
+    process.env.SAP_USERNAME = 'process_login';
+    const none = await list({});
     expect(none.result.isError).toBe(true);
     expect(none.result.content[0].text).toContain('system_user_unknown');
   });

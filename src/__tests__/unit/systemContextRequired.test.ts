@@ -118,12 +118,34 @@ describe('on-premise', () => {
     expect(createBody(connection)).not.toContain('adtcore:masterSystem');
   });
 
-  it('no rules: a login alone is no responsible — refused, nothing sent', async () => {
+  it('no rules: the process SAP_USERNAME is no responsible — refused, nothing sent', async () => {
     process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
     systemContextFromConfiguration();
     const { connection, result } = await createMessageClass();
     expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
     expect(connection.requests).toEqual([]);
+  });
+
+  it('no rules: the stated login alone is the responsible', async () => {
+    process.env.SAP_USERNAME = 'PROCESS_PLACEHOLDER';
+    const { connection, result } = await runWithRequestContext(
+      { login: 'LOGIN_PLACEHOLDER' },
+      createMessageClass,
+    );
+    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
+    expect(createBody(connection)).toContain(
+      'adtcore:responsible="LOGIN_PLACEHOLDER"',
+    );
+  });
+
+  it('no rules: the stated responsible beside a stated login', async () => {
+    const { connection } = await runWithRequestContext(
+      { login: 'LOGIN_PLACEHOLDER', responsible: 'RESPONSIBLE_PLACEHOLDER' },
+      createMessageClass,
+    );
+    expect(createBody(connection)).toContain(
+      'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+    );
   });
 
   it('SAP_RESPONSIBLE is taken, the login beside it ignored', async () => {

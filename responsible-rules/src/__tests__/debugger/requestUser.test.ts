@@ -82,30 +82,34 @@ describe('the request user', () => {
     await expect(userOf(conn)).resolves.toBe('SYSTEMUSER');
     expect(conn.requests).toHaveLength(1);
   });
-  it('on-premise without the function (404 handed back): the login — the scope login before the process login — never the responsible', async () => {
+  it('on-premise without the function (404 handed back): the scope login — never the responsible, never the process login', async () => {
     const conn = recordingConnection([{ status: 404, data: '' }]);
     const another = recordingConnection([{ status: 404, data: '' }]);
     process.env.SAP_USERNAME = 'processlogin';
     process.env.SAP_RESPONSIBLE = 'SOMEONEELSE';
-    await expect(userOf(conn)).resolves.toBe('PROCESSLOGIN');
-    // Made once per connection: another connection for the scope's login.
     await runWithRequestContext({ login: 'scopelogin' }, async () => {
-      await expect(userOf(another)).resolves.toBe('SCOPELOGIN');
-      await expect(userOf(conn)).resolves.toBe('PROCESSLOGIN');
+      await expect(userOf(conn)).resolves.toBe('SCOPELOGIN');
+    });
+    // Made once per connection; a connection with no stated login is unknown.
+    await expect(userOf(conn)).resolves.toBe('SCOPELOGIN');
+    await expect(userOf(another)).rejects.toMatchObject({
+      serverRefusal: 'system_user_unknown',
     });
   });
   it.each([405, 501, 500])(
-    'on-premise a %i handed back: the login stands in',
+    'on-premise a %i handed back: the scope login stands in',
     async (status) => {
       const conn = recordingConnection([{ status, data: '' }]);
-      process.env.SAP_USERNAME = 'processlogin';
-      await expect(userOf(conn)).resolves.toBe('PROCESSLOGIN');
+      await runWithRequestContext({ login: 'scopelogin' }, async () => {
+        await expect(userOf(conn)).resolves.toBe('SCOPELOGIN');
+      });
     },
   );
   it('the stated on-premise kind wins over SAP_SYSTEM_TYPE for a connection the factory did not build', async () => {
     process.env.SAP_SYSTEM_TYPE = 'cloud';
-    process.env.SAP_USERNAME = 'processlogin';
     const conn = recordingConnection([{ status: 404, data: '' }]);
-    await expect(userOf(conn, 'onprem')).resolves.toBe('PROCESSLOGIN');
+    await runWithRequestContext({ login: 'scopelogin' }, async () => {
+      await expect(userOf(conn, 'onprem')).resolves.toBe('SCOPELOGIN');
+    });
   });
 });

@@ -421,8 +421,6 @@ describe('on-premise, through the server', () => {
 
   it('without the function (404) and neither a responsible nor a login: system_user_unknown, nothing sent', async () => {
     delete process.env.SAP_RESPONSIBLE;
-    // The process login is a login too (a host connection's last one).
-    delete process.env.SAP_USERNAME;
     resetSystemContextCache();
     systemContextFromConfiguration();
     lookup.mockRejectedValue(status(404));
@@ -463,7 +461,6 @@ describe('on-premise, through the server', () => {
     '%s and neither a responsible nor a login: system_user_unknown, nothing sent',
     async (_case, answer) => {
       delete process.env.SAP_RESPONSIBLE;
-      delete process.env.SAP_USERNAME;
       resetSystemContextCache();
       systemContextFromConfiguration();
       answer();

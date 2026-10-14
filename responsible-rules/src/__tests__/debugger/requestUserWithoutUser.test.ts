@@ -120,18 +120,18 @@ describe('on-premise', () => {
     }
   });
 
-  it('without the function (404): the process login', async () => {
+  it('without the function (404): the process SAP_USERNAME does not stand in', async () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 404);
-      await expect(userOf(connection)).resolves.toBe('LOGIN_USER');
+      await expect(userOf(connection)).rejects.toMatchObject(USER_UNKNOWN);
       expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     } finally {
       await closeBoth(standIn, connection);
     }
   });
 
-  it('without the function (404): the request scope login before the process login', async () => {
+  it('without the function (404): the request scope login', async () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 404);
@@ -210,11 +210,12 @@ describe('on-premise', () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 404);
-      await expect(userOf(connection)).resolves.toBe('LOGIN_USER');
-      await expect(userOf(connection)).resolves.toBe('LOGIN_USER');
+      await runWithRequestContext({ login: 'scopelogin' }, async () => {
+        await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
+      });
       // Made once: the login gone later changes nothing.
-      delete process.env.SAP_USERNAME;
-      await expect(userOf(connection)).resolves.toBe('LOGIN_USER');
+      await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
+      await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
       expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     } finally {
       await closeBoth(standIn, connection);
@@ -222,7 +223,7 @@ describe('on-premise', () => {
   });
 
   it.each(WITHOUT_USER)(
-    'an answer with %s: the request scope login, then the process login',
+    'an answer with %s: the request scope login, else unknown',
     async (_what, body) => {
       const { standIn, connection } = await standConnection();
       try {
@@ -232,20 +233,16 @@ describe('on-premise', () => {
         });
         // Made once, with the connection: the same user after.
         await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
-        // Another connection: the process login, else unknown.
+        // Another connection, no login stated: unknown — the process
+        // SAP_USERNAME does not stand in.
         const second = await standConnection();
-        const third = await standConnection();
         try {
           second.standIn.body(isLookup, body);
-          third.standIn.body(isLookup, body);
-          await expect(userOf(second.connection)).resolves.toBe('LOGIN_USER');
-          delete process.env.SAP_USERNAME;
-          await expect(userOf(third.connection)).rejects.toMatchObject(
+          await expect(userOf(second.connection)).rejects.toMatchObject(
             USER_UNKNOWN,
           );
         } finally {
           await closeBoth(second.standIn, second.connection);
-          await closeBoth(third.standIn, third.connection);
         }
       } finally {
         await closeBoth(standIn, connection);
@@ -254,7 +251,7 @@ describe('on-premise', () => {
   );
 
   it.each([405, 501, 500])(
-    'systeminformation answered %i: the request scope login, then the process login',
+    'systeminformation answered %i: the request scope login, else unknown',
     async (status) => {
       const { standIn, connection } = await standConnection();
       try {
@@ -264,20 +261,16 @@ describe('on-premise', () => {
         });
         // Made once, with the connection: the same user after.
         await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
-        // Another connection: the process login, else unknown.
+        // Another connection, no login stated: unknown — the process
+        // SAP_USERNAME does not stand in.
         const second = await standConnection();
-        const third = await standConnection();
         try {
           second.standIn.answer(isLookup, status);
-          third.standIn.answer(isLookup, status);
-          await expect(userOf(second.connection)).resolves.toBe('LOGIN_USER');
-          delete process.env.SAP_USERNAME;
-          await expect(userOf(third.connection)).rejects.toMatchObject(
+          await expect(userOf(second.connection)).rejects.toMatchObject(
             USER_UNKNOWN,
           );
         } finally {
           await closeBoth(second.standIn, second.connection);
-          await closeBoth(third.standIn, third.connection);
         }
       } finally {
         await closeBoth(standIn, connection);

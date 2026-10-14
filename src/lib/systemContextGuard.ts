@@ -15,13 +15,14 @@
  *
  * The words are fixed and name only keys: no value reaches them (H4). The
  * responsible is what the call states — the connection's parameters, where
- * a host's rules made them, included. A call whose parameters could not be
+ * a host's rules made them, included — else the login the request scope
+ * states. A call whose parameters could not be
  * made never gets here: that failure is the call's answer, and its handler
  * does not run.
  */
 
 import {
-  getStatedSystemContext,
+  getCreateSystemContext,
   type IAdtSystemContext,
 } from './systemContext';
 
@@ -71,7 +72,7 @@ export function requireSystemContextForCreate(): {
   responsible: string;
   masterSystem: string | undefined;
 } {
-  const { responsible, masterSystem } = getStatedSystemContext();
+  const { responsible, masterSystem } = getCreateSystemContext();
   if (!responsible) throw new SystemContextMissingError();
   return { responsible, masterSystem: masterSystem || undefined };
 }

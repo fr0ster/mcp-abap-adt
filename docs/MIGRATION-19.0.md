@@ -574,13 +574,15 @@ unless you pass otherwise:
   `system_type_required`);
 - **look nothing up**: `systemContextResolver` defaults to none (it was the shipped resolver); the
   responsible a create sends is what is stated — the tool argument, `x-sap-responsible`,
-  `SAP_RESPONSIBLE` — and no login stands in for it (that is the rules' second step); a create
-  with none is refused (`system_context_missing`, its words now name only what to state);
+  `SAP_RESPONSIBLE` — else the login your request scope states (`login`), the same value the
+  debugger's request user and a background run's caller take; a create with neither is refused
+  (`system_context_missing`, its words now name only what to state);
 - with a resolver and no rules, **apply the information** the system gives and refuse nothing
   for its absence: no information leaves the configured values as they are;
 - name **the debugger's request user and a background run's caller** by the stated value: the
-  responsible, else the login (the request scope's, then `SAP_USERNAME`); none is
-  `system_user_unknown`.
+  responsible, else the login your request scope states; none is `system_user_unknown`. The
+  process environment's `SAP_USERNAME` is never read for an injected connection — state the
+  login in the request scope (`runWithRequestContext({ login })`) or pass the rules.
 
 To apply the servers' rules, pass them — the resolver and the rules together:
 

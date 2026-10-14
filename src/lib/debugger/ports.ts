@@ -26,14 +26,11 @@ import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
  * connection's parameters where a host's rules made them (the system's
  * user, else on-premise the stated responsible, else the login), else the
  * stated responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`) — else the
- * login, the request scope's before the process's (`SAP_USERNAME`); upper
+ * login the request scope states (never the process's environment); upper
  * case. None is the call's `system_user_unknown`. Sends nothing.
  */
 export function requestUserOf(): string {
-  const user =
-    statedResponsibleOf() ||
-    getRequestContext()?.login ||
-    process.env.SAP_USERNAME;
+  const user = statedResponsibleOf() || getRequestContext()?.login;
   if (!user?.trim()) throw new ServerRefusal('system_user_unknown');
   return user.trim().toUpperCase();
 }

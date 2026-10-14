@@ -8,7 +8,7 @@
  */
 
 import type { StandInRequest } from '../../../src/__tests__/helpers/adtStandIn';
-import { type HttpStand, httpStand } from './shutdown/harness';
+import { type HttpStand, httpStand, turns } from './shutdown/harness';
 
 jest.setTimeout(30_000);
 
@@ -21,6 +21,9 @@ beforeEach(async () => {
   process.env.SAP_SYSTEM_TYPE = 'cloud';
 });
 afterEach(async () => {
+  // The server logs a call's completion once its response is flushed: let
+  // it, before the stand closes.
+  await turns(20);
   await s.close();
 });
 

@@ -156,7 +156,11 @@ and only a tool the guard refuses for want of a responsible asks again from insi
 outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
 handlers as `HandlerContext.onMainConnection(send)` — directly from a call that holds the flow, on
 the connection that call holds, else in turn, on the connection `getConnection` hands inside the
-flow (a session the call ahead lost already replaced), given back when the send is done. `send` is
+flow (a session the call ahead lost already replaced), given back when the send is done; a holder
+that works on no connection yet (a resume) sends on the connection taken inside its turn. A queued
+call re-checks the connection it took before it waited against the instance's current one
+(`isStaleBuilt`): a spent one, or one replaced meanwhile for the same credential (a resume, a lost
+session's replacement), is given back and the current one taken. `send` is
 handed that connection and must capture none of its own (`context.connection` may be the spent
 one). A caller already known is answered without entering the flow: the backend user SAP named is
 kept per credential object (a host's injected connection for its own) and valid only for the
@@ -221,7 +225,12 @@ tools; the server decides nothing by itself (session-resume spec).
   atomic step two processes race on; the loser finds nothing. `adopt` (resumed), `forget` (gone,
   logged off) or `release` (anything else: back to `<handle>`) ends the claim; a claimed file
   whose claimer died is listed and claimable again. Off Linux liveness is the pid alone.
-- **Resume** (`built` only) builds the instance's connection with `createAbapConnection(…,
+- **Resume** (`built` only) takes its turn in the main flow (`inMainFlow`): it changes the
+  instance's connection, so it waits for the call ahead and claims the file in its turn; a call
+  queued after it took the old connection before it waited, and inside the flow gives it back and
+  takes the resumed one (`isStaleBuilt`: spent, or replaced for the same credential). The list
+  and the logoff take no turn — neither touches the instance's connection. The resume builds the
+  instance's connection with `createAbapConnection(…,
   session)`, records it as `built` before `connect()`, and on success makes it the instance's
   (`takeAsBuilt`: the previous one retired, ended after its last call) and the file this
   process's (`adopt`, same handle). SAP's "gone" — `401`, a redirect, an answer not the session's —

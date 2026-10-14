@@ -70,7 +70,11 @@ long read and the debugger tools that work on the debugger's own connections are
 outside it. A long call on the main connection holds the flow; `background: true` or a
 tool on its own connection does not. Once in the flow, a queued call checks its
 connection again: when the call ahead found the session lost, it takes the replacement before its
-tool runs, so only the call that met the loss fails (it is not replayed).
+tool runs, so only the call that met the loss fails (it is not replayed). A leftover-session
+resume changes the instance's connection, so it takes its turn in the flow: it waits for the call
+ahead, and a call queued after it — which took the old connection before it waited — gives that
+back and runs in the resumed session. A connection retired because another credential's call took
+the instance (Streamable HTTP) stays the queued call's own: its session is its credential's.
 
 - **Compact's `HandlerLock`** leaves the lock in the session until `HandlerUnlock`
   (the consumer's choice) where the connection lives across calls — stdio and SSE —

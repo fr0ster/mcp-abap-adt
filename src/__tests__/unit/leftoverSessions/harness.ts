@@ -75,6 +75,12 @@ export interface LeftoverStand {
     name: string,
     args?: Record<string, unknown>,
   ): Promise<{ text: string; isError: boolean }>;
+  /** Calls a tool with the request's own signal (the client cancels it). */
+  callWith(
+    name: string,
+    args: Record<string, unknown>,
+    signal: AbortSignal,
+  ): Promise<unknown>;
   /** The files in the runtime directory. */
   files(): string[];
   /** A runtime file, parsed. */
@@ -170,6 +176,11 @@ export async function leftoverStand(
         isError: answer.isError === true,
       };
     },
+    callWith: (name, args, signal) =>
+      client.callTool({ name, arguments: args }, undefined, {
+        timeout: 60_000,
+        signal,
+      }),
     files,
     file: (handle) =>
       JSON.parse(fs.readFileSync(path.join(runtime, handle), 'utf8')),

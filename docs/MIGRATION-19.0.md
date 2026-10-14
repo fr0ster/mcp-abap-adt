@@ -225,7 +225,7 @@ only by the write binaries, since a resumed session is for finishing a write or 
 | Full binaries | Compact binaries | What it does |
 |---|---|---|
 | `ListLeftoverSessions` | `HandlerLeftoverSessionList` | your sessions a killed process left: `handle`, `role`, `destination` (`url`, `client`, `system`), `user`, `written_at` — never a cookie |
-| `ResumeLeftoverSession` `{ handle }` | `HandlerLeftoverSessionResume` | role `built` only: this server's connection is built on that session instead of logging on, so its locks and their `lock_handle`s work again; the file is this process's from then on. A session this server held before is logged off once no call uses it. SAP answering that the session is gone (`401`, a redirect, another session) is the answer, as SAP gave it (`state: "gone"`, `sap.status`), and the file is deleted |
+| `ResumeLeftoverSession` `{ handle }` | `HandlerLeftoverSessionResume` | role `built` only: this server's connection is built on that session instead of logging on, so its locks and their `lock_handle`s work again; the file is this process's from then on. It takes its turn in the main flow: it waits for the call ahead, and the calls sent after it run in the resumed session. A session this server held before is logged off once no call uses it. SAP answering that the session is gone (`401`, a redirect, another session) is the answer, as SAP gave it (`state: "gone"`, `sap.status`), and the file is deleted |
 | `LogoffLeftoverSession` `{ handle }` | `HandlerLeftoverSessionLogoff` | any role: one request — the platform's ICF logoff with the session's cookies, no credential, no discovery or CSRF fetch before it (connection 17.1's `disconnect()` without `connect()`); every lock of the session is released. It answers `state: "logged_off"` once the logoff is written — SAP's answer is not read, so a session that had already ended is answered the same — and the file is deleted |
 
 - **Only your own.** A file is yours when its destination and backend user equal what your request
@@ -319,7 +319,11 @@ fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on
 once and never reaches SAP. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the order,
 a queued call checks its connection again: when the call ahead found the session lost, it takes the
 replacement connection before its tool runs, so only the call that met the loss fails (it is not
-retried).
+retried). **A resume (`ResumeLeftoverSession`) takes its turn in the order too**, because it changes
+the instance's connection: it waits for the call ahead, and the calls queued after it run in the
+resumed session — an `UNLOCK` you send right after the resume, with the resumed session's
+`lock_handle`, goes to that session. The list and the logoff of leftover sessions take no turn:
+they do not touch the instance's connection (a logoff works on a dead process's session only).
 
 **On ABAP Cloud the system is asked once per connection, when it connects** (`systeminformation`:
 the user as responsible, the system id as master system, for what a create needs and the request

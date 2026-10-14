@@ -143,9 +143,13 @@ interface BuiltConnection {
  * The instances whose main flow the current async context holds: a call that
  * entered its instance's flow runs inside it, so a send on the instance's
  * connection made from within (an identity lookup) runs directly instead of
- * queueing behind itself.
+ * queueing behind itself. The value is the connection the holding call works
+ * on; `undefined` while the holder works on none yet (a resume, which takes
+ * the instance's connection only to ask whose session it is).
  */
-const heldFlows = new AsyncLocalStorage<ReadonlyMap<object, AbapConnection>>();
+const heldFlows = new AsyncLocalStorage<
+  ReadonlyMap<object, AbapConnection | undefined>
+>();
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -624,14 +628,25 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Whether `connection` is one this instance built (not a host's) whose
-   * session SAP already lost: the next `getConnection` replaces it.
+   * Whether `connection`, taken before its call waited in the main flow, is
+   * no longer the instance's connection for that call once the call's turn
+   * came: one this instance built (not a host's) whose session SAP already
+   * lost (the next `getConnection` replaces it), or one replaced meanwhile by
+   * another connection for the same credential — a resume (`takeAsBuilt`) or
+   * the replacement of a lost session. One retired because another
+   * credential's call took the instance (http, sse: a pooled instance) is
+   * still this call's own: its session is the one its credential holds.
    */
-  private isSpentBuilt(connection: AbapConnection): boolean {
+  private isStaleBuilt(connection: AbapConnection): boolean {
+    if (this.connectionContext?.kind !== 'built') return false;
+    const entry = this.entries.get(connection);
+    if (entry === undefined) return false;
+    if (isSpent(connection)) return true;
+    const current = this.built;
     return (
-      this.connectionContext?.kind === 'built' &&
-      this.entries.has(connection) &&
-      isSpent(connection)
+      current !== undefined &&
+      current !== entry &&
+      current.credential === entry.credential
     );
   }
 
@@ -666,14 +681,34 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<T> {
     const held = heldFlows.getStore()?.get(this);
     if (held !== undefined) return send(held);
-    const leave = await this.enterMainFlow(signal);
-    try {
+    return this.inMainFlow(signal, async () => {
       const connection = await this.getConnection(signal);
       try {
         return await this.inHeldFlow(true, connection, () => send(connection));
       } finally {
         this.connectionReleased(connection);
       }
+    });
+  }
+
+  /**
+   * Runs `fn` as the holder of the instance's main flow: directly when the
+   * current context already holds it, else once its turn came (`enterMainFlow`:
+   * no timeout, a cancelled wait leaves at once), the flow left when `fn`
+   * settles. Inside, `onMainConnection` sends run directly — on the
+   * connection the holder works on, or, while it works on none, on the
+   * instance's connection taken inside the flow.
+   */
+  private async inMainFlow<T>(
+    signal: AbortSignal,
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    if (heldFlows.getStore()?.has(this) === true) return fn();
+    const leave = await this.enterMainFlow(signal);
+    try {
+      const held = new Map(heldFlows.getStore() ?? []);
+      held.set(this, undefined);
+      return await heldFlows.run(held, fn);
     } finally {
       leave();
     }
@@ -825,12 +860,15 @@ export abstract class BaseMcpServer extends McpServer {
                 isDebuggerOwnConnectionTool(entry.toolDefinition.name);
               if (!ownConnection) {
                 leaveFlow = await this.enterMainFlow(signal);
-                // The call ahead may have met a session SAP already lost: the
-                // connection this call took before it waited is spent. It is
-                // given back and the replacement taken — inside the flow,
-                // before the tool runs — so a queued batch does not fail on
-                // the one lost session.
-                if (this.isSpentBuilt(connection)) {
+                // The connection this call took before it waited may no
+                // longer be the instance's: the call ahead met a session SAP
+                // already lost, or a resume ahead took another session as the
+                // instance's connection. It is given back and the current one
+                // taken — inside the flow, before the tool runs — so a queued
+                // batch does not fail on the one lost session, and a call
+                // queued after a resume (an UNLOCK with the resumed session's
+                // lock handle) runs in the resumed session.
+                if (this.isStaleBuilt(connection)) {
                   inUse = undefined;
                   this.connectionReleased(connection);
                   connection = await this.getConnection(signal);
@@ -1445,7 +1483,18 @@ export abstract class BaseMcpServer extends McpServer {
    * instance already held is ended as a replaced one: its logoff after the
    * last call that uses it.
    */
-  private async resumeLeftover(
+  private resumeLeftover(
+    handle: string,
+    signal: AbortSignal,
+  ): Promise<ResumeOutcome> {
+    // A resume changes the instance's connection: it takes its turn in the
+    // main flow — after the call ahead, before the calls queued after it,
+    // which then run on the resumed connection. The claim too is made in
+    // turn: a resume cancelled while it waits claims nothing.
+    return this.inMainFlow(signal, () => this.resumeInFlow(handle, signal));
+  }
+
+  private async resumeInFlow(
     handle: string,
     signal: AbortSignal,
   ): Promise<ResumeOutcome> {

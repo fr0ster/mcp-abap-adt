@@ -85,6 +85,7 @@ import {
 } from '../lib/requestSignal.js';
 import {
   defaultSystemContextResolver,
+  isShippedResolver,
   type ResolvedSystemContext,
   requiringUser,
   resolveOnce,
@@ -252,9 +253,11 @@ export abstract class BaseMcpServer extends McpServer {
    * every credential's entry, whatever credential the old or the new
    * connection was built for — and an answer asked on a connection that was
    * replaced meanwhile is not kept (the generation it was asked in). A known
-   * user is answered without entering the flow.
+   * user is answered without entering the flow; `null` is kept for a
+   * system without the function (an on-premise `404`), so it is not asked
+   * again.
    */
-  private callerUsers = new WeakMap<object, string>();
+  private callerUsers = new WeakMap<object, string | null>();
   /** Bumped by `forgetCallers`: an answer asked before it is not kept. */
   private callerGeneration = 0;
 
@@ -270,8 +273,8 @@ export abstract class BaseMcpServer extends McpServer {
     user: string | undefined,
     generation: number,
   ): void {
-    if (user !== undefined && generation === this.callerGeneration) {
-      this.callerUsers.set(key, user);
+    if (generation === this.callerGeneration) {
+      this.callerUsers.set(key, user ?? null);
     }
   }
 
@@ -584,8 +587,8 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * Each connection's system information (`requireSystem`): what the
-   * resolver answered — on ABAP Cloud the `systeminformation` user and
-   * system id, on-premise `null` (nothing asked). A connection without an
+   * resolver answered — the `systeminformation` user and system id, or
+   * `null` for an on-premise system without the function. A connection without an
    * entry has none yet.
    */
   private readonly systems = new WeakMap<object, ResolvedSystemContext>();
@@ -606,8 +609,9 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * `connection`'s system information, asked when it has none — on ABAP
-   * Cloud `systeminformation`; on-premise the resolver sends nothing. A
+   * `connection`'s system information, asked when it has none —
+   * `systeminformation`, on every kind of system (an on-premise `404`
+   * answers `null`: the configuration applies). A
    * failure is the caller's: an answer that names no user (an invalid
    * system, `requiringUser`) the server's `system_without_user`, a chain
    * failure as it is, any other the server's `system_lookup_failed`. Nothing
@@ -1130,12 +1134,12 @@ export abstract class BaseMcpServer extends McpServer {
               // If handler expects context+args (preferred), pass both.
               // Otherwise, update group context and call with args only for backward compatibility.
               // NOTE: Always await the handler result to ensure we get the resolved value for normalization
-              // Both branches run inside withKnownSystemContext: a call that
-              // lacks responsible/master system gets them from an ABAP Cloud
-              // connection (src/lib/requestSystemResolution.ts).
+              // Both branches run inside withKnownSystemContext: the
+              // responsible/master system are what the system names
+              // (src/lib/requestSystemResolution.ts), over anything stated.
               // The destination's own .env enters the scope first, below the
-              // request's headers, so the cloud lookup fills only what neither
-              // states.
+              // request's headers; it stands only where an on-premise system
+              // has no systeminformation.
               // The whole call runs in the request signal scope (§5.2), and
               // a call whose signal aborted before its tool starts — after
               // the connection is ready, after the system lookup — never
@@ -1424,7 +1428,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (!freshConnectionAvailable(context.connection)) {
       throw new ServerRefusal('fresh_connection_unavailable');
     }
-    const caller = await this.backgroundCaller(signal);
+    const caller = await this.backgroundCaller(signal, context.connection);
     const started = await startBackgroundRun({
       strategy,
       caller,
@@ -1514,14 +1518,18 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * Who calls, for the background runs: the destination (URL, client) and
-   * the backend user the request resolved — the one it names
-   * (`SAP_USERNAME`, `x-sap-login`), else the one SAP answers for the
-   * session (`systemUserOf`, a token credential). An injected connection
-   * names its URL; its user is SAP's. A user that cannot be determined is
-   * refused: a run is kept only for a known caller.
+   * the backend user SAP answers for the session (`systemUserOf`), on every
+   * kind of system, over any login the request states. The stated login
+   * (`SAP_USERNAME`, `x-sap-login`) stands in only on an on-premise system
+   * without the function (`404`). An injected connection names its URL; its
+   * user is SAP's. A user that cannot be determined is refused: a run is
+   * kept only for a known caller. `on`: the instance's connection the call
+   * already holds — its system information, asked before the tool, answers
+   * the user with no second request.
    */
   protected async backgroundCaller(
     signal: AbortSignal,
+    on?: object,
   ): Promise<BackgroundRunCaller> {
     const context = this.connectionContext;
     if (context === null) {
@@ -1532,12 +1540,14 @@ export abstract class BaseMcpServer extends McpServer {
       return {
         url: withoutTrailingSlashes(url.trim()),
         client: '',
-        user: await this.sapUserOf(signal, context.connection),
+        user: await this.sapUserOf(signal, context.connection, on),
       };
     }
     const resolved = await this.resolveCaller(signal);
     const url = withoutTrailingSlashes((resolved.settings.url ?? '').trim());
     const client = (resolved.settings.client ?? '').trim();
+    const named = await this.callerUserOf(signal, resolved.credential, on);
+    if (named !== undefined) return { url, client, user: named };
     const stated = (
       resolved.settings.username ??
       resolved.systemContext?.login ??
@@ -1546,11 +1556,7 @@ export abstract class BaseMcpServer extends McpServer {
       .trim()
       .toUpperCase();
     if (stated !== '') return { url, client, user: stated };
-    return {
-      url,
-      client,
-      user: await this.sapUserOf(signal, resolved.credential),
-    };
+    throw new ServerRefusal('background_run_caller_unknown');
   }
 
   /**
@@ -1558,8 +1564,12 @@ export abstract class BaseMcpServer extends McpServer {
    * `callerUsers`): a known one at once, without entering the main flow;
    * else asked once, on the connection the main flow hands the send.
    */
-  private async sapUserOf(signal: AbortSignal, key: object): Promise<string> {
-    const user = await this.callerUserOf(signal, key);
+  private async sapUserOf(
+    signal: AbortSignal,
+    key: object,
+    on?: object,
+  ): Promise<string> {
+    const user = await this.callerUserOf(signal, key, on);
     if (user === undefined) {
       throw new ServerRefusal('background_run_caller_unknown');
     }
@@ -1567,17 +1577,33 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * `sapUserOf`'s lookup, by the system's kind (`systemUserOf`, with the
-   * server's stated `systemType`): on-premise `undefined`, nothing asked; on
-   * ABAP Cloud the user `systeminformation` names, an answer that names none
-   * `system_without_user`, any other failure the call's error as it came.
+   * `sapUserOf`'s lookup (`systemUserOf`, with the server's stated
+   * `systemType`): the user `systeminformation` names on every kind of
+   * system; `undefined` for an on-premise system without the function
+   * (`404`); an answer that names none `system_without_user`; any other
+   * failure — on ABAP Cloud a `404` too — the call's error as it came.
    */
   private async callerUserOf(
     signal: AbortSignal,
     key: object,
+    on?: object,
   ): Promise<string | undefined> {
     const known = this.callerUsers.get(key);
-    if (known !== undefined) return known;
+    if (known !== undefined) return known ?? undefined;
+    // The connection's system information, already asked before the tool by
+    // the shipped resolver: the same systeminformation, so no second request.
+    if (
+      on !== undefined &&
+      isShippedResolver(this.systemContextResolver) &&
+      this.systems.has(on)
+    ) {
+      const system = this.systems.get(on);
+      if (system === null) return undefined;
+      const user: unknown = system?.responsible;
+      if (typeof user === 'string' && user.trim() !== '') {
+        return user.trim().toUpperCase();
+      }
+    }
     return this.onMainConnection(signal, async (connection) => {
       // Asked on the connection the flow handed: kept unless that
       // connection was replaced meanwhile.

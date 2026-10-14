@@ -5,9 +5,9 @@
  * `null` both for a failed request and for a successful body it could not
  * read — and the server's rules need the two apart.
  *
- * The endpoint exists only on ABAP Cloud, so only a cloud system is asked
- * (the callers decide by the system's kind, `systemKindOf`); there any
- * answer but a usable one is an error:
+ * The endpoint answers on ABAP Cloud and on-premise alike, so its presence
+ * does not tell the system's kind (that comes from the connection's
+ * parameters, `systemKindOf`). Both kinds are asked:
  *
  * - a `2xx` is an answer; `user` is the body's `userName` only when the body
  *   is a JSON object and `userName` a non-blank string (a body that is no
@@ -16,7 +16,9 @@
  * - anything else (`404`, `405`, `501`, a `5xx`, an authentication or
  *   network failure) is thrown as it came — a status other than a `2xx` the
  *   connection handed back instead of throwing as a
- *   `SystemInformationStatusError`.
+ *   `SystemInformationStatusError`. A `404` is the function unavailable
+ *   (`isSystemInformationUnavailable`): on-premise the callers then take the
+ *   configured settings; on ABAP Cloud it is an error like any other.
  *
  * The request is the helper's: GET, the same `Accept`, no timeout, the
  * cache-busting parameter Eclipse sends.
@@ -101,4 +103,22 @@ export class SystemInformationStatusError extends Error {
     this.name = 'SystemInformationStatusError';
     this.response = { status };
   }
+}
+
+/** The HTTP status a failed request carries, if any (read guarded). */
+function statusOf(error: unknown): unknown {
+  try {
+    return (error as { response?: { status?: unknown } } | null)?.response
+      ?.status;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Whether `error` — what `readSystemInformation` threw — is the function
+ * unavailable on the system: a `404`, and only a `404`.
+ */
+export function isSystemInformationUnavailable(error: unknown): boolean {
+  return statusOf(error) === 404;
 }

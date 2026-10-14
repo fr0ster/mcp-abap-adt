@@ -1,23 +1,21 @@
 /**
  * Fills the responsible person and master system of a request from the ABAP
- * Cloud system its connection points at.
+ * system its connection points at.
  *
- * An embedding host that serves several SAP users from one process scopes the
- * responsible person and master system per request (`runWithRequestContext`).
- * On-premise they come from the caller's request, the configuration or the
- * login, and nothing is sent to find them. For an ABAP Cloud system the host often does not know them,
- * and the process-wide context holds one user for the whole process. So a
- * cloud request that does not carry them gets them here, from the system,
- * inside the library — no host has to repeat the lookup or import adt-clients
- * itself.
+ * The responsible person is the user the system names in its
+ * `systeminformation`, and the master system its system id — on ABAP Cloud
+ * and on-premise alike: with passwordless logon or a provisioned user, the
+ * user exists only inside the system. What is configured (the request's
+ * headers, a destination's `.env`, the process configuration, the login) is
+ * used only when the function is unavailable on an on-premise system (a
+ * `404`); on ABAP Cloud a `404` is a failed lookup like any other. The
+ * lookup is made here, inside the library — no host has to repeat it or
+ * import adt-clients itself.
  *
  * Resolution is keyed by the connection object: one connection belongs to one
  * user on one system, so its answer is the same for every request on it and
  * cannot reach another user's connection. The map is weak, so a connection
  * that goes away takes its entry with it.
- *
- * It only fills what the request did not carry: a value from the request scope
- * or from the process context always wins.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -25,17 +23,17 @@ import { errorClassOf } from './auth/errors';
 import { systemKindOf } from './connectionFactory';
 import { logger } from './logger';
 import { getRequestContext, runWithRequestContext } from './requestContext';
+import { getEffectiveSystemContext } from './systemContext';
 import {
-  getEffectiveSystemContext,
-  getStatedSystemContext,
-} from './systemContext';
-import { readSystemInformation } from './systemInformation';
+  isSystemInformationUnavailable,
+  readSystemInformation,
+} from './systemInformation';
 
 /**
- * Resolved values; `null` when the connection is not asked (on-premise — the
- * login then stands as the responsible). A cloud system that answers without
- * a user has no `responsible`: on a cloud connection the login never stands
- * in for its user.
+ * Resolved values; `null` when the system has no `systeminformation`
+ * function (an on-premise `404`) — the configured values then stand as they
+ * are. An answer without a user has no `responsible`: the system's answer
+ * wins, so nothing configured stands in for it.
  */
 export type ResolvedSystemContext = {
   responsible?: string;
@@ -48,14 +46,14 @@ export type SystemContextResolver = (
 ) => Promise<ResolvedSystemContext>;
 
 /**
- * Default resolver. On-premise it sends nothing and answers `null`
- * (configuration, the request scope, the tool arguments or the login supply
- * the values); on ABAP Cloud it asks the system's own `systeminformation`
- * (`readSystemInformation`) — the user name as responsible, the system id as
- * master system, neither when the answer carries none. Any status but a
- * `2xx` there (`404` included) is a failed lookup, thrown as it came. Which
- * of the two is the kind the connection was built for (`systemKindOf`),
- * never a guess from its URL.
+ * Default resolver: asks the system's own `systeminformation`
+ * (`readSystemInformation`) on every kind of system — the user name as
+ * responsible, the system id as master system, neither when the answer
+ * carries none. A `404` on an on-premise system is the function unavailable:
+ * `null`, and the configured values apply. Any other status but a `2xx`, and
+ * on ABAP Cloud a `404` too, is a failed lookup, thrown as it came. Which
+ * kind is the kind the connection was built for (`systemKindOf`), never a
+ * guess from its URL or from the answer.
  */
 /**
  * One resolver per stated kind, for the process: `resolveOnce` memoises per
@@ -63,6 +61,20 @@ export type SystemContextResolver = (
  * lookup per connection.
  */
 const resolversByKind = new Map<string | undefined, SystemContextResolver>();
+
+/** The shipped resolvers: their `responsible` is the session's user. */
+const shippedResolvers = new WeakSet<SystemContextResolver>();
+
+/**
+ * Whether `resolver` is a shipped one (`systemContextResolverFor`), whose
+ * answer names the session's user as `systeminformation` does — so a known
+ * answer serves for the user too, with no second request.
+ */
+export function isShippedResolver(
+  resolver: SystemContextResolver | null,
+): boolean {
+  return resolver !== null && shippedResolvers.has(resolver);
+}
 
 /**
  * The default resolver for a server that states its system kind
@@ -76,15 +88,25 @@ export function systemContextResolverFor(
   const known = resolversByKind.get(systemType);
   if (known) return known;
   const resolver: SystemContextResolver = async (connection) => {
-    if (systemKindOf(connection, process.env, systemType) !== 'cloud') {
-      return null;
+    let info: Awaited<ReturnType<typeof readSystemInformation>>;
+    try {
+      info = await readSystemInformation(connection);
+    } catch (error) {
+      // On-premise without the function: the configuration applies. On
+      // ABAP Cloud the system information is required: any failure is a
+      // failed lookup, never an answer without a user.
+      if (
+        isSystemInformationUnavailable(error) &&
+        systemKindOf(connection, process.env, systemType) !== 'cloud'
+      ) {
+        return null;
+      }
+      throw error;
     }
-    // On ABAP Cloud the system information is required: any failure is a
-    // failed lookup, never an answer without a user.
-    const info = await readSystemInformation(connection);
     return { responsible: info.user, masterSystem: info.systemId };
   };
   resolversByKind.set(systemType, resolver);
+  shippedResolvers.add(resolver);
   return resolver;
 }
 
@@ -111,7 +133,7 @@ const requiringUserOf = new WeakMap<
 
 /**
  * `resolver`, refusing an answer that names no user (`SystemWithoutUserError`):
- * `null` (nothing asked: on-premise) passes; any other answer must carry a
+ * `null` (the function unavailable on-premise) passes; any other answer must carry a
  * responsible that is a non-blank string. One wrapper per resolver, so
  * `resolveOnce` still makes one lookup per connection — and a refused one is
  * not kept, so the next caller asks again.
@@ -135,12 +157,19 @@ export function requiringUser(
 }
 
 /**
- * Set around a call whose cloud lookup threw: the guard then refuses a
- * missing responsible as a failure to retry, not as a key to set.
+ * Set around a call whose lookup threw: the guard then refuses a missing
+ * responsible as a failure to retry, not as a key to set.
  */
 const lookupFailed = new AsyncLocalStorage<true>();
 
-/** Whether this call's cloud lookup threw (see `withResolvedSystemContext`). */
+/**
+ * Set around a call whose system context was already applied (by the
+ * server, before its tool): a handler wrapped again (`HandlerExporter`)
+ * neither asks a second time nor replaces it.
+ */
+const applied = new AsyncLocalStorage<true>();
+
+/** Whether this call's lookup threw (see `withResolvedSystemContext`). */
 export function systemLookupFailed(): boolean {
   return lookupFailed.getStore() === true;
 }
@@ -152,7 +181,8 @@ const memo = new WeakMap<
 
 /**
  * One resolution per resolver and connection. Concurrent callers share the
- * in-flight promise; a `null` answer is kept (on-premise stays on-premise); a
+ * in-flight promise; a `null` answer is kept (the function stays
+ * unavailable); a
  * rejected lookup is dropped so the next request tries again.
  */
 export function resolveOnce(
@@ -244,30 +274,22 @@ export function withDestinationSystemContext<T>(
 }
 
 /**
- * Run `fn` with the responsible person and master system the request lacks
- * filled from the connection's system. `fn` runs unchanged when there is no
- * resolver, no connection, nothing missing, nothing to fill, or the lookup
- * fails — resolution never makes a call fail.
+ * Run `fn` with the responsible person and master system the connection's
+ * system names (`ResolvedSystemContext`). `fn` runs unchanged when there is
+ * no resolver, no connection, the context was already applied around this
+ * call, or the system has no `systeminformation` function on-premise (the
+ * configured values apply). A lookup that fails never makes the call fail:
+ * `fn` runs with no responsible and no master system — nothing configured
+ * stands in — and a change it attempts is refused as a lookup to retry.
  */
 export async function withResolvedSystemContext<T>(
   connection: IAbapConnection | null | undefined,
   fn: () => Promise<T> | T,
   resolver: SystemContextResolver | null = defaultSystemContextResolver,
 ): Promise<T> {
-  if (!resolver || !connection) return fn();
+  if (!resolver || !connection || applied.getStore() === true) return fn();
 
-  // What is stated, without the login: on a cloud connection the login is
-  // the system's user (Ruling 18), so the process SAP_USERNAME, a
-  // destination's SAP_USERNAME and x-sap-login do not count there.
-  const stated = getStatedSystemContext();
   const effective = getEffectiveSystemContext();
-  // By value (Ruling 17): an empty value is missing, whether the scope
-  // carries its key or not. A host that always enters a scope with both keys
-  // — values possibly undefined — still gets the cloud system's answer. Key
-  // presence keeps deciding in getStatedSystemContext, against the process
-  // cache: that is what stops one user's value reaching another's.
-  if (stated.responsible && stated.masterSystem) return fn();
-
   let resolved: ResolvedSystemContext;
   let failed = false;
   try {
@@ -278,11 +300,9 @@ export async function withResolvedSystemContext<T>(
     logger.warn(
       `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
     );
-    // Only a cloud connection is asked: a login does not stand in for the
-    // system's user, so the call runs with what is stated.
     resolved = {};
   }
-  return applyResolved(resolved, failed, stated, effective, fn);
+  return applyResolved(resolved, failed, effective, fn);
 }
 
 /**
@@ -296,34 +316,27 @@ export async function withKnownSystemContext<T>(
   fn: () => Promise<T> | T,
 ): Promise<T> {
   if (resolved === undefined) return fn();
-  const stated = getStatedSystemContext();
-  if (stated.responsible && stated.masterSystem) return fn();
-  return applyResolved(
-    resolved,
-    false,
-    stated,
-    getEffectiveSystemContext(),
-    fn,
-  );
+  return applyResolved(resolved, false, getEffectiveSystemContext(), fn);
 }
 
 function applyResolved<T>(
   resolved: ResolvedSystemContext,
   failed: boolean,
-  stated: ReturnType<typeof getStatedSystemContext>,
   effective: ReturnType<typeof getEffectiveSystemContext>,
   fn: () => Promise<T> | T,
 ): Promise<T> | T {
-  // Not a cloud connection: nothing asked, the login applies as it is.
-  if (!resolved) return fn();
+  // No systeminformation on-premise: the configured values apply as they are.
+  if (!resolved) return applied.run(true, fn);
 
+  // The system's answer wins over everything configured: the stated
+  // responsible and master system, and the login that would stand in.
   const scoped = () =>
     runWithRequestContext(
       {
         ...getRequestContext(),
         login: undefined,
-        responsible: stated.responsible || resolved.responsible,
-        masterSystem: stated.masterSystem || resolved.masterSystem,
+        responsible: resolved.responsible,
+        masterSystem: resolved.masterSystem,
         // The effective value, not the scope's: inside a scope it IS the
         // scope's value, so an outer scope's language is kept; outside any
         // scope it is the process language, which entering this new scope
@@ -331,7 +344,7 @@ function applyResolved<T>(
         // back to the process.
         masterLanguage: effective.masterLanguage,
       },
-      fn,
+      () => applied.run(true, fn),
     );
   return failed ? lookupFailed.run(true, scoped) : scoped();
 }

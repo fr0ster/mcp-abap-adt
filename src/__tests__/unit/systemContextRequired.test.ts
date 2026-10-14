@@ -4,15 +4,18 @@
  * SAP stores that attribute on them as the creator, not the responsible
  * (adt-clients 26.0.1), so the vehicle here is a message class.
  *
- * Responsible: its own variable (the tool argument, `x-sap-responsible`,
- * `SAP_RESPONSIBLE` of the destination then of the process), else the login
- * (the destination's `SAP_USERNAME`, `x-sap-login`, the process
- * `SAP_USERNAME`; on a cloud system `systeminformation`'s `userName`). A
- * create that finds none is refused naming `SAP_RESPONSIBLE`, and nothing is
- * sent — so no empty `adtcore:responsible=""` ever leaves the server.
+ * Responsible: the user the system names (`systeminformation`'s `userName`),
+ * on every kind of system, over anything configured. Only where an
+ * on-premise system has no such function (`404`) — and where the handler
+ * runs outside the server, as here — the configuration: its own variable
+ * (the tool argument, `x-sap-responsible`, `SAP_RESPONSIBLE` of the
+ * destination then of the process), else the login (the destination's
+ * `SAP_USERNAME`, `x-sap-login`, the process `SAP_USERNAME`). A create that
+ * finds none is refused naming `SAP_RESPONSIBLE`, and nothing is sent — so
+ * no empty `adtcore:responsible=""` ever leaves the server.
  *
- * Master system: its own variable, else the cloud system's `systemID`;
- * otherwise it is left out of the request — never refused.
+ * Master system: the system's `systemID`, else (on-premise `404`) its own
+ * variable; otherwise it is left out of the request — never refused.
  */
 jest.mock('../../lib/systemInformation', () => ({
   ...jest.requireActual('../../lib/systemInformation'),
@@ -424,7 +427,7 @@ describe('cloud', () => {
     expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
   });
 
-  it('a scope login is not a cloud login either; a stated SAP_RESPONSIBLE still wins on cloud', async () => {
+  it('a scope login is not a cloud login either; the system user wins over a stated SAP_RESPONSIBLE', async () => {
     lookup.mockResolvedValue({
       user: 'CB_USER',
       systemId: 'CLD',
@@ -449,7 +452,7 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     await toolsOf(statedServer).CreateMessageClass.handler(MSAG_ARGS);
-    expect(createBody(stated)).toContain('adtcore:responsible="STATED_USER"');
+    expect(createBody(stated)).toContain('adtcore:responsible="CB_USER"');
   });
 
   it('a cloud system that answers no user: not a valid system — the process login does not stand in, the call is refused system_without_user, nothing sent', async () => {
@@ -473,14 +476,24 @@ describe('cloud', () => {
 
   it.each([
     ['cloud', true],
+    ['onprem', true],
     ['onprem', false],
   ] as const)(
-    'a host scope carrying both keys as undefined (%s): cloud asks the system, on-premise is refused',
-    async (systemType, filled) => {
-      lookup.mockResolvedValue({
-        user: 'CB_USER',
-        systemId: 'CLD',
-      });
+    'a host scope carrying both keys as undefined (%s, answered %s): the system fills both; on-premise without the function it is refused',
+    async (systemType, answered) => {
+      const filled = answered;
+      if (answered) {
+        lookup.mockResolvedValue({
+          user: 'CB_USER',
+          systemId: 'CLD',
+        });
+      } else {
+        lookup.mockRejectedValue(
+          Object.assign(new Error('placeholder'), {
+            response: { status: 404 },
+          }),
+        );
+      }
       const connection = recordingConnection();
       const server = new EmbeddableMcpServer({
         connection: connection as never,
@@ -498,7 +511,7 @@ describe('cloud', () => {
           'adtcore:responsible="CB_USER"',
         );
       } else {
-        expect(lookup).not.toHaveBeenCalled();
+        expect(lookup).toHaveBeenCalledTimes(1);
         expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
         expect(connection.requests).toEqual([]);
       }
@@ -547,6 +560,92 @@ describe('cloud', () => {
     });
     expect(textOf(result)).not.toContain('system_without_user');
     expect(textOf(result)).not.toContain('PROCESS_LOGIN');
+    expect(connection.requests).toEqual([]);
+  });
+});
+
+describe('on-premise, through the server', () => {
+  const registry = new CompositeHandlersRegistry([
+    {
+      getName: () => 'create',
+      registerHandlers: () => {},
+      getHandlers: (): HandlerEntry[] => [
+        {
+          toolDefinition: CreateMessageClassTool as never,
+          handler: handleCreateMessageClass as never,
+        },
+      ],
+    },
+  ]);
+  const create = async () => {
+    const connection = recordingConnection();
+    const server = new EmbeddableMcpServer({
+      connection: connection as never,
+      handlersRegistry: registry,
+      systemType: 'onprem',
+    });
+    const tools = (
+      server as unknown as {
+        _registeredTools: Record<
+          string,
+          { handler: (a: unknown) => Promise<unknown> }
+        >;
+      }
+    )._registeredTools;
+    const result = await tools.CreateMessageClass.handler(MSAG_ARGS);
+    return { connection, result };
+  };
+  const status = (code: number) =>
+    Object.assign(new Error('placeholder'), { response: { status: code } });
+
+  beforeEach(() => {
+    process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
+    process.env.SAP_RESPONSIBLE = 'STATED_USER';
+    process.env.SAP_MASTER_SYSTEM = 'STATED_SYSTEM';
+    systemContextFromConfiguration();
+  });
+
+  it('the system names its user: it wins over SAP_RESPONSIBLE, SAP_MASTER_SYSTEM and the login', async () => {
+    lookup.mockResolvedValue({ user: 'OP_USER', systemId: 'OPS' });
+    const { connection } = await create();
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(createBody(connection)).toContain('adtcore:responsible="OP_USER"');
+    expect(createBody(connection)).toContain('adtcore:masterSystem="OPS"');
+  });
+
+  it('without the function (404): the configured responsible and master system', async () => {
+    lookup.mockRejectedValue(status(404));
+    const { connection } = await create();
+    expect(createBody(connection)).toContain(
+      'adtcore:responsible="STATED_USER"',
+    );
+    expect(createBody(connection)).toContain(
+      'adtcore:masterSystem="STATED_SYSTEM"',
+    );
+  });
+
+  it('without the function (404) and only a login: the login', async () => {
+    delete process.env.SAP_RESPONSIBLE;
+    resetSystemContextCache();
+    systemContextFromConfiguration();
+    lookup.mockRejectedValue(status(404));
+    const { connection } = await create();
+    expect(createBody(connection)).toContain(
+      'adtcore:responsible="LOGIN_PLACEHOLDER"',
+    );
+  });
+
+  it('an answer without a user: system_without_user, nothing configured stands in, nothing sent', async () => {
+    lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' });
+    const { connection, result } = await create();
+    expect(textOf(result)).toContain('system_without_user');
+    expect(connection.requests).toEqual([]);
+  });
+
+  it('a lookup answered 500: system_lookup_failed, nothing configured stands in, nothing sent', async () => {
+    lookup.mockRejectedValue(status(500));
+    const { connection, result } = await create();
+    expect(textOf(result)).toContain(SYSTEM_LOOKUP_FAILED_WORDS);
     expect(connection.requests).toEqual([]);
   });
 });

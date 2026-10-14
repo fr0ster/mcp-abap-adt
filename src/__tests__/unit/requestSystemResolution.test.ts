@@ -121,7 +121,18 @@ describe('defaultSystemContextResolver', () => {
     });
   });
 
-  it('returns null on-premise without asking the system, whatever the URL', async () => {
+  it('asks an on-premise system too, and maps its answer', async () => {
+    await expect(defaultSystemContextResolver(onPremConn())).resolves.toEqual({
+      responsible: 'CB_USER',
+      masterSystem: 'CLD',
+    });
+    expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
+  it('an on-premise system without the function (404): null, the configuration applies', async () => {
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
     await expect(defaultSystemContextResolver(onPremConn())).resolves.toBe(
       null,
     );
@@ -133,30 +144,46 @@ describe('defaultSystemContextResolver', () => {
         }),
       ),
     ).resolves.toBe(null);
-    expect(lookup).not.toHaveBeenCalled();
   });
 
-  it('SAP_SYSTEM_TYPE states the kind: a jwt on-premise is not asked', async () => {
+  it.each([405, 501, 500])(
+    'an on-premise system whose systeminformation answers %i: the lookup fails with it',
+    async (status) => {
+      const failure = Object.assign(new Error('placeholder'), {
+        response: { status },
+      });
+      lookup.mockRejectedValue(failure);
+      await expect(defaultSystemContextResolver(onPremConn())).rejects.toBe(
+        failure,
+      );
+    },
+  );
+
+  it('SAP_SYSTEM_TYPE states the kind: a jwt on-premise without the function is null', async () => {
     process.env.SAP_SYSTEM_TYPE = 'onprem';
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
     await expect(defaultSystemContextResolver(cloudConn())).resolves.toBe(null);
-    expect(lookup).not.toHaveBeenCalled();
   });
 
   it.each([
     ['https://system.abap.example.hana.ondemand.com'],
     ['https://system.example.invalid'],
   ])(
-    'a connection the factory did not build: SAP_SYSTEM_TYPE alone, never the URL (%s)',
+    'a connection the factory did not build: its 404 read by SAP_SYSTEM_TYPE alone, never the URL (%s)',
     async (url) => {
+      const absent = Object.assign(new Error('placeholder'), {
+        response: { status: 404 },
+      });
+      lookup.mockRejectedValue(absent);
       await expect(
         defaultSystemContextResolver(foreignConn(url)),
       ).resolves.toBe(null);
-      expect(lookup).not.toHaveBeenCalled();
       process.env.SAP_SYSTEM_TYPE = 'cloud';
-      await expect(
-        defaultSystemContextResolver(foreignConn(url)),
-      ).resolves.toEqual({ responsible: 'CB_USER', masterSystem: 'CLD' });
-      expect(lookup).toHaveBeenCalledTimes(1);
+      await expect(defaultSystemContextResolver(foreignConn(url))).rejects.toBe(
+        absent,
+      );
     },
   );
 
@@ -229,8 +256,33 @@ describe('memoisation per connection', () => {
 });
 
 describe('withResolvedSystemContext', () => {
-  it('a scope carrying both makes no lookup and createAdtClient sees the scope', async () => {
-    const conn = cloudConn();
+  it.each([
+    ['cloud', cloudConn],
+    ['on-premise', onPremConn],
+  ])(
+    '%s: the system answer wins over a scope carrying both',
+    async (_kind, conn) => {
+      const connection = conn();
+      await runWithRequestContext(
+        { responsible: 'ALICE', masterSystem: 'SID' },
+        () =>
+          withResolvedSystemContext(connection, () => {
+            createAdtClient(connection);
+          }),
+      );
+      expect(lookup).toHaveBeenCalledTimes(1);
+      expect(lastOptions()).toMatchObject({
+        responsible: 'CB_USER',
+        masterSystem: 'CLD',
+      });
+    },
+  );
+
+  it('on-premise without the function (404): the scope as stated, the system not in it', async () => {
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
+    const conn = onPremConn();
     await runWithRequestContext(
       { responsible: 'ALICE', masterSystem: 'SID' },
       () =>
@@ -238,14 +290,34 @@ describe('withResolvedSystemContext', () => {
           createAdtClient(conn);
         }),
     );
-    expect(lookup).not.toHaveBeenCalled();
     expect(lastOptions()).toMatchObject({
       responsible: 'ALICE',
       masterSystem: 'SID',
     });
   });
 
-  it('a scope carrying responsible only gets the master system from the system', async () => {
+  it.each([
+    ['cloud', cloudConn, 404],
+    ['cloud', cloudConn, 500],
+    ['on-premise', onPremConn, 500],
+  ])(
+    '%s, a lookup answered %i: nothing stated stands in — no responsible',
+    async (_kind, conn, status) => {
+      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+      lookup.mockRejectedValue(
+        Object.assign(new Error('placeholder'), { response: { status } }),
+      );
+      const result = await runWithRequestContext(
+        { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
+        () => withResolvedSystemContext(conn(), seen),
+      );
+      expect(result.responsible).toBeUndefined();
+      expect(result.masterSystem).toBeUndefined();
+      warn.mockRestore();
+    },
+  );
+
+  it('a scope carrying responsible only: the system answer wins for both', async () => {
     const conn = cloudConn();
     await runWithRequestContext({ responsible: 'ALICE' }, () =>
       withResolvedSystemContext(conn, () => {
@@ -253,7 +325,7 @@ describe('withResolvedSystemContext', () => {
       }),
     );
     expect(lastOptions()).toMatchObject({
-      responsible: 'ALICE',
+      responsible: 'CB_USER',
       masterSystem: 'CLD',
     });
   });
@@ -294,6 +366,9 @@ describe('withResolvedSystemContext', () => {
     // Key presence still decides against the process cache: what stops one
     // user's process-wide value reaching another user's scope.
     setSystemContext({ responsible: 'PROC_USER', masterSystem: 'PROC_SYS' });
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
     const result = await runWithRequestContext(
       { responsible: undefined, masterSystem: undefined },
       () => withResolvedSystemContext(onPremConn(), seen),
@@ -532,11 +607,11 @@ describe('BaseMcpServer.registerHandlers', () => {
   });
 
   it.each([
-    ['cloud', 1, { responsible: 'CB_USER', masterSystem: 'CLD' }],
-    ['onprem', 0, {}],
+    ['cloud', { responsible: 'CB_USER', masterSystem: 'CLD' }],
+    ['onprem', { responsible: 'CB_USER', masterSystem: 'CLD' }],
   ] as const)(
-    "an injected connection: the server's systemType %s states the kind, SAP_SYSTEM_TYPE unset",
-    async (systemType, lookups, expected) => {
+    "an injected connection, the server's systemType %s: the system's answer",
+    async (systemType, expected) => {
       const server = new EmbeddableMcpServer({
         connection: foreignConn(
           'https://system.abap.example.hana.ondemand.com',
@@ -545,11 +620,41 @@ describe('BaseMcpServer.registerHandlers', () => {
         systemType,
       });
       const result = textOf(await callTool(server, 'WithContext'));
-      expect(lookup).toHaveBeenCalledTimes(lookups);
+      expect(lookup).toHaveBeenCalledTimes(1);
       expect(result).toMatchObject(expected);
-      if (lookups === 0) expect(result.masterSystem).toBeUndefined();
     },
   );
+
+  it("an injected connection answered 404: the server's systemType states the kind, SAP_SYSTEM_TYPE unset", async () => {
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    const onprem = new EmbeddableMcpServer({
+      connection: foreignConn(
+        'https://system.abap.example.hana.ondemand.com',
+      ) as never,
+      handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+      systemType: 'onprem',
+    });
+    const answered = textOf(await callTool(onprem, 'WithContext'));
+    expect(answered.responsible).toBeUndefined();
+    expect(answered.masterSystem).toBeUndefined();
+    const cloud = new EmbeddableMcpServer({
+      connection: foreignConn(
+        'https://system.abap.example.hana.ondemand.com',
+      ) as never,
+      handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+      systemType: 'cloud',
+    });
+    const refused = (await callTool(cloud, 'WithContext')) as {
+      isError?: boolean;
+      content: { text: string }[];
+    };
+    expect(refused.isError).toBe(true);
+    expect(refused.content[0].text).toContain('systeminformation');
+    warn.mockRestore();
+  });
 
   it("two servers stating systemType 'cloud' over one connection make one lookup", async () => {
     // A host builds a server per request: the memo must span server instances.
@@ -571,13 +676,21 @@ describe('BaseMcpServer.registerHandlers', () => {
   });
 
   it("a factory-built connection follows its recorded settings, not the server's systemType", async () => {
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
     const server = new EmbeddableMcpServer({
       connection: onPremConn() as never,
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
       systemType: 'cloud',
     });
-    await callTool(server, 'WithContext');
-    expect(lookup).not.toHaveBeenCalled();
+    // On-premise by its settings: the 404 is the function unavailable, and
+    // the tool runs with the configuration.
+    const result = (await callTool(server, 'WithContext')) as {
+      isError?: boolean;
+    };
+    expect(result.isError).toBeUndefined();
+    expect(lookup).toHaveBeenCalledTimes(1);
   });
 
   it('systemContextResolver: null disables resolution', async () => {

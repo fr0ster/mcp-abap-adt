@@ -223,14 +223,13 @@ it('one leftover session: picked up before the transport opens, with no tool cal
   try {
     expect(s.exits).toEqual([]);
     expect(s.opened()).toBe(1);
-    // Everything up to the transport's opening was the resume, in the old
-    // session, without the credential.
+    // Everything up to the transport's opening was the resume and the
+    // system lookup, in the old session — no logon; the takeover's request
+    // without the credential.
     const born = standIn.requests.slice(from, s.seenAtOpen());
     expect(born.length).toBeGreaterThan(0);
-    for (const r of born) {
-      expect(r.session).toBe(session);
-      expect(r.authorization).toBeUndefined();
-    }
+    for (const r of born) expect(r.session).toBe(session);
+    expect(born[0]?.authorization).toBeUndefined();
     expect(runtimeFiles(runtime)).toEqual([handle]);
     const file = JSON.parse(
       fs.readFileSync(path.join(runtime, handle), 'utf8'),
@@ -519,6 +518,56 @@ it('ABAP Cloud: the system information is asked at the start, and a tool asks no
   } finally {
     await s.stop();
   }
+});
+
+// On-premise the system is asked at the start too; a `404` there is the
+// function unavailable, and the start goes on with the configuration.
+it('on-premise: the system information is asked at the start, and a tool asks no more', async () => {
+  standIn.body(
+    isLookup,
+    JSON.stringify({ userName: 'OP_USER', systemID: 'OPS' }),
+  );
+  const s = await start({ kind: 'onprem' });
+  try {
+    expect(s.exits).toEqual([]);
+    expect(
+      standIn.requests.slice(0, s.seenAtOpen()).filter(isLookup),
+    ).toHaveLength(1);
+    await s.call('GetClass', { class_name: 'ZCL_AFTER_START' });
+    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+  } finally {
+    await s.stop();
+  }
+});
+
+it('on-premise, systeminformation answered 404: the start goes on with the configuration', async () => {
+  standIn.answer(isLookup, 404);
+  const s = await start({ kind: 'onprem' });
+  try {
+    expect(s.exits).toEqual([]);
+    expect(s.opened()).toBe(1);
+  } finally {
+    await s.stop();
+  }
+});
+
+it.each([500, 405])(
+  'on-premise, systeminformation answered %i: exit 1 naming the lookup, the transport never opens',
+  async (status) => {
+    standIn.answer(isLookup, status);
+    const s = await start({ kind: 'onprem' });
+    expect(s.exits).toEqual([1]);
+    expect(s.opened()).toBe(0);
+    expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
+  },
+);
+
+it('on-premise, systeminformation without a user: exit 1 in its own words', async () => {
+  standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' }));
+  const s = await start({ kind: 'onprem' });
+  expect(s.exits).toEqual([1]);
+  expect(s.opened()).toBe(0);
+  expect(s.stderr).toContain(`[MCP] ${startSystemWithoutUserWords('default')}`);
 });
 
 it.each<[string, ToolSet]>([

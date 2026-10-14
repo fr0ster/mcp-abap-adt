@@ -31,6 +31,7 @@ import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/Compos
 import {
   type AdtStandIn,
   adtStandIn,
+  basicOf,
   isLogoff,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
@@ -145,6 +146,15 @@ export async function callerOn(
     ...(strategy !== undefined ? { backgroundRuns: strategy } : {}),
   });
   if ('user' in who) {
+    // The system names the session's user (systeminformation), as a session
+    // of that SAP user would: the caller is that user.
+    const authorization = basicOf(who.user, 'run-password');
+    standIn.body(
+      (r) =>
+        r.url.includes('systeminformation') &&
+        r.authorization === authorization,
+      JSON.stringify({ userName: who.user, systemID: 'SID' }),
+    );
     server.use({
       settings: {
         url: standIn.url,

@@ -140,16 +140,15 @@ describe('an embedder', () => {
         message: FRESH_CONNECTION_UNAVAILABLE_WORDS,
       });
       expect(standIn.requests.some(isClassRun)).toBe(false);
-      // Refused before the caller was asked of the system.
+      // Refused before the caller was asked of the system: the one lookup
+      // is the connection's own, before the tool.
       expect(
-        standIn.requests.some((r) => r.url.includes('systeminformation')),
-      ).toBe(false);
-      // Nothing kept. (On-premise nothing is asked for the caller: with no
-      // login stated for an injected connection, the list tool has no
-      // caller to answer for, so the store is read directly.)
-      expect(
-        strategy.list({ url: standIn.url, client: '', user: 'EMBEDDED_USER' }),
-      ).toEqual([]);
+        standIn.requests.filter((r) => r.url.includes('systeminformation')),
+      ).toHaveLength(1);
+      // Nothing kept.
+      expect((await client.call('ListBackgroundRuns')).payload).toEqual({
+        runs: [],
+      });
     } finally {
       await client.close();
       await (built as unknown as { disconnect(): Promise<void> })

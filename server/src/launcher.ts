@@ -469,9 +469,9 @@ function startupWords(
   });
 }
 
-/** The start's words for an ABAP Cloud system that answered no system information. */
+/** The start's words for a system that answered no system information. */
 export function startLookupFailedWords(destination: string): string {
-  return `Destination "${destination}": the ABAP Cloud system could not be asked for the session user and system id (systeminformation), which the start needs; the server did not start. Start it again when the system is available`;
+  return `Destination "${destination}": the system could not be asked for the session user and system id (systeminformation), which the start needs; the server did not start. Start it again when the system is available`;
 }
 
 /**

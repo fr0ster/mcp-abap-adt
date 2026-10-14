@@ -221,23 +221,23 @@ async function behindALostSession(
   };
 }
 
-it("(a) a background run's caller lookup waiting behind a lost session goes out on the replacement", async () => {
+it("(a) a background-run tool's caller lookup waiting behind a lost session goes out on the replacement", async () => {
   const standIn = await adtStandIn();
   standIn.body(
     isLookup,
     JSON.stringify({ systemID: 'SID', userName: 'TOKEN_USER' }),
   );
-  // A token credential names no user: the caller is asked of SAP.
+  // The caller is asked of SAP.
   const s = await stand({
     settings: { url: standIn.url, client: '100', authType: 'jwt' },
     credential: TokenAuthProvider.fixed('placeholder.token.sig'),
   });
   try {
+    // A management tool: its caller is asked of SAP in a turn of the flow
+    // (a run tool's caller is its connection's system information, asked
+    // before the tool).
     const outcome = await behindALostSession(standIn, s, () =>
-      s.call('RuntimeRunClass', {
-        class_name: 'ZCL_BACKGROUND',
-        background: true,
-      }),
+      s.call('ListBackgroundRuns', {}),
     );
     const { lostSession, lookups } = outcome;
     const { replacedLogoffs, endedUnderHolder } = outcome;

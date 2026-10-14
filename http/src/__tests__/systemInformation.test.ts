@@ -1,6 +1,9 @@
 /**
- * Over Streamable HTTP, on ABAP Cloud, every call's system context comes
- * from `systeminformation`, asked before its tool. An answer that names no
+ * Over Streamable HTTP every call's system context comes from
+ * `systeminformation`, asked before its tool — on ABAP Cloud and on-premise
+ * alike. On-premise a `404` is the function unavailable, and the
+ * configuration applies; on ABAP Cloud, and for any other failure on both
+ * kinds, the call is refused. An answer that names no
  * user — the field missing or blank, a body that is no JSON, JSON that is no
  * object — is `system_without_user`; any status but a `2xx` (`404`, `405`,
  * `501`, `500`) is a failed lookup, `system_lookup_failed`, with no login
@@ -51,7 +54,7 @@ it.each(WITHOUT_USER)(
 );
 
 it.each([404, 405, 501, 500])(
-  'systeminformation answered %i: system_lookup_failed, no login stands in, the tool not run',
+  'ABAP Cloud, systeminformation answered %i: system_lookup_failed, no login stands in, the tool not run',
   async (status) => {
     s.standIn.answer(isLookup, status);
     const answer = await s.call('ProbeAdt', { id: 'NO_LOOKUP' });
@@ -72,4 +75,53 @@ it('systeminformation naming its user: the tool runs', async () => {
   const answer = await s.call('ProbeAdt', { id: 'WITH_USER' });
   expect(answer.isError).toBe(false);
   expect(s.standIn.requests.some(isProbe)).toBe(true);
+});
+
+describe('on-premise: asked the same way; settings only without the function', () => {
+  beforeEach(() => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+  });
+
+  it('systeminformation naming its user: asked before the tool, which runs', async () => {
+    s.standIn.body(
+      isLookup,
+      JSON.stringify({ userName: 'OP_USER', systemID: 'OPS' }),
+    );
+    const answer = await s.call('ProbeAdt', { id: 'ONPREM_USER' });
+    expect(answer.isError).toBe(false);
+    expect(s.standIn.requests.filter(isLookup)).toHaveLength(1);
+    expect(s.standIn.requests.findIndex(isProbe)).toBeGreaterThan(
+      s.standIn.requests.findIndex(isLookup),
+    );
+  });
+
+  it('systeminformation answered 404 (the function unavailable): the tool runs with the configuration', async () => {
+    s.standIn.answer(isLookup, 404);
+    const answer = await s.call('ProbeAdt', { id: 'ONPREM_ABSENT' });
+    expect(answer.isError).toBe(false);
+    expect(s.standIn.requests.some(isProbe)).toBe(true);
+  });
+
+  it.each([405, 500])(
+    'systeminformation answered %i: system_lookup_failed, the tool not run',
+    async (status) => {
+      s.standIn.answer(isLookup, status);
+      const answer = await s.call('ProbeAdt', { id: 'ONPREM_FAILED' });
+      expect(answer.isError).toBe(true);
+      expect(JSON.parse(answer.text)).toMatchObject({
+        error: 'system_lookup_failed',
+      });
+      expect(s.standIn.requests.some(isProbe)).toBe(false);
+    },
+  );
+
+  it('systeminformation without a user: system_without_user, the tool not run', async () => {
+    s.standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' }));
+    const answer = await s.call('ProbeAdt', { id: 'ONPREM_NO_USER' });
+    expect(answer.isError).toBe(true);
+    expect(JSON.parse(answer.text)).toMatchObject({
+      error: 'system_without_user',
+    });
+    expect(s.standIn.requests.some(isProbe)).toBe(false);
+  });
 });

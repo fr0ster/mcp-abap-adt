@@ -11,7 +11,8 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
-  // The connect's system lookup asks the kind: on-premise sends nothing.
+  // The connect's system lookup reads the kind for a 404: on-premise, the
+  // configuration applies.
   systemKindOf: jest.fn(() => 'onprem'),
 }));
 jest.mock('../../../lib/systemInformation', () => ({
@@ -175,6 +176,10 @@ beforeEach(() => {
   build.mockReset();
   build.mockImplementation(() => fakeConnection());
   lookup.mockReset();
+  // An on-premise system without the function: the configuration applies.
+  lookup.mockRejectedValue(
+    Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+  );
   fromHeaders.mockClear();
 });
 

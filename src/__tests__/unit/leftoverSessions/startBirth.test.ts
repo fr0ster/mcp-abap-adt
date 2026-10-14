@@ -91,10 +91,11 @@ describe('one leftover session of the destination', () => {
     expect(await stand.start()).toEqual({ session: 'picked_up', handle });
     const born = stand.standIn.requests.slice(from);
     expect(born.length).toBeGreaterThan(0);
-    for (const r of born) {
-      expect(r.session).toBe(session);
-      expect(r.authorization).toBeUndefined();
-    }
+    // All in the old session — no logon; the takeover's request without
+    // the credential. (The system lookup that follows goes on that session
+    // as every request of a basic connection does.)
+    for (const r of born) expect(r.session).toBe(session);
+    expect(born[0]?.authorization).toBeUndefined();
     // The file is this process's, under the same handle.
     expect(stand.files()).toEqual([handle]);
     expect(stand.file(handle)).toMatchObject({

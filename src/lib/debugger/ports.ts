@@ -23,13 +23,15 @@ import type { AmdpSessionPorts } from './AmdpSession';
 import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
 
 /**
- * The user whose requests are caught, by the system's kind (`systemType`:
- * the server's stated one, for a connection the factory did not build). On
- * ABAP Cloud what `systeminformation` names: an answer that names no user is
- * the call's `system_without_user`, any other failure (`404`, `405`, `501`,
- * a `5xx`, authentication, network) goes through to the caller as it came —
- * the login never stands in. On-premise nothing is asked: the login, the
- * request scope's before the process's — never the responsible.
+ * The user whose requests are caught: what `systeminformation` names, on
+ * every kind of system, over any configured login. An answer that names no
+ * user is the call's `system_without_user`. The login — the request scope's
+ * before the process's, never the responsible — stands in only on-premise
+ * when the function is unavailable (`404`); on ABAP Cloud a `404`, and on
+ * both kinds any other failure (`405`, `501`, a `5xx`, authentication,
+ * network), goes through to the caller as it came. The kind is the
+ * connection's (`systemType`: the server's stated one, for a connection the
+ * factory did not build).
  */
 export async function requestUserOf(
   connection: IAbapConnection,

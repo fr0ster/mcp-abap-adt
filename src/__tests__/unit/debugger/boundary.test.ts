@@ -18,6 +18,7 @@ import { TOOL_DEFINITION as VirtualFolders } from '../../../handlers/system/low/
 import { TOOL_DEFINITION as CompactStart } from '../../../lib/compact/debug/handleHandlerDebugStart';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { withoutSystemInformation } from '../../helpers/noSystemInformation';
 
 class BoundaryServer extends BaseMcpServer {
   readonly handler = jest.fn(async (_context: unknown, _args: unknown) => ({
@@ -49,7 +50,7 @@ class BoundaryServer extends BaseMcpServer {
     );
   }
   protected async getConnection(): Promise<any> {
-    return {};
+    return withoutSystemInformation();
   }
 }
 

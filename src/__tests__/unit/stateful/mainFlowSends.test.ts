@@ -70,9 +70,8 @@ function testGroup(
 }
 
 /**
- * `systeminformation` exists only on ABAP Cloud, so the identity lookups are
- * asked only there: the cases about them run against a cloud system (the
- * kind of a connection the factory built comes from `SAP_SYSTEM_TYPE`).
+ * Cases on a cloud system (the kind of a connection the factory built comes
+ * from `SAP_SYSTEM_TYPE`); the identity lookups are asked on both kinds.
  */
 let previousType: string | undefined;
 function onCloud(): void {
@@ -91,7 +90,7 @@ const text = (value: string) => ({
 
 it("a background run's caller lookup takes its turn behind the call holding the flow", async () => {
   const standIn = await adtStandIn();
-  // A token credential names no user: the caller is asked of SAP.
+  // The caller is asked of SAP.
   const caller = await callerOn(standIn, new InMemoryBackgroundRuns(), {
     tokenUser: 'RUN_USER',
   });
@@ -108,10 +107,10 @@ it("a background run's caller lookup takes its turn behind the call holding the 
     });
     await held.arrived;
     const lookupsBefore = standIn.requests.filter(isLookup).length;
-    const background = caller.call('RuntimeRunClass', {
-      class_name: 'ZCL_BACKGROUND',
-      background: true,
-    });
+    // A management tool: its caller is asked of SAP in a turn of the flow
+    // (a run tool's caller is its connection's system information, asked
+    // before the tool).
+    const background = caller.call('ListBackgroundRuns', {});
     await settleWhile();
     // The lookup waits for the flow: nothing of it reached SAP yet.
     expect(standIn.requests.filter(isLookup).length).toBe(lookupsBefore);

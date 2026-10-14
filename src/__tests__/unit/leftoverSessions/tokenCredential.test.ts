@@ -32,8 +32,8 @@ afterEach(async () => {
 });
 
 it('writes the file under the destination, with no user, asking SAP no user', async () => {
-  // On-premise: the connect itself looks nothing up, so any lookup would be
-  // the file's.
+  // On-premise the connection's own lookup is the one before its first
+  // tool; any further one would be the file's.
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   stand = await leftoverStand({ token: { tokenUser: 'TOKEN_USER' } });
   await stand.call('ProbeAdt', { id: 'one' });
@@ -48,7 +48,7 @@ it('writes the file under the destination, with no user, asking SAP no user', as
       system: 'onprem',
     },
   });
-  expect(stand.standIn.requests.filter(isLookup)).toEqual([]);
+  expect(stand.standIn.requests.filter(isLookup)).toHaveLength(1);
 });
 
 it("lists and logs off the destination's leftover without a request to SAP but the logoff", async () => {

@@ -9,7 +9,9 @@
  *   request, and never again for later calls.
  * - A tool outside the main flow — a background run, a debugger wait — sends
  *   no lookup on the instance's connection, also when it is the first call.
- * - On-premise nothing is asked.
+ * - On-premise it is asked the same way (the endpoint exists there too); a
+ *   `404` there is the function unavailable, and the tool runs with the
+ *   configuration.
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -127,13 +129,16 @@ it('ABAP Cloud: a background run sends no lookup on the instance’s connection,
       background: true,
     });
     await until(() => standIn.requests.filter(isClassRun).length === 2);
-    // The connect's one lookup, and none of the runs'.
+    // The connect's one lookup — it names the runs' caller too — and none
+    // of the runs'.
     const lookups = standIn.requests.filter(isLookup);
     expect(lookups).toHaveLength(1);
     const runSessions = new Set(
       standIn.requests.filter(isClassRun).map((r) => r.session),
     );
-    expect(runSessions.has(lookups[0]?.session ?? '')).toBe(false);
+    for (const lookup of lookups) {
+      expect(runSessions.has(lookup.session ?? '')).toBe(false);
+    }
   } finally {
     await s.close();
     await standIn.close();
@@ -178,20 +183,37 @@ it('ABAP Cloud: a debugger wait sends no lookup; the injected connection is look
   }
 });
 
-it('on-premise: no lookup is sent', async () => {
+it('on-premise: the lookup is sent once per connection, before the first tool request', async () => {
   const standIn = await adtStandIn();
   const s = await builtStand(standIn, 'onprem');
   try {
     await s.call('ReadClass', { class_name: 'ZCL_ONPREM' });
-    await s.call('RuntimeRunClass', {
-      class_name: 'ZCL_ONPREM_RUN',
-      background: true,
-    });
-    await until(() => standIn.requests.some(isClassRun));
-    expect(standIn.requests.filter(isLookup)).toEqual([]);
+    await s.call('ReadClass', { class_name: 'ZCL_ONPREM_TWO' });
+    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    expect(standIn.requests.findIndex(of('ZCL_ONPREM'))).toBeGreaterThan(
+      standIn.requests.findIndex(isLookup),
+    );
+  } finally {
+    await s.close();
+    await standIn.close();
+  }
+});
+
+it('on-premise without the function (404): asked once, and the tools run', async () => {
+  const standIn = await adtStandIn();
+  standIn.answer(isLookup, 404);
+  const s = await builtStand(standIn, 'onprem');
+  try {
+    expect(
+      (await s.call('ReadClass', { class_name: 'ZCL_ONPREM' })).isError,
+    ).toBe(false);
+    expect(
+      (await s.call('ReadClass', { class_name: 'ZCL_ONPREM_TWO' })).isError,
+    ).toBe(false);
+    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     expect(
       standIn.requests.filter((r) => !isLogoff(r.url)).length,
-    ).toBeGreaterThan(0);
+    ).toBeGreaterThan(1);
   } finally {
     await s.close();
     await standIn.close();
@@ -340,6 +362,7 @@ describe('ABAP Cloud, the lookup refused', () => {
       expect(second.isError).toBe(false);
       await until(() => standIn.requests.some(isClassRun));
       expect(standIn.requests.filter(isClassRun)).toHaveLength(1);
+      // The refused one and the next call's, which names the caller too.
       expect(standIn.requests.filter(isLookup)).toHaveLength(2);
     } finally {
       await s.close();

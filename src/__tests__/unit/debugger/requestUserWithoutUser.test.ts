@@ -1,11 +1,11 @@
 /**
- * The debugger's request user, by the system's kind. `systeminformation`
- * exists only on ABAP Cloud: on-premise the server never asks it, and the
- * user is the configured login (the request scope's, then the process's).
- * On ABAP Cloud it is always asked: an answer naming its user is the user;
- * an answer that names none is `system_without_user`; any other status
- * (`404`, `405`, `501`, `500`) is the call's error as it came — never the
- * login in its place.
+ * The debugger's request user. `systeminformation` is asked of every
+ * system: an answer naming its user is the user, over any configured login;
+ * an answer that names none is `system_without_user`. A `404` is the function
+ * unavailable: on-premise the configured login (the request scope's, then the
+ * process's) stands in, none → the user is unknown; on ABAP Cloud it is the
+ * call's error. Any other status (`405`, `501`, `500`) is the call's error as
+ * it came on both kinds — never the login in its place.
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -53,42 +53,108 @@ afterEach(() => {
   }
 });
 
+/** `systeminformation` answers that name no user. */
+const WITHOUT_USER: Array<[string, string]> = [
+  ['no userName', JSON.stringify({ systemID: 'SID' })],
+  ['a blank userName', JSON.stringify({ userName: '  ', systemID: 'SID' })],
+  ['a userName that is no string', JSON.stringify({ userName: 42 })],
+  ['a body that is no JSON', 'not json'],
+  ['an empty body', ''],
+  ['a JSON array', JSON.stringify([{ userName: 'ARRAY_USER' }])],
+  ['a JSON number', '42'],
+  ['a JSON string', JSON.stringify('STRING_USER')],
+  ['JSON null', 'null'],
+];
+
 describe('on-premise', () => {
-  it('systeminformation is never asked: the process login', async () => {
+  it('the system names its user: that user, over the configured login', async () => {
     const { standIn, connection } = await standConnection();
     try {
-      standIn.body(isLookup, JSON.stringify({ userName: 'SYSTEM_USER' }));
-      await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
-      expect(standIn.requests.filter(isLookup)).toHaveLength(0);
+      standIn.body(isLookup, JSON.stringify({ userName: 'system_user' }));
+      await runWithRequestContext({ login: 'scopelogin' }, async () => {
+        await expect(requestUserOf(connection)).resolves.toBe('SYSTEM_USER');
+      });
+      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     } finally {
       await closeBoth(standIn, connection);
     }
   });
 
-  it('the request scope login before the process login, nothing asked', async () => {
+  it('without the function (404): the process login', async () => {
     const { standIn, connection } = await standConnection();
     try {
+      standIn.answer(isLookup, 404);
+      await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
+      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    } finally {
+      await closeBoth(standIn, connection);
+    }
+  });
+
+  it('without the function (404): the request scope login before the process login', async () => {
+    const { standIn, connection } = await standConnection();
+    try {
+      standIn.answer(isLookup, 404);
       await runWithRequestContext({ login: 'scopelogin' }, async () => {
         await expect(requestUserOf(connection)).resolves.toBe('SCOPELOGIN');
       });
-      expect(standIn.requests.filter(isLookup)).toHaveLength(0);
     } finally {
       await closeBoth(standIn, connection);
     }
   });
 
-  it('no login configured: the user is unknown, nothing asked', async () => {
+  it('without the function (404) and no login configured: the user is unknown', async () => {
     const { standIn, connection } = await standConnection();
     try {
+      standIn.answer(isLookup, 404);
       delete process.env.SAP_USERNAME;
       await expect(requestUserOf(connection)).rejects.toThrow(
         'the ABAP user of this connection is unknown',
       );
-      expect(standIn.requests.filter(isLookup)).toHaveLength(0);
     } finally {
       await closeBoth(standIn, connection);
     }
   });
+
+  it.each(WITHOUT_USER)(
+    'an answer with %s is system_without_user, the login not used',
+    async (_what, body) => {
+      const { standIn, connection } = await standConnection();
+      try {
+        standIn.body(isLookup, body);
+        const error = await requestUserOf(connection).then(
+          () => undefined,
+          (thrown: unknown) => thrown,
+        );
+        expect(error).toBeInstanceOf(ServerRefusal);
+        expect((error as ServerRefusal).serverRefusal).toBe(
+          'system_without_user',
+        );
+      } finally {
+        await closeBoth(standIn, connection);
+      }
+    },
+  );
+
+  it.each([405, 501, 500])(
+    'systeminformation answered %i: the call fails with it, the login not used',
+    async (status) => {
+      const { standIn, connection } = await standConnection();
+      try {
+        standIn.answer(isLookup, status);
+        const error = await requestUserOf(connection).then(
+          () => undefined,
+          (thrown: unknown) => thrown,
+        );
+        expect(error).not.toBeInstanceOf(ServerRefusal);
+        expect(
+          (error as { response?: { status?: number } }).response?.status,
+        ).toBe(status);
+      } finally {
+        await closeBoth(standIn, connection);
+      }
+    },
+  );
 });
 
 describe('ABAP Cloud', () => {
@@ -106,19 +172,6 @@ describe('ABAP Cloud', () => {
       await closeBoth(standIn, connection);
     }
   });
-
-  /** `systeminformation` answers that name no user. */
-  const WITHOUT_USER: Array<[string, string]> = [
-    ['no userName', JSON.stringify({ systemID: 'SID' })],
-    ['a blank userName', JSON.stringify({ userName: '  ', systemID: 'SID' })],
-    ['a userName that is no string', JSON.stringify({ userName: 42 })],
-    ['a body that is no JSON', 'not json'],
-    ['an empty body', ''],
-    ['a JSON array', JSON.stringify([{ userName: 'ARRAY_USER' }])],
-    ['a JSON number', '42'],
-    ['a JSON string', JSON.stringify('STRING_USER')],
-    ['JSON null', 'null'],
-  ];
 
   it.each(WITHOUT_USER)(
     'an answer with %s is system_without_user, the login not used',

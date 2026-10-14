@@ -7,6 +7,7 @@ import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
+import { withoutSystemInformation } from '../helpers/noSystemInformation';
 
 const FORBIDDEN_PREFIX =
   /\bMcpError:\s|\bMCP error -?\d+: |(?:^|\s)(?:Error|ADT error): /;
@@ -100,7 +101,7 @@ class TestServer extends BaseMcpServer {
   }
   // Stubs never touch SAP; bypass the real connection.
   protected async getConnection(): Promise<any> {
-    return {} as any;
+    return withoutSystemInformation() as any;
   }
 }
 

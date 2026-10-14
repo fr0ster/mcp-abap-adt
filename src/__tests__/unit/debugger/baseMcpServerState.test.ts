@@ -6,10 +6,11 @@ import { MockAbapConnection } from '../../../embeddable/MockAbapConnection';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { withoutSystemInformation } from '../../helpers/noSystemInformation';
 
 const make = () =>
   new EmbeddableMcpServer({
-    connection: new MockAbapConnection() as any,
+    connection: withoutSystemInformation(new MockAbapConnection()) as any,
     exposition: ['readonly'],
   } as any);
 
@@ -69,7 +70,7 @@ class GatedServer extends BaseMcpServer {
   }
   protected async getConnection(): Promise<any> {
     await this.connectionGate;
-    return {} as any;
+    return withoutSystemInformation() as any;
   }
 }
 
@@ -167,7 +168,7 @@ describe('the idle bound: a tool call is the user activity', () => {
   it('an embedder passes the bound; under 30 is refused at construction', () => {
     const at = (stateIdleMinutes: number) =>
       new EmbeddableMcpServer({
-        connection: new MockAbapConnection() as any,
+        connection: withoutSystemInformation(new MockAbapConnection()) as any,
         exposition: ['readonly'],
         stateIdleMinutes,
       } as any);
@@ -213,7 +214,7 @@ describe('where the state reports', () => {
   it("an embedder's explicit logger receives the state's lines when no state logger is given", () => {
     const log = logger();
     const server = new EmbeddableMcpServer({
-      connection: new MockAbapConnection() as any,
+      connection: withoutSystemInformation(new MockAbapConnection()) as any,
       exposition: ['readonly'],
       logger: log,
     } as any);
@@ -233,7 +234,7 @@ describe('where the state reports', () => {
     const log = logger();
     const lines: string[] = [];
     const server = new EmbeddableMcpServer({
-      connection: new MockAbapConnection() as any,
+      connection: withoutSystemInformation(new MockAbapConnection()) as any,
       exposition: ['readonly'],
       logger: log,
       stateLogger: { error: (m: string) => lines.push(m) },

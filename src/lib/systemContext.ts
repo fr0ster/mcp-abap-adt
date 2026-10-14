@@ -59,9 +59,11 @@ export function getSystemContext(): IAdtSystemContext {
  * then the process context's — `SAP_RESPONSIBLE`, `setSystemContext`), else
  * the login (the scope's `login` — the destination's `SAP_USERNAME`, or the
  * `x-sap-login` of an `x-sap-*` basic connection — then the process
- * `SAP_USERNAME`). On a cloud connection the login is the system's user only:
- * `withResolvedSystemContext` replaces these login fallbacks there. A create
- * that finds none is refused (`systemContextGuard.ts`).
+ * `SAP_USERNAME`). All of these are the configuration: where the system
+ * names its user (`systeminformation`, on ABAP Cloud and on-premise alike)
+ * the system's answer replaces them (`withResolvedSystemContext`), and they
+ * stand only when an on-premise system has no such function. A create that
+ * finds none is refused (`systemContextGuard.ts`).
  *
  * Outside a request scope (stdio) the process values apply. Inside one:
  * - `masterLanguage` comes only from the scope (#110): a scope without it does
@@ -89,9 +91,7 @@ export function getEffectiveSystemContext(): IAdtSystemContext {
  * The system context as the current request states it, without the login
  * fallback: the same rules as `getEffectiveSystemContext`, but a responsible
  * is only one stated (`x-sap-responsible`, `SAP_RESPONSIBLE`,
- * `setSystemContext`, a scope's `responsible`). On a cloud connection this is
- * what `withResolvedSystemContext` keeps; the system's user stands in for the
- * login there.
+ * `setSystemContext`, a scope's `responsible`).
  */
 export function getStatedSystemContext(): IAdtSystemContext {
   const ctx = getSystemContext();

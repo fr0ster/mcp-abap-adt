@@ -77,22 +77,23 @@ export const BACKGROUND_RUN_RUNNING_WORDS =
   'this background run is still running and cannot be discarded: a started run cannot be stopped; discard it once it has finished';
 
 /**
- * A call on an ABAP Cloud connection without its system information: the
+ * A call on a connection without its system information: the
  * `systeminformation` lookup asked before the tool runs failed — for a
- * reason that is not a chain failure. The tool did not run; the next call
+ * reason that is not a chain failure, and not an on-premise system without
+ * the function (`404`), where the configuration applies. The tool did not run; the next call
  * asks again. On stdio the same failure at the start ends the process.
  */
 export const SYSTEM_LOOKUP_FAILED_WORDS =
-  'the ABAP Cloud system could not be asked for the session user and system id (systeminformation), which a call needs before its tool runs; the tool did not run. Retry when the system is available';
+  'the system could not be asked for the session user and system id (systeminformation), which a call needs before its tool runs; the tool did not run. Retry when the system is available';
 
 /**
- * A call on an ABAP Cloud connection whose system answered `systeminformation`
+ * A call on a connection whose system answered `systeminformation`
  * without a user: not a valid ABAP system for this server. The tool did not
  * run; nothing of the answer is kept, so the next call asks again. On stdio
  * the same answer at the start ends the process.
  */
 export const SYSTEM_WITHOUT_USER_WORDS =
-  'the ABAP Cloud system answered systeminformation without a user, so it is not a valid ABAP system for this server; the tool did not run';
+  'the system answered systeminformation without a user, so it is not a valid ABAP system for this server; the tool did not run';
 
 /**
  * The fixed words of a connection refused because its instance is closed

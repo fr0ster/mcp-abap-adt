@@ -97,8 +97,9 @@ same way.
    `currentRequestSignal()` reads it — for the server's own waits only: a tool's sends carry no
    request signal (D55), and nothing sent to SAP carries it. A call whose signal aborted
    before its tool starts never reaches the tool. The
-   responsible person and master system the call lacks are resolved first, from the destination's
-   `.env`, the request's headers and, on ABAP Cloud, the system.
+   responsible person and master system are resolved first: what the system names
+   (`systeminformation`, on ABAP Cloud and on-premise), over anything configured; the destination's
+   `.env` and the request's headers only where an on-premise system has no such function (`404`).
 4. **The answer.** A failure is read by `readFailure(thrown)`, which is lib's `failureOf`; core
    reads the destination layer's failures first. A failure it knows is answered as JSON `{ error,
    kind?, message, hint?, … }`: `authentication_failed`, `destination_refused`, or one of the
@@ -181,14 +182,15 @@ unless a later stdio process of the same destination starts on it, or the user l
 the instance's connection one after another (`enterMainFlow`), whatever the client sends at once;
 a background run, a listed long read and the debugger tools that work on the debugger's own
 connections (`ownConnectionTools.ts`: every `Debug*`, `AmdpDebug*`, `HandlerDebug*` tool) take no
-place in it. The ABAP Cloud system-context lookup is asked once per connection before a tool
-runs on it, never after — no tool runs twice: on stdio at the start (`bornAtStart` →
+place in it. The system-context lookup is asked once per connection, on ABAP Cloud and on-premise
+alike, before a tool runs on it, never after — no tool runs twice: on stdio at the start (`bornAtStart` →
 `requireSystem`, or the leftover session's file), a failure ending the process; elsewhere by the
 first call on a connection without it (`systemBeforeTool` → `requireSystem`), inside the flow — a
 call outside the flow takes a turn in it for the lookup alone — its failure that call's answer (an
 answer that names no user `system_without_user` — `requiringUser`: not a valid ABAP system for
-this server —, a chain failure as it is, else — any status but a `2xx`, `404` included: the
-endpoint exists only on ABAP Cloud — `system_lookup_failed`), the tool not run, nothing
+this server —, a chain failure as it is, else — any status but a `2xx`, a `404` on ABAP Cloud
+included; on-premise a `404` is the function unavailable and the configuration applies —
+`system_lookup_failed`), the tool not run, nothing
 failed kept, so the next call asks again. The lookup is awaited to its end whatever the call's
 signal says: the call's turn and its tracking last until it settled, so the next request on the
 connection waits for it; the instance's close and the shutdown do not wait for it — they log the
@@ -258,7 +260,7 @@ two explicit tools; with several the server picks none.
   where it points (URL, client, system kind, wire), the backend user the destination states
   (`null` for a token credential, shown and never matched), `system` (the system information the
   session was looked up with — `describeSystem(connection, system)`, written once known; `null`
-  until then and on-premise), `sessionCookies()`. The settings and the credential a resume needs
+  until then and on an on-premise system without the function), `sessionCookies()`. The settings and the credential a resume needs
   come from the destination the process serves; the file adds the cookies and the system
   information, so a resume asks SAP nothing more. Directory `0700`, file `0600`, written atomically (a `.partial` renamed).
   Rewritten after a request whose answer changed the cookies (the owner wraps
@@ -337,9 +339,10 @@ their answers are kept is the host's: a strategy.
   and to the three tools.
 - **The run** (`startBackgroundRun`, `src/lib/backgroundRuns/run.ts`), from the tool wrapper:
   refused at once without a fresh connection to be had (`freshConnectionAvailable`; D20's words);
-  the caller resolved (`backgroundCaller`: the request's stated user — `SAP_USERNAME`,
-  `x-sap-login` — else `systemUserOf` on the call's connection, on ABAP Cloud only (on-premise
-  nothing is asked), cached per connection; an injected
+  the caller resolved (`backgroundCaller`: the user SAP names — the call's connection's system
+  information when the shipped resolver already asked it, else `systemUserOf` on the instance's
+  connection, cached per credential — on both kinds, over the request's stated user; that one
+  — `SAP_USERNAME`, `x-sap-login` — only for an on-premise `404`; an injected
   connection's URL from `getBaseUrl()`, its user SAP's; none at all → `background_run_caller_unknown`);
   registered in the registry of live tools under the calling instance (`"<tool> (background)"`) —
   refused there once the shutdown latched; its own connection opened by `openFreshConnection` and

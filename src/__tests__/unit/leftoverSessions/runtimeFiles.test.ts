@@ -55,7 +55,7 @@ const mode = (file: string) => fs.statSync(file).mode & 0o777;
 const onPosix = process.platform !== 'win32';
 const posixIt = onPosix ? it : it.skip;
 
-it('the instance’s connection: written after connect, 0600 in a 0700 directory; it carries the destination, where it points, the stated user, the system information (none on-premise) and the cookies — nothing else', async () => {
+it('the instance’s connection: written after connect, 0600 in a 0700 directory; it carries the destination, where it points, the stated user, the system information (asked on-premise too) and the cookies — nothing else', async () => {
   stand = await leftoverStand();
   expect(stand.files()).toEqual([]);
   await stand.call('ProbeAdt', { id: 'first' });
@@ -78,7 +78,7 @@ it('the instance’s connection: written after connect, 0600 in a 0700 directory
       wire: 'http',
     },
     user: 'LEFT_USER',
-    system: null,
+    system: { responsible: 'STAND_IN_USER', master_system: 'STD' },
     cookies: expect.stringContaining('SAP_SESSIONID_X01_100=session-1'),
     written_at: expect.any(String),
   });

@@ -35,7 +35,6 @@ it('a lookup asked on a connection replaced meanwhile is not kept — the next c
   const standIn = await adtStandIn();
   standIn.systemInformation('USER_A');
   const previous = process.env.SAP_SYSTEM_TYPE;
-  // `systeminformation` exists only on ABAP Cloud: the caller is asked there.
   process.env.SAP_SYSTEM_TYPE = 'cloud';
   const caller = await callerOn(standIn, new InMemoryBackgroundRuns(), {
     tokenUser: 'USER_A',
@@ -62,8 +61,9 @@ it('a lookup asked on a connection replaced meanwhile is not kept — the next c
   ).register(new CompositeHandlersRegistry([probeGroup([loseOutside])]));
   try {
     await caller.call('ProbeAdt', { id: 'warm' });
-    const start = (name: string) =>
-      caller.call('RuntimeRunClass', { class_name: name, background: true });
+    // A management tool: its caller is asked of SAP in a turn of the flow
+    // (a run tool's caller is its connection's system information).
+    const start = (_name: string) => caller.call('ListBackgroundRuns', {});
 
     // The first caller lookup is held inside the flow, on the first connection.
     const heldLookup = standIn.hold(isLookup);

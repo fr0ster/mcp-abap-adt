@@ -63,14 +63,9 @@ export interface AdtStandIn {
   /**
    * From now on `systeminformation` answers this user (and system id), as a
    * session of that SAP user would; a later call switches the user. `null`:
-   * the endpoint is absent (`404`). A function answers per ABAP session —
-   * each session is one SAP user's, as on a real system. Takes precedence
-   * over `body`.
+   * the endpoint is absent (`404`). Takes precedence over `body`.
    */
-  systemInformation(
-    user: string | null | ((session: string) => string | null),
-    systemId?: string,
-  ): void;
+  systemInformation(user: string | null, systemId?: string): void;
   /** The logoffs received so far: `disconnect()` reached the system. */
   logoffs(): number;
   /** The sessions logged off so far, in order. */
@@ -129,12 +124,7 @@ export async function adtStandIn(): Promise<AdtStandIn> {
   }> = [];
   let sessions = 0;
   /** What `systemInformation` set: the user, or `null` for a `404`. */
-  let systemInfo:
-    | {
-        user: string | null | ((session: string) => string | null);
-        systemId: string;
-      }
-    | undefined;
+  let systemInfo: { user: string | null; systemId: string } | undefined;
   const server = http.createServer((req, res) => {
     const carried = sessionOf(req.headers.cookie);
     const session = carried ?? `session-${++sessions}`;
@@ -165,10 +155,7 @@ export async function adtStandIn(): Promise<AdtStandIn> {
         systemInfo !== undefined &&
         request.url.startsWith('/sap/bc/adt/core/http/systeminformation')
       ) {
-        const user =
-          typeof systemInfo.user === 'function'
-            ? systemInfo.user(session)
-            : systemInfo.user;
+        const user = systemInfo.user;
         if (user === null) {
           res.writeHead(404, { 'content-type': 'text/plain' });
           res.end('');

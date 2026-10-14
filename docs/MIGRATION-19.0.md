@@ -660,7 +660,7 @@ transport's options only:
   one when what it read for the destination changed — a service key, the destination's `.env`)
   no longer reopens the connection: a reopen would leave a lock held in the old session. The kept
   connection is replaced only when SAP already lost its session. To take a changed destination,
-  restart the server. Until then the caller is the user of the session the instance holds — every tool runs in SAP as that user — so the leftover-session and background-run tools answer for that session's user even after the destination's provider changed; nothing is refused for the switch. HTTP and SSE never keep a connection across credentials.
+  restart the server. On stdio the credentials are loaded once at start and cannot change while the process runs, so the caller of the leftover-session and background-run tools is always the user of the session the instance keeps — every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
 - **The auth chain is 6.0.** The server runs on `@mcp-abap-adt/auth-broker` 5,
   `@mcp-abap-adt/auth-providers` 6 and `@mcp-abap-adt/auth-stores` 5. Service keys keep working
   as they are; a destination's means in a `.env` too.

@@ -463,8 +463,11 @@ endpoint exists on both:
 - **`404`** is the function unavailable: **on-premise** the configuration applies (the login for
   the user; `SAP_RESPONSIBLE` / `x-sap-responsible`, then the login, for the responsible;
   `SAP_MASTER_SYSTEM` / `x-sap-master-system` for the master system) and, with nothing
-  configured, today's "unknown" answer for that need; **on ABAP Cloud** a failed lookup — never
-  the configuration;
+  configured, today's "unknown" answer for that need; **on ABAP Cloud**, where every system has
+  the function, the destination is not a valid ABAP Cloud system — `cloud_without_systeminformation`
+  ("the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has:
+  the destination is not a valid ABAP Cloud system; the tool did not run"), never the
+  configuration;
 - **any other status** — `405`, `501`, a `5xx` — or an authentication or network failure is a
   failed lookup on both kinds.
 
@@ -475,23 +478,36 @@ endpoint exists on both:
   server did not start. Start it again when the system is available` — and logs off the logon made
   for it. An answer without a user ends the start the same way, with `[MCP] Destination "<name>":
   the system answered systeminformation without a user, so it is not a valid ABAP system for this
-  server; the server did not start`. An on-premise `404` does not end the start.
+  server; the server did not start`, and an ABAP Cloud `404` with `[MCP] Destination "<name>": the
+  ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the
+  destination is not a valid ABAP Cloud system; the server did not start`. An on-premise `404` does
+  not end the start. A leftover session's file is used only for the session it picked up: when SAP
+  ended that session and a new logon starts a new one, the new session's system information is
+  asked and checked the same way before the start completes — its user, not the one the file
+  carried — and a failure ends the start, logs the new session off and leaves the file as a
+  leftover.
 - **Streamable HTTP and SSE:** the first call that reaches the system asks, before its tool runs,
   inside the main flow (a call outside the flow — a background run, a listed long read, a debugger
   tool — takes a turn in it for the lookup alone). If the lookup fails, that call answers the error
   — a chain failure as it is, an answer that names no user `system_without_user` ("the system
   answered systeminformation without a user, so it is not a valid ABAP system for this server; the
-  tool did not run"), any other failed lookup `system_lookup_failed` — and its tool did not run, a
+  tool did not run"), an ABAP Cloud `404` `cloud_without_systeminformation`, any other failed
+  lookup `system_lookup_failed` — and its tool did not run, a
   read included. Nothing of a refused answer is kept. The following calls are not barred: each call
   on a connection without the information asks again (the system may have been restarted or
-  fixed). An embedder's instance does the same.
+  fixed). An embedder's instance does the same, and so does each handler `HandlerExporter`'s
+`getHandlerEntries()` hands out: it asks before the handler runs (once per connection, through
+`requiringUser`), and a failed or userless lookup is the call's error with the same code and
+words — thrown by the wrapped handler, which does not run; nothing failed is kept, so the next
+call asks again. (Before this, its handler ran anyway, with no responsible.)
 
 The same rule names **the debugger's request user and a background run's caller** (its management
 tools included): the user `systeminformation` names, on both kinds, over any configured login. The
 configured login (the request's — `x-sap-login`, a destination's `SAP_USERNAME` — then the
 process's) stands in only on an on-premise `404`; with none, the user is unknown (for a background
-run `background_run_caller_unknown`). An answer that names no user is `system_without_user`; any
-other failure — on ABAP Cloud a `404` too — is the call's error as it came. A background run
+run `background_run_caller_unknown`). An answer that names no user is `system_without_user`; on
+ABAP Cloud a `404` is `cloud_without_systeminformation`; any other failure is the call's error as
+it came. A background run
 started by a tool reuses the answer its connection's lookup already got: no second request. (Before
 this, a failed lookup failed nothing: a create that needed it asked again inside the tool and ran
 the tool once more with the answer — a tool that had sent something before its guarded create, as
@@ -1124,12 +1140,17 @@ transport's options only:
   whose backend user neither the request nor SAP names); and `system_lookup_failed` (a call on a
   connection whose `systeminformation` lookup, asked before the tool, failed (on-premise a `404`
   is not a failure: the configuration applies): the tool
-  did not run, and the next call asks again), and `system_without_user` (the same lookup answered
-  but named no user: not a valid ABAP system for this server). `requiringUser(resolver)` and
+  did not run, and the next call asks again), `system_without_user` (the same lookup answered
+  but named no user: not a valid ABAP system for this server), and
+  `cloud_without_systeminformation` (an ABAP Cloud system answered that lookup `404`: every ABAP
+  Cloud system has the function, so the destination is not a valid ABAP Cloud system). `requiringUser(resolver)` and
   `SystemWithoutUserError` (`requestSystemResolution`) are how the server checks it, whatever
-  resolver you give. `withKnownSystemContext(resolved, fn)` applies a
+  resolver you give; the shipped resolver throws `CloudWithoutSystemInformationError` for an ABAP
+  Cloud `404`. `withKnownSystemContext(resolved, fn)` applies a
   resolution the server made before the tool (its third parameter is gone); `withResolvedSystemContext` (which looks up) is still there for
-  `HandlerExporter` and `BaseHandlerGroup`. `ConnectionRole` adds `background`: the
+  `HandlerExporter` and `BaseHandlerGroup`: it refuses a failed or userless lookup with the
+  server's codes (`system_lookup_failed`, `system_without_user`, `cloud_without_systeminformation`,
+  a chain failure as it is) instead of running its callback with no responsible. `ConnectionRole` adds `background`: the
   run's connection is owned by the strategy, so no instance's terminal close cuts it.
 - **`HandlerEntry.connectionless?: true`** marks a tool that works on no connection of the
   instance: the server calls it without building or connecting one, its context's `connection`

@@ -71,7 +71,8 @@ export interface HandlerExporterOptions {
    * `cloud` or `legacy`) the constructor throws `ServerRefusal`
    * `system_type_required`, as `EmbeddableMcpServer` does. It decides how a
    * system's answer to its lookup is read (a `404` is "no such function" on
-   * premise, a failure on ABAP Cloud) for a connection the factory did not
+   * premise, `cloud_without_systeminformation` on ABAP Cloud) for a
+   * connection the factory did not
    * build. Never guessed. Overrides `SAP_SYSTEM_TYPE`.
    */
   systemType?: SapEnvironment;
@@ -82,9 +83,12 @@ export interface HandlerExporterOptions {
    * system has no such function (an on-premise `404`) — the configuration
    * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
    * `x-sap-url`) stands; a non-null answer is the system's — nothing
-   * configured counts (`{}`: the system named nothing, so a create is
-   * refused). A resolver that throws is treated like `{}`, and the create is
-   * refused as the system being unreachable, to retry later. The default
+   * configured counts. It is asked before each wrapped handler runs, as the
+   * server asks before a tool: an answer that names no user (`{}` included)
+   * is `system_without_user`, a resolver that throws `system_lookup_failed`
+   * (the shipped one's ABAP Cloud `404` `cloud_without_systeminformation`,
+   * a chain failure as it is) — thrown by the wrapped handler, which does
+   * not run; nothing failed is kept, so the next call asks again. The default
    * asks every system (one lookup per connection). `null` as the option
    * disables it, and `getHandlerEntries()` then returns the groups' handlers
    * unwrapped.
@@ -204,7 +208,9 @@ export class HandlerExporter {
    *
    * Embedders call these handlers themselves, so each one is wrapped to fill
    * the responsible person and master system from the connection (see
-   * `systemContextResolver`). The wrapper keeps the original's `length`,
+   * `systemContextResolver`) before it runs — a failed or userless lookup is
+   * thrown with the server's code, and the handler does not run. The
+   * wrapper keeps the original's `length`,
    * because embedders choose between `handler(context, args)` and
    * `handler(args)` by it.
    */

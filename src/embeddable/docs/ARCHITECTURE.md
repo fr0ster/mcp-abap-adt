@@ -188,9 +188,11 @@ alike, before a tool runs on it, never after — no tool runs twice: on stdio at
 first call on a connection without it (`systemBeforeTool` → `requireSystem`), inside the flow — a
 call outside the flow takes a turn in it for the lookup alone — its failure that call's answer (an
 answer that names no user `system_without_user` — `requiringUser`: not a valid ABAP system for
-this server —, a chain failure as it is, else — any status but a `2xx`, a `404` on ABAP Cloud
-included; on-premise a `404` is the function unavailable and the configuration applies —
-`system_lookup_failed`), the tool not run, nothing
+this server —, an ABAP Cloud `404` `cloud_without_systeminformation` — every ABAP Cloud system
+has the function, so the destination is not a valid one —, a chain failure as it is, else — any
+other status but a `2xx`; on-premise a `404` is the function unavailable and the configuration
+applies — `system_lookup_failed`; one mapping, `systemLookupRefusal`, shared with
+`withResolvedSystemContext`, so `HandlerExporter`'s handlers refuse the same way and do not run), the tool not run, nothing
 failed kept, so the next call asks again. The lookup is awaited to its end whatever the call's
 signal says: the call's turn and its tracking last until it settled, so the next request on the
 connection waits for it; the instance's close and the shutdown do not wait for it — they log the
@@ -296,7 +298,10 @@ two explicit tools; with several the server picks none.
   `sessionGone`) — ends the spent takeover instance (it logged nothing on) and builds a new one
   with the normal logon (`connectedLogon`, connection's "a new session is a new instance"),
   adopted under the same handle: `{ session: 'new', handle }` (else `'picked_up'`; a logon is
-  `{ session: 'logged_on' }`). Then `requireSystem` when the system information is not known.
+  `{ session: 'logged_on' }`). The file's system information is reused only for the session
+  picked up; the new session's is asked (`requireSystem`, `requiringUser`) before it is adopted,
+  and its failure logs the new session off and gives the file back as a leftover. Then
+  `requireSystem` when the system information is not known.
   Any failure rejects the start — the launcher ends the process with exit `1` before the transport
   opens: another answer from the old session (a redirect included) or the new logon's failure
   gives the file back; a failed system lookup logs off a logon made for the start and leaves a

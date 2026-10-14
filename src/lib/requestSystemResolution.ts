@@ -8,7 +8,8 @@
  * user exists only inside the system. What is configured (the request's
  * headers, a destination's `.env`, the process configuration, the login) is
  * used only when the function is unavailable on an on-premise system (a
- * `404`); on ABAP Cloud a `404` is a failed lookup like any other. The
+ * `404`); on ABAP Cloud a `404` means the destination is not a valid ABAP
+ * Cloud system (every one has the function). The
  * lookup is made here, inside the library — no host has to repeat it or
  * import adt-clients itself.
  *
@@ -52,8 +53,9 @@ export type SystemContextResolver = (
  * (`readSystemInformation`) on every kind of system — the user name as
  * responsible, the system id as master system, neither when the answer
  * carries none. A `404` on an on-premise system is the function unavailable:
- * `null`, and the configured values apply. Any other status but a `2xx`, and
- * on ABAP Cloud a `404` too, is a failed lookup, thrown as it came. Which
+ * `null`, and the configured values apply; on ABAP Cloud, where every system
+ * has it, `CloudWithoutSystemInformationError`. Any other status but a
+ * `2xx` is a failed lookup, thrown as it came. Which
  * kind is the kind the connection was built for (`systemKindOf`), never a
  * guess from its URL or from the answer.
  */

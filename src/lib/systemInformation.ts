@@ -18,7 +18,9 @@
  *   connection handed back instead of throwing as a
  *   `SystemInformationStatusError`. A `404` is the function unavailable
  *   (`isSystemInformationUnavailable`): on-premise the callers then take the
- *   configured settings; on ABAP Cloud it is an error like any other.
+ *   configured settings; on ABAP Cloud, which always has it, the
+ *   destination is not a valid ABAP Cloud system
+ *   (`CloudWithoutSystemInformationError`).
  *
  * The request is the helper's: GET, the same `Accept`, no timeout, the
  * cache-busting parameter Eclipse sends.

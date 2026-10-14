@@ -304,8 +304,9 @@ main-flow queue.
 Every send on the instance's connection is inside the order: the identity lookups
 (`systeminformation`, asked on every kind of system — its user wins over any configured
 login; `systemUserOf` reads `systemKindOf`, the resolver's source, only for a `404`: on-premise
-the function unavailable, the configured login the user; on ABAP Cloud the call's error, as
-any other status but a `2xx` is on both kinds)
+the function unavailable, the configured login the user; on ABAP Cloud, where every system
+has it, `cloud_without_systeminformation` — the destination is not a valid ABAP Cloud system;
+any other status but a `2xx` the call's error on both kinds)
 of the background-run tools and the debugger's request user go through `onMainConnection` — directly from a call that
 already holds the flow (an `AsyncLocalStorage` mark), on the connection that call holds,
 else in turn, on the connection taken inside the flow (so a session the call ahead lost
@@ -331,9 +332,10 @@ instance the first call on a connection without it asks (`systemBeforeTool` →
 `requireSystem`, concurrent askers sharing one request through `resolveOnce`) inside
 the main flow — a call outside the flow takes a turn in it for the lookup alone. A
 failure is that call's answer (an answer that names no user `system_without_user` —
-not a valid ABAP system for this server —, a chain failure as it is, else — any
-status but a `2xx`; a `404` only on ABAP Cloud, on-premise it is the function unavailable and
-the resolver answers `null` —
+not a valid ABAP system for this server —, an ABAP Cloud `404`
+`cloud_without_systeminformation` — every ABAP Cloud system has the function, so the destination
+is not a valid one; on-premise a `404` is the function unavailable and the resolver answers
+`null` —, a chain failure as it is, else — any other status but a `2xx` —
 `system_lookup_failed`) and its tool does not run; nothing failed is kept, so the next call asks again. A
 replacement of a connection of the same credential keeps its answer. The tool wrapper
 reads the answer (`withKnownSystemContext`) and sends nothing.

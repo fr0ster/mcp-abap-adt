@@ -115,8 +115,9 @@ export interface EmbeddableMcpServerOptions {
    *
    * It also states the injected connection's kind for reading the system's
    * `systeminformation` (asked on every kind): a `404` is the function
-   * unavailable on-premise (the configuration applies) and a failed lookup
-   * on `'cloud'`. The URL is never consulted.
+   * unavailable on-premise (the configuration applies) and, on `'cloud'`,
+   * where every system has it, `cloud_without_systeminformation`. The URL
+   * is never consulted.
    */
   systemType?: SapEnvironment;
 
@@ -147,7 +148,8 @@ export interface EmbeddableMcpServerOptions {
    * a non-blank string): one that does not — `{}` included — is not a valid
    * ABAP system for this server, and the call fails with
    * `system_without_user`. A resolver that throws fails that call with
-   * `system_lookup_failed`. Either way its tool does not run, nothing is
+   * `system_lookup_failed` (the shipped one's ABAP Cloud `404`:
+   * `cloud_without_systeminformation`). Either way its tool does not run, nothing is
    * kept, and the next call asks again. The default asks every system (one
    * lookup per connection). `null` as the option disables it.
    * @default defaultSystemContextResolver

@@ -296,7 +296,7 @@ new EmbeddableMcpServer({
 
 Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe and is not required.
 
-**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE`; neither is refused at construction (`system_type_required`). That order picks the tools and states the kind of the injected connection for reading its `systeminformation` (asked on every kind; a `404` is the function unavailable on-premise, a failed lookup on `cloud`), never the URL.
+**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE`; neither is refused at construction (`system_type_required`). That order picks the tools and states the kind of the injected connection for reading its `systeminformation` (asked on every kind; a `404` is the function unavailable on-premise, and on `cloud` the destination is not a valid ABAP Cloud system — `cloud_without_systeminformation`), never the URL.
 
 ### System Context for On-Premise Systems
 
@@ -318,7 +318,7 @@ When creating ABAP objects, SAP ADT takes `responsible` and `masterSystem` attri
 
 The values of steps 3, 4, 6 and 7 live in the request's scope, never in a process-wide cache: two concurrent requests to different destinations, or with different headers, each see their own. The `--env` file's `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are read as that destination's own and are not copied into the process environment, so they never become another destination's fallback.
 
-The answer of step 2 is read by the system's kind: an answer naming a user is used on both kinds; an answer without a user is not a valid ABAP system for this server (`system_without_user`, the tool not run); a `404` is the function unavailable — on-premise steps 3–8 apply, on a cloud system it is a failed lookup (`system_lookup_failed`); any other status is a failed lookup on both kinds. On a cloud system steps 3–8 never count. `x-sap-login` is read only on an `x-sap-url` basic connection, which logs on with it; a destination request's `x-sap-login` is ignored. The process environment is read once: a change to `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` or `SAP_USERNAME` while the server runs is not picked up.
+The answer of step 2 is read by the system's kind: an answer naming a user is used on both kinds; an answer without a user is not a valid ABAP system for this server (`system_without_user`, the tool not run); a `404` is the function unavailable — on-premise steps 3–8 apply; a cloud system always has it, so there the destination is not a valid ABAP Cloud system (`cloud_without_systeminformation`: "the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run"); any other status is a failed lookup on both kinds (`system_lookup_failed`). On a cloud system steps 3–8 never count. `x-sap-login` is read only on an `x-sap-url` basic connection, which logs on with it; a destination request's `x-sap-login` is ignored. The process environment is read once: a change to `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` or `SAP_USERNAME` while the server runs is not picked up.
 
 **The one exception: a message class** is created with the system's own default responsible — adt-clients' message class create takes none (15.x the same) — and is never refused for a missing one.
 
@@ -351,7 +351,7 @@ How the scope combines with the process context:
 
 | Key in the scope | Result for this request |
 |---|---|
-| `responsible` present (even `undefined`) | The scope's value, else the scope's `login` — never a process value (neither `SAP_RESPONSIBLE`, `setSystemContext` nor `SAP_USERNAME`); on a cloud connection an empty one is still filled from the system (below) |
+| `responsible` present (even `undefined`) | The scope's value, else the scope's `login` — never a process value (neither `SAP_RESPONSIBLE`, `setSystemContext` nor `SAP_USERNAME`); the system's answer replaces it wherever the system answers (below) |
 | `responsible` absent | The process value (`SAP_RESPONSIBLE`, or what `setSystemContext` / `systemContext` stated), else the scope's `login`, else the process `SAP_USERNAME` |
 | `login` | The user the request is logged on as: the responsible only when none is stated, and only on a connection that is not cloud |
 | `masterSystem` present (even `undefined`) / absent | The scope's value / the process value |
@@ -359,12 +359,12 @@ How the scope combines with the process context:
 
 Outside any scope (stdio) the process values apply: `SAP_RESPONSIBLE` (or `setSystemContext`), else `SAP_USERNAME`.
 
-**ABAP Cloud fills the gaps.** If a tool call has no stated `responsible` or `masterSystem` after the rules above, and its connection is to ABAP Cloud, the library asks the system and fills only the missing one — a login (`login`, `SAP_USERNAME`) does not stand in for the system's user there:
+**The system's answer wins; the scope applies only on an on-premise `404`.** Before a tool runs, the library asks the connection's system (`systeminformation`) on every kind of system, and its answer replaces the scope's `responsible`, `masterSystem` and `login`:
 
 - `responsible` ← the system's user name, `masterSystem` ← its system id.
-- One lookup per connection. `EmbeddableMcpServer` asks before the first tool on the connection runs; `HandlerExporter` only when a call lacks a value. On-premise: no lookup, nothing filled.
-- An **empty value** counts as missing, whether the scope carries its key or not: a scope carrying `responsible: undefined` gets the system's user on a cloud connection. (The key still keeps the process value out: a scope carrying it never inherits another user's process-wide value.)
-- A lookup that answers nothing is remembered as nothing for that connection: the call runs, and a create that still lacks a responsible is refused (`system_context_missing`), nothing sent. A lookup that throws is never remembered — the next call asks again. On `EmbeddableMcpServer` that call answers `system_lookup_failed` and its tool does not run (no tool runs twice); on `HandlerExporter` the call runs, and a create that lacks a responsible is refused saying the system could not be reached and to retry when it is available (it does not advise a key). A missing master system is left out. On-premise nothing is asked, so a scope carrying `responsible: undefined` and no `login` is refused when it creates.
+- One lookup per connection, asked before the handler runs: `EmbeddableMcpServer` before the first tool on the connection, `HandlerExporter`'s handlers (`getHandlerEntries()`) before the call they wrap. An answer is kept for the connection; nothing failed is kept, so the next call asks again.
+- An on-premise system that answers `404` (no such function): the table above applies as it stands.
+- A lookup that fails is the call's error, and the tool or handler does not run: an answer that names no user `system_without_user`; an ABAP Cloud system that answers `404` `cloud_without_systeminformation` (every ABAP Cloud system has the function, so the destination is not a valid ABAP Cloud system — the scope never stands in); any other status `system_lookup_failed`; a chain failure as it is. `EmbeddableMcpServer` answers it as the tool's error; a `HandlerExporter` handler throws it (a `ServerRefusal` carrying the code and fixed words).
 
 Turn it off with `systemContextResolver: null` on `EmbeddableMcpServer` or `HandlerExporter` (or pass your own resolver).
 

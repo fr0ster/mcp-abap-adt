@@ -303,7 +303,7 @@ instance as before. An embedder's own registry that is not a `CompositeHandlersR
 main-flow queue.
 Every send on the instance's connection is inside the order: the identity lookups
 (`systeminformation`, asked on every kind of system through the shipped resolver — its user
-wins over any configured login; no information on-premise: the configured login, with none
+wins over any configured login; no information on-premise: the responsible if stated, else the configured login, with neither
 `system_user_unknown`; on ABAP Cloud a `404` `cloud_without_systeminformation`, anything else
 `system_lookup_failed`; a `401` the credential failure as it came)
 of the background-run tools and the debugger's request user go through `onMainConnection` — directly from a call that
@@ -337,8 +337,9 @@ resolver, by the connection's stated kind (`systemForCall`): an answer naming th
 no information — a `404`, an answer without the user, an error — is, on ABAP Cloud, one step to
 the error (a `404` `cloud_without_systeminformation`: the configuration or headers are
 inconsistent; anything else `system_lookup_failed`: the ABAP system's problem), on-premise `null`,
-admitted only when the call states a user (the destination's `SAP_USERNAME`, else its
-`x-sap-login`; for a host's connection its parameters, else the request scope's login), else
+admitted only when the call states a responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`, the destination's) or,
+none, a login (the destination's `SAP_USERNAME`, else its `x-sap-login`; for a host's connection its parameters,
+else the request scope's login), else
 `system_user_unknown`; a credential failure (a chain failure, a `401`) is not a
 `systeminformation` failure and is the call's as it came, on both kinds. An answer naming the
 user is kept, and on-premise a `404` (an older system without the endpoint: a later call sends no

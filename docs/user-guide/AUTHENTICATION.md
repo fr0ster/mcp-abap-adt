@@ -246,7 +246,7 @@ its target system; over HTTP each request's headers are a destination of their o
 connection — one request (`GET /sap/bc/adt/core/http/systeminformation`). Its answer is read by the
 system's kind (the rule above, never its URL): an answer naming a user is used on both kinds.
 Anything else — a `404` (no endpoint), an answer without the user, an error — is no information:
-on-premise steps 3–8 apply when the call states a user (the destination's or the environment's
+on-premise steps 3–8 apply when the call states a responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`) or, none, a login (the destination's or the environment's
 `SAP_USERNAME`, or `x-sap-login` of an `x-sap-url` basic connection); with none the call is
 refused `system_user_unknown` (the session user is unknown; the tool does not run; at a stdio
 start the server does not start). An on-premise `404` is kept for the destination, so a later call

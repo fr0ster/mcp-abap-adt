@@ -474,11 +474,17 @@ systems have `systeminformation`, older ones do not, ABAP Cloud always has it:
     tool runs, so the tool did not run"). Nothing configured stands in.
   - **On-premise — two steps.** The values are taken from the request's headers
     (`x-sap-login`, `x-sap-responsible`, `x-sap-master-system`) over HTTP/SSE, from the start
-    parameters (`SAP_USERNAME`, `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`) on stdio. When they state
-    no user either, it is the error: `system_user_unknown` ("the system gave no session user
-    (systeminformation) and the call states no user: set SAP_USERNAME (the destination or the
-    environment), or send x-sap-login with x-sap-url, so the session user is known; the tool did
-    not run").
+    parameters (`SAP_USERNAME`, `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`) on stdio. The login
+    (`x-sap-login`, `SAP_USERNAME`) is for the logon; the responsible and the system are passed
+    separately. On this step the responsible, if stated (`x-sap-responsible`, `SAP_RESPONSIBLE`),
+    is taken; if it is not stated but the login is, the login is taken; the system comes from
+    `x-sap-master-system` / `SAP_MASTER_SYSTEM` when stated. The same rule serves a create's
+    responsible, the debugger's request user and a background run's caller. When neither is
+    stated, it is the error: `system_user_unknown` ("the system gave no session user
+    (systeminformation) and the call states no user: set SAP_RESPONSIBLE or SAP_USERNAME (the
+    destination or the environment), or send x-sap-responsible, or x-sap-login with x-sap-url, so
+    the session user is known; the tool did not run"). (Before, a stated responsible did not count
+    on this step and the login was required.)
 - **A `401` (the credentials refused) is not a `systeminformation` failure:** any call would get
   it. It is the call's answer as it came (today's credential error, `authentication_failed`), on
   both kinds — never replaced with another error, and on-premise never a reason to go to the
@@ -501,9 +507,10 @@ applied around any resolver by the connection's stated kind.
   every ABAP Cloud system has: the configuration is inconsistent; the server did not start`, `[MCP]
   Destination "<name>": the ABAP system gave no session user and system id: systeminformation
   answered without them or with an error, a problem of the ABAP system with a valid configuration;
-  the server did not start`, or, on-premise with no `SAP_USERNAME`, `[MCP] Destination "<name>":
+  the server did not start`, or, on-premise with neither `SAP_RESPONSIBLE` nor `SAP_USERNAME`, `[MCP] Destination "<name>":
   the system gave no session user (systeminformation) and the destination states no user: set
-  SAP_USERNAME in the destination, so the session user is known; the server did not start`.
+  SAP_RESPONSIBLE or SAP_USERNAME in the destination or the environment, so the session user is
+  known; the server did not start`.
 - **Streamable HTTP and SSE:** asked by a call before its tool runs, inside the main flow (a call
   outside it — a background run, a listed long read, a debugger tool — takes a turn for the lookup
   alone). An error is that call's answer, and its tool did not run. Each HTTP request is its own
@@ -513,8 +520,8 @@ applied around any resolver by the connection's stated kind.
   with no responsible.)
 
 The same rule names **the debugger's request user and a background run's caller** (its management
-tools included): on ABAP Cloud the same errors; on-premise the configured login (the request's —
-`x-sap-login`, a destination's `SAP_USERNAME` — then the process's), with none
+tools included): on ABAP Cloud the same errors; on-premise the responsible if stated (`x-sap-responsible`, `SAP_RESPONSIBLE`), else the configured
+login (the request's — `x-sap-login`, a destination's `SAP_USERNAME` — then the process's), with neither
 `system_user_unknown`, the same code and words as a tool's call (before, the debugger threw a plain
 error and a background run answered `background_run_caller_unknown`, which is gone). A background run
 started by a tool reuses the answer its connection's lookup already got: no second request. (Before
@@ -1150,8 +1157,8 @@ transport's options only:
   with an error — a problem of the ABAP system; also a resolver of yours that answered nothing),
   `cloud_without_systeminformation` (an ABAP Cloud system answered that lookup `404`: the
   configuration or the headers are inconsistent) and `system_user_unknown` (an on-premise system
-  gave no information and the call states no user — neither the connection's `SAP_USERNAME` nor
-  the request's `x-sap-login`); each time the tool did not run, and the next call asks again; the
+  gave no information and the call states neither a responsible — `x-sap-responsible`,
+  `SAP_RESPONSIBLE` — nor a login — the connection's `SAP_USERNAME`, the request's `x-sap-login`); each time the tool did not run, and the next call asks again; the
   stdio start ends with them. A resolver's `null`, an answer without a user, or a throw other
   than a credential failure (a chain failure, a `401` — thrown as it came) is no information, a
   thrown `404` the endpoint absent; the rule by kind is the server's around any resolver

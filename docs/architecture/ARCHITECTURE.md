@@ -339,7 +339,8 @@ is asked.
   fails) and written back — the same user — so the caller of the leftover-session and
   background-run tools is always the user of the session the instance keeps — every
   tool runs in SAP as that user. HTTP and SSE never keep a connection across
-  credentials.
+  credentials, and keep no runtime session file: the leftover-session tools are stdio's
+  (one http or sse server holds the sessions of many users).
 
 #### Composition Roots
 

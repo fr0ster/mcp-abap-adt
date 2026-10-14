@@ -8,18 +8,20 @@ HTTP and SSE, each `-ro` binary a package of its own:
 
 | Kind | stdio | Streamable HTTP | SSE | Tools |
 |---|---|---|---|---|
-| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, every leftover-session tool, background runs |
-| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger, every leftover-session tool, background runs |
-| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, the leftover-session list and logoff |
+| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs; on stdio every leftover-session tool |
+| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search); on stdio the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger, background runs; on stdio every leftover-session tool |
+| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing; on stdio the leftover-session list and logoff |
 
-No `-ro` binary carries a debugger, a background run or the resume of a leftover session. A
+No `-ro` binary carries a debugger, a background run or the resume of a leftover session, and
+no http or sse binary any leftover-session tool: one such server holds the sessions of many users,
+so it writes no runtime session file. A
 write binary keeps every readonly tool: writing needs reading (in core a `Read<X>` gives way to
 the high group's `Get<X>` of the same object, see the dedup below).
 
-Tool counts (on-premise, measured by the tests): core-ro 68 tools; compact 37 (27 + 4 debugger
-verbs + 3 background-run + 3 leftover-session); compact-ro 18 (16 + the leftover-session list and
-logoff).
+Tool counts (on-premise, measured by the tests), stdio / http and sse: core 252 / 249; core-ro
+68 / 66; compact 37 / 34 (27 + 4 debugger verbs + 3 background-run, + 3 leftover-session on
+stdio); compact-ro 18 / 16 (16, + the leftover-session list and logoff on stdio).
 
 ## Handler Sets
 
@@ -124,11 +126,11 @@ logoff).
      `HandlerBackgroundRunList` and `HandlerBackgroundRunDiscard` beside `HandlerProfileRun`, in
      the compact write binaries
 
-8. **leftover sessions** - In every binary (compact too)
-   - `ListLeftoverSessions` and `LogoffLeftoverSession` in every binary (the `-ro` ones
+8. **leftover sessions** - In every stdio binary (compact too), in no http or sse one
+   - `ListLeftoverSessions` and `LogoffLeftoverSession` in every stdio binary (the `-ro` ones
      included: a logoff is a system action, not a data change); `ResumeLeftoverSession` only in
-     the write binaries. Compact: `HandlerLeftoverSessionList`, `HandlerLeftoverSessionLogoff`,
-     and `HandlerLeftoverSessionResume` in the compact write binaries only
+     the write binary. Compact: `HandlerLeftoverSessionList`, `HandlerLeftoverSessionLogoff`,
+     and `HandlerLeftoverSessionResume` in the compact write binary only
    - The SAP sessions a killed server process left open, listed, resumed or logged off by the
      user; they act only on the caller's own sessions.
    - [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process)
@@ -138,7 +140,7 @@ logoff).
 Install the package whose binary serves the tools you want; the binary takes no flag for it.
 
 ```bash
-# readonly, high, debug, leftover sessions, background runs
+# readonly, high, debug, background runs (and the leftover sessions on stdio)
 npm install -g @mcp-abap-adt/core
 mcp-abap-adt --env-path=.env
 
@@ -298,14 +300,15 @@ the one input of each binary's launcher (`main({ toolSet, program, version })`):
   (`expositionGroups(['readonly', 'high', 'debug'])`, [src/lib/handlers/registry/expositionRegistry.ts](../../src/lib/handlers/registry/expositionRegistry.ts)):
   the non-readonly groups first (`high`, `debug`), so their tool names feed the readonly
   dedup; then `readonly` with `SystemHandlersGroup` and the background-run tools; then search
-  and every leftover-session tool.
+  and, on stdio, every leftover-session tool. A set's `groups(context, transport)` builds the
+  leftover-session group for `'stdio'` only.
 - `fullReadOnlyToolSet` — `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`: `readonly`, `system`,
-  search, and the leftover-session list and logoff.
+  search, and on stdio the leftover-session list and logoff.
 - `compactToolSetOf({ readOnly, modify })` — `mcp-abap-adt-compact`, `-compact-http`,
   `-compact-sse`, with the two halves' entry builders: both halves, the four `HandlerDebug*`
-  verbs, the background-run tools, every leftover-session tool; no search.
+  verbs, the background-run tools, on stdio every leftover-session tool; no search.
 - `compactReadOnlyToolSetOf(readOnly)` — `mcp-abap-adt-compact-ro`, `-compact-http-ro`,
-  `-compact-sse-ro`: the read-only half (`@mcp-abap-adt/compact-readonly-entries`), the
+  `-compact-sse-ro`: the read-only half (`@mcp-abap-adt/compact-readonly-entries`), on stdio the
   leftover-session list and logoff.
 
 Each set's `expositionRemoved(transport)` is the removed `--exposition` of its launcher's table,

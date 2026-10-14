@@ -768,8 +768,10 @@ function readOnlySetTools(tools) {
   const distEntry = path.join(__dirname, '..', 'dist', 'lib', 'toolSet.js');
   requireFreshBuild(distEntry);
   const { fullReadOnlyToolSet } = require(distEntry);
+  // The stdio binary's set: the http and sse ones are the same without the
+  // leftover-session list and logoff, which are stdio's only.
   const entries = fullReadOnlyToolSet
-    .groups({ connection: null })
+    .groups({ connection: null }, 'stdio')
     .flatMap((group) => group.getHandlers());
   return entries.map((entry) => {
     const definition = entry.toolDefinition;
@@ -873,10 +875,10 @@ function generateMarkdown(tools) {
 
   md += `## Handler Sets\n\n`;
   md += `The binary fixes its tool set (19.0.0); there is no \`--exposition\`.\n\n`;
-  md += `- \`readonly\` -> [Read-Only Group](#read-only-group): \`mcp-abap-adt\` (and \`-http\`, \`-sse\`). The read-only binaries (\`mcp-abap-adt-ro\`, \`-http-ro\`, \`-sse-ro\`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group without the background-run tools, the system and search tools, the leftover-session list and logoff, and the run tools without \`background\`\n`;
+  md += `- \`readonly\` -> [Read-Only Group](#read-only-group): \`mcp-abap-adt\` (and \`-http\`, \`-sse\`). The read-only binaries (\`mcp-abap-adt-ro\`, \`-http-ro\`, \`-sse-ro\`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group without the background-run tools, the system and search tools, on stdio the leftover-session list and logoff, and the run tools without \`background\`\n`;
   md += `- \`high\` -> [High-Level Group](#high-level-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`\n`;
   md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
-  md += `- every binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume in the write binaries only)\n`;
+  md += `- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume in the write binaries only). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file\n`;
   md += `- compact -> [High-Level / Compact](#high-level-compact): \`mcp-abap-adt-compact\` and \`mcp-abap-adt-compact-ro\` (and \`-compact-http\`, \`-compact-sse\`, each with its \`-ro\`)\n\n`;
 
   md += `## Navigation\n\n`;
@@ -1061,7 +1063,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
 
 /** What the read-only page lists, said on the page. */
 const READ_ONLY_PAGE_INTRO =
-  'Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).';
+  "Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).";
 
 function main() {
   console.log('🔍 Scanning handler code in src/handlers...');

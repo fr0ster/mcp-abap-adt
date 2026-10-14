@@ -16,7 +16,7 @@ Streamable HTTP and SSE siblings are packages of their own (`@mcp-abap-adt/http`
 
 | Package | What it is | Command |
 |---|---|---|
-| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | **The full server**: one tool per object type and operation (`CreateClass`, `GetTable`, …): the `readonly`, `high` and `debug` sets, the leftover sessions and background runs. The low set left it in 19.0.0: its single-step operations are the compact server's. | `mcp-abap-adt` |
+| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | **The full server**: one tool per object type and operation (`CreateClass`, `GetTable`, …): the `readonly`, `high` and `debug` sets, the leftover sessions (stdio only) and background runs. The low set left it in 19.0.0: its single-step operations are the compact server's. | `mcp-abap-adt` |
 | [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro) | **The read-only full server**: the `readonly` tools (with system and search), the leftover-session list and logoff — no high, debugger, background-run or resume tool. Configuration is the full server's. | `mcp-abap-adt-ro` |
 | [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | **The compact server**: one tool per operation, the object type in the arguments (`HandlerCreate` with `object_type`) — a short tool list for a host that cannot select tools per request — with the four debugger verbs. Configuration is the full server's. | `mcp-abap-adt-compact` |
 | [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro) | **The read-only compact server**: the 16 compact tools that change nothing, the leftover-session list and logoff. | `mcp-abap-adt-compact-ro` |

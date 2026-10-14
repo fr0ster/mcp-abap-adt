@@ -62,12 +62,13 @@ every binary. Four kinds of binary, each on stdio, Streamable HTTP and SSE:
 
 | Kind | Binaries (packages) | Tools |
 |---|---|---|
-| core | `mcp-abap-adt` (`@mcp-abap-adt/core`), `mcp-abap-adt-http` (`@mcp-abap-adt/http`), `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, the leftover sessions (list, resume, logoff), background runs |
-| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`), `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`), `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`), `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the 27 compact tools, the four compact debugger verbs, the leftover sessions, background runs |
-| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`), `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`), `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the 16 compact tools that change nothing, the leftover-session list and logoff |
+| core | `mcp-abap-adt` (`@mcp-abap-adt/core`), `mcp-abap-adt-http` (`@mcp-abap-adt/http`), `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs; on stdio the leftover sessions (list, resume, logoff) |
+| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`), `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`), `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search); on stdio the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`), `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the 27 compact tools, the four compact debugger verbs, background runs; on stdio the leftover sessions |
+| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`), `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`), `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the 16 compact tools that change nothing; on stdio the leftover-session list and logoff |
 
-No `-ro` binary serves the debugger, a background run or the resume. A `-ro` binary takes exactly
+No `-ro` binary serves the debugger, a background run or the resume, and no http or sse binary a
+leftover-session tool (see "stdio: leftover SAP sessions of a killed process"). A `-ro` binary takes exactly
 the options, credentials and behaviour of its write counterpart (`mcp-abap-adt-ro` is
 `mcp-abap-adt`'s launcher, `mcp-abap-adt-http-ro` `mcp-abap-adt-http`'s, and so on).
 
@@ -177,19 +178,25 @@ section but one): it cannot be cut, so it gets no `timeout`.
   does not answer now waits until the network fails; a bound on it is the client's own. The
   listed long reads' `timeout` above is the one deadline left, and it is the caller's.
 
-## Every transport: leftover SAP sessions of a killed process
+## stdio: leftover SAP sessions of a killed process
 
 A server process killed from outside (`SIGKILL`, out of memory, a host that kills its child)
 cannot log off its SAP sessions, and a lock a session holds (`HandlerLock`, `LockClass`, …) stays
-until SAP's idle timeout. 19.0.0 keeps a record of every HTTP session the server holds, so that a
-later server process — on any transport — lets you **see** the sessions a killed one left and
+until SAP's idle timeout. 19.0.0's stdio binaries (`mcp-abap-adt`, `mcp-abap-adt-ro`,
+`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`) keep a record of every HTTP session the server
+holds, so that a later stdio server process lets you **see** the sessions a killed one left and
 **choose** for each: resume it, or log it off. The server decides nothing by itself: it resumes
 nothing, logs off nothing and picks nothing unless you call one of the tools below.
 
+**http and sse: no session files.** One http or sse server holds the sessions of many users, so
+none of their binaries writes a runtime file or serves a leftover-session tool; resuming a SAP
+session there is yours to do if you hold what it takes, and otherwise SAP ends it on its own
+timeout, which releases its locks.
+
 **The runtime files.** `<config dir>/runtime/`: `~/.config/mcp-abap-adt/runtime` on Unix,
 `Documents\mcp-abap-adt\runtime` on Windows; `mcp-abap-adt`'s `--auth-broker-path` moves it with
-`sessions/` and `service-keys/`, and `AUTH_BROKER_PATH`'s first entry moves it for every binary. One
-file per HTTP connection the server owns and that holds a session — an instance's own connection
+`sessions/` and `service-keys/`, and `AUTH_BROKER_PATH`'s first entry moves it for every stdio
+binary. One file per HTTP connection the server owns and that holds a session — an instance's own connection
 (role `built`) and each debugger connection (role `debugger`) — named by a random 128-bit handle.
 It holds the process id and its start time, the role, the destination (URL, client, system kind,
 wire), the backend user and the session's cookies. It is written once the connection holds a
@@ -203,8 +210,8 @@ still lives.
 - **No file over RFC**: an RFC session is its conversation and cannot be picked up by another
   process (and SAP ends it within seconds of the process's death — measured).
 - **The backend user.** A file is matched to its caller by the destination and the backend user:
-  the one the request states (the destination's `SAP_USERNAME`, or `x-sap-login`), else — for a
-  token credential (a service key, a browser login, `x-sap-jwt-token`), which states none — the
+  the one the destination states (its `SAP_USERNAME`), else — for a token credential (a service
+  key, a browser login), which states none — the
   one SAP answers for the session (`systeminformation`'s `userName`, asked once after
   `connect()`, the way the debugger reads its request user). For such a caller the tools ask the
   same of the instance's own connection, logging on first if the instance holds none yet. A
@@ -218,9 +225,9 @@ directory inherits applies — keep it in your profile. Keep the
 directory out of backups, synchronised folders and container images, and do not share it between
 OS users. The server never logs a file's content and never shows a cookie to the model.
 
-**The tools**, on every transport. The list and the logoff are served by every binary — a
-logoff is a system action, not a data change, so the `-ro` binaries serve them too; the resume
-only by the write binaries, since a resumed session is for finishing a write or an unlock:
+**The tools**, on stdio only. The list and the logoff are served by every stdio binary — a
+logoff is a system action, not a data change, so the `-ro` ones serve them too; the resume only by
+the write ones, since a resumed session is for finishing a write or an unlock:
 
 | Full binaries | Compact binaries | What it does |
 |---|---|---|
@@ -240,11 +247,6 @@ only by the write binaries, since a resumed session is for finishing a write or 
   `leftover_session_not_available`. An operation that fails without settling the session gives
   the file back under its handle; a claimed file whose process died is listed and claimable again,
   as any dead process's file.
-- **Where a resume is useful: stdio, SSE and a pooled Streamable HTTP instance.** Over Streamable
-  HTTP each request is served by an instance of its own (a pooled one too gets a new credential with
-  each request, which replaces its connection): a resumed session lives for that one request and is
-  logged off when it ends — as a logoff would. Resume on stdio or SSE, where the instance and its
-  connection outlive the call.
 - **Off Linux, a process's liveness is read by its process id alone.** On Linux the start time in
   the file is compared with `/proc`; elsewhere no start time is read, so a process id the system
   has reused for another process hides the dead process's file until that other process ends — the
@@ -627,10 +629,11 @@ transport's options only:
   headers), `mcp-abap-adt-compact-sse` `mcp-abap-adt-sse`'s, and each `-ro` one the same as its
   write binary. The sections above apply to each as to its counterpart; only the tool list differs.
 - **The binary fixes the tool list** (see "`--exposition` is gone" above): `mcp-abap-adt-compact`
-  (and `-http`, `-sse`) serves the 27 tools, the four debugger verbs (`HandlerDebugStart`,
-  `…Wait`, `…View`, `…Step`), the three background-run tools and the three leftover-session tools
-  — 37; `mcp-abap-adt-compact-ro` (and `-http-ro`, `-sse-ro`) the 16 that change nothing and the
-  leftover-session list and logoff — 18. `--exposition`, with `ro`, `rw`, `debug` or any word,
+  serves the 27 tools, the four debugger verbs (`HandlerDebugStart`, `…Wait`, `…View`, `…Step`),
+  the three background-run tools and the three leftover-session tools — 37 (`-compact-http` and
+  `-compact-sse` the same without the leftover-session tools — 34); `mcp-abap-adt-compact-ro` the 16
+  that change nothing and the leftover-session list and logoff — 18 (`-compact-http-ro` and
+  `-compact-sse-ro` the 16 alone). `--exposition`, with `ro`, `rw`, `debug` or any word,
   stops the start.
 - **Compact is the low set's analogue.** See "The low set leaves the full binaries" above: the
   write under your `lock_handle`, the package operations, the creation and validation parameters,
@@ -666,7 +669,8 @@ transport's options only:
   written back, the same user, and the broker answers the same provider throughout. The connection
   is replaced only when SAP already lost its session, built with that same provider. The caller of
   the leftover-session and background-run tools is the user of the session the instance keeps —
-  every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
+  every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials (and
+  serve no leftover-session tool).
 - **The auth chain is 6.0.** The server runs on `@mcp-abap-adt/auth-broker` 5,
   `@mcp-abap-adt/auth-providers` 6 and `@mcp-abap-adt/auth-stores` 5. Service keys keep working
   as they are; a destination's means in a `.env` too.
@@ -847,8 +851,10 @@ transport's options only:
   instance; no module global. With it, each HTTP connection an instance builds and holds a session
   on keeps a runtime file until its logoff is written, and the three leftover-session tools work;
   without it they answer `leftover_sessions_unavailable`, as they do on an instance whose
-  connection you injected. `StdioServer`, `StreamableHttpServer` and `SseServer` take the same
-  option; the launchers pass one. The server's `resolveCaller(signal)` (protected) is who the tools
+  connection you injected. `StdioServer` takes the same option, and core's launcher passes one;
+  `StreamableHttpServer` and `SseServer` take none — one such server holds the sessions of many
+  users, so the leftover sessions are stdio's (an embedder of `BaseMcpServer` may still give its
+  own instances an owner). The server's `resolveCaller(signal)` (protected) is who the tools
   answer for; core overrides it to refuse in inspection-only mode.
 - **Background runs: give your instances a strategy, or `background: true` is refused.**
   `EmbeddableMcpServer` and `BaseMcpServer` take `backgroundRuns?: IBackgroundRuns`
@@ -962,16 +968,18 @@ transport's options only:
   besides the DNS-rebinding protection and the TLS listener. `destinationFromHeader`,
   `FirstConnectLock`, `destinationFailureAnswer` and `DestinationHeaderError` are gone.
 - **The tools a binary serves are its `ToolSet`** (`@mcp-abap-adt/lib/tool-set`), fixed by the
-  binary: `kind` (`core`, `core-ro`, `compact`, `compact-ro`), `groups(context)`,
+  binary: `kind` (`core`, `core-ro`, `compact`, `compact-ro`), `groups(context, transport)` (the
+  leftover-session group on `'stdio'` only),
   `toolsHelp(transport)` (the TOOLS section of `--help`), `expositionRemoved(transport)` (the
   removed `--exposition` of the binary's table) and `backgroundRuns` (whether the launcher gives
   the server a background-run store). Four sets: `fullToolSet` (readonly, high, debug, search,
-  system, every leftover-session tool, background runs; `low` is gone, see "The low set leaves the
-  full binaries"), `fullReadOnlyToolSet` (readonly, search, system, the leftover-session list and
-  logoff), `compactToolSetOf({ readOnly, modify })` (the compact halves' entry builders,
+  system, background runs, on stdio every leftover-session tool; `low` is gone, see "The low set leaves the
+  full binaries"), `fullReadOnlyToolSet` (readonly, search, system, on stdio the leftover-session
+  list and logoff), `compactToolSetOf({ readOnly, modify })` (the compact halves' entry builders,
   `compactReadOnlyEntries` and `compactModifyEntries`, with the compact debugger verbs, background
-  runs and every leftover-session tool) and `compactReadOnlyToolSetOf(readOnly)` (the read-only half,
-  the leftover-session list and logoff). `registryOf(toolSet)` builds the registry. core's, http's
+  runs and, on stdio, every leftover-session tool) and `compactReadOnlyToolSetOf(readOnly)` (the
+  read-only half, on stdio the leftover-session list and logoff). `registryOf(toolSet, transport)`
+  builds the registry. core's, http's
   and sse's `main({ toolSet, program, version })` take nothing else of the tools:
   `LauncherOptions`' `extraGroups`, `exposition`, `helpExposition` and `includeSearch` are gone,
   and `main()` without options is a type error; a second, optional argument gives the process's

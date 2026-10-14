@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/sse-ro",
   "version": "18.1.0",
-  "description": "The read-only MCP server for SAP ABAP ADT over HTTP+SSE: the readonly tools (with system and search) and the leftover-session list and logoff, no high, debugger, background-run or resume tool; credentials only from the x-sap-* headers of the request that opens each SSE connection. No auth broker, no stores.",
+  "description": "The read-only MCP server for SAP ABAP ADT over HTTP+SSE: the readonly tools (with system and search), no high, debugger, background-run or leftover-session tool; credentials only from the x-sap-* headers of the request that opens each SSE connection. No auth broker, no stores.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"

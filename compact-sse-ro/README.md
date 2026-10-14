@@ -12,14 +12,16 @@ It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s l
   `object_type`: `HandlerGet`, `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData`,
   `HandlerValidate`, `HandlerCheckRun`, the unit-test and CDS unit-test status and result, the
   profiler list and view, the dump list and view, the service-binding type list and validation
-  (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries));
-- the **leftover-session list and logoff** (`HandlerLeftoverSessionList`,
-  `HandlerLeftoverSessionLogoff`): the SAP sessions a killed server process left open, only the
-  caller's own.
+  (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries)).
 
-18 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
-is in the tool list at all, so a client cannot call one; nor the four debugger verbs, the
-background-run tools or the resume of a leftover session — those are `mcp-abap-adt-compact-sse`'s ([`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse)).
+16 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
+is in the tool list at all, so a client cannot call one; nor the four debugger verbs or the
+background-run tools — those are `mcp-abap-adt-compact-sse`'s ([`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse)).
+
+**No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many
+users, so it writes no runtime session file and serves no leftover-session tool; those are the
+stdio binaries' (`mcp-abap-adt-compact-ro` lists and logs off, `mcp-abap-adt-compact` also resumes). Resuming a SAP session here is yours to do if you hold what it takes;
+otherwise SAP ends it on its own timeout, which releases its locks: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#stdio-leftover-sap-sessions-of-a-killed-process).
 
 ## Running it
 

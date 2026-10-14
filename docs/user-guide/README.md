@@ -105,35 +105,37 @@ forced close (a second signal, `--shutdown-timeout`) cuts it. Details:
 
 A server process killed from outside (`SIGKILL`, out of memory, a client that kills its child)
 cannot log off, so its SAP sessions — and the locks a lock tool took in them — stay open until
-SAP's idle timeout. Every server keeps a record of the HTTP sessions it holds in
+SAP's idle timeout. A stdio server keeps a record of the HTTP sessions it holds in
 `<config dir>/runtime/` (`~/.config/mcp-abap-adt/runtime`, `Documents\mcp-abap-adt\runtime` on
 Windows; `--auth-broker-path` moves it) and deletes each record once that session's logoff is
-written, so only a killed process leaves records behind. From a later server process, on any
-transport, three tools act on **your** leftover sessions, and nothing else does:
+written, so only a killed process leaves records behind. From a later stdio server process, three
+tools act on **your** leftover sessions, and nothing else does:
 
 - `ListLeftoverSessions` (compact `HandlerLeftoverSessionList`) — the handle, role, destination,
   user and time of each session a dead process left; never a cookie.
 - `ResumeLeftoverSession { handle }` (compact `HandlerLeftoverSessionResume`) — the server goes on
   in that session instead of logging on, so a `lock_handle` taken there works again: finish the
-  write, or unlock. Served only by the write binaries (`mcp-abap-adt`, `mcp-abap-adt-compact` and their `-http` /
-  `-sse` siblings), never by a `-ro` one. A
-  debugger's session cannot be resumed. If SAP says the session is gone, you get SAP's answer and
-  the record is deleted. Useful on stdio and SSE: over Streamable HTTP each request has an
-  instance of its own, so a resumed session lives for that one request and is logged off with it.
+  write, or unlock. Served only by the write binaries (`mcp-abap-adt`, `mcp-abap-adt-compact`),
+  never by a `-ro` one. A debugger's session cannot be resumed. If SAP says the session is gone,
+  you get SAP's answer and the record is deleted.
 - `LogoffLeftoverSession { handle }` (compact `HandlerLeftoverSessionLogoff`) — logs the session off
   (every lock in it is released) — one request, the logoff, with no credential and nothing sent
   before it — and deletes the record.
 
-A record is yours when its destination and SAP user equal those of your request: the
-destination's `SAP_USERNAME` or `x-sap-login`, or — for a token credential, which names none — the
-user SAP answers for the session. A session of a server still running is never shown; off Linux a
+A record is yours when its destination and SAP user equal yours: the destination's
+`SAP_USERNAME`, or — for a token credential, which names none — the user SAP answers for the
+session. A session of a server still running is never shown; off Linux a
 server's liveness is read by its process id alone, so a reused id hides a record until that other
 process ends. Two servers never act on one record at once: the first to claim it acts, the other
 answers that it is not available. The records hold
 the session's cookies, which act as you while the session lives: on Linux and macOS the directory
 is owner-only (`0700`, files `0600`); on Windows the directory's inherited ACL applies, so keep it
-in your own profile — and everywhere keep it out of backups and shared folders. Details:
-[MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-leftover-sap-sessions-of-a-killed-process).
+in your own profile — and everywhere keep it out of backups and shared folders.
+
+The http and sse binaries keep no record and serve none of these tools: one such server holds
+the sessions of many users. There, resuming a SAP session is yours to do if you hold what it
+takes; otherwise SAP ends it on its own timeout, which releases its locks. Details:
+[MIGRATION-19.0](../MIGRATION-19.0.md#stdio-leftover-sap-sessions-of-a-killed-process).
 
 ## Package Tree Output
 

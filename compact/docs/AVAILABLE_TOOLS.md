@@ -7,9 +7,9 @@ definitions a client receives.
 - Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
-- Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff in every binary, the resume in the write binaries only
+- Leftover-session tools: `@mcp-abap-adt/lib`, on stdio only (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`): the list and the logoff in both, the resume in the write binary only; no `-compact-http` or `-compact-sse` binary serves them
 - Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)
-- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`)
+- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`, the same without the leftover-session tools)
 
 ## How it works
 
@@ -668,7 +668,7 @@ per request.
 
 ### HandlerLeftoverSessionList
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff in every binary, the resume in the write binaries)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both, the resume in the write binary)
 
 **Description:** Lists your SAP sessions an ended server process left open (it was killed before logging them off): handle, role (built or debugger), destination, user, when recorded. Sessions of a running process are not listed.
 
@@ -678,7 +678,7 @@ per request.
 
 ### HandlerLeftoverSessionResume
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff in every binary, the resume in the write binaries)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both, the resume in the write binary)
 
 **Description:** Continues a leftover SAP session (role built only) as this server's connection, without a new logon, so its locks and lock handles work again. A session already held here ends with its logoff once unused. If SAP answers the session is gone, the answer is SAP's and its record is deleted.
 
@@ -690,7 +690,7 @@ per request.
 
 ### HandlerLeftoverSessionLogoff
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff in every binary, the resume in the write binaries)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both, the resume in the write binary)
 
 **Description:** Logs off a leftover SAP session (any role), releasing every lock it holds; only the logoff is sent, with no credential. Its record is deleted afterwards.
 

@@ -62,7 +62,9 @@ alike (a logoff is a system action, not a data change), `HandlerLeftoverSessionR
 `mcp-abap-adt-compact` only — the SAP sessions a killed
 server process left open (and the locks in them), listed, resumed or logged off by the user, only
 the caller's own:
-[Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process).
+[Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process). They are stdio's: `-compact-http` and `-compact-sse`
+(and their `-ro`) serve none and write no session file, since one such server holds the sessions of
+many users.
 
 **Background runs, in `mcp-abap-adt-compact`.** `HandlerProfileRun` takes `background: true` (no default):
 the call answers at once with a `run_handle`, and the run goes on in an ABAP session of its own

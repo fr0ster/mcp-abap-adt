@@ -148,11 +148,11 @@ function page(entries) {
   md +=
     '- Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary\n';
   md +=
-    '- Leftover-session tools: `@mcp-abap-adt/lib`, the list and the logoff in every binary, the resume in the write binaries only\n';
+    '- Leftover-session tools: `@mcp-abap-adt/lib`, on stdio only (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`): the list and the logoff in both, the resume in the write binary only; no `-compact-http` or `-compact-sse` binary serves them\n';
   md +=
     '- Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)\n';
   md +=
-    '- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`)\n\n';
+    '- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`, the same without the leftover-session tools)\n\n';
   md += '## How it works\n\n';
   md +=
     'One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with\n';
@@ -170,10 +170,10 @@ function page(entries) {
         : half === 'background'
           ? '**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)\n\n'
           : half === 'session'
-          ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib` (the list and the logoff in every binary, the resume in the write binaries)\n\n'
-          : half === 'readonly'
-            ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
-            : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
+            ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both, the resume in the write binary)\n\n'
+            : half === 'readonly'
+              ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
+              : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
     const available = tool.available_in
       ? [...tool.available_in].sort().join(', ')

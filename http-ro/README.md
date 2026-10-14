@@ -12,12 +12,10 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
 - the **system** tools — where-used, type and object information, the ABAP AST and semantic
   analysis, SQL queries, dumps, profiler traces, and the class and program runs
   (`RuntimeRunClass`, `RuntimeRunProgram`);
-- **search** (`SearchObject`);
-- the **leftover-session list and logoff** (`ListLeftoverSessions`, `LogoffLeftoverSession`): the
-  SAP sessions a killed server process left open, only the caller's own.
+- **search** (`SearchObject`).
 
-68 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger,
-background runs and the resume of a leftover session — those are
+66 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger and
+background runs — those are
 `mcp-abap-adt-http`'s ([`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)).
 
 **Running code is reading here.** `RuntimeRunClass` and `RuntimeRunProgram` are system tools and
@@ -25,6 +23,11 @@ are served here: "read-only" means the user cannot change code, and running it i
 SAP. What that code does is the code's. They are served **without `background`**: this binary
 keeps no background run, so the parameter is not in their schema and is not read — a call runs
 and waits for its answer.
+
+**No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many
+users, so it writes no runtime session file and serves no leftover-session tool; those are the
+stdio binaries' (`mcp-abap-adt-ro` lists and logs off, `mcp-abap-adt` also resumes). Resuming a SAP session here is yours to do if you hold what it takes;
+otherwise SAP ends it on its own timeout, which releases its locks: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#stdio-leftover-sap-sessions-of-a-killed-process).
 
 ## Running it
 

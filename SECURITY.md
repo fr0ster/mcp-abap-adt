@@ -75,11 +75,12 @@ http:            # or sse:
 - **`x-sap-*` credentials** arrive with each request. The server keeps none of
   them.
 - **SAP sessions** are held in the server process. Their cookies never reach
-  the model, an answer or a log line. One copy leaves the process on purpose:
-  the **runtime files** in `<config dir>/runtime/`, one per HTTP session the
-  server holds, so that a killed process's sessions can be resumed or logged off
-  later by their user (the leftover-session tools). Each file is deleted once its
-  session's logoff is written.
+  the model, an answer or a log line. On stdio one copy leaves the process on
+  purpose: the **runtime files** in `<config dir>/runtime/`, one per HTTP
+  session the server holds, so that a killed process's sessions can be resumed
+  or logged off later by their user (the leftover-session tools). Each file is
+  deleted once its session's logoff is written. An HTTP or SSE server writes
+  none and serves no leftover-session tool: it holds the sessions of many users.
   - **A runtime file is a bearer secret.** Its cookies act as that SAP user for
     as long as the session lives, locks included. On Linux and macOS the
     directory is created `0700` and each file `0600`, owner-only. On Windows
@@ -89,9 +90,7 @@ http:            # or sse:
     other accounts can read. Everywhere: keep the directory out of backups,
     synchronised folders and images, and do not share it between OS users.
   - The tools act only on files whose destination and SAP user match the
-    caller's request; any other handle is answered as unknown. On a shared HTTP
-    or SSE server the files of all its users sit in one directory of the server's
-    OS user: protect that account as you protect the destinations.
+    caller's; any other handle is answered as unknown.
 - **State handles.** A tool that creates state outliving one call, such as a
   debug session, returns a `state_handle`, and later calls send it back. The
   handle identifies an LLM session's state.
@@ -121,8 +120,8 @@ wire trace on a shared machine.
   - only the destinations those callers are entitled to.
 - **Isolation:** a container, a dedicated OS user, and read-only key mounts are
   the deployer's choice and responsibility.
-- **Runtime files:** keep `<config dir>/runtime/` owner-only and off shared or
-  backed-up storage.
+- **Runtime files (stdio):** keep `<config dir>/runtime/` owner-only and off
+  shared or backed-up storage.
 - **SAP TLS verification:** keep it on.
 
 ## Reporting a vulnerability

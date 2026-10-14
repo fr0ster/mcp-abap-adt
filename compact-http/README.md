@@ -17,7 +17,7 @@ transport `@mcp-abap-adt/compact-sse`. It does not depend on
 
 ```bash
 npm install -g @mcp-abap-adt/compact-http
-mcp-abap-adt-compact-http --host=127.0.0.1 --port=3000         # all 27, the debugger verbs, leftover sessions, background runs
+mcp-abap-adt-compact-http --host=127.0.0.1 --port=3000         # all 27, the debugger verbs, background runs
 mcp-abap-adt-compact-http --help                     # every option, from this binary's table
 ```
 
@@ -29,15 +29,12 @@ There is no `--transport`: a binary is its transport.
 carrying `x-mcp-destination` (destinations are served only by `mcp-abap-adt`, stdio).
 
 **The tools are fixed by the binary**: all 27, the four debugger verbs (`HandlerDebugStart`,
-`HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`), the background-run tools and the
-leftover-session tools — 37. `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
+`HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`) and the background-run tools — 34. `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
 `exposition` stop the start, naming the binary to install instead
-(`mcp-abap-adt-compact-http-ro` for `ro`). The leftover-session tools (the SAP sessions a killed
-server process left open, only the caller's own): `HandlerLeftoverSessionList`,
-`HandlerLeftoverSessionLogoff` and `HandlerLeftoverSessionResume`; the `-ro` binary serves the
-first two. Over Streamable HTTP
-a resumed session lives for its one request:
-[Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process). `HandlerProfileRun` takes `background: true`: the call answers at once with a `run_handle` and
+(`mcp-abap-adt-compact-http-ro` for `ro`). No leftover-session tool and no runtime session file: one server holds the sessions of many
+users, so those are the stdio binaries' (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`); resuming
+a SAP session here is yours to do if you hold what it takes, otherwise SAP ends it on its own
+timeout: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#stdio-leftover-sap-sessions-of-a-killed-process). `HandlerProfileRun` takes `background: true`: the call answers at once with a `run_handle` and
 the run goes on in an ABAP session of its own; `HandlerBackgroundRunGet`,
 `HandlerBackgroundRunList` and `HandlerBackgroundRunDiscard` read, list and remove the caller's
 own runs: [Background runs](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#background-runs-of-a-class-or-a-program). A breakpoint catches every request of the connected SAP user; where that must not be

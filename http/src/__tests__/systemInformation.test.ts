@@ -2,9 +2,9 @@
  * Over Streamable HTTP, on ABAP Cloud, every call's system context comes
  * from `systeminformation`, asked before its tool. An answer that names no
  * user — the field missing or blank, a body that is no JSON, JSON that is no
- * object — is `system_without_user`; an absent endpoint (`404`) is a failed
- * lookup, `system_lookup_failed`, with no login standing in; so is any other
- * failure (`405`, `501`). The tool never runs.
+ * object — is `system_without_user`; any status but a `2xx` (`404`, `405`,
+ * `501`, `500`) is a failed lookup, `system_lookup_failed`, with no login
+ * standing in. The tool never runs.
  */
 
 import type { StandInRequest } from '../../../src/__tests__/helpers/adtStandIn';
@@ -50,7 +50,7 @@ it.each(WITHOUT_USER)(
   },
 );
 
-it.each([404, 405, 501])(
+it.each([404, 405, 501, 500])(
   'systeminformation answered %i: system_lookup_failed, no login stands in, the tool not run',
   async (status) => {
     s.standIn.answer(isLookup, status);

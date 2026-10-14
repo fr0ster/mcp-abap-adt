@@ -2,16 +2,19 @@
  * The one reader of a system's `systeminformation`
  * (`/sap/bc/adt/core/http/systeminformation`), read here with its status
  * rather than through adt-clients' `getSystemInformation`, which answers
- * `null` both for an absent endpoint and for a successful body it could not
- * read — and the server's rules need the two apart:
+ * `null` both for a failed request and for a successful body it could not
+ * read — and the server's rules need the two apart.
  *
- * - **absent** — the request failed with HTTP `404`, and only `404`;
- * - **answered** — a `2xx`; `user` is the body's `userName` only when the body
+ * The endpoint exists only on ABAP Cloud, so only a cloud system is asked
+ * (the callers decide by the system's kind, `systemKindOf`); there any
+ * answer but a usable one is an error:
+ *
+ * - a `2xx` is an answer; `user` is the body's `userName` only when the body
  *   is a JSON object and `userName` a non-blank string (a body that is no
  *   JSON, JSON that is no object, a missing, empty, blank or non-string user
  *   is an answer without a user: `user` `undefined`);
- * - anything else (`405`, `501`, a `5xx`, an authentication or network
- *   failure) is thrown as it came — a status other than a `2xx` the
+ * - anything else (`404`, `405`, `501`, a `5xx`, an authentication or
+ *   network failure) is thrown as it came — a status other than a `2xx` the
  *   connection handed back instead of throwing as a
  *   `SystemInformationStatusError`.
  *
@@ -25,25 +28,12 @@ const SYSTEM_INFORMATION_URL = '/sap/bc/adt/core/http/systeminformation';
 const SYSTEM_INFORMATION_ACCEPT =
   'application/vnd.sap.adt.core.http.systeminformation.v1+json';
 
-export type SystemInformation =
-  | { readonly kind: 'absent' }
-  | {
-      readonly kind: 'answered';
-      /** The session's user as the system names it; `undefined`: none named. */
-      readonly user: string | undefined;
-      /** The system id, when the answer carries one as a string. */
-      readonly systemId: string | undefined;
-    };
-
-/** The HTTP status a failed request carries, if any. */
-function statusOf(error: unknown): unknown {
-  try {
-    return (error as { response?: { status?: unknown } } | null)?.response
-      ?.status;
-  } catch {
-    return undefined;
-  }
-}
+export type SystemInformation = {
+  /** The session's user as the system names it; `undefined`: none named. */
+  readonly user: string | undefined;
+  /** The system id, when the answer carries one as a string. */
+  readonly systemId: string | undefined;
+};
 
 /** The body as a plain JSON object, else `undefined`. */
 function objectOf(data: unknown): Record<string, unknown> | undefined {
@@ -76,51 +66,32 @@ function fieldOf(
 export async function readSystemInformation(
   connection: IAbapConnection,
 ): Promise<SystemInformation> {
-  let response: { status?: unknown; data?: unknown };
-  try {
-    response = await connection.makeAdtRequest({
+  const response: { status?: unknown; data?: unknown } =
+    await connection.makeAdtRequest({
       url: SYSTEM_INFORMATION_URL,
       method: 'GET',
       timeout: 0,
       headers: { Accept: SYSTEM_INFORMATION_ACCEPT },
       params: { _: Date.now() },
     });
-  } catch (error) {
-    if (statusOf(error) === 404) return { kind: 'absent' };
-    throw error;
-  }
   // A connection that hands back a status other than a 2xx instead of
   // throwing it (an embedder's own) is read by that status all the same.
   const status = response.status;
   if (typeof status === 'number' && (status < 200 || status > 299)) {
-    if (status === 404) return { kind: 'absent' };
     throw new SystemInformationStatusError(status);
   }
   const body = objectOf(response.data);
   const named = fieldOf(body, 'userName');
   const id = fieldOf(body, 'systemID');
   return {
-    kind: 'answered',
     user: typeof named === 'string' && named.trim() !== '' ? named : undefined,
     systemId: typeof id === 'string' ? id : undefined,
   };
 }
 
 /**
- * A lookup that found no `systeminformation` endpoint (`404`) where the
- * server needs it — on ABAP Cloud, the system context a call runs with: a
- * failed lookup, never an answer without a user.
- */
-export class SystemInformationAbsentError extends Error {
-  constructor() {
-    super('the system has no systeminformation endpoint');
-    this.name = 'SystemInformationAbsentError';
-  }
-}
-
-/**
  * A `systeminformation` request a connection answered with a status other
- * than a `2xx` (and other than `404`) instead of throwing it: thrown as such
+ * than a `2xx` instead of throwing it: thrown as such
  * a failure is, its status on `response` the way a failed request carries it.
  */
 export class SystemInformationStatusError extends Error {

@@ -446,9 +446,9 @@ it('a logon SAP refuses: exit 1 with the failure on stderr, and the transport ne
   expect(s.stderr.join('\n')).not.toContain('start-password');
 });
 
-// An absent endpoint (`404`) is a failed lookup on ABAP Cloud — never an
-// answer without a user, never the login in its place — as `405`, `501` and
-// `500` are.
+// On ABAP Cloud any status but a `2xx` (`404`, `405`, `501`, `500`) is a
+// failed lookup — never an answer without a user, never the login in its
+// place.
 it.each([500, 404, 405, 501])(
   'ABAP Cloud, systeminformation answered %i: exit 1 naming the lookup, the transport never opens, and the logon is logged off',
   async (status) => {

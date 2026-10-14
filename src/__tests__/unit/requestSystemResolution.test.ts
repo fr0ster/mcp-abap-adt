@@ -43,10 +43,7 @@ import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
-import {
-  readSystemInformation,
-  SystemInformationAbsentError,
-} from '../../lib/systemInformation';
+import { readSystemInformation } from '../../lib/systemInformation';
 
 const lookup = readSystemInformation as jest.Mock;
 
@@ -111,7 +108,6 @@ beforeEach(() => {
   (AdtClient as jest.Mock).mockClear();
   lookup.mockReset();
   lookup.mockResolvedValue({
-    kind: 'answered',
     user: 'CB_USER',
     systemId: 'CLD',
   });
@@ -166,7 +162,6 @@ describe('defaultSystemContextResolver', () => {
 
   it('a cloud system that answers without a user has no responsible — asked, so no login stands in — not null', async () => {
     lookup.mockResolvedValue({
-      kind: 'answered',
       user: undefined,
       systemId: 'CLD',
     });
@@ -176,12 +171,18 @@ describe('defaultSystemContextResolver', () => {
     });
   });
 
-  it('a cloud system without the endpoint (404) is a failed lookup, not an answer', async () => {
-    lookup.mockResolvedValue({ kind: 'absent' });
-    await expect(
-      defaultSystemContextResolver(cloudConn()),
-    ).rejects.toBeInstanceOf(SystemInformationAbsentError);
-  });
+  it.each([404, 405, 501, 500])(
+    'a cloud system whose systeminformation answers %i: the lookup fails with it, not an answer',
+    async (status) => {
+      const failure = Object.assign(new Error('placeholder'), {
+        response: { status },
+      });
+      lookup.mockRejectedValue(failure);
+      await expect(defaultSystemContextResolver(cloudConn())).rejects.toBe(
+        failure,
+      );
+    },
+  );
 });
 
 describe('memoisation per connection', () => {

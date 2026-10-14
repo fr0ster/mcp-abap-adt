@@ -23,19 +23,21 @@ import type { AmdpSessionPorts } from './AmdpSession';
 import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
 
 /**
- * The user whose requests are caught: what the system says, else the login —
- * the request scope's before the process's — never the responsible.
- * The login stands in only when the system has no `systeminformation`
- * endpoint (`404`); an answer that names no user is the call's
- * `system_without_user`; any other failure (`405`, `501`, authentication,
- * network) goes through to the caller.
+ * The user whose requests are caught, by the system's kind (`systemType`:
+ * the server's stated one, for a connection the factory did not build). On
+ * ABAP Cloud what `systeminformation` names: an answer that names no user is
+ * the call's `system_without_user`, any other failure (`404`, `405`, `501`,
+ * a `5xx`, authentication, network) goes through to the caller as it came —
+ * the login never stands in. On-premise nothing is asked: the login, the
+ * request scope's before the process's — never the responsible.
  */
 export async function requestUserOf(
   connection: IAbapConnection,
+  systemType?: string,
 ): Promise<string> {
   let named: string | undefined;
   try {
-    named = await systemUserOf(connection);
+    named = await systemUserOf(connection, systemType);
   } catch (error) {
     // An answer without a user is not a valid ABAP system: no fallback to
     // the login, the call's refusal.
@@ -146,7 +148,10 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
     },
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
       new AbapDebugger(c, undefined, undefined, { onConflict }),
-    requestUser: (context) => onMain(context, requestUserOf),
+    requestUser: (context) =>
+      onMain(context, (connection) =>
+        requestUserOf(connection, context.systemType),
+      ),
     run,
   };
 }
@@ -156,7 +161,10 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
     openConnection: openStateful,
     closeConnection: closeOwn,
     amdpDebugger: (c) => new AmdpDebugger(c),
-    requestUser: (context) => onMain(context, requestUserOf),
+    requestUser: (context) =>
+      onMain(context, (connection) =>
+        requestUserOf(connection, context.systemType),
+      ),
     run,
   };
 }

@@ -390,7 +390,6 @@ describe('cloud', () => {
 
   it('nothing stated: both from systeminformation, and the create carries them', async () => {
     lookup.mockResolvedValue({
-      kind: 'answered',
       user: 'CB_USER',
       systemId: 'CLD',
     });
@@ -411,7 +410,6 @@ describe('cloud', () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
     lookup.mockResolvedValue({
-      kind: 'answered',
       user: 'CB_USER',
       systemId: 'CLD',
     });
@@ -428,7 +426,6 @@ describe('cloud', () => {
 
   it('a scope login is not a cloud login either; a stated SAP_RESPONSIBLE still wins on cloud', async () => {
     lookup.mockResolvedValue({
-      kind: 'answered',
       user: 'CB_USER',
       systemId: 'CLD',
     });
@@ -459,7 +456,6 @@ describe('cloud', () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
     lookup.mockResolvedValue({
-      kind: 'answered',
       user: undefined,
       systemId: 'CLD',
     });
@@ -482,7 +478,6 @@ describe('cloud', () => {
     'a host scope carrying both keys as undefined (%s): cloud asks the system, on-premise is refused',
     async (systemType, filled) => {
       lookup.mockResolvedValue({
-        kind: 'answered',
         user: 'CB_USER',
         systemId: 'CLD',
       });
@@ -537,7 +532,9 @@ describe('cloud', () => {
   it('a cloud system without the endpoint (404): a failed lookup, system_lookup_failed — the process login does not stand in, nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
-    lookup.mockResolvedValue({ kind: 'absent' });
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,

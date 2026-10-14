@@ -40,4 +40,10 @@ export interface HandlerContext {
   onMainConnection?: <T>(
     send: (connection: IAbapConnection) => Promise<T>,
   ) => Promise<T>;
+  /**
+   * The system kind the server states (its `systemType` option), for a
+   * connection the factory did not build; absent where none is stated
+   * (`SAP_SYSTEM_TYPE`, else on-premise, then decides — see `systemKindOf`).
+   */
+  systemType?: string;
 }

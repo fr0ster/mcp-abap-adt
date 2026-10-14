@@ -123,7 +123,9 @@ let previousType: string | undefined;
 beforeEach(() => {
   closeGate();
   previousType = process.env.SAP_SYSTEM_TYPE;
-  process.env.SAP_SYSTEM_TYPE = 'onprem';
+  // `systeminformation` exists only on ABAP Cloud: the identity lookups are
+  // asked only there.
+  process.env.SAP_SYSTEM_TYPE = 'cloud';
 });
 afterEach(() => {
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
@@ -137,7 +139,7 @@ async function stand(source: {
   const server = new StandServer({
     name: 'stale-sends',
     logger: silent,
-    systemType: 'onprem',
+    systemType: 'cloud',
     backgroundRuns: new InMemoryBackgroundRuns(),
   });
   server.use(source);

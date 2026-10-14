@@ -69,6 +69,22 @@ function testGroup(
   } as unknown as IHandlerGroup;
 }
 
+/**
+ * `systeminformation` exists only on ABAP Cloud, so the identity lookups are
+ * asked only there: the cases about them run against a cloud system (the
+ * kind of a connection the factory built comes from `SAP_SYSTEM_TYPE`).
+ */
+let previousType: string | undefined;
+function onCloud(): void {
+  previousType = process.env.SAP_SYSTEM_TYPE;
+  process.env.SAP_SYSTEM_TYPE = 'cloud';
+}
+afterEach(() => {
+  if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
+  else process.env.SAP_SYSTEM_TYPE = previousType;
+  previousType = undefined;
+});
+
 const text = (value: string) => ({
   content: [{ type: 'text', text: value }],
 });
@@ -118,11 +134,13 @@ it("a background run's caller lookup takes its turn behind the call holding the 
 });
 
 it("the debugger's request-user lookup takes its turn; a holding DebugWait blocks no ReadClass", async () => {
+  onCloud();
   let releaseWait!: () => void;
   const waiting = new Promise<void>((resolve) => {
     releaseWait = resolve;
   });
   const s = await statefulStand(['UpdateClass', 'ReadClass'], {
+    systemType: 'cloud',
     groups: [
       testGroup({
         // As a DebugWait holding for its `hold_seconds`: nothing on the
@@ -182,7 +200,9 @@ it("the debugger's request-user lookup takes its turn; a holding DebugWait block
 });
 
 it('a lookup from inside a call that holds the flow runs directly, without waiting behind itself', async () => {
+  onCloud();
   const s = await statefulStand([], {
+    systemType: 'cloud',
     groups: [
       testGroup({
         LookupInside: async (context, _args) => {

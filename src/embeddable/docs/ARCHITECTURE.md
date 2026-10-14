@@ -187,8 +187,8 @@ runs on it, never after — no tool runs twice: on stdio at the start (`bornAtSt
 first call on a connection without it (`systemBeforeTool` → `requireSystem`), inside the flow — a
 call outside the flow takes a turn in it for the lookup alone — its failure that call's answer (an
 answer that names no user `system_without_user` — `requiringUser`: not a valid ABAP system for
-this server —, a chain failure as it is, else — no endpoint (`404`) included:
-`readSystemInformation` tells it from an answer — `system_lookup_failed`), the tool not run, nothing
+this server —, a chain failure as it is, else — any status but a `2xx`, `404` included: the
+endpoint exists only on ABAP Cloud — `system_lookup_failed`), the tool not run, nothing
 failed kept, so the next call asks again. The lookup is awaited to its end whatever the call's
 signal says: the call's turn and its tracking last until it settled, so the next request on the
 connection waits for it; the instance's close and the shutdown do not wait for it — they log the
@@ -338,7 +338,8 @@ their answers are kept is the host's: a strategy.
 - **The run** (`startBackgroundRun`, `src/lib/backgroundRuns/run.ts`), from the tool wrapper:
   refused at once without a fresh connection to be had (`freshConnectionAvailable`; D20's words);
   the caller resolved (`backgroundCaller`: the request's stated user — `SAP_USERNAME`,
-  `x-sap-login` — else `systemUserOf` on the call's connection, cached per connection; an injected
+  `x-sap-login` — else `systemUserOf` on the call's connection, on ABAP Cloud only (on-premise
+  nothing is asked), cached per connection; an injected
   connection's URL from `getBaseUrl()`, its user SAP's; none at all → `background_run_caller_unknown`);
   registered in the registry of live tools under the calling instance (`"<tool> (background)"`) —
   refused there once the shutdown latched; its own connection opened by `openFreshConnection` and

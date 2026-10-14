@@ -29,10 +29,7 @@ import {
   getEffectiveSystemContext,
   getStatedSystemContext,
 } from './systemContext';
-import {
-  readSystemInformation,
-  SystemInformationAbsentError,
-} from './systemInformation';
+import { readSystemInformation } from './systemInformation';
 
 /**
  * Resolved values; `null` when the connection is not asked (on-premise — the
@@ -55,10 +52,10 @@ export type SystemContextResolver = (
  * (configuration, the request scope, the tool arguments or the login supply
  * the values); on ABAP Cloud it asks the system's own `systeminformation`
  * (`readSystemInformation`) — the user name as responsible, the system id as
- * master system, neither when the answer carries none. No endpoint (`404`)
- * there is a failed lookup (`SystemInformationAbsentError`), as any other
- * failure is, thrown as it came. Which of the two is the kind the connection
- * was built for (`systemKindOf`), never a guess from its URL.
+ * master system, neither when the answer carries none. Any status but a
+ * `2xx` there (`404` included) is a failed lookup, thrown as it came. Which
+ * of the two is the kind the connection was built for (`systemKindOf`),
+ * never a guess from its URL.
  */
 /**
  * One resolver per stated kind, for the process: `resolveOnce` memoises per
@@ -82,10 +79,9 @@ export function systemContextResolverFor(
     if (systemKindOf(connection, process.env, systemType) !== 'cloud') {
       return null;
     }
-    const info = await readSystemInformation(connection);
-    // On ABAP Cloud the system information is required: no endpoint is a
+    // On ABAP Cloud the system information is required: any failure is a
     // failed lookup, never an answer without a user.
-    if (info.kind === 'absent') throw new SystemInformationAbsentError();
+    const info = await readSystemInformation(connection);
     return { responsible: info.user, masterSystem: info.systemId };
   };
   resolversByKind.set(systemType, resolver);

@@ -78,3 +78,99 @@ it.each(WITHOUT_USER)(
     }
   },
 );
+
+/** A server on the stand, its connection built from `settings`. */
+async function standServerOn(
+  standIn: { url: string },
+  settings: Record<string, string>,
+) {
+  const server = new StandServer({
+    name: 'caller-by-kind',
+    logger: silent,
+    backgroundRuns: new InMemoryBackgroundRuns(),
+  });
+  server.use({
+    settings: { url: standIn.url, client: '100', authType: 'jwt', ...settings },
+    credential: TokenAuthProvider.fixed('placeholder.token.sig'),
+  });
+  server.register(shippedGroups());
+  return { server, client: await clientOf(server) };
+}
+
+it.each([404, 405, 501, 500])(
+  'on ABAP Cloud a caller lookup answered %i is the call error, never the login',
+  async (status) => {
+    const standIn = await adtStandIn();
+    standIn.answer(isLookup, status);
+    const saved = process.env.SAP_USERNAME;
+    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+    const { server, client } = await standServerOn(standIn, {});
+    try {
+      const answer = await client.call('GetBackgroundRun', {
+        run_handle: 'unknown-handle',
+      });
+      expect(answer.isError).toBe(true);
+      expect(answer.payload).not.toMatchObject({
+        error: 'background_run_caller_unknown',
+      });
+      expect(answer.payload).not.toMatchObject({
+        error: 'system_without_user',
+      });
+      expect(JSON.stringify(answer.payload)).not.toContain('PROCESS_LOGIN');
+      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    } finally {
+      if (saved === undefined) delete process.env.SAP_USERNAME;
+      else process.env.SAP_USERNAME = saved;
+      await client.close();
+      await server.terminalClose();
+      await standIn.close();
+    }
+  },
+);
+
+describe('on-premise', () => {
+  beforeEach(() => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+  });
+
+  it('a caller of a token credential with no login: unknown, systeminformation never asked', async () => {
+    const standIn = await adtStandIn();
+    standIn.body(isLookup, JSON.stringify({ userName: 'SYSTEM_USER' }));
+    const { server, client } = await standServerOn(standIn, {});
+    try {
+      const answer = await client.call('GetBackgroundRun', {
+        run_handle: 'unknown-handle',
+      });
+      expect(answer.isError).toBe(true);
+      expect(answer.payload).toMatchObject({
+        error: 'background_run_caller_unknown',
+      });
+      expect(standIn.requests.filter(isLookup)).toHaveLength(0);
+    } finally {
+      await client.close();
+      await server.terminalClose();
+      await standIn.close();
+    }
+  });
+
+  it('a caller with a configured login: that login, systeminformation never asked', async () => {
+    const standIn = await adtStandIn();
+    standIn.body(isLookup, JSON.stringify({ userName: 'SYSTEM_USER' }));
+    const { server, client } = await standServerOn(standIn, {
+      username: 'LOGIN_USER',
+    });
+    try {
+      const answer = await client.call('GetBackgroundRun', {
+        run_handle: 'unknown-handle',
+      });
+      expect(answer.payload).not.toMatchObject({
+        error: 'background_run_caller_unknown',
+      });
+      expect(standIn.requests.filter(isLookup)).toHaveLength(0);
+    } finally {
+      await client.close();
+      await server.terminalClose();
+      await standIn.close();
+    }
+  });
+});

@@ -3,52 +3,70 @@ import { runWithRequestContext } from '../../../lib/requestContext';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 describe('the request user', () => {
-  it('is the user systeminformation names', async () => {
+  const saved = {
+    SAP_USERNAME: process.env.SAP_USERNAME,
+    SAP_RESPONSIBLE: process.env.SAP_RESPONSIBLE,
+    SAP_SYSTEM_TYPE: process.env.SAP_SYSTEM_TYPE,
+  };
+  beforeEach(() => {
+    delete process.env.SAP_SYSTEM_TYPE;
+  });
+  afterEach(() => {
+    for (const [name, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  });
+
+  it('on ABAP Cloud is the user systeminformation names', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'cloud';
     const conn = recordingConnection([
       { status: 200, data: JSON.stringify({ userName: 'sapuser01' }) },
     ]);
     await expect(requestUserOf(conn as any)).resolves.toBe('SAPUSER01');
   });
-  it.each([405, 501])(
-    "a %i handed back is the call's error, never the login",
+  it('on ABAP Cloud the stated kind of the server is enough', async () => {
+    const conn = recordingConnection([
+      { status: 200, data: JSON.stringify({ userName: 'sapuser01' }) },
+    ]);
+    await expect(requestUserOf(conn as any, 'cloud')).resolves.toBe(
+      'SAPUSER01',
+    );
+    expect(conn.requests).toHaveLength(1);
+  });
+  it.each([404, 405, 501, 500])(
+    "on ABAP Cloud a %i handed back is the call's error, never the login",
     async (status) => {
+      process.env.SAP_SYSTEM_TYPE = 'cloud';
       const conn = recordingConnection([{ status, data: '' }]);
-      const saved = process.env.SAP_USERNAME;
       process.env.SAP_USERNAME = 'processlogin';
-      try {
-        await expect(requestUserOf(conn as any)).rejects.toMatchObject({
-          response: { status },
-        });
-      } finally {
-        if (saved === undefined) delete process.env.SAP_USERNAME;
-        else process.env.SAP_USERNAME = saved;
-      }
+      await expect(requestUserOf(conn as any)).rejects.toMatchObject({
+        response: { status },
+      });
     },
   );
-  it('falls back to the login — the scope login before the process login — never the responsible', async () => {
-    // No endpoint (`404`) for both lookups: an empty `200` would be an answer
-    // without a user, not a reason to use the login.
+  it('on-premise is the login — the scope login before the process login — never the responsible, nothing asked', async () => {
     const conn = recordingConnection([
-      { status: 404, data: '' },
-      { status: 404, data: '' },
+      { status: 200, data: JSON.stringify({ userName: 'systemuser' }) },
     ]);
-    const saved = {
-      SAP_USERNAME: process.env.SAP_USERNAME,
-      SAP_RESPONSIBLE: process.env.SAP_RESPONSIBLE,
-    };
     process.env.SAP_USERNAME = 'processlogin';
     process.env.SAP_RESPONSIBLE = 'SOMEONEELSE';
-    try {
-      await expect(requestUserOf(conn as any)).resolves.toBe('PROCESSLOGIN');
-      await runWithRequestContext({ login: 'scopelogin' }, async () => {
-        await expect(requestUserOf(conn as any)).resolves.toBe('SCOPELOGIN');
-      });
-    } finally {
-      for (const [name, value] of Object.entries(saved)) {
-        if (value === undefined) delete process.env[name];
-        else process.env[name] = value;
-      }
-    }
+    await expect(requestUserOf(conn as any)).resolves.toBe('PROCESSLOGIN');
+    await runWithRequestContext({ login: 'scopelogin' }, async () => {
+      await expect(requestUserOf(conn as any)).resolves.toBe('SCOPELOGIN');
+    });
+    expect(conn.requests).toEqual([]);
+  });
+  it('the stated on-premise kind wins over SAP_SYSTEM_TYPE for a connection the factory did not build', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'cloud';
+    process.env.SAP_USERNAME = 'processlogin';
+    const conn = recordingConnection([
+      { status: 200, data: JSON.stringify({ userName: 'systemuser' }) },
+    ]);
+    await expect(requestUserOf(conn as any, 'onprem')).resolves.toBe(
+      'PROCESSLOGIN',
+    );
+    expect(conn.requests).toEqual([]);
   });
 });
 

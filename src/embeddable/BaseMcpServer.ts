@@ -1119,6 +1119,9 @@ export abstract class BaseMcpServer extends McpServer {
                 state: this.state,
                 debugger: () => this.debuggerFor(),
                 onMainConnection: (send) => this.onMainConnection(signal, send),
+                ...(this.systemType !== undefined
+                  ? { systemType: this.systemType }
+                  : {}),
                 ...(this.leftoverSessions !== undefined
                   ? { sessionFiles: this.leftoverSessions }
                   : {}),
@@ -1336,6 +1339,9 @@ export abstract class BaseMcpServer extends McpServer {
         logger: this.logger,
         state: this.state,
         debugger: () => this.debuggerFor(),
+        ...(this.systemType !== undefined
+          ? { systemType: this.systemType }
+          : {}),
         ...(this.leftoverSessions !== undefined
           ? {
               sessionFiles: this.leftoverSessions,
@@ -1561,9 +1567,10 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * `sapUserOf`'s lookup: `undefined` when the system has no
-   * `systeminformation` endpoint (`404`); an answer that names no user is
-   * `system_without_user`.
+   * `sapUserOf`'s lookup, by the system's kind (`systemUserOf`, with the
+   * server's stated `systemType`): on-premise `undefined`, nothing asked; on
+   * ABAP Cloud the user `systeminformation` names, an answer that names none
+   * `system_without_user`, any other failure the call's error as it came.
    */
   private async callerUserOf(
     signal: AbortSignal,
@@ -1577,7 +1584,7 @@ export abstract class BaseMcpServer extends McpServer {
       const generation = this.callerGeneration;
       let asked: string | undefined;
       try {
-        asked = await systemUserOf(connection);
+        asked = await systemUserOf(connection, this.systemType);
       } catch (error) {
         // The per-call lookup's rule (`requireSystem`): an answer that names
         // no user is not a valid ABAP system. Nothing kept.

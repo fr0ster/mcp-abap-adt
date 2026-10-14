@@ -11,7 +11,9 @@
  *   JSON, JSON that is no object, a missing, empty, blank or non-string user
  *   is an answer without a user: `user` `undefined`);
  * - anything else (`405`, `501`, a `5xx`, an authentication or network
- *   failure) is thrown as it came.
+ *   failure) is thrown as it came — a status other than a `2xx` the
+ *   connection handed back instead of throwing as a
+ *   `SystemInformationStatusError`.
  *
  * The request is the helper's: GET, the same `Accept`, no timeout, the
  * cache-busting parameter Eclipse sends.
@@ -74,21 +76,27 @@ function fieldOf(
 export async function readSystemInformation(
   connection: IAbapConnection,
 ): Promise<SystemInformation> {
-  let data: unknown;
+  let response: { status?: unknown; data?: unknown };
   try {
-    const response = await connection.makeAdtRequest({
+    response = await connection.makeAdtRequest({
       url: SYSTEM_INFORMATION_URL,
       method: 'GET',
       timeout: 0,
       headers: { Accept: SYSTEM_INFORMATION_ACCEPT },
       params: { _: Date.now() },
     });
-    data = response.data;
   } catch (error) {
     if (statusOf(error) === 404) return { kind: 'absent' };
     throw error;
   }
-  const body = objectOf(data);
+  // A connection that hands back a status other than a 2xx instead of
+  // throwing it (an embedder's own) is read by that status all the same.
+  const status = response.status;
+  if (typeof status === 'number' && (status < 200 || status > 299)) {
+    if (status === 404) return { kind: 'absent' };
+    throw new SystemInformationStatusError(status);
+  }
+  const body = objectOf(response.data);
   const named = fieldOf(body, 'userName');
   const id = fieldOf(body, 'systemID');
   return {
@@ -107,5 +115,19 @@ export class SystemInformationAbsentError extends Error {
   constructor() {
     super('the system has no systeminformation endpoint');
     this.name = 'SystemInformationAbsentError';
+  }
+}
+
+/**
+ * A `systeminformation` request a connection answered with a status other
+ * than a `2xx` (and other than `404`) instead of throwing it: thrown as such
+ * a failure is, its status on `response` the way a failed request carries it.
+ */
+export class SystemInformationStatusError extends Error {
+  readonly response: { readonly status: number };
+  constructor(status: number) {
+    super(`systeminformation answered ${status}`);
+    this.name = 'SystemInformationStatusError';
+    this.response = { status };
   }
 }

@@ -9,8 +9,29 @@ describe('the request user', () => {
     ]);
     await expect(requestUserOf(conn as any)).resolves.toBe('SAPUSER01');
   });
+  it.each([405, 501])(
+    "a %i handed back is the call's error, never the login",
+    async (status) => {
+      const conn = recordingConnection([{ status, data: '' }]);
+      const saved = process.env.SAP_USERNAME;
+      process.env.SAP_USERNAME = 'processlogin';
+      try {
+        await expect(requestUserOf(conn as any)).rejects.toMatchObject({
+          response: { status },
+        });
+      } finally {
+        if (saved === undefined) delete process.env.SAP_USERNAME;
+        else process.env.SAP_USERNAME = saved;
+      }
+    },
+  );
   it('falls back to the login — the scope login before the process login — never the responsible', async () => {
-    const conn = recordingConnection([{ status: 404, data: '' }]);
+    // No endpoint (`404`) for both lookups: an empty `200` would be an answer
+    // without a user, not a reason to use the login.
+    const conn = recordingConnection([
+      { status: 404, data: '' },
+      { status: 404, data: '' },
+    ]);
     const saved = {
       SAP_USERNAME: process.env.SAP_USERNAME,
       SAP_RESPONSIBLE: process.env.SAP_RESPONSIBLE,

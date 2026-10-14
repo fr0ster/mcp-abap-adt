@@ -241,22 +241,20 @@ export async function withResolvedSystemContext<T>(
 
 /**
  * Run `fn` with the responsible person and master system the request lacks
- * filled from a resolution already made — the server's, at connect time
- * (spec §5.7: no send outside the connection's main flow). Sends nothing.
+ * filled from a resolution already made — the server's, before the tool
+ * runs (spec §5.7: no send outside the connection's main flow). Sends nothing.
  * `undefined`: nothing was resolved (no resolver), and `fn` runs as it is.
  */
 export async function withKnownSystemContext<T>(
   resolved: ResolvedSystemContext | undefined,
   fn: () => Promise<T> | T,
-  /** The lookup failed: a refusal for want of a responsible says so. */
-  failed = false,
 ): Promise<T> {
   if (resolved === undefined) return fn();
   const stated = getStatedSystemContext();
   if (stated.responsible && stated.masterSystem) return fn();
   return applyResolved(
     resolved,
-    failed,
+    false,
     stated,
     getEffectiveSystemContext(),
     fn,

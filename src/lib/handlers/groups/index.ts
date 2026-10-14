@@ -14,7 +14,6 @@ export { DebugHandlersGroup } from './DebugHandlersGroup.js';
 export { HighLevelHandlersGroup } from './HighLevelHandlersGroup.js';
 export {
   LeftoverSessionHandlersGroup,
-  type LeftoverSessionToolsOptions,
   leftoverSessionEntries,
 } from './LeftoverSessionHandlersGroup.js';
 export { ReadOnlyHandlersGroup } from './ReadOnlyHandlersGroup.js';

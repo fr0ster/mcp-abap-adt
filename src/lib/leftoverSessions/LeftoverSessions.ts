@@ -1,9 +1,11 @@
 /**
  * The SAP sessions a server process holds, kept as files so that a process
  * killed from outside (`SIGKILL`, OOM, a host that kills its child) leaves
- * them behind for the user to see — and to resume or log off, through the
- * three leftover-session tools. The server decides nothing by itself: it
- * resumes nothing, logs off nothing and picks nothing unless the user asks.
+ * them behind for the user to see and log off, through the two
+ * leftover-session tools, and so that the next stdio process of the same
+ * destination is born on the one it finds (`claimTheOne`). It logs off
+ * nothing and picks nothing among several: with more than one, none is
+ * taken, and they stay for the user.
  *
  * **The owner.** One object per process, created by the host (the launcher,
  * or an embedder) and handed to its server instances; no module global. An
@@ -18,9 +20,12 @@
  * its destination: the writing process (pid and start time), the role, the
  * destination's name and where it points (URL, client, system kind, wire),
  * the backend user the destination states (none for a token credential:
- * shown in the listing only) and the session's cookies (`sessionCookies()`)
- * — no credential. Written once the connection holds
- * a session and again after a request whose answer changed its cookies;
+ * shown in the listing only), the system information the session was
+ * looked up with (on ABAP Cloud the user and system id `systeminformation`
+ * answered; `null` until known, and on-premise) and the session's cookies
+ * (`sessionCookies()`) — no credential. Written once the connection holds
+ * a session, again once its system information is known, and again after a
+ * request whose answer changed its cookies;
  * deleted once that connection's logoff is written — so it survives only a
  * process that died without its logoff. Never logged, never shown to the
  * model: the cookies act as the user while the session lives.
@@ -38,13 +43,14 @@
  * that process's, this one's included. No TTL: a file stays until the user
  * acts, and SAP's answer decides whether its session is alive.
  *
- * **Claims.** Before a resume or a logoff, a process claims the file by
+ * **Claims.** Before a resume (at a stdio start) or a logoff, a process claims the file by
  * renaming it to `<handle>.claimed.<pid>.<start>`: an atomic rename, so of
  * two processes one acts and the other answers "not available". A claimed
  * file whose claimer died is available again, as any dead process's file.
  *
- * **Format.** `format: 2`. A file of another format (format 1 named no
- * destination) is not read: never listed, resumed or logged off.
+ * **Format.** `format: 3`. A file of another format (format 1 named no
+ * destination, format 2 no system information) is not read: never listed,
+ * resumed or logged off.
  */
 
 import { randomBytes } from 'node:crypto';
@@ -98,6 +104,17 @@ export interface LeftoverListing {
 }
 
 /**
+ * The system information a session was looked up with (ABAP Cloud's
+ * `systeminformation`: the session user as the responsible, the system id as
+ * the master system), as the server keeps it. Each is absent when the system
+ * named none.
+ */
+export interface KnownSystem {
+  responsible?: string;
+  masterSystem?: string;
+}
+
+/**
  * A leftover session claimed for one operation of this process: its file
  * renamed to a name carrying this process (`<handle>.claimed.<pid>.<start>`),
  * so another process cannot act on it at the same time.
@@ -107,13 +124,21 @@ export interface ClaimedSession {
   role: LeftoverRole;
   /** The session's cookies: a secret, handed only to the connection. */
   cookies: string;
+  /** The system information the file carries; absent when it carries none. */
+  system?: KnownSystem;
   /** The claimed file's name in the runtime directory. */
   file: string;
 }
 
+/** The system information as the file holds it. */
+interface FileSystem {
+  responsible: string | null;
+  master_system: string | null;
+}
+
 /** What the file holds. */
 interface RuntimeFile {
-  format: 2;
+  format: 3;
   pid: number;
   start: string | null;
   role: LeftoverRole;
@@ -125,6 +150,8 @@ interface RuntimeFile {
     wire: 'http';
   };
   user: string | null;
+  /** `null`: not known (not yet looked up, or on-premise, where nothing is). */
+  system: FileSystem | null;
   cookies: string;
   written_at: string;
 }
@@ -136,6 +163,8 @@ interface Tracked {
   identity: SessionIdentity;
   /** The cookies last written; `null` before the first write. */
   cookies: string | null;
+  /** The system information to write; `null` while not known. */
+  system: FileSystem | null;
   /** Its logoff was written: nothing is written for it any more. */
   ended: boolean;
   /** The claimed file of a resumed session, kept until `<handle>` landed. */
@@ -271,7 +300,8 @@ function parseFile(text: string): RuntimeFile | undefined {
   if (
     file === null ||
     typeof file !== 'object' ||
-    file.format !== 2 ||
+    file.format !== 3 ||
+    !isFileSystem(file.system) ||
     typeof file.pid !== 'number' ||
     !(file.start === null || typeof file.start === 'string') ||
     (file.role !== 'built' && file.role !== 'debugger') ||
@@ -290,6 +320,28 @@ function parseFile(text: string): RuntimeFile | undefined {
     return undefined;
   }
   return file as RuntimeFile;
+}
+
+/** Whether `value` is a file's system information: `null`, or both fields a string or `null`. */
+function isFileSystem(value: unknown): value is FileSystem | null {
+  if (value === null) return true;
+  if (typeof value !== 'object') return false;
+  const system = value as Partial<FileSystem>;
+  return (
+    (system.responsible === null || typeof system.responsible === 'string') &&
+    (system.master_system === null || typeof system.master_system === 'string')
+  );
+}
+
+/** The file's system information as the server keeps it; `undefined` when it carries none. */
+function knownSystemOf(system: FileSystem | null): KnownSystem | undefined {
+  if (system === null) return undefined;
+  return {
+    ...(system.responsible !== null && { responsible: system.responsible }),
+    ...(system.master_system !== null && {
+      masterSystem: system.master_system,
+    }),
+  };
 }
 
 function identityOfFile(file: RuntimeFile): SessionIdentity {
@@ -354,6 +406,7 @@ export class LeftoverSessions {
       role,
       identity,
       cookies: null,
+      system: null,
       ended: false,
     };
     this.tracked.set(connection, entry);
@@ -430,7 +483,53 @@ export class LeftoverSessions {
       // Another process renamed it first.
       return undefined;
     }
-    return { handle, role: file.role, cookies: file.cookies, file: mine };
+    const system = knownSystemOf(file.system);
+    return {
+      handle,
+      role: file.role,
+      cookies: file.cookies,
+      ...(system !== undefined && { system }),
+      file: mine,
+    };
+  }
+
+  /**
+   * The caller's one leftover session of an instance's own connection
+   * (`built`), claimed — what a stdio process is born on at its start. None
+   * when there is none, or more than one: no tie-break, they all stay
+   * leftovers. A debugger's session is never one: it stays for the list and
+   * the logoff, and is not counted.
+   */
+  claimTheOne(identity: SessionIdentity): ClaimedSession | undefined {
+    const built = this.list(identity).filter((s) => s.role === 'built');
+    const [only] = built;
+    if (built.length !== 1 || only === undefined) return undefined;
+    return this.claim(only.handle, identity);
+  }
+
+  /**
+   * The system information `connection`'s session was looked up with: kept
+   * in its file from now on (written again now when the file exists), so a
+   * resume of it needs no lookup. Nothing for a connection not kept.
+   */
+  describeSystem(connection: object, system: KnownSystem): void {
+    const entry = this.tracked.get(connection);
+    if (entry === undefined || entry.ended) return;
+    const next: FileSystem = {
+      responsible: system.responsible ?? null,
+      master_system: system.masterSystem ?? null,
+    };
+    if (
+      entry.system !== null &&
+      entry.system.responsible === next.responsible &&
+      entry.system.master_system === next.master_system
+    ) {
+      return;
+    }
+    entry.system = next;
+    if (entry.cookies !== null && !isEnded(connection)) {
+      this.write(entry, entry.cookies);
+    }
   }
 
   /** The claimed session stays a leftover: its file is named by its handle again. */
@@ -514,7 +613,7 @@ export class LeftoverSessions {
   private write(entry: Tracked, cookies: string): boolean {
     const self: ProcessStamp = this.probe.self();
     const file: RuntimeFile = {
-      format: 2,
+      format: 3,
       pid: self.pid,
       start: self.start,
       role: entry.role,
@@ -526,6 +625,7 @@ export class LeftoverSessions {
         wire: entry.identity.wire,
       },
       user: entry.identity.user,
+      system: entry.system,
       cookies,
       written_at: this.now().toISOString(),
     };

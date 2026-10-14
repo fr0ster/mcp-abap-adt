@@ -1,8 +1,9 @@
 /**
- * The ABAP Cloud system-context lookup (`systeminformation`) is part of the
- * connect (spec §5.7): sent once per connection, inside `getConnection`,
- * before any tool proceeds — never a send of a tool outside the main flow.
- * The tool wrapper reads its answer and sends nothing.
+ * The ABAP Cloud system-context lookup (`systeminformation`) is asked once
+ * per connection, before the first tool on it runs, inside the main flow
+ * (spec §5.7) — never after a tool, so no tool runs twice. The tool wrapper
+ * reads its answer and sends nothing. (A stdio process asks it at its start:
+ * `startBirth.test.ts`.)
  *
  * - On ABAP Cloud, a built connection sends it once, before the first tool
  *   request, and never again for later calls.
@@ -18,7 +19,7 @@ import type {
   IHandlerGroup,
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
-import { SystemContextMissingError } from '../../../lib/systemContextGuard';
+import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -89,7 +90,7 @@ async function builtStand(standIn: AdtStandIn, kind: 'cloud' | 'onprem') {
   };
 }
 
-it('ABAP Cloud: the lookup is sent once per connection, at connect, before the first tool request', async () => {
+it('ABAP Cloud: the lookup is sent once per connection, before the first tool request', async () => {
   const standIn = await adtStandIn();
   const s = await builtStand(standIn, 'cloud');
   try {
@@ -198,92 +199,148 @@ it('on-premise: no lookup is sent', async () => {
 });
 
 /**
- * The lookup at connect never widens failures (C15 round 4): when it is
- * refused the connect succeeds and the connection carries no system
- * context. Only a tool that needs the context — a create, refused by the
- * guard for want of a responsible — asks again, from inside the main flow;
- * a read and every tool outside the flow send no lookup.
+ * A lookup that fails is the call's answer, asked before the tool runs —
+ * never after a refusal, so no tool runs twice. The connection stays, and
+ * the next call asks again: the system may have been restarted.
  */
-describe('ABAP Cloud, the lookup at connect refused', () => {
-  // A service definition's create writes `adtcore:responsible`: the guard
-  // refuses it for want of one (a class create sends none).
-  const isClassCreate = (r: StandInRequest) =>
-    r.method === 'POST' &&
-    r.url.split('?')[0] === '/sap/bc/adt/ddic/srvd/sources';
-
-  async function refusedAtConnect() {
-    const standIn = await adtStandIn();
-    // The connect's lookup is refused once; a later one as told per case.
-    standIn.answerOnce(isLookup, 500);
-    const s = await builtStand(standIn, 'cloud');
-    s.register(oneToolGroup('CreateServiceDefinition'));
-    return { standIn, s };
-  }
-
-  it('a read tool works, and asks nothing again', async () => {
-    const { standIn, s } = await refusedAtConnect();
-    try {
-      const read = await s.call('ReadClass', { class_name: 'ZCL_READ' });
-      expect(read.isError).toBe(false);
-      await s.call('ReadClass', { class_name: 'ZCL_READ_AGAIN' });
-      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
-    } finally {
-      await s.close();
-      await standIn.close();
-    }
-  });
-
-  it('a create asks again and is refused when the retry is refused too; nothing created', async () => {
-    const { standIn, s } = await refusedAtConnect();
-    standIn.answer(isLookup, 500);
-    try {
-      const created = await s.call('CreateServiceDefinition', {
-        service_definition_name: 'ZSD_CREATED',
-        package_name: '$TMP',
+describe('ABAP Cloud, the lookup refused', () => {
+  /**
+   * `TwoStep`: as `CreateCdsUnitTest` (a check sent before its guarded
+   * create) — sends `before-<id>`, then reads the responsible a create needs
+   * and sends `create-<responsible>`.
+   */
+  const twoStep: HandlerEntry = {
+    toolDefinition: {
+      name: 'TwoStep',
+      description: 'TwoStep',
+      inputSchema: {
+        type: 'object',
+        properties: { id: { type: 'string' } },
+        required: ['id'],
+      },
+    },
+    handler: (async (
+      context: {
+        connection: { makeAdtRequest(o: object): Promise<unknown> };
+      },
+      args: { id: string },
+    ) => {
+      await context.connection.makeAdtRequest({
+        url: `/sap/bc/adt/probe/before-${args.id}`,
+        method: 'GET',
+        timeout: 10_000,
       });
-      expect(created.isError).toBe(true);
-      expect(created.payload).toMatchObject({ error: 'system_lookup_failed' });
-      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
-      expect(standIn.requests.some(isClassCreate)).toBe(false);
-    } finally {
-      await s.close();
-      await standIn.close();
-    }
-  });
+      const { responsible } = requireSystemContextForCreate();
+      await context.connection.makeAdtRequest({
+        url: `/sap/bc/adt/probe/create-${responsible}`,
+        method: 'GET',
+        timeout: 10_000,
+      });
+      return { content: [{ type: 'text', text: responsible }] };
+    }) as never,
+  } as unknown as HandlerEntry;
+  const sent = (standIn: AdtStandIn, what: string) =>
+    standIn.requests.filter((r) => r.url === `/sap/bc/adt/probe/${what}`)
+      .length;
 
-  it('a create asks again and goes on with the answer when the retry is answered', async () => {
-    const { standIn, s } = await refusedAtConnect();
+  async function refusedFirst() {
+    const standIn = await adtStandIn();
+    // The first lookup is refused; the next answered.
+    standIn.answerOnce(isLookup, 500);
     standIn.body(
       isLookup,
       JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
     );
+    const s = await builtStand(standIn, 'cloud');
+    s.register({
+      getName: () => 'two-step',
+      getHandlers: () => [twoStep],
+      registerHandlers: () => {},
+    } as unknown as IHandlerGroup);
+    return { standIn, s };
+  }
+
+  it('the first call answers the error and its tool does not run; the next call asks again, and its tool runs once', async () => {
+    const { standIn, s } = await refusedFirst();
     try {
-      await s.call('CreateServiceDefinition', {
-        service_definition_name: 'ZSD_CREATED',
-        package_name: '$TMP',
-      });
-      const lookups = standIn.requests
-        .map((r, i) => (isLookup(r) ? i : -1))
-        .filter((i) => i >= 0);
-      expect(lookups).toHaveLength(2);
-      const create = standIn.requests.findIndex(isClassCreate);
-      expect(create).toBeGreaterThan(lookups[1] ?? Number.MAX_SAFE_INTEGER);
+      const first = await s.call('TwoStep', { id: 'one' });
+      expect(first.isError).toBe(true);
+      expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
+      expect(sent(standIn, 'before-one')).toBe(0);
+
+      const second = await s.call('TwoStep', { id: 'two' });
+      expect(second.isError).toBe(false);
+      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
+      // Ran once: one check, one create — nothing replayed.
+      expect(sent(standIn, 'before-two')).toBe(1);
+      expect(sent(standIn, 'create-CLOUD_USER')).toBe(1);
+      const lookup = standIn.requests.map(isLookup).lastIndexOf(true);
+      expect(
+        standIn.requests.findIndex(
+          (r) => r.url === '/sap/bc/adt/probe/before-two',
+        ),
+      ).toBeGreaterThan(lookup);
+      // Known from now on: asked no more.
+      await s.call('TwoStep', { id: 'three' });
+      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
+      expect(sent(standIn, 'before-three')).toBe(1);
     } finally {
       await s.close();
       await standIn.close();
     }
   });
 
-  it('a tool outside the flow sends no lookup and is not refused', async () => {
-    const { standIn, s } = await refusedAtConnect();
+  it('a read is refused the same way, and works on the next call', async () => {
+    const { standIn, s } = await refusedFirst();
     try {
-      const started = await s.call('RuntimeRunClass', {
+      const first = await s.call('ReadClass', { class_name: 'ZCL_READ' });
+      expect(first.isError).toBe(true);
+      expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
+      expect(standIn.requests.some(of('ZCL_READ'))).toBe(false);
+      const second = await s.call('ReadClass', { class_name: 'ZCL_AGAIN' });
+      expect(second.isError).toBe(false);
+      expect(standIn.requests.filter(of('ZCL_AGAIN')).length).toBeGreaterThan(
+        0,
+      );
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  });
+
+  it('a lookup refused every time: each call asks again, and no tool runs', async () => {
+    const { standIn, s } = await refusedFirst();
+    standIn.answer(isLookup, 500);
+    try {
+      for (const id of ['a', 'b', 'c']) {
+        const answer = await s.call('TwoStep', { id });
+        expect(answer.payload).toMatchObject({ error: 'system_lookup_failed' });
+        expect(sent(standIn, `before-${id}`)).toBe(0);
+      }
+      expect(standIn.requests.filter(isLookup)).toHaveLength(3);
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  });
+
+  it('a background run as the first call: refused before anything starts, asked again on the next call', async () => {
+    const { standIn, s } = await refusedFirst();
+    try {
+      const first = await s.call('RuntimeRunClass', {
         class_name: 'ZCL_BACKGROUND',
         background: true,
       });
-      expect(started.isError).toBe(false);
+      expect(first.isError).toBe(true);
+      expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
+      const second = await s.call('RuntimeRunClass', {
+        class_name: 'ZCL_BACKGROUND',
+        background: true,
+      });
+      expect(second.isError).toBe(false);
       await until(() => standIn.requests.some(isClassRun));
-      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+      expect(standIn.requests.filter(isClassRun)).toHaveLength(1);
+      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
     } finally {
       await s.close();
       await standIn.close();
@@ -291,17 +348,17 @@ describe('ABAP Cloud, the lookup at connect refused', () => {
   });
 });
 
-it('ABAP Cloud, the lookup at connect refused: a tool outside the flow that the guard refuses asks nothing again', async () => {
-  // A debugger-listed name (outside the flow) whose handler meets the guard,
-  // as a create would: the refusal stands, and no lookup is sent for it.
-  const guarded: HandlerEntry = {
+it('ABAP Cloud, the lookup refused: a tool outside the flow is refused before it runs', async () => {
+  let ran = 0;
+  const outOfFlow: HandlerEntry = {
     toolDefinition: {
       name: 'DebugWait',
       description: 'DebugWait',
       inputSchema: { type: 'object', properties: {} },
     },
     handler: (async (_context: unknown, _args: unknown) => {
-      throw new SystemContextMissingError();
+      ran += 1;
+      return { content: [{ type: 'text', text: 'waited' }] };
     }) as never,
   } as unknown as HandlerEntry;
   process.env.SAP_SYSTEM_TYPE = 'cloud';
@@ -309,18 +366,21 @@ it('ABAP Cloud, the lookup at connect refused: a tool outside the flow that the 
     systemType: 'cloud',
     groups: [
       {
-        getName: () => 'guarded-out-of-flow',
-        getHandlers: () => [guarded],
+        getName: () => 'out-of-flow',
+        getHandlers: () => [outOfFlow],
         registerHandlers: () => {},
       } as unknown as IHandlerGroup,
     ],
   });
-  s.standIn.answer(isLookup, 500);
+  s.standIn.answerOnce(isLookup, 500);
   try {
     const answer = await s.call('DebugWait', {});
     expect(answer.isError).toBe(true);
-    // The one lookup of the connection's first use, and no retry.
-    expect(s.standIn.requests.filter(isLookup)).toHaveLength(1);
+    expect(ran).toBe(0);
+    const again = await s.call('DebugWait', {});
+    expect(again.isError).toBeFalsy();
+    expect(ran).toBe(1);
+    expect(s.standIn.requests.filter(isLookup)).toHaveLength(2);
   } finally {
     await s.close();
   }

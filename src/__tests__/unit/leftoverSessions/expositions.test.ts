@@ -1,9 +1,10 @@
 /**
- * Which leftover-session tools a tool set serves (owner's decision on C21,
- * the binaries fixed by C23): the list and the logoff in every binary — a
- * logoff is a system action, not a data change — and the resume only in the
- * write binaries (core, compact); for an embedder's handler sets, only
- * beside `high`.
+ * Which leftover-session tools a tool set serves: the list and the logoff in
+ * every set — a logoff is a system action, not a data change — and no resume
+ * in any: a stdio process is born on the one leftover session of its
+ * destination at its start, before any tool call, so a resume tool could
+ * only refuse. The leftover-session tools are stdio's only: an http or sse
+ * binary lists none (`toolSet.test.ts`).
  */
 
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
@@ -19,64 +20,35 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 
-const FULL = [
-  'ListLeftoverSessions',
-  'ResumeLeftoverSession',
-  'LogoffLeftoverSession',
-];
-const COMPACT = [
-  'HandlerLeftoverSessionList',
-  'HandlerLeftoverSessionResume',
-  'HandlerLeftoverSessionLogoff',
-];
+const FULL = ['ListLeftoverSessions', 'LogoffLeftoverSession'];
+const COMPACT = ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'];
 
-const leftoverOf = (tools: string[], names: string[]) =>
-  tools.filter((t) => names.includes(t));
+/** The leftover-session tools among `tools`, a resume of any name included. */
+const leftoverOf = (tools: string[]) =>
+  tools.filter((t) => t.includes('Leftover'));
+
+const namesOf = (
+  groups: { getHandlers(): { toolDefinition: { name: string } }[] }[],
+) => groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
 describe('the object-oriented handler sets an embedder combines', () => {
-  it.each<[HandlerSet[], string[]]>([
-    [['readonly'], ['ListLeftoverSessions', 'LogoffLeftoverSession']],
-    [
-      ['readonly', 'debug'],
-      ['ListLeftoverSessions', 'LogoffLeftoverSession'],
-    ],
-    [['debug'], ['ListLeftoverSessions', 'LogoffLeftoverSession']],
-    [['readonly', 'high'], FULL],
-    [['high'], FULL],
-  ])('%j serves %j', (exposition, expected) => {
-    const tools = registryForExposition(exposition)
-      .getHandlerGroups()
-      .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
-    expect(leftoverOf(tools, FULL)).toEqual(expected);
+  it.each<[HandlerSet[]]>([
+    [['readonly']],
+    [['readonly', 'debug']],
+    [['debug']],
+    [['readonly', 'high']],
+    [['high']],
+  ])('%j serves the list and the logoff, no resume', (exposition) => {
+    const tools = namesOf(registryForExposition(exposition).getHandlerGroups());
+    expect(leftoverOf(tools)).toEqual(FULL);
   });
 });
 
-/**
- * The binary fixes its set (C23): the resume only in a write binary. The
- * leftover-session tools are stdio's only (fix round 14): an http or sse
- * binary lists none (`toolSet.test.ts`).
- */
 describe('the stdio binaries', () => {
   it.each<[string, ToolSet, string[]]>([
     ['core', fullToolSet, FULL],
-    [
-      'core-ro',
-      fullReadOnlyToolSet,
-      ['ListLeftoverSessions', 'LogoffLeftoverSession'],
-    ],
-  ])('%s serves %j', (_kind, set, expected) => {
-    const tools = registryOf(set, 'stdio')
-      .getHandlerGroups()
-      .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
-    expect(leftoverOf(tools, FULL)).toEqual(expected);
-  });
-
-  it.each<[string, ToolSet, string[]]>([
-    [
-      'compact-ro',
-      compactReadOnlyToolSetOf(compactReadOnlyEntries),
-      ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'],
-    ],
+    ['core-ro', fullReadOnlyToolSet, FULL],
+    ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries), COMPACT],
     [
       'compact',
       compactToolSetOf({
@@ -85,10 +57,9 @@ describe('the stdio binaries', () => {
       }),
       COMPACT,
     ],
-  ])('%s serves %j', (_kind, set, expected) => {
-    const tools = registryOf(set, 'stdio')
-      .getHandlerGroups()
-      .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
-    expect(leftoverOf(tools, COMPACT)).toEqual(expected);
+  ])('%s serves %j and no resume', (_kind, set, expected) => {
+    const tools = namesOf(registryOf(set, 'stdio').getHandlerGroups());
+    expect(leftoverOf(tools)).toEqual(expected);
+    expect(tools.some((t) => t.includes('Resume'))).toBe(false);
   });
 });

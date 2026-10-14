@@ -13,9 +13,9 @@
  *
  * | Set | Binaries | Tools |
  * |---|---|---|
- * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs; on stdio the leftover sessions (list, resume, logoff) |
+ * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs; on stdio the leftover-session list and logoff |
  * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search); on stdio the leftover-session list and logoff |
- * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs; on stdio the leftover sessions |
+ * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs; on stdio the leftover-session list and logoff |
  * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half; on stdio the leftover-session list and logoff |
  *
  * **The leftover-session tools are stdio's**: the
@@ -24,7 +24,9 @@
  * session file, and none of its binaries lists a leftover-session tool — the
  * transport a set is served on is the one dimension beside the kind.
  *
- * No `-ro` set serves the debugger, a background run or the resume. There is
+ * No `-ro` set serves the debugger or a background run. No set serves a
+ * resume of a leftover session: a stdio process is born on the one leftover
+ * of its destination at its start. There is
  * no `--exposition`: each set refuses it (and its YAML key) as a removed
  * parameter, naming the binary its words asked for.
  */
@@ -145,7 +147,7 @@ const DEBUG_LINE =
 /**
  * The object-oriented tool set of `mcp-abap-adt`, `mcp-abap-adt-http` and
  * `mcp-abap-adt-sse`: readonly (with system and search), high, debug and the
- * background runs; on stdio the leftover sessions (list, resume, logoff).
+ * background runs; on stdio the leftover-session list and logoff.
  */
 export const fullToolSet: ToolSet = {
   kind: 'core',
@@ -160,7 +162,7 @@ export const fullToolSet: ToolSet = {
         DEBUG_LINE,
         ...leftoverLine(
           transport,
-          'the leftover SAP sessions of an ended process: list, resume, log off',
+          'the leftover SAP sessions of an ended process: list, log off',
         ),
         'background runs of RuntimeRunClass and RuntimeRunProgram: read, list, discard',
       ],
@@ -188,7 +190,7 @@ export const fullToolSet: ToolSet = {
  * The read-only object-oriented tool set of `mcp-abap-adt-ro`,
  * `mcp-abap-adt-http-ro` and `mcp-abap-adt-sse-ro`: readonly (with system and
  * search); on stdio the leftover-session list and logoff. No high, no debugger, no
- * background run, no resume.
+ * background run.
  */
 export const fullReadOnlyToolSet: ToolSet = {
   kind: 'core-ro',
@@ -221,7 +223,7 @@ export const fullReadOnlyToolSet: ToolSet = {
     new SystemHandlersGroup(context, { background: false }),
     new SearchHandlersGroup(context),
     ...(servesLeftoverSessions(transport)
-      ? [new LeftoverSessionHandlersGroup(context, { resume: false })]
+      ? [new LeftoverSessionHandlersGroup(context)]
       : []),
   ],
 };
@@ -261,7 +263,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
           'the compact debugger: HandlerDebugStart, ...Wait, ...View, ...Step; they catch every request of the connected SAP user',
           ...leftoverLine(
             transport,
-            'the leftover SAP sessions of an ended process: list, resume, log off',
+            'the leftover SAP sessions of an ended process: list, log off',
           ),
           'background runs of HandlerProfileRun: read, list, discard',
         ],
@@ -278,7 +280,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
       // listed and discarded.
       new CompactBackgroundRunHandlersGroup(context),
       ...(servesLeftoverSessions(transport)
-        ? [new CompactLeftoverSessionHandlersGroup(context, { resume: true })]
+        ? [new CompactLeftoverSessionHandlersGroup(context)]
         : []),
     ],
   };
@@ -289,7 +291,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
  * `-compact-http-ro` and `-compact-sse-ro`: the half that changes nothing
  * (`compactReadOnlyEntries` of `@mcp-abap-adt/compact-readonly-entries`); on
  * stdio the leftover-session list and logoff. No modify half, no debugger, no
- * background run, no resume.
+ * background run.
  */
 export function compactReadOnlyToolSetOf(
   readOnly: CompactEntryBuilder,
@@ -317,7 +319,7 @@ export function compactReadOnlyToolSetOf(
     groups: (context, transport) => [
       new CompactHandlersGroup(context, [readOnly], 'CompactReadOnlyHandlers'),
       ...(servesLeftoverSessions(transport)
-        ? [new CompactLeftoverSessionHandlersGroup(context, { resume: false })]
+        ? [new CompactLeftoverSessionHandlersGroup(context)]
         : []),
     ],
   };

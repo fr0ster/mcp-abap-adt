@@ -68,12 +68,8 @@ export function expositionGroups(
   handlerGroups.push(...overridingGroups);
   handlerGroups.push(new SearchHandlersGroup(baseContext));
   // Every exposition: the user's own leftover sessions, listed and logged
-  // off; resumed only where writes are served (high).
-  handlerGroups.push(
-    new LeftoverSessionHandlersGroup(baseContext, {
-      resume: exposition.includes('high'),
-    }),
-  );
+  // off.
+  handlerGroups.push(new LeftoverSessionHandlersGroup(baseContext));
   return handlerGroups;
 }
 

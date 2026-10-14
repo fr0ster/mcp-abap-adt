@@ -53,7 +53,6 @@ import {
 import {
   type LeftoverSessionTools,
   type LogoffOutcome,
-  type ResumeOutcome,
   sapAnswerOf,
 } from '../lib/leftoverSessions/port.js';
 import { runLongCall } from '../lib/longCall.js';
@@ -93,7 +92,6 @@ import {
   stateLoggerOf,
 } from '../lib/state/InstanceState.js';
 import { systemContextFromConfiguration } from '../lib/systemContext.js';
-import { watchSystemContextGuard } from '../lib/systemContextGuard.js';
 import { systemUserOf } from '../lib/systemUser.js';
 import {
   normalizeToolContent,
@@ -104,6 +102,17 @@ import type {
   ConnectionContext,
   ResolvedConnection,
 } from './ConnectionContext.js';
+
+/**
+ * How a stdio instance's connection was born at its start
+ * (`bornAtStart`): a logon (`logged_on`), or the one leftover session of
+ * its destination taken up — picked up (`picked_up`), or, SAP answering it
+ * ended, a new session with the normal logon (`new`) — under that
+ * session's `handle`.
+ */
+export type StartedConnection =
+  | { session: 'logged_on' }
+  | { session: 'picked_up' | 'new'; handle: string };
 
 /** What the SDK hands a tool callback beside its arguments: the request's signal. */
 interface ToolCallExtra {
@@ -418,9 +427,9 @@ export abstract class BaseMcpServer extends McpServer {
       );
     }
     if (context.kind === 'injected') {
-      // The host's connection: its system looked up once, on first use,
-      // before any tool on it proceeds (a failed lookup fails nothing).
-      await raceRequestSignal(this.lookupSystem(context.connection), signal);
+      // The host's connection, as given: its system is looked up before the
+      // first tool on it runs (`systemBeforeTool`).
+      throwIfRequestAborted(signal);
       return context.connection;
     }
 
@@ -437,14 +446,25 @@ export abstract class BaseMcpServer extends McpServer {
       // ends with its logoff — once no call works on it any more (spec §6.4).
       // stdio's source answers the same provider for the process's life, so
       // only a lost session replaces its connection (D13).
+      // The system a replaced connection of the same credential was looked
+      // up with is the replacement's too: the same user on the same system
+      // (stdio: fixed for the process).
+      const known =
+        held !== undefined &&
+        held.credential === resolved.credential &&
+        held.ready !== undefined
+          ? this.systems.get(held.ready)
+          : undefined;
       if (held) {
         this.retire(held);
         // A cached caller user is valid only for the connection it was asked
         // on: asked again on the replacement.
         this.forgetCallers();
       }
-      held = this.buildConnection(resolved.credential, () =>
-        this.logOn(resolved),
+      held = this.buildConnection(
+        resolved.credential,
+        () => this.logOn(resolved),
+        known,
       );
     }
     // This call is the entry's user from now on — counted before the await,
@@ -488,78 +508,54 @@ export abstract class BaseMcpServer extends McpServer {
     );
   }
 
-  /** Each connection's system context, resolved at connect (`lookupSystem`). */
+  /**
+   * Each connection's system information (`requireSystem`): what the
+   * resolver answered — on ABAP Cloud the `systeminformation` user and
+   * system id, on-premise `null` (nothing asked). A connection without an
+   * entry has none yet.
+   */
   private readonly systems = new WeakMap<object, ResolvedSystemContext>();
-  private readonly systemLookups = new WeakMap<object, Promise<void>>();
 
   /**
-   * The connections whose lookup at connect failed: they carry no system
-   * context, and only a tool that needs it asks again (`retryLookup`).
+   * Keeps `system` as `connection`'s system information, and in its runtime
+   * file when the instance keeps one (a resume then needs no lookup).
    */
-  private readonly lookupFailedAt = new WeakSet<object>();
+  private knowSystem(connection: object, system: ResolvedSystemContext): void {
+    this.systems.set(connection, system);
+    if (system !== null)
+      this.leftoverSessions?.describeSystem(connection, system);
+  }
 
-  /**
-   * Resolves `connection`'s system context once, at connect (on-premise:
-   * nothing sent, `null`); concurrent callers share the attempt. A failure
-   * fails nothing: the connection carries no system context, nothing failed
-   * is kept, and no later connect of it asks again — only a tool that needs
-   * the context does, from inside the main flow (`retryLookup`).
-   */
-  private lookupSystem(connection: object): Promise<void> {
-    const resolver = this.systemContextResolver;
-    if (
-      resolver === null ||
-      this.systems.has(connection) ||
-      this.lookupFailedAt.has(connection)
-    ) {
-      return Promise.resolve();
-    }
-    const running = this.systemLookups.get(connection);
-    if (running) return running;
-    const attempt = (async () => {
-      try {
-        // Shared across instances on one connection (`resolveOnce`): one
-        // lookup per connection; a failure is not kept.
-        this.systems.set(
-          connection,
-          await resolveOnce(resolver, connection as AbapConnection),
-        );
-      } catch (error) {
-        // The class only: a lookup's message may quote what the system
-        // answered (H4).
-        this.logger?.warn?.(
-          `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
-        );
-        this.lookupFailedAt.add(connection);
-      } finally {
-        this.systemLookups.delete(connection);
-      }
-    })();
-    this.systemLookups.set(connection, attempt);
-    return attempt;
+  /** Whether a call on `connection` must ask for its system information first. */
+  private lacksSystem(connection: object): boolean {
+    return this.systemContextResolver !== null && !this.systems.has(connection);
   }
 
   /**
-   * A tool that needs the system context, on a connection whose lookup at
-   * connect failed, asks again — on the instance's connection, through the
-   * main flow it already holds (`onMainConnection`). A chain failure is
-   * answered as it is; any other refuses the tool, `system_lookup_failed`.
+   * `connection`'s system information, asked when it has none — on ABAP
+   * Cloud `systeminformation`; on-premise the resolver sends nothing. A
+   * failure is the caller's: a chain failure as it is, any other the
+   * server's `system_lookup_failed`. Nothing failed is kept, so the next
+   * caller asks again. Concurrent askers share one request (`resolveOnce`);
+   * an answer that arrives after its caller left is kept all the same.
    */
-  private async retryLookup(
-    connection: object,
+  private async requireSystem(
+    connection: AbapConnection,
     signal: AbortSignal,
   ): Promise<void> {
     const resolver = this.systemContextResolver;
-    if (resolver === null) return;
+    if (resolver === null || this.systems.has(connection)) return;
+    const asked = resolveOnce(resolver, connection).then((system) => {
+      this.knowSystem(connection, system);
+    });
     try {
-      // From inside the flow: the connection the holding call holds.
-      const resolved = await this.onMainConnection(signal, (held) =>
-        resolveOnce(resolver, held),
-      );
-      this.systems.set(connection, resolved);
-      this.lookupFailedAt.delete(connection);
+      await raceRequestSignal(asked, signal);
     } catch (error) {
+      asked.catch(() => undefined);
+      if (signal.aborted) throw error;
       if (readGuarded(failureOf, error) !== undefined) throw error;
+      // The class only: a lookup's message may quote what the system
+      // answered (H4).
       this.logger?.warn?.(
         `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
       );
@@ -568,38 +564,37 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * What `lookupSystem` resolved for `connection`; `{}` when its lookup
-   * failed (on ABAP Cloud the login never stands in); `undefined`: nothing to
-   * resolve.
+   * Before a tool runs on `connection`: its system information, asked when
+   * it has none — never after the tool, so no tool runs twice. A call that
+   * holds the main flow asks there; one outside it (a background run, a
+   * long read, a debugger tool) takes a turn in the flow for the lookup
+   * alone, so nothing is sent on the instance's connection outside it.
    */
-  private systemOf(connection: object): ResolvedSystemContext | undefined {
-    if (this.systemContextResolver === null) return undefined;
-    if (this.lookupFailedAt.has(connection)) return {};
-    return this.systems.get(connection);
+  private async systemBeforeTool(
+    connection: AbapConnection,
+    holdsFlow: boolean,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (!this.lacksSystem(connection)) return;
+    if (holdsFlow) {
+      await this.requireSystem(connection, signal);
+      return;
+    }
+    const leave = await this.enterMainFlow(signal);
+    try {
+      await this.requireSystem(connection, signal);
+    } finally {
+      leave();
+    }
   }
 
   /**
-   * Runs a tool with its connection's system context, sending nothing. When
-   * the tool needed the context — the guard refused it for want of a
-   * responsible (`SystemContextMissingError`) — on a connection whose lookup
-   * at connect failed, and the call holds the main flow, the lookup is asked
-   * again (`retryLookup`) and the tool runs again with its answer: the guard
-   * refuses before the change is sent. Out of the flow no lookup is sent; the
-   * tool's refusal stands.
+   * What is known of `connection`'s system: `undefined` when there is
+   * nothing to resolve (no resolver).
    */
-  private async withSystemContextOf<T>(
-    connection: object,
-    holdsFlow: boolean,
-    signal: AbortSignal,
-    run: () => Promise<T>,
-  ): Promise<T> {
-    const failed = () => this.lookupFailedAt.has(connection);
-    const first = await watchSystemContextGuard(() =>
-      withKnownSystemContext(this.systemOf(connection), run, failed()),
-    );
-    if (!first.fired || !holdsFlow || !failed()) return first.settled();
-    await this.retryLookup(connection, signal);
-    return withKnownSystemContext(this.systemOf(connection), run, failed());
+  private systemOf(connection: object): ResolvedSystemContext | undefined {
+    if (this.systemContextResolver === null) return undefined;
+    return this.systems.get(connection);
   }
 
   /**
@@ -696,16 +691,17 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * The instance's connection is born: `birth` makes it — a logon
-   * (`logOn`), or a leftover session taken up (`resumedSession`) — and it is
-   * kept as `built` for `credential`. Its system context (ABAP Cloud:
-   * `systeminformation`) is part of the birth: once per connection, before
-   * any tool proceeds, never a send outside the main flow; a failed lookup
-   * fails nothing. Set as `built` in the turn it is called, so every call
-   * that asks for a connection meanwhile waits for this one.
+   * (`logOn`), or a leftover session taken up at a stdio start
+   * (`resumedSession`) — and it is kept as `built` for `credential`. The
+   * system information `known` (a replaced connection's) is its own too;
+   * without it the first tool call asks (`systemBeforeTool`). Set as
+   * `built` in the turn it is called, so every call that asks for a
+   * connection meanwhile waits for this one.
    */
   private buildConnection(
     credential: IAuthProvider,
     birth: () => Promise<AbapConnection>,
+    known?: ResolvedSystemContext,
   ): BuiltConnection {
     const entry: BuiltConnection = {
       credential,
@@ -715,7 +711,7 @@ export abstract class BaseMcpServer extends McpServer {
     };
     entry.connection = (async () => {
       const connection = await birth();
-      await this.lookupSystem(connection);
+      if (known !== undefined) this.knowSystem(connection, known);
       entry.ready = connection;
       return connection;
     })();
@@ -768,7 +764,8 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * A leftover session taken up: the connection built from `resolved` on the
+   * A leftover session taken up at a stdio start (`bornAtStart`): the
+   * connection built from `resolved` on the
    * session's cookies (connection 17's `session`) — `connect()` logs on
    * nowhere and asks SAP, without the credential, whether the session lives.
    * Alive: picked up. SAP answering it is gone (`sessionGone`): that
@@ -776,9 +773,11 @@ export abstract class BaseMcpServer extends McpServer {
    * a new instance" — so a new one is built with the normal logon, with the
    * process's settings and credential, and starts a new session. Either way
    * the file is this process's under the same handle (`adopt`), rewritten
-   * with the connection's cookies; `outcome.session` says which. Any other
-   * failure — the old session's answer or the new logon's — is the call's,
-   * as SAP gave it, and gives the file back as a leftover.
+   * with the connection's cookies; `outcome.session` says which. The system
+   * information the file carries is the connection's (same destination, same
+   * system): nothing is looked up. Any other failure — the old session's
+   * answer or the new logon's — is the start's, as SAP gave it, and gives
+   * the file back as a leftover.
    */
   private async resumedSession(
     resolved: ResolvedConnection,
@@ -821,12 +820,64 @@ export abstract class BaseMcpServer extends McpServer {
         throw logonError;
       }
       owner.adopt(claimed, fresh, identity);
+      if (claimed.system !== undefined) this.knowSystem(fresh, claimed.system);
       outcome.session = 'new';
       return fresh;
     }
     owner.adopt(claimed, connection, identity);
+    if (claimed.system !== undefined)
+      this.knowSystem(connection, claimed.system);
     outcome.session = 'picked_up';
     return connection;
+  }
+
+  /**
+   * stdio: the instance's connection born at the process's start, before
+   * its transport opens. The one leftover session of the destination
+   * (`claimTheOne`: a dead process's, role `built`) is taken up
+   * (`resumedSession`); none, or more than one — none picked, they stay for
+   * the list and the logoff — is a normal logon. Then its system
+   * information: from the file when it carries it, else asked
+   * (`requireSystem`). Any failure is thrown for the start to end the
+   * process with; a logon made for it is logged off first, a picked-up
+   * session is left as it is (its file is a leftover again once the process
+   * ended). A tool call after the start runs on this connection: the
+   * source answers the same credential for the process's life.
+   */
+  protected async bornAtStart(signal: AbortSignal): Promise<StartedConnection> {
+    const context = this.connectionContext;
+    if (context?.kind !== 'built') {
+      throw new Error(
+        'Connection context not set. Call setConnectionContext() first.',
+      );
+    }
+    throwIfRequestAborted(signal);
+    const resolved = await context.source.resolve(signal);
+    const owner = this.leftoverSessions;
+    const identity = this.sessionOf(resolved);
+    const claimed =
+      owner !== undefined && identity !== undefined
+        ? owner.claimTheOne(identity)
+        : undefined;
+    const outcome: { session?: 'picked_up' | 'new' } = {};
+    const entry =
+      claimed !== undefined && owner !== undefined && identity !== undefined
+        ? this.buildConnection(resolved.credential, () =>
+            this.resumedSession(resolved, owner, claimed, identity, outcome),
+          )
+        : this.buildConnection(resolved.credential, () => this.logOn(resolved));
+    const connection = await raceRequestSignal(entry.connection, signal);
+    this.systemContexts.set(connection, resolved.systemContext);
+    try {
+      await this.requireSystem(connection, signal);
+    } catch (error) {
+      if (this.built === entry) this.built = undefined;
+      if (outcome.session !== 'picked_up') await endConnection(connection);
+      throw error;
+    }
+    return claimed === undefined
+      ? { session: 'logged_on' }
+      : { session: outcome.session ?? 'picked_up', handle: claimed.handle };
   }
 
   /**
@@ -904,6 +955,14 @@ export abstract class BaseMcpServer extends McpServer {
                   inUse = connection;
                 }
               }
+              // The connection's system information, asked before the tool
+              // runs when it has none; its failure is this call's answer, and
+              // the tool never runs twice.
+              await this.systemBeforeTool(
+                connection,
+                leaveFlow !== undefined,
+                signal,
+              );
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,
@@ -935,12 +994,10 @@ export abstract class BaseMcpServer extends McpServer {
                     withDestinationSystemContext(
                       this.systemContexts.get(context.connection),
                       () =>
-                        // Resolved at connect (`lookupSystem`): nothing is
-                        // sent here, so no call sends outside the flow.
-                        this.withSystemContextOf(
-                          context.connection,
-                          holdsFlow,
-                          signal,
+                        // Asked before the tool (`systemBeforeTool`):
+                        // nothing is sent here.
+                        withKnownSystemContext(
+                          this.systemOf(context.connection),
                           () => {
                             throwIfRequestAborted(signal);
                             return fn();
@@ -1406,7 +1463,6 @@ export abstract class BaseMcpServer extends McpServer {
         // Over RFC no session is kept, and none is the caller's.
         return identity === undefined ? [] : owner.list(identity);
       },
-      resume: (handle) => this.resumeLeftover(handle, signal),
       logoff: (handle) => this.logoffLeftover(handle, signal),
     };
   }
@@ -1423,43 +1479,6 @@ export abstract class BaseMcpServer extends McpServer {
       throw new ServerRefusal('leftover_session_not_available');
     }
     return claimed;
-  }
-
-  /**
-   * Resume (`built` role only): how the instance's connection is born when
-   * it has none yet — built on the session instead of logging on
-   * (`resumedSession`), and the instance's connection from then on, as a
-   * logon's would be. It takes no place in the main flow and never replaces
-   * a connection: an instance that already has one refuses, before the
-   * handle is read (`leftover_session_connector_exists`). The connection is
-   * set as the instance's in the same turn as that check, so a tool call
-   * asking meanwhile waits for it. A session SAP says is gone is replaced
-   * by a new one with the normal logon (`resumedSession`): the answer is
-   * `resumed` either way, `session` saying which.
-   */
-  private async resumeLeftover(
-    handle: string,
-    signal: AbortSignal,
-  ): Promise<ResumeOutcome> {
-    const { owner, resolved, identity } = await this.leftoverCaller(signal);
-    if (this.built !== undefined) {
-      throw new ServerRefusal('leftover_session_connector_exists');
-    }
-    const claimed = this.claimLeftover(owner, identity, handle);
-    if (claimed.role !== 'built' || identity === undefined) {
-      owner.release(claimed);
-      throw new ServerRefusal('leftover_session_not_resumable');
-    }
-    const outcome: { session?: 'picked_up' | 'new' } = {};
-    const entry = this.buildConnection(resolved.credential, () =>
-      this.resumedSession(resolved, owner, claimed, identity, outcome),
-    );
-    await raceRequestSignal(entry.connection, signal);
-    return {
-      handle: claimed.handle,
-      state: 'resumed',
-      session: outcome.session ?? 'picked_up',
-    };
   }
 
   /**

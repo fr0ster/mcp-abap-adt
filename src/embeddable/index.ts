@@ -50,6 +50,7 @@ export {
   type ProcessProbe,
   type ProcessStamp,
   runtimeDirectory,
+  sapAnswerOf,
 } from '../lib/leftoverSessions/index.js';
 export {
   currentRequestSignal,

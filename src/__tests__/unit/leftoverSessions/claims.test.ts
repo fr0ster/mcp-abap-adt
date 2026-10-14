@@ -1,6 +1,6 @@
 /**
  * Two live processes on one leftover file (owner's decision on C21): before
- * a resume or a logoff, a process claims the file by renaming it to a name
+ * a resume (at a stdio start) or a logoff, a process claims the file by renaming it to a name
  * carrying itself; of two claims, one wins and the other finds nothing — it
  * answers "not available". A file claimed by a process that then died is
  * available again, as any dead process's file.
@@ -40,7 +40,7 @@ function leftover(dir: string, handle = HANDLE): void {
   fs.writeFileSync(
     path.join(dir, handle),
     JSON.stringify({
-      format: 2,
+      format: 3,
       pid: 111,
       start: 'start-111',
       role: 'built',
@@ -52,6 +52,7 @@ function leftover(dir: string, handle = HANDLE): void {
         wire: 'http',
       },
       user: IDENTITY.user,
+      system: null,
       cookies: 'SAP_SESSIONID_X01_100=placeholder',
       written_at: '2026-10-13T00:00:00.000Z',
     }),
@@ -175,7 +176,7 @@ describe('through the tools', () => {
     jest.restoreAllMocks();
   });
 
-  it.each(['ResumeLeftoverSession', 'LogoffLeftoverSession'])(
+  it.each(['LogoffLeftoverSession'])(
     '%s: a file another live process claimed is not available, and nothing is sent',
     async (tool) => {
       stand = await leftoverStand();
@@ -210,13 +211,33 @@ describe('through the tools', () => {
     },
   );
 
-  it('a failed operation gives the file back under its handle', async () => {
+  it('a start whose resume failed gives the file back under its handle', async () => {
     stand = await leftoverStand();
     const { handle, session } = await stand.leftover();
     stand.standIn.answer((r) => r.session === session, 500);
-    expect(
-      (await stand.call('ResumeLeftoverSession', { handle })).isError,
-    ).toBe(true);
+    await expect(stand.start()).rejects.toBeDefined();
     expect(stand.files()).toEqual([handle]);
+  });
+
+  it('a start claims nothing another live process claimed: a normal logon', async () => {
+    stand = await leftoverStand();
+    const { handle } = await stand.leftover();
+    stand.alive.add(333);
+    const other = new LeftoverSessions({
+      directory: stand.dir,
+      probe: fakeProbe(333, stand.alive),
+      report: () => {},
+    });
+    const claimed = other.claim(handle, {
+      destination: DESTINATION,
+      url: stand.standIn.url,
+      client: '100',
+      system: 'onprem',
+      wire: 'http',
+      user: 'LEFT_USER',
+    });
+    expect(claimed).toBeDefined();
+    expect(await stand.start()).toEqual({ session: 'logged_on' });
+    expect(stand.files()).toContain(claimed?.file);
   });
 });

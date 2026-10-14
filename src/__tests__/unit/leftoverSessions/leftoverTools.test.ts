@@ -1,14 +1,12 @@
 /**
- * The three leftover-session tools (session-resume spec): list, resume and
- * log off the SAP sessions a killed process left, through an MCP client,
- * against the ADT stand-in. Each tool answers only for the caller's own
- * sessions — those of the destination the instance serves; another
- * destination's file and an unknown handle get the same answer — and never
- * for a live process's. Resume builds the instance's connection
- * on the session (no logon: no credential, no new session at the stand-in);
- * when SAP says the session is gone, a new one is started with the normal
- * logon, and the file stays this process's. Logoff sends the ICF logoff with the
- * session's cookies and no `Authorization`, then deletes the file.
+ * The two leftover-session tools (session-resume spec): list and log off
+ * the SAP sessions a killed process left, through an MCP client, against
+ * the ADT stand-in. Each tool answers only for the caller's own sessions —
+ * those of the destination the instance serves; another destination's file
+ * and an unknown handle get the same answer — and never for a live
+ * process's. Logoff sends the ICF logoff with the session's cookies and no
+ * `Authorization`, then deletes the file. (The resume is a stdio start's:
+ * `startBirth.test.ts`.)
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -100,102 +98,6 @@ describe('ListLeftoverSessions', () => {
   });
 });
 
-describe('ResumeLeftoverSession', () => {
-  it('builds the instance’s connection on the session: no logon, no new session', async () => {
-    stand = await leftoverStand();
-    const { handle, session } = await stand.leftover();
-    const from = stand.standIn.requests.length;
-    const answer = await stand.call('ResumeLeftoverSession', { handle });
-    expect(answer.isError).toBe(false);
-    expect(json(answer.text)).toEqual({
-      handle,
-      state: 'resumed',
-      session: 'picked_up',
-    });
-    // The resume's own request: in that session, without the credential.
-    const resumed = stand.standIn.requests.slice(from);
-    expect(resumed.length).toBeGreaterThan(0);
-    for (const r of resumed) {
-      expect(r.session).toBe(session);
-      expect(r.authorization).toBeUndefined();
-    }
-    // The next call works in that session, on the same connection.
-    await stand.call('ProbeAdt', { id: 'after' });
-    const probe = stand.standIn.requests.find(
-      (r) => r.url === `${PROBE_PATH}after`,
-    );
-    expect(probe?.session).toBe(session);
-    // The file is this process's now, under the same handle.
-    expect(stand.files()).toEqual([handle]);
-    expect(stand.file(handle)).toMatchObject({ pid: OUR_PID, role: 'built' });
-    expect(stand.standIn.logoffs()).toBe(0);
-  });
-
-  it('a session SAP answers 401 for: a new one is started, and the file is kept under its handle', async () => {
-    stand = await leftoverStand();
-    const { handle, session } = await stand.leftover();
-    stand.standIn.answer((r) => r.session === session, 401);
-    const answer = await stand.call('ResumeLeftoverSession', { handle });
-    expect(answer.isError).toBe(false);
-    expect(json(answer.text)).toEqual({
-      handle,
-      state: 'resumed',
-      session: 'new',
-    });
-    expect(stand.files()).toEqual([handle]);
-  });
-
-  it('a 2xx that names another session than the old one: a new one is started, and the file is kept under its handle', async () => {
-    stand = await leftoverStand();
-    const { handle, session } = await stand.leftover();
-    stand.standIn.body((r) => r.session === session, '', {
-      'set-cookie': 'SAP_SESSIONID_X01_100=another-session; path=/',
-    });
-    const answer = await stand.call('ResumeLeftoverSession', { handle });
-    expect(answer.isError).toBe(false);
-    expect(json(answer.text)).toEqual({
-      handle,
-      state: 'resumed',
-      session: 'new',
-    });
-    expect(stand.files()).toEqual([handle]);
-  });
-
-  it('a redirect is not "gone": the call’s error as SAP gave it, and the file is kept', async () => {
-    stand = await leftoverStand();
-    const { handle, session } = await stand.leftover();
-    const from = stand.standIn.requests.length;
-    stand.standIn.answer((r) => r.session === session, 302);
-    const answer = await stand.call('ResumeLeftoverSession', { handle });
-    expect(answer.isError).toBe(true);
-    expect(stand.files()).toEqual([handle]);
-    // No new logon was tried: nothing but the takeover's request ran.
-    expect(
-      stand.standIn.requests.slice(from).some((r) => r.authorization),
-    ).toBe(false);
-  });
-
-  it('is the call’s error, and keeps the file, when SAP answers something other than "gone" (a 500)', async () => {
-    stand = await leftoverStand();
-    const { handle, session } = await stand.leftover();
-    stand.standIn.answer((r) => r.session === session, 500);
-    const answer = await stand.call('ResumeLeftoverSession', { handle });
-    expect(answer.isError).toBe(true);
-    expect(stand.files()).toEqual([handle]);
-  });
-
-  it('refuses a debugger’s session and leaves it', async () => {
-    stand = await leftoverStand();
-    const { handle } = await stand.leftover({ role: 'debugger' });
-    const from = stand.standIn.requests.length;
-    const answer = await stand.call('ResumeLeftoverSession', { handle });
-    expect(answer.isError).toBe(true);
-    expect(json(answer.text).error).toBe('leftover_session_not_resumable');
-    expect(stand.standIn.requests.length).toBe(from);
-    expect(stand.files()).toEqual([handle]);
-  });
-});
-
 describe('LogoffLeftoverSession', () => {
   it('sends the ICF logoff with the session’s cookies and no credential, then deletes the file', async () => {
     stand = await leftoverStand();
@@ -241,7 +143,7 @@ describe('LogoffLeftoverSession', () => {
 });
 
 describe('a handle that is not the caller’s', () => {
-  it.each(['ResumeLeftoverSession', 'LogoffLeftoverSession'])(
+  it.each(['LogoffLeftoverSession'])(
     '%s answers an unknown, a foreign and a live one the same, sending nothing',
     async (tool) => {
       stand = await leftoverStand();

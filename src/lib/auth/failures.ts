@@ -32,8 +32,6 @@ export type FailureCode =
   | 'credentials_required'
   | 'leftover_sessions_unavailable'
   | 'leftover_session_not_available'
-  | 'leftover_session_not_resumable'
-  | 'leftover_session_connector_exists'
   | 'background_runs_unavailable'
   | 'background_run_not_available'
   | 'background_run_running'

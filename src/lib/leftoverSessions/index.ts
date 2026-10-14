@@ -1,6 +1,7 @@
 export {
   type ClaimedSession,
   isHandle,
+  type KnownSystem,
   type LeftoverListing,
   type LeftoverRole,
   LeftoverSessions,
@@ -12,7 +13,6 @@ export {
 export {
   type LeftoverSessionTools,
   type LogoffOutcome,
-  type ResumeOutcome,
   type SapAnswer,
   sapAnswerOf,
 } from './port';

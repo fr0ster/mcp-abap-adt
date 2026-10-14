@@ -22,12 +22,16 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
+import {
+  BaseMcpServer,
+  type StartedConnection,
+} from '../../../embeddable/BaseMcpServer';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { LeftoverSessionHandlersGroup } from '../../../lib/handlers/groups/LeftoverSessionHandlersGroup';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import {
+  type KnownSystem,
   type LeftoverRole,
   LeftoverSessions,
   sessionIdentity,
@@ -65,6 +69,10 @@ class StandServer extends BaseMcpServer {
   register(registry: CompositeHandlersRegistry): void {
     this.registerHandlers(registry);
   }
+  /** The connection born as a stdio start makes it (`bornAtStart`). */
+  born(signal: AbortSignal): Promise<StartedConnection> {
+    return this.bornAtStart(signal);
+  }
 }
 
 export interface LeftoverStand {
@@ -74,6 +82,8 @@ export interface LeftoverStand {
   alive: Set<number>;
   owner: LeftoverSessions;
   server: StandServer;
+  /** The connection born as a stdio start makes it, before any tool call. */
+  start(): Promise<StartedConnection>;
   /** Calls a tool; its answer's text and isError. */
   call(
     name: string,
@@ -100,6 +110,8 @@ export interface LeftoverStand {
     role?: LeftoverRole;
     /** The destination it was opened for; default the stand's. */
     destination?: string;
+    /** The system information its file carries; none by default. */
+    system?: KnownSystem;
   }): Promise<{ handle: string; session: string }>;
   close(): Promise<void>;
 }
@@ -172,6 +184,7 @@ export async function leftoverStand(
     alive,
     owner,
     server,
+    start: () => server.born(new AbortController().signal),
     call: async (name, args = {}) => {
       const answer = (await client.callTool(
         { name, arguments: args },
@@ -212,6 +225,9 @@ export async function leftoverStand(
       );
       if (!identity) throw new Error('no identity');
       killed.track(connection, made.role ?? 'built', identity);
+      if (made.system !== undefined) {
+        killed.describeSystem(connection, made.system);
+      }
       const handle = files().find((f) => !before.has(f));
       if (!handle) throw new Error('no file was written');
       const session = standIn.requests.at(-1)?.session ?? '';

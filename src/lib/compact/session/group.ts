@@ -1,10 +1,8 @@
 /**
- * The compact leftover-session tools, served by every compact binary — the
- * resume only by the write ones (`compactToolSetOf`): the SAP sessions an ended
- * process left open, listed, resumed or logged off by the user. Each works on no connection of the instance
- * (`connectionless`).
+ * The compact leftover-session tools, served by every compact stdio binary:
+ * the SAP sessions an ended process left open, listed or logged off by the
+ * user. Each works on no connection of the instance (`connectionless`).
  */
-import type { LeftoverSessionToolsOptions } from '../../handlers/groups/LeftoverSessionHandlersGroup';
 import {
   BaseHandlerGroup,
   defineTool,
@@ -19,27 +17,13 @@ import {
   TOOL_DEFINITION as HandlerLeftoverSessionLogoff_Tool,
   handleHandlerLeftoverSessionLogoff,
 } from './handleHandlerLeftoverSessionLogoff';
-import {
-  TOOL_DEFINITION as HandlerLeftoverSessionResume_Tool,
-  handleHandlerLeftoverSessionResume,
-} from './handleHandlerLeftoverSessionResume';
 
-export function compactLeftoverSessionEntries(
-  options: LeftoverSessionToolsOptions = {},
-): HandlerEntry[] {
+export function compactLeftoverSessionEntries(): HandlerEntry[] {
   return [
     defineTool(
       HandlerLeftoverSessionList_Tool,
       handleHandlerLeftoverSessionList,
     ),
-    ...(options.resume === false
-      ? []
-      : [
-          defineTool(
-            HandlerLeftoverSessionResume_Tool,
-            handleHandlerLeftoverSessionResume,
-          ),
-        ]),
     defineTool(
       HandlerLeftoverSessionLogoff_Tool,
       handleHandlerLeftoverSessionLogoff,
@@ -50,14 +34,11 @@ export function compactLeftoverSessionEntries(
 export class CompactLeftoverSessionHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'CompactLeftoverSessionHandlers';
 
-  constructor(
-    context: HandlerContext,
-    private readonly options: LeftoverSessionToolsOptions = {},
-  ) {
+  constructor(context: HandlerContext) {
     super(context);
   }
 
   getHandlers(): HandlerEntry[] {
-    return compactLeftoverSessionEntries(this.options);
+    return compactLeftoverSessionEntries();
   }
 }

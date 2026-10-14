@@ -55,7 +55,7 @@ const mode = (file: string) => fs.statSync(file).mode & 0o777;
 const onPosix = process.platform !== 'win32';
 const posixIt = onPosix ? it : it.skip;
 
-it('the instance’s connection: written after connect, 0600 in a 0700 directory; it carries the destination, where it points, the stated user and the cookies — nothing else', async () => {
+it('the instance’s connection: written after connect, 0600 in a 0700 directory; it carries the destination, where it points, the stated user, the system information (none on-premise) and the cookies — nothing else', async () => {
   stand = await leftoverStand();
   expect(stand.files()).toEqual([]);
   await stand.call('ProbeAdt', { id: 'first' });
@@ -66,7 +66,7 @@ it('the instance’s connection: written after connect, 0600 in a 0700 directory
     expect(mode(path.join(stand.dir, handle ?? ''))).toBe(0o600);
   }
   expect(stand.file(handle ?? '')).toEqual({
-    format: 2,
+    format: 3,
     pid: OUR_PID,
     start: `start-${OUR_PID}`,
     role: 'built',
@@ -78,6 +78,7 @@ it('the instance’s connection: written after connect, 0600 in a 0700 directory
       wire: 'http',
     },
     user: 'LEFT_USER',
+    system: null,
     cookies: expect.stringContaining('SAP_SESSIONID_X01_100=session-1'),
     written_at: expect.any(String),
   });
@@ -217,41 +218,49 @@ describe('the owner, without a server', () => {
     });
   });
 
-  it('reads no file of another format: a format-1 file is never listed or claimed', () => {
-    const identity = sessionIdentity('PLACEHOLDER_DEST', {
-      url: 'http://placeholder.invalid',
-      client: '100',
-      authType: 'basic',
-      username: 'PLACEHOLDER_USER',
-    });
-    if (!identity) throw new Error('no identity');
-    const handle = '0123456789abcdef0123456789abcdef';
-    fs.writeFileSync(
-      path.join(dir, handle),
-      JSON.stringify({
-        format: 1,
-        pid: 111,
-        start: 'start-111',
-        role: 'built',
-        destination: {
-          url: identity.url,
-          client: identity.client,
-          system: identity.system,
-          wire: 'http',
-        },
-        user: 'PLACEHOLDER_USER',
-        cookies: 'SAP_SESSIONID_X01_100=placeholder',
-        written_at: '2026-10-13T00:00:00.000Z',
-      }),
-    );
-    const owner = new LeftoverSessions({
-      directory: dir,
-      probe: fakeProbe(OUR_PID, new Set()),
-    });
-    expect(owner.list(identity)).toEqual([]);
-    expect(owner.claim(handle, identity)).toBeUndefined();
-    expect(fs.readdirSync(dir)).toEqual([handle]);
-  });
+  it.each([
+    [1, {}],
+    // Format 2 named the destination but carried no system information.
+    [2, { name: 'PLACEHOLDER_DEST' }],
+  ])(
+    'reads no file of another format: a format-%i file is never listed or claimed',
+    (format, named) => {
+      const identity = sessionIdentity('PLACEHOLDER_DEST', {
+        url: 'http://placeholder.invalid',
+        client: '100',
+        authType: 'basic',
+        username: 'PLACEHOLDER_USER',
+      });
+      if (!identity) throw new Error('no identity');
+      const handle = '0123456789abcdef0123456789abcdef';
+      fs.writeFileSync(
+        path.join(dir, handle),
+        JSON.stringify({
+          format,
+          pid: 111,
+          start: 'start-111',
+          role: 'built',
+          destination: {
+            ...named,
+            url: identity.url,
+            client: identity.client,
+            system: identity.system,
+            wire: 'http',
+          },
+          user: 'PLACEHOLDER_USER',
+          cookies: 'SAP_SESSIONID_X01_100=placeholder',
+          written_at: '2026-10-13T00:00:00.000Z',
+        }),
+      );
+      const owner = new LeftoverSessions({
+        directory: dir,
+        probe: fakeProbe(OUR_PID, new Set()),
+      });
+      expect(owner.list(identity)).toEqual([]);
+      expect(owner.claim(handle, identity)).toBeUndefined();
+      expect(fs.readdirSync(dir)).toEqual([handle]);
+    },
+  );
 
   it('writes nothing for a connection holding no session (an RFC wire answers null)', () => {
     const owner = new LeftoverSessions({

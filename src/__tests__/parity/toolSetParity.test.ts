@@ -847,16 +847,11 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       }).toEqual(
         onStdio
           ? {
-              full: [
-                'ListLeftoverSessions',
-                'LogoffLeftoverSession',
-                'ResumeLeftoverSession',
-              ],
+              full: ['ListLeftoverSessions', 'LogoffLeftoverSession'],
               fullRo: ['ListLeftoverSessions', 'LogoffLeftoverSession'],
               compact: [
                 'HandlerLeftoverSessionList',
                 'HandlerLeftoverSessionLogoff',
-                'HandlerLeftoverSessionResume',
               ],
               compactRo: [
                 'HandlerLeftoverSessionList',
@@ -866,7 +861,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           : { full: [], fullRo: [], compact: [], compactRo: [] },
       );
       // core: the debugger, high and background runs, always.
-      expect(full.tools).toHaveLength(onStdio ? 252 : 249);
+      expect(full.tools).toHaveLength(onStdio ? 251 : 249);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
@@ -894,9 +889,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         });
       }
       // compact: the 27, the four debugger verbs, the three background-run
-      // tools beside the run tool, and on stdio the three leftover-session
-      // tools.
-      expect(compact.tools).toHaveLength(27 + 4 + 3 + (onStdio ? 3 : 0));
+      // tools beside the run tool, and on stdio the leftover-session list
+      // and logoff (no set serves a resume).
+      expect(compact.tools).toHaveLength(27 + 4 + 3 + (onStdio ? 2 : 0));
       expect(compact.tools).toEqual(
         expect.arrayContaining([...COMPACT_RW, ...COMPACT_DEBUG]),
       );
@@ -1180,7 +1175,10 @@ async function until(done: () => boolean, limitMs = 10_000): Promise<void> {
  * the client closing its request — then the lookup answered: whether the
  * read reached the stand-in, and how the server exited.
  */
-async function cancelledRead(transportName: TransportName, set: SetName) {
+async function cancelledRead(
+  transportName: Exclude<TransportName, 'stdio'>,
+  set: SetName,
+) {
   const launcher = LAUNCHERS[transportName][set];
   const className = 'ZCL_PARITY_CANCEL';
   const call = readCall(set, className);
@@ -1190,32 +1188,7 @@ async function cancelledRead(transportName: TransportName, set: SetName) {
   let client: Client | undefined;
   let done: Promise<unknown>;
 
-  if (transportName === 'stdio') {
-    const envFile = path.join(workdir, 'cancel.env');
-    fs.writeFileSync(
-      envFile,
-      [
-        `SAP_URL=${standIn.url}`,
-        'SAP_CLIENT=100',
-        'SAP_AUTH_TYPE=basic',
-        'SAP_USERNAME=PARITY_USER',
-        'SAP_PASSWORD=parity-password',
-        '',
-      ].join('\n'),
-    );
-    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-    client = new Client({ name: 'parity', version: '1.0.0' });
-    open.clients.push(client);
-    started = await run(
-      launcher,
-      [`--env-path=${envFile}`, '--system-type=cloud'],
-      serverSide,
-    );
-    await client.connect(clientSide);
-    done = client
-      .callTool(call, undefined, { signal: controller.signal })
-      .catch(() => 'cancelled');
-  } else if (transportName === 'sse') {
+  if (transportName === 'sse') {
     const port = await freePort();
     started = await run(launcher, [
       '--sse-host=127.0.0.1',
@@ -1261,8 +1234,8 @@ async function cancelledRead(transportName: TransportName, set: SetName) {
   await hold.arrived;
   controller.abort();
   // The server has seen the cancel: the call's signal is aborted (or the call
-  // already settled — the lookup is part of its connect, which a cancelled
-  // caller leaves at once).
+  // already settled — a cancelled caller leaves the lookup asked before its
+  // tool at once).
   await until(() => activeTools().every((tool) => tool.signal.aborted));
   hold.release();
   await until(() => activeTools().length === 0);
@@ -1275,7 +1248,13 @@ async function cancelledRead(transportName: TransportName, set: SetName) {
   return { reached, exit };
 }
 
-describe.each<TransportName>(['stdio', 'http', 'sse'])(
+/**
+ * http and sse: the window is the connection's system lookup, held. A stdio
+ * process has its connection and its system information from its start, so
+ * a read has no wait before its tool there; a call queued in the main flow
+ * leaves it at once when cancelled (`stateful/mainFlow.test.ts`).
+ */
+describe.each<Exclude<TransportName, 'stdio'>>(['http', 'sse'])(
   '%s: a cancelled call never reaches its tool, on both sets (D5)',
   (transportName) => {
     jest.setTimeout(60_000);
@@ -1285,6 +1264,73 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       const compact = await cancelledRead(transportName, 'compact');
       expect(full).toEqual({ reached: false, exit: 0 });
       expect(compact).toEqual(full);
+    });
+  },
+);
+
+/**
+ * http and sse on ABAP Cloud: the first call that reaches the system asks
+ * for its system information before its tool runs. A refused lookup is that
+ * call's answer, its tool never run; the next call is not barred — it asks
+ * again, and its tool runs once.
+ */
+describe.each<Exclude<TransportName, 'stdio'>>(['http', 'sse'])(
+  '%s: a refused system lookup is the call’s answer, and the next call asks again',
+  (transportName) => {
+    jest.setTimeout(60_000);
+
+    it.each<SetName>(['full', 'compact'])('%s', async (set) => {
+      const launcher = LAUNCHERS[transportName][set];
+      const port = await freePort();
+      const started = await run(launcher, [
+        ...(transportName === 'http'
+          ? ['--host=127.0.0.1', `--port=${port}`]
+          : ['--sse-host=127.0.0.1', `--sse-port=${port}`]),
+        '--system-type=cloud',
+      ]);
+      const url =
+        transportName === 'http'
+          ? `http://127.0.0.1:${port}/mcp/stream/http`
+          : `http://127.0.0.1:${port}/sse`;
+      const client = new Client({ name: 'parity', version: '1.0.0' });
+      open.clients.push(client);
+      await client.connect(
+        transportName === 'http'
+          ? new StreamableHTTPClientTransport(new URL(url), {
+              requestInit: { headers: basicHeaders() },
+            })
+          : new SSEClientTransport(new URL(url), {
+              requestInit: { headers: basicHeaders() },
+            }),
+      );
+      const isLookup = (r: { url: string }) =>
+        r.url.includes('systeminformation');
+      const reads = (className: string) =>
+        standIn.requests.filter(
+          (r) => !isLogoff(r.url) && r.url.includes(className.toLowerCase()),
+        ).length;
+      const lookups = () => standIn.requests.filter(isLookup).length;
+      const from = lookups();
+      standIn.answerOnce(isLookup, 500);
+      try {
+        const refused = outcomeOf(
+          await client.callTool(readCall(set, 'ZCL_PARITY_LOOKUP_ONE')),
+        );
+        expect(refused).toMatchObject({
+          ok: false,
+          error: 'system_lookup_failed',
+        });
+        expect(reads('ZCL_PARITY_LOOKUP_ONE')).toBe(0);
+        const answered = outcomeOf(
+          await client.callTool(readCall(set, 'ZCL_PARITY_LOOKUP_TWO')),
+        );
+        expect(answered).toEqual({ ok: true });
+        expect(lookups() - from).toBe(2);
+        expect(reads('ZCL_PARITY_LOOKUP_TWO')).toBe(1);
+      } finally {
+        await client.close();
+        expect(await started.stop()).toBe(0);
+      }
     });
   },
 );

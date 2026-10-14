@@ -1,5 +1,5 @@
 /**
- * The three leftover-session tools' answers, shared by the full and the
+ * The two leftover-session tools' answers, shared by the full and the
  * compact names: the instance's port does the work; this turns its outcome
  * into the tool's answer. No answer carries a cookie.
  */
@@ -31,13 +31,6 @@ export async function answerLeftoverList(
 ): Promise<LeftoverAnswer> {
   const sessions = await portOf(context).list();
   return json({ sessions });
-}
-
-export async function answerLeftoverResume(
-  context: HandlerContext,
-  handle: string,
-): Promise<LeftoverAnswer> {
-  return json(await portOf(context).resume(handle));
 }
 
 export async function answerLeftoverLogoff(

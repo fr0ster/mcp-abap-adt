@@ -173,6 +173,10 @@ async function start(argv: string[]) {
   const stdioStart = jest
     .spyOn(StdioServer.prototype, 'start')
     .mockResolvedValue(undefined);
+  // The connection at start is the launcher's own step: not made here.
+  jest
+    .spyOn(StdioServer.prototype, 'connectAtStart')
+    .mockResolvedValue({ session: 'logged_on' });
   await launch(config, TEST_OPTIONS, {
     browserStrategy: logins.browserStrategy,
     stderr: (line) => stderr.push(line),

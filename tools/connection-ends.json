@@ -8,10 +8,10 @@
   },
   {
     "file": "src/embeddable/BaseMcpServer.ts",
-    "function": "BaseMcpServer.resumeLeftover",
+    "function": "BaseMcpServer.resumedSession",
     "site": "createAbapConnection",
-    "end": "once connected, the instance's own (role 'built') like the one getConnection builds: the instance's terminal close, a replacement (a new credential, a session SAP lost, another resume) ended after its last call; a connect SAP refused ends at once (endConnection), nothing logged off for a session it did not take",
-    "why": "ResumeLeftoverSession: the instance's connection built on a leftover session's cookies (connection 17's `session`) instead of a logon; the resumed connection is an owned built connection like any other, its runtime file adopted by this process"
+    "end": "once connected, the instance's own (role 'built') like the one getConnection builds: the instance's terminal close, or a replacement once SAP lost its session, ended after its last call; a connect SAP refused ends at once (endConnection), nothing logged off for a session it did not take",
+    "why": "a stdio start on the one leftover session of its destination (bornAtStart): the instance's connection built on that session's cookies (connection 17's `session`) instead of a logon; an owned built connection like any other, its runtime file adopted by this process"
   },
   {
     "file": "src/embeddable/BaseMcpServer.ts",

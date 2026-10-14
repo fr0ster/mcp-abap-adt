@@ -10,6 +10,7 @@ import {
   type IBackgroundRuns,
   type LeftoverSessions,
   type ResolvedConnection,
+  type StartedConnection,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
@@ -54,7 +55,10 @@ export interface StdioServerOptions {
 /**
  * The stdio server: one instance, one destination. Its source is the
  * destination (`destinationSource`), set once at startup; the settings and
- * the provider come from `IDestinations` — the factory — per request.
+ * the provider come from `IDestinations` — the factory — per request. The
+ * launcher has its connection born before the transport opens
+ * (`connectAtStart`): the destination's one leftover session taken up, or a
+ * logon, and the system information with it.
  * Without destinations the server is in inspection-only mode: the tools are
  * listed, and a tool call answers the server's own `inspection_only` refusal
  * before any connection is built (D17).
@@ -101,31 +105,58 @@ export class StdioServer extends BaseMcpServer {
   }
 
   /**
+   * The connection to `destination` born before the transport opens: the
+   * destination's one leftover session taken up, or a logon (an interactive
+   * login included: its prompts go to stderr), and the system information
+   * (BaseMcpServer's `bornAtStart`). Rejects with what failed; the
+   * launcher ends the process with it. The start's own signal, aborted once
+   * the birth ended, as the startup check's.
+   */
+  async connectAtStart(destination: string): Promise<StartedConnection> {
+    if (!this.destinations) throw new ServerRefusal('inspection_only');
+    this.serve(destination);
+    const startup = new AbortController();
+    try {
+      return await this.bornAtStart(startup.signal);
+    } finally {
+      startup.abort();
+    }
+  }
+
+  /**
    * Serves `destination` (none: inspection-only mode) over `transport` —
-   * stdio unless a host passes its own.
+   * stdio unless a host passes its own. Its connection is the one
+   * `connectAtStart` made, when the launcher called it; otherwise the first
+   * tool call makes it.
    */
   async start(
     destination: string | undefined,
     transport: Transport = new StdioServerTransport(),
   ): Promise<void> {
     if (destination !== undefined && this.destinations) {
-      this.destination = destination;
-      this.setConnectionContext({
-        kind: 'built',
-        // The user is fixed for the process: getProvider answers the same
-        // provider while the session is renewed (refresh, or a new login when
-        // the refresh fails) and written back, so the connection is replaced
-        // only when SAP lost its session (D13, D56).
-        source: destinationSource(destination, this.destinations),
-        sessionId: destination,
-        // Who calls, for the leftover sessions: on stdio the destination —
-        // its user and credential are fixed for the process.
-        destination,
-        metadata: { destination },
-      });
+      this.serve(destination);
     }
     this.registerHandlers(this.handlersRegistry);
     await this.connect(transport);
+  }
+
+  /** The destination's source, set once. */
+  private serve(destination: string): void {
+    if (this.destination !== undefined || !this.destinations) return;
+    this.destination = destination;
+    this.setConnectionContext({
+      kind: 'built',
+      // The user is fixed for the process: getProvider answers the same
+      // provider while the session is renewed (refresh, or a new login when
+      // the refresh fails) and written back, so the connection is replaced
+      // only when SAP lost its session (D13, D56).
+      source: destinationSource(destination, this.destinations),
+      sessionId: destination,
+      // Who calls, for the leftover sessions: on stdio the destination —
+      // its user and credential are fixed for the process.
+      destination,
+      metadata: { destination },
+    });
   }
 
   /**

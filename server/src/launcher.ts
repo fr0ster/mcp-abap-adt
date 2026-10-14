@@ -5,6 +5,7 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   assertDestinationName,
   browserCallbackStrategy,
+  errorClassOf,
 } from '@mcp-abap-adt/lib/auth';
 import {
   answerVersionOrHelp,
@@ -16,6 +17,7 @@ import {
 import {
   LeftoverSessions,
   runtimeDirectory,
+  sapAnswerOf,
 } from '@mcp-abap-adt/lib/embeddable';
 import { type StateLogger, stderrStateLogger } from '@mcp-abap-adt/lib/state';
 import {
@@ -33,6 +35,7 @@ import {
   BrowserChoiceError,
   browserFor,
   browserOf,
+  destinationFailureOf,
   destinationFailureWords,
   type IAuthBrokerFactoryConfig,
   promptLogger,
@@ -463,6 +466,30 @@ function startupWords(
 }
 
 /**
+ * The words the connection at start failed in: what the failure reader
+ * makes of it (a chain failure, the server's own refusal — a system lookup
+ * that failed — or the destination layer's), else the destination, the
+ * error's class and the status SAP answered — never its message.
+ */
+export function startConnectionWords(
+  error: unknown,
+  destination: string,
+  factory: Pick<AuthBrokerFactory, 'sentenceFor'>,
+  platform: string,
+): string {
+  const options = {
+    platform,
+    sentenceFor: (e: Parameters<AuthBrokerFactory['sentenceFor']>[0]) =>
+      factory.sentenceFor(e),
+  };
+  if (destinationFailureOf(error, { ...options, destination }) !== undefined) {
+    return destinationFailureWords(error, destination, options);
+  }
+  const sap = sapAnswerOf(error);
+  return `Destination "${destination}" could not be connected at start: ${errorClassOf(error)}${sap === undefined ? '' : `, SAP answered ${sap.status}`}`;
+}
+
+/**
  * The startup check (D18), then the summary. The destination's settings are
  * read and its provider is built — `getProvider(destination, { signal })`
  * with the start's own signal, aborted once the check ends — so a
@@ -519,9 +546,13 @@ async function checkAndSummarise(
 
 /**
  * Everything after the parameters are read: the tool list, one factory, the
- * destination the process serves checked and summarised, the transport, and
- * the shutdown. A destination that cannot be served stops the start before
- * any transport does.
+ * destination the process serves checked and summarised, the shutdown, the
+ * connection born (`connectAtStart`: the destination's one leftover session
+ * taken up, or a logon — a browser login included — with the system
+ * information), and only then the transport. A destination that cannot be
+ * served, a logon or resume that fails, a system lookup that fails: each
+ * ends the process with exit `1` and the failure's words on stderr, before
+ * any transport opens.
  */
 export async function launch(
   config: CoreConfig,
@@ -658,6 +689,19 @@ export async function launch(
         ? undefined
         : config.shutdownTimeout * 1000,
   });
+  // The connection is born before the transport opens: nothing to retry,
+  // the process ends with what failed.
+  if (destination) {
+    try {
+      await server.connectAtStart(destination);
+    } catch (error) {
+      deps.stderr(
+        `[MCP] ${startConnectionWords(error, destination, factory, deps.platform ?? process.platform)}`,
+      );
+      deps.exit(1);
+      return;
+    }
+  }
   // stdio unless the edges carry a transport of their own (a test's).
   await (deps.transport === undefined
     ? server.start(destination)

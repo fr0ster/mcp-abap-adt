@@ -4,8 +4,10 @@
  * while it holds the session, deleted once its logoff is written at the
  * instance's close; the leftover-session tools answer for the destination —
  * on stdio who calls is the destination the process serves — read from the
- * files and the destination alone, without a request to SAP; the resume is
- * the destination's connection's birth. In inspection-only mode (no destination) they answer the
+ * files and the destination alone, without a request to SAP. The resume is
+ * the destination's connection's birth at the start (`connectAtStart`): the
+ * one leftover session of the destination, before the transport opens. In
+ * inspection-only mode (no destination) the tools answer the
  * inspection-only refusal before anything is read.
  */
 
@@ -57,7 +59,7 @@ afterEach(async () => {
 const registry = () =>
   new CompositeHandlersRegistry([probeGroup(leftoverSessionEntries())]);
 
-async function serve(withDestination: boolean) {
+async function serve(withDestination: boolean, atStart = false) {
   const settings: SapConfig = {
     url: standIn.url,
     client: '100',
@@ -80,6 +82,10 @@ async function serve(withDestination: boolean) {
       }),
     },
   );
+  const started =
+    withDestination && atStart
+      ? await server.connectAtStart('dest')
+      : undefined;
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'leftover-core', version: '1.0.0' });
   await Promise.all([
@@ -93,7 +99,7 @@ async function serve(withDestination: boolean) {
     };
     return { text: answer.content[0]?.text ?? '', isError: !!answer.isError };
   };
-  return { server, client, call };
+  return { server, client, call, started };
 }
 
 it("the destination's connection keeps its file until its logoff is written", async () => {
@@ -105,7 +111,7 @@ it("the destination's connection keeps its file until its logoff is written", as
   expect(runtimeFiles(dir)).toEqual([]);
 });
 
-it("lists and resumes the destination's leftover session, asking SAP nothing before the resume's connect", async () => {
+it("the start takes up the destination's one leftover session; another destination's stays listed for it, and nothing is asked of SAP to list", async () => {
   const handle = await killedProcessSession(standIn.url, dir, {
     user: 'CORE_USER',
     destination: 'dest',
@@ -115,17 +121,16 @@ it("lists and resumes the destination's leftover session, asking SAP nothing bef
     user: 'CORE_USER',
     destination: 'other',
   });
-  const { server, client, call } = await serve(true);
+  const { server, client, call, started } = await serve(true, true);
+  expect(started).toEqual({ session: 'picked_up', handle });
   const from = standIn.requests.length;
+  // Taken up: this process's now, not listed.
   const listed = JSON.parse((await call('ListLeftoverSessions')).text)
-    .sessions as Array<{ handle: string; destination: { name: string } }>;
-  expect(listed.map((s) => s.handle)).toEqual([handle]);
-  expect(listed[0]?.destination.name).toBe('dest');
+    .sessions as Array<{ handle: string }>;
+  expect(listed).toEqual([]);
   expect(standIn.requests.length).toBe(from);
   expect(runtimeFiles(dir)).toContain(other);
-  expect(
-    JSON.parse((await call('ResumeLeftoverSession', { handle })).text),
-  ).toEqual({ handle, state: 'resumed', session: 'picked_up' });
+  expect(runtimeFiles(dir)).toContain(handle);
   await client.close();
   await server.terminalClose();
   expect(runtimeFiles(dir)).toEqual([other]);

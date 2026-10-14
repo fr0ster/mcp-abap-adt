@@ -70,6 +70,10 @@ async function start(argv: string[], env: NodeJS.ProcessEnv = {}) {
   const served = jest
     .spyOn(StdioServer.prototype, 'start')
     .mockResolvedValue(undefined);
+  // The connection at start is the launcher's own step: not made here.
+  jest
+    .spyOn(StdioServer.prototype, 'connectAtStart')
+    .mockResolvedValue({ session: 'logged_on' });
   await main({
     toolSet: fullToolSet,
     program: 'mcp-abap-adt',

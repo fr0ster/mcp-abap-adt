@@ -17,8 +17,6 @@ export type ServerRefusalCode =
   | 'credentials_required'
   | 'leftover_sessions_unavailable'
   | 'leftover_session_not_available'
-  | 'leftover_session_not_resumable'
-  | 'leftover_session_connector_exists'
   | 'background_runs_unavailable'
   | 'background_run_not_available'
   | 'background_run_running'
@@ -57,17 +55,6 @@ export const LEFTOVER_SESSIONS_UNAVAILABLE_WORDS =
 export const LEFTOVER_SESSION_NOT_AVAILABLE_WORDS =
   'no leftover session of yours with this handle is available';
 
-/** A resume of a debugger's session: only an instance's own session resumes. */
-export const LEFTOVER_SESSION_NOT_RESUMABLE_WORDS =
-  "a debugger's session cannot be resumed (its listener, breakpoints and poll lived in the ended process); log it off instead";
-
-/**
- * A resume on an instance that already has its connection to SAP: a resume
- * is how the connection is born, never a replacement of one.
- */
-export const LEFTOVER_SESSION_CONNECTOR_EXISTS_WORDS =
-  'a leftover session can be resumed only before this server has connected to SAP; it already has a connection, and a resume never replaces it';
-
 /**
  * `background: true` on an instance whose host gave no store for background
  * runs (an embedder without `backgroundRuns`), and the background-run tools
@@ -88,12 +75,13 @@ export const BACKGROUND_RUN_RUNNING_WORDS =
   'this background run is still running and cannot be discarded: a started run cannot be stopped; discard it once it has finished';
 
 /**
- * A tool that needs the system context (a create's responsible) on an ABAP
- * Cloud connection whose `systeminformation` lookup failed at connect asked
- * again, and that failed too — for a reason that is not a chain failure.
+ * A call on an ABAP Cloud connection without its system information: the
+ * `systeminformation` lookup asked before the tool runs failed — for a
+ * reason that is not a chain failure. The tool did not run; the next call
+ * asks again. On stdio the same failure at the start ends the process.
  */
 export const SYSTEM_LOOKUP_FAILED_WORDS =
-  'No responsible person for this change: the ABAP Cloud system could not be asked for the session user and system id (systeminformation), so nothing was sent; retry when the system is available';
+  'the ABAP Cloud system could not be asked for the session user and system id (systeminformation), which a call needs before its tool runs; the tool did not run. Retry when the system is available';
 
 /** A background run whose request names no backend user, and SAP named none either. */
 export const BACKGROUND_RUN_CALLER_UNKNOWN_WORDS =
@@ -122,8 +110,6 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   credentials_required: CREDENTIALS_REQUIRED_WORDS,
   leftover_sessions_unavailable: LEFTOVER_SESSIONS_UNAVAILABLE_WORDS,
   leftover_session_not_available: LEFTOVER_SESSION_NOT_AVAILABLE_WORDS,
-  leftover_session_not_resumable: LEFTOVER_SESSION_NOT_RESUMABLE_WORDS,
-  leftover_session_connector_exists: LEFTOVER_SESSION_CONNECTOR_EXISTS_WORDS,
   background_runs_unavailable: BACKGROUND_RUNS_UNAVAILABLE_WORDS,
   background_run_not_available: BACKGROUND_RUN_NOT_AVAILABLE_WORDS,
   background_run_running: BACKGROUND_RUN_RUNNING_WORDS,

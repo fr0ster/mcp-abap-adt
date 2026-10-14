@@ -84,6 +84,10 @@ beforeEach(async () => {
   stdioStart = jest
     .spyOn(StdioServer.prototype, 'start')
     .mockResolvedValue(undefined);
+  // The connection at start is the launcher's own step: not made here.
+  jest
+    .spyOn(StdioServer.prototype, 'connectAtStart')
+    .mockResolvedValue({ session: 'logged_on' });
   settingsFor = jest.spyOn(AuthBrokerFactory.prototype, 'settingsFor');
   getProvider = jest.spyOn(AuthBrokerFactory.prototype, 'getProvider');
 });

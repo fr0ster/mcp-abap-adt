@@ -6,10 +6,6 @@ import {
   handleLogoffLeftoverSession,
   TOOL_DEFINITION as LogoffLeftoverSession_Tool,
 } from '../../../handlers/leftover_session/session/handleLogoffLeftoverSession';
-import {
-  handleResumeLeftoverSession,
-  TOOL_DEFINITION as ResumeLeftoverSession_Tool,
-} from '../../../handlers/leftover_session/session/handleResumeLeftoverSession';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import {
   defineTool,
@@ -17,31 +13,17 @@ import {
   type HandlerEntry,
 } from '../interfaces.js';
 
-/** Which of the leftover-session tools a tool set serves. */
-export interface LeftoverSessionToolsOptions {
-  /**
-   * The resume, served only with a writing set: a resumed session is for
-   * finishing a write or an unlock. The list and the logoff (a system
-   * action, not a data change) are served with every set. Default: served.
-   */
-  resume?: boolean;
-}
-
 /**
- * The leftover-session tools (every stdio binary — the resume only with a
- * writing one; no http or sse binary serves them): the SAP sessions an ended process left
- * open, listed, resumed or logged off by the user. Each works on no
- * connection of the instance (`connectionless`): the server calls it
- * without logging on first.
+ * The leftover-session tools (every stdio binary; no http or sse binary
+ * serves them): the SAP sessions an ended process left open, listed or
+ * logged off by the user. None resumes one: a stdio process is born on the
+ * one leftover of its destination at its start, before any tool call. Each
+ * works on no connection of the instance (`connectionless`): the server
+ * calls it without logging on first.
  */
-export function leftoverSessionEntries(
-  options: LeftoverSessionToolsOptions = {},
-): HandlerEntry[] {
+export function leftoverSessionEntries(): HandlerEntry[] {
   return [
     defineTool(ListLeftoverSessions_Tool, handleListLeftoverSessions),
-    ...(options.resume === false
-      ? []
-      : [defineTool(ResumeLeftoverSession_Tool, handleResumeLeftoverSession)]),
     defineTool(LogoffLeftoverSession_Tool, handleLogoffLeftoverSession),
   ].map((entry) => ({ ...entry, connectionless: true as const }));
 }
@@ -49,14 +31,11 @@ export function leftoverSessionEntries(
 export class LeftoverSessionHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'LeftoverSessionHandlers';
 
-  constructor(
-    context: HandlerContext,
-    private readonly options: LeftoverSessionToolsOptions = {},
-  ) {
+  constructor(context: HandlerContext) {
     super(context);
   }
 
   getHandlers(): HandlerEntry[] {
-    return leftoverSessionEntries(this.options);
+    return leftoverSessionEntries();
   }
 }

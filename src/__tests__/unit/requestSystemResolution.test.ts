@@ -464,7 +464,7 @@ describe('withResolvedSystemContext', () => {
     warn.mockRestore();
   });
 
-  it.each([
+  it.each<[string, { responsible?: string; login?: string }]>([
     ['(a) responsible only', { responsible: 'ALICE' }],
     ['(b) login only', { login: 'BOB' }],
     ['(c) both', { responsible: 'ALICE', login: 'BOB' }],

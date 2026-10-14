@@ -248,85 +248,85 @@
   {
     "group": "high",
     "name": "ActivateDomain",
-    "inputs": "domain_name*, session_id, session_state, detail",
+    "inputs": "domain_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateDataElement",
-    "inputs": "data_element_name*, session_id, session_state, detail",
+    "inputs": "data_element_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateTable",
-    "inputs": "table_name*, session_id, session_state, detail",
+    "inputs": "table_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateStructure",
-    "inputs": "structure_name*, session_id, session_state, detail",
+    "inputs": "structure_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateDdl",
-    "inputs": "ddl_name*, session_id, session_state, detail",
+    "inputs": "ddl_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateClass",
-    "inputs": "class_name*, session_id, session_state, detail",
+    "inputs": "class_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateInterface",
-    "inputs": "interface_name*, session_id, session_state, detail",
+    "inputs": "interface_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateProgram",
-    "inputs": "program_name*, session_id, session_state, detail",
+    "inputs": "program_name*, detail",
     "available_in": "onprem"
   },
   {
     "group": "high",
     "name": "ActivateFunctionModule",
-    "inputs": "function_module_name*, function_group_name*, session_id, session_state, detail",
+    "inputs": "function_module_name*, function_group_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateFunctionGroup",
-    "inputs": "function_group_name*, session_id, session_state, detail",
+    "inputs": "function_group_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateBehaviorDefinition",
-    "inputs": "name*, session_id, session_state, detail",
+    "inputs": "name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateMetadataExtension",
-    "inputs": "name*, session_id, session_state, detail",
+    "inputs": "name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateServiceDefinition",
-    "inputs": "name*, session_id, session_state, detail",
+    "inputs": "name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateServiceBinding",
-    "inputs": "name*, session_id, session_state, detail",
+    "inputs": "name*, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1347,12 +1347,6 @@
     "group": "system",
     "name": "GetAbapSystemSymbols",
     "inputs": "code*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "system",
-    "name": "GetSession",
-    "inputs": "force_new",
     "available_in": "cloud, onprem"
   },
   {

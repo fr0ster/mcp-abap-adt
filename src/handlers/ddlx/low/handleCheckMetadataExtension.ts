@@ -58,21 +58,6 @@ export const TOOL_DEFINITION = {
         description:
           "Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back — asking for a version the extension does not have answers status notProcessed, 'Error while reading the object … from the database', rather than checking the other one.",
       },
-      session_id: {
-        type: 'string',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
       ...DETAIL_PROPERTY,
     },
     required: ['name'],
@@ -82,12 +67,6 @@ export const TOOL_DEFINITION = {
 interface CheckMetadataExtensionArgs {
   name: string;
   version?: 'active' | 'inactive';
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
   detail?: 'terse' | 'full' | 'raw';
 }
 

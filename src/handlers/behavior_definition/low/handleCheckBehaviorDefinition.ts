@@ -26,21 +26,6 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'BehaviorDefinition name.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
       version: {
         type: 'string',
         enum: ['active', 'inactive'],
@@ -55,12 +40,6 @@ export const TOOL_DEFINITION = {
 
 interface CheckBehaviorDefinitionArgs {
   name: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
   version?: 'active' | 'inactive';
   detail?: 'terse' | 'full' | 'raw';
 }

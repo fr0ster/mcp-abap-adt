@@ -75,23 +75,8 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Lock handle from LockObject operation',
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Required, and sent on no request: the unlock runs in the instance’s own session.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
-    required: ['object_name', 'object_type', 'lock_handle', 'session_id'],
+    required: ['object_name', 'object_type', 'lock_handle'],
   },
 } as const;
 
@@ -99,12 +84,6 @@ interface UnlockObjectArgs {
   object_name: string;
   object_type: string;
   lock_handle: string;
-  session_id: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 const VALID_TYPES = [
@@ -129,14 +108,11 @@ export async function handleUnlockObject(
   args: UnlockObjectArgs,
 ) {
   const { connection, logger } = context;
-  const { object_name, object_type, lock_handle, session_id } =
-    args as UnlockObjectArgs;
+  const { object_name, object_type, lock_handle } = args as UnlockObjectArgs;
 
-  if (!object_name || !object_type || !lock_handle || !session_id) {
+  if (!object_name || !object_type || !lock_handle) {
     return return_error(
-      new Error(
-        'object_name, object_type, lock_handle, and session_id are required',
-      ),
+      new Error('object_name, object_type and lock_handle are required'),
     );
   }
 

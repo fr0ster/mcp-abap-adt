@@ -51,12 +51,6 @@ type HandlerValidateArgs = {
   implementation_type?: string;
   service_definition_name?: string;
   service_binding_version?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 };
 
 export async function handleHandlerValidate(
@@ -90,7 +84,5 @@ export async function handleHandlerValidate(
     behavior_definition: args.behavior_definition,
     root_entity: args.root_entity,
     implementation_type: args.implementation_type,
-    session_id: args.session_id,
-    session_state: args.session_state,
   });
 }

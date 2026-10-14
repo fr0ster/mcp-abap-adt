@@ -76,21 +76,6 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockObject. Required for update operation.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
     required: ['package_name', 'updated_description', 'lock_handle'],
   },
@@ -102,12 +87,6 @@ interface UpdatePackageArgs {
   updated_description: string;
   lock_handle: string;
   transport_request?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 export async function handleUpdatePackage(
@@ -122,7 +101,6 @@ export async function handleUpdatePackage(
       updated_description,
       lock_handle,
       transport_request,
-      session_id,
     } = args as UpdatePackageArgs;
 
     if (!package_name || !updated_description || !lock_handle) {
@@ -195,8 +173,6 @@ export async function handleUpdatePackage(
               super_package: super_package.toUpperCase(),
             }),
             updated_description,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
             message: `Package ${packageName} updated successfully. Remember to unlock using UnlockObject.`,
           },
           null,

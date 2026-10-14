@@ -17,7 +17,7 @@ No `-ro` binary carries a debugger, a background run or the resume of a leftover
 write binary keeps every readonly tool: writing needs reading (in core a `Read<X>` gives way to
 the high group's `Get<X>` of the same object, see the dedup below).
 
-Tool counts (on-premise, measured by the tests): core-ro 69 tools; compact 37 (27 + 4 debugger
+Tool counts (on-premise, measured by the tests): core-ro 68 tools; compact 37 (27 + 4 debugger
 verbs + 3 background-run + 3 leftover-session); compact-ro 18 (16 + the leftover-session list and
 logoff).
 

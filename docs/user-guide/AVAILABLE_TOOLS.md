@@ -4,8 +4,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 263
-- Read-only tools: 69
+- Total tools: 262
+- Read-only tools: 68
 - High-level tools: 161
 - Debug tools: 30
 - Session tools: 3
@@ -93,7 +93,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [GetObjectNodeFromCache](#getobjectnodefromcache-read-only-system)
     - [GetObjectStructure](#getobjectstructure-read-only-system)
     - [GetServiceBindingPreviewUrl](#getservicebindingpreviewurl-read-only-system)
-    - [GetSession](#getsession-read-only-system)
     - [GetSqlQuery](#getsqlquery-read-only-system)
     - [GetTransaction](#gettransaction-read-only-system)
     - [GetTypeInfo](#gettypeinfo-read-only-system)
@@ -978,17 +977,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `navigation` (string, optional) - Association or composition to follow. Omitted, the first one of the exposed root view is used.
 - `service_binding_name` (string, required) - Service binding name.
 - `target_entity_set` (string, optional) - Entity set the navigation reaches. Omitted, the second exposed entity set is used.
-
----
-
-<a id="getsession-read-only-system"></a>
-#### GetSession (Read-Only / System)
-**Description:** [read-only] A new random session ID. It is sent on no request and changes nothing: every call runs in the instance’s own session, and a lock handle stays valid there until its unlock or the instance’s end.
-
-**Source:** `src/handlers/system/readonly/handleGetSession.ts`
-
-**Parameters:**
-- `force_new` (boolean, optional) - Force creation of a new session even if one exists. Default: false
 
 ---
 
@@ -3977,4 +3965,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-13*
+*Last updated: 2026-10-14*

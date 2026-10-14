@@ -47,21 +47,6 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number, not a task. Optional if object is local or already in transport.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
       ...DETAIL_PROPERTY,
     },
     required: ['table_name', 'ddl_code', 'lock_handle'],
@@ -73,12 +58,6 @@ interface UpdateTableArgs {
   ddl_code: string;
   lock_handle: string;
   transport_request?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
   detail?: 'terse' | 'full' | 'raw';
 }
 

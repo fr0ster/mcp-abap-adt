@@ -275,7 +275,6 @@ describe('with the host’s freshConnection', () => {
         object_type: 'PACKAGE',
         object_name: 'ZFRESH',
         lock_handle: lockHandle,
-        session_id: 'embedded',
       },
     });
 

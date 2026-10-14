@@ -106,21 +106,6 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Optional description for validation',
       },
-      session_id: {
-        type: 'string',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
       ...DETAIL_PROPERTY,
     },
     required: ['object_name', 'object_type'],
@@ -137,12 +122,6 @@ interface ValidateObjectArgs {
   behavior_definition?: string;
   root_entity?: string;
   implementation_type?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
   detail?: 'terse' | 'full' | 'raw';
 }
 

@@ -94,9 +94,8 @@ export async function assertNameAvailable(
 /**
  * Write a view's source under a lock of its own, and release it.
  *
- * The release is checked: the unlock wants the `session_id` the lock
- * answered with — an empty one is refused — and a refused unlock leaves the
- * object locked with nothing said. Both outcomes are collected so a failed
+ * The release is checked: a refused unlock leaves the object locked with
+ * nothing said. Both outcomes are collected so a failed
  * write and an unreleased lock can be reported together; neither hides the
  * other.
  */
@@ -114,14 +113,6 @@ async function writeViewSource(
   }
   const lockData = parseHandlerResponse(locked);
   const lockHandle = extractLockHandle(lockData);
-  const sessionId = String(
-    (lockData as { session_id?: unknown })?.session_id ?? '',
-  );
-  if (!sessionId) {
-    throw new Error(
-      `lock ${view.name} answered no session_id, so the lock it took cannot be released — refusing to write under it.`,
-    );
-  }
 
   const failures: string[] = [];
   try {
@@ -142,7 +133,6 @@ async function writeViewSource(
       object_type: 'ddl',
       object_name: view.name,
       lock_handle: lockHandle,
-      session_id: sessionId,
     })) as HandlerAnswer;
     if (released.isError) {
       failures.push(

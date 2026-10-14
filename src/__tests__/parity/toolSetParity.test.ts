@@ -810,7 +810,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       );
       // core-ro: the readonly tools with system and search, the list and
       // the logoff; no write, debugger, background run or resume.
-      expect(fullRo.tools).toHaveLength(69);
+      expect(fullRo.tools).toHaveLength(68);
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
           'ReadClass',

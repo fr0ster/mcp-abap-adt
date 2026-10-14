@@ -2,7 +2,7 @@
   {
     "group": "compact",
     "name": "HandlerValidate",
-    "inputs": "object_type*, object_name*, package_name, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version, session_id, session_state",
+    "inputs": "object_type*, object_name*, package_name, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version",
     "available_in": "cloud, onprem"
   },
   {
@@ -14,19 +14,19 @@
   {
     "group": "compact",
     "name": "HandlerLock",
-    "inputs": "object_type*, object_name*, super_package, session_id, session_state",
+    "inputs": "object_type*, object_name*, super_package",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerUnlock",
-    "inputs": "object_type*, object_name*, lock_handle*, session_id*, session_state",
+    "inputs": "object_type*, object_name*, lock_handle*",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerCheckRun",
-    "inputs": "object_type*, object_name*, version, session_id, session_state",
+    "inputs": "object_type*, object_name*, version",
     "available_in": "cloud, onprem"
   },
   {

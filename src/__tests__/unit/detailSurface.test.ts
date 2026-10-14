@@ -22,8 +22,7 @@
  * of them — they call no `answer()` of their own to check — so they are
  * not ledger exceptions the way `ActivateObjectLow`'s second call site is;
  * each is instead documented, in its own file, for why the reduced surface
- * it offers deliberately excludes `detail` (the same reduction it already
- * makes for other low-level knobs like `session_id`/`session_state`).
+ * it offers deliberately excludes `detail`.
  *
  * **A fifth shape, found in fix round 2: the node-level family.** A real
  * ADT wire document is fetched here too, but the STRATEGY it goes through

@@ -8,9 +8,7 @@ This guide explains how to debug the integration tests, especially session manag
 
 Enables detailed logging in test files. Shows:
 - Test step execution (Validate, Create, Lock, Update, Unlock, Activate)
-- Session state changes between operations
 - Lock handle extraction and usage
-- Session ID tracking
 
 **Usage:**
 ```bash
@@ -20,16 +18,9 @@ DEBUG_TESTS=true npm test -- integration/domain
 **Example output:**
 ```
 [DEBUG] LOCK: Starting lock for ZADT_BLD_DOM02
+[DEBUG] LOCK: Lock completed
 [DEBUG] LOCK data: {
-  "session_id": "abc123...",
-  "has_session_state": true,
-  "session_state_cookies": "sap-usercontext=sap-client=100;..."
-}
-[DEBUG] LOCK: Lock completed, extracted session
-[DEBUG] LOCK data: {
-  "lock_handle": "xyz789...",
-  "lock_session_id": "abc123...",
-  "session_from_lock": {...}
+  "lock_handle": "xyz789..."
 }
 ```
 
@@ -37,7 +28,6 @@ DEBUG_TESTS=true npm test -- integration/domain
 
 Enables detailed logging in handler functions. Shows:
 - Handler entry/exit points
-- Session state restoration
 - Lock handle usage
 - Property validation
 - Error details
@@ -54,10 +44,7 @@ DEBUG_HANDLERS=true npm test -- integration/domain
   "timestamp": "2025-01-25T10:30:00.000Z",
   "handler": "LockDomain",
   "step": "start",
-  "message": "Starting lock for ZADT_BLD_DOM02",
-  "session_id": "abc123...",
-  "has_session_state": true,
-  "session_state_cookies": "sap-usercontext=..."
+  "message": "Starting lock for ZADT_BLD_DOM02"
 }
 ```
 
@@ -136,44 +123,18 @@ DEBUG_TESTS=true DEBUG_HANDLERS=true npm test -- integration/domain
 DEBUG_TESTS=true DEBUG_HANDLERS=true DEBUG_ADT_LIBS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true npm test -- integration/domain
 ```
 
-## Critical Session Management Points
+## Lock, update, unlock: what carries the lock
 
-### 1. Lock Operation
-
-The `LockDomain` handler returns:
-- `lock_handle`: Required for Update and Unlock
-- `session_id`: Must be passed to Update and Unlock
-- `session_state`: Contains cookies, CSRF token, and cookie store
+A lock lives in the server instance's own SAP session, and the `lock_handle` is the only thing a
+caller carries between the calls. The tools take no `session_id` or `session_state` (removed in
+19.0.0): every call of one MCP session runs on the instance's one connection, one call at a time.
+Only the `LOCK` and the `UNLOCK` are sent stateful; the write under the lock goes stateless with the
+handle (see `docs/architecture/STATEFUL_SESSION_GUIDE.md`).
 
 **What to check:**
 - ✅ Lock returns a valid `lock_handle`
-- ✅ Lock returns `session_id` and `session_state`
-- ✅ Session state contains cookies and CSRF token
-
-### 2. Update Operation
-
-The `UpdateDomain` handler **MUST** receive:
-- `lock_handle` from Lock operation
-- `session_id` from Lock operation
-- `session_state` from Lock operation
-
-**What to check:**
-- ✅ Update receives `session_id` from Lock (not from Create or Validate)
-- ✅ Update receives `session_state` from Lock
-- ✅ Session state is restored before calling `client.updateDomain()`
-- ✅ Properties include `packageName` or `package_name`
-
-### 3. Unlock Operation
-
-The `UnlockDomain` handler **MUST** receive:
-- `lock_handle` from Lock operation
-- `session_id` from Lock operation
-- `session_state` from Lock operation
-
-**What to check:**
-- ✅ Unlock receives `session_id` from Lock (same as Update)
-- ✅ Unlock receives `session_state` from Lock (same as Update)
-- ✅ Session state is restored before calling `client.unlockDomain()`
+- ✅ Update and Unlock receive that `lock_handle`
+- ✅ Properties include `packageName` or `package_name` on an update
 
 ## Common Issues
 
@@ -193,35 +154,14 @@ const properties = {
 };
 ```
 
-### Issue: "Invalid lock handle or session" during Unlock
+### Issue: "Invalid lock handle" during Unlock
 
-**Cause:** Session state from Lock was not passed to Unlock, or session expired.
+**Cause:** the lock was taken in another SAP session: another MCP session or instance (over
+Streamable HTTP each request has its own), or a session SAP lost meanwhile (its logoff released the
+lock).
 
-**Solution:**
-1. Extract session from Lock response:
-   ```typescript
-   const lockSession = extractLockSession(lockData);
-   ```
-
-2. Pass to Unlock:
-   ```typescript
-   await handleUnlockDomain({
-     domain_name: domainName,
-     lock_handle: lockHandle,
-     session_id: lockSession.session_id,      // ← From Lock
-     session_state: lockSession.session_state   // ← From Lock
-   });
-   ```
-
-### Issue: Session state not persisting between operations
-
-**Cause:** Session state is not being extracted and updated from handler responses.
-
-**Solution:**
-```typescript
-// After each operation, update session:
-session = updateSessionFromResponse(session, responseData);
-```
+**Solution:** lock, update and unlock in one MCP session over stdio or SSE, or use the update tool
+without a `lock_handle` (it locks, writes and unlocks in one call).
 
 ## Debugging Workflow
 
@@ -230,63 +170,14 @@ session = updateSessionFromResponse(session, responseData);
    DEBUG_TESTS=true DEBUG_HANDLERS=true npm test -- integration/domain
    ```
 
-2. **Check Lock operation:**
-   - Verify `lock_handle` is returned
-   - Verify `session_id` and `session_state` are returned
-   - Check session state contains cookies and CSRF token
+2. **Check Lock operation:** verify `lock_handle` is returned.
 
-3. **Check Update operation:**
-   - Verify it receives `session_id` from Lock
-   - Verify it receives `session_state` from Lock
-   - Verify session state is restored before update
-   - Check properties include `packageName`
-
-4. **Check Unlock operation:**
-   - Verify it receives same `session_id` as Update
-   - Verify it receives same `session_state` as Update
-   - Verify session state is restored before unlock
-
-## Example Debug Output
-
-With `DEBUG_TESTS=true` and `DEBUG_HANDLERS=true`:
-
-```
-[DEBUG] LOCK: Starting lock for ZADT_BLD_DOM02
-{
-  "level": "INFO",
-  "handler": "LockDomain",
-  "step": "restore_session",
-  "message": "Restoring session state",
-  "session_id": "abc123",
-  "cookies_length": 137
-}
-{
-  "level": "INFO",
-  "handler": "LockDomain",
-  "step": "success",
-  "message": "Lock completed for ZADT_BLD_DOM02",
-  "lock_handle": "xyz789",
-  "updated_session_state": {
-    "has_cookies": true,
-    "cookies_length": 137
-  }
-}
-[DEBUG] UPDATE: Starting update for ZADT_BLD_DOM02
-{
-  "level": "INFO",
-  "handler": "UpdateDomain",
-  "step": "restore_session",
-  "message": "Restoring session state from Lock",
-  "session_id": "abc123",
-  "cookies_length": 137
-}
-```
+3. **Check Update and Unlock operations:** verify each receives the same `lock_handle`, and that the
+   update's properties include `packageName`.
 
 ## Tips
 
-1. **Always use session from Lock** for Update and Unlock operations
-2. **Check session state** contains cookies and CSRF token before each operation
-3. **Verify lock handle** is the same across Lock, Update, and Unlock
+1. **Verify lock handle** is the same across Lock, Update, and Unlock
 4. **Check package name** is included in Update properties
 5. **Use DEBUG_HANDLERS** to see exactly what handlers receive and return
 
@@ -386,7 +277,6 @@ DEBUG_AUTH_BROKER=true mcp-abap-adt --mcp=TRIAL
 
 Enables detailed logging in MCP handler functions. Shows:
 - Handler entry/exit points
-- Session state restoration
 - Lock handle usage
 - Property validation
 - Error details

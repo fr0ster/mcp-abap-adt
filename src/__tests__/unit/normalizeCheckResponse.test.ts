@@ -22,8 +22,6 @@ describe('normalizeCheckResponse', () => {
               has_warnings: false,
               message: '',
             },
-            session_id: 'abc123',
-            session_state: { cookies: 'x=y' },
             message: 'Class ZCL_TEST has no syntax errors',
           }),
         },
@@ -39,8 +37,6 @@ describe('normalizeCheckResponse', () => {
     expect(data.success).toBe(true);
     expect(data.check_result).toBeDefined();
     expect(data.message).toBeDefined();
-    expect(data).not.toHaveProperty('session_id');
-    expect(data).not.toHaveProperty('session_state');
   });
 
   it('should pass through error responses unchanged', () => {

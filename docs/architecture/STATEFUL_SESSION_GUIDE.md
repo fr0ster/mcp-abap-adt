@@ -36,8 +36,8 @@ non-stateful request never carries the context cookie.
 
 `sap-adt-connection-id` (the connection's) and `sap-adt-request-id` (fresh per
 request) are written by the connection on every request; nothing in the server sets
-them. The `session_id` and `session_state` arguments some tools still accept change
-nothing on the wire: a tool cannot reach into the connection's session.
+them. No tool takes a `session_id` or `session_state` (removed in 19.0.0): a tool cannot
+reach into the connection's session.
 
 ## Across tool calls
 

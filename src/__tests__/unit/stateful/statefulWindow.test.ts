@@ -133,7 +133,6 @@ it("compact's HandlerLock leaves the window open until HandlerUnlock: the calls 
         object_type: 'CLASS',
         object_name: NAME,
         lock_handle: 'B92E65858E83454C783181344F429D4BFD8E395D',
-        session_id: 'placeholder-session-id',
       }),
     ),
   );

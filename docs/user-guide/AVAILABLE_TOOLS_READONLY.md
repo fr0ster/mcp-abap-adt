@@ -5,7 +5,7 @@ Generated from code in `src/handlers/**` (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 69
+- Total tools: 68
 
 ## Navigation
 
@@ -87,7 +87,6 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
     - [GetAbapAST](#getabapast-read-only-system)
     - [GetAbapSemanticAnalysis](#getabapsemanticanalysis-read-only-system)
     - [GetAbapSystemSymbols](#getabapsystemsymbols-read-only-system)
-    - [GetSession](#getsession-read-only-system)
     - [GetInactiveObjects](#getinactiveobjects-read-only-system)
     - [GetAdtTypes](#getadttypes-read-only-system)
     - [GetObjectStructure](#getobjectstructure-read-only-system)
@@ -910,17 +909,6 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 ---
 
-<a id="getsession-read-only-system"></a>
-#### GetSession (Read-Only / System)
-**Description:** [read-only] A new random session ID. It is sent on no request and changes nothing: every call runs in the instance’s own session, and a lock handle stays valid there until its unlock or the instance’s end.
-
-**Source:** `src/handlers/system/readonly/handleGetSession.ts`
-
-**Parameters:**
-- `force_new` (boolean, optional) - Force creation of a new session even if one exists. Default: false
-
----
-
 <a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
 **Description:** [read-only] Get a list of inactive ABAP objects — modified but not yet activated, pending activation. Shows classes, tables, CDS views, and other objects awaiting activation.
@@ -1098,4 +1086,4 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 ---
 
-*Last updated: 2026-10-13*
+*Last updated: 2026-10-14*

@@ -75,7 +75,6 @@ The `CreateDomain` tool creates a new ABAP domain in the SAP system through ADT 
   "package": "ZOK_LOCAL",
   "transport_request": "SIDK905635",
   "status": "active",
-  "session_id": "9887bcfa3a564460843569a9efc55981",
   "message": "Domain ZZ_TEST_0001 created and activated successfully",
   "domain_details": {
     "adtcore:name": "ZZ_TEST_0001",
@@ -118,9 +117,6 @@ The tool implements automatic cleanup on errors:
 ## Technical Implementation
 
 ### Key Functions
-
-#### `generateSessionId()`
-Generates a UUID for the entire MCP call, removing hyphens to match SAP ADT format.
 
 #### `buildDomainXml(args, username)`
 Constructs the XML payload for domain creation according to SAP ADT schema `http://www.sap.com/dictionary/domain`.

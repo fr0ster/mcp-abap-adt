@@ -30,7 +30,6 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionForPackageLock } from '../../../lib/packageSessions';
-import { generateSessionId } from '../../../lib/sessionUtils';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -72,21 +71,6 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Super package (required for package locking)',
       },
-      session_id: {
-        type: 'string',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
     required: ['object_name', 'object_type'],
   },
@@ -96,12 +80,6 @@ interface LockObjectArgs {
   object_name: string;
   object_type: string;
   super_package?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 const VALID_TYPES = [
@@ -126,8 +104,7 @@ export async function handleLockObject(
   args: LockObjectArgs,
 ) {
   const { connection, logger } = context;
-  const { object_name, object_type, super_package, session_id } =
-    args as LockObjectArgs;
+  const { object_name, object_type, super_package } = args as LockObjectArgs;
 
   if (!object_name || !object_type) {
     return return_error(new Error('object_name and object_type are required'));
@@ -163,7 +140,6 @@ export async function handleLockObject(
     );
   }
 
-  const desiredSessionId = session_id || generateSessionId();
   const objectName = object_name.toUpperCase();
   const client = createAdtClient(connection, logger);
 
@@ -265,10 +241,8 @@ export async function handleLockObject(
       success: true,
       object_name: objectName,
       object_type: objectType,
-      session_id: desiredSessionId,
       lock_handle: lockHandle,
-      session_state: null, // Session state management is now handled by auth-broker
-      message: `Object ${objectName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
+      message: `Object ${objectName} locked successfully. Use this lock_handle for the update and the unlock.`,
     }),
   );
 }

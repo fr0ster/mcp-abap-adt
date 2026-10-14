@@ -39,12 +39,6 @@ type HandlerCheckRunArgs = {
   object_name: string;
   version?: 'active' | 'inactive';
   source_code?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 };
 
 export async function handleHandlerCheckRun(
@@ -63,7 +57,5 @@ export async function handleHandlerCheckRun(
     object_type: lowType,
     version: args.version,
     source_code: args.source_code,
-    session_id: args.session_id,
-    session_state: args.session_state,
   });
 }

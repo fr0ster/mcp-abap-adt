@@ -37,10 +37,6 @@ import {
   handleGetServiceBindingPreviewUrl,
 } from '../../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
 import {
-  TOOL_DEFINITION as GetSession_Tool,
-  handleGetSession,
-} from '../../../handlers/system/readonly/handleGetSession';
-import {
   TOOL_DEFINITION as GetSqlQuery_Tool,
   handleGetSqlQuery,
 } from '../../../handlers/system/readonly/handleGetSqlQuery';
@@ -232,10 +228,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetAbapSystemSymbols_Tool,
         handler: (args: any) => handleGetAbapSystemSymbols(this.context, args),
-      },
-      {
-        toolDefinition: GetSession_Tool,
-        handler: (args: any) => handleGetSession(this.context, args),
       },
       {
         toolDefinition: GetInactiveObjects_Tool,

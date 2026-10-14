@@ -227,7 +227,6 @@ describe('one main flow per instance', () => {
         object_type: 'CLASS',
         object_name: 'ZCL_A',
         lock_handle: HANDLE,
-        session_id: 'placeholder-session-id',
       });
       await settleWhile();
       // B's LOCK ends; its `finally` sets the connection stateless.

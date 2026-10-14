@@ -1038,30 +1038,6 @@ export const compactValidateSchema = {
       type: 'string',
       description: 'Optional service binding version for SERVICE_BINDING.',
     },
-    session_id: {
-      type: 'string',
-      description:
-        "Accepted and ignored: every call runs in the instance's own session.",
-    },
-    session_state: {
-      type: 'object',
-      description:
-        "Accepted and ignored: every call runs in the instance's own session.",
-      properties: {
-        cookies: {
-          type: 'string',
-          description: 'Accepted and ignored.',
-        },
-        csrf_token: {
-          type: 'string',
-          description: 'Accepted and ignored.',
-        },
-        cookie_store: {
-          type: 'object',
-          description: 'Accepted and ignored.',
-        },
-      },
-    },
   },
   required: ['object_type', 'object_name'],
 } as const;
@@ -1073,30 +1049,6 @@ export const compactLockSchema = {
     super_package: {
       type: 'string',
       description: 'Super package context when relevant.',
-    },
-    session_id: {
-      type: 'string',
-      description:
-        "Accepted and ignored: every call runs in the instance's own session.",
-    },
-    session_state: {
-      type: 'object',
-      description:
-        "Accepted and ignored: every call runs in the instance's own session.",
-      properties: {
-        cookies: {
-          type: 'string',
-          description: 'Accepted and ignored.',
-        },
-        csrf_token: {
-          type: 'string',
-          description: 'Accepted and ignored.',
-        },
-        cookie_store: {
-          type: 'object',
-          description: 'Accepted and ignored.',
-        },
-      },
     },
   },
   required: ['object_type', 'object_name'],
@@ -1110,32 +1062,8 @@ export const compactUnlockSchema = {
       type: 'string',
       description: 'Lock handle returned by lock.',
     },
-    session_id: {
-      type: 'string',
-      description:
-        'Required, and sent on no request: the unlock runs in the instance’s own session.',
-    },
-    session_state: {
-      type: 'object',
-      description:
-        "Accepted and ignored: every call runs in the instance's own session.",
-      properties: {
-        cookies: {
-          type: 'string',
-          description: 'Accepted and ignored.',
-        },
-        csrf_token: {
-          type: 'string',
-          description: 'Accepted and ignored.',
-        },
-        cookie_store: {
-          type: 'object',
-          description: 'Accepted and ignored.',
-        },
-      },
-    },
   },
-  required: ['object_type', 'object_name', 'lock_handle', 'session_id'],
+  required: ['object_type', 'object_name', 'lock_handle'],
 } as const;
 
 export const compactCheckRunSchema = {
@@ -1152,30 +1080,6 @@ export const compactCheckRunSchema = {
       type: 'string',
       description:
         'Source to check instead of the saved one; nothing is saved. CLASS, STRUCTURE and DDL only.',
-    },
-    session_id: {
-      type: 'string',
-      description:
-        "Accepted and ignored: every call runs in the instance's own session.",
-    },
-    session_state: {
-      type: 'object',
-      description:
-        "Accepted and ignored: every call runs in the instance's own session.",
-      properties: {
-        cookies: {
-          type: 'string',
-          description: 'Accepted and ignored.',
-        },
-        csrf_token: {
-          type: 'string',
-          description: 'Accepted and ignored.',
-        },
-        cookie_store: {
-          type: 'object',
-          description: 'Accepted and ignored.',
-        },
-      },
     },
   },
   required: ['object_type', 'object_name'],

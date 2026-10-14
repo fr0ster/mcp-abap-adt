@@ -23,7 +23,6 @@ import { handleUpdateFunctionGroup } from '../../../../handlers/function/high/ha
 import { handleUpdateFunctionModule } from '../../../../handlers/function/high/handleUpdateFunctionModule';
 import { handleDeleteFunctionGroup } from '../../../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleDeleteFunctionModule } from '../../../../handlers/function_module/high/handleDeleteFunctionModule';
-import { handleGetSession } from '../../../../handlers/system/readonly/handleGetSession';
 import {
   getCleanupAfter,
   getCleanupAfterRun,

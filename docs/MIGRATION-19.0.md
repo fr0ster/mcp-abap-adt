@@ -334,12 +334,15 @@ connection does not.** A unit-test run (and `HandlerGet`'s `UNIT_TEST` polling),
 creates and updates that activate — hold every other call of that session until they end, by
 design. Send a long run to the background where the tool offers it.
 
-- **`session_id` / `session_state` change nothing any more.** The tools that took them
-  (compact `HandlerLock`, `HandlerUnlock`, `HandlerValidate`, `HandlerCheckRun`, the `Activate*`
-  and `Check*` tools, `GetNodeStructure`, …) used to switch the shared connection to stateful for
-  every request that followed, and left it so. They still accept the arguments and ignore them;
-  `HandlerLock` still answers a `session_id` and `HandlerUnlock` still requires one, but it is sent
-  on no request.
+- **The `session_id` / `session_state` parameters are gone, and so is `GetSession`.** The tools
+  that took them (compact `HandlerLock`, `HandlerUnlock`, `HandlerValidate`, `HandlerCheckRun`, the
+  `Activate*` and `Check*` tools, `GetNodeStructure`, …) used to switch the shared connection to
+  stateful for every request that followed, and left it so; `GetSession` only made up an id for
+  them. A tool cannot reach into the connection's session: every call of one MCP session runs on
+  the instance's own connection, one at a time, and a lock is carried by its `lock_handle` alone.
+  So `HandlerLock` answers no `session_id`, `HandlerUnlock` requires none, no tool declares either,
+  and the low tools' answers carry neither. Drop them from your calls; a client that still sends
+  them is not refused by the schema — the server reads nothing from them.
 - **Compact `HandlerLock` keeps the lock until `HandlerUnlock` — on stdio and SSE**, where the
   instance's connection lives across calls; the calls in between are stateless, and the instance's
   end (its logoff) releases a lock you never unlocked. **Over Streamable HTTP it does not**: the
@@ -366,7 +369,7 @@ of the full set's high or low tools; only read-only reads may be in both.
 **If you used the low set, run the compact binary of your transport** (`mcp-abap-adt-compact`,
 `-compact-http`, `-compact-sse`), which does what the low set did, a step at a time:
 
-- **Lock, write, unlock.** `HandlerLock` answers a `lock_handle` and a `session_id`;
+- **Lock, write, unlock.** `HandlerLock` answers a `lock_handle`;
   `HandlerUpdate` with that `lock_handle` sends the write alone under your lock — no lock, unlock,
   check or activation of its own (`activate: true` beside it is refused); `HandlerUnlock`
   releases it. Without `lock_handle`, `HandlerUpdate` locks and unlocks itself, as before.
@@ -485,19 +488,19 @@ first; a function module, service definition or service binding activates throug
 | `LockProgramLow` | `HandlerLock` (object_type: PROGRAM, object_name) | the same requests |
 | `LockStructureLow` | `HandlerLock` (object_type: STRUCTURE, object_name) | the same requests |
 | `LockTableLow` | `HandlerLock` (object_type: TABLE, object_name) | the same requests |
-| `UnlockBehaviorDefinitionLow` | `HandlerUnlock` (object_type: BEHAVIOR_DEFINITION, object_name, lock_handle, session_id) | the same requests |
-| `UnlockClassLow` | `HandlerUnlock` (object_type: CLASS, object_name, lock_handle, session_id) | the same requests |
-| `UnlockDataElementLow` | `HandlerUnlock` (object_type: DATA_ELEMENT, object_name, lock_handle, session_id) | the same requests |
-| `UnlockDdlLow` | `HandlerUnlock` (object_type: DDL, object_name, lock_handle, session_id) | the same requests |
-| `UnlockDomainLow` | `HandlerUnlock` (object_type: DOMAIN, object_name, lock_handle, session_id) | the same requests |
-| `UnlockFunctionGroupLow` | `HandlerUnlock` (object_type: FUNCTION_GROUP, object_name, lock_handle, session_id) | the same requests |
-| `UnlockFunctionModuleLow` | `HandlerUnlock` (object_type: FUNCTION_MODULE, object_name, lock_handle, session_id) | The lifecycle tools name a function module GROUP\|MODULE in object_name. |
-| `UnlockInterfaceLow` | `HandlerUnlock` (object_type: INTERFACE, object_name, lock_handle, session_id) | the same requests |
-| `UnlockMetadataExtensionLow` | `HandlerUnlock` (object_type: METADATA_EXTENSION, object_name, lock_handle, session_id) | the same requests |
-| `UnlockPackageLow` | `HandlerUnlock` (object_type: PACKAGE, object_name, lock_handle, session_id) | the same requests |
-| `UnlockProgramLow` | `HandlerUnlock` (object_type: PROGRAM, object_name, lock_handle, session_id) | the same requests |
-| `UnlockStructureLow` | `HandlerUnlock` (object_type: STRUCTURE, object_name, lock_handle, session_id) | the same requests |
-| `UnlockTableLow` | `HandlerUnlock` (object_type: TABLE, object_name, lock_handle, session_id) | the same requests |
+| `UnlockBehaviorDefinitionLow` | `HandlerUnlock` (object_type: BEHAVIOR_DEFINITION, object_name, lock_handle) | the same requests |
+| `UnlockClassLow` | `HandlerUnlock` (object_type: CLASS, object_name, lock_handle) | the same requests |
+| `UnlockDataElementLow` | `HandlerUnlock` (object_type: DATA_ELEMENT, object_name, lock_handle) | the same requests |
+| `UnlockDdlLow` | `HandlerUnlock` (object_type: DDL, object_name, lock_handle) | the same requests |
+| `UnlockDomainLow` | `HandlerUnlock` (object_type: DOMAIN, object_name, lock_handle) | the same requests |
+| `UnlockFunctionGroupLow` | `HandlerUnlock` (object_type: FUNCTION_GROUP, object_name, lock_handle) | the same requests |
+| `UnlockFunctionModuleLow` | `HandlerUnlock` (object_type: FUNCTION_MODULE, object_name, lock_handle) | The lifecycle tools name a function module GROUP\|MODULE in object_name. |
+| `UnlockInterfaceLow` | `HandlerUnlock` (object_type: INTERFACE, object_name, lock_handle) | the same requests |
+| `UnlockMetadataExtensionLow` | `HandlerUnlock` (object_type: METADATA_EXTENSION, object_name, lock_handle) | the same requests |
+| `UnlockPackageLow` | `HandlerUnlock` (object_type: PACKAGE, object_name, lock_handle) | the same requests |
+| `UnlockProgramLow` | `HandlerUnlock` (object_type: PROGRAM, object_name, lock_handle) | the same requests |
+| `UnlockStructureLow` | `HandlerUnlock` (object_type: STRUCTURE, object_name, lock_handle) | the same requests |
+| `UnlockTableLow` | `HandlerUnlock` (object_type: TABLE, object_name, lock_handle) | the same requests |
 | `UpdateBehaviorDefinitionLow` | `HandlerUpdate` (object_type: BEHAVIOR_DEFINITION, name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateClassLow` | `HandlerUpdate` (object_type: CLASS, class_name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateDataElementLow` | `HandlerUpdate` (object_type: DATA_ELEMENT, data_element_name, description, lock_handle) | The properties go as the compact update names them (description, datatype, length, …) or in properties. |

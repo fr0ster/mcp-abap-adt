@@ -57,21 +57,6 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockObject. Required for update operation.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
     required: ['domain_name', 'properties', 'lock_handle'],
   },
@@ -81,12 +66,6 @@ interface UpdateDomainArgs {
   domain_name: string;
   properties: Record<string, any>;
   lock_handle: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 /**
@@ -100,8 +79,7 @@ export async function handleUpdateDomain(
 ) {
   const { connection, logger } = context;
   try {
-    const { domain_name, properties, lock_handle, session_id } =
-      args as UpdateDomainArgs;
+    const { domain_name, properties, lock_handle } = args as UpdateDomainArgs;
 
     // Validation
     if (!domain_name || !properties || !lock_handle) {
@@ -162,8 +140,6 @@ export async function handleUpdateDomain(
           {
             success: true,
             domain_name: domainName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
             message: `Domain ${domainName} updated successfully. Remember to unlock using UnlockObject.`,
           },
           null,

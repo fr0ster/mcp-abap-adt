@@ -70,21 +70,6 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockObject. Required for update operation.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
     required: ['data_element_name', 'properties', 'lock_handle'],
   },
@@ -94,12 +79,6 @@ interface UpdateDataElementArgs {
   data_element_name: string;
   properties: Record<string, any>;
   lock_handle: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 /** `properties` always took both spellings; the patch function only knows snake_case. */
@@ -141,7 +120,7 @@ export async function handleUpdateDataElement(
 ) {
   const { connection, logger } = context;
   try {
-    const { data_element_name, properties, lock_handle, session_id } =
+    const { data_element_name, properties, lock_handle } =
       args as UpdateDataElementArgs;
 
     if (!data_element_name || !properties || !lock_handle) {
@@ -202,8 +181,6 @@ export async function handleUpdateDataElement(
           {
             success: true,
             data_element_name: dataElementName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
             message: `DataElement ${dataElementName} updated successfully. Remember to unlock using UnlockObject.`,
           },
           null,

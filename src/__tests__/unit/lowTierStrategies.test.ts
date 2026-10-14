@@ -106,7 +106,7 @@ const context = {
   logger: undefined,
 };
 
-/** For the branch of `connection.getSessionId() || session_id || null` that the caller's session_id never reaches. */
+/** A connection that names a session id of its own. */
 const connectionSessionContext = {
   connection: { getSessionId: () => 'CONN_SESSION' } as any,
   logger: undefined,

@@ -109,8 +109,7 @@
       "low_call": {
         "package_name": "PKG_A",
         "super_package": "PKG_SUPER",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -118,8 +117,7 @@
           "args": {
             "object_type": "PACKAGE",
             "object_name": "PKG_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -342,8 +340,7 @@
       "handler": "src/handlers/domain/low/handleUnlockDomain.ts",
       "low_call": {
         "domain_name": "DOM_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -351,8 +348,7 @@
           "args": {
             "object_type": "DOMAIN",
             "object_name": "DOM_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -601,8 +597,7 @@
       "handler": "src/handlers/data_element/low/handleUnlockDataElement.ts",
       "low_call": {
         "data_element_name": "DTEL_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -610,8 +605,7 @@
           "args": {
             "object_type": "DATA_ELEMENT",
             "object_name": "DTEL_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -882,8 +876,7 @@
       "handler": "src/handlers/table/low/handleUnlockTable.ts",
       "low_call": {
         "table_name": "TAB_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -891,8 +884,7 @@
           "args": {
             "object_type": "TABLE",
             "object_name": "TAB_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -1140,8 +1132,7 @@
       "handler": "src/handlers/structure/low/handleUnlockStructure.ts",
       "low_call": {
         "structure_name": "STRU_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -1149,8 +1140,7 @@
           "args": {
             "object_type": "STRUCTURE",
             "object_name": "STRU_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -1389,8 +1379,7 @@
       "handler": "src/handlers/ddl/low/handleUnlockDdl.ts",
       "low_call": {
         "ddl_name": "DDL_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -1398,8 +1387,7 @@
           "args": {
             "object_type": "DDL",
             "object_name": "DDL_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -1648,8 +1636,7 @@
       "handler": "src/handlers/class/low/handleUnlockClass.ts",
       "low_call": {
         "class_name": "CLAS_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -1657,8 +1644,7 @@
           "args": {
             "object_type": "CLASS",
             "object_name": "CLAS_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -1901,8 +1887,7 @@
       "handler": "src/handlers/program/low/handleUnlockProgram.ts",
       "low_call": {
         "program_name": "PROG_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -1910,8 +1895,7 @@
           "args": {
             "object_type": "PROGRAM",
             "object_name": "PROG_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -2148,8 +2132,7 @@
       "handler": "src/handlers/interface/low/handleUnlockInterface.ts",
       "low_call": {
         "interface_name": "INTF_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -2157,8 +2140,7 @@
           "args": {
             "object_type": "INTERFACE",
             "object_name": "INTF_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -2396,8 +2378,7 @@
       "handler": "src/handlers/function/low/handleUnlockFunctionGroup.ts",
       "low_call": {
         "function_group_name": "FUGR_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -2405,8 +2386,7 @@
           "args": {
             "object_type": "FUNCTION_GROUP",
             "object_name": "FUGR_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -2611,8 +2591,7 @@
       "low_call": {
         "function_module_name": "FM_A",
         "function_group_name": "FUGR_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -2620,8 +2599,7 @@
           "args": {
             "object_type": "FUNCTION_MODULE",
             "object_name": "FUGR_A|FM_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -2890,8 +2868,7 @@
       "handler": "src/handlers/behavior_definition/low/handleUnlockBehaviorDefinition.ts",
       "low_call": {
         "name": "BDEF_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -2899,8 +2876,7 @@
           "args": {
             "object_type": "BEHAVIOR_DEFINITION",
             "object_name": "BDEF_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
@@ -3276,8 +3252,7 @@
       "handler": "src/handlers/ddlx/low/handleUnlockMetadataExtension.ts",
       "low_call": {
         "name": "DDLX_A",
-        "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-        "session_id": "SESSION_PLACEHOLDER"
+        "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
       },
       "compact": [
         {
@@ -3285,8 +3260,7 @@
           "args": {
             "object_type": "METADATA_EXTENSION",
             "object_name": "DDLX_A",
-            "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
-            "session_id": "SESSION_PLACEHOLDER"
+            "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],

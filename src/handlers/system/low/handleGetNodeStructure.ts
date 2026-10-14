@@ -88,21 +88,6 @@ export const TOOL_DEFINITION = {
         description: 'Include short descriptions in response',
         default: true,
       },
-      session_id: {
-        type: 'string',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-      },
-      session_state: {
-        type: 'object',
-        description:
-          "Accepted and ignored: every call runs in the instance's own session.",
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
     required: ['parent_type', 'parent_name'],
   },
@@ -113,12 +98,6 @@ interface GetNodeStructureArgs {
   parent_name: string;
   node_id?: string;
   with_short_descriptions?: boolean;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 /**

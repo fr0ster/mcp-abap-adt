@@ -6,9 +6,9 @@
  * mixing another call into a lock's session.
  *
  * Against the stand-in, which records `x-sap-adt-sessiontype` and `Cookie`
- * per request: after an update, an activation, a lock and an unlock — also
- * when a tool is handed the legacy `session_id` / `session_state` arguments,
- * and when the `LOCK` or the `UNLOCK` is refused — the next read is stateless.
+ * per request: after an update, an activation, a lock, an unlock and a
+ * check — also when the `LOCK` or the `UNLOCK` is refused — the next read is
+ * stateless.
  */
 
 import type { StandInRequest } from '../../helpers/adtStandIn';
@@ -29,10 +29,6 @@ jest.setTimeout(30_000);
 const NAME = 'ZCL_PLACEHOLDER';
 const SOURCE = 'CLASS zcl_placeholder DEFINITION. ENDCLASS.';
 const HANDLE = 'B92E65858E83454C783181344F429D4BFD8E395D';
-const LEGACY = {
-  session_id: 'placeholder-session-id',
-  session_state: { cookies: '', csrf_token: '' },
-};
 
 let s: StatefulStand;
 
@@ -112,34 +108,29 @@ it('after an activation', async () => {
   await expectTheNextReadStateless();
 });
 
-it('after an activation handed the legacy session arguments', async () => {
-  await ran('ActivateClass', { class_name: NAME, ...LEGACY }, isActivation);
-  await expectTheNextReadStateless();
-});
-
-it("after compact's HandlerLock, also handed the legacy session arguments", async () => {
+it("after compact's HandlerLock", async () => {
   await ran(
     'HandlerLock',
-    { object_type: 'CLASS', object_name: NAME, ...LEGACY },
+    { object_type: 'CLASS', object_name: NAME },
     statefulLock,
   );
   await expectTheNextReadStateless();
 });
 
-it("after compact's HandlerUnlock, also handed the legacy session arguments", async () => {
+it("after compact's HandlerUnlock", async () => {
   await s.call('HandlerLock', { object_type: 'CLASS', object_name: NAME });
   await ran(
     'HandlerUnlock',
-    { object_type: 'CLASS', object_name: NAME, lock_handle: HANDLE, ...LEGACY },
+    { object_type: 'CLASS', object_name: NAME, lock_handle: HANDLE },
     statefulUnlock,
   );
   await expectTheNextReadStateless();
 });
 
-it('after a check handed the legacy session arguments', async () => {
+it('after a check', async () => {
   await ran(
     'HandlerCheckRun',
-    { object_type: 'CLASS', object_name: NAME, ...LEGACY },
+    { object_type: 'CLASS', object_name: NAME },
     anyRequest,
   );
   await expectTheNextReadStateless();

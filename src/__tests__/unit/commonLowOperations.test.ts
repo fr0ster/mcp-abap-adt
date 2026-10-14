@@ -544,7 +544,6 @@ describe('UnlockObjectLow', () => {
       object_type: 'class',
       object_name: 'zcl_x',
       lock_handle: 'h',
-      session_id: 's',
     });
 
     expect(result.isError).toBe(false);
@@ -557,7 +556,6 @@ describe('UnlockObjectLow', () => {
       object_type: 'class',
       object_name: 'ZCL_X',
       lock_handle: 'h',
-      session_id: 's',
     });
     const call = seen.calls.filter((c) => c.member === 'unlock').at(-1);
     expect(call?.carriedAnalyse).toBe(true);
@@ -571,7 +569,6 @@ describe('UnlockObjectLow', () => {
       object_type: 'behavior_definition',
       object_name: 'zbd',
       lock_handle: 'h',
-      session_id: 's',
     });
     expect(
       seen.calls.filter((c) => c.member === 'unlock').at(-1)?.factory,
@@ -581,7 +578,6 @@ describe('UnlockObjectLow', () => {
       object_type: 'metadata_extension',
       object_name: 'zmd',
       lock_handle: 'h',
-      session_id: 's',
     });
     expect(
       seen.calls.filter((c) => c.member === 'unlock').at(-1)?.factory,

@@ -18,12 +18,6 @@ type HandlerLockArgs = {
   object_type: CompactObjectType;
   object_name: string;
   super_package?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 };
 
 export async function handleHandlerLock(
@@ -41,7 +35,5 @@ export async function handleHandlerLock(
     object_name: args.object_name,
     object_type: lowType,
     super_package: args.super_package,
-    session_id: args.session_id,
-    session_state: args.session_state,
   });
 }

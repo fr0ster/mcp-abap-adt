@@ -1283,17 +1283,21 @@ export abstract class BaseMcpServer extends McpServer {
               ? jsonSchemaToZod(entry.toolDefinition.inputSchema)
               : entry.toolDefinition.inputSchema;
 
-          // Skip tools not available in the current SAP environment
+          // Skip tools not available in the stated SAP environment. The
+          // kind is never guessed: with none stated (stdio's inspection-only
+          // mode, which has no system; an embedder's own transport host that
+          // states none) nothing is filtered — every tool of the set is
+          // listed, and a call that would reach a system is refused
+          // `system_type_required` before anything is sent.
           const availableIn = entry.toolDefinition.available_in;
-          if (availableIn && availableIn.length > 0) {
-            const resolvedType =
-              this.systemType ?? process.env.SAP_SYSTEM_TYPE?.toLowerCase();
-            const currentEnv: SapEnvironment =
-              resolvedType === 'legacy'
-                ? 'legacy'
-                : resolvedType === 'onprem'
-                  ? 'onprem'
-                  : 'cloud';
+          const currentEnv = statedEnvironment(
+            this.systemType ?? process.env.SAP_SYSTEM_TYPE,
+          );
+          if (
+            availableIn &&
+            availableIn.length > 0 &&
+            currentEnv !== undefined
+          ) {
             if (!availableIn.includes(currentEnv)) {
               this.logger.debug(
                 `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${currentEnv}, source=${this.systemType ? 'option' : 'env'}, SAP_SYSTEM_TYPE=${process.env.SAP_SYSTEM_TYPE || '(not set)'}`,
@@ -2004,3 +2008,17 @@ const stderrLogger: Logger = {
   warn: (msg: string) => process.stderr.write(`[WARN] ${msg}\n`),
   error: (msg: string) => process.stderr.write(`[ERROR] ${msg}\n`),
 };
+
+/**
+ * The SAP environment a stated system type names (`onprem`, `cloud`,
+ * `legacy`, any case); `undefined` for none or any other value — never a
+ * default.
+ */
+function statedEnvironment(
+  value: string | undefined,
+): SapEnvironment | undefined {
+  const declared = value?.trim().toLowerCase();
+  return declared === 'onprem' || declared === 'cloud' || declared === 'legacy'
+    ? declared
+    : undefined;
+}

@@ -131,8 +131,6 @@ per request.
 - `implementation_type` — Optional implementation type, used for behavior implementation validation.
 - `service_definition_name` — Required when object_type=SERVICE_BINDING. Service definition paired with the binding.
 - `service_binding_version` — Optional service binding version for SERVICE_BINDING.
-- `session_id` — Optional ADT session id for stateful validation flow.
-- `session_state` — Optional ADT session state container (cookies/CSRF) for stateful validation flow.
 
 ### HandlerCheckRun
 
@@ -148,8 +146,6 @@ per request.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `version` — Version to syntax-check.
 - `source_code` — Source to check instead of the saved one; nothing is saved. CLASS, STRUCTURE and DDL only.
-- `session_id` — Optional ADT session id for stateful check flow.
-- `session_state` — Optional ADT session state container (cookies/CSRF) for stateful check flow.
 
 ### HandlerUnitTestStatus
 
@@ -507,14 +503,12 @@ per request.
 - `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `super_package` — Super package context when relevant.
-- `session_id` — Optional ADT session id for stateful lock flow.
-- `session_state` — Optional ADT session state container (cookies/CSRF) for stateful lock flow.
 
 ### HandlerUnlock
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*, session_id*), PROGRAM(object_name*, lock_handle*, session_id*) [onprem only], INTERFACE(object_name*, lock_handle*, session_id*), FUNCTION_GROUP(object_name*, lock_handle*, session_id*), FUNCTION_MODULE(object_name*, lock_handle*, session_id*), TABLE(object_name*, lock_handle*, session_id*), STRUCTURE(object_name*, lock_handle*, session_id*), DDL(object_name*, lock_handle*, session_id*), DOMAIN(object_name*, lock_handle*, session_id*), DATA_ELEMENT(object_name*, lock_handle*, session_id*), PACKAGE(object_name*, lock_handle*, session_id*), BEHAVIOR_DEFINITION(object_name*, lock_handle*, session_id*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*, session_id*), METADATA_EXTENSION(object_name*, lock_handle*, session_id*).
+**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*), PROGRAM(object_name*, lock_handle*) [onprem only], INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*).
 
 **Available in:** cloud, onprem
 
@@ -523,8 +517,6 @@ per request.
 - `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `lock_handle` (required) — Lock handle returned by lock.
-- `session_id` (required) — ADT session id used during lock.
-- `session_state` — Optional ADT session state container (cookies/CSRF) for stateful unlock flow.
 
 ### HandlerUnitTestRun
 

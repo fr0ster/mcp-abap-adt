@@ -60,8 +60,9 @@ the source (`--mcp`, `destination`) and never quotes the name.
   start's own signal, aborted once the check ends; building sends nothing — so a destination
   the broker refuses stops the start, exit 1, with the error's own vetted words.
 - One server instance for the process; its source is the destination (`destinationSource`). Its
-  connection is built on the first tool call and kept while `getProvider` answers the same
-  provider; a new provider builds a new connection (D13).
+  connection is built on the first tool call and kept for the session; the user and the
+  credentials are fixed for the process, and the session is only renewed (refresh token, or a
+  new login when the refresh fails) and written back — the same user.
 - With no default destination the server starts in inspection-only mode: the tool list answers, and
   a tool call answers the server's own `inspection_only` refusal before any connection is built.
 

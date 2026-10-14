@@ -8,8 +8,9 @@
  *   leftover session.
  * - A user SAP already named for this credential is answered without
  *   entering the main flow, also when the instance's connection is spent.
- * - When the connection is replaced, the user SAP named for its credential
- *   is asked again: a renewable credential may log on as another user.
+ * - When the connection is replaced, the cache of named users is cleared and
+ *   the user is asked again (a late lookup of the replaced connection never
+ *   lands); on stdio the replacement keeps the session's user.
  *
  * Against the stand-in, whose `systeminformation` answers the token's SAP
  * user and can switch to another (`standIn.systemInformation`).
@@ -168,58 +169,6 @@ it('a user SAP named for this credential is answered without the flow, also when
   expect(outcome).toBe('settled');
   expect((await listed).isError).toBe(false);
   expect(stand.standIn.requests.filter(isLookup).length).toBe(lookups);
-});
-
-it("a replaced connection asks its credential's user again: the background caller follows a re-logon as another user", async () => {
-  const standIn = await adtStandIn();
-  standIn.systemInformation('USER_A');
-  const caller = await callerOn(standIn, new InMemoryBackgroundRuns(), {
-    tokenUser: 'USER_A',
-  });
-  (
-    caller.server as unknown as {
-      register(registry: CompositeHandlersRegistry): void;
-    }
-  ).register(new CompositeHandlersRegistry([probeGroup([loseAndHold])]));
-  try {
-    expect(
-      (
-        await caller.call('RuntimeRunClass', {
-          class_name: 'ZCL_FIRST',
-          background: true,
-        })
-      ).isError,
-    ).toBe(false);
-
-    // The same credential logs on again as another SAP user: the session is
-    // lost, and the next call replaces the connection.
-    standIn.systemInformation('USER_B');
-    openGate();
-    await caller.call('LoseAndHold', { id: 'b' });
-    await caller.call('ProbeAdt', { id: 'replaced' });
-    // Counted after the replacement's connect (on ABAP Cloud it asks the
-    // system context there).
-    const before = standIn.requests.filter(isLookup).length;
-
-    expect(
-      (
-        await caller.call('RuntimeRunClass', {
-          class_name: 'ZCL_SECOND',
-          background: true,
-        })
-      ).isError,
-    ).toBe(false);
-    // Asked again, on the replacement — not answered from before.
-    const after = standIn.requests.filter(isLookup);
-    expect(after.length).toBe(before + 1);
-    const replaced = standIn.requests.find(
-      (r) => r.url === `${PROBE_PATH}replaced`,
-    )?.session;
-    expect(after.at(-1)?.session).toBe(replaced);
-  } finally {
-    await caller.close();
-    await standIn.close();
-  }
 });
 
 it("stdio's shape — one provider for the instance's life: after a lost session the replacement is built with it, and the caller stays the session's user", async () => {

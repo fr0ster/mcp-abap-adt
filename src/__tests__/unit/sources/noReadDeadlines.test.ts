@@ -161,7 +161,7 @@ describe('no built-in deadline on the server reads', () => {
     const reads = scans.flatMap((s) =>
       s.calls.filter((c) => c.callee === 'makeAdtRequest'),
     );
-    // sessionUtils' two request helpers left in C15 (D56): 12 calls today.
+    // 12 calls today; the floor keeps the scan from passing on an empty set.
     expect(reads.length).toBeGreaterThanOrEqual(12);
   });
 

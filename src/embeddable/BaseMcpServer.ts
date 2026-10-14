@@ -859,8 +859,14 @@ export abstract class BaseMcpServer extends McpServer {
       owner.release(claimed);
       throw error;
     }
-    // The instance's own from here on, like any built connection (§6.4).
-    own(connection, { owner: this, role: 'built' });
+    // The instance's own from here on, like any built connection (§6.4). A
+    // closed owner refuses it: the claimed file is given back as a leftover.
+    try {
+      own(connection, { owner: this, role: 'built' });
+    } catch (error) {
+      owner.release(claimed);
+      throw error;
+    }
     try {
       await connection.connect();
     } catch (error) {

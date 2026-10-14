@@ -102,4 +102,4 @@ closes and every open connection gets the close above — its ADT sessions logge
 running tools interrupted, no state undo sent —, joined where one is already closing; it never
 rejects. The binary's own shutdown calls `stopListening()`, logs every session of the process off
 at once (lib's `installTransportShutdown`), then `releaseConnections()`, which closes the client
-connections left. There is no `lastStep()`.
+connections left.

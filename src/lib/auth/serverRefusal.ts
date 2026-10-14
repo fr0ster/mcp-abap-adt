@@ -23,7 +23,8 @@ export type ServerRefusalCode =
   | 'background_run_limit'
   | 'background_run_caller_unknown'
   | 'system_lookup_failed'
-  | 'system_without_user';
+  | 'system_without_user'
+  | 'instance_closed';
 
 /** Inspection-only mode: stdio started without a destination (D17). */
 export const INSPECTION_ONLY_WORDS =
@@ -93,6 +94,13 @@ export const SYSTEM_LOOKUP_FAILED_WORDS =
 export const SYSTEM_WITHOUT_USER_WORDS =
   'the ABAP Cloud system answered systeminformation without a user, so it is not a valid ABAP system for this server; the tool did not run';
 
+/**
+ * The fixed words of a connection refused because its instance is closed
+ * (its stream closed, its close began) while the server keeps running.
+ */
+export const INSTANCE_CLOSED_WORDS =
+  'the server instance is closed: no new connection is opened for it';
+
 /** A background run whose request names no backend user, and SAP named none either. */
 export const BACKGROUND_RUN_CALLER_UNKNOWN_WORDS =
   'a background run is kept for the backend user of the request, and none could be determined (the request names none and the system answered none)';
@@ -126,6 +134,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   background_run_caller_unknown: BACKGROUND_RUN_CALLER_UNKNOWN_WORDS,
   system_lookup_failed: SYSTEM_LOOKUP_FAILED_WORDS,
   system_without_user: SYSTEM_WITHOUT_USER_WORDS,
+  instance_closed: INSTANCE_CLOSED_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

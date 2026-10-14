@@ -19,6 +19,7 @@ import {
 import {
   ClosedInstanceRefusal,
   failureOf,
+  INSTANCE_CLOSED_WORDS,
   isClosedInstanceRefusal,
 } from '../../lib/auth/failures';
 import { closeInstance } from '../../lib/instanceClose';
@@ -45,7 +46,7 @@ interface Fake {
   connected: () => void;
 }
 
-function fake(holdConnect = false): Fake {
+function fake(holdConnect = false, rejectAfterHold = false): Fake {
   let release: () => void = () => {};
   const held = new Promise<void>((resolve) => {
     release = resolve;
@@ -60,6 +61,7 @@ function fake(holdConnect = false): Fake {
     connect: async () => {
       self.connects += 1;
       if (holdConnect) await held;
+      if (rejectAfterHold) throw new Error('connect abandoned');
     },
     disconnect: async () => {
       self.logoffs += 1;
@@ -86,7 +88,7 @@ function injected(make: () => Promise<IAbapConnection>) {
 beforeEach(() => resetProcessLatchForTests());
 afterAll(() => resetProcessLatchForTests());
 
-it('after the instance close: refused before the factory is called, nothing owned; answered as the shutdown refusal', async () => {
+it('after the instance close: refused before the factory is called, nothing owned; answered as instance_closed', async () => {
   const instance = closable();
   const fresh = fake();
   const { main, calls } = injected(async () => fresh.connection);
@@ -104,7 +106,11 @@ it('after the instance close: refused before the factory is called, nothing owne
   expect(calls.count).toBe(0);
   expect(fresh.connects).toBe(0);
   expect(ownedConnections(instance)).toEqual([]);
-  expect(failureOf(thrown)).toEqual(shutdownRefusal());
+  // The server keeps running: its own refusal, not the shutdown's.
+  expect(failureOf(thrown)).toEqual({
+    error: 'instance_closed',
+    message: INSTANCE_CLOSED_WORDS,
+  });
   // Forged: the same name and message are not the refusal.
   expect(
     isClosedInstanceRefusal(Object.assign(new Error(''), { name: 'x' })),
@@ -117,6 +123,14 @@ it('after the process latch: refused, outside a call and inside one', async () =
   const { main, calls } = injected(async () => fresh.connection);
   latch();
   expect(() => refuseIfClosed()).toThrow(ClosedInstanceRefusal);
+  // A real shutdown keeps the shutdown refusal.
+  let thrown: unknown;
+  try {
+    refuseIfClosed();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(failureOf(thrown)).toEqual(shutdownRefusal());
   await expect(
     runAsOwner(instance, () => openFreshConnection(main, undefined)),
   ).rejects.toBeInstanceOf(ClosedInstanceRefusal);
@@ -165,6 +179,23 @@ it('the close comes while the connect runs: swept with the rest, one logoff, the
   fresh.connected();
   await refused;
   // Joined, never a second `disconnect()`.
+  expect(fresh.logoffs).toBe(1);
+  expect(ownedConnections(instance)).toEqual([]);
+});
+
+it('the close comes while the connect runs and the connect then REJECTS (connection 17 abandons it): the caller gets the refusal, not the connect error; one logoff', async () => {
+  const instance = closable();
+  const fresh = fake(true, true);
+  const { main } = injected(async () => fresh.connection);
+  const opening = runAsOwner(instance, () =>
+    openFreshConnection(main, undefined),
+  );
+  const refused = expect(opening).rejects.toBeInstanceOf(ClosedInstanceRefusal);
+  await turns();
+  expect(fresh.connects).toBe(1);
+  await closeInstance(instance);
+  fresh.connected();
+  await refused;
   expect(fresh.logoffs).toBe(1);
   expect(ownedConnections(instance)).toEqual([]);
 });

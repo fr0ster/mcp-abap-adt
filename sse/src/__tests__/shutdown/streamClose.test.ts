@@ -26,6 +26,7 @@ jest.setTimeout(30_000);
 
 let s: SseStand;
 let errorSpy: jest.SpyInstance;
+let stderrSpy: jest.SpyInstance | undefined;
 
 beforeEach(async () => {
   errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -35,6 +36,8 @@ beforeEach(async () => {
 afterEach(async () => {
   await s.close();
   errorSpy.mockRestore();
+  stderrSpy?.mockRestore();
+  stderrSpy = undefined;
 });
 
 const loggedOff = () =>
@@ -102,6 +105,20 @@ it("SAP answers the tool's main-connection request after the close: its next ste
   await hold.arrived;
   expect(s.connects()).toBe(1);
 
+  const written: string[] = [];
+  const stderr = jest
+    .spyOn(process.stderr, 'write')
+    .mockImplementation((chunk: unknown) => {
+      written.push(String(chunk));
+      return true;
+    });
+  const written: string[] = [];
+  stderrSpy = jest
+    .spyOn(process.stderr, 'write')
+    .mockImplementation((chunk: unknown) => {
+      written.push(String(chunk));
+      return true;
+    });
   connection.close();
   await until(() => s.standIn.logoffs() === 1);
   // SAP answers the held request: the tool goes on to its fresh connection.
@@ -111,5 +128,9 @@ it("SAP answers the tool's main-connection request after the close: its next ste
   expect(s.connects()).toBe(1);
   expect(s.indexOf((url) => url.startsWith(listenUrl('M')))).toBe(-1);
   expect(ownedConnections()).toEqual([]);
-  expect(s.standIn.logoffs()).toBe(s.connects());
+  expect(s.standIn.logoffs()).toBe(s.connects()); // The server keeps running: the refusal is the instance's own, neither an
+  // authentication failure nor a shutdown.
+  const lines = written.join('');
+  expect(lines).toContain('[MCP] instance_closed');
+  expect(lines).not.toContain('authentication_failed');
 });

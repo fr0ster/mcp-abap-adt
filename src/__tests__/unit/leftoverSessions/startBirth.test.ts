@@ -10,6 +10,8 @@
  * Against the stand-in, whose request log shows every request SAP got.
  */
 
+import { latch, resetProcessLatchForTests } from '../../../lib/activeTools';
+import { ClosedInstanceRefusal } from '../../../lib/auth/failures';
 import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
 import { PROBE_PATH, type StandInRequest } from '../../helpers/adtStandIn';
 import {
@@ -36,6 +38,7 @@ afterEach(async () => {
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
   jest.restoreAllMocks();
+  resetProcessLatchForTests();
 });
 
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
@@ -101,6 +104,15 @@ describe('one leftover session of the destination', () => {
     // No further logon: no session but the picked-up one.
     expect(sessionsSince(before)).toEqual(new Set([session]));
     expect(stand.standIn.logoffs()).toBe(0);
+  });
+
+  it('the process is shutting down at the start: the claimed file is given back as a leftover, the start refused', async () => {
+    stand = await leftoverStand();
+    const { handle } = await stand.leftover();
+    latch();
+    await expect(stand.start()).rejects.toBeInstanceOf(ClosedInstanceRefusal);
+    expect(stand.files()).toEqual([handle]);
+    expect(stand.file(handle)).toMatchObject({ pid: 111 });
   });
 
   it('SAP answers 401 for it: a new session with the normal logon, the file rewritten under the same handle', async () => {

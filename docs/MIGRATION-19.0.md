@@ -920,8 +920,11 @@ transport's options only:
   running tool; a second call returns the same promise. **From the close on, the instance opens
   no new connection**: a running tool whose next step would log on — `getConnection`, a fresh
   connection (`openFreshConnection`, a host's `freshConnection` factory is then not called), a
-  debugger's or a lock's session — is refused before anything is built or sent, answered as the
-  shutdown refusal ("The server is shutting down."); a connection whose `connect()` was under way
+  debugger's or a lock's session — is refused before anything is built or sent: after the
+  process's shutdown, answered as the shutdown refusal ("The server is shutting down."); after
+  the instance's close alone (an SSE stream's close, the server keeps running), as the server's
+  own `instance_closed` ("the server instance is closed: no new connection is opened for it",
+  stderr `[MCP] instance_closed`; `ServerRefusalCode` / `FailureCode` add it); a connection whose `connect()` was under way
   at the close is logged off with the rest and refused once it settles. The process shutdown's
   latch does the same for every instance.
 - **`SseServer.stop()`** (`@mcp-abap-adt/sse`) is the instance close of every open connection —
@@ -930,7 +933,7 @@ transport's options only:
   `releaseConnections()` are public, for a shutdown of your own: stop listening, log the sessions
   off (`installTransportShutdown` does it at once), then close the client connections left.
   `StreamableHttpServer.stop()` still waits for its requests and undoes each pooled instance's
-  state before the logoffs. Neither server has a `lastStep()`.
+  state before the logoffs.
 - **`connectionReleased(connection)`**: a subclass that calls `getConnection` itself calls it
   exactly once per `getConnection` when its work on the connection is done; a connection replaced
   meanwhile is logged off only then.

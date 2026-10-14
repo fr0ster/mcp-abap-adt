@@ -21,7 +21,9 @@ import type {
   AuthProviderErrorKind,
   IAuthProviderError,
 } from '@mcp-abap-adt/interfaces-auth';
-import { serverRefusalOf } from './serverRefusal';
+import { INSTANCE_CLOSED_WORDS, serverRefusalOf } from './serverRefusal';
+
+export { INSTANCE_CLOSED_WORDS };
 
 /** What a failure answers as its `error` (spec §7.3). */
 export type FailureCode =
@@ -38,7 +40,8 @@ export type FailureCode =
   | 'background_run_limit'
   | 'background_run_caller_unknown'
   | 'system_lookup_failed'
-  | 'system_without_user';
+  | 'system_without_user'
+  | 'instance_closed';
 
 /**
  * A failure as it was read: the fields of the §7.3 answer, and the chain's
@@ -146,23 +149,21 @@ export function shutdownRefusal(): ReadFailure {
   };
 }
 
-/** The fixed words of a connection refused because its instance is closed. */
-export const INSTANCE_CLOSED_WORDS =
-  'the server instance is closed: no new connection is opened for it';
-
-const closedRefusals = new WeakSet<object>();
+const closedRefusals = new WeakMap<object, boolean>();
 
 /**
  * Thrown where a connection would be opened or owned for an instance that is
  * latched closed (its close, or the process's shutdown, began): nothing is
- * sent. Answered as the shutdown refusal. Known by the object, recorded at
- * construction, never by its shape or its message.
+ * sent. Known by the object, recorded at construction, never by its shape or
+ * its message. Answered as the shutdown refusal when the process's shutdown
+ * latched it (`byProcess`); as `instance_closed` when only the instance closed
+ * (an SSE stream's close — the server keeps running).
  */
 export class ClosedInstanceRefusal extends Error {
-  constructor() {
+  constructor(byProcess: boolean) {
     super(INSTANCE_CLOSED_WORDS);
     this.name = 'ClosedInstanceRefusal';
-    closedRefusals.add(this);
+    closedRefusals.set(this, byProcess);
   }
 }
 
@@ -175,13 +176,20 @@ export function isClosedInstanceRefusal(value: unknown): boolean {
   );
 }
 
+/** The answer for a `ClosedInstanceRefusal`: the shutdown's, or the instance's own. */
+function closedAnswer(value: object): ReadFailure {
+  return closedRefusals.get(value) === true
+    ? shutdownRefusal()
+    : { error: 'instance_closed', message: INSTANCE_CLOSED_WORDS };
+}
+
 /**
  * What `thrown` is, as the client's answer; `undefined` when it is not a
  * failure this reader knows — the caller answers it as before. Total.
  */
 export function failureOf(thrown: unknown): ReadFailure | undefined {
   try {
-    if (isClosedInstanceRefusal(thrown)) return shutdownRefusal();
+    if (isClosedInstanceRefusal(thrown)) return closedAnswer(thrown as object);
     const chain = chainErrorOf(thrown);
     if (chain !== undefined) return authenticationFailed(chain);
     const own = serverRefusalOf(thrown);

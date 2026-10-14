@@ -131,7 +131,7 @@ export function own(
   if (isLatched(owner)) {
     // Its owner's terminal close already ran: nothing would end it later.
     void endConnection(connection);
-    throw new ClosedInstanceRefusal();
+    throw new ClosedInstanceRefusal(isLatched());
   }
   owned.set(connection, { owner, role: options.role });
 }
@@ -144,7 +144,7 @@ export function own(
 export function refuseIfClosed(
   owner: object | undefined = currentOwner(),
 ): void {
-  if (isLatched(owner)) throw new ClosedInstanceRefusal();
+  if (isLatched(owner)) throw new ClosedInstanceRefusal(isLatched());
 }
 
 /**
@@ -156,7 +156,7 @@ export function refuseWhenClosed(connection: object): void {
   if (!owners.has(connection)) return;
   if (!isLatched(owners.get(connection))) return;
   void endConnection(connection);
-  throw new ClosedInstanceRefusal();
+  throw new ClosedInstanceRefusal(isLatched());
 }
 
 /** Whether `connection` was ended here (its `disconnect()` was asked for). */

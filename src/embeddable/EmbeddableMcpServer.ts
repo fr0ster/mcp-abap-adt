@@ -162,6 +162,15 @@ export interface EmbeddableMcpServerOptions {
   stateIdleMinutes?: number;
 
   /**
+   * Whether the transport's close ends this instance's session (every live
+   * call's signal aborts then). `false` for a host that connects a transport
+   * per request: the client's disconnect closes that request's transport and
+   * ends no call; the instance's close or the process shutdown does.
+   * @default true
+   */
+  transportCloseEndsSession?: boolean;
+
+  /**
    * Where the state's lifecycle lines go: the idle bound's end of a state, a
    * cleanup that failed, an observer that threw. Never a state handle.
    * @default stderr, always on
@@ -203,6 +212,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       systemContextResolver: options.systemContextResolver,
       stateIdleMinutes: options.stateIdleMinutes,
       stateLogger: options.stateLogger,
+      ...(options.transportCloseEndsSession !== undefined && {
+        transportCloseEndsSession: options.transportCloseEndsSession,
+      }),
       ...(options.backgroundRuns !== undefined && {
         backgroundRuns: options.backgroundRuns,
       }),

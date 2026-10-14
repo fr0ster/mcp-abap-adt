@@ -281,6 +281,18 @@ export abstract class BaseMcpServer extends McpServer {
      * tools are refused.
      */
     backgroundRuns?: IBackgroundRuns;
+    /**
+     * Whether the transport's close is the end of this instance's session
+     * (default `true`): stdio's transport, an SSE stream, an embedder's
+     * connected transport — every live call's signal aborts then. `false`
+     * for a host that connects a transport per request (Streamable HTTP):
+     * the client's disconnect closes that request's transport and ends no
+     * call — an admitted call (waiting for its connection, its system
+     * lookup, its turn in the main flow, or running) goes on to its end.
+     * Its calls are interrupted only by the instance's close
+     * (`closeInstance`) or the process shutdown.
+     */
+    transportCloseEndsSession?: boolean;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
@@ -302,12 +314,17 @@ export abstract class BaseMcpServer extends McpServer {
         : options.systemContextResolver;
     // The session's end: the transport closed (the SDK calls the protocol's
     // `onclose` once per transport). Every live call's signal aborts then —
-    // and only then: a client's cancel aborts nothing (`trackCall`).
-    const previousOnClose = this.server.onclose;
-    this.server.onclose = () => {
-      previousOnClose?.();
-      this.sessionEnded();
-    };
+    // and only then: a client's cancel aborts nothing (`trackCall`). A host
+    // with a transport per request (http) states that its transport's close
+    // is no session's end: nothing is wired, and a dropped request ends no
+    // call.
+    if (options.transportCloseEndsSession !== false) {
+      const previousOnClose = this.server.onclose;
+      this.server.onclose = () => {
+        previousOnClose?.();
+        this.sessionEnded();
+      };
+    }
   }
 
   /** The controllers of this instance's live calls (`trackCall`). */
@@ -1613,7 +1630,9 @@ export abstract class BaseMcpServer extends McpServer {
    * counts: it pauses while the call runs and counts from its end.
    *
    * Each call has a request signal of its own (§5.1): aborted when the
-   * session ends — the instance's transport closed (`sessionEnded`) — and
+   * session ends — the instance's transport closed (`sessionEnded`), unless
+   * the host connects a transport per request (`transportCloseEndsSession:
+   * false`, http: a dropped request ends no call) — and
    * when the call ends whatever its outcome (D4: the broker releases the
    * party it attached only then). A tool call cannot be cancelled: the
    * request's `extra.signal`, which the SDK also aborts for a client's

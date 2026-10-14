@@ -458,7 +458,16 @@ export class StreamableHttpServer extends BaseMcpServer {
           backgroundRuns?: IBackgroundRuns;
         },
       ) {
-        super({ name: 'mcp-abap-adt', version, logger, ...state });
+        // A transport per request: the client's disconnect closes that
+        // transport and ends no call — an admitted call goes on to its end.
+        // The instance's calls end with its close or the process shutdown.
+        super({
+          name: 'mcp-abap-adt',
+          version,
+          logger,
+          ...state,
+          transportCloseEndsSession: false,
+        });
         this.registerHandlers(this.registry);
       }
 

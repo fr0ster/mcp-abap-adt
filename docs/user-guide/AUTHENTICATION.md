@@ -222,7 +222,8 @@ no longer taken for cloud).
 
 **Responsible and master system.** A created object always carries its responsible person; its master
 system only when one is known. **The responsible is the user the system names**: the server asks the
-system's `systeminformation` once per connection, on ABAP Cloud and on-premise alike, and its answer
+system's `systeminformation` once per destination (its credentials and its target system: a new
+session of the same ones is not asked again), on ABAP Cloud and on-premise alike, and its answer
 wins over everything configured — with passwordless SSO, or a user provisioned into the system, the
 user exists only inside the system. For each request the server takes each from the first of:
 
@@ -240,11 +241,15 @@ user exists only inside the system. For each request the server takes each from 
 
 The headers are read per request over HTTP and from the connection's opening request over SSE. The
 destination's own `.env` (stdio) is the `--env` / `--env-path` file, or `sessions/<destination>.env`
-for a named destination (`--mcp`). The system is asked once per connection, on the connected
+for a named destination (`--mcp`). The system is asked once per destination — its credentials and
+its target system; over HTTP each request's headers are a destination of their own — on the connected
 connection — one request (`GET /sap/bc/adt/core/http/systeminformation`). Its answer is read by the
 system's kind (the rule above, never its URL): an answer naming a user is used on both kinds; an
 answer without a user is not a valid ABAP system for this server (`system_without_user`); a `404` is
-the function unavailable — on-premise steps 3–8 apply; every ABAP Cloud system has it, so on a cloud
+the function unavailable — on-premise steps 3–8 apply when the call states a user (the
+destination's or the environment's `SAP_USERNAME`, or `x-sap-login` of an `x-sap-url` basic
+connection); with none the call is refused `system_user_unknown` (the session user is unknown; the
+tool does not run, and the next call asks again; at a stdio start the server does not start) —; every ABAP Cloud system has it, so on a cloud
 system the destination is not a valid ABAP Cloud system (`cloud_without_systeminformation`); any
 other status is a failed lookup on both kinds. On a cloud system steps 3–8 never count. `x-sap-login`
 is the login only of an `x-sap-url` basic connection, which logs on with it; a token connection states

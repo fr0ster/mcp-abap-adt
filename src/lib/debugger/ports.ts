@@ -12,11 +12,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
-import { ServerRefusal } from '../auth/serverRefusal';
 import { endConnection, own } from '../ownedConnections';
 import { openFreshConnection } from '../packageSessions';
 import { getRequestContext } from '../requestContext';
-import { SystemWithoutUserError } from '../requestSystemResolution';
+import { invalidSystemRefusal } from '../requestSystemResolution';
 import { ourClassExecutor, ourProgramExecutor } from '../strategies/resultSets';
 import { systemUserOf } from '../systemUser';
 import type { AmdpSessionPorts } from './AmdpSession';
@@ -27,9 +26,10 @@ import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
  * every kind of system, over any configured login. An answer that names no
  * user is the call's `system_without_user`. The login — the request scope's
  * before the process's, never the responsible — stands in only on-premise
- * when the function is unavailable (`404`); on ABAP Cloud a `404`, and on
- * both kinds any other failure (`405`, `501`, a `5xx`, authentication,
- * network), goes through to the caller as it came. The kind is the
+ * when the function is unavailable (`404`); on ABAP Cloud a `404` is the
+ * call's `cloud_without_systeminformation` (every ABAP Cloud system has it),
+ * and on both kinds any other failure (`405`, `501`, a `5xx`,
+ * authentication, network) goes through to the caller as it came. The kind is the
  * connection's (`systemType`: the server's stated one, for a connection the
  * factory did not build).
  */
@@ -43,10 +43,7 @@ export async function requestUserOf(
   } catch (error) {
     // An answer without a user is not a valid ABAP system: no fallback to
     // the login, the call's refusal.
-    if (error instanceof SystemWithoutUserError) {
-      throw new ServerRefusal('system_without_user');
-    }
-    throw error;
+    throw invalidSystemRefusal(error, undefined) ?? error;
   }
   const user = named || getRequestContext()?.login || process.env.SAP_USERNAME;
   if (!user?.trim()) {

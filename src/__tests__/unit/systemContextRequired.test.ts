@@ -538,7 +538,7 @@ describe('cloud', () => {
     expect(connection.requests).toEqual([]);
   });
 
-  it('a cloud system without the endpoint (404): a failed lookup, system_lookup_failed — the process login does not stand in, nothing sent', async () => {
+  it('a cloud system without the endpoint (404): not a valid ABAP Cloud system, cloud_without_systeminformation — the process login does not stand in, nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
     lookup.mockRejectedValue(
@@ -551,10 +551,11 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(JSON.parse(textOf(result))).toMatchObject({
-      error: 'system_lookup_failed',
+    expect(JSON.parse(textOf(result))).toEqual({
+      error: 'cloud_without_systeminformation',
+      message:
+        'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run',
     });
-    expect(textOf(result)).not.toContain('system_without_user');
     expect(textOf(result)).not.toContain('PROCESS_LOGIN');
     expect(connection.requests).toEqual([]);
   });

@@ -491,6 +491,17 @@ export function startSystemWithoutUserWords(destination: string): string {
 }
 
 /**
+ * The start's words for an ABAP Cloud system that answered `404` for
+ * systeminformation: every ABAP Cloud system has it, so the destination is
+ * not a valid ABAP Cloud system.
+ */
+export function startCloudWithoutSystemInformationWords(
+  destination: string,
+): string {
+  return `Destination "${destination}": the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the server did not start`;
+}
+
+/**
  * The words the connection at start failed in: what the failure reader
  * makes of it (a chain failure, the server's own refusal — a system lookup
  * that failed — or the destination layer's), else the destination, the
@@ -513,6 +524,9 @@ export function startConnectionWords(
   }
   if (read?.error === 'system_without_user') {
     return startSystemWithoutUserWords(destination);
+  }
+  if (read?.error === 'cloud_without_systeminformation') {
+    return startCloudWithoutSystemInformationWords(destination);
   }
   if (read !== undefined) {
     return destinationFailureWords(error, destination, options);

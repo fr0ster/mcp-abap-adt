@@ -5,9 +5,11 @@
  * configuration applies; on ABAP Cloud, and for any other failure on both
  * kinds, the call is refused. An answer that names no
  * user — the field missing or blank, a body that is no JSON, JSON that is no
- * object — is `system_without_user`; any status but a `2xx` (`404`, `405`,
- * `501`, `500`) is a failed lookup, `system_lookup_failed`, with no login
- * standing in. The tool never runs.
+ * object — is `system_without_user`; on ABAP Cloud a `404` is
+ * `cloud_without_systeminformation` (every ABAP Cloud system has the
+ * function); any other status but a `2xx` (`405`, `501`, `500`) is a failed
+ * lookup, `system_lookup_failed`, with no login standing in. The tool never
+ * runs.
  */
 
 import type { StandInRequest } from '../../../src/__tests__/helpers/adtStandIn';
@@ -53,7 +55,20 @@ it.each(WITHOUT_USER)(
   },
 );
 
-it.each([404, 405, 501, 500])(
+it('ABAP Cloud, systeminformation answered 404: cloud_without_systeminformation, no header stands in, the tool not run', async () => {
+  s.standIn.answer(isLookup, 404);
+  const answer = await s.call('ProbeAdt', { id: 'NO_LOOKUP' });
+  expect(answer.isError).toBe(true);
+  expect(JSON.parse(answer.text)).toEqual({
+    error: 'cloud_without_systeminformation',
+    message:
+      'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run',
+  });
+  expect(answer.text).not.toContain('SHUTDOWN_USER');
+  expect(s.standIn.requests.some(isProbe)).toBe(false);
+});
+
+it.each([405, 501, 500])(
   'ABAP Cloud, systeminformation answered %i: system_lookup_failed, no login stands in, the tool not run',
   async (status) => {
     s.standIn.answer(isLookup, status);

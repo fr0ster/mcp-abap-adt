@@ -9,9 +9,10 @@
  * body that is no JSON or JSON that is no object — is not a valid ABAP
  * system for this server: `SystemWithoutUserError`. A `404` is the function
  * unavailable: on-premise the answer is `undefined` (the configured login
- * applies); on ABAP Cloud it is thrown as it came, like any other failure
- * (`405`, `501`, a `5xx`, authentication, network) — the login never stands
- * in there. The kind is the one the connection was built for
+ * applies); on ABAP Cloud, which always has it, the destination is not a
+ * valid ABAP Cloud system (`CloudWithoutSystemInformationError`) — the login
+ * never stands in there. Any other failure (`405`, `501`, a `5xx`,
+ * authentication, network) is thrown as it came. The kind is the one the connection was built for
  * (`systemKindOf`: the factory's recorded settings, else the server's stated
  * `systemType`, else `SAP_SYSTEM_TYPE`; none is `system_type_required`) —
  * the same the system-context resolver reads.
@@ -22,7 +23,10 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { systemKindOf } from './connectionFactory';
-import { SystemWithoutUserError } from './requestSystemResolution';
+import {
+  CloudWithoutSystemInformationError,
+  SystemWithoutUserError,
+} from './requestSystemResolution';
 import {
   isSystemInformationUnavailable,
   readSystemInformation,
@@ -37,11 +41,11 @@ export async function systemUserOf(
   try {
     info = await readSystemInformation(connection);
   } catch (error) {
-    if (
-      isSystemInformationUnavailable(error) &&
-      systemKindOf(connection, process.env, systemType) !== 'cloud'
-    ) {
-      return undefined;
+    if (isSystemInformationUnavailable(error)) {
+      if (systemKindOf(connection, process.env, systemType) !== 'cloud') {
+        return undefined;
+      }
+      throw new CloudWithoutSystemInformationError();
     }
     throw error;
   }

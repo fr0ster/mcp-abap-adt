@@ -4,7 +4,8 @@
  * An answer that names no user is the same `system_without_user` the
  * per-call lookup answers — one rule, one code. Nothing is kept: once the
  * system names its user, the next call asks again and goes on. The
- * configured login stands in only on an on-premise `404`.
+ * configured login stands in only on an on-premise `404`; on ABAP Cloud a
+ * `404` is `cloud_without_systeminformation`.
  */
 
 import { TokenAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -120,7 +121,33 @@ it('on ABAP Cloud the user the system names wins over a configured login', async
   }
 });
 
-it.each([404, 405, 501, 500])(
+it('on ABAP Cloud a caller lookup answered 404: cloud_without_systeminformation, never the login', async () => {
+  const standIn = await adtStandIn();
+  standIn.answer(isLookup, 404);
+  const saved = process.env.SAP_USERNAME;
+  process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+  const { server, client } = await standServerOn(standIn, {});
+  try {
+    const answer = await client.call('GetBackgroundRun', {
+      run_handle: 'unknown-handle',
+    });
+    expect(answer.isError).toBe(true);
+    expect(answer.payload).toEqual({
+      error: 'cloud_without_systeminformation',
+      message:
+        'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run',
+    });
+    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+  } finally {
+    if (saved === undefined) delete process.env.SAP_USERNAME;
+    else process.env.SAP_USERNAME = saved;
+    await client.close();
+    await server.terminalClose();
+    await standIn.close();
+  }
+});
+
+it.each([405, 501, 500])(
   'on ABAP Cloud a caller lookup answered %i is the call error, never the login',
   async (status) => {
     const standIn = await adtStandIn();

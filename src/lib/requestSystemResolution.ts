@@ -95,13 +95,13 @@ export function systemContextResolverFor(
       info = await readSystemInformation(connection);
     } catch (error) {
       // On-premise without the function: the configuration applies. On
-      // ABAP Cloud the system information is required: any failure is a
-      // failed lookup, never an answer without a user.
-      if (
-        isSystemInformationUnavailable(error) &&
-        systemKindOf(connection, process.env, systemType) !== 'cloud'
-      ) {
-        return null;
+      // ABAP Cloud every system has it: its absence is the destination's
+      // fault (`CloudWithoutSystemInformationError`), never a fallback.
+      if (isSystemInformationUnavailable(error)) {
+        if (systemKindOf(connection, process.env, systemType) !== 'cloud') {
+          return null;
+        }
+        throw new CloudWithoutSystemInformationError();
       }
       throw error;
     }
@@ -126,6 +126,43 @@ export class SystemWithoutUserError extends Error {
     super('the system answered systeminformation without a user');
     this.name = 'SystemWithoutUserError';
   }
+}
+
+/**
+ * An ABAP Cloud system that answered `404` for `systeminformation`: every
+ * ABAP Cloud system has the function, so the destination is not a valid
+ * ABAP Cloud system. Nothing configured stands in.
+ */
+export class CloudWithoutSystemInformationError extends Error {
+  constructor() {
+    super('the ABAP Cloud system answered without systeminformation');
+    this.name = 'CloudWithoutSystemInformationError';
+  }
+}
+
+/**
+ * The server's refusal for a system whose answer disqualifies it — no user
+ * (`system_without_user`), an ABAP Cloud system without the function
+ * (`cloud_without_systeminformation`) — with its fixed warning; `undefined`
+ * for any other failure.
+ */
+export function invalidSystemRefusal(
+  error: unknown,
+  warn: ((message: string) => void) | undefined,
+): ServerRefusal | undefined {
+  if (error instanceof SystemWithoutUserError) {
+    warn?.(
+      'The system answered systeminformation without a user: not a valid ABAP system for this server',
+    );
+    return new ServerRefusal('system_without_user');
+  }
+  if (error instanceof CloudWithoutSystemInformationError) {
+    warn?.(
+      'The ABAP Cloud system answered without systeminformation: not a valid ABAP Cloud system',
+    );
+    return new ServerRefusal('cloud_without_systeminformation');
+  }
+  return undefined;
 }
 
 const requiringUserOf = new WeakMap<
@@ -162,7 +199,8 @@ export function requiringUser(
  * What a failed lookup is to the call that needed it — the same on every
  * path that asks before a handler runs (the server's, `HandlerExporter`'s):
  * an answer that names no user (`requiringUser`) the server's
- * `system_without_user`, a chain failure as it is, any other the server's
+ * `system_without_user`, an ABAP Cloud system without the function
+ * `cloud_without_systeminformation`, a chain failure as it is, any other the server's
  * `system_lookup_failed`. `warn` gets fixed words, or the error's class
  * only: a lookup's message may quote what the system answered (H4).
  */
@@ -170,12 +208,8 @@ export function systemLookupRefusal(
   error: unknown,
   warn: ((message: string) => void) | undefined,
 ): unknown {
-  if (error instanceof SystemWithoutUserError) {
-    warn?.(
-      'The system answered systeminformation without a user: not a valid ABAP system for this server',
-    );
-    return new ServerRefusal('system_without_user');
-  }
+  const invalid = invalidSystemRefusal(error, warn);
+  if (invalid !== undefined) return invalid;
   if (readGuarded(failureOf, error) !== undefined) return error;
   warn?.(
     `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,

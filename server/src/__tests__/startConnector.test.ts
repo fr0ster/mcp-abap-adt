@@ -449,10 +449,28 @@ it('a logon SAP refuses: exit 1 with the failure on stderr, and the transport ne
   expect(s.stderr.join('\n')).not.toContain('start-password');
 });
 
-// On ABAP Cloud any status but a `2xx` (`404`, `405`, `501`, `500`) is a
-// failed lookup — never an answer without a user, never the login in its
-// place.
-it.each([500, 404, 405, 501])(
+// On ABAP Cloud a `404` is a system without the function every ABAP Cloud
+// system has: the destination is not a valid ABAP Cloud system.
+it('ABAP Cloud, systeminformation answered 404: exit 1 naming an invalid ABAP Cloud destination, the transport never opens, and the logon is logged off', async () => {
+  standIn.answer(isLookup, 404);
+  const s = await start({ kind: 'cloud' });
+  expect(s.exits).toEqual([1]);
+  expect(s.opened()).toBe(0);
+  expect(s.stderr).toContain(
+    '[MCP] Destination "default": the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the server did not start',
+  );
+  expect(s.stderr).not.toContain(`[MCP] ${startLookupFailedWords('default')}`);
+  const end = Date.now() + 10_000;
+  while (standIn.logoffs() === 0 && Date.now() < end) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  expect(standIn.logoffs()).toBe(1);
+  expect(runtimeFiles(runtime)).toEqual([]);
+});
+
+// Any other status but a `2xx` (`405`, `501`, `500`) is a failed lookup —
+// never an answer without a user, never the login in its place.
+it.each([500, 405, 501])(
   'ABAP Cloud, systeminformation answered %i: exit 1 naming the lookup, the transport never opens, and the logon is logged off',
   async (status) => {
     standIn.answer(isLookup, status);

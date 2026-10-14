@@ -24,6 +24,7 @@ export type ServerRefusalCode =
   | 'background_run_caller_unknown'
   | 'system_lookup_failed'
   | 'system_without_user'
+  | 'cloud_without_systeminformation'
   | 'system_type_required'
   | 'instance_closed';
 
@@ -97,6 +98,16 @@ export const SYSTEM_WITHOUT_USER_WORDS =
   'the system answered systeminformation without a user, so it is not a valid ABAP system for this server; the tool did not run';
 
 /**
+ * A call on an ABAP Cloud connection whose system answered `404` for
+ * `systeminformation`: every ABAP Cloud system has the function, so its
+ * absence is the destination's fault — not a system to retry, and nothing
+ * configured stands in. The tool did not run; nothing is kept, so the next
+ * call asks again. On stdio the same answer at the start ends the process.
+ */
+export const CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS =
+  'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run';
+
+/**
  * The fixed words of a connection refused because its instance is closed
  * (its stream closed, its close began) while the server keeps running.
  */
@@ -146,6 +157,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   background_run_caller_unknown: BACKGROUND_RUN_CALLER_UNKNOWN_WORDS,
   system_lookup_failed: SYSTEM_LOOKUP_FAILED_WORDS,
   system_without_user: SYSTEM_WITHOUT_USER_WORDS,
+  cloud_without_systeminformation: CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS,
   system_type_required: SYSTEM_TYPE_REQUIRED_WORDS,
   instance_closed: INSTANCE_CLOSED_WORDS,
 };

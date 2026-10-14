@@ -84,12 +84,12 @@ import {
 } from '../lib/requestSignal.js';
 import {
   defaultSystemContextResolver,
+  invalidSystemRefusal,
   isShippedResolver,
   type ResolvedSystemContext,
   requiringUser,
   resolveOnce,
   type SystemContextResolver,
-  SystemWithoutUserError,
   systemContextResolverFor,
   systemLookupRefusal,
   withDestinationSystemContext,
@@ -1590,8 +1590,9 @@ export abstract class BaseMcpServer extends McpServer {
    * `sapUserOf`'s lookup (`systemUserOf`, with the server's stated
    * `systemType`): the user `systeminformation` names on every kind of
    * system; `undefined` for an on-premise system without the function
-   * (`404`); an answer that names none `system_without_user`; any other
-   * failure — on ABAP Cloud a `404` too — the call's error as it came.
+   * (`404`); an answer that names none `system_without_user`; on ABAP
+   * Cloud a `404` `cloud_without_systeminformation`; any other failure the
+   * call's error as it came.
    */
   private async callerUserOf(
     signal: AbortSignal,
@@ -1624,13 +1625,11 @@ export abstract class BaseMcpServer extends McpServer {
       } catch (error) {
         // The per-call lookup's rule (`requireSystem`): an answer that names
         // no user is not a valid ABAP system. Nothing kept.
-        if (error instanceof SystemWithoutUserError) {
-          this.logger?.warn?.(
-            'The system answered systeminformation without a user: not a valid ABAP system for this server',
-          );
-          throw new ServerRefusal('system_without_user');
-        }
-        throw error;
+        throw (
+          invalidSystemRefusal(error, (message) =>
+            this.logger?.warn?.(message),
+          ) ?? error
+        );
       }
       this.keepCallerUser(key, asked, generation);
       return asked;

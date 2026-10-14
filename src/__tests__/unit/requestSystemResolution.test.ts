@@ -38,6 +38,7 @@ import {
   type SystemContextResolver,
   withResolvedSystemContext,
 } from '../../lib/requestContext';
+import { CloudWithoutSystemInformationError } from '../../lib/requestSystemResolution';
 import {
   getEffectiveSystemContext,
   resetSystemContextCache,
@@ -214,9 +215,9 @@ describe('defaultSystemContextResolver', () => {
         defaultSystemContextResolver(foreignConn(url)),
       ).resolves.toBe(null);
       process.env.SAP_SYSTEM_TYPE = 'cloud';
-      await expect(defaultSystemContextResolver(foreignConn(url))).rejects.toBe(
-        absent,
-      );
+      await expect(
+        defaultSystemContextResolver(foreignConn(url)),
+      ).rejects.toBeInstanceOf(CloudWithoutSystemInformationError);
     },
   );
 
@@ -231,7 +232,16 @@ describe('defaultSystemContextResolver', () => {
     });
   });
 
-  it.each([404, 405, 501, 500])(
+  it('a cloud system whose systeminformation answers 404: not a valid ABAP Cloud system, never null', async () => {
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
+    await expect(
+      defaultSystemContextResolver(cloudConn()),
+    ).rejects.toBeInstanceOf(CloudWithoutSystemInformationError);
+  });
+
+  it.each([405, 501, 500])(
     'a cloud system whose systeminformation answers %i: the lookup fails with it, not an answer',
     async (status) => {
       const failure = Object.assign(new Error('placeholder'), {
@@ -332,12 +342,12 @@ describe('withResolvedSystemContext', () => {
   });
 
   it.each([
-    ['cloud', cloudConn, 404],
-    ['cloud', cloudConn, 500],
-    ['on-premise', onPremConn, 500],
-  ])(
-    '%s, a lookup answered %i: the call fails as system_lookup_failed, fn never runs, and the next call asks again',
-    async (_kind, conn, status) => {
+    ['cloud', cloudConn, 404, 'cloud_without_systeminformation'],
+    ['cloud', cloudConn, 500, 'system_lookup_failed'],
+    ['on-premise', onPremConn, 500, 'system_lookup_failed'],
+  ] as const)(
+    '%s, a lookup answered %d: the call fails as %s, fn never runs, and the next call asks again',
+    async (_kind, conn, status, code) => {
       const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
       lookup.mockRejectedValue(
         Object.assign(new Error('placeholder'), { response: { status } }),
@@ -350,7 +360,7 @@ describe('withResolvedSystemContext', () => {
             { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
             () => withResolvedSystemContext(connection, fn),
           ),
-        ).rejects.toMatchObject({ serverRefusal: 'system_lookup_failed' });
+        ).rejects.toMatchObject({ serverRefusal: code });
       }
       expect(fn).not.toHaveBeenCalled();
       expect(lookup).toHaveBeenCalledTimes(2);
@@ -630,7 +640,7 @@ describe('HandlerExporter.getHandlerEntries', () => {
               response: { status: 404 },
             }),
           ),
-        'system_lookup_failed',
+        'cloud_without_systeminformation',
       ],
     ])(
       '%s: the call fails with the server refusal, no handler runs, and the next call asks again',

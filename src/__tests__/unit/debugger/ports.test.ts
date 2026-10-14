@@ -35,7 +35,15 @@ describe('the request user', () => {
     );
     expect(conn.requests).toHaveLength(1);
   });
-  it.each([404, 405, 501, 500])(
+  it('on ABAP Cloud a 404 handed back is cloud_without_systeminformation, never the login', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'cloud';
+    const conn = recordingConnection([{ status: 404, data: '' }]);
+    process.env.SAP_USERNAME = 'processlogin';
+    await expect(requestUserOf(conn as any)).rejects.toMatchObject({
+      serverRefusal: 'cloud_without_systeminformation',
+    });
+  });
+  it.each([405, 501, 500])(
     "on ABAP Cloud a %i handed back is the call's error, never the login",
     async (status) => {
       process.env.SAP_SYSTEM_TYPE = 'cloud';

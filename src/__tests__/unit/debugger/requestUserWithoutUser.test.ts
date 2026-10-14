@@ -3,8 +3,8 @@
  * system: an answer naming its user is the user, over any configured login;
  * an answer that names none is `system_without_user`. A `404` is the function
  * unavailable: on-premise the configured login (the request scope's, then the
- * process's) stands in, none → the user is unknown; on ABAP Cloud it is the
- * call's error. Any other status (`405`, `501`, `500`) is the call's error as
+ * process's) stands in, none → the user is unknown; on ABAP Cloud, which
+ * always has it, the call's `cloud_without_systeminformation`. Any other status (`405`, `501`, `500`) is the call's error as
  * it came on both kinds — never the login in its place.
  */
 
@@ -194,7 +194,22 @@ describe('ABAP Cloud', () => {
     },
   );
 
-  it.each([404, 405, 501, 500])(
+  it('systeminformation answered 404: not a valid ABAP Cloud system — cloud_without_systeminformation, the login not used', async () => {
+    const { standIn, connection } = await standConnection();
+    try {
+      standIn.answer(isLookup, 404);
+      await expect(requestUserOf(connection)).rejects.toMatchObject({
+        serverRefusal: 'cloud_without_systeminformation',
+        message:
+          'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run',
+      });
+      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    } finally {
+      await closeBoth(standIn, connection);
+    }
+  });
+
+  it.each([405, 501, 500])(
     'systeminformation answered %i: the call fails with it, the login not used',
     async (status) => {
       const { standIn, connection } = await standConnection();

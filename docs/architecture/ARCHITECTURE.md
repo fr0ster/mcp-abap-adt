@@ -327,7 +327,8 @@ instance the first call on a connection without it asks (`systemBeforeTool` →
 `requireSystem`, concurrent askers sharing one request through `resolveOnce`) inside
 the main flow — a call outside the flow takes a turn in it for the lookup alone. A
 failure is that call's answer (an answer that names no user `system_without_user` —
-not a valid ABAP system for this server —, a chain failure as it is, else
+not a valid ABAP system for this server —, a chain failure as it is, else — no
+endpoint (`404`) included: `readSystemInformation` tells it from an answer —
 `system_lookup_failed`) and its tool does not run; nothing failed is kept, so the next call asks again. A
 replacement of a connection of the same credential keeps its answer. The tool wrapper
 reads the answer (`withKnownSystemContext`) and sends nothing; on-premise nothing is

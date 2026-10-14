@@ -383,15 +383,22 @@ on a dead process's session only).
 **On ABAP Cloud the system is asked once per connection, before a tool runs on it**
 (`systeminformation`: the user as responsible, the system id as master system, for what a create
 needs and the request does not state). **No tool ever runs twice**: the lookup comes before the
-tool, never after a refusal.
+tool, never after a refusal. The server reads `systeminformation` with its HTTP status, and tells
+three answers apart: **no endpoint** — the request failed with `404`, and only `404`; **an answer
+without a user** — a `2xx` whose body is no JSON, is JSON but no object, or names no user (the
+user missing, empty, blank or not a string); **any other failure** — `405`, `501`, a `5xx`, an
+authentication or network failure — as it came. On ABAP Cloud the system information is required:
+no endpoint there is a failed lookup like any other failure, never an answer without a user, and
+the login never stands in.
 
 - **stdio:** at the start, with the connection (or from the leftover session's file, when it
   carries it); it is fixed for the process, like the user. A failed lookup ends the process before
   the transport opens — exit `1`, and on stderr `[MCP] Destination "<name>": the ABAP Cloud system
   could not be asked for the session user and system id (systeminformation), which the start
   needs; the server did not start. Start it again when the system is available` — and logs off the
-  logon made for it. A system that answers `systeminformation` but names no user (the user
-  missing, empty, blank or not a string, or a body that is no JSON) is not a valid ABAP system for
+  logon made for it; a system without the endpoint (`404`) ends the start the same way. A system
+  that answers `systeminformation` but names no user (the user missing, empty, blank or not a
+  string, a body that is no JSON or JSON that is no object) is not a valid ABAP system for
   this server: exit `1` the same way, with `[MCP] Destination "<name>": the system answered
   systeminformation without a user, so it is not a valid ABAP system for this server; the server
   did not start`.
@@ -400,14 +407,17 @@ tool, never after a refusal.
   tool — takes a turn in it for the lookup alone). If the lookup fails, that call answers the error
   — a chain failure as it is, an answer that names no user `system_without_user` ("the ABAP Cloud
   system answered systeminformation without a user, so it is not a valid ABAP system for this
-  server; the tool did not run"), any other `system_lookup_failed` — and its tool did not run, a
+  server; the tool did not run"), any other — no endpoint (`404`) included —
+  `system_lookup_failed` — and its tool did not run, a
   read included. Nothing of a refused answer is kept. The following calls are not barred: each call on a connection without the information
   asks again (the system may have been restarted or fixed). An embedder's instance does the same.
 
 On-premise nothing is asked before a tool. Where the server does ask `systeminformation` for a
 user — the debugger's request user, a background run's caller of a token login — an answer that
-names no user is `system_without_user` on every system kind, with no fallback to the login; only a
-system without the endpoint (`404`) falls back to the configured login. (Before this, a failed lookup failed nothing: a create that needed it
+names no user (a body that is no JSON or no object included) is `system_without_user` on every
+system kind, with no fallback to the login; only a system without the endpoint (`404`) falls back
+to the configured login. Any other failure of that lookup (`405`, `501`, a `5xx`, authentication,
+network) is the call's error, with no fallback either. (Before this, a failed lookup failed nothing: a create that needed it
 asked again inside the tool and ran the tool once more with the answer — a tool that had sent
 something before its guarded create, as `CreateCdsUnitTest` does, sent it twice.)
 

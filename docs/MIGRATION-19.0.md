@@ -352,7 +352,7 @@ caller's user (run directly when the call that makes it already holds the flow, 
 connection taken in its turn, so a session lost ahead of it is already replaced); the connect's own
 sends (its session record) come before any tool can use the connection, and the ABAP Cloud system
 lookup before the first tool runs (below). An embedder's own registry that is not a `CompositeHandlersRegistry` (it registers its
-tools itself) gets no main-flow queue. Outside the order, because they work
+tools itself) takes its turn in the order for every call, whatever the tool's name. Outside the order, because they work
 on a connection of their own: a background run (`background: true`), a listed long read (on its
 fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow). **A tool call cannot be cancelled**: it ends with
 its result or with the session. A cancel your client sends aborts nothing — a queued call keeps
@@ -965,12 +965,17 @@ transport's options only:
   `CompositeHandlersRegistry`) take their turn too: the server handed to the registry is the
   instance, so a callback can reach its connection (`getConnection`, `onMainConnection`, or a
   subclass's protected members). Two calls of such tools sent at once run one after the other;
-  each leaves the flow when its callback settled. The same tools as a handler group's stay out
-  of it — a run tool asked for `background: true`, a listed long read, a debugger tool on the
-  debugger's own connections — by name, so a tool of yours named like one of them is trusted to
-  work on a connection of its own. Inside its turn, `onMainConnection(signal, send)` sends at
-  once, on the connection it takes there; a callback that calls `getConnection` itself calls
-  `connectionReleased` once for it. `sessionUtils`' `makeAdtRequestWithSession` / `makeAdtRequestStateless` (not
+  each leaves the flow when its callback settled. **Your own tool always takes its turn**, whatever
+  its name or arguments: no tool of yours is exempt — not one named like a debugger tool or a long
+  read, not a run tool called with `background: true`; a callback that works on a connection of its
+  own still waits for the call ahead. Before the callback runs, its turn takes the instance's
+  connection and asks its system information when it has none (on ABAP Cloud `systeminformation`),
+  as before a handler group's tool: a failed lookup — `system_without_user` included — is that
+  call's error answer and your callback is not called; the next call asks again. The callback runs
+  in the same system context scope as a handler group's tool. Inside its turn,
+  `onMainConnection(signal, send)` sends at once, on the connection the turn holds; a callback that
+  calls `getConnection` itself calls `connectionReleased` once for it. On an instance with no
+  connection source set, nothing is taken or asked: the callback runs in its turn. `sessionUtils`' `makeAdtRequestWithSession` / `makeAdtRequestStateless` (not
   exported) are gone too.
 - **`IAuthBrokerFactoryConfig.loginTimeoutStated?`** names the bound in D10's sentence (the
   launcher passes the form the user set, `` `--login-timeout=300` ``); absent, the sentence names

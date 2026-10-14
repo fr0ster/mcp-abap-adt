@@ -211,12 +211,17 @@ reaches its tool. An embedder's own registry that is not a `CompositeHandlersReg
 (`registerAllTools(trackingRegistrations())`) takes its turn too: the server it is handed is the
 instance itself (every member bound, `getConnection` and `onMainConnection` among them) and a
 subclass's registry may call its protected members, so its callbacks can reach the instance's
-connection. Each call enters the flow before its callback runs and leaves it when the callback
-settled, except the tools on the same list as a handler group's (`worksOnOwnConnection`: a run
-tool with `background: true`, a listed long read, a debugger tool on the debugger's own
-connections), matched by name. The turn is marked held without a connection (`inHeldTurn`): a
-send through `onMainConnection` from inside it takes the instance's connection there and runs at
-once instead of queueing behind its own call. The instance close and the process shutdown interrupt every call — the queued ones
+connection. Every call enters the flow before its callback runs and leaves it when the callback
+settled, whatever its name or arguments: the list a handler group's tools are read by
+(`worksOnOwnConnection`) exempts none of them, since a name cannot prove a callback works on a
+connection of its own. Inside its turn the instance's connection is taken and its system
+information asked before the callback runs (`systemBeforeTool`), as for a handler group's tool: a
+failure — `system_without_user` included — is that call's answer, the callback does not run, and
+the next call asks again. The callback runs in the same system context scope
+(`withDestinationSystemContext`, `withKnownSystemContext`), and the turn is marked held on that
+connection (`inHeldFlow`): a send through `onMainConnection` from inside it runs at once on it
+instead of queueing behind its own call. An instance with no connection source has nothing to
+reach: the callback runs in its turn alone (`inHeldTurn`), nothing looked up. The instance close and the process shutdown interrupt every call — the queued ones
 leave without sending — and log the connection off at once, under the running call. Once in the flow, a queued call
 checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives
 the spent connection back (`connectionReleased`) and takes the replacement (`getConnection`)

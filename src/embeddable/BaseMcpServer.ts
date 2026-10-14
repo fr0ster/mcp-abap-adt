@@ -148,8 +148,9 @@ interface BuiltConnection {
  * connection made from within (an identity lookup) runs directly instead of
  * queueing behind itself. The value is the connection the holding call works
  * on; `null` when the holder took its turn without a connection (a tool its
- * own registry registered), so a send made from within takes the instance's
- * connection itself, inside that turn.
+ * own registry registered on an instance with no connection source), so a
+ * send made from within takes the instance's connection itself, inside that
+ * turn.
  */
 const heldFlows = new AsyncLocalStorage<
   ReadonlyMap<object, AbapConnection | null>
@@ -158,8 +159,9 @@ const heldFlows = new AsyncLocalStorage<
 /**
  * Whether a call of `tool` works on a connection of its own and takes no
  * place in the instance's main flow: a background run, a listed long read,
- * a debugger tool whose SAP work is on the debugger's own connections. One
- * list for both registration paths.
+ * a debugger tool whose SAP work is on the debugger's own connections. Read
+ * only for a handler group's tools, whose handlers are known: a callback a
+ * registry registers itself always takes its turn.
  */
 function worksOnOwnConnection(
   tool: string,
@@ -1746,11 +1748,18 @@ export abstract class BaseMcpServer extends McpServer {
    * Such a callback can reach the instance's connection: the server it is
    * handed is this instance (every member bound, `getConnection` and
    * `onMainConnection` included), and a subclass's own registry may call its
-   * protected members. So each call takes its turn in the main flow, as a
-   * handler group's does — by the same list of tools that work on a
-   * connection of their own (`worksOnOwnConnection`) — and leaves it when
-   * the callback settled. Inside the turn a send through `onMainConnection`
-   * runs at once, on the connection it takes there.
+   * protected members. So every call takes its turn in the main flow and
+   * leaves it when the callback settled — whatever its name or its
+   * arguments: no list exempts it (`worksOnOwnConnection` reads only a
+   * handler group's tools, which are known). Inside the turn the instance's
+   * connection is taken and its system information asked before the
+   * callback runs, as before a handler group's tool (`systemBeforeTool`):
+   * a failure — `system_without_user` included — is that call's answer, the
+   * callback does not run, and the next call asks again. The callback runs
+   * in the same system context scope, and a send through `onMainConnection`
+   * runs at once on the connection its turn holds. An instance with no
+   * connection source has nothing to reach and nothing to look up: the
+   * callback runs in its turn alone.
    */
   private trackingRegistrations(): McpServer {
     const track =
@@ -1765,33 +1774,51 @@ export abstract class BaseMcpServer extends McpServer {
             typeof last === 'object' && last !== null
               ? [...callbackArgs.slice(0, -1), { ...last, signal }]
               : callbackArgs;
-          // The tool's arguments: the first of `(args, extra)`, none for
-          // `(extra)`.
-          const toolArgs =
-            callbackArgs.length >= 2 ? callbackArgs[0] : undefined;
           let leaveFlow: (() => void) | undefined;
+          let inUse: AbapConnection | undefined;
           try {
             throwIfRequestAborted(signal);
-            const ownConnection = worksOnOwnConnection(
-              name,
-              toolArgs,
-              isBackgroundTool(name) && readBackground(toolArgs) === true,
-            );
-            if (!ownConnection) leaveFlow = await this.enterMainFlow(signal);
+            // Every call takes its turn, whatever its name or arguments: a
+            // callback can reach the instance's connection, and nothing in
+            // its name proves it works on a connection of its own.
+            leaveFlow = await this.enterMainFlow(signal);
             const run = () =>
               runWithRequestSignal(signal, async () => {
                 // Its turn came after the session ended: it never runs.
                 throwIfRequestAborted(signal);
                 return callback(...args);
               });
-            return await (leaveFlow !== undefined
-              ? this.inHeldTurn(run)
-              : run());
+            // No connection source: nothing of the instance's to reach, so
+            // nothing to look up; a send from within takes its turn's
+            // connection itself (and finds none).
+            if (this.connectionContext === null) {
+              return await this.inHeldTurn(run);
+            }
+            // Taken inside the turn, so no session the call ahead lost is
+            // handed on. Its system information is asked before the callback
+            // runs, as before a handler group's tool: a failure is this
+            // call's answer, the callback does not run, and the next call
+            // asks again.
+            const connection = await this.getConnection(signal);
+            inUse = connection;
+            await this.systemBeforeTool(connection, true, signal, (taken) => {
+              inUse = taken;
+            });
+            return await this.inHeldFlow(true, connection, () =>
+              withDestinationSystemContext(
+                this.systemContexts.get(connection),
+                () =>
+                  withKnownSystemContext(this.systemOf(connection), () =>
+                    run(),
+                  ),
+              ),
+            );
           } catch (error) {
             const read = readGuarded((t) => this.readFailure(t), error);
             if (read !== undefined) return answerRead(read);
             throw error;
           } finally {
+            if (inUse !== undefined) this.connectionReleased(inUse);
             leaveFlow?.();
           }
         });

@@ -10,10 +10,10 @@
  * - through the server the registry was handed (`getConnection`);
  * - through the subclass's `onMainConnection`, which inside the call's turn
  *   sends at once (no wait behind itself);
- * - a tool on the list of those that work on a connection of their own (a
- *   debugger tool, a run tool asked for a background run) takes no place in
- *   the flow, as a handler group's does; the same run tool in the foreground
- *   does.
+ * - no name and no argument exempts such a call: a tool named like a debugger
+ *   tool on its own connection, a run tool asked for a background run — each
+ *   takes its turn, since a name cannot prove the callback works on a
+ *   connection of its own.
  */
 
 import type { AbapConnection } from '@mcp-abap-adt/connection';
@@ -208,38 +208,55 @@ it.each<['handed-server' | 'main-connection']>([
   },
 );
 
-it('a self-registered tool on the own-connection list takes no place in the flow', async () => {
+it('a self-registered tool named like a debugger tool on its own connection still takes its turn', async () => {
   const name = DEBUGGER_OWN_CONNECTION_TOOLS[0];
   if (name === undefined) throw new Error('no own-connection tool listed');
   const s = await serve(name, 'handed-server');
   try {
     await Promise.all([s.call(1, 'first'), s.call(2, 'second')]);
     await s.held.arrived('first');
-    await s.held.arrived('second');
-    expect(s.log).toEqual(['start first', 'start second']);
+    await settleWhile();
+    expect(s.log).toEqual(['start first']);
     s.held.release('first');
+    await s.held.arrived('second');
     s.held.release('second');
     await until(() => s.answers.length === 2);
+    expect(s.log).toEqual([
+      'start first',
+      'end first',
+      'start second',
+      'end second',
+    ]);
   } finally {
     await s.server.close();
   }
 });
 
-it('a self-registered run tool asked for a background run takes no place in the flow; in the foreground it does', async () => {
+it('a self-registered run tool called with background: true takes its turn, as in the foreground', async () => {
   const s = await serve('RuntimeRunClass', 'handed-server');
   try {
     await s.call(1, 'holder');
     await s.held.arrived('holder');
     await s.call(2, 'background', { background: true });
-    await s.held.arrived('background');
     await s.call(3, 'foreground');
     await settleWhile();
-    expect(s.log).toEqual(['start holder', 'start background']);
+    expect(s.log).toEqual(['start holder']);
     s.held.release('holder');
+    await s.held.arrived('background');
+    await settleWhile();
+    expect(s.log).toEqual(['start holder', 'end holder', 'start background']);
     s.held.release('background');
     await s.held.arrived('foreground');
     s.held.release('foreground');
     await until(() => s.answers.length === 3);
+    expect(s.log).toEqual([
+      'start holder',
+      'end holder',
+      'start background',
+      'end background',
+      'start foreground',
+      'end foreground',
+    ]);
   } finally {
     await s.server.close();
   }

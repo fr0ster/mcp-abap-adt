@@ -29,6 +29,8 @@ import {
 import { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { return_error } from '../../../lib/utils';
+import { withoutSystemInformation } from '../../helpers/noSystemInformation';
+import { stateSystemKind } from '../../helpers/systemKind';
 
 const ALLOWED_KEYS = [
   'error',
@@ -192,6 +194,7 @@ describe('the answer sites read the failure first (§7.2)', () => {
   let written: string[];
   let stderr: jest.SpyInstance;
   beforeEach(() => {
+    stateSystemKind();
     written = [];
     stderr = jest
       .spyOn(process.stderr, 'write')
@@ -260,7 +263,10 @@ describe('the answer sites read the failure first (§7.2)', () => {
     }
     const server = new McpServer({ name: 'group-test', version: '1.0.0' });
     new CompositeHandlersRegistry([
-      new Group({ connection: {} as never, logger: undefined as never }),
+      new Group({
+        connection: withoutSystemInformation() as never,
+        logger: undefined as never,
+      }),
     ]).registerAllTools(server);
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: 'test', version: '1.0.0' });

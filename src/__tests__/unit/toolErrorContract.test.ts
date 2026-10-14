@@ -217,7 +217,7 @@ describe('BaseHandlerGroup registration path honours the same contract (#155)', 
 
     const server = new McpServer({ name: 'group-test', version: '1.0.0' });
     const group = new Group({
-      connection: {} as any,
+      connection: withoutSystemInformation() as any,
       logger: undefined as any,
     });
     // Drive registration through the registry — this is the branch production

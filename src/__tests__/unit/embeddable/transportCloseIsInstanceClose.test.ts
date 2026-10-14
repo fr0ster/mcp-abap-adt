@@ -46,6 +46,10 @@ const holding: StatePart = {
   dispose: async () => {},
 };
 
+/** A `GET` on `connection`; the request type requires a timeout, as the shutdown tools give it. */
+const get = (connection: IAbapConnection, url: string): Promise<unknown> =>
+  connection.makeAdtRequest({ url, method: 'GET', timeout: 600_000 });
+
 interface Seen {
   /** What the second fresh connection's open threw. */
   second?: unknown;
@@ -67,16 +71,14 @@ function holdThenOpen(seen: Seen): HandlerEntry {
       ctx: { connection: IAbapConnection; state: InstanceState },
       _args: unknown,
     ) => {
-      await ctx.connection.makeAdtRequest({ url: MAIN_READ, method: 'GET' });
+      await get(ctx.connection, MAIN_READ);
       const first = await openFreshConnection(ctx.connection, undefined);
       own(first, { role: 'state' });
       ctx.state.attach(holding);
-      await first
-        .makeAdtRequest({ url: LISTEN, method: 'GET' })
-        .catch(() => undefined);
+      await get(first, LISTEN).catch(() => undefined);
       try {
         const second = await openFreshConnection(ctx.connection, undefined);
-        await second.makeAdtRequest({ url: SECOND, method: 'GET' });
+        await get(second, SECOND);
       } catch (error) {
         seen.second = error;
       }

@@ -111,7 +111,7 @@ For on-premise systems using basic authentication:
 
 **Note:** Over HTTP the user and password come only from the headers (`x-sap-login`, `x-sap-password`); a server `.env` is read only by `mcp-abap-adt` (stdio).
 
-**System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional. When present, they win over the process environment, the login and, for a cloud system, the `systeminformation` lookup — for this request only (SSE: for the session the headers opened). Without `x-sap-responsible` (and no `SAP_RESPONSIBLE`), the responsible on-premise is the login: here `x-sap-login`; on a cloud system, the system's user. See [System context](#system-context-for-on-premise-systems).
+**System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional, and apply only where an on-premise system has no `systeminformation` function (it answers `404`): the user and the system id the system names win over them, on every kind of system. Where they apply, they win over the process environment and the login — for this request only (SSE: for the session the headers opened); without `x-sap-responsible` (and no `SAP_RESPONSIBLE`) the responsible is the login: here `x-sap-login`. See [System context](#system-context-for-on-premise-systems).
 
 ## Destinations
 
@@ -302,33 +302,33 @@ Use this when one host serves multiple SAP systems per request — for example, 
 
 When creating ABAP objects, SAP ADT takes `responsible` and `masterSystem` attributes in the XML request body (a transport takes its owner). The server always sends a responsible person; it sends a master system only when it knows one, and otherwise leaves the attribute out so the system applies itself (as 15.x did).
 
-**How system context is resolved**, per request, each from the first that has it:
+**How system context is resolved**, per request, each from the first that has it. The system is asked first (`systeminformation`, once per connection, on ABAP Cloud and on-premise alike): what it names wins over everything configured — with passwordless SSO, or a user provisioned into the system, the user exists only inside the system. The configuration (steps 3–8) applies only where an on-premise system has no such function (it answers `404`):
 
 | Order | Source | `responsible` | `masterSystem` |
 |---|---|---|---|
 | 1 | The tool's own argument | `owner` (`CreateTransport`) | — (no tool takes one) |
-| 2 | Request headers (HTTP/SSE) | `x-sap-responsible` | `x-sap-master-system` |
-| 3 | The destination's own `.env` (`--env` / `--env-path` file, or `sessions/<destination>.env`) | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
-| 4 | The process environment | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
-| 5 | On-premise, the login: the destination's own `.env` | `SAP_USERNAME` | — |
-| 6 | On-premise, the login: an `x-sap-url` connection's header | `x-sap-login` | — |
-| 7 | On-premise, the login: the process environment | `SAP_USERNAME` | — |
-| 8 | Cloud only: `systeminformation` on the connected connection — the only login on a cloud system | the system's user | the system id |
+| 2 | `systeminformation` on the connected connection | the system's user | the system id |
+| 3 | Request headers (HTTP/SSE) — on-premise `404` only | `x-sap-responsible` | `x-sap-master-system` |
+| 4 | The destination's own `.env` (`--env` / `--env-path` file, or `sessions/<destination>.env`) — on-premise `404` only | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
+| 5 | The process environment — on-premise `404` only | `SAP_RESPONSIBLE` | `SAP_MASTER_SYSTEM` |
+| 6 | The login: the destination's own `.env` — on-premise `404` only | `SAP_USERNAME` | — |
+| 7 | The login: an `x-sap-url` connection's header — on-premise `404` only | `x-sap-login` | — |
+| 8 | The login: the process environment — on-premise `404` only | `SAP_USERNAME` | — |
 | — | Nothing found | the create is refused | left out of the request |
 
-The values of steps 2, 3, 5 and 6 live in the request's scope, never in a process-wide cache: two concurrent requests to different destinations, or with different headers, each see their own. The `--env` file's `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are read as that destination's own and are not copied into the process environment, so they never become another destination's fallback.
+The values of steps 3, 4, 6 and 7 live in the request's scope, never in a process-wide cache: two concurrent requests to different destinations, or with different headers, each see their own. The `--env` file's `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are read as that destination's own and are not copied into the process environment, so they never become another destination's fallback.
 
-On a cloud system steps 5–7 do not count: neither `SAP_USERNAME` nor `x-sap-login` is its login. `x-sap-login` is read only on an `x-sap-url` basic connection, which logs on with it; a destination request's `x-sap-login` is ignored. The process environment is read once: a change to `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` or `SAP_USERNAME` while the server runs is not picked up.
+The answer of step 2 is read by the system's kind: an answer naming a user is used on both kinds; an answer without a user is not a valid ABAP system for this server (`system_without_user`, the tool not run); a `404` is the function unavailable — on-premise steps 3–8 apply, on a cloud system it is a failed lookup (`system_lookup_failed`); any other status is a failed lookup on both kinds. On a cloud system steps 3–8 never count. `x-sap-login` is read only on an `x-sap-url` basic connection, which logs on with it; a destination request's `x-sap-login` is ignored. The process environment is read once: a change to `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` or `SAP_USERNAME` while the server runs is not picked up.
 
 **The one exception: a message class** is created with the system's own default responsible — adt-clients' message class create takes none (15.x the same) — and is never refused for a missing one.
 
 Whether a system is cloud is the kind its connection was built for: `SAP_SYSTEM_TYPE` / `--system-type`, else a `jwt` destination is cloud and any other on-premise. It is never guessed from the URL. A connection an embedding host builds itself (not through the server's factory) has no settings to read: the server's `systemType` option states its kind, then `SAP_SYSTEM_TYPE`, else on-premise.
 
-**A create without a responsible is refused.** An operation that sends a responsible — creating an object, a transport without an `owner` — and finds none after all eight steps is answered `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE`, the `x-sap-responsible` header and the login, and no request is made. On-premise this happens only without a login: SNC, or a token you hold, with no `SAP_RESPONSIBLE`. A missing master system is never refused. Reads are never refused for either.
+**A create without a responsible is refused.** An operation that sends a responsible — creating an object, a transport without an `owner` — and finds none after all the steps is answered `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE`, the `x-sap-responsible` header and the login, and no request is made. This happens only on an on-premise system without `systeminformation` and without a login: SNC, or a token you hold, with no `SAP_RESPONSIBLE`. A missing master system is never refused. Reads are never refused for either.
 
-**On-premise systems**: nothing is asked of the system. A basic destination needs nothing more — its `SAP_USERNAME` is the responsible. Over SNC or with a token, set `SAP_RESPONSIBLE` in the destination's `.env` or the environment, or send `x-sap-responsible`. Set `SAP_MASTER_SYSTEM` only if the system should record one other than itself.
+**On-premise systems** are asked too — one request per connection. Where the system answers, nothing more is needed. Where it has no `systeminformation` (`404`), a basic destination needs nothing more — its `SAP_USERNAME` is the responsible; over SNC or with a token, set `SAP_RESPONSIBLE` in the destination's `.env` or the environment, or send `x-sap-responsible`; set `SAP_MASTER_SYSTEM` only if the system should record one other than itself.
 
-**Cloud systems** (ABAP Cloud / BTP) fill what the steps before left empty, per call, from `systeminformation` on the connected connection — no additional configuration is needed. A cloud destination without `SAP_CLIENT` uses the system's default client.
+**Cloud systems** (ABAP Cloud / BTP) take both from `systeminformation` on the connected connection — no additional configuration is needed, and none applies. A cloud destination without `SAP_CLIENT` uses the system's default client.
 
 #### Per-request responsible and master system (embedding hosts)
 

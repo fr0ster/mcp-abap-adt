@@ -204,8 +204,8 @@ It holds everything a resume needs beside what the process already has from its 
 process id and its start time, the role, the destination's name and where it points (URL, client,
 system kind, wire), the backend user the destination states (`null` for a token credential: shown
 in the list, never matched), the system information the session was looked up with (`system`:
-on ABAP Cloud the `responsible` and `master_system` `systeminformation` answered — the session
-user and the system id —, `null` until known and on-premise, where nothing is asked) and the
+the `responsible` and `master_system` `systeminformation` answered — the session user and the
+system id —, `null` until known and on an on-premise system without the function) and the
 session's cookies — no credential. It is written once the connection holds a session, again once
 its system information is known, and again after a request that changed the session's cookies (a
 stateful request's context cookie), and deleted once that connection's logoff is written — at every end: a tool's
@@ -358,7 +358,7 @@ Every send a call makes on the instance's connection is inside the order — als
 `systeminformation` lookup a background run or the debugger makes for its
 caller's user (run directly when the call that makes it already holds the flow, else on the
 connection taken in its turn, so a session lost ahead of it is already replaced); the connect's own
-sends (its session record) come before any tool can use the connection, and the ABAP Cloud system
+sends (its session record) come before any tool can use the connection, and the system
 lookup before the first tool runs (below). An embedder's own registry that is not a `CompositeHandlersRegistry` (it registers its
 tools itself) takes its turn in the order for every call, whatever the tool's name. Outside the order, because they work
 on a connection of their own: a background run (`background: true`), a listed long read (on its
@@ -380,49 +380,64 @@ retried). On stdio the connection is born at the start, before the transport ope
 can be in the order then. The list and the logoff of leftover sessions take no turn: they do not touch the instance's connection (a logoff works
 on a dead process's session only).
 
-**On ABAP Cloud the system is asked once per connection, before a tool runs on it**
-(`systeminformation`: the user as responsible, the system id as master system, for what a create
-needs and the request does not state). **No tool ever runs twice**: the lookup comes before the
-tool, never after a refusal. **The endpoint exists only on ABAP Cloud, so the server asks it by
-the system's kind**, the kind the connection was built for (`--system-type` / `SAP_SYSTEM_TYPE`,
-an embedder's `systemType`; on-premise when none is stated): on-premise it is never asked, on ABAP
-Cloud always. There the server reads it with its HTTP status: **an answer** — a `2xx` whose body is
-a JSON object naming a non-blank `userName` — gives the user and the system id; **an answer
-without a user** — a `2xx` whose body is no JSON, is JSON but no object, or names no user (the
-user missing, empty, blank or not a string); **any other status** — `404`, `405`, `501`, a `5xx`
-— or an authentication or network failure is a failed lookup, as it came. On ABAP Cloud the
-system information is required: the login never stands in.
+**The system is asked once per connection, before a tool runs on it — on ABAP Cloud and
+on-premise alike** (`systeminformation`: the user as the responsible, the system id as the master
+system). **The user and the responsible are what the system names**: with passwordless SSO, or a
+user provisioned into the system, the user exists only inside the system, so its answer wins over
+anything configured — the login (`SAP_USERNAME`, `x-sap-login`), `SAP_RESPONSIBLE` /
+`x-sap-responsible` and `SAP_MASTER_SYSTEM` / `x-sap-master-system`, a destination's own `.env`
+included. **The configuration is used only when the function is unavailable**: an on-premise
+system that answers `404`. **Behaviour change for on-premise:** before, nothing was asked
+on-premise and the configuration always applied; now there is one extra request per connection
+(`GET /sap/bc/adt/core/http/systeminformation`), and where the system answers, a configured
+responsible or master system no longer applies. A tool argument that names the value (a
+transport's `owner`, say) still states it for that call. **No tool ever runs twice**: the lookup
+comes before the tool, never after a refusal. The server reads the answer with its HTTP status,
+by the system's kind — the kind the connection was built for (`--system-type` /
+`SAP_SYSTEM_TYPE`, an embedder's `systemType`); the answer itself never tells the kind, since the
+endpoint exists on both:
+
+- **an answer** — a `2xx` whose body is a JSON object naming a non-blank `userName` — gives the
+  user and the system id, on both kinds;
+- **an answer without a user** — a `2xx` whose body is no JSON, is JSON but no object, or names no
+  user (the user missing, empty, blank or not a string) — is not a valid ABAP system for this
+  server, on both kinds;
+- **`404`** is the function unavailable: **on-premise** the configuration applies (the login for
+  the user; `SAP_RESPONSIBLE` / `x-sap-responsible`, then the login, for the responsible;
+  `SAP_MASTER_SYSTEM` / `x-sap-master-system` for the master system) and, with nothing
+  configured, today's "unknown" answer for that need; **on ABAP Cloud** a failed lookup — never
+  the configuration;
+- **any other status** — `405`, `501`, a `5xx` — or an authentication or network failure is a
+  failed lookup on both kinds.
 
 - **stdio:** at the start, with the connection (or from the leftover session's file, when it
   carries it); it is fixed for the process, like the user. A failed lookup ends the process before
-  the transport opens — exit `1`, and on stderr `[MCP] Destination "<name>": the ABAP Cloud system
-  could not be asked for the session user and system id (systeminformation), which the start
-  needs; the server did not start. Start it again when the system is available` — and logs off the
-  logon made for it; any status but a `2xx` (`404` included) ends the start the same way. A system
-  that answers `systeminformation` but names no user (the user missing, empty, blank or not a
-  string, a body that is no JSON or JSON that is no object) is not a valid ABAP system for
-  this server: exit `1` the same way, with `[MCP] Destination "<name>": the system answered
-  systeminformation without a user, so it is not a valid ABAP system for this server; the server
-  did not start`.
+  the transport opens — exit `1`, and on stderr `[MCP] Destination "<name>": the system could not
+  be asked for the session user and system id (systeminformation), which the start needs; the
+  server did not start. Start it again when the system is available` — and logs off the logon made
+  for it. An answer without a user ends the start the same way, with `[MCP] Destination "<name>":
+  the system answered systeminformation without a user, so it is not a valid ABAP system for this
+  server; the server did not start`. An on-premise `404` does not end the start.
 - **Streamable HTTP and SSE:** the first call that reaches the system asks, before its tool runs,
   inside the main flow (a call outside the flow — a background run, a listed long read, a debugger
   tool — takes a turn in it for the lookup alone). If the lookup fails, that call answers the error
-  — a chain failure as it is, an answer that names no user `system_without_user` ("the ABAP Cloud
-  system answered systeminformation without a user, so it is not a valid ABAP system for this
-  server; the tool did not run"), any other — any status but a `2xx`, `404` included —
-  `system_lookup_failed` — and its tool did not run, a
-  read included. Nothing of a refused answer is kept. The following calls are not barred: each call on a connection without the information
-  asks again (the system may have been restarted or fixed). An embedder's instance does the same.
+  — a chain failure as it is, an answer that names no user `system_without_user` ("the system
+  answered systeminformation without a user, so it is not a valid ABAP system for this server; the
+  tool did not run"), any other failed lookup `system_lookup_failed` — and its tool did not run, a
+  read included. Nothing of a refused answer is kept. The following calls are not barred: each call
+  on a connection without the information asks again (the system may have been restarted or
+  fixed). An embedder's instance does the same.
 
-On-premise nothing is asked before a tool, and nothing is asked for a user either: the debugger's
-request user and a background run's caller are the configured login (the request's, then the
-process's; with none, the user is unknown — for a background run `background_run_caller_unknown`).
-On ABAP Cloud the server asks `systeminformation` for that user — the debugger's request user, a
-background run's caller of a token login: an answer that names no user (a body that is no JSON or
-no object included) is `system_without_user`, and any other failure of that lookup (`404`, `405`,
-`501`, a `5xx`, authentication, network) is the call's error as it came; the login never stands in. (Before this, a failed lookup failed nothing: a create that needed it
-asked again inside the tool and ran the tool once more with the answer — a tool that had sent
-something before its guarded create, as `CreateCdsUnitTest` does, sent it twice.)
+The same rule names **the debugger's request user and a background run's caller** (its management
+tools included): the user `systeminformation` names, on both kinds, over any configured login. The
+configured login (the request's — `x-sap-login`, a destination's `SAP_USERNAME` — then the
+process's) stands in only on an on-premise `404`; with none, the user is unknown (for a background
+run `background_run_caller_unknown`). An answer that names no user is `system_without_user`; any
+other failure — on ABAP Cloud a `404` too — is the call's error as it came. A background run
+started by a tool reuses the answer its connection's lookup already got: no second request. (Before
+this, a failed lookup failed nothing: a create that needed it asked again inside the tool and ran
+the tool once more with the answer — a tool that had sent something before its guarded create, as
+`CreateCdsUnitTest` does, sent it twice.)
 
 **A long call on the main connection holds the flow; `background: true` or a tool on its own
 connection does not.** A unit-test run (and `HandlerGet`'s `UNIT_TEST` polling), `RunATC` with
@@ -765,7 +780,7 @@ transport's options only:
 - **The connection is made at the start, before the MCP transport opens.** The process has the
   system, the user and the connection parameters when it starts, so it connects then — not at the
   first tool call: it takes up the destination's one leftover session (see "stdio: leftover SAP
-  sessions of a killed process"), or logs on; and on ABAP Cloud it asks the system information
+  sessions of a killed process"), or logs on; and it asks the system information
   (`systeminformation`) a create needs, unless the leftover session's file carries it. **An
   interactive login (`jwt` / `authorization_code`) therefore happens at the start**: its prompts
   and the browser come before your MCP client sees the server's tools, on stderr as before; the
@@ -996,7 +1011,7 @@ transport's options only:
   its name or arguments: no tool of yours is exempt — not one named like a debugger tool or a long
   read, not a run tool called with `background: true`; a callback that works on a connection of its
   own still waits for the call ahead. Before the callback runs, its turn takes the instance's
-  connection and asks its system information when it has none (on ABAP Cloud `systeminformation`),
+  connection and asks its system information when it has none (`systeminformation`),
   as before a handler group's tool: a failed lookup — `system_without_user` included — is that
   call's error answer and your callback is not called; the next call asks again. The callback runs
   in the same system context scope as a handler group's tool. Inside its turn,
@@ -1048,8 +1063,9 @@ transport's options only:
   `background: true`. `HandlerContext` has `backgroundRuns?` (the tools' port); `ServerRefusalCode`
   / `FailureCode` add `background_runs_unavailable`, `background_run_not_available`,
   `background_run_running`, `background_run_limit` and `background_run_caller_unknown` (a caller
-  whose backend user neither the request nor SAP names); and `system_lookup_failed` (a call on an
-  ABAP Cloud connection whose `systeminformation` lookup, asked before the tool, failed: the tool
+  whose backend user neither the request nor SAP names); and `system_lookup_failed` (a call on a
+  connection whose `systeminformation` lookup, asked before the tool, failed (on-premise a `404`
+  is not a failure: the configuration applies): the tool
   did not run, and the next call asks again), and `system_without_user` (the same lookup answered
   but named no user: not a valid ABAP system for this server). `requiringUser(resolver)` and
   `SystemWithoutUserError` (`requestSystemResolution`) are how the server checks it, whatever

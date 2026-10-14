@@ -221,33 +221,40 @@ setting picks the connector; without it a `jwt` destination connects as cloud an
 on-premise.
 
 **Responsible and master system.** A created object always carries its responsible person; its master
-system only when one is known. For each request the server takes each from the first of:
+system only when one is known. **The responsible is the user the system names**: the server asks the
+system's `systeminformation` once per connection, on ABAP Cloud and on-premise alike, and its answer
+wins over everything configured — with passwordless SSO, or a user provisioned into the system, the
+user exists only inside the system. For each request the server takes each from the first of:
 
 | Order | Responsible | Master system |
 |-------|-------------|---------------|
 | 1 | the tool's own argument, where the tool has one (`CreateTransport`'s `owner`) | the tool's own argument, where a tool has one (none does today) |
-| 2 | the request's `x-sap-responsible` header | the request's `x-sap-master-system` header |
-| 3 | `SAP_RESPONSIBLE` in the destination's own `.env` (stdio) | `SAP_MASTER_SYSTEM` in the destination's own `.env` (stdio) |
-| 4 | `SAP_RESPONSIBLE` in the process environment | `SAP_MASTER_SYSTEM` in the process environment |
-| 5 | on-premise, the login: the destination's own `SAP_USERNAME` (stdio) | on a cloud system, the system id (`systeminformation`) |
-| 6 | on-premise, the login: `x-sap-login` of an `x-sap-url` basic connection (HTTP, SSE) | — left out of the request |
-| 7 | on-premise, the login: the process `SAP_USERNAME` | |
-| 8 | on a cloud system, the login is the system's user (`systeminformation`) alone | |
+| 2 | the system's user (`systeminformation`), on any system that answers it | the system id (`systeminformation`) |
+| | *Only on an on-premise system without the function (it answers `404`):* | |
+| 3 | the request's `x-sap-responsible` header | the request's `x-sap-master-system` header |
+| 4 | `SAP_RESPONSIBLE` in the destination's own `.env` (stdio) | `SAP_MASTER_SYSTEM` in the destination's own `.env` (stdio) |
+| 5 | `SAP_RESPONSIBLE` in the process environment | `SAP_MASTER_SYSTEM` in the process environment |
+| 6 | the login: the destination's own `SAP_USERNAME` (stdio) | — left out of the request |
+| 7 | the login: `x-sap-login` of an `x-sap-url` basic connection (HTTP, SSE) | |
+| 8 | the login: the process `SAP_USERNAME` | |
 
 The headers are read per request over HTTP and from the connection's opening request over SSE. The
 destination's own `.env` (stdio) is the `--env` / `--env-path` file, or `sessions/<destination>.env`
-for a named destination (`--mcp`). A cloud system is
-asked once per connection, on the connected connection, and only for what is not stated; on-premise
-nothing is asked of the system. Which kind a system is follows the rule above, never its URL. On a cloud
-system steps 5–7 do not count: `SAP_USERNAME` and `x-sap-login` are not its login. `x-sap-login` is the
-login only of an `x-sap-url` basic connection, which logs on with it; a token connection states no
-login. The process environment (`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_USERNAME`) is read once: a
-change made to it while the server runs is not picked up.
+for a named destination (`--mcp`). The system is asked once per connection, on the connected
+connection — one request (`GET /sap/bc/adt/core/http/systeminformation`). Its answer is read by the
+system's kind (the rule above, never its URL): an answer naming a user is used on both kinds; an
+answer without a user is not a valid ABAP system for this server (`system_without_user`); a `404` is
+the function unavailable — on-premise steps 3–8 apply, on a cloud system it is a failed lookup; any
+other status is a failed lookup on both kinds. On a cloud system steps 3–8 never count. `x-sap-login`
+is the login only of an `x-sap-url` basic connection, which logs on with it; a token connection states
+no login. The process environment (`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_USERNAME`) is read
+once: a change made to it while the server runs is not picked up.
 
-A create (or a transport without an `owner`) that finds no responsible person — on-premise over SNC or
-with a token you hold, with no `SAP_RESPONSIBLE` anywhere — is refused by the server before any request
+A create (or a transport without an `owner`) that finds no responsible person — on an on-premise
+system without `systeminformation`, over SNC or with a token you hold, with no `SAP_RESPONSIBLE`
+anywhere — is refused by the server before any request
 is made: the answer is `"error": "system_context_missing"` with words naming `SAP_RESPONSIBLE`, the
-`x-sap-responsible` header and the login. The servers ask a cloud system for its user before a
+`x-sap-responsible` header and the login. The servers ask the system for its user before a
 tool runs: when that lookup fails, the call answers `"error": "system_lookup_failed"` (the system
 could not be asked; retry when it is available) and its tool does not run — on stdio the start
 fails instead, and the process ends. The next call asks again. `HandlerExporter`, which asks inside

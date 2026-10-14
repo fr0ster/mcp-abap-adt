@@ -12,8 +12,13 @@
 
 import { latch, resetProcessLatchForTests } from '../../../lib/activeTools';
 import { ClosedInstanceRefusal } from '../../../lib/auth/failures';
+import { ownedConnections } from '../../../lib/ownedConnections';
 import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
-import { PROBE_PATH, type StandInRequest } from '../../helpers/adtStandIn';
+import {
+  isLogoff,
+  PROBE_PATH,
+  type StandInRequest,
+} from '../../helpers/adtStandIn';
 import {
   json,
   type LeftoverStand,
@@ -323,6 +328,51 @@ describe('ABAP Cloud: the system information at the start', () => {
     await expect(stand.start()).rejects.toBeDefined();
     await until(() => stand.standIn.logoffs() === 1);
     expect(stand.files()).toEqual([]);
+  });
+
+  it('latched while its system information is asked: the start is refused, and the picked-up session ends with its logoff', async () => {
+    stand = await leftoverStand();
+    stand.standIn.body(
+      isLookup,
+      JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
+    );
+    const { session } = await stand.leftover();
+    const held = stand.standIn.hold(isLookup);
+    const started = stand.start();
+    const refused = expect(started).rejects.toBeInstanceOf(
+      ClosedInstanceRefusal,
+    );
+    await held.arrived;
+    latch();
+    held.release();
+    await refused;
+    await until(() => stand.standIn.logoffs() === 1);
+    expect(stand.standIn.loggedOff()).toEqual([session]);
+    expect(ownedConnections(stand.server)).toEqual([]);
+    // Logged off: its file is gone with it.
+    expect(stand.files()).toEqual([]);
+  });
+
+  it('latched while a leftover carrying its system information is resumed: the start is refused, the file a leftover again, nothing owned', async () => {
+    stand = await leftoverStand();
+    const { handle, session } = await stand.leftover({
+      system: { responsible: 'FILE_USER', masterSystem: 'FIL' },
+    });
+    const held = stand.standIn.hold(
+      (r) => r.session === session && !isLogoff(r.url),
+    );
+    const started = stand.start();
+    const refused = expect(started).rejects.toBeInstanceOf(
+      ClosedInstanceRefusal,
+    );
+    await held.arrived;
+    latch();
+    held.release();
+    await refused;
+    expect(stand.files()).toEqual([handle]);
+    expect(stand.file(handle)).toMatchObject({ pid: 111 });
+    expect(ownedConnections(stand.server)).toEqual([]);
+    expect(stand.standIn.requests.filter(isLookup)).toEqual([]);
   });
 
   it('no system information for a picked-up session: the start fails, and the session is not logged off', async () => {

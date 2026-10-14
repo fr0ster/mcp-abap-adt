@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import {
+  type KnownSystem,
   type LeftoverRole,
   LeftoverSessions,
   sessionIdentity,
@@ -50,6 +51,8 @@ export async function killedProcessSession(
     destination: string;
     pid?: number;
     role?: LeftoverRole;
+    /** The system information its file carries; none by default. */
+    system?: KnownSystem;
   },
 ): Promise<string> {
   const killed = new LeftoverSessions({
@@ -72,6 +75,9 @@ export async function killedProcessSession(
   const identity = sessionIdentity(options.destination, settings);
   if (identity === undefined) throw new Error('no identity');
   killed.track(connection, options.role ?? 'built', identity);
+  if (options.system !== undefined) {
+    killed.describeSystem(connection, options.system);
+  }
   const handle = runtimeFiles(dir).find((f) => !before.has(f));
   if (handle === undefined) throw new Error('no file was written');
   return handle;

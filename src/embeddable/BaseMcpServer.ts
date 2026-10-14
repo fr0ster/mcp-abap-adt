@@ -899,7 +899,9 @@ export abstract class BaseMcpServer extends McpServer {
    * information the file carries is the connection's (same destination, same
    * system): nothing is looked up. Any other failure — the old session's
    * answer or the new logon's — is the start's, as SAP gave it, and gives
-   * the file back as a leftover.
+   * the file back as a leftover. So does a close (the process shutdown, the
+   * instance's) that latched while either connected: the connection is not
+   * adopted, and the start is refused (`refuseWhenClosed`).
    */
   private async resumedSession(
     resolved: ResolvedConnection,
@@ -943,6 +945,8 @@ export abstract class BaseMcpServer extends McpServer {
       let fresh: AbapConnection;
       try {
         fresh = await this.connectedLogon(resolved);
+        // Closed since the logon settled: its close swept it; not adopted.
+        refuseWhenClosed(fresh);
       } catch (logonError) {
         owner.release(claimed);
         throw logonError;
@@ -951,6 +955,15 @@ export abstract class BaseMcpServer extends McpServer {
       if (claimed.system !== undefined) this.knowSystem(fresh, claimed.system);
       outcome.session = 'new';
       return fresh;
+    }
+    // Closed while it connected (the process shutdown, the instance's
+    // close): its close swept it. Not adopted, not handed out; the claimed
+    // file is given back as a leftover.
+    try {
+      refuseWhenClosed(connection);
+    } catch (error) {
+      owner.release(claimed);
+      throw error;
     }
     owner.adopt(claimed, connection, identity);
     if (claimed.system !== undefined)
@@ -998,6 +1011,10 @@ export abstract class BaseMcpServer extends McpServer {
     this.systemContexts.set(connection, resolved.systemContext);
     try {
       await this.requireSystem(connection);
+      // Closed meanwhile (no lookup, or during it): the start is refused —
+      // the launcher never opens the transport — and the close's sweep has
+      // the connection's logoff.
+      refuseWhenClosed(connection);
     } catch (error) {
       if (this.built === entry) this.built = undefined;
       if (outcome.session !== 'picked_up') await endConnection(connection);

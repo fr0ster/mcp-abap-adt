@@ -28,13 +28,16 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
   type AdtStandIn,
   adtStandIn,
+  isLogoff,
   type StandInRequest,
 } from '../../../src/__tests__/helpers/adtStandIn';
 import {
   killedProcessSession,
   runtimeFiles,
 } from '../../../src/__tests__/helpers/leftoverSession';
-import { resetProcessLatchForTests } from '../../../src/lib/activeTools';
+import { latch, resetProcessLatchForTests } from '../../../src/lib/activeTools';
+import type { KnownSystem } from '../../../src/lib/leftoverSessions/LeftoverSessions';
+import { ownedConnections } from '../../../src/lib/ownedConnections';
 import { readCoreConfig } from '../config/coreParameters';
 import {
   launch,
@@ -87,11 +90,15 @@ afterEach(async () => {
 });
 
 /** A session a killed process left for this destination, on `kind`. */
-async function leftover(kind: 'onprem' | 'cloud' = 'onprem') {
+async function leftover(
+  kind: 'onprem' | 'cloud' = 'onprem',
+  system?: KnownSystem,
+) {
   process.env.SAP_SYSTEM_TYPE = kind;
   const handle = await killedProcessSession(standIn.url, runtime, {
     user: USER,
     destination: 'default',
+    ...(system !== undefined && { system }),
   });
   const session = standIn.requests.at(-1)?.session ?? '';
   return { handle, session };
@@ -99,7 +106,15 @@ async function leftover(kind: 'onprem' | 'cloud' = 'onprem') {
 
 /** Launches `mcp-abap-adt` (or `toolSet`) over an in-memory transport. */
 async function start(
-  options: { kind?: 'onprem' | 'cloud'; toolSet?: ToolSet } = {},
+  options: {
+    kind?: 'onprem' | 'cloud';
+    toolSet?: ToolSet;
+    /**
+     * Runs beside the launch, while the connection is born; `shutdown()`
+     * starts the shutdown as the end of stdin does.
+     */
+    atBirth?: (shutdown: () => void) => Promise<void>;
+  } = {},
 ) {
   const args = [
     `--env-path=${envFile}`,
@@ -123,7 +138,7 @@ async function start(
     stdin: new EventEmitter(),
   });
   jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
-  await launch(
+  const launched = launch(
     config,
     {
       toolSet: options.toolSet ?? fullToolSet,
@@ -141,6 +156,10 @@ async function start(
       transport: serverSide,
     },
   );
+  await Promise.all([
+    launched,
+    options.atBirth?.(() => processLike.stdin.emit('end')),
+  ]);
   const client = new Client({ name: 'start', version: '1.0.0' });
   const connected = opened > 0;
   if (connected) await client.connect(clientSide);
@@ -221,6 +240,67 @@ it('one leftover session SAP says has ended (401): a new session logged on at th
   } finally {
     await s.stop();
   }
+});
+
+it('the shutdown lands while a leftover with its system information is resumed: the start fails, the transport never opens, the file is a leftover again, nothing owned', async () => {
+  const { handle, session } = await leftover('cloud', {
+    responsible: 'FILE_USER',
+    masterSystem: 'FIL',
+  });
+  // The resume's request in the old session, held until the shutdown began.
+  const held = standIn.hold((r) => r.session === session && !isLogoff(r.url));
+  const s = await start({
+    kind: 'cloud',
+    atBirth: async (shutdown) => {
+      await held.arrived;
+      shutdown();
+      held.release();
+    },
+  });
+  const end = Date.now() + 10_000;
+  while (s.exits.length < 2 && Date.now() < end) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  expect(s.exits).toContain(1);
+  expect(s.opened()).toBe(0);
+  expect(standIn.requests.filter(isLookup)).toEqual([]);
+  expect(runtimeFiles(runtime)).toEqual([handle]);
+  expect(
+    JSON.parse(fs.readFileSync(path.join(runtime, handle), 'utf8')).pid,
+  ).toBe(111);
+  expect(ownedConnections()).toEqual([]);
+});
+
+it('the latch lands while a leftover with its system information is resumed and SAP answers: the start fails, the transport never opens, the file is a leftover again, nothing owned', async () => {
+  const { handle, session } = await leftover('cloud', {
+    responsible: 'FILE_USER',
+    masterSystem: 'FIL',
+  });
+  // The resume's request answered only once the process is latched, before
+  // any logoff reached the connection: its connect() succeeds.
+  const held = standIn.hold((r) => r.session === session && !isLogoff(r.url));
+  const s = await start({
+    kind: 'cloud',
+    atBirth: async () => {
+      await held.arrived;
+      latch();
+      held.release();
+    },
+  });
+  expect(s.exits).toEqual([1]);
+  expect(s.opened()).toBe(0);
+  expect(standIn.requests.filter(isLookup)).toEqual([]);
+  expect(runtimeFiles(runtime)).toEqual([handle]);
+  expect(
+    JSON.parse(fs.readFileSync(path.join(runtime, handle), 'utf8')).pid,
+  ).toBe(111);
+  // The connection the resume built is ended: its logoff, nothing owned.
+  const end = Date.now() + 10_000;
+  while (standIn.logoffs() === 0 && Date.now() < end) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  expect(standIn.loggedOff()).toEqual([session]);
+  expect(ownedConnections()).toEqual([]);
 });
 
 it('none: a normal logon at the start, before the transport opens', async () => {

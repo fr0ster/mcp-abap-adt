@@ -166,9 +166,9 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * The connection built from the source, kept while the source answers the
-   * same credential object (D13): stdio's provider, an SSE connection's
-   * headers. A new credential — the broker built a new provider, a new HTTP
-   * request — builds a new connection.
+   * same credential object (D13): stdio's provider (the same one for the
+   * process's life), an SSE connection's headers. A new credential — a new
+   * HTTP request's headers — builds a new connection.
    */
   private built: BuiltConnection | undefined;
 
@@ -399,11 +399,13 @@ export abstract class BaseMcpServer extends McpServer {
    * no `resolve`, no `connect()`, no wrap. Built: the source resolves the
    * settings and the credential with the request's `signal` (its own waits
    * race it), and the connection is built and connected once per credential
-   * object — kept while the source answers the same one (D13); a source that
-   * keeps its connection (`keepsConnection`, stdio) keeps it for the
-   * instance's life, replaced only when SAP already lost the session. The credential
-   * renews itself (a 401 reaches its `rejected()`), so nothing is looked up
-   * here for refreshing.
+   * object — kept while the source answers the same one (D13), replaced
+   * only when SAP already lost the session or the source answers another
+   * credential object (http, sse: the request's). On stdio the source
+   * answers the same provider for the process's life: the user is fixed, and
+   * a renewed token (refresh, or a new login when the refresh fails) lives
+   * inside that provider. The credential renews itself (a 401 reaches its
+   * `rejected()`), so nothing is looked up here for refreshing.
    *
    * The connect is shared by every call that asks while it runs, and each
    * caller's wait races its own signal (D32): a cancelled caller settles at
@@ -433,24 +435,20 @@ export abstract class BaseMcpServer extends McpServer {
     throwIfRequestAborted(signal);
     const resolved = await context.source.resolve(signal);
     let held = this.built;
-    const newCredential =
-      held !== undefined &&
-      held.credential !== resolved.credential &&
-      context.keepsConnection !== true;
     if (
       !held ||
-      newCredential ||
+      held.credential !== resolved.credential ||
       (held.ready !== undefined && isSpent(held.ready))
     ) {
-      // A new credential where the source's credential is the request's (http,
-      // sse), or a session SAP already lost (D56): the connection is
-      // replaced, and the replaced one ends with its logoff — once no call
-      // works on it any more (spec §6.4). A source that keeps its connection
-      // (stdio) is never reopened for a new credential (D13).
+      // A new credential (http, sse: the request's), or a session SAP
+      // already lost (D56): the connection is replaced, and the replaced one
+      // ends with its logoff — once no call works on it any more (spec §6.4).
+      // stdio's source answers the same provider for the process's life, so
+      // only a lost session replaces its connection (D13).
       if (held) {
         this.retire(held);
-        // A renewable credential may log on again as another SAP user: the
-        // user SAP named for it is asked again on the replacement.
+        // A cached caller user is valid only for the connection it was asked
+        // on: asked again on the replacement.
         this.forgetCallers();
       }
       held = this.buildConnection(
@@ -1385,10 +1383,10 @@ export abstract class BaseMcpServer extends McpServer {
     // lost its session.
     //
     // The caller is the user of the session the instance holds: every tool
-    // runs in SAP as that user. On stdio the credentials are loaded once at
-    // start and cannot change while the process runs, so the caller is
-    // always the kept session's user (a replacement after a lost session
-    // logs on with the same credentials). HTTP and SSE never keep a
+    // runs in SAP as that user. On stdio the user is fixed for the process:
+    // the session is renewed (refresh token, or a new login when the refresh
+    // fails) and written back by the same provider, and a replacement after a
+    // lost session logs on with it — the same user. HTTP and SSE never keep a
     // connection across credentials: a new credential builds a new
     // connection, so this lookup always runs on the caller's own.
     const identity = await this.onMainConnection(signal, async (connection) => {

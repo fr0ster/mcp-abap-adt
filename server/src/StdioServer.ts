@@ -112,10 +112,11 @@ export class StdioServer extends BaseMcpServer {
       this.destination = destination;
       this.setConnectionContext({
         kind: 'built',
+        // The user is fixed for the process: getProvider answers the same
+        // provider while the session is renewed (refresh, or a new login when
+        // the refresh fails) and written back, so the connection is replaced
+        // only when SAP lost its session (D13, D56).
         source: destinationSource(destination, this.destinations),
-        // No reopen while the instance lives (D13, D56): a new provider the
-        // broker built does not replace the kept connection.
-        keepsConnection: true,
         sessionId: destination,
         metadata: { destination },
       });

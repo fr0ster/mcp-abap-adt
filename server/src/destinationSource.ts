@@ -2,20 +2,23 @@
  * core's `ConnectionSource` (spec §4.1): the destination the process serves,
  * through the destination layer. Per request — with the request's signal —
  * the settings (read once per process by the factory), the provider
- * (`getProvider(destination, { signal })`: the broker's cached provider
- * while the destination is unchanged, a new one when it built a new one) and
- * what the destination's own `.env` states about who creates objects.
+ * (`getProvider(destination, { signal })`: the broker's provider, the same
+ * one for the process's life) and what the destination's own `.env` states
+ * about who creates objects.
  *
  * Each of the three waits races the request's signal (D32): they are shared
  * work (one read, one build, one lookup for every caller), so a cancelled
  * caller settles at once while the work runs on for the others, and a late
  * rejection is handled.
  *
- * The server keeps no provider, and stdio's instance keeps its connection
- * for its life (D13 as amended by D56, `keepsConnection`): a new provider
- * this answers — the broker builds one when what its build read changed —
- * does not reopen it; only a session SAP already lost does, built with the
- * provider that call resolved.
+ * The server keeps no provider: asking `getProvider` per request is what
+ * carries renewal, a failed session write's refusal and the cancel of a
+ * login. On stdio the user is fixed for the process: the session is renewed
+ * (refresh token, or a new login when the refresh fails) and written back by
+ * that same provider — the same user. The instance's connection is kept
+ * while the source answers the same provider (D13), and replaced only when
+ * SAP already lost the session (D56), built with the provider `getProvider`
+ * answers — the same one.
  */
 
 import {

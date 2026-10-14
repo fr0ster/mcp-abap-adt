@@ -1,12 +1,11 @@
 /**
- * D13 (amended by D56) on stdio: the one instance keeps its connection for
- * its life — no reopen while the instance lives, only when SAP already lost
- * the session. A new provider the broker built (`getProvider` answers one
- * when what its build read changed) does not replace the connection: a
- * reopen would leave the locks of the old session behind. Every call still
- * asks `getProvider` with a signal; the server keeps no provider of its own,
- * and a connection replaced because its session was lost is built with the
- * provider that call resolved.
+ * D13 (amended by D56) on stdio: the user is fixed for the process. The
+ * broker answers the same provider for the process's life — a renewed token
+ * (refresh, or a new login when the refresh fails) is written back by that
+ * provider — so the one instance keeps its connection while `getProvider`
+ * answers it, and replaces it only when SAP already lost the session, built
+ * with the provider `getProvider` answers: the same one. Every call still
+ * asks `getProvider` with a signal; the server keeps no provider of its own.
  */
 
 let built = 0;
@@ -108,16 +107,14 @@ afterEach(() => {
   else process.env.SAP_SYSTEM_TYPE = previousType;
 });
 
-describe('stdio: the connection is kept for the instance\'s life (D13, D56)', () => {
-  it('a new provider from getProvider: the same connection, no reopen', async () => {
-    const first = provider();
-    const renewed = provider();
-    const answers = [first, first, renewed, renewed];
+describe("stdio: the connection is kept while getProvider answers the session's provider (D13, D56)", () => {
+  it('the same provider on every call: the same connection, no reopen', async () => {
+    const session = provider();
     const getProvider = jest.fn(
       async (
         _destination: string,
         _options?: { readonly signal?: AbortSignal | undefined },
-      ) => answers.shift() ?? renewed,
+      ) => session,
     );
     const destinations: IDestinations = {
       settingsFor: async () => ({
@@ -131,12 +128,11 @@ describe('stdio: the connection is kept for the instance\'s life (D13, D56)', ()
       expect(await which()).toBe('connection-1');
       expect(await which()).toBe('connection-1');
       expect(await which()).toBe('connection-1');
-      expect(await which()).toBe('connection-1');
 
       expect(build).toHaveBeenCalledTimes(1);
-      expect(build.mock.calls[0][1]).toBe(first);
+      expect(build.mock.calls[0][1]).toBe(session);
       // Asked on every call, each with a signal.
-      expect(getProvider).toHaveBeenCalledTimes(4);
+      expect(getProvider).toHaveBeenCalledTimes(3);
       for (const [destination, options] of getProvider.mock.calls) {
         expect(destination).toBe('dest');
         expect(options?.signal).toBeInstanceOf(AbortSignal);
@@ -146,28 +142,29 @@ describe('stdio: the connection is kept for the instance\'s life (D13, D56)', ()
     }
   });
 
-  it('a session SAP already lost: a new connection, with the provider that call resolved', async () => {
-    const first = provider();
-    const renewed = provider();
-    const answers = [first, renewed, renewed];
+  it('a session SAP already lost: a new connection, built with the provider getProvider answers — the same one', async () => {
+    const session = provider();
+    const getProvider = jest.fn(async () => session);
     const destinations: IDestinations = {
       settingsFor: async () => ({
         url: 'https://system.example.invalid',
         authType: 'basic',
       }),
-      getProvider: async () => answers.shift() ?? renewed,
+      getProvider,
     };
     const { client, which } = await serve(destinations);
     try {
       expect(await which()).toBe('connection-1');
-      expect(await which()).toBe('connection-1');
       const lost = connections.get('connection-1');
       if (lost) lost.connected = false;
       expect(await which()).toBe('connection-2');
+      expect(await which()).toBe('connection-2');
 
       expect(build).toHaveBeenCalledTimes(2);
-      expect(build.mock.calls[0][1]).toBe(first);
-      expect(build.mock.calls[1][1]).toBe(renewed);
+      expect(build.mock.calls[0][1]).toBe(session);
+      expect(build.mock.calls[1][1]).toBe(session);
+      // The replacement's provider came from this call's getProvider.
+      expect(getProvider).toHaveBeenCalledTimes(3);
     } finally {
       await client.close();
     }

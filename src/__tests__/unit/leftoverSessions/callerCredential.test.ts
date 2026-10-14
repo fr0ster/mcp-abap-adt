@@ -222,120 +222,46 @@ it("a replaced connection asks its credential's user again: the background calle
   }
 });
 
-/**
- * stdio's shape: a source that keeps its connection while the provider it
- * answers changes (`keepsConnection`), its credential switchable.
- */
-function keepingSource(
-  server: object,
-  url: string,
-  first: TokenAuthProvider,
-): { switchTo(next: TokenAuthProvider): void } {
-  let current = first;
-  (
-    server as {
-      setConnectionContext(context: unknown): void;
-    }
-  ).setConnectionContext({
-    kind: 'built',
-    source: {
-      resolve: async () => ({
-        settings: { url, client: '100', authType: 'jwt' },
-        credential: current,
-      }),
-    },
-    keepsConnection: true,
-    sessionId: 'keeping',
-  });
-  return {
-    switchTo: (next) => {
-      current = next;
-    },
-  };
-}
-
-it('I-R6a, background: a new provider on the kept session, the session replaced as another user — the next start asks again', async () => {
-  const standIn = await adtStandIn();
-  standIn.systemInformation('USER_A');
-  const caller = await callerOn(standIn, new InMemoryBackgroundRuns(), {
-    tokenUser: 'USER_A',
-  });
-  (
-    caller.server as unknown as {
-      register(registry: CompositeHandlersRegistry): void;
-    }
-  ).register(new CompositeHandlersRegistry([probeGroup([loseAndHold])]));
-  const source = keepingSource(
-    caller.server,
-    standIn.url,
-    TokenAuthProvider.fixed('placeholder.p1.sig'),
-  );
-  try {
-    const start = (name: string) =>
-      caller.call('RuntimeRunClass', { class_name: name, background: true });
-    // P1 asks USER_A on the kept session.
-    expect((await start('ZCL_P1')).isError).toBe(false);
-    // P2 on the same kept session: asked there, USER_A.
-    source.switchTo(TokenAuthProvider.fixed('placeholder.p2.sig'));
-    expect((await start('ZCL_P2')).isError).toBe(false);
-
-    // The session is lost; the replacement logs on as USER_B.
-    standIn.systemInformation('USER_B');
-    openGate();
-    await caller.call('LoseAndHold', { id: 'kept' });
-    await caller.call('ProbeAdt', { id: 'replaced' });
-    const before = standIn.requests.filter(isLookup).length;
-
-    expect((await start('ZCL_AFTER')).isError).toBe(false);
-    const after = standIn.requests.filter(isLookup);
-    expect(after.length).toBe(before + 1);
-    expect(after.at(-1)?.session).toBe(
-      standIn.requests.find((r) => r.url === `${PROBE_PATH}replaced`)?.session,
-    );
-  } finally {
-    await caller.close();
-    await standIn.close();
-  }
-});
-
-it('I-R6a, leftover: a new provider on the kept session, the session replaced as another user — the caller is B, never A', async () => {
+it("stdio's shape — one provider for the instance's life: after a lost session the replacement is built with it, and the caller stays the session's user", async () => {
+  // The harness's source answers the same token provider on every call, as
+  // stdio's getProvider does: the user is fixed for the process.
   stand = await leftoverStand({
     token: { tokenUser: 'USER_A' },
     extra: [loseAndHold],
   });
-  const source = keepingSource(
-    stand.server,
-    stand.standIn.url,
-    TokenAuthProvider.fixed('placeholder.p1.sig'),
-  );
   const ofA = await stand.leftover({ user: 'USER_A' });
-  const ofB = await stand.leftover({ user: 'USER_B' });
-  // P1, then P2, on the kept session: both asked as USER_A.
-  await stand.call('ListLeftoverSessions');
-  source.switchTo(TokenAuthProvider.fixed('placeholder.p2.sig'));
-  await stand.call('ListLeftoverSessions');
+  const handlesOf = async () =>
+    (
+      json((await stand?.call('ListLeftoverSessions'))?.text ?? '{}')
+        .sessions as Array<{ handle: string }>
+    ).map((s) => s.handle);
+  expect(await handlesOf()).toContain(ofA.handle);
 
-  // The session is lost and replaced as USER_B; that one is lost too while
-  // a call holds the flow, so the kept identity is not read.
-  stand.standIn.systemInformation('USER_B');
+  // The session is lost; the next call builds the replacement.
   openGate();
-  await stand.call('LoseAndHold', { id: 'kept' });
+  await stand.call('LoseAndHold', { id: 'lost' });
   await stand.call('ProbeAdt', { id: 'replaced' });
-  gate = new Promise<void>((resolve) => {
-    openGate = resolve;
-  });
-  const holding = stand.call('LoseAndHold', { id: 'replacement' });
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  const listing = stand.call('ListLeftoverSessions');
-  await new Promise((resolve) => setTimeout(resolve, 100));
-  openGate();
-  await holding;
-  const listed = json((await listing).text).sessions as Array<{
-    handle: string;
-  }>;
-  const handles = listed.map((s) => s.handle);
-  expect(handles).toContain(ofB.handle);
-  expect(handles).not.toContain(ofA.handle);
+  const sessionOf = (id: string) =>
+    stand?.standIn.requests.find((r) => r.url === `${PROBE_PATH}${id}`)
+      ?.session;
+  const replaced = sessionOf('replaced');
+  expect(replaced).toBeDefined();
+  expect(replaced).not.toBe(
+    stand.standIn.requests.find((r) => r.url === `${LOSE_PATH}lost`)?.session,
+  );
+  // Built with the same provider: the same credential on the wire.
+  expect(stand.standIn.authorizationOf('replaced')).toBeDefined();
+  expect(stand.standIn.authorizationOf('replaced')).toBe(
+    stand.standIn.requests.find((r) => r.url === `${LOSE_PATH}lost`)
+      ?.authorization,
+  );
+
+  // The caller is the replacement session's user — asked on it (at its
+  // connect, the session kept under it) — and is still USER_A.
+  expect(await handlesOf()).toContain(ofA.handle);
+  const lookups = stand.standIn.requests.filter(isLookup);
+  expect(lookups.some((r) => r.session === replaced)).toBe(true);
+  expect(lookups.at(-1)?.session).toBe(replaced);
 });
 
 it('m-R6b: a resume forgets the cached caller users', async () => {

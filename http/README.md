@@ -44,9 +44,10 @@ destination, no service key, no session file, no login, no auth broker.
 - Each request builds its own credential and its own connection; nothing is stored, shared or
   cached across requests. The one exception is held state (below): the connections it opened stay
   with it until it ends.
-- The system kind follows `--system-type` / `SAP_SYSTEM_TYPE` (`cloud`, `onprem`, `legacy`): it
-  decides the tools offered and whether a cloud system is asked for the responsible and the master
-  system.
+- The system kind follows `--system-type` / `SAP_SYSTEM_TYPE` (`cloud`, `onprem`, `legacy`) and is
+  required — no request header states it: it decides the tools offered and how the system's
+  `systeminformation` is read. Without it every call that would reach the system is refused
+  (`system_type_required`), nothing sent.
 
 Per request, beside the credential: `x-sap-responsible`, `x-sap-master-system`, `x-sap-language`,
 and the debugger's `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` (then `SAP_RESPONSIBLE`,

@@ -215,10 +215,10 @@ version states no grant: regenerate it, or add `SAP_GRANT_TYPE` by hand.
 **.env comments rule:** only full-line comments are supported (lines that start with `#`).
 Inline comments are not parsed, so keep comments on separate lines.
 
-**On-premise:** add `SAP_SYSTEM_TYPE=onprem` (or `--system-type=onprem`) to enable the
-on-premise-only tools (for example Programs); without it the tools offered are cloud's. The same
-setting picks the connector; without it a `jwt` destination connects as cloud and any other as
-on-premise.
+**The system type is required:** add `SAP_SYSTEM_TYPE=onprem` (or `cloud`, `legacy`; or
+`--system-type=…`). It enables the on-premise-only tools (for example Programs) and picks the
+connector; without it the destination does not start (19.0.0: no default — a `jwt` destination is
+no longer taken for cloud).
 
 **Responsible and master system.** A created object always carries its responsible person; its master
 system only when one is known. **The responsible is the user the system names**: the server asks the

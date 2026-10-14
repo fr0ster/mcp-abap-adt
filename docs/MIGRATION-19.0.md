@@ -54,6 +54,51 @@ The packages, all at **19.0.0**:
 - `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, `--system-type` and
   `--conf` are in every binary's table, unchanged. `--exposition` is gone: see the next section.
 
+## BREAKING — every binary and every embedder: the system type is required
+
+**The system's kind — `onprem`, `cloud` or `legacy` — must be stated; it is no longer guessed.**
+18.x picked the connector from the credential when nothing was stated (a `jwt` destination
+connected as cloud, any other as on-premise). That default is gone: a JWT is no sign of a cloud
+system, and the kind is never read from the URL or from what the system answers either. State it
+the way it was always documented:
+
+- `--system-type=<onprem|cloud|legacy>`, `SAP_SYSTEM_TYPE` in the environment or in the `--env` /
+  `--env-path` file (which joins the environment, never over a value already set), or YAML
+  `system-type`; precedence as before — the CLI flag, then the environment, then YAML. A
+  service-key destination (`--mcp=<name>`) has no `.env` of its own: state the kind on the command
+  line, in the environment or in YAML.
+- An embedder: `EmbeddableMcpServer`'s `systemType` option, else `SAP_SYSTEM_TYPE`.
+- `legacy` stays a kind of its own for the tools offered and connects as on-premise. Any other
+  value is refused like a missing one.
+
+What each answers without it:
+
+- **stdio** (`mcp-abap-adt` and the stdio binaries of the other tool sets): a destination's start
+  ends before anything is sent and before the transport opens — exit `1`, and on stderr `[MCP]
+  Destination "<name>": the SAP system type is required — set --system-type, SAP_SYSTEM_TYPE (the
+  environment or the --env file) or system-type (YAML) to onprem, cloud or legacy; the server did
+  not start`. (A value other than the three was already refused at start: `SAP_SYSTEM_TYPE
+  (environment or env file) must be onprem, cloud or legacy`.) Inspection-only mode — no
+  destination — needs no kind: it connects nowhere.
+- **Streamable HTTP and SSE**: no request header states the kind; it is the process's parameter
+  (`--system-type`, `SAP_SYSTEM_TYPE`, YAML). Without it every call that would reach the system is
+  refused before anything is sent: `"error": "system_type_required"`, "the SAP system type is not
+  stated: set --system-type, SAP_SYSTEM_TYPE (the environment or the --env file) or system-type
+  (YAML) to onprem, cloud or legacy — an embedding host passes systemType; nothing was sent to the
+  system".
+- **An embedder**: `new EmbeddableMcpServer(...)` throws that same `ServerRefusal`
+  (`system_type_required`) at construction — the kind decides the tools it registers and how the
+  system's answers are read, so the host learns it before any client sees a tool. A connection
+  the factory built (`createAbapConnection`) is refused the same way when `SAP_SYSTEM_TYPE` is not
+  set, before it connects. `HandlerExporter` has no `systemType` option: without
+  `SAP_SYSTEM_TYPE` the system lookup of a connection answering `404` fails, and a create is
+  refused as the system being unreachable — set `SAP_SYSTEM_TYPE`, or pass your own
+  `systemContextResolver`.
+- `ServerRefusalCode` / `FailureCode` add `system_type_required`.
+
+The tools offered still follow the same parameter; where none is stated (Streamable HTTP and SSE
+started without it, inspection-only stdio) the list is cloud's, as before.
+
 ## Every binary: `--exposition` is gone — the binary fixes its tool set
 
 **You choose the tools by the package you install**, not by a flag. `--exposition` (either

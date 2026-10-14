@@ -266,19 +266,19 @@ SAP_SYSTEM_TYPE=onprem
 
 ### SAP System Type
 
-The `SAP_SYSTEM_TYPE` environment variable controls which tools are available and how the server interacts with the SAP system:
+The `SAP_SYSTEM_TYPE` environment variable controls which tools are available and how the server interacts with the SAP system. **It is required (19.0.0): there is no default, and the kind is never guessed** — not from the credential, the URL or the system's answers.
 
-| Value | Description | Default |
-|-------|-------------|---------|
-| `cloud` | ABAP Cloud / BTP systems | **Yes** (default) |
-| `onprem` | On-premise systems (BASIS ≥ 7.50) | No |
-| `legacy` | Legacy on-premise systems (BASIS < 7.50) — **not supported at present**, see below | No |
+| Value | Description |
+|-------|-------------|
+| `cloud` | ABAP Cloud / BTP systems |
+| `onprem` | On-premise systems (BASIS ≥ 7.50) |
+| `legacy` | Legacy on-premise systems (BASIS < 7.50) — **not supported at present**, see below; connects as on-premise |
 
 **Why this matters:** Different SAP environments support different ADT endpoints. For example, Programs are only available on `onprem` systems. The server uses `SAP_SYSTEM_TYPE` to filter tools accordingly.
 
 **On `legacy`:** no tool declares that environment, so a server started with `SAP_SYSTEM_TYPE=legacy` offers none. Support for legacy systems is parked on the `parked/legacy-support` branch until it can be tried against a live one — it was declared on 142 tools and had never been run against such a system, which is a claim rather than a fact.
 
-**Default is `cloud`** — this covers most modern scenarios. On-premise users must set `SAP_SYSTEM_TYPE=onprem` to access on-premise-only tools (e.g., Programs).
+**Without it** `mcp-abap-adt` does not start a destination (exit `1`, naming the parameter), `mcp-abap-adt-http` / `mcp-abap-adt-sse` refuse every call that would reach the system (`system_type_required`, nothing sent; no request header states the kind), and `EmbeddableMcpServer` throws `system_type_required` at construction. A value other than the three is refused the same way. Where no kind is stated (Streamable HTTP and SSE started without it, inspection-only stdio) the tools listed are cloud's.
 
 You can also set this via CLI: `--system-type=onprem`, or YAML `system-type: onprem`. Precedence: the CLI flag, then the environment — which the `--env` / `--env-path` `.env` value joins, never over one already set — then YAML.
 
@@ -296,7 +296,7 @@ new EmbeddableMcpServer({
 
 Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe and is not required.
 
-**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE` → default `cloud`. That order picks the tools. The same option also states the kind of the injected connection for the responsible / master-system lookup (`cloud` asks the system, per call): `options.systemType` → `process.env.SAP_SYSTEM_TYPE` → on-premise, never the URL.
+**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE`; neither is refused at construction (`system_type_required`). That order picks the tools and states the kind of the injected connection for reading its `systeminformation` (asked on every kind; a `404` is the function unavailable on-premise, a failed lookup on `cloud`), never the URL.
 
 ### System Context for On-Premise Systems
 
@@ -322,7 +322,7 @@ The answer of step 2 is read by the system's kind: an answer naming a user is us
 
 **The one exception: a message class** is created with the system's own default responsible — adt-clients' message class create takes none (15.x the same) — and is never refused for a missing one.
 
-Whether a system is cloud is the kind its connection was built for: `SAP_SYSTEM_TYPE` / `--system-type`, else a `jwt` destination is cloud and any other on-premise. It is never guessed from the URL. A connection an embedding host builds itself (not through the server's factory) has no settings to read: the server's `systemType` option states its kind, then `SAP_SYSTEM_TYPE`, else on-premise.
+Whether a system is cloud is the kind its connection was built for: `SAP_SYSTEM_TYPE` / `--system-type` — required, never guessed from the credential or the URL. A connection an embedding host builds itself (not through the server's factory) has no settings to read: the server's `systemType` option states its kind, then `SAP_SYSTEM_TYPE`.
 
 **A create without a responsible is refused.** An operation that sends a responsible — creating an object, a transport without an `owner` — and finds none after all the steps is answered `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE`, the `x-sap-responsible` header and the login, and no request is made. This happens only on an on-premise system without `systeminformation` and without a login: SNC, or a token you hold, with no `SAP_RESPONSIBLE`. A missing master system is never refused. Reads are never refused for either.
 

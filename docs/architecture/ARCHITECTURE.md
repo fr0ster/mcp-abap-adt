@@ -184,7 +184,7 @@ Adding an authentication means a handler there, a row in this table and a test; 
 | **Runtime role** | Executes ADT requests over HTTP or RFC against a SAP system, presenting the `IAuthProvider` it is handed |
 | **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios` |
 
-**Construction** -- the server has one place that builds a connector (`src/lib/connectionFactory.ts`): the system kind and the wire follow from the settings (`SAP_SYSTEM_TYPE`, `connectionType`), and the credential is the one the caller hands in. Where a credential comes from is `src/lib/credentialSources.ts` (headers, an embedder's `SapConfig`) or the broker's `getProvider(destination)`; the factory never builds one from `settings.authType`.
+**Construction** -- the server has one place that builds a connector (`src/lib/connectionFactory.ts`): the system kind and the wire follow from the settings (`SAP_SYSTEM_TYPE` — required, never guessed: none, or a value other than `onprem` / `cloud` / `legacy`, is `system_type_required` before anything is sent —, `connectionType`), and the credential is the one the caller hands in. Where a credential comes from is `src/lib/credentialSources.ts` (headers, an embedder's `SapConfig`) or the broker's `getProvider(destination)`; the factory never builds one from `settings.authType`.
 
 **Key capabilities:**
 - CSRF token management (automatic fetch, cache, refresh on error)

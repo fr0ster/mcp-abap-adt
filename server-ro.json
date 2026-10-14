@@ -66,14 +66,14 @@
         },
         {
           "name": "SAP_SYSTEM_TYPE",
-          "description": "System type, controls which tools are available (e.g. Programs are onprem-only).",
+          "description": "System type, required (here or as --system-type; no default, never guessed): the tools offered (e.g. Programs are onprem-only), the connector, and how the system's answers are read. Without it a destination does not start.",
           "format": "string",
+          "isRequired": true,
           "choices": [
             "cloud",
             "onprem",
             "legacy"
-          ],
-          "default": "cloud"
+          ]
         },
         {
           "name": "SAP_LANGUAGE",

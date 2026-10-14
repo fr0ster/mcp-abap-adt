@@ -51,7 +51,9 @@ nowhere else: no destination, no service key, no session file, no login, no auth
   with another connection, and nothing outlives it. Held state (a debug session)
   lives in the connection's instance until the connection closes, its
   stop tool runs or the idle bound (`--state-idle-minutes`) ends it.
-- The system kind follows `--system-type` / `SAP_SYSTEM_TYPE`.
+- The system kind follows `--system-type` / `SAP_SYSTEM_TYPE` and is required — no request header
+  states it. Without it every call that would reach the system is refused
+  (`system_type_required`), nothing sent.
 
 Beside the credential, the opening `GET` may state `x-sap-responsible`, `x-sap-master-system`,
 `x-sap-language` and the debugger's `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` (then the

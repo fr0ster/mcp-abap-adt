@@ -22,7 +22,10 @@
  *    disposed, the counted calls drain, every broker is flushed — no
  *    deadline of the server's choosing; then the logoff of any connection
  *    opened meanwhile;
- * 5. exit `0`, or `1` with one stderr line per fact.
+ * 5. exit `0`, or `1` with one stderr line per fact. A shutdown that began
+ *    before the transport opened (`startBirth`: the connector still being
+ *    born) waits for the start to end after the logoffs and exits `1` — the
+ *    start failed; it is the process's one exit.
  *
  * Only a `SIGTERM` / `SIGINT` after the start, or `--shutdown-timeout` (no
  * default), ends the waiting early: the forced close (lib's
@@ -57,6 +60,73 @@ export interface ShutdownOptions {
   processLike: ShutdownProcess;
   /** `--shutdown-timeout` in milliseconds; absent: none. */
   shutdownTimeoutMs?: number | undefined;
+  /**
+   * The start: whether the transport opened. A shutdown before it ends the
+   * start and exits `1` (`startBirth`); absent: the transport is open.
+   */
+  birth?: StartBirth | undefined;
+}
+
+/** The line of a shutdown that came before the transport opened. */
+export const SHUTDOWN_BEFORE_START_LINE =
+  '[MCP] The shutdown began before the server started: the start failed';
+
+/**
+ * The start as the shutdown sees it: the connector's birth, then the
+ * transport's opening. The launcher hands its birth over (`joining`) and
+ * asks, once the birth settled, whether it may still open the transport
+ * (`open`) — `false` once the shutdown began. A shutdown that began before
+ * the transport opened waits for the birth to settle (its logoffs at once
+ * end it), then exits `1`: the start failed. The launcher then exits
+ * nothing itself (`shutdownBegan`): the shutdown's exit is the process's
+ * one exit.
+ */
+export interface StartBirth {
+  /** Whether the shutdown began. */
+  shutdownBegan(): boolean;
+  /** The birth under way; the shutdown joins it. */
+  joining<T>(birth: Promise<T>): Promise<T>;
+  /** The transport opens now — `false` (nothing opened) once the shutdown began. */
+  open(): boolean;
+}
+
+/** The shutdown's side of a start (`StartBirth`). */
+interface StartBirthState extends StartBirth {
+  /** In the trigger's tick. */
+  began(): void;
+  /** Whether the transport opened. */
+  opened(): boolean;
+  /** Settles once the birth handed over settled (or at once: none). */
+  settled(): Promise<void>;
+}
+
+/** A new start, not yet opened. */
+export function startBirth(): StartBirth {
+  let began = false;
+  let opened = false;
+  let birth: Promise<unknown> = Promise.resolve();
+  const state: StartBirthState = {
+    shutdownBegan: () => began,
+    joining: (pending) => {
+      birth = pending;
+      return pending;
+    },
+    open: () => {
+      if (began) return false;
+      opened = true;
+      return true;
+    },
+    began: () => {
+      began = true;
+    },
+    opened: () => opened,
+    settled: () =>
+      birth.then(
+        () => undefined,
+        () => undefined,
+      ),
+  };
+  return state;
 }
 
 /** The line of a session secret not stored. */
@@ -70,12 +140,24 @@ export function notStoredLine(entry: string): string {
  */
 export function installShutdown(options: ShutdownOptions): () => Promise<void> {
   const { factory, instance } = options;
+  const birth = options.birth as StartBirthState | undefined;
   return installShutdownSequence({
-    begin: () => factory.beginShutdown(),
+    begin: () => {
+      birth?.began();
+      factory.beginShutdown();
+    },
     run: async (step, signal) => {
       const lines: string[] = [];
+      // Read in the trigger's turn: the transport cannot open after it.
+      const beforeStart = birth !== undefined && !birth.opened();
       step('the logoffs');
       await logOffAtOnce();
+      if (beforeStart) {
+        // The start ends with the logoffs; its own failure line first.
+        step('the start');
+        await birth.settled();
+        lines.push(SHUTDOWN_BEFORE_START_LINE);
+      }
       step('the instance close');
       try {
         await instance.close();

@@ -44,6 +44,7 @@ import {
   startLookupFailedWords,
   startSystemWithoutUserWords,
 } from '../launcher.js';
+import { SHUTDOWN_BEFORE_START_LINE } from '../shutdown.js';
 
 jest.setTimeout(30_000);
 
@@ -104,6 +105,19 @@ async function leftover(
   return { handle, session };
 }
 
+/** What the exit stub throws: execution stops at the first exit. */
+const EXITED = Symbol('exited');
+
+/** Waits until the process exited (the stub's first call), then a little more. */
+async function exited(exits: number[]): Promise<void> {
+  const end = Date.now() + 10_000;
+  while (exits.length === 0 && Date.now() < end) {
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  // Long enough for a second exit, were there one, to be recorded.
+  await new Promise((r) => setTimeout(r, 50));
+}
+
 /** Launches `mcp-abap-adt` (or `toolSet`) over an in-memory transport. */
 async function start(
   options: {
@@ -113,7 +127,10 @@ async function start(
      * Runs beside the launch, while the connection is born; `shutdown()`
      * starts the shutdown as the end of stdin does.
      */
-    atBirth?: (shutdown: () => void) => Promise<void>;
+    atBirth?: (
+      shutdown: () => void,
+      signal: (name: 'SIGTERM' | 'SIGINT') => void,
+    ) => Promise<void>;
   } = {},
 ) {
   const args = [
@@ -150,15 +167,25 @@ async function start(
         throw new Error('no login in this test');
       }) as never,
       stderr: (line) => stderr.push(line),
-      exit: (code) => exits.push(code),
+      // A real exit ends the process at its first call: this one stops
+      // the caller there too, so a later exit cannot hide the first.
+      exit: (code) => {
+        exits.push(code);
+        throw EXITED;
+      },
       processLike,
       platform: 'linux',
       transport: serverSide,
     },
   );
   await Promise.all([
-    launched,
-    options.atBirth?.(() => processLike.stdin.emit('end')),
+    launched.catch((error: unknown) => {
+      if (error !== EXITED) throw error;
+    }),
+    options.atBirth?.(
+      () => processLike.stdin.emit('end'),
+      (name) => processLike.emit(name),
+    ),
   ]);
   const client = new Client({ name: 'start', version: '1.0.0' });
   const connected = opened > 0;
@@ -257,11 +284,10 @@ it('the shutdown lands while a leftover with its system information is resumed: 
       held.release();
     },
   });
-  const end = Date.now() + 10_000;
-  while (s.exits.length < 2 && Date.now() < end) {
-    await new Promise((r) => setTimeout(r, 5));
-  }
-  expect(s.exits).toContain(1);
+  await exited(s.exits);
+  // The one exit is the shutdown's, and it is 1: the start failed.
+  expect(s.exits).toEqual([1]);
+  expect(s.stderr).toContain(SHUTDOWN_BEFORE_START_LINE);
   expect(s.opened()).toBe(0);
   expect(standIn.requests.filter(isLookup)).toEqual([]);
   expect(runtimeFiles(runtime)).toEqual([handle]);
@@ -315,6 +341,34 @@ it('none: a normal logon at the start, before the transport opens', async () => 
     await s.stop();
   }
 });
+
+it.each<['the end of stdin' | 'a signal', 'onprem' | 'cloud']>([
+  ['the end of stdin', 'onprem'],
+  ['a signal', 'onprem'],
+  ['the end of stdin', 'cloud'],
+])(
+  'the shutdown (%s) while the start is still logging on (%s): the process exits 1 once, never 0, and the transport never opens',
+  async (trigger, kind) => {
+    process.env.SAP_SYSTEM_TYPE = kind;
+    // The logon's first request, held until the shutdown began.
+    const held = standIn.hold((r) => !isLogoff(r.url));
+    const s = await start({
+      kind,
+      atBirth: async (shutdown, signal) => {
+        await held.arrived;
+        if (trigger === 'a signal') signal('SIGTERM');
+        else shutdown();
+        held.release();
+      },
+    });
+    await exited(s.exits);
+    expect(s.exits).toEqual([1]);
+    expect(s.stderr).toContain(SHUTDOWN_BEFORE_START_LINE);
+    expect(s.opened()).toBe(0);
+    expect(standIn.requests.filter(isLookup)).toEqual([]);
+    expect(ownedConnections()).toEqual([]);
+  },
+);
 
 it('two: a normal logon, and both files are left untouched', async () => {
   const first = await leftover();

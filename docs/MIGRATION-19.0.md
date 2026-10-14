@@ -750,7 +750,10 @@ transport's options only:
   system information — with exit `1` and the failure's words on stderr (a chain failure's, the
   server's refusal's, or the destination, the error's class and SAP's status — never an error's
   message), before the MCP transport is opened: there is nothing to retry; start the process
-  again. A logon made for a start that then fails is logged off.
+  again. A logon made for a start that then fails is logged off. **A shutdown during the start** —
+  your client closing stdin, a signal — before the transport opened ends the start too: its
+  sessions are logged off at once, and the process exits `1` (never `0`), with
+  `[MCP] The shutdown began before the server started: the start failed` on stderr.
 - **The connection is kept for the process's life.** On stdio the user is fixed for the process:
   the session is renewed — with the refresh token, or by a new login when the refresh fails — and
   written back, the same user, and the broker answers the same provider throughout. The connection

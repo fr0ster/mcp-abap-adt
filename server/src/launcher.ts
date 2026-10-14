@@ -49,7 +49,11 @@ import {
 import { hydrateSystemContextFromEnvFile } from './config/envFileContext';
 import { getPlatformPaths } from './config/platformPaths';
 import { StdioServer } from './StdioServer.js';
-import { installShutdown, type ShutdownProcess } from './shutdown.js';
+import {
+  installShutdown,
+  type ShutdownProcess,
+  startBirth,
+} from './shutdown.js';
 
 const stderrLogger: ILogger = {
   info: (...args: any[]) => console.error(...args),
@@ -694,6 +698,7 @@ export async function launch(
     },
   );
   activeServer = server;
+  const birth = startBirth();
   // The shutdown (D33) — a signal, or the client closing stdin: latch, every
   // owned connection logged off at once and the running tools interrupted,
   // the MCP server closed, then the gate, the logins, the drain and the flush.
@@ -708,20 +713,25 @@ export async function launch(
       config.shutdownTimeout === undefined
         ? undefined
         : config.shutdownTimeout * 1000,
+    birth,
   });
   // The connection is born before the transport opens: nothing to retry,
-  // the process ends with what failed.
+  // the process ends with what failed. A shutdown during the birth (stdin
+  // closed, a signal) ends it, and its exit — 1, the start failed — is the
+  // process's one exit.
   if (destination) {
     try {
-      await server.connectAtStart(destination);
+      await birth.joining(server.connectAtStart(destination));
     } catch (error) {
       deps.stderr(
         `[MCP] ${startConnectionWords(error, destination, factory, deps.platform ?? process.platform)}`,
       );
-      deps.exit(1);
+      if (!birth.shutdownBegan()) deps.exit(1);
       return;
     }
   }
+  // The shutdown began meanwhile: the transport never opens.
+  if (!birth.open()) return;
   // stdio unless the edges carry a transport of their own (a test's).
   await (deps.transport === undefined
     ? server.start(destination)

@@ -3,8 +3,8 @@
  * session. In core (stdio), SSE and an embedded server a client's MCP cancel
  * aborts nothing: the call runs to its end and reaches its tool. Over
  * Streamable HTTP, whose requests are each their own, the client closing its
- * request ends that request's session: the call does not reach its tool
- * (D5, spec §5.3, §14.4.5).
+ * request ends no call either: a dropped request closes nothing, and the
+ * admitted call reaches its tool.
  *
  * Each server runs a probe tool against an ADT stand-in on an ABAP Cloud
  * system type, so before the tool runs the call asks the system for its
@@ -56,11 +56,9 @@ async function until(done: () => boolean, limit = 2_000): Promise<void> {
 interface Served {
   /**
    * Calls the probe; `cancel()` cancels it the transport's way: an MCP
-   * cancel, or (`endsSession`) the request closed.
+   * cancel, or (Streamable HTTP) the request closed.
    */
   call(id: string): { cancel(): void; done: Promise<unknown> };
-  /** Whether the transport's cancel ends the request's session (Streamable HTTP). */
-  endsSession?: boolean;
   close(): Promise<void>;
 }
 
@@ -180,7 +178,6 @@ const SERVERS: Record<string, () => Promise<Served>> = {
           .catch((error: unknown) => error);
         return { cancel: () => controller.abort(), done };
       },
-      endsSession: true,
       close: async () => {
         await mcp.stop().catch(() => undefined);
         await closeServer(http);
@@ -241,16 +238,11 @@ describe.each(Object.keys(SERVERS))('%s', (name) => {
     await hold.arrived;
     if (cancel) {
       call.cancel();
-      if (served.endsSession === true) {
-        // The request closed: the session's end aborts the call's signal.
-        await until(() => activeTools().every((tool) => tool.signal.aborted));
-      } else {
-        // An MCP cancel aborts nothing: the call is live, its signal not
-        // aborted.
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        expect(activeTools()).toHaveLength(1);
-        expect(activeTools()[0]?.signal.aborted).toBe(false);
-      }
+      // An MCP cancel, or a dropped http request, aborts nothing: the call
+      // is live, its signal not aborted.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(activeTools()).toHaveLength(1);
+      expect(activeTools()[0]?.signal.aborted).toBe(false);
     }
     hold.release();
     // The call has settled on the server.
@@ -271,16 +263,14 @@ describe.each(Object.keys(SERVERS))('%s', (name) => {
     }
   });
 
-  it('a call cancelled after its connection is ready: an MCP cancel aborts nothing and the tool runs; a closed request (the session’s end) never reaches it', async () => {
+  it('a call cancelled after its connection is ready: an MCP cancel, or a dropped http request, aborts nothing and the tool runs once', async () => {
     const served = await SERVERS[name]();
     try {
       await heldCall(served, 'cancelled', true);
       const urls = standIn.requests.map((r) => r.url);
-      if (served.endsSession === true) {
-        expect(urls).not.toContain(`${PROBE_PATH}cancelled`);
-      } else {
-        expect(urls).toContain(`${PROBE_PATH}cancelled`);
-      }
+      expect(
+        urls.filter((url) => url === `${PROBE_PATH}cancelled`),
+      ).toHaveLength(1);
     } finally {
       await served.close();
     }

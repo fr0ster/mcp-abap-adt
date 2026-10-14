@@ -21,9 +21,10 @@
  * - and, with `debug` in the exposition (full: `readonly,debug`, compact:
  *   `ro,debug`), the debugger's tools on each.
  *
- * A8's cancellation case (D5): a call cancelled after its connection is
- * ready — while the system lookup an ABAP Cloud call makes first is held at
- * the stand-in — never reaches its tool, the same on both sets. A10's
+ * A8's cancellation case: a call cancelled after its connection is ready —
+ * while the system lookup an ABAP Cloud call makes first is held at the
+ * stand-in — by an MCP cancel (sse) or a dropped request (http) reaches its
+ * tool once the lookup is answered, the same on both sets. A10's
  * shutdown cases (D33, D55): a write whose update is held at the stand-in
  * when the shutdown starts runs to its end — the `UNLOCK` lands, then the
  * session's logoff, exit `0` — and a call arriving after the latch reaches no
@@ -1172,7 +1173,7 @@ async function until(done: () => boolean, limitMs = 10_000): Promise<void> {
  * One read on a cloud system, its system lookup held at the stand-in, and
  * while it is held: over SSE an MCP cancel — which aborts nothing, a tool
  * call cannot be cancelled; over Streamable HTTP, whose requests are each
- * their own, the client closing its request — the session's end. Then the
+ * their own, the client closing its request — which ends no call. Then the
  * lookup answered: whether the read reached the stand-in, and how the
  * server exited.
  */
@@ -1234,16 +1235,11 @@ async function cancelledRead(
 
   await hold.arrived;
   controller.abort();
-  if (transportName === 'http') {
-    // The request's transport closed: the session's end aborts the call's
-    // signal; the call still waits for its lookup.
-    await until(() => activeTools().every((tool) => tool.signal.aborted));
-  } else {
-    // A cancel aborts nothing: the call is live, its signal not aborted.
-    await new Promise((resolve) => setTimeout(resolve, 150));
-    expect(activeTools().length).toBeGreaterThan(0);
-    expect(activeTools().every((tool) => !tool.signal.aborted)).toBe(true);
-  }
+  // A cancel (sse) or a dropped request (http) aborts nothing: the call is
+  // live, its signal not aborted.
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  expect(activeTools().length).toBeGreaterThan(0);
+  expect(activeTools().every((tool) => !tool.signal.aborted)).toBe(true);
   hold.release();
   await until(() => activeTools().length === 0);
   await done;
@@ -1257,25 +1253,24 @@ async function cancelledRead(
 
 /**
  * http and sse: the window is the connection's system lookup, held. Over
- * Streamable HTTP the client closing its request ends that request's
- * session: the call never reaches its tool (D5). Over SSE an MCP cancel
- * aborts nothing: the tool runs once the lookup is answered (a stdio
+ * Streamable HTTP the client closing its request ends no call, and over SSE
+ * an MCP cancel aborts nothing: the tool runs once the lookup is answered (a stdio
  * process has its system information from its start; a queued call that
  * is sent a cancel keeps its place: `stateful/noCallCancel.test.ts`).
  */
 describe.each<Exclude<TransportName, 'stdio'>>(['http', 'sse'])(
-  '%s: a call during its system lookup, then a cancel or the session’s end, on both sets',
+  '%s: a call during its system lookup, then a cancel or a dropped request, on both sets',
   (transportName) => {
     jest.setTimeout(60_000);
 
     it(
       transportName === 'http'
-        ? 'the request closed (the session’s end): no read reaches the system (D5)'
+        ? 'the request closed ends no call: the read reaches the system'
         : 'an MCP cancel aborts nothing: the read reaches the system',
       async () => {
         const full = await cancelledRead(transportName, 'full');
         const compact = await cancelledRead(transportName, 'compact');
-        expect(full).toEqual({ reached: transportName === 'sse', exit: 0 });
+        expect(full).toEqual({ reached: true, exit: 0 });
         expect(compact).toEqual(full);
       },
     );

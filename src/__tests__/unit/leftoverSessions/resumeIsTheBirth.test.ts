@@ -15,7 +15,7 @@ import {
   LEFTOVER_SESSION_NOT_AVAILABLE_WORDS,
 } from '../../../lib/auth/serverRefusal';
 import { PROBE_PATH } from '../../helpers/adtStandIn';
-import { json, type LeftoverStand, leftoverStand } from './harness';
+import { json, type LeftoverStand, leftoverStand, OUR_PID } from './harness';
 
 jest.setTimeout(30_000);
 
@@ -52,7 +52,11 @@ it('a token caller lists and resumes as its first act: SAP gets nothing before t
   expect(stand.standIn.requests.length).toBe(from);
 
   const resumed = await stand.call('ResumeLeftoverSession', { handle });
-  expect(json(resumed.text)).toEqual({ handle, state: 'resumed' });
+  expect(json(resumed.text)).toEqual({
+    handle,
+    state: 'resumed',
+    session: 'picked_up',
+  });
   // Everything SAP got from here on is in the leftover session: no logon
   // came first, and none came at all. The first is the resume's own
   // request, without the credential.
@@ -65,7 +69,7 @@ it('a token caller lists and resumes as its first act: SAP gets nothing before t
   expect(sessionOf('after')).toBe(session);
 });
 
-it('a basic caller resumes as its first act: no logon, and the next tool runs in the resumed session', async () => {
+it('a quick restart — the session still lives: a basic caller picks it up as its first act, no logon, and the file is rewritten as this process’s', async () => {
   stand = await leftoverStand();
   const { handle, session } = await stand.leftover();
   const from = stand.standIn.requests.length;
@@ -75,10 +79,15 @@ it('a basic caller resumes as its first act: no logon, and the next tool runs in
   expect(stand.standIn.requests.length).toBe(from);
   expect(
     json((await stand.call('ResumeLeftoverSession', { handle })).text),
-  ).toEqual({ handle, state: 'resumed' });
+  ).toEqual({ handle, state: 'resumed', session: 'picked_up' });
   for (const r of stand.standIn.requests.slice(from)) {
     expect(r.session).toBe(session);
   }
+  expect(stand.files()).toEqual([handle]);
+  expect(stand.file(handle)).toMatchObject({
+    pid: OUR_PID,
+    cookies: expect.stringContaining(`=${session}`),
+  });
   await stand.call('ProbeAdt', { id: 'after' });
   expect(sessionOf('after')).toBe(session);
   expect(stand.standIn.logoffs()).toBe(0);
@@ -143,14 +152,62 @@ it('after a resume the instance has its connection: a second resume is refused',
   expect(stand.standIn.loggedOff()).not.toContain(first.session);
 });
 
-it('a session SAP says is gone gives the instance no connection: the next tool logs on', async () => {
+it('a session SAP says is gone: one fresh logon starts a new session, the next tool runs in it, and the file is rewritten under the same handle', async () => {
   stand = await leftoverStand();
   const { handle, session } = await stand.leftover();
   stand.standIn.answer((r) => r.session === session, 401);
+  const from = stand.standIn.requests.length;
   const answer = await stand.call('ResumeLeftoverSession', { handle });
-  expect(json(answer.text)).toMatchObject({ handle, state: 'gone' });
-  expect(stand.files()).toEqual([]);
-  expect((await stand.call('ProbeAdt', { id: 'fresh' })).isError).toBe(false);
-  expect(sessionOf('fresh')).toBeDefined();
-  expect(sessionOf('fresh')).not.toBe(session);
+  expect(answer.isError).toBe(false);
+  expect(json(answer.text)).toEqual({
+    handle,
+    state: 'resumed',
+    session: 'new',
+  });
+  const sent = stand.standIn.requests.slice(from);
+  // The takeover's one request in the old session, without the credential;
+  // then the logon, with it, in one new session.
+  expect(sent[0]?.session).toBe(session);
+  expect(sent[0]?.authorization).toBeUndefined();
+  const fresh = new Set(
+    sent.filter((r) => r.session !== session).map((r) => r.session),
+  );
+  expect(fresh.size).toBe(1);
+  const [started] = [...fresh];
+  expect(
+    sent.some((r) => r.session === started && r.authorization !== undefined),
+  ).toBe(true);
+  // The same handle, this process's, the new session's cookies.
+  expect(stand.files()).toEqual([handle]);
+  expect(stand.file(handle)).toMatchObject({ pid: OUR_PID });
+  const pairs = String(stand.file(handle).cookies).split('; ');
+  expect(pairs).toContain(`SAP_SESSIONID_X01_100=${started}`);
+  expect(pairs).not.toContain(`SAP_SESSIONID_X01_100=${session}`);
+  await stand.call('ProbeAdt', { id: 'next' });
+  expect(sessionOf('next')).toBe(started);
+  // The instance has its connection now.
+  expect(
+    json(
+      (
+        await stand.call('ResumeLeftoverSession', {
+          handle: (await stand.leftover()).handle,
+        })
+      ).text,
+    ).error,
+  ).toBe('leftover_session_connector_exists');
+});
+
+it('a gone session whose fresh logon SAP refuses: the call’s error, the file given back under its handle, and no connection kept', async () => {
+  stand = await leftoverStand();
+  const { handle } = await stand.leftover();
+  stand.standIn.refuse(true);
+  const answer = await stand.call('ResumeLeftoverSession', { handle });
+  expect(answer.isError).toBe(true);
+  expect(json(answer.text).error).not.toBe('leftover_session_connector_exists');
+  expect(stand.files()).toEqual([handle]);
+  stand.standIn.refuse(false);
+  // Still a leftover, and the instance still has no connection: a second
+  // resume is not refused for one.
+  const again = await stand.call('ResumeLeftoverSession', { handle });
+  expect(json(again.text)).toMatchObject({ handle, state: 'resumed' });
 });

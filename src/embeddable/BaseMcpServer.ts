@@ -734,6 +734,18 @@ export abstract class BaseMcpServer extends McpServer {
    * them (`sessionOf`).
    */
   private async logOn(resolved: ResolvedConnection): Promise<AbapConnection> {
+    const connection = await this.connectedLogon(resolved);
+    const identity = this.sessionOf(resolved);
+    if (identity !== undefined) {
+      this.leftoverSessions?.track(connection, 'built', identity);
+    }
+    return connection;
+  }
+
+  /** A connection built from `resolved`, owned as `built`, and connected with its logon. */
+  private async connectedLogon(
+    resolved: ResolvedConnection,
+  ): Promise<AbapConnection> {
     const connection = createAbapConnection(
       resolved.settings,
       resolved.credential,
@@ -752,10 +764,6 @@ export abstract class BaseMcpServer extends McpServer {
       await endConnection(connection);
       throw error;
     }
-    const identity = this.sessionOf(resolved);
-    if (identity !== undefined) {
-      this.leftoverSessions?.track(connection, 'built', identity);
-    }
     return connection;
   }
 
@@ -763,14 +771,21 @@ export abstract class BaseMcpServer extends McpServer {
    * A leftover session taken up: the connection built from `resolved` on the
    * session's cookies (connection 17's `session`) — `connect()` logs on
    * nowhere and asks SAP, without the credential, whether the session lives.
-   * Taken: its file is this process's (`adopt`). SAP's answer that it is
-   * gone deletes the file; any other failure gives it back as a leftover.
+   * Alive: picked up. SAP answering it is gone (`sessionGone`): that
+   * instance is spent and logged nothing on — connection's "a new session is
+   * a new instance" — so a new one is built with the normal logon, with the
+   * process's settings and credential, and starts a new session. Either way
+   * the file is this process's under the same handle (`adopt`), rewritten
+   * with the connection's cookies; `outcome.session` says which. Any other
+   * failure — the old session's answer or the new logon's — is the call's,
+   * as SAP gave it, and gives the file back as a leftover.
    */
   private async resumedSession(
     resolved: ResolvedConnection,
     owner: LeftoverSessions,
     claimed: ClaimedSession,
     identity: SessionIdentity,
+    outcome: { session?: 'picked_up' | 'new' },
   ): Promise<AbapConnection> {
     let connection: AbapConnection;
     try {
@@ -794,11 +809,23 @@ export abstract class BaseMcpServer extends McpServer {
       // did not take.
       await endConnection(connection);
       const sap = sapAnswerOf(error);
-      if (sap !== undefined && sessionGone(sap.status)) owner.forget(claimed);
-      else owner.release(claimed);
-      throw error;
+      if (sap === undefined || !sessionGone(sap.status)) {
+        owner.release(claimed);
+        throw error;
+      }
+      let fresh: AbapConnection;
+      try {
+        fresh = await this.connectedLogon(resolved);
+      } catch (logonError) {
+        owner.release(claimed);
+        throw logonError;
+      }
+      owner.adopt(claimed, fresh, identity);
+      outcome.session = 'new';
+      return fresh;
     }
     owner.adopt(claimed, connection, identity);
+    outcome.session = 'picked_up';
     return connection;
   }
 
@@ -1406,9 +1433,9 @@ export abstract class BaseMcpServer extends McpServer {
    * a connection: an instance that already has one refuses, before the
    * handle is read (`leftover_session_connector_exists`). The connection is
    * set as the instance's in the same turn as that check, so a tool call
-   * asking meanwhile waits for it. SAP's answer that the session is gone is
-   * the call's answer, the file deleted, and the instance still has no
-   * connection.
+   * asking meanwhile waits for it. A session SAP says is gone is replaced
+   * by a new one with the normal logon (`resumedSession`): the answer is
+   * `resumed` either way, `session` saying which.
    */
   private async resumeLeftover(
     handle: string,
@@ -1423,17 +1450,16 @@ export abstract class BaseMcpServer extends McpServer {
       owner.release(claimed);
       throw new ServerRefusal('leftover_session_not_resumable');
     }
+    const outcome: { session?: 'picked_up' | 'new' } = {};
     const entry = this.buildConnection(resolved.credential, () =>
-      this.resumedSession(resolved, owner, claimed, identity),
+      this.resumedSession(resolved, owner, claimed, identity, outcome),
     );
-    try {
-      await raceRequestSignal(entry.connection, signal);
-    } catch (error) {
-      const sap = sapAnswerOf(error);
-      if (sap === undefined || !sessionGone(sap.status)) throw error;
-      return { handle: claimed.handle, state: 'gone', sap };
-    }
-    return { handle: claimed.handle, state: 'resumed' };
+    await raceRequestSignal(entry.connection, signal);
+    return {
+      handle: claimed.handle,
+      state: 'resumed',
+      session: outcome.session ?? 'picked_up',
+    };
   }
 
   /**
@@ -1635,10 +1661,11 @@ export const LEFTOVER_LOGOFF_NOT_WRITTEN_WORDS =
 
 /**
  * Whether SAP's answer to the request in a resumed session says the session
- * is gone (connection 17): a `401`, a redirect (not followed), or an answer
- * that is not that session's (a `2xx` naming another session, none, or no
- * token). Any other status — a server failure — leaves the file: the session
- * may still live.
+ * is gone (connection 17, read by status from the error's `response`, never
+ * its words): a `401`, a redirect (not followed), or an answer that is not
+ * that session's (a `2xx` naming another session, none, or no token). Any
+ * other status — a server failure — is the call's error: the session may
+ * still live.
  */
 function sessionGone(status: number): boolean {
   return status === 401 || (status >= 200 && status < 400);

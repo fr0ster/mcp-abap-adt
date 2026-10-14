@@ -125,7 +125,7 @@ it("lists and resumes the destination's leftover session, asking SAP nothing bef
   expect(runtimeFiles(dir)).toContain(other);
   expect(
     JSON.parse((await call('ResumeLeftoverSession', { handle })).text),
-  ).toEqual({ handle, state: 'resumed' });
+  ).toEqual({ handle, state: 'resumed', session: 'picked_up' });
   await client.close();
   await server.terminalClose();
   expect(runtimeFiles(dir)).toEqual([other]);

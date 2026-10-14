@@ -37,16 +37,7 @@ export async function answerLeftoverResume(
   context: HandlerContext,
   handle: string,
 ): Promise<LeftoverAnswer> {
-  const outcome = await portOf(context).resume(handle);
-  if (outcome.state === 'resumed') return json(outcome);
-  return json(
-    {
-      ...outcome,
-      message:
-        'SAP answered that this session is gone; its record is deleted. Nothing was resumed.',
-    },
-    true,
-  );
+  return json(await portOf(context).resume(handle));
 }
 
 export async function answerLeftoverLogoff(

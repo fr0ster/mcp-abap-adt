@@ -223,8 +223,7 @@ tools; the server decides nothing by itself (session-resume spec).
   read); an unknown handle, another destination's file, a live process's file and one another live process claimed are refused alike
   (`leftover_session_not_available`).
 - **Claims.** Before acting, `claim` renames the file to `<handle>.claimed.<pid>.<start>` — the
-  atomic step two processes race on; the loser finds nothing. `adopt` (resumed), `forget` (gone,
-  logged off) or `release` (anything else: back to `<handle>`) ends the claim; a claimed file
+  atomic step two processes race on; the loser finds nothing. `adopt` (resumed), `forget` (logged off) or `release` (anything else: back to `<handle>`) ends the claim; a claimed file
   whose claimer died is listed and claimable again. Off Linux liveness is the pid alone.
 - **Resume** (`built` only) is the instance's connection's birth, not a call in the main flow:
   refused once the instance has a connection (`built` set — connecting, ready or spent;
@@ -234,8 +233,11 @@ tools; the server decides nothing by itself (session-resume spec).
   `createAbapConnection(…, session)`, owns it as `built`, connects (connection 17's takeover: one
   request in the session, without the credential), and makes the file this process's (`adopt`,
   same handle); the system lookup follows as for a logon. SAP's "gone" — `401`, a redirect, an
-  answer not the session's — ends the spent connection, deletes the file, and leaves the instance
-  without a connection (the next call logs on); any other failure gives the file back. The list
+  answer not the session's, read by status from connection's error (`sapAnswerOf`, `sessionGone`)
+  — ends the spent takeover instance (it logged nothing on) and builds a new one with the normal
+  logon (`connectedLogon`, connection's "a new session is a new instance"), adopted under the same
+  handle: answered `resumed`, `session: 'new'` (else `'picked_up'`). Any other failure, the new
+  logon's included, is the call's error and gives the file back; the instance has no connection. The list
   and the logoff take no turn either — neither touches the instance's connection. After a resume
   the server checks and repairs nothing (no lock probing, no replay): an ended session or lost
   locks reach the model as SAP answers.

@@ -119,8 +119,9 @@ tools act on the leftover sessions of the destination the server serves, and not
   has a connection, a resume is refused ("a leftover session can be resumed only before this
   server has connected to SAP; it already has a connection, and a resume never replaces it").
   Served only by the write binaries (`mcp-abap-adt`, `mcp-abap-adt-compact`), never by a `-ro`
-  one. A debugger's session cannot be resumed. If SAP says the session is gone, you get SAP's
-  answer, the record is deleted, and the next call logs on. After a resume the server checks and
+  one. A debugger's session cannot be resumed. If SAP says the old session has ended (much
+  time passed), the server logs on normally and starts a new session instead — answered `resumed`
+  with `session: "new"`; its locks are gone — and the record stays the server's either way. After a resume the server checks and
   repairs nothing: if the session ended or its locks are gone, SAP's answers say so, and you redo
   your requests.
 - `LogoffLeftoverSession { handle }` (compact `HandlerLeftoverSessionLogoff`) — logs the session off

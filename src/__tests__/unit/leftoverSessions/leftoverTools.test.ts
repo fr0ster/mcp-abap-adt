@@ -6,7 +6,8 @@
  * destination's file and an unknown handle get the same answer — and never
  * for a live process's. Resume builds the instance's connection
  * on the session (no logon: no credential, no new session at the stand-in);
- * SAP's "gone" deletes the file. Logoff sends the ICF logoff with the
+ * when SAP says the session is gone, a new one is started with the normal
+ * logon, and the file stays this process's. Logoff sends the ICF logoff with the
  * session's cookies and no `Authorization`, then deletes the file.
  */
 
@@ -106,7 +107,11 @@ describe('ResumeLeftoverSession', () => {
     const from = stand.standIn.requests.length;
     const answer = await stand.call('ResumeLeftoverSession', { handle });
     expect(answer.isError).toBe(false);
-    expect(json(answer.text)).toEqual({ handle, state: 'resumed' });
+    expect(json(answer.text)).toEqual({
+      handle,
+      state: 'resumed',
+      session: 'picked_up',
+    });
     // The resume's own request: in that session, without the credential.
     const resumed = stand.standIn.requests.slice(from);
     expect(resumed.length).toBeGreaterThan(0);
@@ -126,21 +131,21 @@ describe('ResumeLeftoverSession', () => {
     expect(stand.standIn.logoffs()).toBe(0);
   });
 
-  it('answers SAP’s 401 as it is, and deletes the file', async () => {
+  it('a session SAP answers 401 for: a new one is started, and the file is kept under its handle', async () => {
     stand = await leftoverStand();
     const { handle, session } = await stand.leftover();
     stand.standIn.answer((r) => r.session === session, 401);
     const answer = await stand.call('ResumeLeftoverSession', { handle });
-    expect(answer.isError).toBe(true);
-    expect(json(answer.text)).toMatchObject({
+    expect(answer.isError).toBe(false);
+    expect(json(answer.text)).toEqual({
       handle,
-      state: 'gone',
-      sap: { status: 401 },
+      state: 'resumed',
+      session: 'new',
     });
-    expect(stand.files()).toEqual([]);
+    expect(stand.files()).toEqual([handle]);
   });
 
-  it('keeps the file when SAP answers something other than "gone" (a 500)', async () => {
+  it('is the call’s error, and keeps the file, when SAP answers something other than "gone" (a 500)', async () => {
     stand = await leftoverStand();
     const { handle, session } = await stand.leftover();
     stand.standIn.answer((r) => r.session === session, 500);

@@ -406,7 +406,7 @@ export class LeftoverSessions {
    * process: of two processes renaming the same file, one wins and the
    * other finds nothing. A file whose claimer died is available again, as
    * any dead process's file. Ends with `release` (the session stays a
-   * leftover), `forget` (it is gone) or `adopt` (resumed here).
+   * leftover), `forget` (logged off) or `adopt` (resumed here).
    */
   claim(
     handle: unknown,

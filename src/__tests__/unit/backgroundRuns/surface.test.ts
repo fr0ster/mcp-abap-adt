@@ -52,6 +52,10 @@ const placeholder = {
 
 describe('an embedder', () => {
   it('runs in the background on its injected connection’s fresh connection, its caller the user SAP answers', async () => {
+    // On ABAP Cloud, where the caller is asked of the system (the kind of a
+    // connection the factory built comes from `SAP_SYSTEM_TYPE`).
+    const previousType = process.env.SAP_SYSTEM_TYPE;
+    process.env.SAP_SYSTEM_TYPE = 'cloud';
     const standIn = await adtStandIn();
     standIn.body(
       (r) => r.url.startsWith('/sap/bc/adt/core/http/systeminformation'),
@@ -66,7 +70,7 @@ describe('an embedder', () => {
     const server = new EmbeddableMcpServer({
       connection: built as never,
       handlersRegistry: shippedGroups(),
-      systemType: 'onprem',
+      systemType: 'cloud',
       logger: silent,
       backgroundRuns: strategy,
     });
@@ -91,6 +95,8 @@ describe('an embedder', () => {
         }),
       ).toHaveLength(1);
     } finally {
+      if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
+      else process.env.SAP_SYSTEM_TYPE = previousType;
       await client.close();
       await (built as unknown as { disconnect(): Promise<void> })
         .disconnect()
@@ -138,9 +144,12 @@ describe('an embedder', () => {
       expect(
         standIn.requests.some((r) => r.url.includes('systeminformation')),
       ).toBe(false);
-      expect((await client.call('ListBackgroundRuns')).payload).toEqual({
-        runs: [],
-      });
+      // Nothing kept. (On-premise nothing is asked for the caller: with no
+      // login stated for an injected connection, the list tool has no
+      // caller to answer for, so the store is read directly.)
+      expect(
+        strategy.list({ url: standIn.url, client: '', user: 'EMBEDDED_USER' }),
+      ).toEqual([]);
     } finally {
       await client.close();
       await (built as unknown as { disconnect(): Promise<void> })

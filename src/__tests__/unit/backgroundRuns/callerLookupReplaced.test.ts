@@ -35,7 +35,8 @@ it('a lookup asked on a connection replaced meanwhile is not kept — the next c
   const standIn = await adtStandIn();
   standIn.systemInformation('USER_A');
   const previous = process.env.SAP_SYSTEM_TYPE;
-  process.env.SAP_SYSTEM_TYPE = 'onprem';
+  // `systeminformation` exists only on ABAP Cloud: the caller is asked there.
+  process.env.SAP_SYSTEM_TYPE = 'cloud';
   const caller = await callerOn(standIn, new InMemoryBackgroundRuns(), {
     tokenUser: 'USER_A',
   });

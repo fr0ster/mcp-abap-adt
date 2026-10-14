@@ -70,7 +70,8 @@ async function embedder(factory: () => Promise<IAbapConnection>) {
     connection: injected as never,
     freshConnection: factory,
     handlersRegistry: shippedGroups(),
-    systemType: 'onprem',
+    // On ABAP Cloud, where the caller is asked of the system.
+    systemType: 'cloud',
     logger: silent,
     backgroundRuns: strategy,
   });

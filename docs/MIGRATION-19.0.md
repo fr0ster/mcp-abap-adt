@@ -481,7 +481,10 @@ endpoint exists on both:
   server; the server did not start`, and an ABAP Cloud `404` with `[MCP] Destination "<name>": the
   ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the
   destination is not a valid ABAP Cloud system; the server did not start`. An on-premise `404` does
-  not end the start. A leftover session's file is used only for the session it picked up: when SAP
+  not end the start when the connection states a user (`SAP_USERNAME` of the destination or the
+  environment); with none it ends the same way (`system_user_unknown`) with `[MCP] Destination
+  "<name>": the system has no systeminformation and the destination states no user: set
+  SAP_USERNAME in the destination, so the session user is known; the server did not start`. A leftover session's file is used only for the session it picked up: when SAP
   ended that session and a new logon starts a new one, the new session's system information is
   asked and checked the same way before the start completes — its user, not the one the file
   carried — and a failure ends the start, logs the new session off and leaves the file as a

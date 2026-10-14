@@ -36,14 +36,17 @@ import {
   runtimeFiles,
 } from '../../../src/__tests__/helpers/leftoverSession';
 import { latch, resetProcessLatchForTests } from '../../../src/lib/activeTools';
+import { ServerRefusal } from '../../../src/lib/auth/serverRefusal';
 import type { KnownSystem } from '../../../src/lib/leftoverSessions/LeftoverSessions';
 import { ownedConnections } from '../../../src/lib/ownedConnections';
 import { AuthBrokerFactory } from '../auth';
 import { readCoreConfig } from '../config/coreParameters';
 import {
   launch,
+  startConnectionWords,
   startLookupFailedWords,
   startSystemTypeRequiredWords,
+  startSystemUserUnknownWords,
   startSystemWithoutUserWords,
 } from '../launcher.js';
 import { SHUTDOWN_BEFORE_START_LINE } from '../shutdown.js';
@@ -635,3 +638,15 @@ it.each<[string, ToolSet]>([
     }
   },
 );
+
+it('the start words of a refusal for an unknown session user name what to set', () => {
+  expect(
+    startConnectionWords(
+      new ServerRefusal('system_user_unknown'),
+      'default',
+      { sentenceFor: () => undefined },
+      'linux',
+    ),
+  ).toBe(startSystemUserUnknownWords('default'));
+  expect(startSystemUserUnknownWords('default')).toContain('SAP_USERNAME');
+});

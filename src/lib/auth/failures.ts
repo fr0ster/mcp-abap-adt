@@ -42,6 +42,7 @@ export type FailureCode =
   | 'system_lookup_failed'
   | 'system_without_user'
   | 'cloud_without_systeminformation'
+  | 'system_user_unknown'
   | 'system_type_required'
   | 'instance_closed';
 

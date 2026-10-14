@@ -128,7 +128,7 @@ export async function leftoverStand(
      * none when absent (the endpoint answers 404) — for the tools that ask
      * it (the background runs, the debugger).
      */
-    token?: { tokenUser?: string };
+    token?: { tokenUser?: string; statedUser?: string };
     /** Extra tools beside the leftover-session ones and the probe. */
     extra?: Parameters<typeof probeGroup>[0];
   } = {},
@@ -153,7 +153,14 @@ export async function leftoverStand(
     // The token's SAP user, switchable later (`standIn.systemInformation`).
     standIn.systemInformation(options.token.tokenUser ?? null);
     server.use({
-      settings: { url: standIn.url, client: '100', authType: 'jwt' },
+      settings: {
+        url: standIn.url,
+        client: '100',
+        authType: 'jwt',
+        ...(options.token.statedUser !== undefined
+          ? { username: options.token.statedUser }
+          : {}),
+      },
       credential: TokenAuthProvider.fixed('placeholder.token.sig'),
     });
   } else {

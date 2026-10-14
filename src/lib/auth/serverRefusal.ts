@@ -25,6 +25,7 @@ export type ServerRefusalCode =
   | 'system_lookup_failed'
   | 'system_without_user'
   | 'cloud_without_systeminformation'
+  | 'system_user_unknown'
   | 'system_type_required'
   | 'instance_closed';
 
@@ -108,6 +109,14 @@ export const CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS =
   'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run';
 
 /**
+ * The stdio start on an on-premise system without `systeminformation` (a
+ * `404`), whose connection states no user: the user is unknown, so the
+ * process ends before its transport opens. Only the start asks.
+ */
+export const SYSTEM_USER_UNKNOWN_WORDS =
+  'the system has no systeminformation and the connection states no user: set SAP_USERNAME (the destination or the environment), so the session user is known; the server did not start';
+
+/**
  * The fixed words of a connection refused because its instance is closed
  * (its stream closed, its close began) while the server keeps running.
  */
@@ -158,6 +167,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   system_lookup_failed: SYSTEM_LOOKUP_FAILED_WORDS,
   system_without_user: SYSTEM_WITHOUT_USER_WORDS,
   cloud_without_systeminformation: CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS,
+  system_user_unknown: SYSTEM_USER_UNKNOWN_WORDS,
   system_type_required: SYSTEM_TYPE_REQUIRED_WORDS,
   instance_closed: INSTANCE_CLOSED_WORDS,
 };

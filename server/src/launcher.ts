@@ -502,6 +502,14 @@ export function startCloudWithoutSystemInformationWords(
 }
 
 /**
+ * The start's words for an on-premise system without systeminformation
+ * whose connection states no user.
+ */
+export function startSystemUserUnknownWords(destination: string): string {
+  return `Destination "${destination}": the system has no systeminformation and the destination states no user: set SAP_USERNAME in the destination, so the session user is known; the server did not start`;
+}
+
+/**
  * The words the connection at start failed in: what the failure reader
  * makes of it (a chain failure, the server's own refusal — a system lookup
  * that failed — or the destination layer's), else the destination, the
@@ -527,6 +535,9 @@ export function startConnectionWords(
   }
   if (read?.error === 'cloud_without_systeminformation') {
     return startCloudWithoutSystemInformationWords(destination);
+  }
+  if (read?.error === 'system_user_unknown') {
+    return startSystemUserUnknownWords(destination);
   }
   if (read !== undefined) {
     return destinationFailureWords(error, destination, options);

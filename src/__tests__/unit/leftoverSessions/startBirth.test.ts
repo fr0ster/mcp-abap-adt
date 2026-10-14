@@ -12,6 +12,7 @@
 
 import { latch, resetProcessLatchForTests } from '../../../lib/activeTools';
 import { ClosedInstanceRefusal } from '../../../lib/auth/failures';
+import { ServerRefusal } from '../../../lib/auth/serverRefusal';
 import { ownedConnections } from '../../../lib/ownedConnections';
 import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
 import {
@@ -218,6 +219,38 @@ describe('on-premise: a new session after a gone leftover', () => {
     expect(await stand.start()).toEqual({ session: 'new', handle });
     expect(stand.standIn.requests.slice(from).filter(isLookup)).toHaveLength(1);
     expect(stand.file(handle)).toMatchObject({ pid: OUR_PID, system: null });
+  });
+});
+
+describe('on-premise without systeminformation: the start needs a stated user', () => {
+  it('a passwordless logon, a 404, no user stated: the start fails as system_user_unknown, the logon logged off, nothing owned', async () => {
+    stand = await leftoverStand({ token: {} });
+    stand.standIn.answer(isLookup, 404);
+    const refused = await stand.start().then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    expect(refused).toBeInstanceOf(ServerRefusal);
+    expect((refused as ServerRefusal).serverRefusal).toBe(
+      'system_user_unknown',
+    );
+    await until(() => stand.standIn.logoffs() === 1);
+    expect(ownedConnections(stand.server)).toEqual([]);
+  });
+
+  it('a blank user stated counts as none', async () => {
+    stand = await leftoverStand({ token: { statedUser: '  ' } });
+    stand.standIn.answer(isLookup, 404);
+    await expect(stand.start()).rejects.toMatchObject({
+      serverRefusal: 'system_user_unknown',
+    });
+  });
+
+  it('the same with a user stated: the start succeeds', async () => {
+    stand = await leftoverStand({ token: { statedUser: 'STATED' } });
+    stand.standIn.answer(isLookup, 404);
+    expect(await stand.start()).toEqual({ session: 'logged_on' });
+    expect(stand.standIn.logoffs()).toBe(0);
   });
 });
 

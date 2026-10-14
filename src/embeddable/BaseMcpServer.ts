@@ -1020,6 +1020,20 @@ export abstract class BaseMcpServer extends McpServer {
     this.systemContexts.set(connection, resolved.systemContext);
     try {
       await this.requireSystem(connection);
+      // An on-premise system without the function (`404`) names no user:
+      // the connection must (the login the later needs read — a
+      // background run's caller). Nothing stated, the start ends.
+      if (
+        this.systemContextResolver !== null &&
+        this.systems.get(connection) === null &&
+        (
+          resolved.settings.username ??
+          resolved.systemContext?.login ??
+          ''
+        ).trim() === ''
+      ) {
+        throw new ServerRefusal('system_user_unknown');
+      }
       // Closed meanwhile (no lookup, or during it): the start is refused —
       // the launcher never opens the transport — and the close's sweep has
       // the connection's logoff.

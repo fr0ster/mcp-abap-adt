@@ -38,7 +38,13 @@ import { ServerRefusal } from './auth/serverRefusal';
 import { createAbapConnection, siblingRecordOf } from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
 import type { HandlerContext } from './handlers/interfaces';
-import { endConnection, own, whenEnded } from './ownedConnections';
+import {
+  endConnection,
+  own,
+  refuseIfClosed,
+  refuseWhenClosed,
+  whenEnded,
+} from './ownedConnections';
 
 type Logger = HandlerContext['logger'];
 
@@ -81,11 +87,17 @@ export function registerFreshConnectionFactory(
  *   no argument (D56); what it returns is the server's (D22), connected here
  *   like the server's own;
  * - anything else → refused `fresh_connection_unavailable`, nothing sent.
+ *
+ * Once the calling instance is latched closed (its close, the process's
+ * shutdown), nothing is built and the host's factory is not called:
+ * `ClosedInstanceRefusal`, nothing sent. A latch that closes while the
+ * factory or the connect runs ends the connection and refuses the same way.
  */
 export async function openFreshConnection(
   connection: IAbapConnection,
   logger: Logger,
 ): Promise<IAbapConnection> {
+  refuseIfClosed();
   const record = siblingRecordOf(connection);
   if (record) {
     const built = createAbapConnection(
@@ -131,8 +143,11 @@ async function connectedOrClosed(
     if (typeof connectable.connect === 'function') await connectable.connect();
   } catch (error) {
     await closeQuietly(fresh, logger, 'A fresh connection');
+    // A connect its instance's close cut short: the close's refusal.
+    refuseWhenClosed(fresh);
     throw error;
   }
+  refuseWhenClosed(fresh);
   return fresh;
 }
 

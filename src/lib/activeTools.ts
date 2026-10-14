@@ -22,9 +22,10 @@
  * instance's close; no transport keeps a registry of its own.
  */
 
-import { authError } from '@mcp-abap-adt/auth-errors';
 import { answerRead, type FailureAnswer } from './auth/answerFailure';
-import { authenticationFailed, type ReadFailure } from './auth/failures';
+import { SHUTDOWN_SENTENCE, shutdownRefusal } from './auth/failures';
+
+export { SHUTDOWN_SENTENCE, shutdownRefusal };
 
 /** A registered call, as the registry shows it. */
 export interface ActiveTool {
@@ -152,22 +153,6 @@ export function pending(): string[] {
   return [...counts].map(([name, count]) =>
     count === 1 ? name : `${name} (${count} calls)`,
   );
-}
-
-/** D17's sentence: the server's own words beside the shutdown refusal (§7.4). */
-export const SHUTDOWN_SENTENCE = 'The server is shutting down.';
-
-/**
- * The shutdown refusal as the client reads it: auth-errors'
- * `interactive-login` `aborted`, minted, with the shutdown sentence beside it.
- */
-export function shutdownRefusal(): ReadFailure {
-  return {
-    ...authenticationFailed(
-      authError['interactive-login']({ outcome: 'aborted' }),
-    ),
-    server: SHUTDOWN_SENTENCE,
-  };
 }
 
 /** The answer of a call a latch refused: the shutdown refusal, as a tool result. */

@@ -4,7 +4,9 @@
  * held state's, a long read's own — is written at once, while a tool's
  * request is still held at the stand-in; a call queued behind it never
  * sends; the tool's later request (its `UNLOCK`) never reaches the system;
- * another stream's instance is untouched.
+ * another stream's instance is untouched. A tool whose main-connection
+ * request SAP answers after the close opens no fresh connection: no second
+ * logon, nothing left owned.
  */
 
 import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
@@ -12,9 +14,12 @@ import {
   isLockOf,
   isUnlockOf,
   isUpdateOf,
+  listenUrl,
   longReadUrl,
+  mainReadUrl,
 } from '../../../../src/__tests__/helpers/shutdownTools';
 import { activeTools } from '../../../../src/lib/activeTools';
+import { ownedConnections } from '../../../../src/lib/ownedConnections';
 import { type SseStand, sseStand, turns, until } from './harness';
 
 jest.setTimeout(30_000);
@@ -88,4 +93,23 @@ it("the stream closes under a held long read: the read's own connection is logge
   await until(() => s.standIn.logoffs() === s.connects());
   hold.release();
   await until(() => activeTools().length === 0);
+});
+
+it("SAP answers the tool's main-connection request after the close: its next step opens no fresh connection — no second logon, nothing owned", async () => {
+  const connection = await s.open();
+  const hold = s.standIn.hold((r) => r.url.startsWith(mainReadUrl('M')));
+  expect(await connection.call('MainThenFresh', { id: 'M' }, 1)).toBe(202);
+  await hold.arrived;
+  expect(s.connects()).toBe(1);
+
+  connection.close();
+  await until(() => s.standIn.logoffs() === 1);
+  // SAP answers the held request: the tool goes on to its fresh connection.
+  hold.release();
+  await until(() => activeTools().length === 0);
+  await turns(20);
+  expect(s.connects()).toBe(1);
+  expect(s.indexOf((url) => url.startsWith(listenUrl('M')))).toBe(-1);
+  expect(ownedConnections()).toEqual([]);
+  expect(s.standIn.logoffs()).toBe(s.connects());
 });

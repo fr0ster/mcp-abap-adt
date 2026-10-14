@@ -72,6 +72,8 @@ import {
   endConnection,
   isEnded,
   own,
+  refuseIfClosed,
+  refuseWhenClosed,
   runAsOwner,
 } from '../lib/ownedConnections.js';
 import { freshConnectionAvailable } from '../lib/packageSessions.js';
@@ -794,6 +796,8 @@ export abstract class BaseMcpServer extends McpServer {
   private async connectedLogon(
     resolved: ResolvedConnection,
   ): Promise<AbapConnection> {
+    // A closed instance logs on nowhere (§6.4): nothing is built or sent.
+    refuseIfClosed(this);
     const connection = createAbapConnection(
       resolved.settings,
       resolved.credential,
@@ -810,8 +814,12 @@ export abstract class BaseMcpServer extends McpServer {
       // A failed connect is not kept, and still ends with its one
       // `disconnect()` (connection 16 logs off a session it received).
       await endConnection(connection);
+      // A connect the instance's close cut short: the close's refusal.
+      refuseWhenClosed(connection);
       throw error;
     }
+    // Closed while it connected: its close swept it; it is not handed out.
+    refuseWhenClosed(connection);
     return connection;
   }
 
@@ -1568,6 +1576,8 @@ export abstract class BaseMcpServer extends McpServer {
     const claimed = this.claimLeftover(owner, identity, handle);
     let settled = false;
     try {
+      // A closed instance sends nothing, a logoff included.
+      refuseIfClosed(this);
       const connection = createAbapConnection(
         resolved.settings,
         resolved.credential,

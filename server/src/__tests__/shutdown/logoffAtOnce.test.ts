@@ -5,7 +5,9 @@
  * read's own — is written at once, while a tool's request is still held at
  * the stand-in; a call queued behind it never sends; the process exits
  * without waiting for the tool, and the tool's later request (its `UNLOCK`)
- * never reaches the system: the logoff released the lock.
+ * never reaches the system: the logoff released the lock. A tool whose
+ * main-connection request SAP answers after the logoffs opens no fresh
+ * connection: no second logon, nothing left owned.
  */
 
 import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
@@ -13,8 +15,11 @@ import {
   isLockOf,
   isUnlockOf,
   isUpdateOf,
+  listenUrl,
   longReadUrl,
+  mainReadUrl,
 } from '../../../../src/__tests__/helpers/shutdownTools';
+import * as connectionFactory from '../../../../src/lib/connectionFactory';
 import { ownedConnections } from '../../../../src/lib/ownedConnections';
 import { type Stand, stand, turns, until } from '../helpers/loginStand';
 
@@ -93,5 +98,36 @@ it.each(triggers)(
     expect(await running).toBe('cancelled');
     hold.release();
     await until(() => s.active() === 0);
+  },
+);
+
+it.each(triggers)(
+  "%s: SAP answers the tool's main-connection request after the logoffs: its next step opens no fresh connection — no second logon, nothing owned",
+  async (_name, trigger) => {
+    s = await stand({ shutdown: {} });
+    const hold = s.adt.hold((r) => r.url.startsWith(mainReadUrl('M')));
+    const running = s.callTool('MainThenFresh', { id: 'M' });
+    await hold.arrived;
+    expect(connects()).toBe(1);
+
+    trigger(s);
+    await until(() => s.adt.logoffs() === 1);
+    expect(await s.exited).toBe(0);
+    const built = jest.spyOn(connectionFactory, 'createAbapConnection');
+    // SAP answers the held request: the tool goes on to its fresh connection.
+    hold.release();
+    await until(() => s.active() === 0);
+    await turns(20);
+    // Refused before anything is built — the provider's closed gate is not
+    // what stopped it.
+    expect(built).not.toHaveBeenCalled();
+    built.mockRestore();
+    expect(connects()).toBe(1);
+    expect(s.adt.requests.some((r) => r.url.startsWith(listenUrl('M')))).toBe(
+      false,
+    );
+    expect(ownedConnections()).toEqual([]);
+    expect(s.adt.logoffs()).toBe(connects());
+    expect(await running).toBe('cancelled');
   },
 );

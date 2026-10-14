@@ -33,9 +33,23 @@
  * Which instance owns a connection a tool opens is the instance whose call
  * runs (`runAsOwner`, entered by the tool wrapper); outside any call, none —
  * the forced close still reaches it.
+ *
+ * **A closed instance owns nothing new.** Once its owner is latched — the
+ * instance's close (`latch(instance)`) or the process's shutdown (`latch()`)
+ * began — the terminal close has already swept what it owned, so nothing
+ * opened after would ever be logged off. Every site that opens a connection
+ * asks `refuseIfClosed()` before it builds or logs on anything, and `own()`
+ * refuses too: the connection is ended at once (its logoff, when it holds a
+ * session) and `ClosedInstanceRefusal` is thrown. A connection whose
+ * `connect()` was under way when the latch closed was swept with the rest
+ * (connection 17 queues its logoff behind the connect); the site asks
+ * `refuseWhenClosed(connection)` once the connect settled, so the caller gets
+ * the refusal, never a connection whose session is gone.
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { isLatched } from './activeTools';
+import { ClosedInstanceRefusal } from './auth/failures';
 
 /** What an owned connection is to its instance. */
 export type ConnectionRole =
@@ -83,6 +97,8 @@ const logoffListeners = new WeakMap<OwnedConnection, Array<() => void>>();
  */
 const writing = new Set<Promise<void>>();
 const ownerScope = new AsyncLocalStorage<object>();
+/** Each recorded connection's owner, kept past its end for `refuseWhenClosed`. */
+const owners = new WeakMap<OwnedConnection, object | undefined>();
 
 /** The fixed words of a close that failed. */
 export const CLOSE_FAILED_WORDS =
@@ -110,10 +126,37 @@ export function own(
 ): void {
   if (ending.has(connection)) return;
   const known = owned.get(connection);
-  owned.set(connection, {
-    owner: options.owner ?? known?.owner ?? currentOwner(),
-    role: options.role,
-  });
+  const owner = options.owner ?? known?.owner ?? currentOwner();
+  owners.set(connection, owner);
+  if (isLatched(owner)) {
+    // Its owner's terminal close already ran: nothing would end it later.
+    void endConnection(connection);
+    throw new ClosedInstanceRefusal();
+  }
+  owned.set(connection, { owner, role: options.role });
+}
+
+/**
+ * Throws `ClosedInstanceRefusal` when `owner` — by default the instance whose
+ * call runs; outside any call, the process — is latched closed. Asked by every
+ * site before it builds or logs on a connection: nothing is sent.
+ */
+export function refuseIfClosed(
+  owner: object | undefined = currentOwner(),
+): void {
+  if (isLatched(owner)) throw new ClosedInstanceRefusal();
+}
+
+/**
+ * Asked once a recorded connection's `connect()` settled: when its owner was
+ * latched closed meanwhile, the connection is ended (joined, if the terminal
+ * close already asked for its logoff) and `ClosedInstanceRefusal` thrown.
+ */
+export function refuseWhenClosed(connection: object): void {
+  if (!owners.has(connection)) return;
+  if (!isLatched(owners.get(connection))) return;
+  void endConnection(connection);
+  throw new ClosedInstanceRefusal();
 }
 
 /** Whether `connection` was ended here (its `disconnect()` was asked for). */

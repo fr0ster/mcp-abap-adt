@@ -203,6 +203,8 @@ export function destinationFailureOf(
     }
     if (read?.authError === undefined || read.error !== 'authentication_failed')
       return read;
+    // A sentence the reader already gave (the shutdown refusal's) stays.
+    if (read.server !== undefined) return read;
     const server = options.sentenceFor?.(read.authError);
     return server === undefined ? read : { ...read, server };
   } catch {

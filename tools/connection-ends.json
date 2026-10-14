@@ -3,7 +3,7 @@
     "file": "src/embeddable/BaseMcpServer.ts",
     "function": "BaseMcpServer.getConnection",
     "site": "createAbapConnection",
-    "end": "the instance's terminal close (closeOwnedConnections) \u2014 at once, under any request in flight, when the client closes (stdio's stdin, an SSE stream) and at the process shutdown (forceClose); after the undo at the pool's eviction \u2014; replaced on a new credential where the credential is the request's (http, sse) \u2014 stdio's source answers the same provider for the process's life (D13) \u2014 or once SAP lost its session (D56), then ended when no call works on it any more; a failed connect() ends at once",
+    "end": "the instance's terminal close (closeOwnedConnections) \u2014 at once, under any request in flight, when the client closes (stdio's stdin, an SSE stream) and at the process shutdown (forceClose); after the undo at the pool's eviction \u2014; replaced on a new credential where the credential is the request's (http, sse) \u2014 stdio's source answers the same provider for the process's life (D13) \u2014 or once SAP lost its session (D56), then ended when no call works on it any more; a failed connect() ends at once; once its instance is latched closed (the instance close, the process shutdown) nothing is built or sent (refuseIfClosed: ClosedInstanceRefusal), and one whose connect() was under way at the latch is swept with the rest and refused once the connect settles (refuseWhenClosed)",
     "why": "the instance's own connection (role 'built'), recorded as its own before connect(); a connect that completed after its callers cancelled is kept and ends here too (D32/D56, RF1)"
   },
   {
@@ -17,7 +17,7 @@
     "file": "src/embeddable/BaseMcpServer.ts",
     "function": "BaseMcpServer.logoffLeftover",
     "site": "createAbapConnection",
-    "end": "in the same call: endConnection (its one disconnect(), the ICF logoff) once connected, or at once when the connect failed; recorded as the instance's (role 'fresh'), so its terminal close and the forced close reach it too",
+    "end": "in the same call: endConnection (its one disconnect(), the ICF logoff) once connected, or at once when the connect failed; recorded as the instance's (role 'fresh'), so its terminal close and the forced close reach it too; once the instance is latched closed nothing is built and no logoff is sent (refuseIfClosed)",
     "why": "LogoffLeftoverSession: an instance on the leftover session's cookies, only to send the ICF logoff with them and no credential"
   },
   {
@@ -52,7 +52,7 @@
     "file": "src/handlers/package/high/handleDeletePackage.ts",
     "function": "handleDeletePackage",
     "site": "openFreshConnection",
-    "end": "the handler's finally: closeQuietly (endConnection) on success and failure; a failed connect is ended inside openFreshConnection",
+    "end": "the handler's finally: closeQuietly (endConnection) on success and failure; a failed connect is ended inside openFreshConnection; none is opened once its owner is latched closed \u2014 openFreshConnection refuses (ClosedInstanceRefusal), and own() ends and refuses any connection recorded for a latched owner, so the terminal close that already ran leaves nothing behind",
     "why": "force_new_connection: a delete in an ABAP session of its own"
   },
   {
@@ -73,7 +73,7 @@
     "file": "src/lib/backgroundRuns/run.ts",
     "function": "startBackgroundRun",
     "site": "openFreshConnection",
-    "end": "once SAP answered the run: closeQuietly (endConnection), then the answer handed to the strategy; a start refused after it opened (the caller's limit, a strategy that threw) ends it at once; owned by the strategy (role background), so no instance's terminal close cuts it, and an instance close does not wait for it \u2014 the process's logoffs (forceClose: stdio's client close, a signal) end it at once, under its request",
+    "end": "once SAP answered the run: closeQuietly (endConnection), then the answer handed to the strategy; a start refused after it opened (the caller's limit, a strategy that threw) ends it at once; owned by the strategy (role background), so no instance's terminal close cuts it, and an instance close does not wait for it \u2014 the process's logoffs (forceClose: stdio's client close, a signal) end it at once, under its request; none is opened once its owner is latched closed \u2014 openFreshConnection refuses (ClosedInstanceRefusal), and own() ends and refuses any connection recorded for a latched owner, so the terminal close that already ran leaves nothing behind",
     "why": "a background run's own stateless connection, from the call's start until SAP's answer: the run is never cut by the call's end, an HTTP request's instance leaving, or an instance close; only the process's end cuts it"
   },
   {
@@ -143,14 +143,14 @@
     "file": "src/lib/debugger/ports.ts",
     "function": "openStateful",
     "site": "openFreshConnection",
-    "end": "the session's stop, the idle bound's stop, the host's stop and dispose() (closeOwn = endConnection); the instance's terminal close for one still open \u2014 at once, with no stop, when the client closes or the process ends",
+    "end": "the session's stop, the idle bound's stop, the host's stop and dispose() (closeOwn = endConnection); the instance's terminal close for one still open \u2014 at once, with no stop, when the client closes or the process ends; none is opened once its owner is latched closed \u2014 openFreshConnection refuses (ClosedInstanceRefusal), and own() ends and refuses any connection recorded for a latched owner, so the terminal close that already ran leaves nothing behind",
     "why": "held state's own stateful connection, recorded with role state"
   },
   {
     "file": "src/lib/longCall.ts",
     "function": "runLongCall",
     "site": "openFreshConnection",
-    "end": "when its timeout cuts the read: endConnection at once, under the request; otherwise once the call's work settled: closeQuietly (endConnection) on success and failure; the instance's terminal close (at once on the client's close) and the process's logoffs (at once at shutdown) end one still open, under its read",
+    "end": "when its timeout cuts the read: endConnection at once, under the request; otherwise once the call's work settled: closeQuietly (endConnection) on success and failure; the instance's terminal close (at once on the client's close) and the process's logoffs (at once at shutdown) end one still open, under its read; none is opened once its owner is latched closed \u2014 openFreshConnection refuses (ClosedInstanceRefusal), and own() ends and refuses any connection recorded for a latched owner, so the terminal close that already ran leaves nothing behind",
     "why": "a listed long tool's own stateless connection for one read (spec \u00a75.8), role long, recorded as the calling instance's"
   },
   {
@@ -182,17 +182,24 @@
     "why": "connection 16 refuses a second disconnect(): every end joins the first"
   },
   {
+    "file": "src/lib/ownedConnections.ts",
+    "function": "owners",
+    "site": "WeakMap<OwnedConnection, object | undefined>",
+    "end": "none needed: keyed weakly, holds owners, not connections",
+    "why": "each recorded connection's owner, kept past its end, so refuseWhenClosed knows whether the instance a settling connect belongs to was latched closed meanwhile"
+  },
+  {
     "file": "src/lib/packageSessions.ts",
     "function": "openFreshConnection",
     "site": "createAbapConnection",
-    "end": "its caller's end (each caller of openFreshConnection is listed); a connect that fails ends here (connectedOrClosed); recorded as the calling instance's, so its terminal close reaches it",
+    "end": "its caller's end (each caller of openFreshConnection is listed); a connect that fails ends here (connectedOrClosed); recorded as the calling instance's, so its terminal close reaches it; once its instance is latched closed (the instance close, the process shutdown) nothing is built or sent (refuseIfClosed: ClosedInstanceRefusal), and one whose connect() was under way at the latch is swept with the rest and refused once the connect settles (refuseWhenClosed)",
     "why": "a sibling of a connection the server built (D20)"
   },
   {
     "file": "src/lib/packageSessions.ts",
     "function": "openFreshConnection",
     "site": "freshConnection",
-    "end": "the same as a sibling: the caller's end, connectedOrClosed on a failed connect, the instance's terminal close",
+    "end": "the same as a sibling: the caller's end, connectedOrClosed on a failed connect, the instance's terminal close; once its instance is latched closed (the instance close, the process shutdown) nothing is built or sent (refuseIfClosed: ClosedInstanceRefusal), and one whose connect() was under way at the latch is swept with the rest and refused once the connect settles (refuseWhenClosed)",
     "why": "a consumer's freshConnection result is the server's once returned (D22)"
   },
   {
@@ -206,14 +213,14 @@
     "file": "src/lib/packageSessions.ts",
     "function": "inOwnSessionOverRfc",
     "site": "openFreshConnection",
-    "end": "the finally: closeQuietly (endConnection), on success and failure",
+    "end": "the finally: closeQuietly (endConnection), on success and failure; none is opened once its owner is latched closed \u2014 openFreshConnection refuses (ClosedInstanceRefusal), and own() ends and refuses any connection recorded for a latched owner, so the terminal close that already ran leaves nothing behind",
     "why": "a fresh RFC session for one operation"
   },
   {
     "file": "src/lib/packageSessions.ts",
     "function": "connectionForPackageLock",
     "site": "openFreshConnection",
-    "end": "drop() when the lock was not taken; else releasePackageLockSession or the instance's terminal close",
+    "end": "drop() when the lock was not taken; else releasePackageLockSession or the instance's terminal close; none is opened once its owner is latched closed \u2014 openFreshConnection refuses (ClosedInstanceRefusal), and own() ends and refuses any connection recorded for a latched owner, so the terminal close that already ran leaves nothing behind",
     "why": "the lock session (role lock)"
   },
   {

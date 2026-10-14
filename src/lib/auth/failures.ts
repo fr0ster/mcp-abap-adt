@@ -130,12 +130,58 @@ function chainErrorOf(thrown: unknown): IAuthProviderError | undefined {
   return classify(refusal, 'unfamiliar-error');
 }
 
+/** D17's sentence: the server's own words beside the shutdown refusal (§7.4). */
+export const SHUTDOWN_SENTENCE = 'The server is shutting down.';
+
+/**
+ * The shutdown refusal as the client reads it: auth-errors'
+ * `interactive-login` `aborted`, minted, with the shutdown sentence beside it.
+ */
+export function shutdownRefusal(): ReadFailure {
+  return {
+    ...authenticationFailed(
+      authError['interactive-login']({ outcome: 'aborted' }),
+    ),
+    server: SHUTDOWN_SENTENCE,
+  };
+}
+
+/** The fixed words of a connection refused because its instance is closed. */
+export const INSTANCE_CLOSED_WORDS =
+  'the server instance is closed: no new connection is opened for it';
+
+const closedRefusals = new WeakSet<object>();
+
+/**
+ * Thrown where a connection would be opened or owned for an instance that is
+ * latched closed (its close, or the process's shutdown, began): nothing is
+ * sent. Answered as the shutdown refusal. Known by the object, recorded at
+ * construction, never by its shape or its message.
+ */
+export class ClosedInstanceRefusal extends Error {
+  constructor() {
+    super(INSTANCE_CLOSED_WORDS);
+    this.name = 'ClosedInstanceRefusal';
+    closedRefusals.add(this);
+  }
+}
+
+/** Whether `value` is a `ClosedInstanceRefusal` the server built. Total. */
+export function isClosedInstanceRefusal(value: unknown): boolean {
+  return (
+    value !== null &&
+    (typeof value === 'object' || typeof value === 'function') &&
+    closedRefusals.has(value)
+  );
+}
+
 /**
  * What `thrown` is, as the client's answer; `undefined` when it is not a
  * failure this reader knows — the caller answers it as before. Total.
  */
 export function failureOf(thrown: unknown): ReadFailure | undefined {
   try {
+    if (isClosedInstanceRefusal(thrown)) return shutdownRefusal();
     const chain = chainErrorOf(thrown);
     if (chain !== undefined) return authenticationFailed(chain);
     const own = serverRefusalOf(thrown);

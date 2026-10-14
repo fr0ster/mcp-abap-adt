@@ -18,6 +18,10 @@
  *    undone — the logoff ended in SAP what the state held;
  * 4. the MCP server and its transport closed, awaited.
  *
+ * From the latch on the instance opens no new connection (`own()`,
+ * `refuseIfClosed`, `refuseWhenClosed` in `ownedConnections.ts`): the sweep
+ * in step 2 runs once, so nothing opened after it could be logged off.
+ *
  * A background run is not the instance's (its connection is the host
  * strategy's): it runs on until SAP answers; the process's end logs it off.
  */

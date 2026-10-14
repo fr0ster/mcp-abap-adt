@@ -248,8 +248,11 @@ system's kind (the rule above, never its URL): an answer naming a user is used o
 Anything else — a `404` (no endpoint), an answer without the user, an error — is no information:
 on-premise steps 3–8 apply when the call states a user (the destination's or the environment's
 `SAP_USERNAME`, or `x-sap-login` of an `x-sap-url` basic connection); with none the call is
-refused `system_user_unknown` (the session user is unknown; the tool does not run, and the next
-call asks again; at a stdio start the server does not start). Every ABAP Cloud system has it, so
+refused `system_user_unknown` (the session user is unknown; the tool does not run; at a stdio
+start the server does not start). An on-premise `404` is kept for the destination, so a later call
+sends no lookup; nothing else but an answer naming the user is kept. A `401` on the lookup is the
+credentials refused, not a `systeminformation` failure: the call's credential error as it came, on
+both kinds, never the configuration in its place. Every ABAP Cloud system has it, so
 on a cloud system it is one step to the error: a `404` is `cloud_without_systeminformation` (the
 configuration or headers are inconsistent), anything else `system_lookup_failed` (a problem of the
 ABAP system). On a cloud system steps 3–8 never count. `x-sap-login`

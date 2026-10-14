@@ -303,8 +303,9 @@ instance as before. An embedder's own registry that is not a `CompositeHandlersR
 main-flow queue.
 Every send on the instance's connection is inside the order: the identity lookups
 (`systeminformation`, asked on every kind of system through the shipped resolver — its user
-wins over any configured login; no information on-premise: the configured login; on ABAP Cloud
-a `404` `cloud_without_systeminformation`, anything else `system_lookup_failed`)
+wins over any configured login; no information on-premise: the configured login, with none
+`system_user_unknown`; on ABAP Cloud a `404` `cloud_without_systeminformation`, anything else
+`system_lookup_failed`; a `401` the credential failure as it came)
 of the background-run tools and the debugger's request user go through `onMainConnection` — directly from a call that
 already holds the flow (an `AsyncLocalStorage` mark), on the connection that call holds,
 else in turn, on the connection taken inside the flow (so a session the call ahead lost
@@ -330,15 +331,18 @@ failure ends the process before the transport opens. On http, sse and an embedde
 instance the first call on a connection without it asks (`systemBeforeTool` →
 `requireSystem`, concurrent askers sharing one request through `resolveOnce`) inside
 the main flow — a call outside the flow takes a turn in it for the lookup alone. A
-failure is that call's answer and its tool does not run. The recipe (`systemContextResolverFor`,
-`resolveForCall`): an answer naming the user is taken; no information — a `404`, an answer
-without the user, an error — is, on ABAP Cloud, one step to the error (a `404`
-`cloud_without_systeminformation`: the configuration or headers are inconsistent; anything else
-`system_lookup_failed`: the ABAP system's problem), on-premise `null`, admitted only when the
-call states a user (the destination's `SAP_USERNAME`, else its `x-sap-login`; for a host's
-connection its parameters, else the request scope's login), else `system_user_unknown`; a chain
-failure as it is. Only an answer naming the user is kept; a failure (`null` included) never is,
-so the next call asks again. A
+failure is that call's answer and its tool does not run. The resolver only answers the
+information, no information, or a credential failure; the recipe is the server's, around any
+resolver, by the connection's stated kind (`systemForCall`): an answer naming the user is taken;
+no information — a `404`, an answer without the user, an error — is, on ABAP Cloud, one step to
+the error (a `404` `cloud_without_systeminformation`: the configuration or headers are
+inconsistent; anything else `system_lookup_failed`: the ABAP system's problem), on-premise `null`,
+admitted only when the call states a user (the destination's `SAP_USERNAME`, else its
+`x-sap-login`; for a host's connection its parameters, else the request scope's login), else
+`system_user_unknown`; a credential failure (a chain failure, a `401`) is not a
+`systeminformation` failure and is the call's as it came, on both kinds. An answer naming the
+user is kept, and on-premise a `404` (an older system without the endpoint: a later call sends no
+lookup); anything else never is, so the next call asks again. A
 new session of the same destination — a replacement after a lost session, a new logon after a gone
 leftover (the file's) — keeps its answer (`destinationSystems`); another credential (an HTTP
 request's headers) asks its own. The tool wrapper

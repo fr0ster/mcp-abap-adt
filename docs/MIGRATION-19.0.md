@@ -479,10 +479,19 @@ systems have `systeminformation`, older ones do not, ABAP Cloud always has it:
     (systeminformation) and the call states no user: set SAP_USERNAME (the destination or the
     environment), or send x-sap-login with x-sap-url, so the session user is known; the tool did
     not run").
-- A chain failure (the credentials refused) is answered as it is.
+- **A `401` (the credentials refused) is not a `systeminformation` failure:** any call would get
+  it. It is the call's answer as it came (today's credential error, `authentication_failed`), on
+  both kinds — never replaced with another error, and on-premise never a reason to go to the
+  headers / start parameters.
 
-Only an answer naming the user is kept for the destination; a failure is never kept, so the next
-call asks again (on-premise, the headers are read per call).
+An answer naming the user is kept for the destination, and so is an on-premise `404` (an older
+system without the endpoint): a later call on the same destination sends no `systeminformation`
+(on-premise, the headers are still read per call). Anything else is never kept, so the next call
+asks again.
+
+The resolver (the shipped one, or an embedder's `systemContextResolver`) only answers the
+information, no information, or a credential failure; the rule by kind above is the server's,
+applied around any resolver by the connection's stated kind.
 
 - **stdio:** asked at the start, with the connection (or taken from the leftover session's file,
   which carries the system information asked for the same destination — also when SAP ended that
@@ -505,8 +514,9 @@ call asks again (on-premise, the headers are read per call).
 
 The same rule names **the debugger's request user and a background run's caller** (its management
 tools included): on ABAP Cloud the same errors; on-premise the configured login (the request's —
-`x-sap-login`, a destination's `SAP_USERNAME` — then the process's), with none the user is unknown
-(for a background run `background_run_caller_unknown`). A background run
+`x-sap-login`, a destination's `SAP_USERNAME` — then the process's), with none
+`system_user_unknown`, the same code and words as a tool's call (before, the debugger threw a plain
+error and a background run answered `background_run_caller_unknown`, which is gone). A background run
 started by a tool reuses the answer its connection's lookup already got: no second request. (Before
 this, a failed lookup failed nothing: a create that needed it asked again inside the tool and ran
 the tool once more with the answer — a tool that had sent something before its guarded create, as
@@ -1135,17 +1145,18 @@ transport's options only:
   tools beside the system group. A group registered on an `McpServer` of its own refuses
   `background: true`. `HandlerContext` has `backgroundRuns?` (the tools' port); `ServerRefusalCode`
   / `FailureCode` add `background_runs_unavailable`, `background_run_not_available`,
-  `background_run_running`, `background_run_limit` and `background_run_caller_unknown` (a caller
-  whose backend user neither the request nor SAP names); and `system_lookup_failed` (an ABAP
+  `background_run_running` and `background_run_limit`; and `system_lookup_failed` (an ABAP
   Cloud system answered the `systeminformation` lookup asked before the tool without the user or
-  with an error — a problem of the ABAP system; also a resolver of yours that threw),
+  with an error — a problem of the ABAP system; also a resolver of yours that answered nothing),
   `cloud_without_systeminformation` (an ABAP Cloud system answered that lookup `404`: the
   configuration or the headers are inconsistent) and `system_user_unknown` (an on-premise system
   gave no information and the call states no user — neither the connection's `SAP_USERNAME` nor
   the request's `x-sap-login`); each time the tool did not run, and the next call asks again; the
-  stdio start ends with them. A resolver's `null`, or an answer without a user, is no
-  information; the shipped resolver throws `CloudWithoutSystemInformationError` /
-  `NoSystemInformationError` on ABAP Cloud. `withKnownSystemContext(resolved, fn)` applies a
+  stdio start ends with them. A resolver's `null`, an answer without a user, or a throw other
+  than a credential failure (a chain failure, a `401` — thrown as it came) is no information, a
+  thrown `404` the endpoint absent; the rule by kind is the server's around any resolver
+  (`withResolvedSystemContext` takes the kind as its fourth parameter), and the shipped resolver
+  is one for every kind (`systemContextResolverFor` is gone). `withKnownSystemContext(resolved, fn)` applies a
   resolution the server made before the tool (its third parameter is gone);
   `withResolvedSystemContext` (which looks up) is still there for `HandlerExporter` and
   `BaseHandlerGroup`: it refuses with the server's codes (a chain failure as it is) instead of

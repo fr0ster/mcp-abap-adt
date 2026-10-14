@@ -325,12 +325,17 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
   naming the limit and `DiscardBackgroundRun` (compact: `HandlerBackgroundRunDiscard`), before
   anything is sent. No expiry: a kept answer stays until you discard it — or the process ends: the
   answers live in the server's memory and **end with the process**.
-- **The ends.** A run's session is the host's, not its instance's: an SSE connection that closes
-  (or an HTTP request's instance that leaves) neither waits for it nor logs it off — its answer stays
-  reachable through another connection of the same caller. The process's end — a signal, or stdio's
-  client closing stdin — **logs its session off at once, which cuts it**, as it does every other ADT
-  session of the process; the forced close names it on stderr
-  (`Still running at the forced close: RuntimeRunClass (background)`).
+- **The ends.** An SSE stream is networked stdio: **when the stream closes, the runs it started are
+  cut** — each run's session gets its logoff at once, in the same moment as the stream's other ADT
+  sessions, without waiting for SAP's answer; a run another stream started is untouched. Over
+  Streamable HTTP a dropped request, the pool's idle bound and its eviction cut nothing: a run goes on
+  to SAP's answer. The process's end — a signal, or stdio's client closing stdin — **logs every run's
+  session off at once, which cuts it**, as it does every other ADT session of the process; the forced
+  close names it on stderr (`Still running at the forced close: RuntimeRunClass (background)`). A cut
+  run ends in the store by its own end, the same either way: it stays `running` until the request it
+  had sent settles, then it is `finished` with what the run tool answered — SAP's answer when the
+  request reached SAP before the logoff, else the run tool's error. Its answer is read as any other
+  (`GetBackgroundRun`, from another connection of the same caller).
 - **No session of its own to be had** — an embedded server given a connection without
   `freshConnection` — refuses the start with the fresh-connection words, as the listed long reads.
 

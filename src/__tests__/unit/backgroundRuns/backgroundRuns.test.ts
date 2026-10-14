@@ -453,23 +453,50 @@ describe('without a strategy', () => {
 });
 
 describe('the ends', () => {
-  it('the instance close neither waits for a running background run nor cuts it (the run is the strategy’s); the process’s logoffs cut it at once', async () => {
-    const held = stand.standIn.hold(isClassRun);
-    await stand.a.call('RuntimeRunClass', { ...RUN, background: true });
-    await held.arrived;
-    const session = runSession();
+  it('the instance close cuts the runs it started at once, without waiting for them; another instance’s run goes on until the process’s logoffs', async () => {
+    const heldA = stand.standIn.hold(
+      (r) => isClassRun(r) && r.url.toUpperCase().includes('ZCL_RUN_A'),
+    );
+    const heldB = stand.standIn.hold(
+      (r) => isClassRun(r) && r.url.toUpperCase().includes('ZCL_RUN_B'),
+    );
+    const b = await callerOn(stand.standIn, stand.strategy, {
+      user: 'RUN_USER',
+    });
+    try {
+      await stand.a.call('RuntimeRunClass', {
+        class_name: 'ZCL_RUN_A',
+        background: true,
+      });
+      await b.call('RuntimeRunClass', {
+        class_name: 'ZCL_RUN_B',
+        background: true,
+      });
+      await Promise.all([heldA.arrived, heldB.arrived]);
+      const of = (name: string) =>
+        stand.standIn.requests.find(
+          (r) => isClassRun(r) && r.url.toUpperCase().includes(name),
+        )?.session ?? '';
+      const sessionA = of('ZCL_RUN_A');
+      const sessionB = of('ZCL_RUN_B');
 
-    // The client closed: the instance closes without waiting for the run.
-    await closeInstance(stand.a.server);
-    expect(pending()).toContain('RuntimeRunClass (background)');
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(logoffIndex(stand.standIn, session)).toBe(-1);
+      // The client closed: the instance close logs its run off at once,
+      // under the run's request still held, and waits for no run.
+      await closeInstance(stand.a.server);
+      await until(() => logoffIndex(stand.standIn, sessionA) > -1);
+      // Both runs still wait for SAP: the close awaited neither.
+      expect(pending()).toEqual(['RuntimeRunClass (background) (2 calls)']);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(logoffIndex(stand.standIn, sessionB)).toBe(-1);
 
-    // The process ends: its logoffs reach the run's own session at once,
-    // under its request still held.
-    await logOffAtOnce();
-    await until(() => logoffIndex(stand.standIn, session) > -1);
-    held.release();
+      // The process ends: its logoffs reach the other instance's run.
+      await logOffAtOnce();
+      await until(() => logoffIndex(stand.standIn, sessionB) > -1);
+    } finally {
+      heldA.release();
+      heldB.release();
+      await b.close();
+    }
   });
 
   it('the forced close logs it off at once, cutting it, and names it', async () => {

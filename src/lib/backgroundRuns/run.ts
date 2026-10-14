@@ -8,16 +8,23 @@
  *   without one the start is refused with D20's words, before anything is
  *   kept. Stateless. It is the server's (role `background`), owned by the
  *   strategy, not by the instance whose call started it: the instance's
- *   terminal close does not cut it (an HTTP request's instance ends with its
- *   request; the run goes on);
- * - **not cut by its instance's close** — the run is registered in the
- *   registry of live tools (`activeTools`) under the instance whose call
- *   started it, but its connection is the strategy's: an instance close (an
- *   SSE stream that closed, an HTTP request's instance leaving) neither
- *   waits for it nor logs it off — its answer stays reachable through the
- *   host's strategy. The process's end (stdio's client close, a signal)
- *   logs its connection off at once (`logOffAtOnce`), which cuts it, and the
- *   forced close names it among what was still running;
+ *   terminal close (`closeOwnedConnections` — the pool's eviction, the idle
+ *   bound) does not cut it;
+ * - **cut by its instance's close, as by the process's end** — the run is
+ *   registered in the registry of live tools (`activeTools`) under the
+ *   instance whose call started it, and its connection is handed to that
+ *   instance's tracking (`track`) once owned: the instance close
+ *   (`closeInstance` — an SSE stream that closed, stdio's transport, an
+ *   embedder's session-ending transport) logs it off at once with the
+ *   instance's own, in the same tick, which cuts it. A run of another
+ *   instance is untouched. An HTTP instance is never closed that way (its
+ *   transport close ends no session): its runs go on — neither a dropped
+ *   request nor the pool's eviction cuts them. The process's end (stdio's client close, a signal) logs every
+ *   run's connection off at once (`logOffAtOnce`), and the forced close
+ *   names it among what was still running. A cut run ends in the store the
+ *   same way either way: by its own end below, once its request settled —
+ *   with the run tool's answer (an error when its session was gone first);
+ *   nothing else is written for it;
  * - **its end** — once SAP answered: the connection is logged off
  *   (`disconnect()`), then the answer is handed to the strategy (`finish`),
  *   then the run leaves the registry. An answer is what the run tool would
@@ -49,8 +56,15 @@ export interface StartBackgroundRunOptions {
   tool: string;
   /** What it runs (a class or a program), upper case. */
   object: string;
-  /** The instance whose call starts the run: its close waits for the run. */
+  /** The instance whose call starts the run. */
   instance: object;
+  /**
+   * The instance's tracking of the runs it started: handed the run's own
+   * connection once it is owned, before the strategy keeps the run; answers
+   * the untracking, called when the run ended. It may throw (the instance
+   * closed meanwhile): the start is refused, its connection ended.
+   */
+  track?: (connection: IAbapConnection) => () => void;
   /** The instance's connection: what the run's own is opened from. */
   connection: IAbapConnection;
   logger: Logger;
@@ -101,13 +115,17 @@ export async function startBackgroundRun(
   if (unregister === undefined) return undefined;
 
   let connection: IAbapConnection | undefined;
+  let untrack: (() => void) | undefined;
   try {
     // The strategy's connection, not the instance's: no instance's terminal
-    // close reaches it; the process's logoffs (`forceClose`) do.
+    // close (`closeOwnedConnections`, the pool's) reaches it; the instance
+    // close does through `track`, the process's logoffs (`forceClose`) do.
     connection = await runAsOwner(strategy, () =>
       openFreshConnection(options.connection, logger),
     );
     own(connection, { owner: strategy, role: 'background' });
+    // The instance's from now on to cut: its close logs it off.
+    untrack = options.track?.(connection);
     // Stateless (§5.7): a fresh connection is, and a host's factory's is made so.
     const typed = connection as { setSessionType?: (type: string) => void };
     if (typeof typed.setSessionType === 'function') {
@@ -156,6 +174,7 @@ export async function startBackgroundRun(
           }
         }
       } finally {
+        untrack?.();
         unregister();
       }
     })();
@@ -166,6 +185,7 @@ export async function startBackgroundRun(
       started_at: startedAt,
     };
   } catch (error) {
+    untrack?.();
     if (connection !== undefined && !isEnded(connection)) {
       await closeQuietly(connection, logger, tool);
     }

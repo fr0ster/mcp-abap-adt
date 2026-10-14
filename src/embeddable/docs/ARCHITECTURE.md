@@ -349,11 +349,16 @@ their answers are kept is the host's: a strategy.
   registry. A group registered on its own `McpServer` (no instance, no strategy) refuses
   `background: true` instead of running in the foreground.
 - **Its ends.** Owned by the strategy, the connection is not reached by any instance's terminal
-  close (an HTTP request's instance ends with its request; the run goes on). Registered under its
-  instance, it is neither awaited nor cut by `closeInstance` (an SSE close): its answer stays
-  reachable through the strategy. The process's logoffs (`logOffAtOnce` → `forceClose`,
-  process-wide: every launcher's shutdown, stdio's client close) log it off at once, which cuts it;
-  the forced close names it.
+  close (`closeOwnedConnections`: the pool's eviction, the idle bound; an HTTP request's instance
+  ends with its request and the run goes on). The instance that started it tracks it while it runs
+  (`track` → `startedRuns`, per instance, refused once the instance is latched): `closeInstance`
+  (an SSE stream's close, stdio's transport, an embedder's session-ending transport) calls
+  `cutBackgroundRuns()` in the tick of its own logoffs — each such run's connection logged off at
+  once, which cuts it — and awaits no run; another instance's runs are untouched. The process's
+  logoffs (`logOffAtOnce` → `forceClose`, process-wide: every launcher's shutdown, stdio's client
+  close) log every run off at once; the forced close names it. A cut run ends in the strategy by its
+  own end — `finish` once its request settled, with what the run tool answered (SAP's answer when
+  the request reached SAP before the logoff, else its error): nothing else is written for it.
 - **The tools** (`GetBackgroundRun` / `ListBackgroundRuns` / `DiscardBackgroundRun`; compact
   `HandlerBackgroundRun{Get,List,Discard}`) are `connectionless` entries beside the run tools —
   the full set's `readonly` (with the system group, in `HandlerExporter` too), compact's `rw` —

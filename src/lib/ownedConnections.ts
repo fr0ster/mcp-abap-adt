@@ -66,7 +66,8 @@ export type ConnectionRole =
   /**
    * A background run's own, until SAP answers (`startBackgroundRun`): owned
    * by the host's strategy, not an instance — no instance's terminal close
-   * cuts it; the process's logoffs (`forceClose`) do.
+   * cuts it; the instance close of the instance that started it
+   * (`cutBackgroundRuns`) and the process's logoffs (`forceClose`) do.
    */
   | 'background';
 

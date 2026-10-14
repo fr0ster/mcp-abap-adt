@@ -14,7 +14,8 @@
  * 2. in the same tick, **the logoffs at once** — every connection the
  *    instance owns (its connector, held state's — the debugger's —, long
  *    reads' and lock sessions' fresh ones) gets its logoff, which releases
- *    the locks — and **every call of the instance is interrupted**: its
+ *    the locks — the background runs it started included
+ *    (`cutBackgroundRuns`) — and **every call of the instance is interrupted**: its
  *    signal aborts, a call queued in its main flow leaves without sending.
  *    A running tool's later requests fail against the ended session, and
  *    nobody reads their answer. Awaited only to each logoff's write;
@@ -26,8 +27,10 @@
  * `refuseIfClosed`, `refuseWhenClosed` in `ownedConnections.ts`): the sweep
  * in step 2 runs once, so nothing opened after it could be logged off.
  *
- * A background run is not the instance's (its connection is the host
- * strategy's): it runs on until SAP answers; the process's end logs it off.
+ * A background run's connection is the host strategy's, but the instance
+ * close cuts the runs this instance started (`cutBackgroundRuns`): their
+ * connections get their logoff in step 2's tick, as at the process's end.
+ * Another instance's runs are untouched.
  */
 
 import { interrupt, latch } from './activeTools';
@@ -37,6 +40,11 @@ import { closeOwnedConnections } from './ownedConnections';
 export interface ClosableInstance {
   /** The state let go after the logoffs: no bound, nothing undone. */
   letGoOfState(): void;
+  /**
+   * The logoff of every background run's connection this instance started,
+   * at once; resolves once each is written. Absent: none to cut.
+   */
+  cutBackgroundRuns?(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -48,9 +56,15 @@ export function closeInstance(instance: ClosableInstance): Promise<void> {
   if (running) return running;
   latch(instance);
   const written = closeOwnedConnections(instance);
+  let cut: Promise<void> = Promise.resolve();
+  try {
+    cut = instance.cutBackgroundRuns?.() ?? cut;
+  } catch {
+    // Nothing to cut: the instance's own logoffs are written either way.
+  }
   interrupt(instance);
   const closing = (async () => {
-    await written;
+    await Promise.all([written, cut.catch(() => undefined)]);
     try {
       instance.letGoOfState();
     } catch {

@@ -1427,6 +1427,7 @@ export abstract class BaseMcpServer extends McpServer {
       instance: this,
       connection: context.connection,
       logger: this.logger,
+      track: (own) => this.trackRun(own),
       run: (own) =>
         this.backgroundAnswer(
           handler,
@@ -1437,6 +1438,39 @@ export abstract class BaseMcpServer extends McpServer {
     });
     if (started === undefined) return shutdownRefusalAnswer();
     return answerBackgroundStarted(started);
+  }
+
+  /**
+   * The connections of the background runs this instance started, while
+   * they run: the instance close cuts them (`cutBackgroundRuns`). Per
+   * instance — another instance's runs are not here.
+   */
+  private readonly startedRuns = new Set<object>();
+
+  /**
+   * Tracks a run's own connection; answers its untracking. Refused once
+   * this instance is closed: a run that connected after the close's sweep
+   * would never be cut.
+   */
+  private trackRun(connection: object): () => void {
+    refuseIfClosed(this);
+    this.startedRuns.add(connection);
+    return () => {
+      this.startedRuns.delete(connection);
+    };
+  }
+
+  /**
+   * The instance close (`closeInstance`): every background run this
+   * instance started gets its logoff at once, which cuts it — as the
+   * process's end does. Each run then ends in its strategy by its own end
+   * (the run tool's answer once its request settled).
+   */
+  cutBackgroundRuns(): Promise<void> {
+    const runs = [...this.startedRuns].map((connection) =>
+      endConnection(connection),
+    );
+    return Promise.all(runs).then(() => undefined);
   }
 
   /**

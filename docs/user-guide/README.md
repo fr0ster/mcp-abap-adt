@@ -98,8 +98,10 @@ credential, the user SAP answers); another user's handle reads as an unknown one
 runs, running and kept together; discard a finished one to start another. Kept answers live in the
 server's memory (`@mcp-abap-adt/background-runs-memory`) and end with the process. An application
 embedding `@mcp-abap-adt/lib` keeps runs in a store of its own (`IBackgroundRuns`), or takes that
-package. An SSE connection that closes leaves a running background run alone; the process's end
-(a signal, or stdio's client closing stdin) logs its session off at once, which cuts it. Details:
+package. An SSE connection that closes cuts the runs it started: their sessions are logged off at
+once, as stdio's are when its client closes stdin; over Streamable HTTP a run goes on. The
+process's end (a signal, or stdio's client closing stdin) logs every run's session off at once,
+which cuts it. Details:
 [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-background-runs-of-the-class-and-program-runs).
 
 ## Leftover SAP sessions of a killed process

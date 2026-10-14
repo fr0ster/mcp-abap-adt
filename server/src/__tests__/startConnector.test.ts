@@ -258,7 +258,9 @@ it('a logon SAP refuses: exit 1 with the failure on stderr, and the transport ne
   expect(s.exits).toEqual([1]);
   expect(s.opened()).toBe(0);
   // The chain failure's own words.
-  expect(s.stderr.at(-1)).toMatch(/^\[MCP\] the user or password was refused\n/);
+  expect(s.stderr.at(-1)).toMatch(
+    /^\[MCP\] the user or password was refused\n/,
+  );
   expect(s.stderr.join('\n')).not.toContain('start-password');
 });
 

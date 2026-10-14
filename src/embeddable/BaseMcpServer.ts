@@ -574,15 +574,27 @@ export abstract class BaseMcpServer extends McpServer {
     connection: AbapConnection,
     holdsFlow: boolean,
     signal: AbortSignal,
-  ): Promise<void> {
-    if (!this.lacksSystem(connection)) return;
+    taken: (connection: AbapConnection | undefined) => void,
+  ): Promise<AbapConnection> {
+    if (!this.lacksSystem(connection)) return connection;
     if (holdsFlow) {
       await this.requireSystem(connection, signal);
-      return;
+      return connection;
     }
     const leave = await this.enterMainFlow(signal);
     try {
-      await this.requireSystem(connection, signal);
+      // Its turn came: the connection taken before the wait may be one whose
+      // session SAP lost meanwhile. Given back and taken again, inside the
+      // flow, before asking — as a queued call does.
+      let current = connection;
+      if (this.isStaleBuilt(current)) {
+        taken(undefined);
+        this.connectionReleased(current);
+        current = await this.getConnection(signal);
+        taken(current);
+      }
+      await this.requireSystem(current, signal);
+      return current;
     } finally {
       leave();
     }
@@ -958,10 +970,13 @@ export abstract class BaseMcpServer extends McpServer {
               // The connection's system information, asked before the tool
               // runs when it has none; its failure is this call's answer, and
               // the tool never runs twice.
-              await this.systemBeforeTool(
+              connection = await this.systemBeforeTool(
                 connection,
                 leaveFlow !== undefined,
                 signal,
+                (taken) => {
+                  inUse = taken;
+                },
               );
               const context: HandlerContext = {
                 connection,

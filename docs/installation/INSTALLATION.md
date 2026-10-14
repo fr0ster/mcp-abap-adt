@@ -246,7 +246,7 @@ cat > ~/.config/mcp-abap-adt/service-keys/TRIAL.json << 'EOF'
 }
 EOF
 
-# Run the server with the destination; the first tool call opens a browser login
+# Run the server with the destination; the browser login opens at the start
 # (callback port 61001 unless --browser-auth-port says otherwise)
 mcp-abap-adt --mcp=TRIAL
 ```

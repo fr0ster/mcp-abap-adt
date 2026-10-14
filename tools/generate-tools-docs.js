@@ -878,7 +878,7 @@ function generateMarkdown(tools) {
   md += `- \`readonly\` -> [Read-Only Group](#read-only-group): \`mcp-abap-adt\` (and \`-http\`, \`-sse\`). The read-only binaries (\`mcp-abap-adt-ro\`, \`-http-ro\`, \`-sse-ro\`) serve a set of their own, listed exactly in [AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md): this group without the background-run tools, the system and search tools, on stdio the leftover-session list and logoff, and the run tools without \`background\`\n`;
   md += `- \`high\` -> [High-Level Group](#high-level-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`\n`;
   md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
-  md += `- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process; the resume in the write binaries only). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file\n`;
+  md += `- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file\n`;
   md += `- compact -> [High-Level / Compact](#high-level-compact): \`mcp-abap-adt-compact\` and \`mcp-abap-adt-compact-ro\` (and \`-compact-http\`, \`-compact-sse\`, each with its \`-ro\`)\n\n`;
 
   md += `## Navigation\n\n`;

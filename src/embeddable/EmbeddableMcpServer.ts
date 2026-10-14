@@ -140,8 +140,9 @@ export interface EmbeddableMcpServerOptions {
    * `x-sap-login` with `x-sap-url`) stands as the responsible; a non-null
    * answer is a cloud system's — the login does not count, and only what the
    * call does not state is taken from it (`{}`: the system named nothing, so a
-   * create without a stated responsible is refused). A resolver that throws is
-   * treated like `{}`, and the create is refused as the system being unreachable, to retry later. The default
+   * create without a stated responsible is refused). A resolver that throws
+   * fails that call with `system_lookup_failed`: its tool does not run, and
+   * the next call asks again. The default
    * asks on ABAP Cloud (one lookup per connection) and answers `null`
    * on-premise. `null` as the option disables it.
    * @default defaultSystemContextResolver

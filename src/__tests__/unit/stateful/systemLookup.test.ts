@@ -385,3 +385,75 @@ it('ABAP Cloud, the lookup refused: a tool outside the flow is refused before it
     await s.close();
   }
 });
+
+it('ABAP Cloud: a tool outside the flow that waits for its turn to ask is given the replacement of a connection the call ahead lost', async () => {
+  const standIn = await adtStandIn();
+  standIn.body(
+    isLookup,
+    JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
+  );
+  const s = await builtStand(standIn, 'cloud');
+  type Sender = { makeAdtRequest(o: object): Promise<unknown> };
+  const losing: HandlerEntry = {
+    toolDefinition: {
+      name: 'LoseSession',
+      description: 'LoseSession',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    handler: (async (
+      context: { connection: Sender & { isConnected?: () => boolean } },
+      _args: unknown,
+    ) => {
+      await context.connection.makeAdtRequest({
+        url: '/sap/bc/adt/probe/lose',
+        method: 'GET',
+        timeout: 10_000,
+      });
+      context.connection.isConnected = () => false;
+      throw new Error('the session was lost');
+    }) as never,
+  } as unknown as HandlerEntry;
+  const outside: HandlerEntry = {
+    toolDefinition: {
+      name: 'DebugWait',
+      description: 'DebugWait',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    handler: (async (context: { connection: Sender }, _args: unknown) => {
+      await context.connection.makeAdtRequest({
+        url: '/sap/bc/adt/probe/outside',
+        method: 'GET',
+        timeout: 10_000,
+      });
+      return { content: [{ type: 'text', text: 'waited' }] };
+    }) as never,
+  } as unknown as HandlerEntry;
+  s.register({
+    getName: () => 'lose-and-wait',
+    getHandlers: () => [losing, outside],
+    registerHandlers: () => {},
+  } as unknown as IHandlerGroup);
+  try {
+    const held = standIn.hold(isLookup);
+    const first = s.call('LoseSession', {});
+    await held.arrived;
+    // Taken on the first connection, which has no system information yet.
+    const second = s.call('DebugWait', {});
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    held.release();
+    expect((await first).isError).toBe(true);
+    expect((await second).isError).toBeFalsy();
+    const lostSession = standIn.requests.find((r) =>
+      r.url.endsWith('/probe/lose'),
+    )?.session;
+    const outsideSession = standIn.requests.find((r) =>
+      r.url.endsWith('/probe/outside'),
+    )?.session;
+    expect(lostSession).toBeDefined();
+    expect(outsideSession).toBeDefined();
+    expect(outsideSession).not.toBe(lostSession);
+  } finally {
+    await s.close();
+    await standIn.close();
+  }
+});

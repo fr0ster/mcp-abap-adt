@@ -303,6 +303,16 @@ describe('ABAP Cloud: the system information at the start', () => {
     expect(stand.files()).toEqual([]);
   });
 
+  it('a gone leftover whose new logon then finds no system information: the start fails, and the new session is logged off', async () => {
+    stand = await leftoverStand();
+    const { session } = await stand.leftover();
+    stand.standIn.answer((r) => r.session === session, 401);
+    stand.standIn.answer(isLookup, 500);
+    await expect(stand.start()).rejects.toBeDefined();
+    await until(() => stand.standIn.logoffs() === 1);
+    expect(stand.files()).toEqual([]);
+  });
+
   it('no system information for a picked-up session: the start fails, and the session is not logged off', async () => {
     stand = await leftoverStand();
     const { handle } = await stand.leftover();

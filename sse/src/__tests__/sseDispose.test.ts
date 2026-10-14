@@ -1,6 +1,6 @@
 /**
- * The SSE session's instance is disposed when its connection closes, and
- * stop() waits for every disposal (no timer) and rejects with what was left.
+ * The SSE session's instance is disposed when its connection closes — once
+ * — and stop() waits for every close (no timer).
  */
 
 import { EventEmitter } from 'node:events';
@@ -47,21 +47,26 @@ function fakeRes() {
 }
 
 describe('SseServer disposes the instance of a session', () => {
-  let shutdown: jest.SpyInstance;
+  let letGo: jest.SpyInstance;
+  let mcpClose: jest.SpyInstance;
   let errorSpy: jest.SpyInstance;
   beforeEach(() => {
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     jest
       .spyOn(BaseMcpServer.prototype as any, 'getConnection')
       .mockResolvedValue({});
-    shutdown = jest.spyOn(BaseMcpServer.prototype, 'shutdownState');
+    letGo = jest.spyOn(BaseMcpServer.prototype, 'letGoOfState');
+    mcpClose = jest.spyOn(BaseMcpServer.prototype, 'close');
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => {
+    errorSpy.mockRestore();
+    jest.restoreAllMocks();
+  });
 
   it('when the connection closes: once; stop() is pending until it settles', async () => {
-    const release = deferred<string[]>();
+    const release = deferred<void>();
     const called = deferred<void>();
-    shutdown.mockImplementation(() => {
+    mcpClose.mockImplementation(() => {
       called.resolve();
       return release.promise;
     });
@@ -79,7 +84,7 @@ describe('SseServer disposes the instance of a session', () => {
     await new Promise<void>((resolve) => req.once('response', () => resolve()));
     req.destroy();
     await called.promise;
-    expect(shutdown).toHaveBeenCalledTimes(1);
+    expect(letGo).toHaveBeenCalledTimes(1);
 
     let stopped = false;
     const stopping = sse.stop().then(() => {
@@ -88,13 +93,13 @@ describe('SseServer disposes the instance of a session', () => {
     await tick();
     await tick();
     expect(stopped).toBe(false);
-    release.resolve([]);
+    release.resolve();
     await stopping;
     expect(stopped).toBe(true);
+    expect(letGo).toHaveBeenCalledTimes(1);
   });
 
-  it('on an external app: stop() disposes the open sessions, and rejects with what was left', async () => {
-    shutdown.mockResolvedValue(['a lock could not be released']);
+  it('on an external app: stop() closes the open sessions', async () => {
     const routes: Record<string, any> = {};
     const app: any = {
       get: (p: string, h: any) => {
@@ -106,17 +111,15 @@ describe('SseServer disposes the instance of a session', () => {
     sse.registerRoutes(app);
     const res = fakeRes();
     await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
-    expect(shutdown).not.toHaveBeenCalled();
+    expect(letGo).not.toHaveBeenCalled();
 
-    await expect(sse.stop()).rejects.toThrow(
-      /state cleanup failed: .*a lock could not be released/,
-    );
-    expect(shutdown).toHaveBeenCalledTimes(1);
+    await sse.stop();
+    expect(letGo).toHaveBeenCalledTimes(1);
   });
 
-  it("a close during stop()'s drain does not dispose twice, and stop() reports its failure", async () => {
-    const release = deferred<string[]>();
-    shutdown.mockReturnValue(release.promise);
+  it("a close during stop()'s drain does not close twice", async () => {
+    const release = deferred<void>();
+    mcpClose.mockReturnValue(release.promise);
     const routes: Record<string, any> = {};
     const app: any = {
       get: (p: string, h: any) => {
@@ -132,96 +135,10 @@ describe('SseServer disposes the instance of a session', () => {
     await tick();
     res.emit('close');
     await tick();
-    expect(shutdown).toHaveBeenCalledTimes(1);
-    release.resolve(['left behind']);
-    await expect(stopping).rejects.toThrow(/left behind/);
-    expect(shutdown).toHaveBeenCalledTimes(1);
-  });
-
-  // The failure of a session that finished closing BEFORE stop() ran is only
-  // logged and then forgotten: stop() reports what it drains, and a settled
-  // closing is no longer pending. Here the close is still pending when stop() runs.
-  it('a close that leaves something is logged with it, and stop() reports it too', async () => {
-    shutdown.mockResolvedValue(['a session was left']);
-    const logger = {
-      error: jest.fn(),
-      debug: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    };
-    const routes: Record<string, any> = {};
-    const app: any = {
-      get: (p: string, h: any) => {
-        routes[p] = h;
-      },
-      post: jest.fn(),
-    };
-    const sse = make({ app, logger });
-    sse.registerRoutes(app);
-    const res = fakeRes();
-    await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
-    res.emit('close');
-    await expect(sse.stop()).rejects.toThrow(/a session was left/);
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('a session was left'),
-    );
-  });
-
-  it('a close that leaves something is written through the state logger: stderr when only the silent transport logger is set', async () => {
-    shutdown.mockResolvedValue(['a debuggee was left']);
-    const written: string[] = [];
-    const stderr = jest
-      .spyOn(process.stderr, 'write')
-      .mockImplementation((chunk: unknown) => {
-        written.push(String(chunk));
-        return true;
-      });
-    const routes: Record<string, any> = {};
-    const app: any = {
-      get: (p: string, h: any) => {
-        routes[p] = h;
-      },
-      post: jest.fn(),
-    };
-    const sse = make({ app });
-    sse.registerRoutes(app);
-    const res = fakeRes();
-    await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
-    res.emit('close');
-    await expect(sse.stop()).rejects.toThrow(/a debuggee was left/);
-    stderr.mockRestore();
-    expect(written.join('')).toContain('a debuggee was left');
-  });
-
-  it('a close that leaves something goes to the state logger given, not the transport logger', async () => {
-    shutdown.mockResolvedValue(['a listener was left']);
-    const lines: string[] = [];
-    const logger = {
-      error: jest.fn(),
-      debug: jest.fn(),
-      info: jest.fn(),
-      warn: jest.fn(),
-    };
-    const routes: Record<string, any> = {};
-    const app: any = {
-      get: (p: string, h: any) => {
-        routes[p] = h;
-      },
-      post: jest.fn(),
-    };
-    const sse = make({
-      app,
-      logger,
-      stateLogger: { error: (m: string) => lines.push(m) },
-    });
-    sse.registerRoutes(app);
-    const res = fakeRes();
-    await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
-    res.emit('close');
-    await expect(sse.stop()).rejects.toThrow(/a listener was left/);
-    expect(lines.join('')).toContain('a listener was left');
-    expect(logger.error).not.toHaveBeenCalledWith(
-      expect.stringContaining('a listener was left'),
-    );
+    expect(letGo).toHaveBeenCalledTimes(1);
+    release.resolve();
+    await stopping;
+    expect(letGo).toHaveBeenCalledTimes(1);
+    expect(mcpClose).toHaveBeenCalledTimes(1);
   });
 });

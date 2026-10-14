@@ -86,7 +86,7 @@ it('refused invalid_grant, shutdown, a new factory over the same file seeds none
   const processLike = new EventEmitter();
   installShutdown({
     factory: second,
-    instance: { shutdownState: async () => [], close: async () => {} },
+    instance: { close: async () => {} },
     exit: (code) => exits.push(code),
     stderr: () => {},
     processLike,

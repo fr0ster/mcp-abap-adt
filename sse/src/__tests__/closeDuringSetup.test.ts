@@ -1,8 +1,8 @@
 /**
  * RF8, the setup window (spec §6.4, D51): an SSE connection closes, or
  * `server.connect` rejects, while it is still being set up — and a
- * `SIGTERM` arrives during setup. Each time the instance close runs once
- * (its state shut down — main's failed-`connect` path did not), no session
+ * host's stop arrives during setup. Each time the instance close runs once
+ * (its state let go — main's failed-`connect` path did not), no session
  * entry is left, and the instance is never routed to.
  */
 
@@ -64,15 +64,13 @@ function external() {
 const sessionsOf = (sse: SseServer) =>
   (sse as unknown as { sessions: Map<string, unknown> }).sessions;
 
-let shutdownState: jest.SpyInstance;
+let letGoOfState: jest.SpyInstance;
 let connect: jest.SpyInstance;
 
 beforeEach(() => {
   resetProcessLatchForTests();
   jest.spyOn(console, 'error').mockImplementation(() => {});
-  shutdownState = jest
-    .spyOn(BaseMcpServer.prototype, 'shutdownState')
-    .mockResolvedValue([]);
+  letGoOfState = jest.spyOn(BaseMcpServer.prototype, 'letGoOfState');
   connect = jest.spyOn(BaseMcpServer.prototype, 'connect');
 });
 
@@ -87,32 +85,32 @@ it('the response closes while connect() is held: one instance close, never route
   await turns();
   res.emit('close');
   await turns();
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGoOfState).toHaveBeenCalledTimes(1);
   held.resolve();
   await getting;
   await turns();
   expect(sessionsOf(sse).size).toBe(0);
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGoOfState).toHaveBeenCalledTimes(1);
   await sse.stop();
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGoOfState).toHaveBeenCalledTimes(1);
 });
 
-it('connect() rejects: the instance close runs once (the state is shut down), no entry is left', async () => {
+it('connect() rejects: the instance close runs once (the state is let go), no entry is left', async () => {
   connect.mockRejectedValue(new Error('transport broke'));
   const { sse, routes } = external();
   const res = fakeRes();
   await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
   await turns();
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGoOfState).toHaveBeenCalledTimes(1);
   expect(sessionsOf(sse).size).toBe(0);
   res.emit('close');
   await turns();
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGoOfState).toHaveBeenCalledTimes(1);
   await sse.stop();
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGoOfState).toHaveBeenCalledTimes(1);
 });
 
-it('a shutdown during setup awaits the same cleanup: one instance close', async () => {
+it('a stop during setup awaits the same cleanup: one instance close', async () => {
   const held = deferred();
   connect.mockReturnValue(held.promise);
   const { sse, routes } = external();
@@ -120,17 +118,17 @@ it('a shutdown during setup awaits the same cleanup: one instance close', async 
   const getting = routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
   await turns();
   let stopped = false;
-  const stopping = sse.lastStep().then(() => {
+  const stopping = sse.stop().then(() => {
     stopped = true;
   });
   await turns();
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGoOfState).toHaveBeenCalledTimes(1);
   held.resolve();
   await getting;
   await stopping;
   expect(stopped).toBe(true);
   res.emit('close');
   await turns();
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGoOfState).toHaveBeenCalledTimes(1);
   expect(sessionsOf(sse).size).toBe(0);
 });

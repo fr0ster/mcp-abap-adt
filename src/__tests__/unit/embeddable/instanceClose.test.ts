@@ -1,9 +1,10 @@
 /**
- * The instance close (spec §6.4, D51), main's `closeInstanceState` grown up:
- * in order — the instance latch (in the tick it begins), its calls settle
- * (none aborted), the state undo, the terminal close whatever the undo
- * answered, the MCP server's close. One promise per instance: a second
- * caller joins it. What the undo left is answered, never thrown.
+ * The instance close (spec §6.4, D51) — the client closed its connection
+ * (an SSE stream, an embedder's own close): in the tick it begins, the
+ * instance latch, the logoff of every connection the instance owns and the
+ * interruption of every call of the instance; nothing waits for a running
+ * call. Then the state let go (no undo sent) and the MCP server's close. One
+ * promise per instance: a second caller joins it.
  */
 
 import {
@@ -18,74 +19,83 @@ const turns = async (n = 10) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
 };
 
-function instance(left: string[] | Error = []) {
+function instance(letGo: () => void = () => {}) {
   const order: string[] = [];
-  const connection = {
+  const connection = (name: string) => ({
     disconnect: async () => {
-      order.push('logoff');
+      order.push(`logoff ${name}`);
     },
-  };
+  });
   const self = {
     order,
-    shutdownState: async () => {
-      order.push('undo');
-      if (left instanceof Error) throw left;
-      return left;
+    letGoOfState: () => {
+      order.push('let go');
+      letGo();
     },
     close: async () => {
       order.push('mcp close');
     },
   };
-  own(connection, { owner: self, role: 'built' });
+  own(connection('built'), { owner: self, role: 'built' });
+  own(connection('state'), { owner: self, role: 'state' });
+  own(connection('long'), { owner: self, role: 'long' });
   return self;
 }
 
+const LOGOFFS = ['logoff built', 'logoff state', 'logoff long'];
+
 beforeEach(() => resetProcessLatchForTests());
 
-it('latch in its tick, then the calls settle, the undo, the logoffs, the MCP server', async () => {
+it('in its tick: the latch, every owned connection logged off, every call interrupted — the running call is not awaited', async () => {
   const one = instance();
-  const call = registerActiveTool(new AbortController(), {
+  const running = new AbortController();
+  const queued = new AbortController();
+  const call = registerActiveTool(running, {
     instance: one,
     name: 'UpdateClass',
   });
+  registerActiveTool(queued, { instance: one, name: 'UpdateClass' });
   const closing = closeInstance(one);
   expect(isLatched(one)).toBe(true);
   expect(isClosing(one)).toBe(true);
   expect(isLatched()).toBe(false);
-  await turns();
-  expect(one.order).toEqual([]);
+  expect(running.signal.aborted).toBe(true);
+  expect(queued.signal.aborted).toBe(true);
+  expect(one.order).toEqual(LOGOFFS);
+  // The running call never settled: the close ends without it.
+  await closing;
+  expect(one.order).toEqual([...LOGOFFS, 'let go', 'mcp close']);
   call?.();
-  expect(await closing).toEqual([]);
-  expect(one.order).toEqual(['undo', 'logoff', 'mcp close']);
 });
 
-it('a second caller joins the first: one undo, one logoff', async () => {
+it('a second caller joins the first: one logoff each, one let-go', async () => {
   const one = instance();
-  const [a, b] = await Promise.all([closeInstance(one), closeInstance(one)]);
+  const a = closeInstance(one);
+  const b = closeInstance(one);
   expect(a).toBe(b);
-  expect(one.order).toEqual(['undo', 'logoff', 'mcp close']);
+  await a;
+  expect(one.order).toEqual([...LOGOFFS, 'let go', 'mcp close']);
 });
 
-it('an undo that left something: answered, and the logoffs are still written', async () => {
-  const one = instance(['a debuggee was left']);
-  expect(await closeInstance(one)).toEqual(['a debuggee was left']);
-  expect(one.order).toEqual(['undo', 'logoff', 'mcp close']);
+it('a let-go that throws changes nothing: the MCP server is still closed', async () => {
+  const one = instance(() => {
+    throw new Error('a secret-looking detail');
+  });
+  await closeInstance(one);
+  expect(one.order.slice(-2)).toEqual(['let go', 'mcp close']);
 });
 
-it('an undo that threw: fixed words, never its message, and the logoffs are still written', async () => {
-  const one = instance(new Error('a secret-looking detail'));
-  const left = await closeInstance(one);
-  expect(left).toEqual(['the state could not be shut down']);
-  expect(one.order).toEqual(['undo', 'logoff', 'mcp close']);
-});
-
-it("another instance's calls are not awaited", async () => {
+it("another instance's calls are neither interrupted nor awaited, and its connections stay", async () => {
   const one = instance();
-  const other = {};
-  const call = registerActiveTool(new AbortController(), {
+  const other = instance();
+  const theirs = new AbortController();
+  const call = registerActiveTool(theirs, {
     instance: other,
     name: 'GetClass',
   });
-  expect(await closeInstance(one)).toEqual([]);
+  await closeInstance(one);
+  await turns();
+  expect(theirs.signal.aborted).toBe(false);
+  expect(other.order).toEqual([]);
   call?.();
 });

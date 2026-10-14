@@ -3,12 +3,12 @@
  * `sseDispose.test.ts`:
  *
  * - a connection with no tool in flight closes → the instance close ran once
- *   (one `shutdownState()`, its connections disconnected, its MCP server
+ *   (its connections disconnected, its state let go once, its MCP server
  *   closed), the session left the map, a later `POST` for its `sessionId`
  *   is answered as an unknown session;
- * - a connection closed while a tool holds a lock (the update held) → the
- *   tool runs to its end (the update, the `UNLOCK`), then the state is shut
- *   down and the connection logged off;
+ * - a connection closed while a tool holds a lock (the update held) → its
+ *   session is logged off at once, under the held update; the tool is not
+ *   awaited and its `UNLOCK` never lands (the logoff released the lock);
  * - another open connection's tool and instance are untouched.
  */
 
@@ -24,12 +24,12 @@ import { type SseStand, sseStand, turns, until } from './shutdown/harness';
 jest.setTimeout(30_000);
 
 let s: SseStand;
-let shutdownState: jest.SpyInstance;
+let letGo: jest.SpyInstance;
 let mcpClose: jest.SpyInstance;
 
 beforeEach(async () => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
-  shutdownState = jest.spyOn(BaseMcpServer.prototype, 'shutdownState');
+  letGo = jest.spyOn(BaseMcpServer.prototype, 'letGoOfState');
   mcpClose = jest.spyOn(BaseMcpServer.prototype, 'close');
   s = await sseStand();
 });
@@ -51,7 +51,7 @@ it('a connection with no tool in flight: the instance close ran once, the sessio
   connection.close();
   await until(() => s.standIn.logoffs() === s.connects());
   await until(() => mcpClose.mock.calls.length === 1);
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGo).toHaveBeenCalledTimes(1);
   expect(sessions().has(connection.sessionId)).toBe(false);
   expect(ownedConnections()).toEqual([]);
 
@@ -63,10 +63,10 @@ it('a connection with no tool in flight: the instance close ran once, the sessio
   expect(late.status).toBe(400);
   expect(await late.text()).toBe('Invalid session');
   await turns(10);
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGo).toHaveBeenCalledTimes(1);
 });
 
-it('a connection closed while a tool holds a lock: the tool runs to its end, then the state is shut down and the session logged off; another connection is untouched', async () => {
+it('a connection closed while a tool holds a lock: its session is logged off at once, the tool not awaited, no UNLOCK; another connection is untouched', async () => {
   const closing = await s.open();
   const other = await s.open();
   const holdA = s.standIn.hold((r) => isUpdateOf('A')(r.url));
@@ -74,26 +74,27 @@ it('a connection closed while a tool holds a lock: the tool runs to its end, the
   await closing.call('LockedUpdate', { id: 'A' }, 1);
   await other.call('LockedUpdate', { id: 'B' }, 1);
   await Promise.all([holdA.arrived, holdB.arrived]);
+  const sessionA = s.standIn.requests.find((r) =>
+    isUpdateOf('A')(r.url),
+  )?.session;
 
   closing.close();
-  await turns(20);
-  // Its tool still runs: nothing shut down, no logoff.
-  expect(shutdownState).not.toHaveBeenCalled();
-  expect(s.standIn.logoffs()).toBe(0);
+  // Logged off under the held update: nothing waited for the tool.
+  await until(() => s.standIn.logoffs() === 1);
+  expect(s.standIn.requests.find((r) => isLogoff(r.url))?.session).toBe(
+    sessionA,
+  );
+  await until(() => letGo.mock.calls.length === 1);
 
   holdA.release();
-  await until(() => shutdownState.mock.calls.length === 1);
-  await until(() => s.standIn.logoffs() === 1);
-  const unlockA = s.indexOf(isUnlockOf('A'));
-  expect(unlockA).toBeGreaterThan(s.indexOf(isUpdateOf('A')));
-  expect(s.standIn.requests.findIndex((r) => isLogoff(r.url))).toBeGreaterThan(
-    unlockA,
-  );
+  await turns(20);
+  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
 
   // The other connection: its tool still held, its instance alive.
   expect(s.indexOf(isUnlockOf('B'))).toBe(-1);
   expect(sessions().has(other.sessionId)).toBe(true);
   holdB.release();
   expect(await other.answer(1)).toEqual({ text: 'B', isError: false });
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGo).toHaveBeenCalledTimes(1);
+  expect(s.standIn.logoffs()).toBe(1);
 });

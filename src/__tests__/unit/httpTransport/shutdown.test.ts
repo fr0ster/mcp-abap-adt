@@ -1,9 +1,10 @@
 /**
  * The HTTP-transport shutdown (spec §3.7, §6.4, D50): one sequence for http
  * and sse — the latch and the transport's `begin` in the trigger's tick,
- * stop listening, await every registered tool (none aborted), the last step,
- * exit `0` or `1` with its lines. No deadline: a later signal or
- * `--shutdown-timeout` forces — the last step is not awaited.
+ * stop listening, then the logoffs at once: every connection the process
+ * owns logged off and every running call interrupted, in one tick; no
+ * running tool awaited; then `release`, exit `0`. A later signal while a
+ * logoff is still being written forces: exit `1` naming the step.
  */
 
 import { EventEmitter } from 'node:events';
@@ -13,12 +14,13 @@ import {
   resetProcessLatchForTests,
 } from '../../../lib/activeTools';
 import { installTransportShutdown } from '../../../lib/httpTransport/shutdown';
+import { own } from '../../../lib/ownedConnections';
 
 const turns = async (n = 10) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
 };
 
-function setup(lastStep: () => Promise<string[]> = async () => []) {
+function setup() {
   resetProcessLatchForTests();
   const order: string[] = [];
   const exits: number[] = [];
@@ -27,10 +29,7 @@ function setup(lastStep: () => Promise<string[]> = async () => []) {
   installTransportShutdown({
     begin: () => order.push(`begin latched=${isLatched()}`),
     stopListening: () => order.push('stop listening'),
-    lastStep: async () => {
-      order.push('last step');
-      return lastStep();
-    },
+    release: () => order.push('release'),
     exit: (code) => {
       order.push(`exit(${code})`);
       exits.push(code);
@@ -41,49 +40,57 @@ function setup(lastStep: () => Promise<string[]> = async () => []) {
   return { order, exits, stderr, processLike };
 }
 
-it('SIGTERM: latch and begin in its tick, stop listening, the tools settle, the last step, exit 0', async () => {
+it('SIGTERM: latch and begin in its tick, stop listening, the logoffs at once with the tools interrupted, release, exit 0 — the running tool not awaited', async () => {
   const s = setup();
-  const tool = registerActiveTool(new AbortController(), {
-    name: 'UpdateClass',
-  });
+  const controller = new AbortController();
+  const tool = registerActiveTool(controller, { name: 'UpdateClass' });
+  own(
+    {
+      disconnect: async () => {
+        s.order.push('logoff');
+      },
+    },
+    { owner: {}, role: 'built' },
+  );
   s.processLike.emit('SIGTERM');
-  expect(s.order).toEqual(['begin latched=true', 'stop listening']);
+  // The logoff is asked for in the trigger's tick, the interruption beside it.
+  expect(s.order).toEqual(['begin latched=true', 'stop listening', 'logoff']);
+  expect(controller.signal.aborted).toBe(true);
   await turns();
-  expect(s.order).toEqual(['begin latched=true', 'stop listening']);
-  tool?.();
-  await turns();
+  // The tool never settled: the exit does not wait for it.
   expect(s.order).toEqual([
     'begin latched=true',
     'stop listening',
-    'last step',
+    'logoff',
+    'release',
     'exit(0)',
   ]);
+  tool?.();
 });
 
-it("the last step's leftovers: one line each, exit 1", async () => {
-  const s = setup(async () => ['[MCP] left a', '[MCP] left b']);
-  s.processLike.emit('SIGINT');
-  await turns();
-  expect(s.stderr).toEqual(['[MCP] left a', '[MCP] left b']);
-  expect(s.exits).toEqual([1]);
-});
-
-it('a second signal while the last step runs: not awaited, exit 1 naming the step', async () => {
-  let release!: () => void;
-  const held = new Promise<string[]>((r) => {
-    release = () => r([]);
-  });
-  const s = setup(() => held);
+it('a second signal while a logoff is still being written: exit 1 naming the step', async () => {
+  const s = setup();
+  let written!: () => void;
+  own(
+    {
+      disconnect: () =>
+        new Promise<void>((r) => {
+          written = r;
+        }),
+    },
+    { owner: {}, role: 'built' },
+  );
   s.processLike.emit('SIGTERM');
   await turns();
-  expect(s.order).toContain('last step');
+  expect(s.exits).toEqual([]);
   s.processLike.emit('SIGTERM');
+  await turns();
+  expect(s.exits).toEqual([]);
+  // The forced close joins the logoff under way: exit once it is written.
+  written();
   await turns();
   expect(s.exits).toEqual([1]);
   expect(s.stderr).toEqual([
-    '[MCP] Not finished at the forced close: closing the instances',
+    '[MCP] Not finished at the forced close: the logoffs',
   ]);
-  release();
-  await turns();
-  expect(s.exits).toEqual([1]);
 });

@@ -132,7 +132,7 @@ export class SseServer {
    */
   private readonly connections = new Map<
     BaseMcpServer,
-    { sessionId: string; close: () => Promise<string[]> }
+    { sessionId: string; close: () => Promise<void> }
   >();
   private readonly logger: Logger;
   private readonly version: string;
@@ -294,49 +294,34 @@ export class SseServer {
   }
 
   /**
-   * After the last step nothing is answered any more: the connections still
-   * open on the stopped listener (a client's idle keep-alive) are closed, so
-   * none keeps the process alive.
+   * The launcher's shutdown, after the logoffs (lib's
+   * `installTransportShutdown`), and `stop()`: nothing is answered any more —
+   * the connections still open on the stopped listener (a request whose tool
+   * was interrupted, a client's idle keep-alive) are closed, so none keeps
+   * the process alive.
    */
-  private closeLeftConnections(): void {
+  releaseConnections(): void {
     this.stoppedListener?.closeAllConnections();
     this.stoppedListener = undefined;
   }
 
   /**
-   * The shutdown's last step, after every registered tool settled (D33,
-   * D51): the instance close of every connection — run for the open ones,
-   * joined for those already closing — each ending its stream, its
-   * connections closed with a logoff whatever its undo answered. Answers one
-   * line per leftover. No timer.
-   */
-  async lastStep(): Promise<string[]> {
-    const failures = await this.closeAll();
-    this.closeLeftConnections();
-    return failures.map(
-      (failure) => `[MCP] State not undone at shutdown: ${failure}`,
-    );
-  }
-
-  /**
    * For a host that stops the server itself (embedded): the listener
-   * closes, then every connection's instance close (no timer). Rejects with
-   * what could not be undone. A launcher's shutdown awaits every registered
-   * tool between the two (lib's `installTransportShutdown`).
+   * closes, then every connection's instance close — its connections logged
+   * off at once, its calls interrupted (no tool awaited, no timer). A
+   * launcher's shutdown does not run this: it logs every connection the
+   * process owns off at once and interrupts every running tool (lib's
+   * `installTransportShutdown`).
    */
   async stop(): Promise<void> {
     this.stopListening();
-    const failures = await this.closeAll();
-    this.closeLeftConnections();
-    if (failures.length) {
-      throw new Error(`state cleanup failed: ${failures.join('; ')}`);
-    }
+    await this.closeAll();
+    this.releaseConnections();
   }
 
   /** The instance close of every connection, joined where one runs already. */
-  private async closeAll(): Promise<string[]> {
-    const closes = [...this.connections.values()].map((c) => c.close());
-    return (await Promise.all(closes)).flat();
+  private async closeAll(): Promise<void> {
+    await Promise.all([...this.connections.values()].map((c) => c.close()));
   }
 
   private async handleGet(req: any, res: any): Promise<void> {
@@ -411,8 +396,8 @@ export class SseServer {
     // The close tracking comes first, before the first setup await (D51,
     // RF8): the response's close, the stream's failure and a rejected
     // connect all reach this one cleanup — the instance close, once.
-    let cleanup: Promise<string[]> | undefined;
-    const close = (): Promise<string[]> => {
+    let cleanup: Promise<void> | undefined;
+    const close = (): Promise<void> => {
       cleanup ??= this.closeConnection(sessionId, server);
       return cleanup;
     };
@@ -448,29 +433,22 @@ export class SseServer {
   }
 
   /**
-   * One connection's cleanup (D51): the session leaves the routing map first
+   * One connection's cleanup (D51) — the client closed its stream, as a
+   * stdio client closes stdin: the session leaves the routing map first
    * (main's: a later `POST` for it is an unknown session), then the instance
-   * close — the instance latch in this tick, its tools awaited (none
-   * aborted), its state undone, its connections closed with a logoff
-   * whatever the undo answered, its MCP server and stream closed. What the
-   * undo left is written on the state logger and answered.
+   * close — the instance latch, its connections logged off at once and its
+   * running and queued calls interrupted in the same tick (no tool awaited),
+   * its state let go, its MCP server and stream closed.
    */
   private async closeConnection(
     sessionId: string,
     server: BaseMcpServer,
-  ): Promise<string[]> {
+  ): Promise<void> {
     if (this.sessions.get(sessionId)?.server === server) {
       this.sessions.delete(sessionId);
     }
     try {
-      const left = await closeInstance(server);
-      if (left.length) {
-        // The state's line: always written (stderr unless an embedder chose a logger).
-        this.stateLogger.error(
-          `[SSE CLOSE] state cleanup for session ${sessionId} left: ${left.join('; ')}`,
-        );
-      }
-      return left.map((l) => `${sessionId}: ${l}`);
+      await closeInstance(server);
     } finally {
       this.connections.delete(server);
     }

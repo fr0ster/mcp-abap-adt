@@ -163,7 +163,7 @@ export async function launch(
   installTransportShutdown({
     begin: () => server.beginShutdown(),
     stopListening: () => server.stopListening(),
-    lastStep: () => server.lastStep(),
+    release: () => server.releaseConnections(),
     exit: deps.exit,
     stderr: deps.stderr,
     processLike: deps.processLike,

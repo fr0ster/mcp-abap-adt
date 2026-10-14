@@ -58,8 +58,8 @@ Setting it reads nothing and sends nothing.
   credential renews itself, since a `401` reaches its `rejected()`.
 - **A shared connect:** every caller that asks while a connect runs shares it, and awaits it to
   its end whatever its signal says: the connect is a send on the instance's connection, so a call
-  whose session ended still waits for it, and the instance's close comes after it (no logoff under
-  it). A login inside it ends with the session: its party is the call's signal. A connect that
+  whose session ended still waits for it; the instance's close and the shutdown do not — they log
+  the connection off under it. A login inside it ends with the session: its party is the call's signal. A connect that
   succeeds is the instance's connection: kept, used by the next call, and closed only by the
   instance's terminal close.
 - **Nothing in the chain takes a signal.** connection 16, interfaces-adt-connection 3,
@@ -85,8 +85,9 @@ same way.
    must chain the previous one. The
    call is registered at its entry, before any connection is built, in the one process-wide
    registry of live tools (`src/lib/activeTools.ts`: `activeTools()`, `settled(instance?)`,
-   `latch(instance?)`, `pending()`), with its instance. The registry aborts nothing: a started
-   tool runs to its end, and a shutdown or an instance close awaits its settlement. Once the
+   `latch(instance?)`, `interrupt(instance?)`, `pending()`), with its instance and its
+   controller. A client's cancel aborts nothing; the instance close and the process shutdown
+   interrupt the call (`interrupt`) in the tick they log its connections off. Once the
    process or the instance is latched, the call is refused right there — the shutdown refusal
    (`interactive-login` `aborted`, "The server is shutting down."), no connection, no handler.
    The call runs as its instance's (`runAsOwner`): a connection it opens is that instance's.
@@ -133,20 +134,26 @@ Ending an instance has two parts, kept apart:
   callable again, each call retrying what the state could not undo. It closes no connection.
 - **The terminal close** — `terminalClose()` (lib's `closeOwnedConnections(instance)`): the
   `disconnect()` of every connection the instance owns, each once, a failure logged in fixed
-  words. Every terminal disposal runs it after the undo was tried, **never conditional on the undo
-  succeeding**: a failed undo is reported, never a reason to keep a session — or a lock — open.
+  words; it waits for no request in flight. The pool and the idle bound run it after the undo was
+  tried, **never conditional on the undo succeeding**: a failed undo is reported, never a reason to
+  keep a session — or a lock — open.
 
 **The instance close** (`closeInstance(instance)`, `src/lib/instanceClose.ts`; on the embeddable
-entry, for an embedder closing its own instance), one promise per
-instance: `latch(instance)` in the tick it begins; await `settled(instance)` (none aborted); the
-state undo; the terminal close, whatever the undo answered; the MCP server and its transport
-closed. An SSE close, SSE's shutdown and core's shutdown use it; the pool runs the undo and the
-terminal close when an instance leaves it.
+entry, for an embedder whose client closed), one promise per instance, for a client that closed
+its connection: in the tick it begins `latch(instance)`, the terminal close and
+`interrupt(instance)` — every connection logged off under any request in flight, every call of
+the instance interrupted (a queued one never starts), no running tool awaited, no state undo
+sent (the logoff ends the state) —; then `letGoOfState()` (no idle bound any more) and the MCP
+server and its transport closed. An SSE close uses it; the pool runs the undo and the terminal
+close when an instance leaves it.
 
-**The forced close** (`forceClose()`): the logoff of every connection the process owns, joined
-where one is under way, awaiting nothing that waits on a tool, a request, an instance close or a
-state undo. It does await each logoff to its **write** (connection 16's `disconnect()`): a write
-that never completes keeps the process until it is killed (`SIGKILL`). The launchers use it for both escapes (a second signal, `--shutdown-timeout`) and for
+**The process's logoffs** (`logOffAtOnce()`, lib's `shutdownSequence.ts`): `forceClose()` — the
+logoff of every connection the process owns, background runs' included, joined where one is under
+way — and `interrupt()` of every live call, in one tick. Every launcher's shutdown begins with it
+(stdio's on the end of stdin too): nothing waits for a running tool. It does await each logoff to
+its **write** (connection 16's `disconnect()`): a write that never completes keeps the process
+until it is killed (`SIGKILL`). **The forced close** (`forceClose()` again, without waiting for
+the sequence's last steps) serves both escapes (a second signal, `--shutdown-timeout`) and
 a crash outside a tool (`uncaughtException`, `unhandledRejection`, registered beside the signals
 in lib's `shutdownSequence.ts`): one fixed-words line naming the failure by its class, exit `1`; a
 crash during a shutdown forces it, and a second crash joins the forced close under way. A killed
@@ -167,7 +174,8 @@ answer that names no user `system_without_user` — `requiringUser`: not a valid
 this server —, a chain failure as it is, else `system_lookup_failed`), the tool not run, nothing
 failed kept, so the next call asks again. The lookup is awaited to its end whatever the call's
 signal says: the call's turn and its tracking last until it settled, so the next request on the
-connection waits for it and the instance's close logs nothing off under it. A replacement of a connection of the same credential keeps the answer
+connection waits for it; the instance's close and the shutdown do not wait for it — they log the
+connection off under it. A replacement of a connection of the same credential keeps the answer
 (`buildConnection(…, known)`). The wrapper reads it (`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
 outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
 handlers as `HandlerContext.onMainConnection(send)` — directly from a call that holds the flow, on
@@ -185,7 +193,8 @@ replaced (`forgetCallers`), and an answer asked on a connection replaced meanwhi
 kept. The leftover tools ask nothing of SAP: their caller is the instance's destination. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
 reaches its tool. An embedder's own registry that is not a `CompositeHandlersRegistry`
 (`registerAllTools(trackingRegistrations())`) gets no main-flow queue: its tools take no place in
-the flow. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the flow, a queued call
+the flow. The instance close and the process shutdown interrupt every call — the queued ones
+leave without sending — and log the connection off at once, under the running call. Once in the flow, a queued call
 checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives
 the spent connection back (`connectionReleased`) and takes the replacement (`getConnection`)
 before its tool runs, so only the call that met the loss fails; it is not replayed.
@@ -313,9 +322,10 @@ their answers are kept is the host's: a strategy.
   `background: true` instead of running in the foreground.
 - **Its ends.** Owned by the strategy, the connection is not reached by any instance's terminal
   close (an HTTP request's instance ends with its request; the run goes on). Registered under its
-  instance, the run is awaited by `settled()` (every launcher's orderly shutdown) and
-  `settled(instance)` (`closeInstance`: an SSE close, stdio's shutdown) — as a running tool; the
-  forced close (`forceClose`, process-wide) logs it off at once, which cuts it, and names it.
+  instance, it is neither awaited nor cut by `closeInstance` (an SSE close): its answer stays
+  reachable through the strategy. The process's logoffs (`logOffAtOnce` → `forceClose`,
+  process-wide: every launcher's shutdown, stdio's client close) log it off at once, which cuts it;
+  the forced close names it.
 - **The tools** (`GetBackgroundRun` / `ListBackgroundRuns` / `DiscardBackgroundRun`; compact
   `HandlerBackgroundRun{Get,List,Discard}`) are `connectionless` entries beside the run tools —
   the full set's `readonly` (with the system group, in `HandlerExporter` too), compact's `rw` —
@@ -361,11 +371,15 @@ await server.start(); // standalone, or registers its routes on `app` (registerR
   close. One whose undo failed is kept for a retry (it has not left); when it leaves, the terminal
   close runs whatever the retry answered. After the idle bound's stop a pooled instance's
   connections are closed even when the undo failed.
-- **Shutdown** (`beginShutdown()`, `stopListening()`, `lastStep()`, driven by lib's
+- **A dropped request** closes nothing: its tool runs to its end, and its instance leaves the pool
+  as above (after its work when it holds nothing; a pooled instance at its state's end).
+- **Shutdown** (`beginShutdown()`, `stopListening()`, `releaseConnections()`, driven by lib's
   `installTransportShutdown`): the pool stops admitting (`503`) in the latch's tick, the listener
-  closes, every registered tool settles, then the pool's shutdown disposes and logs off every
-  instance and reports what could not be undone, each instance by its ordinal. `stop()` is the same
-  for an embedder, without the wait on the tools.
+  closes, every connection of the process is logged off at once and every running tool
+  interrupted (`logOffAtOnce`; no state undo, no tool awaited), then the client connections left
+  are closed; exit `0`. `stop()`, for an embedder, is the pool's own shutdown instead: the
+  requests awaited, every instance's state undone, then logged off, what could not be undone
+  reported by ordinal.
 
 ### SseServer (`@mcp-abap-adt/sse`)
 
@@ -382,11 +396,14 @@ await server.start();
   are answered `400`.
 - **Closing a connection.** One cleanup per connection, installed before the first setup await:
   the response's `close`, the stream's failure and a rejected `connect` all reach it. The session
-  leaves the routing map first; then the instance close (above) — its tools awaited, its state
-  undone, its connections logged off, its MCP server and stream closed. An instance whose
-  connection closed during setup is never routed to.
-- **Shutdown** (`stopListening()`, `lastStep()`): after every registered tool settled, the instance
-  close of every connection, joined where one is already closing.
+  leaves the routing map first; then the instance close (above), as stdio's client close — its
+  connections logged off at once, its calls interrupted (no tool awaited, no state undo), its
+  state let go, its MCP server and stream closed. An instance whose connection closed during setup
+  is never routed to.
+- **Shutdown** (`stopListening()`, `releaseConnections()`): every connection of the process
+  logged off at once and every running tool interrupted (`logOffAtOnce`), then every stream
+  ended. `stop()`, for an embedder: the instance close of every connection, joined where one is
+  already closing.
 
 ### EmbeddableMcpServer (`@mcp-abap-adt/lib`): the consumer's connection
 

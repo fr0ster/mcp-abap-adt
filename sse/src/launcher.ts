@@ -165,7 +165,7 @@ export async function launch(
   });
   installTransportShutdown({
     stopListening: () => server.stopListening(),
-    lastStep: () => server.lastStep(),
+    release: () => server.releaseConnections(),
     shutdownTimeoutMs:
       config.shutdownTimeout === undefined
         ? undefined

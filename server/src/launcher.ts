@@ -694,8 +694,9 @@ export async function launch(
     },
   );
   activeServer = server;
-  // The shutdown (D33): latch, the tools settle, the instance close with its
-  // logoffs, then the gate, the logins, the drain and the flush.
+  // The shutdown (D33) — a signal, or the client closing stdin: latch, every
+  // owned connection logged off at once and the running tools interrupted,
+  // the MCP server closed, then the gate, the logins, the drain and the flush.
   installShutdown({
     factory,
     instance: server,

@@ -370,6 +370,15 @@ export abstract class BaseMcpServer extends McpServer {
     return closeOwnedConnections(this, ['state']);
   }
 
+  /**
+   * The state let go after this instance's connections were logged off (the
+   * instance close, `closeInstance`): the idle bound never arms again, and
+   * nothing is undone — the logoff ended in SAP what the state held.
+   */
+  letGoOfState(): void {
+    this.state.letGo();
+  }
+
   /** Dispose, settle, once more, settle — what a host awaits before letting the instance go; answers what is left. */
   shutdownState(): Promise<string[]> {
     return this.state.shutdown();
@@ -489,9 +498,10 @@ export abstract class BaseMcpServer extends McpServer {
     let connection: AbapConnection;
     try {
       // Awaited whatever the signal says: the connect is a send on the
-      // instance's connection, and a session that ends meanwhile still
-      // waits for it (no logoff under it). A login inside it ends with the
-      // session: its party is the call's signal.
+      // instance's connection. The instance close and the process shutdown
+      // do not wait for it: they log the connection off at once, under it.
+      // A login inside it ends with the session: its party is the call's
+      // signal.
       connection = await held.connection;
     } catch (error) {
       this.release(held);
@@ -508,10 +518,11 @@ export abstract class BaseMcpServer extends McpServer {
    * before it has left; no timeout on the wait. A client's cancel aborts
    * nothing (`trackCall`): the call keeps its place. A call whose session
    * ended while it waits (its signal aborted) leaves the queue at once — its
-   * place passes on, and it ends without reaching its tool (D5). A shutdown
-   * or an instance close aborts no call (D55): it waits for the running call
-   * and every queued one to run to their end; only an SSE close, whose
-   * transport closing ends the session, makes the queued calls leave.
+   * place passes on, and it ends without reaching its tool (D5). The process
+   * shutdown (stdio's client close included) interrupts every call — the
+   * queued ones leave without sending — and logs the connector off at once,
+   * under the running call (`logOffAtOnce`); an SSE close ends the session,
+   * so its queued calls leave too.
    */
   private enterMainFlow(signal: AbortSignal): Promise<() => void> {
     const before = this.mainFlow;
@@ -1591,10 +1602,11 @@ export abstract class BaseMcpServer extends McpServer {
    * party it attached only then). A tool call cannot be cancelled: the
    * request's `extra.signal`, which the SDK also aborts for a client's
    * `notifications/cancelled`, is not read — the call runs to its end (the
-   * SDK then sends no answer to a cancelled request). Nothing else aborts it: the
-   * registry of live calls, where the call is registered here before
-   * anything else, keeps its settlement for the shutdown and the instance
-   * close to await (D55). Once the process or this instance is latched, the
+   * SDK then sends no answer to a cancelled request). The registry of live
+   * calls, where the call is registered here before anything else, keeps
+   * its controller: the instance close (`closeInstance`) and the process
+   * shutdown (`logOffAtOnce`) abort it — the call is interrupted, its
+   * connections logged off at once. Once the process or this instance is latched, the
    * call is refused here — the shutdown refusal, before any connection or
    * handler (§6.4).
    *

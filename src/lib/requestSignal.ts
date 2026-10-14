@@ -8,13 +8,16 @@
  * the handler inside `runWithRequestSignal(signal, …)`. It is for the
  * server's own waits (D32) and D5's check only: a tool's sends carry no
  * request signal — nothing sent to SAP carries it, and no `freshConnection`
- * factory receives it (D55, D56). Nothing reads it to abort a running tool:
- * a started tool runs to its end, and a shutdown awaits it.
+ * factory receives it (D55, D56). Nothing reads it to abort a request on
+ * the wire: a client's close and the process shutdown end a running tool by
+ * the logoff of its connections, sent at once (`closeInstance`,
+ * `logOffAtOnce`), and abort this signal beside it, so its waits end.
  *
  * Also here: what a request whose signal aborted ends with, and the race a
  * server's own wait that sends nothing runs against the request's signal
- * (D32). The signal aborts at the end of the call's session, never at a
- * client's cancel: a tool call cannot be cancelled (`BaseMcpServer`).
+ * (D32). The signal aborts at the end of the call's session, at the
+ * instance close and at the process shutdown — never at a client's cancel:
+ * a tool call cannot be cancelled (`BaseMcpServer`).
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';

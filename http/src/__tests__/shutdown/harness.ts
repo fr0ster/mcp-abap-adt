@@ -96,7 +96,7 @@ export async function httpStand(
   installTransportShutdown({
     begin: () => mcp.beginShutdown(),
     stopListening: () => mcp.stopListening(),
-    lastStep: () => mcp.lastStep(),
+    release: () => mcp.releaseConnections(),
     exit: (code) => {
       exits.push(code);
       exitedWith(code);

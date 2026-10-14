@@ -418,41 +418,29 @@ export class StreamableHttpServer extends BaseMcpServer {
   }
 
   /**
-   * After the last step nothing is answered any more: the connections still
-   * open on the stopped listener (a client's idle keep-alive) are closed, so
-   * none keeps the process alive.
+   * The launcher's shutdown, after the logoffs (lib's
+   * `installTransportShutdown`), and `stop()`: nothing is answered any more —
+   * the connections still open on the stopped listener (a request whose tool
+   * was interrupted, a client's idle keep-alive) are closed, so none keeps
+   * the process alive.
    */
-  private closeLeftConnections(): void {
+  releaseConnections(): void {
     this.stoppedListener?.closeAllConnections();
     this.stoppedListener = undefined;
   }
 
   /**
-   * The shutdown's last step, after every registered tool settled (D33,
-   * ruling 16): the pool's own shutdown — the requests and disposals still
-   * running awaited, every held or retained instance disposed, retried once,
-   * and closed with a logoff whatever its undo answered — answering one line
-   * per leftover, each instance by its ordinal, never its handle.
-   */
-  async lastStep(): Promise<string[]> {
-    const failures = await this.pool.shutdown();
-    this.closeLeftConnections();
-    return failures.map(
-      (failure) => `[MCP] State not undone at shutdown: ${failure}`,
-    );
-  }
-
-  /**
    * For a host that stops the server itself (embedded): admission stops, the
    * listener closes, then the pool's shutdown (no timer). Rejects with what
-   * could not be undone. A launcher's shutdown awaits every registered tool
-   * between the two (lib's `installTransportShutdown`).
+   * could not be undone. A launcher's shutdown does not run this: it logs
+   * every owned connection off at once and interrupts the running tools
+   * (lib's `installTransportShutdown`).
    */
   async stop(): Promise<void> {
     this.beginShutdown();
     this.stopListening();
     const failures = await this.pool.shutdown();
-    this.closeLeftConnections();
+    this.releaseConnections();
     if (failures.length) {
       throw new Error(`state cleanup failed: ${failures.join('; ')}`);
     }

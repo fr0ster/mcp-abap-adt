@@ -3,7 +3,7 @@
     "file": "src/embeddable/BaseMcpServer.ts",
     "function": "BaseMcpServer.getConnection",
     "site": "createAbapConnection",
-    "end": "the instance's terminal close (closeOwnedConnections): stdio at exit, an SSE close, the pool's eviction, shutdown; replaced on a new credential where the credential is the request's (http, sse) — stdio's source answers the same provider for the process's life (D13) — or once SAP lost its session (D56), then ended when no call works on it any more; a failed connect() ends at once",
+    "end": "the instance's terminal close (closeOwnedConnections) \u2014 at once, under any request in flight, when the client closes (stdio's stdin, an SSE stream) and at the process shutdown (forceClose); after the undo at the pool's eviction \u2014; replaced on a new credential where the credential is the request's (http, sse) \u2014 stdio's source answers the same provider for the process's life (D13) \u2014 or once SAP lost its session (D56), then ended when no call works on it any more; a failed connect() ends at once",
     "why": "the instance's own connection (role 'built'), recorded as its own before connect(); a connect that completed after its callers cancelled is kept and ends here too (D32/D56, RF1)"
   },
   {
@@ -73,8 +73,8 @@
     "file": "src/lib/backgroundRuns/run.ts",
     "function": "startBackgroundRun",
     "site": "openFreshConnection",
-    "end": "once SAP answered the run: closeQuietly (endConnection), then the answer handed to the strategy; a start refused after it opened (the caller's limit, a strategy that threw) ends it at once; owned by the strategy (role background), so no instance's terminal close cuts it \u2014 the orderly shutdown and its instance's close wait for the run (activeTools), the forced close ends it at once",
-    "why": "a background run's own stateless connection, from the call's start until SAP's answer: the run is never cut by the call's end, an HTTP request's instance leaving, or an instance close"
+    "end": "once SAP answered the run: closeQuietly (endConnection), then the answer handed to the strategy; a start refused after it opened (the caller's limit, a strategy that threw) ends it at once; owned by the strategy (role background), so no instance's terminal close cuts it, and an instance close does not wait for it \u2014 the process's logoffs (forceClose: stdio's client close, a signal) end it at once, under its request",
+    "why": "a background run's own stateless connection, from the call's start until SAP's answer: the run is never cut by the call's end, an HTTP request's instance leaving, or an instance close; only the process's end cuts it"
   },
   {
     "file": "src/lib/connectionFactory.ts",
@@ -122,14 +122,14 @@
     "file": "src/lib/debugger/DebuggerInstance.ts",
     "function": "createDebuggerInstance",
     "site": "liveAmdpPorts",
-    "end": "AMDP's stop (closeConnection = endConnection), the idle bound's stop, the host's stop (shutdownState), dispose(); the terminal close for any left",
+    "end": "AMDP's stop (closeConnection = endConnection), the idle bound's stop, the pool's undo (dispose()); the terminal close for any left \u2014 at once, with no stop, when the client closes or the process ends",
     "why": "the AMDP session's own connections, opened by the port's openStateful (role state)"
   },
   {
     "file": "src/lib/debugger/DebuggerInstance.ts",
     "function": "createDebuggerInstance",
     "site": "liveDebugPorts",
-    "end": "the debug session's stop (closeConnection / dropConnection = endConnection), the idle bound's stop, the host's stop (shutdownState), dispose(); the terminal close for any left",
+    "end": "the debug session's stop (closeConnection / dropConnection = endConnection), the idle bound's stop, the pool's undo (dispose()); the terminal close for any left \u2014 at once, with no stop, when the client closes or the process ends",
     "why": "the debug session's own connections, opened by the port's openStateful (role state)"
   },
   {
@@ -143,14 +143,14 @@
     "file": "src/lib/debugger/ports.ts",
     "function": "openStateful",
     "site": "openFreshConnection",
-    "end": "the session's stop, the idle bound's stop, the host's stop and dispose() (closeOwn = endConnection); the instance's terminal close for one still open",
+    "end": "the session's stop, the idle bound's stop, the host's stop and dispose() (closeOwn = endConnection); the instance's terminal close for one still open \u2014 at once, with no stop, when the client closes or the process ends",
     "why": "held state's own stateful connection, recorded with role state"
   },
   {
     "file": "src/lib/longCall.ts",
     "function": "runLongCall",
     "site": "openFreshConnection",
-    "end": "when its timeout cuts the read: endConnection at once, under the request; otherwise once the call's work settled: closeQuietly (endConnection) on success and failure; the instance's terminal close and the forced close end one still open",
+    "end": "when its timeout cuts the read: endConnection at once, under the request; otherwise once the call's work settled: closeQuietly (endConnection) on success and failure; the instance's terminal close (at once on the client's close) and the process's logoffs (at once at shutdown) end one still open, under its read",
     "why": "a listed long tool's own stateless connection for one read (spec \u00a75.8), role long, recorded as the calling instance's"
   },
   {

@@ -68,22 +68,24 @@ new in 19.0.0, `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` (see [Shutdown](#sh
 
 ## A closed connection disposes its instance
 
-When an SSE connection closes — or fails while it is being set up — its session leaves the
-routing map at once (a later `POST` for it is an unknown session) and its instance is closed, in
-order: no call of it starts any more, **its running tools run to their end and are awaited**, its
-held state is undone, its ADT sessions are logged off — whatever the undo answered: the logoff
-releases a lock a tool left —, then its MCP server and stream are closed. What the undo could not
-undo is written on stderr. Another connection's tools and instance are not touched.
+An SSE connection closes as a stdio client's transport does: it is one long stream with the
+credentials of its opening `GET`, one instance per stream. When it closes — or fails while it is
+being set up — its session leaves the routing map at once (a later `POST` for it is an unknown
+session) and its instance is closed: no call of it starts any more, **its ADT sessions are logged
+off at once** — its connection, the debugger's, a long read's own; the logoff releases a lock a
+tool holds — and its running tools are interrupted: **nothing waits for a running tool**, a queued
+call never starts, and no state undo is sent (the logoff ends the held state). Then its MCP server
+and stream are closed. Another connection's tools and instance are not touched, and a background
+run it started runs on (the process's end logs it off).
 
 ## Shutdown
 
 On `SIGTERM` / `SIGINT` the server stops listening and takes no new call (a `POST` arriving after
-it is answered "The server is shutting down." and reaches no tool), **waits for every running tool
-to finish** on every connection — none is aborted —, then closes every connection's instance as
-above (one already closing is joined) and ends its stream. It exits `0`, or `1` with one stderr
-line per state that could not be undone. There is no deadline. A second signal, or
-`--shutdown-timeout=<seconds>` (no default), forces it: nothing more is waited for, every ADT
-session is still logged off, exit `1` naming the requests still running.
+it is answered "The server is shutting down." and reaches no tool), **logs off every ADT session
+of the process at once** and interrupts the running tools — nothing waits for a running tool —,
+then ends every stream. It exits `0`. There is no deadline. A second signal, or
+`--shutdown-timeout=<seconds>` (no default), matters only while a logoff is still being written:
+exit `1` naming the requests still running.
 
 ## Health
 

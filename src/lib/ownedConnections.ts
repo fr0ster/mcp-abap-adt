@@ -16,10 +16,16 @@
  *
  * - **the terminal close** (`closeOwnedConnections(instance)`): every
  *   connection the instance owns — the one it built, held state's own,
- *   package lock sessions, fresh connections still open — run by every
- *   terminal disposal after the state undo, whatever the undo answered;
- * - **the forced close** (`forceClose()`): every connection the process
- *   owns, awaiting nothing that waits on a tool, a request or a state undo;
+ *   package lock sessions, fresh connections still open. The instance close
+ *   (`closeInstance`: an SSE stream that closed, an embedder's close) runs
+ *   it at once, under the requests in flight, without a state undo; the
+ *   pool's eviction and the idle bound run it after their undo, whatever
+ *   the undo answered;
+ * - **the process's logoffs** (`forceClose()`): every connection the
+ *   process owns, the background runs' included, awaiting nothing that
+ *   waits on a tool, a request or a state undo — the process shutdown
+ *   (stdio's client close included) runs it at once (`logOffAtOnce`), and
+ *   the forced close again;
  * - each site's own end (a fresh connection when its operation ends, a lock
  *   session at its unlock, the debugger's at its stop).
  *
@@ -45,8 +51,8 @@ export type ConnectionRole =
   | 'long'
   /**
    * A background run's own, until SAP answers (`startBackgroundRun`): owned
-   * by the host's strategy, not an instance — no terminal close cuts it; the
-   * forced close does.
+   * by the host's strategy, not an instance — no instance's terminal close
+   * cuts it; the process's logoffs (`forceClose`) do.
    */
   | 'background';
 
@@ -212,9 +218,11 @@ export function ownedConnections(
 /**
  * **The terminal close** (spec §6.4, D51, D55): `disconnect()` of every
  * connection `instance` owns — or only those of `roles` — each once; a
- * failure logged in fixed words. Never conditional on the state undo: every
- * terminal disposal runs it after the undo was tried, whatever it answered.
- * An injected connection was never recorded, so it is never closed.
+ * failure logged in fixed words. Never conditional on a state undo: the
+ * instance close runs it with none, the pool and the idle bound after
+ * theirs, whatever it answered. Resolves once each logoff is written; it
+ * waits for no request in flight. An injected connection was never
+ * recorded, so it is never closed.
  */
 export async function closeOwnedConnections(
   instance: object,
@@ -228,10 +236,11 @@ export async function closeOwnedConnections(
 }
 
 /**
- * **The forced close** (spec §6.4): the logoff of every connection the
+ * **The process's logoffs** (spec §6.4): the logoff of every connection the
  * process owns, each `disconnect()` joined if one is already under way. It
  * awaits nothing that waits on a tool, a request, an instance close or a
- * state undo — only each logoff's write (connection 16).
+ * state undo — only each logoff's write (connection 16). The process
+ * shutdown runs it at once (`logOffAtOnce`), the forced close again.
  */
 export async function forceClose(): Promise<void> {
   const owned_ = ownedConnections().map((connection) =>

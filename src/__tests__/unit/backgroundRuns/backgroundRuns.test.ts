@@ -14,7 +14,6 @@ import {
   activeTools,
   pending,
   resetProcessLatchForTests,
-  settled,
 } from '../../../lib/activeTools';
 import {
   BACKGROUND_RUN_NOT_AVAILABLE_WORDS,
@@ -24,6 +23,7 @@ import {
 } from '../../../lib/auth/serverRefusal';
 import { closeInstance } from '../../../lib/instanceClose';
 import { forceClose } from '../../../lib/ownedConnections';
+import { logOffAtOnce } from '../../../lib/shutdownSequence';
 import { isLogoff } from '../../helpers/adtStandIn';
 import {
   type BackgroundStand,
@@ -453,34 +453,23 @@ describe('without a strategy', () => {
 });
 
 describe('the ends', () => {
-  it('the orderly shutdown and the instance close wait for a running background request, then it is logged off after its answer', async () => {
+  it('the instance close neither waits for a running background run nor cuts it (the run is the strategy’s); the process’s logoffs cut it at once', async () => {
     const held = stand.standIn.hold(isClassRun);
     await stand.a.call('RuntimeRunClass', { ...RUN, background: true });
     await held.arrived;
     const session = runSession();
 
-    let processSettled = false;
-    let instanceClosed = false;
-    void settled().then(() => {
-      processSettled = true;
-    });
-    const closing = closeInstance(stand.a.server).then(() => {
-      instanceClosed = true;
-    });
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(processSettled).toBe(false);
-    expect(instanceClosed).toBe(false);
-    expect(logoffIndex(stand.standIn, session)).toBe(-1);
+    // The client closed: the instance closes without waiting for the run.
+    await closeInstance(stand.a.server);
     expect(pending()).toContain('RuntimeRunClass (background)');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(logoffIndex(stand.standIn, session)).toBe(-1);
 
-    held.release();
-    await closing;
-    expect(processSettled).toBe(true);
-    // Its own logoff was written after SAP's answer, before the close
-    // completed; it reaches the system.
+    // The process ends: its logoffs reach the run's own session at once,
+    // under its request still held.
+    await logOffAtOnce();
     await until(() => logoffIndex(stand.standIn, session) > -1);
-    const runAt = stand.standIn.requests.findIndex(isClassRun);
-    expect(logoffIndex(stand.standIn, session)).toBeGreaterThan(runAt);
+    held.release();
   });
 
   it('the forced close logs it off at once, cutting it, and names it', async () => {

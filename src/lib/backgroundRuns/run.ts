@@ -10,12 +10,14 @@
  *   strategy, not by the instance whose call started it: the instance's
  *   terminal close does not cut it (an HTTP request's instance ends with its
  *   request; the run goes on);
- * - **never cut by the server's own ends** — the run is registered in the
+ * - **not cut by its instance's close** — the run is registered in the
  *   registry of live tools (`activeTools`) under the instance whose call
- *   started it, so the orderly shutdown (`settled()`) and that instance's
- *   close (`settled(instance)`) wait for it, as for a running tool; only the
- *   forced close logs its connection off at once, which cuts it (the
- *   user's escape), and names it among what was still running;
+ *   started it, but its connection is the strategy's: an instance close (an
+ *   SSE stream that closed, an HTTP request's instance leaving) neither
+ *   waits for it nor logs it off — its answer stays reachable through the
+ *   host's strategy. The process's end (stdio's client close, a signal)
+ *   logs its connection off at once (`logOffAtOnce`), which cuts it, and the
+ *   forced close names it among what was still running;
  * - **its end** — once SAP answered: the connection is logged off
  *   (`disconnect()`), then the answer is handed to the strategy (`finish`),
  *   then the run leaves the registry. An answer is what the run tool would
@@ -91,7 +93,7 @@ export async function startBackgroundRun(
   const { strategy, tool, logger } = options;
   const now = options.now ?? (() => new Date());
   // Registered before anything is opened: a shutdown that began refuses the
-  // start, and one that begins later waits for the run.
+  // start, and one that begins later names the run if it forces.
   const unregister = registerActiveTool(new AbortController(), {
     instance: options.instance,
     name: `${tool} (background)`,
@@ -101,7 +103,7 @@ export async function startBackgroundRun(
   let connection: IAbapConnection | undefined;
   try {
     // The strategy's connection, not the instance's: no instance's terminal
-    // close reaches it; the forced close does.
+    // close reaches it; the process's logoffs (`forceClose`) do.
     connection = await runAsOwner(strategy, () =>
       openFreshConnection(options.connection, logger),
     );

@@ -1,23 +1,28 @@
 /**
  * The shutdown of a program — core's, http's and sse's launchers (spec §6.4,
- * D33, D55): installed by the launcher only, so an embedder's process is
- * never taken over.
+ * D33): installed by the launcher only, so an embedder's process is never
+ * taken over.
  *
  * **What starts it.** The first trigger — `SIGTERM`, `SIGINT`, and for stdio
- * the end of stdin (`end` and `close` alike: one start, M7) — starts one
- * sequence. In that tick the process latch is set (`latch()`), before
- * anything else: a call arriving from here on is refused before any
- * connection. Then the program's own `begin` (stop listening, stop the pool's
- * admission, stop taking input) and its orderly `run` (await every
- * registered tool — none aborted —, then its last steps). No deadline: the
- * sequence takes as long as its steps do.
+ * the end of stdin (`end` and `close` alike: one start, M7; the client
+ * closed the transport) — starts one sequence. In that tick the process
+ * latch is set (`latch()`), before anything else: a call arriving from here
+ * on is refused before any connection. Then the program's own `begin` (stop
+ * listening, stop the pool's admission, stop taking input) and its orderly
+ * `run`, which begins with **the logoffs at once** (`logOffAtOnce`): every
+ * connection the process owns is logged off — the logoff is what releases
+ * the locks — and every running call is interrupted, in the same tick;
+ * nothing waits for a running tool. A tool's later requests fail against
+ * the ended session, and nobody reads their answer; a queued call never
+ * sends. Then the program's last steps (stdio: the session writes). No
+ * deadline: the sequence takes as long as its steps do.
  *
  * **The forced close.** Only a `SIGTERM` / `SIGINT` after the start, or
  * `--shutdown-timeout` (no default), ends the waiting early: no further wait
- * on a tool, an instance close, a state undo or a flush — every connection
- * the process owns is logged off (`forceClose`, awaited only to each logoff's
- * write), and the exit is `1` with one stderr line per fact still pending:
- * each tool still running, and the step the orderly sequence was in.
+ * on a last step or a flush — every connection the process owns is logged
+ * off (`forceClose`, awaited only to each logoff's write), and the exit is
+ * `1` with one stderr line per fact still pending: each tool still running,
+ * and the step the orderly sequence was in.
  *
  * **A crash outside a tool** (`uncaughtException`, `unhandledRejection`)
  * runs the same forced close, with one fixed-words line naming the failure
@@ -28,9 +33,25 @@
  */
 
 import type { EventEmitter } from 'node:events';
-import { latch, pending } from './activeTools';
+import { interrupt, latch, pending } from './activeTools';
 import { errorClassOf } from './auth/errors';
 import { forceClose } from './ownedConnections';
+
+/**
+ * **The logoffs at once** (the process's end — stdio's client close, a
+ * signal): in one tick, every connection the process owns gets its logoff
+ * (`forceClose`: the main connectors, held state's, the fresh ones of long
+ * reads and lock sessions, the background runs') and every live call is
+ * interrupted (`interrupt`): its signal aborts, a queued call leaves without
+ * sending. Resolves once every logoff is written (connection 17's
+ * `disconnect()` waits for no request in flight and not for SAP's answer);
+ * it waits for no tool.
+ */
+export async function logOffAtOnce(): Promise<void> {
+  const written = forceClose();
+  interrupt();
+  await written;
+}
 
 /** What the shutdown listens on: the process, or a test's stand-in. */
 export type ShutdownProcess = EventEmitter & { stdin?: EventEmitter };

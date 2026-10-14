@@ -36,7 +36,7 @@ afterEach(async () => {
 });
 
 it('the POST body completes after the close: refused, nothing sent, one instance close, no registry entry left', async () => {
-  const shutdownState = jest.spyOn(BaseMcpServer.prototype, 'shutdownState');
+  const letGo = jest.spyOn(BaseMcpServer.prototype, 'letGoOfState');
   const connection = await s.open();
   const late = halfPost(
     s.port,
@@ -48,12 +48,12 @@ it('the POST body completes after the close: refused, nothing sent, one instance
   await late.sent;
   await new Promise((r) => setTimeout(r, 100));
   connection.close();
-  await until(() => shutdownState.mock.calls.length === 1);
+  await until(() => letGo.mock.calls.length === 1);
   const answered = await late.finish();
   expect(answered.status).toBe(400);
   await turns(20);
   expect(s.indexOf(isLockOf('LATE'))).toBe(-1);
-  expect(shutdownState).toHaveBeenCalledTimes(1);
+  expect(letGo).toHaveBeenCalledTimes(1);
   expect(activeTools()).toEqual([]);
 });
 

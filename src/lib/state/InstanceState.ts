@@ -318,6 +318,17 @@ export class InstanceState {
     if (failures.length) throw new StateCleanupError(failures);
   }
 
+  /**
+   * The host let the instance go after its connections were logged off (the
+   * client closed its stream, the process ends): the bound is never armed
+   * again, and nothing is undone — the logoff ended in SAP what the state
+   * held there.
+   */
+  letGo(): void {
+    this.closed = true;
+    this.disarm();
+  }
+
   /** Resolves when nothing is held, or nothing is finishing on its own. */
   settled(): Promise<void> {
     const done = () => !this.holdsState() || !this.pending();

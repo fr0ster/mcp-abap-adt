@@ -116,7 +116,7 @@ export async function sseStand(
   });
   installTransportShutdown({
     stopListening: () => sse.stopListening(),
-    lastStep: () => sse.lastStep(),
+    release: () => sse.releaseConnections(),
     exit: (code) => {
       exits.push(code);
       exitedWith(code);

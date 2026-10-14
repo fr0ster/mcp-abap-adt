@@ -30,11 +30,15 @@ export function fakeProcess() {
   return Object.assign(new EventEmitter(), { stdin: new EventEmitter() });
 }
 
-/** A running tool in the one registry: `end()` settles it. */
-export function runningTool(name = 'UpdateClass', instance?: object) {
-  const remove = registerActiveTool(new AbortController(), { instance, name });
+/** A running tool in the one registry: `end()` settles it; `signal` is its call's. */
+export function runningTool(
+  name = 'UpdateClass',
+  instance?: object,
+): { end: () => void; signal: { readonly aborted: boolean } } {
+  const controller = new AbortController();
+  const remove = registerActiveTool(controller, { instance, name });
   if (remove === undefined) throw new Error('the registry is latched');
-  return { end: remove };
+  return { end: remove, signal: controller.signal };
 }
 
 export interface CoreHarness {
@@ -49,7 +53,6 @@ export interface CoreHarness {
 export function setup(
   options: {
     settle?: () => Promise<SettleReport>;
-    shutdownState?: () => Promise<string[]>;
     shutdownTimeoutMs?: number;
     onStdinEnd?: boolean;
   } = {},
@@ -73,10 +76,6 @@ export function setup(
       },
     },
     instance: {
-      shutdownState: async () => {
-        order.push('undo');
-        return (await options.shutdownState?.()) ?? [];
-      },
       close: async () => {
         order.push('mcp close');
       },

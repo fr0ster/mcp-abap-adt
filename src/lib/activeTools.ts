@@ -4,9 +4,13 @@
  * wrapper's entry — before any connection is acquired or the handler runs —
  * with the server instance it runs in, and removed when the call ends.
  *
- * It aborts nothing (D55): a started tool runs to its end. What it keeps is
- * each call's settlement, so a shutdown and an instance close can await it,
- * and two latches, each set synchronously when its close begins:
+ * It keeps each call's settlement, so an instance close can await it, and
+ * each call's controller, so a process shutdown — stdio's included, which
+ * begins when the client closes the transport — interrupts every running
+ * call at once (`interrupt()`): its signal aborts, its waits end, a queued
+ * call leaves the queue without sending. Nothing else here aborts a call: a
+ * client's cancel aborts nothing. Two latches, each set synchronously when
+ * its close begins:
  *
  * - the process latch (`latch()`), set first by every launcher's shutdown;
  * - an instance's own latch (`latch(instance)`), set first by its close (D51).
@@ -14,8 +18,8 @@
  * Once either is set, `registerActiveTool` refuses — the wrapper answers that
  * request with the shutdown refusal before any connection or handler — so
  * `settled()` waits for a complete set: nothing can be added after the latch.
- * One implementation, used by core's, http's and sse's shutdowns and by sse's
- * connection close; no transport keeps a registry of its own.
+ * One implementation, used by every launcher's shutdown and by an
+ * instance's close; no transport keeps a registry of its own.
  */
 
 import { authError } from '@mcp-abap-adt/auth-errors';
@@ -108,6 +112,23 @@ export async function settled(instance?: object): Promise<void> {
   while (waiting.length > 0) {
     await Promise.all(waiting.map((item) => item.ended));
     waiting = of();
+  }
+}
+
+/**
+ * Interrupts every live call of the process — or of `instance` alone: each
+ * call's signal aborts at once — its waits end, a call queued in its
+ * instance's main flow leaves without sending. It waits for nothing and
+ * removes nothing: each call leaves the registry when it settles. The
+ * process shutdown (`logOffAtOnce`) and an instance's close
+ * (`closeInstance`) run it in the tick their logoffs are sent, after the
+ * latch.
+ */
+export function interrupt(instance?: object): void {
+  for (const item of [...live]) {
+    if (instance === undefined || item.instance === instance) {
+      item.controller.abort();
+    }
   }
 }
 

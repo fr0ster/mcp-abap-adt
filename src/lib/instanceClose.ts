@@ -1,60 +1,58 @@
 /**
  * **The instance close** (spec §6.4, D51): how an instance ends when its
- * consumer let it go — an SSE connection that closed, a launcher's shutdown.
- * One promise per instance; a second caller joins it.
+ * client closed its connection — an SSE stream that closed, an embedder's
+ * own close. One promise per instance; a second caller joins it.
  *
- * In this order:
+ * In this order, nothing waiting for a running tool:
  *
  * 1. `latch(instance)` — synchronous, in the tick the close begins: a call
  *    routed to the instance from here on is refused before any connection;
- * 2. await `settled(instance)` — its calls run to their end, none aborted
- *    (D55; the session's end — the server's `onclose`, when the transport
- *    closes — aborts their signals, which ends only their waits);
- * 3. `shutdownState()` — the state undo (main's), its leftovers answered;
- * 4. **the terminal close**, whatever the undo answered — every connection
- *    the instance owns closed with a logoff;
- * 5. the MCP server and its transport closed, awaited.
+ * 2. in the same tick, **the logoffs at once** — every connection the
+ *    instance owns (its connector, held state's — the debugger's —, long
+ *    reads' and lock sessions' fresh ones) gets its logoff, which releases
+ *    the locks — and **every call of the instance is interrupted**: its
+ *    signal aborts, a call queued in its main flow leaves without sending.
+ *    A running tool's later requests fail against the ended session, and
+ *    nobody reads their answer. Awaited only to each logoff's write;
+ * 3. the state let go (`letGoOfState`): no idle bound any more, nothing
+ *    undone — the logoff ended in SAP what the state held;
+ * 4. the MCP server and its transport closed, awaited.
  *
- * The forced close (`forceClose`) awaits none of this.
+ * A background run is not the instance's (its connection is the host
+ * strategy's): it runs on until SAP answers; the process's end logs it off.
  */
 
-import { latch, settled } from './activeTools';
+import { interrupt, latch } from './activeTools';
 import { closeOwnedConnections } from './ownedConnections';
 
 /** What the instance close drives: `BaseMcpServer`, seen structurally. */
 export interface ClosableInstance {
-  shutdownState(): Promise<string[]>;
+  /** The state let go after the logoffs: no bound, nothing undone. */
+  letGoOfState(): void;
   close(): Promise<void>;
 }
 
-const closes = new WeakMap<object, Promise<string[]>>();
+const closes = new WeakMap<object, Promise<void>>();
 
-/** The words of a state undo that threw instead of answering. */
-const UNDO_THREW = 'the state could not be shut down';
-
-/**
- * Closes `instance` (see above) and answers what its state undo could not
- * undo; never rejects. A second call joins the first.
- */
-export function closeInstance(instance: ClosableInstance): Promise<string[]> {
+/** Closes `instance` (see above); never rejects. A second call joins the first. */
+export function closeInstance(instance: ClosableInstance): Promise<void> {
   const running = closes.get(instance);
   if (running) return running;
   latch(instance);
+  const written = closeOwnedConnections(instance);
+  interrupt(instance);
   const closing = (async () => {
-    await settled(instance);
-    let left: string[];
+    await written;
     try {
-      left = await instance.shutdownState();
+      instance.letGoOfState();
     } catch {
-      left = [UNDO_THREW];
+      // Letting go changes nothing in SAP: the logoffs are written.
     }
-    await closeOwnedConnections(instance);
     try {
       await instance.close();
     } catch {
       // The MCP server's own close: its transport is gone either way.
     }
-    return left;
   })();
   closes.set(instance, closing);
   return closing;

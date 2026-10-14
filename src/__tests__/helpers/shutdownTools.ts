@@ -11,7 +11,9 @@
  * - `HoldState { id }`: held state with a connection of its own (opened
  *   fresh, recorded as the state's), whose undo sends a debugger stop on it —
  *   refused while the stand-in refuses `/debugger/stop`; answers the handle;
- * - `StopState { state_handle }`: the state's stop tool — a complete stop.
+ * - `StopState { state_handle }`: the state's stop tool — a complete stop;
+ * - `LongRead { id }`: a long read's shape — a fresh connection of its own
+ *   (role `long`, the calling instance's), one `GET` on it, then its end.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -26,6 +28,7 @@ export const updateUrl = (id: string) => `${classUrl(id)}/source/main`;
 export const unlockUrl = (id: string) => `${classUrl(id)}?_action=UNLOCK`;
 export const listenUrl = (id: string) => `/sap/bc/adt/debugger/listen/${id}`;
 export const stopUrl = (id: string) => `/sap/bc/adt/debugger/stop/${id}`;
+export const longReadUrl = (id: string) => `/sap/bc/adt/longread/${id}`;
 
 /** Whether the stand-in's `url` is the `UNLOCK` of `id` (and so on). */
 export const isUnlockOf = (id: string) => (url: string) =>
@@ -131,6 +134,17 @@ export function shutdownTools(): HandlerEntry[] {
       await send(own_, 'GET', listenUrl(id));
       ctx.state.attach(new HeldDebugState(id, own_));
       return text(ctx.state.handle);
+    }),
+    entry('LongRead', { id: { type: 'string' } }, async (ctx, args) => {
+      const id = args.id ?? '';
+      const own_ = await openFreshConnection(ctx.connection, undefined);
+      own(own_, { role: 'long' });
+      try {
+        await send(own_, 'GET', longReadUrl(id));
+      } finally {
+        await endConnection(own_);
+      }
+      return text(id);
     }),
     entry(
       'StopState',

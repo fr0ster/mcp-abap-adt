@@ -1,17 +1,20 @@
 /**
- * The admission latch, sse (spec §6.4, §14.5): a `POST` admitted before the
- * latch whose body completes after it reaches no tool — it is answered with
- * the shutdown refusal on the stream, no request of it reaches the stand-in
- * — while another tool's held `UNLOCK` still lands before exit. (Full and
+ * The admission latch, sse (spec §6.4, §14.5): `POST`s admitted before the
+ * latch whose bodies complete after it reach no tool — no request of them
+ * reaches the stand-in, no connection is built for them — while another
+ * tool, its update held, is interrupted and not awaited: its session is
+ * logged off at once, exit `0`, its `UNLOCK` never lands. (The answer a
+ * latched call gets: `closeDuringPost.test.ts` and core's suite. Full and
  * compact: the A7 parity suite.)
  */
 
-import { SHUTDOWN_SENTENCE } from '@mcp-abap-adt/lib/state';
 import {
   isLockOf,
   isUnlockOf,
+  isUpdateOf,
 } from '../../../../src/__tests__/helpers/shutdownTools';
-import { halfPost, type SseStand, sseStand, turns } from './harness';
+import { activeTools } from '../../../../src/lib/activeTools';
+import { halfPost, type SseStand, sseStand, turns, until } from './harness';
 
 jest.setTimeout(30_000);
 
@@ -28,9 +31,9 @@ afterEach(async () => {
   errorSpy.mockRestore();
 });
 
-it('a POST whose body completes after SIGTERM reaches no tool; the held UNLOCK lands; exit 0', async () => {
+it('POSTs whose bodies complete after SIGTERM reach no tool; the running tool is not awaited; exit 0', async () => {
   const connection = await s.open();
-  const hold = s.standIn.hold((r) => isUnlockOf('A')(r.url));
+  const hold = s.standIn.hold((r) => isUpdateOf('A')(r.url));
   await connection.call('LockedUpdate', { id: 'A' }, 1);
   await hold.arrived;
   // A second connection, open but with no call yet: no connection of its
@@ -56,24 +59,16 @@ it('a POST whose body completes after SIGTERM reaches no tool; the held UNLOCK l
   await late.sent;
   await new Promise((r) => setTimeout(r, 100));
   s.processLike.emit('SIGTERM');
-  await turns(10);
-  expect((await late.finish()).status).toBe(202);
-  const refused = await connection.answer(2);
-  expect(refused.isError).toBe(true);
-  expect(JSON.parse(refused.text)).toMatchObject({
-    error: 'authentication_failed',
-    kind: 'interactive-login',
-    server: SHUTDOWN_SENTENCE,
-  });
-  expect(s.indexOf(isLockOf('LATE'))).toBe(-1);
-  // On the fresh connection too: refused before any connection is acquired.
-  expect((await lateOnFresh.finish()).status).toBe(202);
-  expect((await fresh.answer(1)).isError).toBe(true);
-  expect(s.indexOf(isLockOf('FRESH'))).toBe(-1);
-  expect(s.connects()).toBe(connects);
+  void late.finish().catch(() => undefined);
+  void lateOnFresh.finish().catch(() => undefined);
+  expect(await s.exited).toBe(0);
+  await until(() => s.standIn.logoffs() === connects);
 
   hold.release();
-  expect(await connection.answer(1)).toEqual({ text: 'A', isError: false });
-  expect(await s.exited).toBe(0);
-  expect(s.indexOf(isUnlockOf('A'))).toBeGreaterThan(0);
+  await until(() => activeTools().length === 0);
+  await turns(20);
+  expect(s.indexOf(isLockOf('LATE'))).toBe(-1);
+  expect(s.indexOf(isLockOf('FRESH'))).toBe(-1);
+  expect(s.connects()).toBe(connects);
+  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
 });

@@ -43,7 +43,8 @@ export interface EmbeddableMcpServerOptions {
    * RFC CreatePackage / LockPackage, DeletePackage with force_new_connection
    * (and a debug session's own connections). The connection is built by you,
    * with its credential. The factory receives no signal: a fresh connection
-   * is made inside a started tool, which runs to its end. A package lock's
+   * is made inside a started tool, and the server ends it with a logoff (at
+   * the latest when the client closes or the process ends). A package lock's
    * and a debug session's connection outlive the request that opened them.
    * Once returned it is the server's: the server
    * connects it (`connect()`), holds it for the operation (or under the

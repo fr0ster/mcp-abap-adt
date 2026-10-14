@@ -78,19 +78,21 @@ An instance logs off every ADT session it opened when it leaves the pool: a requ
 after its request, when it holds nothing; a pooled instance when its state ends (its stop tool,
 the idle bound). An instance whose state undo fails is kept for a retry — it has not left, and its
 sessions stay open — until a later undo succeeds or the server shuts down, where its sessions are
-logged off whatever the undo answered. (After the idle bound's stop a pooled instance's sessions
-are logged off even when the undo failed.) The logoff is what releases a lock a tool left.
+logged off at once. (After the idle bound's stop a pooled instance's sessions are logged off even
+when the undo failed.) The logoff is what releases a lock a tool left. A client that drops its
+request closes nothing: the request's tool runs to its end, and its instance leaves the pool as
+above — after its work when it holds nothing, at its state's end when it holds state.
 
 ## Shutdown
 
 On `SIGTERM` / `SIGINT` the server stops taking requests (`503`, *the server is shutting down*;
-a call already accepted whose body arrives later reaches no tool), stops listening, **waits for
-every running tool to finish** on every instance — none is aborted, so a write still sends its
-`UNLOCK` —, then disposes the pool's instances and logs off their sessions. It exits `0`, or `1`
-with one stderr line per instance whose state could not be undone (named by its ordinal, never its
-handle). There is no deadline. A second signal, or `--shutdown-timeout=<seconds>` (no default),
-forces it: nothing more is waited for, every session is still logged off, exit `1` naming the
-requests still running.
+a call already accepted whose body arrives later reaches no tool), stops listening, **logs off
+every ADT session of every instance at once** — pooled instances and their held state's included;
+no state undo is sent, the logoff ends the state — and interrupts the running tools: **nothing
+waits for a running tool**, and a write whose `UNLOCK` was still to come never sends it (the
+logoff releases its lock). It exits `0`. There is no deadline. A second signal, or
+`--shutdown-timeout=<seconds>` (no default), matters only while a logoff is still being written:
+exit `1` naming the requests still running.
 
 ## Health
 
@@ -103,5 +105,6 @@ credentials.
 the routes on your own Express (or CAP) application instead of listening itself. `main({ program,
 version })` is the binary's launcher (`@mcp-abap-adt/http/launcher`). An embedder that stops the
 server itself calls `stop()`: admission stops, the listener closes, the pool's instances are
-disposed and logged off; to wait for the running tools first, await lib's `settled()` between
-`beginShutdown()` / `stopListening()` and `lastStep()`, as the binary does.
+disposed (their state undone) and logged off. The binary's own shutdown does not wait: it logs
+every session off at once (lib's `installTransportShutdown`, with `releaseConnections()` after the
+logoffs).

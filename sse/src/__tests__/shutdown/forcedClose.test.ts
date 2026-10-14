@@ -1,13 +1,14 @@
 /**
- * The forced close with a tool that never settles, sse (spec §6.4, §14.5):
- * one connection's tool holds its request at the stand-in for ever, and
- * another connection already closed has its instance close running (waiting
- * for its own never-settling tool); `SIGTERM`, then a second `SIGTERM` (and
- * separately `--shutdown-timeout=1`): the stand-in received the logoff of
- * every owned connection, and the process exits `1` naming the requests.
+ * Tools that never settle, sse (spec §6.4, §14.5): one connection's tool
+ * holds its request at the stand-in for ever, and another connection
+ * already closed (its session logged off by its close). On `SIGTERM` (with
+ * or without `--shutdown-timeout=1`) no second signal is needed: every owned
+ * connection is logged off, once each, and the exit is `0` without waiting
+ * for either tool.
  */
 
 import { isUpdateOf } from '../../../../src/__tests__/helpers/shutdownTools';
+import { activeTools } from '../../../../src/lib/activeTools';
 import { ownedConnections } from '../../../../src/lib/ownedConnections';
 import { type SseStand, sseStand, turns, until } from './harness';
 
@@ -22,10 +23,10 @@ afterEach(async () => {
 });
 
 it.each([
-  ['a second SIGTERM', undefined],
+  ['no --shutdown-timeout', undefined],
   ['--shutdown-timeout=1', 1_000],
 ])(
-  '%s: every owned connection logged off, exit 1 naming the requests',
+  '%s: every owned connection logged off once, exit 0 without the tools',
   async (_name, shutdownTimeoutMs) => {
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
     s = await sseStand(
@@ -33,26 +34,28 @@ it.each([
     );
     const open = await s.open();
     const closing = await s.open();
-    s.standIn.hold((r) => isUpdateOf('A')(r.url));
-    s.standIn.hold((r) => isUpdateOf('B')(r.url));
+    const holds = [
+      s.standIn.hold((r) => isUpdateOf('A')(r.url)),
+      s.standIn.hold((r) => isUpdateOf('B')(r.url)),
+    ];
     await open.call('LockedUpdate', { id: 'A' }, 1);
     await closing.call('LockedUpdate', { id: 'B' }, 1);
     await until(
       () => s.indexOf(isUpdateOf('A')) >= 0 && s.indexOf(isUpdateOf('B')) >= 0,
     );
-    // The second connection closes: its instance close runs and waits.
+    // The second connection closes: its session is logged off at once.
     closing.close();
-    await turns(20);
+    await until(() => s.standIn.logoffs() === 1);
 
     s.processLike.emit('SIGTERM');
-    await turns(20);
-    expect(s.exits).toEqual([]);
-    if (shutdownTimeoutMs === undefined) s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(1);
-    expect(s.stderr).toContain(
-      '[MCP] Still running at the forced close: LockedUpdate (2 calls)',
-    );
+    expect(await s.exited).toBe(0);
+    expect(s.stderr).toEqual([]);
+    expect(activeTools()).toHaveLength(2);
     expect(ownedConnections()).toEqual([]);
     await until(() => s.standIn.logoffs() === s.connects());
+    await turns(20);
+    expect(s.standIn.logoffs()).toBe(2);
+    for (const hold of holds) hold.release();
+    await until(() => activeTools().length === 0);
   },
 );

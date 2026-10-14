@@ -1,8 +1,10 @@
 /**
- * The program's shutdown, stdio (spec §6.4, D33): every trigger runs one
- * sequence — the latch, the tools settle, the instance close, then the
- * factory's settle (gate, logins, drain, flush), then the exit code — once,
- * and nothing of it reaches stdout.
+ * The program's shutdown, stdio (spec §6.4, D33): every trigger — a signal,
+ * or stdin's end (the client closed the transport) — runs one sequence: the
+ * latch, the logoffs at once with every running tool interrupted (none
+ * awaited), the MCP server's close, then the factory's settle (gate,
+ * logins, drain, flush), then the exit code — once, and nothing of it
+ * reaches stdout.
  */
 
 import { isLatched } from '../../../src/lib/activeTools';
@@ -35,7 +37,7 @@ describe('installShutdown (core)', () => {
       (p: ReturnType<typeof fakeProcess>) => p.stdin.emit('close'),
     ],
   ])(
-    '%s runs the sequence: latch and begin in its tick, the instance close, then settle, exit 0',
+    '%s runs the sequence: latch and begin in its tick, the MCP server closed, then settle, exit 0',
     async (_name, trigger) => {
       const s = setup();
       trigger(s.processLike);
@@ -45,7 +47,6 @@ describe('installShutdown (core)', () => {
       await turns();
       expect(s.order).toEqual([
         'begin',
-        'undo',
         'mcp close',
         'settle',
         'settled',
@@ -62,32 +63,20 @@ describe('installShutdown (core)', () => {
     expect(s.order).toEqual([]);
   });
 
-  it('the instance close and the settle wait for every registered tool, none aborted', async () => {
+  it('a running tool is interrupted in the trigger’s tick and not awaited: the sequence runs to its exit without it', async () => {
     const s = setup();
     const tool = runningTool();
     s.processLike.emit('SIGTERM');
-    await turns();
-    expect(s.order).toEqual(['begin']);
-    tool.end();
+    expect(tool.signal.aborted).toBe(true);
     await turns();
     expect(s.order).toEqual([
       'begin',
-      'undo',
       'mcp close',
       'settle',
       'settled',
       'exit(0)',
     ]);
-  });
-
-  it('a state undo that left something: one line, the settle still runs, exit 1', async () => {
-    const s = setup({ shutdownState: async () => ['a debuggee was left'] });
-    await s.run();
-    expect(s.order).toContain('settle');
-    expect(s.stderr).toEqual([
-      '[MCP] State not undone at shutdown: a debuggee was left',
-    ]);
-    expect(s.exits).toEqual([1]);
+    tool.end();
   });
 
   it('notStored: one stderr line per destination, exit 1', async () => {
@@ -115,7 +104,7 @@ describe('installShutdown (core)', () => {
           throw new FlushTrouble('a token, perhaps');
         },
       },
-      instance: { shutdownState: async () => [], close: async () => {} },
+      instance: { close: async () => {} },
       exit: (code) => exits.push(code),
       stderr: (line) => stderr.push(line),
       processLike: fakeProcess(),

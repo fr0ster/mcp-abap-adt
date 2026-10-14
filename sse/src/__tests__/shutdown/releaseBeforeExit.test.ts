@@ -1,16 +1,17 @@
 /**
- * RF4, sse (spec §6.4, §14.5, D55): a tool holding a lock — the update held
- * at the stand-in — when `SIGTERM` arrives is not aborted: the update, the
- * `UNLOCK` and then the session's logoff reach the stand-in, exit `0`; every
- * open connection's instance is disposed only after its tools settled, its
- * connections logged off. (Full and compact: the A7 parity suite.)
+ * The process shutdown, sse (spec §6.4, §14.5): on `SIGTERM` every
+ * connection the process owns is logged off at once and every running tool
+ * interrupted — a tool whose update the stand-in holds is not awaited: its
+ * session is logged off under the held update, exit `0`, its `UNLOCK`
+ * never lands; an idle connection's session is logged off too, and every
+ * stream is ended. (Full and compact: the A7 parity suite.)
  */
 
-import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
 import {
   isUnlockOf,
   isUpdateOf,
 } from '../../../../src/__tests__/helpers/shutdownTools';
+import { activeTools } from '../../../../src/lib/activeTools';
 import { ownedConnections } from '../../../../src/lib/ownedConnections';
 import { type SseStand, sseStand, turns, until } from './harness';
 
@@ -29,7 +30,7 @@ afterEach(async () => {
   errorSpy.mockRestore();
 });
 
-it('the held update is released, then the UNLOCK and the logoff land; exit 0; an idle connection is closed too', async () => {
+it('the logoffs at once under the held update; exit 0 without the tool; an idle connection is logged off too; every stream ended', async () => {
   const busy = await s.open();
   const idle = await s.open();
   const hold = s.standIn.hold((r) => isUpdateOf('A')(r.url));
@@ -40,21 +41,16 @@ it('the held update is released, then the UNLOCK and the logoff land; exit 0; an
   await idle.answer(2);
 
   s.processLike.emit('SIGTERM');
-  await turns(20);
-  expect(s.exits).toEqual([]);
-  // No instance is disposed while a tool runs: no logoff yet.
-  expect(s.standIn.logoffs()).toBe(0);
-
-  hold.release();
-  expect(await busy.answer(1)).toEqual({ text: 'A', isError: false });
   expect(await s.exited).toBe(0);
-  const unlock = s.indexOf(isUnlockOf('A'));
-  expect(unlock).toBeGreaterThan(s.indexOf(isUpdateOf('A')));
-  await until(() => s.standIn.logoffs() === s.connects());
-  expect(s.standIn.requests.findIndex((r) => isLogoff(r.url))).toBeGreaterThan(
-    unlock,
-  );
+  expect(activeTools().map((t) => t.name)).toEqual(['LockedUpdate']);
   expect(ownedConnections()).toEqual([]);
+  await until(() => s.standIn.logoffs() === s.connects());
+  expect(s.standIn.logoffs()).toBe(2);
   // Each stream was ended.
   await until(() => busy.ended() && idle.ended());
+
+  hold.release();
+  await until(() => activeTools().length === 0);
+  await turns(20);
+  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
 });

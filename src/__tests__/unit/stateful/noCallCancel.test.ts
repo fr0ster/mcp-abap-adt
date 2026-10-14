@@ -7,9 +7,10 @@
  *   once the lookup is answered, and it stays a live call until then;
  * - a call queued behind another keeps its place and runs after it.
  *
- * The session's end (the transport closed, the instance closed) during a
- * pending lookup: the instance's close sends no logoff before the lookup
- * settled — no logoff under an in-flight request.
+ * The client's close (the transport closed, the instance closed) during a
+ * pending lookup: the instance's close logs its connector off at once,
+ * under the request in flight — nothing waits for it — and the tool never
+ * runs.
  */
 
 import { TokenAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -163,7 +164,7 @@ it('a cancel sent while the call waits in the main flow aborts nothing: it keeps
   }
 });
 
-it('the session ends while a call’s system lookup is on the wire: no logoff before the lookup settled', async () => {
+it('the instance closes while a call’s system lookup is on the wire: the logoff is written at once, before the lookup settled; the tool never runs', async () => {
   const standIn = await adtStandIn();
   const s = await cloudStand(standIn);
   try {
@@ -172,24 +173,16 @@ it('the session ends while a call’s system lookup is on the wire: no logoff be
       .callWith('ReadClass', { class_name: 'ZCL_FIRST' })
       .catch(() => 'the session ended');
     await held.arrived;
-    // The session's end: the client's transport closes, and the instance
-    // is closed — as an SSE connection's close does.
+    // The client closed: its transport closes, and the instance is closed —
+    // as an SSE stream's close does.
     await s.client.close();
     expect(await first).toBe('the session ended');
-    let closed = false;
-    const closing = closeInstance(s.server).then(() => {
-      closed = true;
-    });
-    await settleWhile();
-    expect(standIn.requests.filter((r) => isLogoff(r.url))).toEqual([]);
-    expect(closed).toBe(false);
-    held.release();
-    await closing;
-    // Logged off once the lookup was answered; the tool never ran.
+    await closeInstance(s.server);
+    // The logoff went out under the lookup still held: nothing waited for it.
     await until(() => standIn.requests.some((r) => isLogoff(r.url)));
-    expect(standIn.requests.findIndex((r) => isLogoff(r.url))).toBeGreaterThan(
-      standIn.requests.findIndex(isLookup),
-    );
+    expect(live()).toBe(1);
+    held.release();
+    await until(() => live() === 0);
     expect(standIn.requests.some(of('ZCL_FIRST'))).toBe(false);
   } finally {
     await s.close();

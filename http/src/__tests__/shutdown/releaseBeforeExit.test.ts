@@ -1,17 +1,18 @@
 /**
- * RF4, http (spec §6.4, §14.5, D55): a tool holding a lock — the lock
- * answered, the update held at the stand-in — when `SIGTERM` arrives is not
- * aborted: the stand-in releases the update, and its log holds the update,
- * the `UNLOCK` and then the session's logoff before the process exits, exit
- * `0`. Two concurrent tools on two per-request instances are both awaited.
- * (The full and the compact tool set: the A7 parity suite.)
+ * The process shutdown, http (spec §6.4, §14.5): on `SIGTERM` every
+ * connection the process owns is logged off at once and every running tool
+ * interrupted — a tool whose update the stand-in holds is not awaited: its
+ * session's logoff reaches the system while the update is still held, the
+ * exit is `0`, and its `UNLOCK` never lands (the logoff released the lock).
+ * Two concurrent tools on two per-request instances: both sessions logged
+ * off at once. (The full and the compact tool set: the A7 parity suite.)
  */
 
-import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
 import {
   isUnlockOf,
   isUpdateOf,
 } from '../../../../src/__tests__/helpers/shutdownTools';
+import { activeTools } from '../../../../src/lib/activeTools';
 import { type HttpStand, httpStand, turns, until } from './harness';
 
 jest.setTimeout(30_000);
@@ -29,56 +30,40 @@ afterEach(async () => {
   errorSpy.mockRestore();
 });
 
-it('the held update is released, then the UNLOCK and the logoff land before exit 0', async () => {
+it('the logoff is written under the held update, exit 0 without waiting for the tool; no UNLOCK', async () => {
   const hold = s.standIn.hold((r) => isUpdateOf('A')(r.url));
-  const answered = s.call('LockedUpdate', { id: 'A' });
+  void s.call('LockedUpdate', { id: 'A' }).catch(() => undefined);
   await hold.arrived;
 
   s.processLike.emit('SIGTERM');
-  await turns(20);
-  expect(s.exits).toEqual([]);
+  expect(await s.exited).toBe(0);
+  // The tool still runs: its update is held.
+  expect(activeTools().map((t) => t.name)).toEqual(['LockedUpdate']);
+  await until(() => s.standIn.logoffs() === 1);
+  expect(s.stderr).toEqual([]);
 
   hold.release();
-  expect(await s.exited).toBe(0);
-  expect(await answered).toMatchObject({
-    status: 200,
-    text: 'A',
-    isError: false,
-  });
-  const update = s.indexOf(isUpdateOf('A'));
-  const unlock = s.indexOf(isUnlockOf('A'));
-  expect(update).toBeGreaterThanOrEqual(0);
-  expect(unlock).toBeGreaterThan(update);
-  // The logoff was written before the exit (connection 16 resolves on the
-  // write); the stand-in reads it off its socket.
-  await until(() => s.standIn.logoffs() === 1);
-  const logoff = s.standIn.requests.findIndex((r) => isLogoff(r.url));
-  expect(logoff).toBeGreaterThan(unlock);
-  expect(s.stderr).toEqual([]);
+  await until(() => activeTools().length === 0);
+  await turns(20);
+  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
 });
 
-it('two concurrent tools on two per-request instances are both awaited', async () => {
+it('two concurrent tools on two per-request instances: both sessions logged off at once, neither awaited', async () => {
   const holdA = s.standIn.hold((r) => isUpdateOf('A')(r.url));
   const holdB = s.standIn.hold((r) => isUpdateOf('B')(r.url));
-  const a = s.call('LockedUpdate', { id: 'A' });
-  const b = s.call('LockedUpdate', { id: 'B' });
+  void s.call('LockedUpdate', { id: 'A' }).catch(() => undefined);
+  void s.call('LockedUpdate', { id: 'B' }).catch(() => undefined);
   await Promise.all([holdA.arrived, holdB.arrived]);
 
   s.processLike.emit('SIGTERM');
-  holdA.release();
-  await until(() => s.indexOf(isUnlockOf('A')) >= 0);
-  await turns(20);
-  expect(s.exits).toEqual([]);
-
-  holdB.release();
   expect(await s.exited).toBe(0);
-  expect((await a).text).toBe('A');
-  expect((await b).text).toBe('B');
-  // Each session is logged off, after its UNLOCK.
   await until(() => s.standIn.logoffs() === 2);
-  const unlockB = s.indexOf(isUnlockOf('B'));
-  expect(unlockB).toBeGreaterThan(s.indexOf(isUnlockOf('A')));
-  expect(
-    s.standIn.requests.filter((r, i) => i > unlockB && isLogoff(r.url)),
-  ).toHaveLength(1);
+  expect(activeTools()).toHaveLength(2);
+
+  holdA.release();
+  holdB.release();
+  await until(() => activeTools().length === 0);
+  await turns(20);
+  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
+  expect(s.indexOf(isUnlockOf('B'))).toBe(-1);
 });

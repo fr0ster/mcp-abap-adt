@@ -475,6 +475,13 @@ export function startLookupFailedWords(destination: string): string {
 }
 
 /**
+ * The start's words for a destination whose system kind no parameter states.
+ */
+export function startSystemTypeRequiredWords(destination: string): string {
+  return `Destination "${destination}": the SAP system type is required — set --system-type, SAP_SYSTEM_TYPE (the environment or the --env file) or system-type (YAML) to onprem, cloud or legacy; the server did not start`;
+}
+
+/**
  * The start's words for a system that answered systeminformation without a
  * user: not a valid ABAP system for this server.
  */
@@ -690,6 +697,15 @@ export async function launch(
   // The shutdown began during the check: no connector is born, no transport
   // opens.
   if (birth.shutdownBegan()) return;
+
+  // A destination's system kind is required: never guessed. After the
+  // destination's own check (which sends nothing), the start ends here
+  // without it — before anything is sent and before the transport.
+  if (destination && systemType === undefined) {
+    deps.stderr(`[MCP] ${startSystemTypeRequiredWords(destination)}`);
+    deps.exit(1);
+    return;
+  }
 
   if (!destination) {
     // Inspection-only mode: no connection parameters provided

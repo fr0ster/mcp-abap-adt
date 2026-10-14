@@ -37,6 +37,7 @@ import {
   type StandInRequest,
 } from '../../helpers/adtStandIn';
 import { LOCK_SUCCESS_XML } from '../../helpers/recordingConnection';
+import { stateSystemKind } from '../../helpers/systemKind';
 
 /** The context cookie a `LOCK` opens (HTTP's stateful ABAP context). */
 export const CONTEXT_COOKIE = 'sap-contextid';
@@ -116,6 +117,7 @@ export async function statefulStand(
   standIn.body((r) => r.url.includes('_action=LOCK'), LOCK_SUCCESS_XML, {
     'set-cookie': `${CONTEXT_COOKIE}=context-of-the-lock; path=/`,
   });
+  stateSystemKind();
   const connection = createAbapConnection(
     { url: standIn.url, client: '100', authType: 'basic' },
     (options.credential ?? ((basic) => basic))(

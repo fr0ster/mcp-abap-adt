@@ -11,6 +11,7 @@ import { answerFailure } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { stateSystemKind } from '../../../../src/__tests__/helpers/systemKind';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import {
   DestinationRefusal,
@@ -249,6 +250,8 @@ describe('a tool call on core (StdioServer): the server sentence beside the chai
   let base: BrokerBase;
   beforeEach(() => {
     base = brokerBase('destination-failure-tool');
+    // The system kind is required: an authorization-code stand-in on cloud.
+    stateSystemKind('cloud');
   });
   afterEach(() => base.remove());
 

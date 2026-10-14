@@ -6,6 +6,12 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
+import { stateSystemKind } from '../../helpers/systemKind';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 const connection = {} as unknown as IAbapConnection;
 

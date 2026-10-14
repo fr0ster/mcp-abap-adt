@@ -2,6 +2,7 @@ import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import { ServerRefusal } from '../lib/auth/serverRefusal.js';
 import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
@@ -24,6 +25,7 @@ import type { SystemContextResolver } from '../lib/requestSystemResolution.js';
 import type { StateLogger } from '../lib/state/InstanceState.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
 import { setSystemContext } from '../lib/systemContext.js';
+import { statedSystemKind } from '../lib/systemKind.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
 
 const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
@@ -100,20 +102,21 @@ export interface EmbeddableMcpServerOptions {
   systemContext?: Partial<IAdtSystemContext>;
 
   /**
-   * SAP system type for this server instance. Governs which tools are
-   * registered via the `available_in` filter. Overrides the process-global
-   * `SAP_SYSTEM_TYPE` env var. If omitted, falls back to the env var,
-   * then to `'cloud'`.
+   * SAP system type for this server instance — required, here or as
+   * `SAP_SYSTEM_TYPE`: without either (or with a value other than `onprem`,
+   * `cloud` or `legacy`) the constructor throws `ServerRefusal`
+   * `system_type_required`. Governs which tools are registered via the
+   * `available_in` filter. Overrides the process-global `SAP_SYSTEM_TYPE`
+   * env var.
    *
    * Use this when a single host serves multiple SAP systems (e.g., a proxy
    * that handles both OnPremise and cloud destinations per request) —
    * mutating `process.env.SAP_SYSTEM_TYPE` per instance is not safe.
    *
-   * It also states the injected connection's kind for the responsible /
-   * master-system lookup: `'cloud'` asks the system's `systeminformation`
-   * for what the call lacks; anything else — and, when omitted,
-   * `SAP_SYSTEM_TYPE`, else on-premise — asks nothing. The URL is never
-   * consulted.
+   * It also states the injected connection's kind for reading the system's
+   * `systeminformation` (asked on every kind): a `404` is the function
+   * unavailable on-premise (the configuration applies) and a failed lookup
+   * on `'cloud'`. The URL is never consulted.
    */
   systemType?: SapEnvironment;
 
@@ -136,18 +139,17 @@ export interface EmbeddableMcpServerOptions {
 
   /**
    * Asks the connection's system for the responsible person and master
-   * system a call does not state. Its answer decides whether the login counts:
-   * `null` means not asked (on-premise) — the login (`SAP_USERNAME`, or
-   * `x-sap-login` with `x-sap-url`) stands as the responsible; a non-null
-   * answer is a cloud system's — the login does not count, and only what the
-   * call does not state is taken from it. A non-null answer must name the
-   * user (`responsible`, a non-blank string): one that does not — `{}`
-   * included — is not a valid ABAP system for this server, and the call
-   * fails with `system_without_user`. A resolver that throws fails that call
-   * with `system_lookup_failed`. Either way its tool does not run, nothing is
-   * kept, and the next call asks again. The default
-   * asks on ABAP Cloud (one lookup per connection) and answers `null`
-   * on-premise. `null` as the option disables it.
+   * system. Its answer wins over anything configured: `null` means the
+   * system has no such function (an on-premise `404`) — the configuration
+   * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
+   * `x-sap-url`) stands; a non-null answer is the system's, and nothing
+   * configured counts. A non-null answer must name the user (`responsible`,
+   * a non-blank string): one that does not — `{}` included — is not a valid
+   * ABAP system for this server, and the call fails with
+   * `system_without_user`. A resolver that throws fails that call with
+   * `system_lookup_failed`. Either way its tool does not run, nothing is
+   * kept, and the next call asks again. The default asks every system (one
+   * lookup per connection). `null` as the option disables it.
    * @default defaultSystemContextResolver
    */
   systemContextResolver?: SystemContextResolver | null;
@@ -221,6 +223,17 @@ export class EmbeddableMcpServer extends BaseMcpServer {
         backgroundRuns: options.backgroundRuns,
       }),
     });
+
+    // The system kind is required (never guessed): it decides the tools
+    // registered below and how the system's answers are read. Stated by the
+    // option, else SAP_SYSTEM_TYPE; neither is refused here, before the
+    // host hands the instance a transport.
+    if (
+      statedSystemKind(options.systemType) === undefined &&
+      statedSystemKind(process.env.SAP_SYSTEM_TYPE) === undefined
+    ) {
+      throw new ServerRefusal('system_type_required');
+    }
 
     // Used as given (spec §4.3): no credential built, no wrap, no connect().
     this.setConnectionContext({

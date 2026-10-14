@@ -14,6 +14,12 @@ import { sseStand } from '../../../../sse/src/__tests__/shutdown/harness';
 import { ownedConnections } from '../../../lib/ownedConnections';
 import { isLogoff } from '../../helpers/adtStandIn';
 import { isLockOf, isUnlockOf } from '../../helpers/shutdownTools';
+import { stateSystemKind } from '../../helpers/systemKind';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 jest.setTimeout(30_000);
 

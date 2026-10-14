@@ -154,7 +154,12 @@ let stderrSpy: jest.SpyInstance;
 const savedEnv = process.env;
 
 beforeEach(() => {
-  process.env = { ...savedEnv, SAP_MASTER_SYSTEM: 'master-placeholder' };
+  // The system kind is required: stated for every case.
+  process.env = {
+    ...savedEnv,
+    SAP_MASTER_SYSTEM: 'master-placeholder',
+    SAP_SYSTEM_TYPE: 'onprem',
+  };
   resetSystemContextCache();
   stderrLines = [];
   stderrSpy = jest

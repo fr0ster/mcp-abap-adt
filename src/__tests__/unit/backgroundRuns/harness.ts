@@ -35,6 +35,7 @@ import {
   isLogoff,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
+import { stateSystemKind } from '../../helpers/systemKind';
 
 /** Whether a request is a class run (`POST …/oo/classrun/<name>`). */
 export const isClassRun = (r: StandInRequest): boolean =>
@@ -46,6 +47,7 @@ export const isProgramRun = (r: StandInRequest): boolean =>
 
 export class StandServer extends BaseMcpServer {
   use(source: { settings: SapConfig; credential: IAuthProvider }): void {
+    stateSystemKind();
     this.setConnectionContext({
       kind: 'built',
       source: { resolve: async () => source },

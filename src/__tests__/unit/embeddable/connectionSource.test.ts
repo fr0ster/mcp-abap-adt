@@ -22,6 +22,12 @@ import type {
 } from '../../../embeddable/ConnectionContext';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { createAbapConnection } from '../../../lib/connectionFactory';
+import { stateSystemKind } from '../../helpers/systemKind';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 const build = createAbapConnection as jest.MockedFunction<
   typeof createAbapConnection

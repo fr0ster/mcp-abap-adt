@@ -69,6 +69,9 @@ beforeEach(async () => {
   ]) {
     delete process.env[name];
   }
+  // The system kind is required: the stand-in's is stated for every case
+  // (a case about the type itself deletes or restates it).
+  process.env.SAP_SYSTEM_TYPE = 'onprem';
   adt = await adtStandIn();
   uaa = await adtStandIn();
 });

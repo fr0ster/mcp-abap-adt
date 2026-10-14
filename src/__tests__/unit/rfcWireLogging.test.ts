@@ -1,6 +1,12 @@
 import { createConnection } from '@mcp-abap-adt/connection';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../lib/credentialSources';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 /**
  * Whether the RFC wire logs what it carries, and who decides.

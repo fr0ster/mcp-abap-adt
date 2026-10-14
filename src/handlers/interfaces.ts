@@ -43,7 +43,8 @@ export interface HandlerContext {
   /**
    * The system kind the server states (its `systemType` option), for a
    * connection the factory did not build; absent where none is stated
-   * (`SAP_SYSTEM_TYPE`, else on-premise, then decides — see `systemKindOf`).
+   * (`SAP_SYSTEM_TYPE` then decides; neither is `system_type_required` —
+   * see `systemKindOf`).
    */
   systemType?: string;
 }

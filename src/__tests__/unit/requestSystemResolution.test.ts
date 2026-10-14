@@ -57,20 +57,37 @@ const credential: IAuthProvider = {
 
 /**
  * Connections built by the factory, so the system kind is the one they were
- * built for: a jwt is cloud, anything else on-premise, SAP_SYSTEM_TYPE wins.
- * The URL decides nothing.
+ * built for: what SAP_SYSTEM_TYPE stated then (required). Neither the
+ * credential nor the URL decides anything.
  */
-function built(settings: Partial<SapConfig>): IAbapConnection {
-  return createAbapConnection(settings as SapConfig, credential);
+function built(
+  settings: Partial<SapConfig>,
+  kind: 'cloud' | 'onprem',
+): IAbapConnection {
+  const stated = process.env.SAP_SYSTEM_TYPE;
+  process.env.SAP_SYSTEM_TYPE = kind;
+  try {
+    return createAbapConnection(settings as SapConfig, credential);
+  } finally {
+    if (stated === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = stated;
+  }
 }
 
+/** A basic credential: the credential does not make it on-premise. */
 function cloudConn(): IAbapConnection {
-  return built({ url: 'https://system.example.invalid', authType: 'jwt' });
+  return built(
+    { url: 'https://system.example.invalid', authType: 'basic' },
+    'cloud',
+  );
 }
 
-/** An https URL without a port: a URL guess could not call it on-premise. */
+/** A jwt, and an https URL without a port: neither makes it cloud. */
 function onPremConn(): IAbapConnection {
-  return built({ url: 'https://system.example.invalid', authType: 'basic' });
+  return built(
+    { url: 'https://system.example.invalid', authType: 'jwt' },
+    'onprem',
+  );
 }
 
 /** A connection the factory did not build (an embedder's own). */
@@ -138,10 +155,13 @@ describe('defaultSystemContextResolver', () => {
     );
     await expect(
       defaultSystemContextResolver(
-        built({
-          url: 'https://system.abap.example.hana.ondemand.com',
-          authType: 'basic',
-        }),
+        built(
+          {
+            url: 'https://system.abap.example.hana.ondemand.com',
+            authType: 'basic',
+          },
+          'onprem',
+        ),
       ),
     ).resolves.toBe(null);
   });
@@ -159,12 +179,24 @@ describe('defaultSystemContextResolver', () => {
     },
   );
 
-  it('SAP_SYSTEM_TYPE states the kind: a jwt on-premise without the function is null', async () => {
-    process.env.SAP_SYSTEM_TYPE = 'onprem';
+  it('the kind recorded at build wins over a later SAP_SYSTEM_TYPE', async () => {
+    const connection = onPremConn();
+    process.env.SAP_SYSTEM_TYPE = 'cloud';
     lookup.mockRejectedValue(
       Object.assign(new Error('placeholder'), { response: { status: 404 } }),
     );
-    await expect(defaultSystemContextResolver(cloudConn())).resolves.toBe(null);
+    await expect(defaultSystemContextResolver(connection)).resolves.toBe(null);
+  });
+
+  it('a connection the factory did not build, no kind stated anywhere: its 404 is system_type_required', async () => {
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
+    await expect(
+      defaultSystemContextResolver(
+        foreignConn('https://system.example.invalid'),
+      ),
+    ).rejects.toMatchObject({ serverRefusal: 'system_type_required' });
   });
 
   it.each([
@@ -177,6 +209,7 @@ describe('defaultSystemContextResolver', () => {
         response: { status: 404 },
       });
       lookup.mockRejectedValue(absent);
+      process.env.SAP_SYSTEM_TYPE = 'onprem';
       await expect(
         defaultSystemContextResolver(foreignConn(url)),
       ).resolves.toBe(null);
@@ -594,6 +627,7 @@ describe('BaseMcpServer.registerHandlers', () => {
     const server = new EmbeddableMcpServer({
       connection: cloudConn() as never,
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+      systemType: 'cloud',
     });
     expect(textOf(await callTool(server, 'WithContext'))).toMatchObject({
       responsible: 'CB_USER',
@@ -697,6 +731,7 @@ describe('BaseMcpServer.registerHandlers', () => {
     const server = new EmbeddableMcpServer({
       connection: cloudConn() as never,
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+      systemType: 'cloud',
       systemContextResolver: null,
     });
     const result = textOf(await callTool(server, 'WithContext'));

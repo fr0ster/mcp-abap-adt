@@ -41,6 +41,7 @@ export type FailureCode =
   | 'background_run_caller_unknown'
   | 'system_lookup_failed'
   | 'system_without_user'
+  | 'system_type_required'
   | 'instance_closed';
 
 /**

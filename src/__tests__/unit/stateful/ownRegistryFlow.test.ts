@@ -25,6 +25,7 @@ import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { DEBUGGER_OWN_CONNECTION_TOOLS } from '../../../lib/debugger/ownConnectionTools';
 import type { IHandlersRegistry } from '../../../lib/handlers/interfaces';
 import { notFound } from '../../helpers/noSystemInformation';
+import { stateSystemKind } from '../../helpers/systemKind';
 
 jest.setTimeout(30_000);
 
@@ -178,6 +179,8 @@ async function serve(name: string, via: 'handed-server' | 'main-connection') {
 }
 
 beforeEach(() => {
+  // The system kind is required: the stand-in is on-premise.
+  stateSystemKind();
   jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });
 

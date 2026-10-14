@@ -88,6 +88,8 @@ beforeEach(() => {
   ]) {
     delete process.env[name];
   }
+  // The system kind is required: stated for every case.
+  process.env.SAP_SYSTEM_TYPE = 'onprem';
   resetSystemContextCache();
 });
 

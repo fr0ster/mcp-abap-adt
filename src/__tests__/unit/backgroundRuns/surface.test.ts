@@ -41,7 +41,13 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import { adtStandIn } from '../../helpers/adtStandIn';
+import { stateSystemKind } from '../../helpers/systemKind';
 import { clientOf, isClassRun, shippedGroups, silent, until } from './harness';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 const RUN = { class_name: 'PLACEHOLDER_CLASS', background: true };
 

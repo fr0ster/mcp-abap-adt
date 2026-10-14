@@ -15,7 +15,13 @@ import { createAbapConnection } from '../../../lib/connectionFactory';
 import { closeInstance } from '../../../lib/instanceClose';
 import { ownedConnections } from '../../../lib/ownedConnections';
 import { adtStandIn } from '../../helpers/adtStandIn';
+import { stateSystemKind } from '../../helpers/systemKind';
 import { clientOf, shippedGroups, silent, until } from './harness';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 const RUN = { class_name: 'PLACEHOLDER_CLASS', background: true };
 

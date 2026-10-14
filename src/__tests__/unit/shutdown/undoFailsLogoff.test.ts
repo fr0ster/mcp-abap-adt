@@ -16,6 +16,12 @@ import { stand as coreStand } from '../../../../server/src/__tests__/helpers/log
 import { sseStand } from '../../../../sse/src/__tests__/shutdown/harness';
 import { ownedConnections } from '../../../lib/ownedConnections';
 import { stopUrl } from '../../helpers/shutdownTools';
+import { stateSystemKind } from '../../helpers/systemKind';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 jest.setTimeout(30_000);
 

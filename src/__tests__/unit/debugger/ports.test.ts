@@ -9,7 +9,8 @@ describe('the request user', () => {
     SAP_SYSTEM_TYPE: process.env.SAP_SYSTEM_TYPE,
   };
   beforeEach(() => {
-    delete process.env.SAP_SYSTEM_TYPE;
+    // The kind is required: on-premise unless the case states cloud.
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
   });
   afterEach(() => {
     for (const [name, value] of Object.entries(saved)) {

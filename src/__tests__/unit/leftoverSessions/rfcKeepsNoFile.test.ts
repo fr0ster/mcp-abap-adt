@@ -33,7 +33,13 @@ import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { LeftoverSessions } from '../../../lib/leftoverSessions/LeftoverSessions';
 import { probeGroup } from '../../helpers/adtStandIn';
+import { stateSystemKind } from '../../helpers/systemKind';
 import { fakeProbe, OUR_PID } from './harness';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 class Server extends BaseMcpServer {
   constructor(

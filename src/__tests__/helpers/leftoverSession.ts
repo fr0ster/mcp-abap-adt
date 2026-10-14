@@ -15,6 +15,7 @@ import {
   sessionIdentity,
 } from '../../lib/leftoverSessions/LeftoverSessions';
 import type { ProcessProbe } from '../../lib/leftoverSessions/processStamp';
+import { stateSystemKind } from './systemKind';
 
 /** A probe that says this process is `self` and that `alive` pids run. */
 export function fakeProbe(
@@ -67,6 +68,7 @@ export async function killedProcessSession(
     authType: 'basic' as const,
     username: options.user,
   };
+  stateSystemKind();
   const connection = createAbapConnection(
     settings,
     new BasicAuthProvider(options.user, 'left-password'),

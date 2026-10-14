@@ -19,6 +19,12 @@ import { TOOL_DEFINITION as CompactStart } from '../../../lib/compact/debug/hand
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { withoutSystemInformation } from '../../helpers/noSystemInformation';
+import { stateSystemKind } from '../../helpers/systemKind';
+
+// The system kind is required: the stand-in's is stated for every case.
+beforeEach(() => {
+  stateSystemKind();
+});
 
 class BoundaryServer extends BaseMcpServer {
   readonly handler = jest.fn(async (_context: unknown, _args: unknown) => ({

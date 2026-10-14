@@ -98,6 +98,9 @@ beforeEach(() => {
   ]) {
     delete process.env[name];
   }
+  // The system kind is required: the stand-in's is stated for every case
+  // (a case about the type itself deletes or restates it).
+  process.env.SAP_SYSTEM_TYPE = 'onprem';
   constructed.mockClear();
   stdioStart = jest
     .spyOn(StdioServer.prototype, 'start')
@@ -708,6 +711,10 @@ describe('the working directory .env is never the destination', () => {
  * environment, so that is where the outcome is checked.
  */
 describe('SAP_SYSTEM_TYPE inside the env file', () => {
+  // These cases are about where the type comes from: none is preset.
+  beforeEach(() => {
+    delete process.env.SAP_SYSTEM_TYPE;
+  });
   const envFile = (lines: string[]) => {
     const file = path.join(root, 'conn.env');
     fs.writeFileSync(file, `${lines.join('\n')}\n`);

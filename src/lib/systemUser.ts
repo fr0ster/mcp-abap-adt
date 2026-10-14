@@ -13,8 +13,8 @@
  * (`405`, `501`, a `5xx`, authentication, network) — the login never stands
  * in there. The kind is the one the connection was built for
  * (`systemKindOf`: the factory's recorded settings, else the server's stated
- * `systemType`, else `SAP_SYSTEM_TYPE`, else on-premise) — the same the
- * system-context resolver reads.
+ * `systemType`, else `SAP_SYSTEM_TYPE`; none is `system_type_required`) —
+ * the same the system-context resolver reads.
  *
  * Asked for the debugger's request user (`requestUserOf`) and a background
  * run's caller.

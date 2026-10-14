@@ -22,6 +22,7 @@ import {
   basicOf,
   probeGroup,
 } from '../../../src/__tests__/helpers/adtStandIn';
+import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../src/lib/auth/serverRefusal';
 import { SseServer } from '../SseServer.js';
 
 const registry = new CompositeHandlersRegistry([probeGroup()]);
@@ -37,7 +38,7 @@ const open: AbortController[] = [];
 beforeEach(async () => {
   errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
   previousType = process.env.SAP_SYSTEM_TYPE;
-  process.env.SAP_SYSTEM_TYPE = 'onprem'; // no system lookup
+  process.env.SAP_SYSTEM_TYPE = 'onprem';
   standIn = await adtStandIn();
   sse = new SseServer(registry, {});
   const app = express();
@@ -171,6 +172,18 @@ describe("a connection's credential is its opening GET's", () => {
 });
 
 describe('a request the server does not serve', () => {
+  it('no SAP_SYSTEM_TYPE: a call is refused system_type_required, nothing sent', async () => {
+    delete process.env.SAP_SYSTEM_TYPE;
+    const session = await connect(basic('USER_A', 'pass-a'));
+    const answer = await session.probe('k1');
+    expect(answer.isError).toBe(true);
+    expect(JSON.parse(answer.text)).toMatchObject({
+      error: 'system_type_required',
+      message: SYSTEM_TYPE_REQUIRED_WORDS,
+    });
+    expect(standIn.requests).toEqual([]);
+  });
+
   it('a GET without credentials: 400 with its sentence', async () => {
     const res = await fetch(`${baseUrl}/sse`);
     expect(res.status).toBe(400);

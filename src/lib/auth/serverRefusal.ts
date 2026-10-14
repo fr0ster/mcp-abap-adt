@@ -24,6 +24,7 @@ export type ServerRefusalCode =
   | 'background_run_caller_unknown'
   | 'system_lookup_failed'
   | 'system_without_user'
+  | 'system_type_required'
   | 'instance_closed';
 
 /** Inspection-only mode: stdio started without a destination (D17). */
@@ -117,6 +118,16 @@ export function backgroundRunLimitWords(
   return `background run refused: you hold ${limit} background runs (running and kept), the limit; discard a finished one with ${discardTool} first`;
 }
 
+/**
+ * A connection whose system kind no parameter states: `--system-type`,
+ * `SAP_SYSTEM_TYPE` (the environment or the `--env` file), YAML
+ * `system-type`, an embedder's `systemType` — `onprem`, `cloud` or `legacy`.
+ * The kind is never guessed (from the credential, the URL or an answer).
+ * Refused before anything is sent to the system.
+ */
+export const SYSTEM_TYPE_REQUIRED_WORDS =
+  'the SAP system type is not stated: set --system-type, SAP_SYSTEM_TYPE (the environment or the --env file) or system-type (YAML) to onprem, cloud or legacy — an embedding host passes systemType; nothing was sent to the system';
+
 /** The refusals whose words are given at construction. */
 type WordedCode = 'destination_refused' | 'background_run_limit';
 
@@ -135,6 +146,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   background_run_caller_unknown: BACKGROUND_RUN_CALLER_UNKNOWN_WORDS,
   system_lookup_failed: SYSTEM_LOOKUP_FAILED_WORDS,
   system_without_user: SYSTEM_WITHOUT_USER_WORDS,
+  system_type_required: SYSTEM_TYPE_REQUIRED_WORDS,
   instance_closed: INSTANCE_CLOSED_WORDS,
 };
 

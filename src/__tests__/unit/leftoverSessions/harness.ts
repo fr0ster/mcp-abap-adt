@@ -42,6 +42,7 @@ import {
   probeGroup,
 } from '../../helpers/adtStandIn';
 import { fakeProbe } from '../../helpers/leftoverSession';
+import { stateSystemKind } from '../../helpers/systemKind';
 
 export const OUR_PID = 222;
 
@@ -133,6 +134,7 @@ export async function leftoverStand(
   } = {},
 ): Promise<LeftoverStand> {
   const standIn = await adtStandIn();
+  stateSystemKind();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'leftover-'));
   const runtime = path.join(dir, 'runtime');
   const alive = new Set<number>();

@@ -37,6 +37,7 @@ import {
   probeGroup,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
+import { stateSystemKind } from '../../helpers/systemKind';
 
 /**
  * Each listed tool's arguments: valid, and enough to make it send its first
@@ -151,6 +152,7 @@ export async function longStand(
 ): Promise<LongStand> {
   if (!LONG_TOOLS.includes(tool)) throw new Error(`${tool} is not listed`);
   const standIn = await adtStandIn();
+  stateSystemKind();
   const built = createAbapConnection(
     { url: standIn.url, client: '100', authType: 'basic' },
     new BasicAuthProvider('LONG_USER', 'long-password'),

@@ -44,7 +44,8 @@ const saved = {
 };
 beforeEach(() => {
   process.env.SAP_USERNAME = 'LOGIN_USER';
-  delete process.env.SAP_SYSTEM_TYPE;
+  // The kind is required: stated for every case (the cloud ones restate it).
+  process.env.SAP_SYSTEM_TYPE = 'onprem';
 });
 afterEach(() => {
   for (const [name, value] of Object.entries(saved)) {

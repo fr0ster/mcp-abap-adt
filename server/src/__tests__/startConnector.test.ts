@@ -43,6 +43,7 @@ import { readCoreConfig } from '../config/coreParameters';
 import {
   launch,
   startLookupFailedWords,
+  startSystemTypeRequiredWords,
   startSystemWithoutUserWords,
 } from '../launcher.js';
 import { SHUTDOWN_BEFORE_START_LINE } from '../shutdown.js';
@@ -122,7 +123,8 @@ async function exited(exits: number[]): Promise<void> {
 /** Launches `mcp-abap-adt` (or `toolSet`) over an in-memory transport. */
 async function start(
   options: {
-    kind?: 'onprem' | 'cloud';
+    /** `null`: no `--system-type` at all. */
+    kind?: 'onprem' | 'cloud' | null;
     toolSet?: ToolSet;
     /**
      * Runs beside the launch, while the connection is born; `shutdown()`
@@ -137,7 +139,9 @@ async function start(
   const args = [
     `--env-path=${envFile}`,
     `--auth-broker-path=${root}`,
-    `--system-type=${options.kind ?? 'onprem'}`,
+    ...(options.kind === null
+      ? []
+      : [`--system-type=${options.kind ?? 'onprem'}`]),
   ];
   const config = readCoreConfig(args, process.env, null);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
@@ -515,6 +519,31 @@ it('ABAP Cloud: the system information is asked at the start, and a tool asks no
     expect(read.text).not.toContain('not found');
     expect(standIn.requests.length).toBeGreaterThan(before);
     expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+  } finally {
+    await s.stop();
+  }
+});
+
+// The system kind is required: no parameter stating it ends the start
+// before anything is sent and before the transport opens.
+it('no system type stated anywhere: exit 1 naming the parameter, nothing sent, the transport never opens', async () => {
+  delete process.env.SAP_SYSTEM_TYPE;
+  const s = await start({ kind: null });
+  expect(s.exits).toEqual([1]);
+  expect(s.opened()).toBe(0);
+  expect(s.stderr).toContain(
+    `[MCP] ${startSystemTypeRequiredWords('default')}`,
+  );
+  expect(standIn.requests).toEqual([]);
+});
+
+it('the --env file states it (SAP_SYSTEM_TYPE): the start goes on', async () => {
+  delete process.env.SAP_SYSTEM_TYPE;
+  fs.appendFileSync(envFile, 'SAP_SYSTEM_TYPE=onprem\n');
+  const s = await start({ kind: null });
+  try {
+    expect(s.exits).toEqual([]);
+    expect(s.opened()).toBe(1);
   } finally {
     await s.stop();
   }

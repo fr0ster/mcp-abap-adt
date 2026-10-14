@@ -34,6 +34,7 @@ import {
   probeGroup,
 } from '../../../../src/__tests__/helpers/adtStandIn';
 import { shutdownTools } from '../../../../src/__tests__/helpers/shutdownTools';
+import { stateSystemKind } from '../../../../src/__tests__/helpers/systemKind';
 import {
   activeTools,
   resetProcessLatchForTests,
@@ -288,6 +289,9 @@ export interface Stand {
 }
 
 export async function stand(options: StandOptions = {}): Promise<Stand> {
+  // The system kind is required: a jwt stand is a cloud stand-in, a basic
+  // one on-premise — as the cases were written for.
+  stateSystemKind(options.auth === 'jwt' ? 'cloud' : 'onprem');
   process.env.NO_PROXY = '127.0.0.1,localhost';
   process.env.no_proxy = '127.0.0.1,localhost';
   const adt = await adtStandIn();

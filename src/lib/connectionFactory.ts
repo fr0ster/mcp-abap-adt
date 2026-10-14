@@ -17,29 +17,28 @@ import {
 } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import { ServerRefusal } from './auth/serverRefusal';
 
-export type AbapSystemKind = 'onprem' | 'cloud';
+import { type AbapSystemKind, statedSystemKind } from './systemKind';
+
+export type { AbapSystemKind } from './systemKind';
+export { statedSystemKind } from './systemKind';
 
 /**
- * Which system this config dials.
- *
- * `SAP_SYSTEM_TYPE` states it outright and wins — `legacy` is an on-premise
- * system, just an older one. Absent that, a JWT means cloud, which is what the
- * removed factory did and what every existing deployment is therefore running
- * on; changing that default silently would re-route live connections.
- *
- * The point of reading the variable first is that the guess now has an
- * override: a bearer token against an on-premise system finally has a way to
- * say so.
+ * Which system this config dials: what `SAP_SYSTEM_TYPE` states (set by
+ * `--system-type`, the environment, the `--env` file or YAML
+ * `system-type`). It is required: nothing else decides it — not the
+ * credential (a JWT is no sign of a cloud system), not the URL. None, or a
+ * value other than `onprem`, `cloud` or `legacy`, is refused
+ * (`system_type_required`) before anything is sent.
  */
 export function resolveSystemKind(
-  config: SapConfig,
+  _config: SapConfig,
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
 ): AbapSystemKind {
-  const declared = env.SAP_SYSTEM_TYPE?.trim().toLowerCase();
-  if (declared === 'cloud') return 'cloud';
-  if (declared === 'onprem' || declared === 'legacy') return 'onprem';
-  return config.authType === 'jwt' ? 'cloud' : 'onprem';
+  const kind = statedSystemKind(env.SAP_SYSTEM_TYPE);
+  if (kind === undefined) throw new ServerRefusal('system_type_required');
+  return kind;
 }
 
 /**
@@ -268,6 +267,8 @@ function withHttpWireLog<T>(connection: T): T {
 /** How a connection was built, so a sibling can be opened exactly like it. */
 export interface ConnectionRecord {
   settings: SapConfig;
+  /** The system kind it was built for, as stated when it was built. */
+  kind?: AbapSystemKind;
   credential: IAuthProvider;
   logger?: ILogger | null;
 }
@@ -275,11 +276,12 @@ export interface ConnectionRecord {
 const records = new WeakMap<object, ConnectionRecord>();
 
 /**
- * The system kind a connection was built for: `resolveSystemKind` of the
- * settings the factory recorded. A connection the factory did not build (an
+ * The system kind a connection was built for: the kind the factory
+ * recorded when it built it (`resolveSystemKind` then). A connection the factory did not build (an
  * embedder's own) has no settings: the kind the server states for it
  * (`declared`, the server's `systemType` option) wins, then
- * `SAP_SYSTEM_TYPE`, else on-premise. The URL decides nothing.
+ * `SAP_SYSTEM_TYPE`. Neither is refused (`system_type_required`): the kind
+ * is never guessed, not from the URL either.
  */
 export function systemKindOf(
   connection: object,
@@ -287,7 +289,7 @@ export function systemKindOf(
   declared?: string,
 ): AbapSystemKind {
   const record = records.get(connection);
-  if (record) return resolveSystemKind(record.settings, env);
+  if (record) return record.kind ?? resolveSystemKind(record.settings, env);
   const stated = declared ? { SAP_SYSTEM_TYPE: declared } : env;
   return resolveSystemKind({} as SapConfig, stated);
 }
@@ -322,8 +324,9 @@ export function createAbapConnection(
     ...(sessionId !== undefined ? { sessionId } : {}),
   };
   const resumed = session !== undefined ? { session } : {};
+  const kind = resolveSystemKind(settings);
   const built = ((): IAbapConnection => {
-    if (resolveSystemKind(settings) === 'cloud') {
+    if (kind === 'cloud') {
       return withHttpWireLog(
         createConnection({
           ...common,
@@ -365,6 +368,11 @@ export function createAbapConnection(
     );
   })();
 
-  records.set(built as unknown as object, { settings, credential, logger });
+  records.set(built as unknown as object, {
+    settings,
+    credential,
+    logger,
+    kind,
+  });
   return built;
 }

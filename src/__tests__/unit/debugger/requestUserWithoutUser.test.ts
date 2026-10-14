@@ -3,14 +3,20 @@
  * system: an answer naming its user is the user, over any configured login.
  * Anything else is no information. On-premise (a `404`, an answer without a
  * user, another status) the configured login (the request scope's, then the
- * process's) stands in, none → the user is unknown. On ABAP Cloud, which
+ * process's) stands in, none → `system_user_unknown`, the tool path's code
+ * and words. A `404` is kept for the connection: asked once. A `401` is the
+ * credential failure as it came, on both kinds. On ABAP Cloud, which
  * always has it, one step to the call's error: a `404`
  * `cloud_without_systeminformation` (the configuration is inconsistent),
  * anything else `system_lookup_failed` — never the login in its place.
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
-import { ServerRefusal } from '../../../lib/auth/serverRefusal';
+import { failureOf } from '../../../lib/auth/failures';
+import {
+  ServerRefusal,
+  SYSTEM_USER_UNKNOWN_WORDS,
+} from '../../../lib/auth/serverRefusal';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { requestUserOf } from '../../../lib/debugger/ports';
 import { runWithRequestContext } from '../../../lib/requestContext';
@@ -54,6 +60,12 @@ afterEach(() => {
     else process.env[name] = value;
   }
 });
+
+/** The tool path's refusal for an unknown session user. */
+const USER_UNKNOWN = {
+  serverRefusal: 'system_user_unknown',
+  message: SYSTEM_USER_UNKNOWN_WORDS,
+};
 
 /** `systeminformation` answers that name no user. */
 const WITHOUT_USER: Array<[string, string]> = [
@@ -110,9 +122,25 @@ describe('on-premise', () => {
     try {
       standIn.answer(isLookup, 404);
       delete process.env.SAP_USERNAME;
-      await expect(requestUserOf(connection)).rejects.toThrow(
-        'the ABAP user of this connection is unknown',
+      await expect(requestUserOf(connection)).rejects.toMatchObject(
+        USER_UNKNOWN,
       );
+    } finally {
+      await closeBoth(standIn, connection);
+    }
+  });
+
+  it('without the function (404): asked once — a later call sends no systeminformation', async () => {
+    const { standIn, connection } = await standConnection();
+    try {
+      standIn.answer(isLookup, 404);
+      await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
+      await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
+      delete process.env.SAP_USERNAME;
+      await expect(requestUserOf(connection)).rejects.toMatchObject(
+        USER_UNKNOWN,
+      );
+      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     } finally {
       await closeBoth(standIn, connection);
     }
@@ -129,8 +157,8 @@ describe('on-premise', () => {
         });
         await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
         delete process.env.SAP_USERNAME;
-        await expect(requestUserOf(connection)).rejects.toThrow(
-          'the ABAP user of this connection is unknown',
+        await expect(requestUserOf(connection)).rejects.toMatchObject(
+          USER_UNKNOWN,
         );
       } finally {
         await closeBoth(standIn, connection);
@@ -149,8 +177,8 @@ describe('on-premise', () => {
         });
         await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
         delete process.env.SAP_USERNAME;
-        await expect(requestUserOf(connection)).rejects.toThrow(
-          'the ABAP user of this connection is unknown',
+        await expect(requestUserOf(connection)).rejects.toMatchObject(
+          USER_UNKNOWN,
         );
       } finally {
         await closeBoth(standIn, connection);
@@ -225,4 +253,27 @@ describe('ABAP Cloud', () => {
       }
     },
   );
+});
+
+describe.each([
+  ['on-premise', 'onprem'],
+  ['ABAP Cloud', 'cloud'],
+])('%s: a 401 on the lookup', (_kind, kind) => {
+  it('is the credential failure as it came — no login stands in, no other error', async () => {
+    process.env.SAP_SYSTEM_TYPE = kind;
+    const { standIn, connection } = await standConnection();
+    try {
+      standIn.answer(isLookup, 401);
+      const error = await requestUserOf(connection).then(
+        () => undefined,
+        (thrown: unknown) => thrown,
+      );
+      expect(error).not.toBeInstanceOf(ServerRefusal);
+      expect(failureOf(error)).toMatchObject({
+        error: 'authentication_failed',
+      });
+    } finally {
+      await closeBoth(standIn, connection);
+    }
+  });
 });

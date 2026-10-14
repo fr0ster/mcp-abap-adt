@@ -5,7 +5,6 @@ import { noopLogger } from '../handlerLogger.js';
 import {
   defaultSystemContextResolver,
   type SystemContextResolver,
-  systemContextResolverFor,
   withResolvedSystemContext,
 } from '../requestSystemResolution.js';
 import { statedSystemKind } from '../systemKind.js';
@@ -79,29 +78,29 @@ export interface HandlerExporterOptions {
 
   /**
    * Asks the connection's system for the responsible person and master
-   * system. An answer naming the user wins over anything configured. `null`,
-   * or an answer without a user, is no information: the configuration
+   * system. It answers only what the system said; the recipe around it is
+   * the same for any resolver, by the connection's kind (`systemType`). An
+   * answer naming the user wins over anything configured. `null`, an answer
+   * without a user, or a throw other than a credential failure, is no
+   * information: on ABAP Cloud the wrapped handler throws (a `404` thrown
+   * by the resolver `cloud_without_systeminformation`, anything else
+   * `system_lookup_failed`); on-premise the configuration
    * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
    * `x-sap-url`) stands, when the call states a user (the connection's
-   * `SAP_USERNAME`, else the request scope's login); with none the wrapped
-   * handler throws `system_user_unknown` and does not run. The shipped
-   * resolver answers no information for an on-premise system that has no
-   * `systeminformation`, answered without the user or with an error; on
-   * ABAP Cloud it throws instead — a `404` is
-   * `cloud_without_systeminformation`, any other `system_lookup_failed`. A
-   * resolver that throws makes the wrapped handler throw
-   * `system_lookup_failed` (a chain failure as it is), and the handler does
-   * not run. It is asked before each wrapped handler runs, as the server
-   * asks before a tool; nothing but an answer naming the user is kept, so
-   * the next call asks again. The default
-   * asks every system (one lookup per connection). `null` as the option
-   * disables it, and `getHandlerEntries()` then returns the groups' handlers
-   * unwrapped.
+   * `SAP_USERNAME`, else the request scope's login), and with none the
+   * wrapped handler throws `system_user_unknown`. A credential failure (a
+   * chain failure, a `401`) is thrown as it came. In each case the handler
+   * does not run. It is asked before each wrapped handler runs, as the
+   * server asks before a tool, once per connection: an answer naming the
+   * user is kept, and on-premise a `404` (the endpoint absent); anything
+   * else is not, so the next call asks again. The default asks every
+   * system's `systeminformation`. `null` as the option disables it, and
+   * `getHandlerEntries()` then returns the groups' handlers unwrapped.
    * MIGRATION (16.0.0): the kind of a connection the factory did not build is
    * no longer guessed from its URL — it is `systemType`, else
    * `SAP_SYSTEM_TYPE` (19.0.0: required, refused at construction without
-   * either); or pass your own `systemContextResolver`.
-   * @default the shipped resolver for `systemType`
+   * either).
+   * @default the shipped resolver
    */
   systemContextResolver?: SystemContextResolver | null;
 }
@@ -135,6 +134,7 @@ export class HandlerExporter {
   private readonly logger: Logger;
   private readonly handlerGroups: IHandlerGroup[];
   private readonly systemContextResolver: SystemContextResolver | null;
+  private readonly systemType: string | undefined;
 
   constructor(options?: HandlerExporterOptions) {
     // The system kind is required (never guessed): stated by the option,
@@ -147,11 +147,10 @@ export class HandlerExporter {
       throw new ServerRefusal('system_type_required');
     }
     this.logger = options?.logger ?? noopLogger;
+    this.systemType = options?.systemType;
     this.systemContextResolver =
       options?.systemContextResolver === undefined
-        ? options?.systemType
-          ? systemContextResolverFor(options.systemType)
-          : defaultSystemContextResolver
+        ? defaultSystemContextResolver
         : options.systemContextResolver;
 
     // Create dummy context for group instantiation
@@ -241,6 +240,7 @@ export class HandlerExporter {
               context?.connection,
               () => original(context, args),
               resolver,
+              this.systemType,
             )
         : // Args-only handlers close over their group's context, which the
           // embedder swaps before calling — so read it at call time.
@@ -250,6 +250,7 @@ export class HandlerExporter {
                 ?.connection,
               () => original(...callArgs),
               resolver,
+              this.systemType,
             );
     Object.defineProperty(wrapped, 'length', { value: original.length });
     return { ...entry, handler: wrapped as ToolHandler };

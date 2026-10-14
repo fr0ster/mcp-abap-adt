@@ -140,21 +140,23 @@ export interface EmbeddableMcpServerOptions {
 
   /**
    * Asks the connection's system for the responsible person and master
-   * system. An answer naming the user (`responsible`, a non-blank string)
-   * wins over anything configured. `null`, or an answer without a user, is
-   * no information: the configuration (`SAP_RESPONSIBLE`, the login:
-   * `SAP_USERNAME`, or `x-sap-login` with `x-sap-url`) stands, when the call
-   * states a user (the connection's `SAP_USERNAME`, else the request scope's
-   * login); with none the call fails with `system_user_unknown`. The shipped
-   * resolver answers no information for an on-premise system that has no
-   * `systeminformation`, answered without the user or with an error; on
-   * ABAP Cloud it throws instead — a `404` is
-   * `cloud_without_systeminformation`, any other `system_lookup_failed`. A
-   * resolver that throws fails that call with `system_lookup_failed` (a
-   * chain failure as it is). Either way its tool does not run, nothing but
-   * an answer naming the user is
-   * kept, and the next call asks again. The default asks every system (one
-   * lookup per connection). `null` as the option disables it.
+   * system. It answers only what the system said; the recipe around it is
+   * the server's, the same for any resolver, by the connection's kind
+   * (`systemType`). An answer naming the user (`responsible`, a non-blank
+   * string) wins over anything configured. `null`, an answer without a
+   * user, or a throw other than a credential failure, is no information: on
+   * ABAP Cloud the call's error (a `404` thrown by the resolver
+   * `cloud_without_systeminformation`, anything else
+   * `system_lookup_failed`); on-premise the configuration
+   * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
+   * `x-sap-url`) stands, when the call states a user (the connection's
+   * `SAP_USERNAME`, else the request scope's login), and with none the call
+   * fails with `system_user_unknown`. A credential failure (a chain
+   * failure, a `401`) is the call's as it came. Either way its tool does
+   * not run. An answer naming the user is kept per destination, and
+   * on-premise a `404` (the endpoint absent); anything else is not, and the
+   * next call asks again. The default asks every system's
+   * `systeminformation`. `null` as the option disables it.
    * @default defaultSystemContextResolver
    */
   systemContextResolver?: SystemContextResolver | null;

@@ -5,11 +5,14 @@
  * call's error: a `404` `cloud_without_systeminformation` (the configuration
  * is inconsistent), an answer without a user or another status
  * `system_lookup_failed` — the per-call lookup's codes. On-premise the
- * configured login stands in; none → `background_run_caller_unknown`.
+ * configured login stands in; none → `system_user_unknown`, the tool
+ * path's code and words. On-premise a `404` is kept: asked once. A `401` is
+ * the credential failure as it came, on both kinds.
  */
 
 import { TokenAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
+import { SYSTEM_USER_UNKNOWN_WORDS } from '../../../lib/auth/serverRefusal';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -200,19 +203,26 @@ describe('on-premise', () => {
     }
   });
 
-  const NO_INFORMATION: Array<[string, (standIn: AdtStandIn) => void]> = [
-    ['no systeminformation (404)', (standIn) => standIn.answer(isLookup, 404)],
+  const NO_INFORMATION: Array<[string, (standIn: AdtStandIn) => void, number]> =
     [
-      'an answer without a user',
-      (standIn) => standIn.body(isLookup, JSON.stringify({ systemID: 'SID' })),
-    ],
-    ['an error (405)', (standIn) => standIn.answer(isLookup, 405)],
-    ['an error (500)', (standIn) => standIn.answer(isLookup, 500)],
-  ];
+      [
+        'no systeminformation (404)',
+        (standIn) => standIn.answer(isLookup, 404),
+        1,
+      ],
+      [
+        'an answer without a user',
+        (standIn) =>
+          standIn.body(isLookup, JSON.stringify({ systemID: 'SID' })),
+        2,
+      ],
+      ['an error (405)', (standIn) => standIn.answer(isLookup, 405), 2],
+      ['an error (500)', (standIn) => standIn.answer(isLookup, 500), 2],
+    ];
 
   it.each(NO_INFORMATION)(
-    '%s: the configured login; not kept, so the next call asks again',
-    async (_case, answer) => {
+    '%s: the configured login; only a 404 is kept, anything else asked again',
+    async (_case, answer, lookups) => {
       const standIn = await adtStandIn();
       answer(standIn);
       const { server, client, caller } = await standServerOn(standIn, {
@@ -222,7 +232,7 @@ describe('on-premise', () => {
         expect((await client.call('ListBackgroundRuns')).isError).toBeFalsy();
         expect(caller()).toBe('LOGIN_USER');
         expect((await client.call('ListBackgroundRuns')).isError).toBeFalsy();
-        expect(standIn.requests.filter(isLookup)).toHaveLength(2);
+        expect(standIn.requests.filter(isLookup)).toHaveLength(lookups);
       } finally {
         await client.close();
         await server.terminalClose();
@@ -231,16 +241,43 @@ describe('on-premise', () => {
     },
   );
 
-  it.each(NO_INFORMATION)('%s and no login: unknown', async (_case, answer) => {
+  it.each(NO_INFORMATION)(
+    '%s and no login: system_user_unknown',
+    async (_case, answer) => {
+      const standIn = await adtStandIn();
+      answer(standIn);
+      const { server, client } = await standServerOn(standIn, {});
+      try {
+        const result = await client.call('ListBackgroundRuns');
+        expect(result.isError).toBe(true);
+        expect(result.payload).toEqual({
+          error: 'system_user_unknown',
+          message: SYSTEM_USER_UNKNOWN_WORDS,
+        });
+      } finally {
+        await client.close();
+        await server.terminalClose();
+        await standIn.close();
+      }
+    },
+  );
+});
+
+describe.each([
+  ['on-premise', 'onprem'],
+  ['ABAP Cloud', 'cloud'],
+])('%s: a 401 on the caller lookup', (_kind, kind) => {
+  it('is the credential failure as it came — no login stands in', async () => {
+    process.env.SAP_SYSTEM_TYPE = kind;
     const standIn = await adtStandIn();
-    answer(standIn);
-    const { server, client } = await standServerOn(standIn, {});
+    standIn.answer(isLookup, 401);
+    const { server, client } = await standServerOn(standIn, {
+      username: 'LOGIN_USER',
+    });
     try {
       const result = await client.call('ListBackgroundRuns');
       expect(result.isError).toBe(true);
-      expect(result.payload).toMatchObject({
-        error: 'background_run_caller_unknown',
-      });
+      expect(result.payload).toMatchObject({ error: 'authentication_failed' });
     } finally {
       await client.close();
       await server.terminalClose();

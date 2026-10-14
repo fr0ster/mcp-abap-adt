@@ -21,7 +21,6 @@ export type ServerRefusalCode =
   | 'background_run_not_available'
   | 'background_run_running'
   | 'background_run_limit'
-  | 'background_run_caller_unknown'
   | 'system_lookup_failed'
   | 'cloud_without_systeminformation'
   | 'system_user_unknown'
@@ -83,7 +82,8 @@ export const BACKGROUND_RUN_RUNNING_WORDS =
  * always has `systeminformation`): the endpoint answered without the
  * session user, another error status, or failed — a problem of the ABAP
  * system with a valid configuration (a `404` is
- * `cloud_without_systeminformation`); also a custom resolver that threw.
+ * `cloud_without_systeminformation`); also a custom resolver that answered
+ * nothing or threw (not a credential failure).
  * The tool did not run; the next call asks again. On stdio the same failure
  * at the start ends the process.
  */
@@ -117,10 +117,6 @@ export const SYSTEM_USER_UNKNOWN_WORDS =
  */
 export const INSTANCE_CLOSED_WORDS =
   'the server instance is closed: no new connection is opened for it';
-
-/** A background run whose request names no backend user, and SAP named none either. */
-export const BACKGROUND_RUN_CALLER_UNKNOWN_WORDS =
-  'a background run is kept for the backend user of the request, and none could be determined (the request names none and the system answered none)';
 
 /**
  * A background run beyond the caller's limit (running plus kept): the
@@ -158,7 +154,6 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   background_runs_unavailable: BACKGROUND_RUNS_UNAVAILABLE_WORDS,
   background_run_not_available: BACKGROUND_RUN_NOT_AVAILABLE_WORDS,
   background_run_running: BACKGROUND_RUN_RUNNING_WORDS,
-  background_run_caller_unknown: BACKGROUND_RUN_CALLER_UNKNOWN_WORDS,
   system_lookup_failed: SYSTEM_LOOKUP_FAILED_WORDS,
   cloud_without_systeminformation: CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS,
   system_user_unknown: SYSTEM_USER_UNKNOWN_WORDS,

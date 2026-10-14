@@ -203,16 +203,18 @@ it.each([
   [
     'no systeminformation (404)',
     (standIn: AdtStandIn) => standIn.answer(isLookup, 404),
+    1,
   ],
-  ['an error (500)', (standIn: AdtStandIn) => standIn.answer(isLookup, 500)],
+  ['an error (500)', (standIn: AdtStandIn) => standIn.answer(isLookup, 500), 2],
   [
     'an answer without a user',
     (standIn: AdtStandIn) =>
       standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' })),
+    2,
   ],
 ] as const)(
-  'on-premise, %s: the stated user is taken and the tools run; no information is not kept, so each call asks again',
-  async (_case, answer) => {
+  'on-premise, %s: the stated user is taken and the tools run; only a 404 is kept for the destination, anything else asked again',
+  async (_case, answer, lookups) => {
     const standIn = await adtStandIn();
     answer(standIn);
     const s = await builtStand(standIn, 'onprem');
@@ -223,10 +225,31 @@ it.each([
       expect(
         (await s.call('ReadClass', { class_name: 'ZCL_ONPREM_TWO' })).isError,
       ).toBe(false);
-      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
+      expect(standIn.requests.filter(isLookup)).toHaveLength(lookups);
       expect(
         standIn.requests.filter((r) => !isLogoff(r.url)).length,
       ).toBeGreaterThan(2);
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  },
+);
+
+it.each([
+  ['on-premise', 'onprem'],
+  ['ABAP Cloud', 'cloud'],
+] as const)(
+  '%s, a 401 on the lookup: the credential failure as it came — no stated user stands in, the tool not run',
+  async (_kind, kind) => {
+    const standIn = await adtStandIn();
+    standIn.answer(isLookup, 401);
+    const s = await builtStand(standIn, kind);
+    try {
+      const answer = await s.call('ReadClass', { class_name: 'ZCL_REFUSED' });
+      expect(answer.isError).toBe(true);
+      expect(answer.payload).toMatchObject({ error: 'authentication_failed' });
+      expect(standIn.requests.some(of('ZCL_REFUSED'))).toBe(false);
     } finally {
       await s.close();
       await standIn.close();

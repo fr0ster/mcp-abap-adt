@@ -39,10 +39,6 @@ import {
   withResolvedSystemContext,
 } from '../../lib/requestContext';
 import {
-  CloudWithoutSystemInformationError,
-  NoSystemInformationError,
-} from '../../lib/requestSystemResolution';
-import {
   getEffectiveSystemContext,
   resetSystemContextCache,
   setSystemContext,
@@ -146,7 +142,10 @@ beforeEach(() => {
   });
 });
 
-describe('defaultSystemContextResolver', () => {
+const status = (code: number) =>
+  Object.assign(new Error('placeholder'), { response: { status: code } });
+
+describe('defaultSystemContextResolver: only what the system said, on every kind', () => {
   it('maps a cloud system to responsible and master system', async () => {
     await expect(defaultSystemContextResolver(cloudConn())).resolves.toEqual({
       responsible: 'CB_USER',
@@ -162,61 +161,45 @@ describe('defaultSystemContextResolver', () => {
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
-  it('an on-premise system without the function (404): null, the configuration applies', async () => {
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
-    await expect(defaultSystemContextResolver(onPremConn())).resolves.toBe(
-      null,
-    );
-    await expect(
-      defaultSystemContextResolver(
-        built(
-          {
-            url: 'https://system.abap.example.hana.ondemand.com',
-            authType: 'basic',
-          },
-          'onprem',
-        ),
-      ),
-    ).resolves.toBe(null);
+  it.each([
+    ['cloud', cloudConn],
+    ['on-premise', onPremConn],
+  ])('%s, an answer without a user: null', async (_kind, conn) => {
+    lookup.mockResolvedValue({ user: undefined, systemId: 'SID' });
+    await expect(defaultSystemContextResolver(conn())).resolves.toBe(null);
   });
 
-  it.each([405, 501, 500])(
-    'an on-premise system whose systeminformation answers %i: no information, null — the configuration applies',
-    async (status) => {
-      lookup.mockRejectedValue(
-        Object.assign(new Error('placeholder'), { response: { status } }),
-      );
-      await expect(defaultSystemContextResolver(onPremConn())).resolves.toBe(
-        null,
-      );
+  it.each([
+    ['cloud', cloudConn, 404],
+    ['cloud', cloudConn, 500],
+    ['on-premise', onPremConn, 404],
+    ['on-premise', onPremConn, 500],
+  ] as const)(
+    '%s, a failed request (%i): thrown as it came — the kind is not its to read',
+    async (_kind, conn, code) => {
+      const failed = status(code);
+      lookup.mockRejectedValue(failed);
+      await expect(defaultSystemContextResolver(conn())).rejects.toBe(failed);
     },
   );
+});
 
-  it('an on-premise system that answers without a user: no information, null', async () => {
-    lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' });
-    await expect(defaultSystemContextResolver(onPremConn())).resolves.toBe(
-      null,
-    );
-  });
-
+describe('the recipe around the resolver, by the kind', () => {
   it('the kind recorded at build wins over a later SAP_SYSTEM_TYPE', async () => {
-    const connection = onPremConn();
+    const connection = onPremUserConn();
     process.env.SAP_SYSTEM_TYPE = 'cloud';
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
-    await expect(defaultSystemContextResolver(connection)).resolves.toBe(null);
+    lookup.mockRejectedValue(status(404));
+    await expect(
+      withResolvedSystemContext(connection, () => 'ran'),
+    ).resolves.toBe('ran');
   });
 
   it('a connection the factory did not build, no kind stated anywhere: its 404 is system_type_required', async () => {
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
+    lookup.mockRejectedValue(status(404));
     await expect(
-      defaultSystemContextResolver(
+      withResolvedSystemContext(
         foreignConn('https://system.example.invalid'),
+        () => 'ran',
       ),
     ).rejects.toMatchObject({ serverRefusal: 'system_type_required' });
   });
@@ -225,53 +208,155 @@ describe('defaultSystemContextResolver', () => {
     ['https://system.abap.example.hana.ondemand.com'],
     ['https://system.example.invalid'],
   ])(
-    'a connection the factory did not build: its 404 read by SAP_SYSTEM_TYPE alone, never the URL (%s)',
+    'a connection the factory did not build: its 404 read by the stated kind alone, never the URL (%s)',
     async (url) => {
-      const absent = Object.assign(new Error('placeholder'), {
-        response: { status: 404 },
+      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+      lookup.mockRejectedValue(status(404));
+      await expect(
+        runWithRequestContext({ login: 'BOB' }, () =>
+          withResolvedSystemContext(
+            foreignConn(url),
+            () => 'ran',
+            undefined,
+            'onprem',
+          ),
+        ),
+      ).resolves.toBe('ran');
+      await expect(
+        runWithRequestContext({ login: 'BOB' }, () =>
+          withResolvedSystemContext(
+            foreignConn(url),
+            () => 'ran',
+            undefined,
+            'cloud',
+          ),
+        ),
+      ).rejects.toMatchObject({
+        serverRefusal: 'cloud_without_systeminformation',
       });
-      lookup.mockRejectedValue(absent);
-      process.env.SAP_SYSTEM_TYPE = 'onprem';
-      await expect(
-        defaultSystemContextResolver(foreignConn(url)),
-      ).resolves.toBe(null);
-      process.env.SAP_SYSTEM_TYPE = 'cloud';
-      await expect(
-        defaultSystemContextResolver(foreignConn(url)),
-      ).rejects.toBeInstanceOf(CloudWithoutSystemInformationError);
+      warn.mockRestore();
     },
   );
 
-  it("a cloud system that answers without a user: the lookup fails (the system's problem), never null", async () => {
-    lookup.mockResolvedValue({
-      user: undefined,
-      systemId: 'CLD',
-    });
-    await expect(
-      defaultSystemContextResolver(cloudConn()),
-    ).rejects.toBeInstanceOf(NoSystemInformationError);
+  it.each([
+    ['cloud', cloudConn],
+    ['on-premise', onPremUserConn],
+  ])(
+    '%s, a 401 on the lookup: the credential failure as it came — no fallback, never another error',
+    async (_kind, conn) => {
+      const refused = status(401);
+      lookup.mockRejectedValue(refused);
+      const fn = jest.fn();
+      await expect(
+        runWithRequestContext({ login: 'BOB' }, () =>
+          withResolvedSystemContext(conn(), fn),
+        ),
+      ).rejects.toBe(refused);
+      expect(fn).not.toHaveBeenCalled();
+    },
+  );
+
+  it('on-premise, a 404: asked once per connection — later calls send no systeminformation', async () => {
+    lookup.mockRejectedValue(status(404));
+    const connection = onPremUserConn();
+    for (let i = 0; i < 3; i += 1) {
+      await expect(
+        withResolvedSystemContext(connection, () => 'ran'),
+      ).resolves.toBe('ran');
+    }
+    expect(lookup).toHaveBeenCalledTimes(1);
   });
 
-  it('a cloud system whose systeminformation answers 404: not a valid ABAP Cloud system, never null', async () => {
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+  it('on-premise, a kept 404 with no user stated: system_user_unknown each call, still asked once', async () => {
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    lookup.mockRejectedValue(status(404));
+    const connection = onPremConn();
+    for (let i = 0; i < 2; i += 1) {
+      await expect(
+        withResolvedSystemContext(connection, () => 'ran'),
+      ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
+    }
+    await expect(
+      runWithRequestContext({ login: 'BOB' }, () =>
+        withResolvedSystemContext(connection, () => 'ran'),
+      ),
+    ).resolves.toBe('ran');
+    expect(lookup).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it.each([['cloud', cloudConn, 'cloud_without_systeminformation']] as const)(
+    '%s, a 404 is not kept: the next call asks again (%s)',
+    async (_kind, conn, code) => {
+      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+      lookup.mockRejectedValue(status(404));
+      const connection = conn();
+      for (let i = 0; i < 2; i += 1) {
+        await expect(
+          withResolvedSystemContext(connection, () => 'ran'),
+        ).rejects.toMatchObject({ serverRefusal: code });
+      }
+      expect(lookup).toHaveBeenCalledTimes(2);
+      warn.mockRestore();
+    },
+  );
+
+  describe('a custom resolver answering nothing', () => {
+    const nothing: Array<[string, () => SystemContextResolver]> = [
+      ['null', () => async () => null],
+      [
+        'a throw',
+        () => async () => {
+          throw new Error('custom lookup failed');
+        },
+      ],
+    ];
+
+    it.each(nothing)(
+      'on ABAP Cloud (%s): the cloud error, the stated user not used',
+      async (_what, make) => {
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+        const fn = jest.fn();
+        await expect(
+          runWithRequestContext({ login: 'BOB' }, () =>
+            withResolvedSystemContext(cloudConn(), fn, make()),
+          ),
+        ).rejects.toMatchObject({ serverRefusal: 'system_lookup_failed' });
+        expect(fn).not.toHaveBeenCalled();
+        warn.mockRestore();
+      },
     );
-    await expect(
-      defaultSystemContextResolver(cloudConn()),
-    ).rejects.toBeInstanceOf(CloudWithoutSystemInformationError);
-  });
 
-  it.each([405, 501, 500])(
-    "a cloud system whose systeminformation answers %i: the lookup fails (the system's problem), not an answer",
-    async (status) => {
-      lookup.mockRejectedValue(
-        Object.assign(new Error('placeholder'), { response: { status } }),
-      );
+    it.each(nothing)(
+      'on-premise (%s): the headers / parameters — the stated values, else system_user_unknown',
+      async (_what, make) => {
+        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+        await expect(
+          runWithRequestContext(
+            { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
+            () => withResolvedSystemContext(onPremConn(), seen, make()),
+          ),
+        ).resolves.toMatchObject({ responsible: 'ALICE', masterSystem: 'SID' });
+        await expect(
+          withResolvedSystemContext(onPremConn(), seen, make()),
+        ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
+        warn.mockRestore();
+      },
+    );
+
+    it('a custom resolver throwing a 404: the cloud error for a missing endpoint on ABAP Cloud', async () => {
+      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+      const resolver: SystemContextResolver = async () => {
+        throw status(404);
+      };
       await expect(
-        defaultSystemContextResolver(cloudConn()),
-      ).rejects.toBeInstanceOf(NoSystemInformationError);
-    },
-  );
+        withResolvedSystemContext(cloudConn(), () => 'ran', resolver),
+      ).rejects.toMatchObject({
+        serverRefusal: 'cloud_without_systeminformation',
+      });
+      warn.mockRestore();
+    });
+  });
 });
 
 describe('memoisation per connection', () => {
@@ -360,7 +445,7 @@ describe('withResolvedSystemContext', () => {
     });
   });
 
-  it('on-premise without the function (404), no user stated: system_user_unknown, fn never runs, and the next call asks again', async () => {
+  it('on-premise without the function (404), no user stated: system_user_unknown, fn never runs; the 404 is kept, so the next call sends no lookup', async () => {
     const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
     lookup.mockRejectedValue(
       Object.assign(new Error('placeholder'), { response: { status: 404 } }),
@@ -375,7 +460,7 @@ describe('withResolvedSystemContext', () => {
       ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
     }
     expect(fn).not.toHaveBeenCalled();
-    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(lookup).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });
 
@@ -469,10 +554,12 @@ describe('withResolvedSystemContext', () => {
             response: { status: 404 },
           }),
         ),
+      1,
     ],
     [
       'an answer without a user',
       () => lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' }),
+      2,
     ],
     [
       'an error (500)',
@@ -482,12 +569,13 @@ describe('withResolvedSystemContext', () => {
             response: { status: 500 },
           }),
         ),
+      2,
     ],
   ] as const;
 
   it.each(onPremNoInformation)(
-    'on-premise, %s: the stated values are taken, fn runs, and each call asks again',
-    async (_case, answer) => {
+    'on-premise, %s: the stated values are taken, fn runs; asked again only when not a 404',
+    async (_case, answer, lookups) => {
       answer();
       const connection = onPremConn();
       for (let i = 0; i < 2; i++) {
@@ -498,7 +586,7 @@ describe('withResolvedSystemContext', () => {
           ),
         ).resolves.toMatchObject({ responsible: 'ALICE', masterSystem: 'SID' });
       }
-      expect(lookup).toHaveBeenCalledTimes(2);
+      expect(lookup).toHaveBeenCalledTimes(lookups);
     },
   );
 
@@ -826,7 +914,7 @@ describe('HandlerExporter.getHandlerEntries', () => {
         'cloud_without_systeminformation',
       ],
     ])(
-      '%s: the call fails with the server refusal, no handler runs, and the next call asks again',
+      '%s: the call fails with the server refusal, no handler runs; the next call asks again, but for an on-premise 404',
       async (_case, conn, answer, code) => {
         const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
         answer();
@@ -834,7 +922,9 @@ describe('HandlerExporter.getHandlerEntries', () => {
         await expect(call()).rejects.toMatchObject({ serverRefusal: code });
         await expect(call()).rejects.toMatchObject({ serverRefusal: code });
         expect(ran).not.toHaveBeenCalled();
-        expect(lookup).toHaveBeenCalledTimes(2);
+        expect(lookup).toHaveBeenCalledTimes(
+          _case === 'an on-premise 404 with no user stated' ? 1 : 2,
+        );
         warn.mockRestore();
       },
     );
@@ -1054,7 +1144,7 @@ describe('BaseMcpServer.registerHandlers', () => {
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
-  it('an injected on-premise connection, a 404, no user stated: system_user_unknown, the tool does not run, the next call asks again', async () => {
+  it('an injected on-premise connection, a 404, no user stated: system_user_unknown, the tool does not run; the 404 is kept, the next call sends no lookup', async () => {
     const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
     lookup.mockRejectedValue(
       Object.assign(new Error('placeholder'), { response: { status: 404 } }),
@@ -1074,9 +1164,55 @@ describe('BaseMcpServer.registerHandlers', () => {
       expect(result.content[0]?.text).toContain('system_user_unknown');
     }
     expect(group.observed).toBeUndefined();
-    expect(lookup).toHaveBeenCalledTimes(2);
+    expect(lookup).toHaveBeenCalledTimes(1);
     warn.mockRestore();
   });
+
+  it.each([
+    ['null', async () => null],
+    [
+      'a throw',
+      async () => {
+        throw new Error('custom lookup failed');
+      },
+    ],
+  ] as Array<[string, SystemContextResolver]>)(
+    "a custom resolver answering nothing (%s): on ABAP Cloud the cloud error, on-premise the stated values — the server's recipe, by the kind",
+    async (_what, resolver) => {
+      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+      const cloudGroup = new ReportingGroup({ connection: {} as never });
+      const cloud = new EmbeddableMcpServer({
+        connection: cloudConn() as never,
+        handlersRegistry: new CompositeHandlersRegistry([cloudGroup]),
+        systemType: 'cloud',
+        systemContextResolver: resolver,
+      });
+      const refused = (await runWithRequestContext(
+        { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
+        () => callTool(cloud, 'Report'),
+      )) as { isError?: boolean; content: Array<{ text: string }> };
+      expect(refused.isError).toBe(true);
+      expect(refused.content[0]?.text).toContain('system_lookup_failed');
+      expect(cloudGroup.observed).toBeUndefined();
+
+      const onPremGroup = new ReportingGroup({ connection: {} as never });
+      const onPrem = new EmbeddableMcpServer({
+        connection: onPremConn() as never,
+        handlersRegistry: new CompositeHandlersRegistry([onPremGroup]),
+        systemType: 'onprem',
+        systemContextResolver: resolver,
+      });
+      await runWithRequestContext(
+        { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
+        () => callTool(onPrem, 'Report'),
+      );
+      expect(onPremGroup.observed).toMatchObject({
+        responsible: 'ALICE',
+        masterSystem: 'SID',
+      });
+      warn.mockRestore();
+    },
+  );
 
   it('systemContextResolver: null disables resolution', async () => {
     const server = new EmbeddableMcpServer({

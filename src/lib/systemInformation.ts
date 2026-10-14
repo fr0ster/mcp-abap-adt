@@ -15,10 +15,10 @@
  *   is an answer without a user: `user` `undefined`);
  * - anything else is thrown as it came — a status other than a `2xx` the
  *   connection handed back instead of throwing as a
- *   `SystemInformationStatusError`. A `404` is the endpoint absent
- *   (`isSystemInformationUnavailable`): on ABAP Cloud, which always has it,
- *   the configuration or the headers are inconsistent; any other failure is
- *   a problem of the ABAP system (`systemContextResolverFor`).
+ *   `SystemInformationStatusError`. A `401` is the credentials refused
+ *   (`isCredentialRefusedStatus`), not a `systeminformation` failure; a
+ *   `404` is the endpoint absent (`isSystemInformationUnavailable`); how
+ *   the server reads each is its recipe (`systemForCall`).
  *
  * The request is the helper's: GET, the same `Accept`, no timeout, the
  * cache-busting parameter Eclipse sends.
@@ -121,4 +121,13 @@ function statusOf(error: unknown): unknown {
  */
 export function isSystemInformationUnavailable(error: unknown): boolean {
   return statusOf(error) === 404;
+}
+
+/**
+ * Whether `error` — what a request threw — is the credentials refused: a
+ * `401`, which any call would get, so it is never read as the
+ * `systeminformation` endpoint's answer.
+ */
+export function isCredentialRefusedStatus(error: unknown): boolean {
+  return statusOf(error) === 401;
 }

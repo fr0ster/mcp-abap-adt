@@ -7,8 +7,8 @@
  * request's `x-sap-login`. Each session sees its own values — two
  * concurrent sessions never see each other's. Such a system names no user,
  * so the session must state one (`x-sap-login` of a basic connection): one
- * that states none is refused `system_user_unknown` before its tool, and its
- * next call asks again.
+ * that states none is refused `system_user_unknown` before its tool. The
+ * 404 is kept for the session's destination: its next call sends no lookup.
  */
 
 import type { Server } from 'node:http';
@@ -251,7 +251,7 @@ describe('SseServer: responsible and master system per session', () => {
       { ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' },
     ],
   ])(
-    '%s states no user: system_user_unknown, the tool not run, and the next call on the session asks again',
+    '%s states no user: system_user_unknown, the tool not run; the 404 is kept, so the next call on the session sends no lookup',
     async (_case, headers) => {
       process.env.SAP_USERNAME = 'PROCESS_LOGIN';
       const before = mockLookups.count;
@@ -263,16 +263,16 @@ describe('SseServer: responsible and master system per session', () => {
           error: 'system_user_unknown',
         });
       }
-      expect(mockLookups.count - before).toBe(2);
+      expect(mockLookups.count - before).toBe(1);
     },
   );
 
-  it('a session that states its user: every call runs, each asking again (no information is not kept)', async () => {
+  it('a session that states its user: every call runs, asked once (an on-premise 404 is kept)', async () => {
     const before = mockLookups.count;
     const next = await session(BASIC);
     expect((await next()).isError).toBe(false);
     expect((await next()).isError).toBe(false);
-    expect(mockLookups.count - before).toBe(2);
+    expect(mockLookups.count - before).toBe(1);
   });
 
   it('two concurrent sessions each see their own', async () => {

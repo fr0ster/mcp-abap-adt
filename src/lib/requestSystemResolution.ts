@@ -2,15 +2,17 @@
  * Fills the responsible person and master system of a request from the ABAP
  * system its connection points at.
  *
- * The responsible person is the user the system names in its
- * `systeminformation`, and the master system its system id. When the system
- * answers with them, they are taken from there. When it has no
- * `systeminformation`, answers without the user, or answers an error: on
- * ABAP Cloud (which always has it) that is the call's error; on-premise the
- * configured values (the request's headers on HTTP/SSE, the start
- * configuration on stdio) are taken, and the call's error only when they
- * state no user either. The lookup is made here, inside the library — no
- * host has to repeat it or import adt-clients itself.
+ * A resolver (the shipped one reads `systeminformation`) answers only what
+ * the system said: the information (the user, the system id), no
+ * information, or a credential failure. The recipe around it is the
+ * server's, the same for any resolver, by the connection's stated kind
+ * (`systemForCall`): the information is taken when given; a credential
+ * failure is the call's as it came; no information is, on ABAP Cloud
+ * (which always has `systeminformation`), the call's error, and on-premise
+ * the configured values (the request's headers on HTTP/SSE, the start
+ * configuration on stdio) — the call's error only when they state no user
+ * either. The lookup is made here, inside the library — no host has to
+ * repeat it or import adt-clients itself.
  *
  * Resolution is keyed by the connection object: one connection belongs to one
  * user on one system, so its answer is the same for every request on it and
@@ -27,40 +29,51 @@ import { logger } from './logger';
 import { getRequestContext, runWithRequestContext } from './requestContext';
 import { getEffectiveSystemContext } from './systemContext';
 import {
+  isCredentialRefusedStatus,
   isSystemInformationUnavailable,
   readSystemInformation,
 } from './systemInformation';
 
 /**
- * Resolved values; `null` when the system gave no information (an
- * on-premise system without `systeminformation`, one that answered without
- * the user or answered an error) — the configured values then stand as they
- * are.
+ * Resolved values; `null` when the system gave no information — on-premise
+ * the configured values then stand as they are.
  */
 export type ResolvedSystemContext = {
   responsible?: string;
   masterSystem?: string;
 } | null;
 
-/** Looks up the responsible person and master system for a connection. */
+/**
+ * Looks up the responsible person and master system for a connection. It
+ * answers only what the system said: an answer naming the user (a non-blank
+ * `responsible`) is the information; `null`, or an answer naming no user, is
+ * no information; a throw is a credential failure when it is one (a chain
+ * failure, or a `401`), thrown as it came — else no information, a `404`
+ * read as the endpoint absent. What follows (the kind's rule, the stated
+ * user) is the server's, never the resolver's.
+ */
 export type SystemContextResolver = (
   connection: IAbapConnection,
 ) => Promise<ResolvedSystemContext>;
 
-/**
- * One resolver per stated kind, for the process: `resolveOnce` memoises per
- * resolver, so a host that builds a server per request still makes one
- * lookup per connection.
- */
-const resolversByKind = new Map<string | undefined, SystemContextResolver>();
+/** System information as kept: an answer naming the user. */
+type KnownSystemContext = Exclude<ResolvedSystemContext, null>;
 
-/** The shipped resolvers: their `responsible` is the session's user. */
+/**
+ * What a lookup answered, as the recipe reads it: the information, or none —
+ * `absent` when the system has no `systeminformation` endpoint (a `404`).
+ */
+export type SystemLookup =
+  | { readonly system: KnownSystemContext }
+  | { readonly system: null; readonly absent: boolean };
+
+/** The shipped resolver: its `responsible` is the session's user. */
 const shippedResolvers = new WeakSet<SystemContextResolver>();
 
 /**
- * Whether `resolver` is a shipped one (`systemContextResolverFor`), whose
- * answer names the session's user as `systeminformation` does — so a known
- * answer serves for the user too, with no second request.
+ * Whether `resolver` is the shipped one (`defaultSystemContextResolver`),
+ * whose answer names the session's user as `systeminformation` does — so a
+ * known answer serves for the user too, with no second request.
  */
 export function isShippedResolver(
   resolver: SystemContextResolver | null,
@@ -95,53 +108,35 @@ export class NoSystemInformationError extends Error {
 }
 
 /**
- * The default resolver for a server that states its system kind
- * (`systemType`): for a connection the factory did not build, that kind wins
- * over `SAP_SYSTEM_TYPE`. A connection the factory built follows its
- * recorded settings either way. The same kind answers the same resolver.
- *
- * It asks the system's own `systeminformation` (`readSystemInformation`):
- * an answer naming the user is the user as responsible and the system id as
- * master system. Anything else — a `404`, an answer without the user, an
- * error — is no information: on ABAP Cloud a `404` is
- * `CloudWithoutSystemInformationError` (the configuration or headers are
- * inconsistent) and any other `NoSystemInformationError` (the system's
- * problem); on-premise `null` (the configured values apply). A chain
- * failure is thrown as it came. The kind is the one the connection was built for
- * (`systemKindOf`), never a guess from its URL or from the answer.
+ * The shipped resolver: the system's own `systeminformation`
+ * (`readSystemInformation`). An answer naming the user is the user as
+ * responsible and the system id as master system; an answer without the
+ * user is `null`; a failed request is thrown as it came. The same on every
+ * kind of system: the kind's rule is the server's (`systemForCall`).
  */
-export function systemContextResolverFor(
-  systemType: string | undefined,
-): SystemContextResolver {
-  const known = resolversByKind.get(systemType);
-  if (known) return known;
-  const resolver: SystemContextResolver = async (connection) => {
-    let user: string | undefined;
-    let systemId: string | undefined;
-    let absent = false;
-    try {
-      ({ user, systemId } = await readSystemInformation(connection));
-    } catch (error) {
-      if (readGuarded(failureOf, error) !== undefined) throw error;
-      absent = isSystemInformationUnavailable(error);
-    }
-    if (typeof user === 'string' && user.trim() !== '') {
-      return { responsible: user, masterSystem: systemId };
-    }
-    if (systemKindOf(connection, process.env, systemType) === 'cloud') {
-      throw absent
-        ? new CloudWithoutSystemInformationError()
-        : new NoSystemInformationError();
-    }
-    return null;
-  };
-  resolversByKind.set(systemType, resolver);
-  shippedResolvers.add(resolver);
-  return resolver;
-}
+export const defaultSystemContextResolver: SystemContextResolver = async (
+  connection,
+) => {
+  const { user, systemId } = await readSystemInformation(connection);
+  if (typeof user === 'string' && user.trim() !== '') {
+    return { responsible: user, masterSystem: systemId };
+  }
+  return null;
+};
+shippedResolvers.add(defaultSystemContextResolver);
 
-export const defaultSystemContextResolver: SystemContextResolver =
-  systemContextResolverFor(undefined);
+/**
+ * Whether `error` — what a lookup threw — is a credential failure: a chain
+ * failure (the credentials refused, read by `failureOf`), or a `401`. Not a
+ * `systeminformation` failure: any call would get it, so it is the call's as
+ * it came, on every kind of system.
+ */
+function isCredentialFailure(error: unknown): boolean {
+  return (
+    readGuarded(failureOf, error) !== undefined ||
+    isCredentialRefusedStatus(error)
+  );
+}
 
 /**
  * An on-premise system that gave no information whose call states no user
@@ -157,12 +152,13 @@ export class SystemUserUnknownError extends Error {
 
 /**
  * What a failed lookup is to the call that needed it — the same on every
- * path that asks before a handler runs (the server's, `HandlerExporter`'s):
- * an ABAP Cloud system without the endpoint
+ * path that asks (the server's, `HandlerExporter`'s, the debugger's, a
+ * background run's caller): an ABAP Cloud system without the endpoint
  * `cloud_without_systeminformation`, an on-premise system with no
- * information and no user stated `system_user_unknown`, a chain failure as
- * it is, any other the server's `system_lookup_failed`. `warn` gets fixed words, or the error's class
- * only: a lookup's message may quote what the system answered (H4).
+ * information and no user stated `system_user_unknown`, a credential
+ * failure as it came, any other the server's `system_lookup_failed`. `warn`
+ * gets fixed words, or the error's class only: a lookup's message may quote
+ * what the system answered (H4).
  */
 export function systemLookupRefusal(
   error: unknown,
@@ -180,7 +176,7 @@ export function systemLookupRefusal(
     );
     return new ServerRefusal('system_user_unknown');
   }
-  if (readGuarded(failureOf, error) !== undefined) return error;
+  if (isCredentialFailure(error)) return error;
   warn?.(
     `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
   );
@@ -196,19 +192,58 @@ const applied = new AsyncLocalStorage<true>();
 
 const memo = new WeakMap<
   SystemContextResolver,
-  WeakMap<object, Promise<ResolvedSystemContext>>
+  WeakMap<object, Promise<SystemLookup>>
 >();
 
 /**
- * One resolution per resolver and connection. Concurrent callers share the
- * in-flight promise; an answer naming the user is kept; no information
- * (`null`, an answer without a user — read as `null`) and a rejected lookup
- * are dropped, so the next request asks again.
+ * `resolver`'s answer on `connection`, read as the recipe reads it
+ * (`SystemLookup`); a credential failure is thrown as it came.
+ */
+export async function lookUpSystem(
+  resolver: SystemContextResolver,
+  connection: IAbapConnection,
+): Promise<SystemLookup> {
+  let answer: ResolvedSystemContext;
+  try {
+    answer = await resolver(connection);
+  } catch (error) {
+    if (isCredentialFailure(error)) throw error;
+    return { system: null, absent: isSystemInformationUnavailable(error) };
+  }
+  const system = withUser(answer);
+  return system === null ? { system: null, absent: false } : { system };
+}
+
+/**
+ * Whether a lookup is kept for the destination: the information, and — on
+ * an on-premise system — the endpoint absent (a `404`: an older system, so
+ * it is not asked again). Anything else, and anything on ABAP Cloud without
+ * the information, is not kept: the next call asks again.
+ */
+export function isKeptLookup(
+  lookup: SystemLookup,
+  kind: () => string,
+): boolean {
+  if (lookup.system !== null) return true;
+  if (!lookup.absent) return false;
+  try {
+    return kind() !== 'cloud';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * One lookup per resolver and connection (`lookUpSystem`). Concurrent
+ * callers share the in-flight promise; a kept answer (`isKeptLookup`) is
+ * kept; any other, and a rejected lookup, is dropped, so the next request
+ * asks again.
  */
 export function resolveOnce(
   resolver: SystemContextResolver,
   connection: IAbapConnection,
-): Promise<ResolvedSystemContext> {
+  systemType?: string,
+): Promise<SystemLookup> {
   let perConnection = memo.get(resolver);
   if (!perConnection) {
     perConnection = new WeakMap();
@@ -218,24 +253,67 @@ export function resolveOnce(
   if (known) return known;
 
   // async wrapper: an injected resolver that throws synchronously rejects too.
-  const pending = (async () => withUser(await resolver(connection)))();
+  const pending = (async () => lookUpSystem(resolver, connection))();
   perConnection.set(connection, pending);
   const drop = () => {
     if (perConnection.get(connection) === pending) {
       perConnection.delete(connection);
     }
   };
-  pending.then((system) => {
-    if (system === null) drop();
+  pending.then((lookup) => {
+    if (
+      !isKeptLookup(lookup, () =>
+        systemKindOf(connection, process.env, systemType),
+      )
+    ) {
+      drop();
+    }
   }, drop);
   return pending;
 }
 
 /** An answer that names no user (a non-blank string) is no information. */
-function withUser(system: ResolvedSystemContext): ResolvedSystemContext {
-  if (system === null) return null;
+function withUser(system: ResolvedSystemContext): KnownSystemContext | null {
+  if (system === null || typeof system !== 'object') return null;
   const user: unknown = system.responsible;
   return typeof user === 'string' && user.trim() !== '' ? system : null;
+}
+
+/**
+ * The recipe's first step, by the connection's stated kind (`kind`, read
+ * only when there is no information): the information when given; else on
+ * ABAP Cloud the error — `CloudWithoutSystemInformationError` for a `404`,
+ * `NoSystemInformationError` for anything else —, and on-premise `null`
+ * (the configured values apply).
+ */
+export function systemOf(
+  lookup: SystemLookup,
+  kind: () => string,
+): ResolvedSystemContext {
+  if (lookup.system !== null) return lookup.system;
+  if (kind() === 'cloud') {
+    throw lookup.absent
+      ? new CloudWithoutSystemInformationError()
+      : new NoSystemInformationError();
+  }
+  return null;
+}
+
+/**
+ * The whole recipe for a call: `systemOf`, and on-premise no information
+ * admits the call only when it states a user (`statedUser`, see
+ * `statedUserOf`) — else `SystemUserUnknownError`.
+ */
+export function systemForCall(
+  lookup: SystemLookup,
+  kind: () => string,
+  statedUser: string | undefined,
+): ResolvedSystemContext {
+  const system = systemOf(lookup, kind);
+  if (system === null && (statedUser ?? '').trim() === '') {
+    throw new SystemUserUnknownError();
+  }
+  return system;
 }
 
 /**
@@ -254,22 +332,23 @@ export function statedUserOf(
 
 /**
  * `connection`'s system information for a call about to run on it — the
- * rule every path that asks before a handler applies (the server's,
- * `HandlerExporter`'s, the stdio start's): one lookup per connection
- * (`resolveOnce`); no information (`null`) admits the call only when it
- * states a user (`statedUser`, see `statedUserOf`) — else
- * `SystemUserUnknownError`.
+ * rule every path that asks before a handler applies (`HandlerExporter`'s,
+ * a host's connection): one lookup per connection (`resolveOnce`), then the
+ * recipe (`systemForCall`) by the connection's kind (`systemType`: the
+ * stated one, for a connection the factory did not build).
  */
 export async function resolveForCall(
   resolver: SystemContextResolver,
   connection: IAbapConnection,
   statedUser: string | undefined,
+  systemType?: string,
 ): Promise<ResolvedSystemContext> {
-  const system = await resolveOnce(resolver, connection);
-  if (system === null && (statedUser ?? '').trim() === '') {
-    throw new SystemUserUnknownError();
-  }
-  return system;
+  const lookup = await resolveOnce(resolver, connection, systemType);
+  return systemForCall(
+    lookup,
+    () => systemKindOf(connection, process.env, systemType),
+    statedUser,
+  );
 }
 
 /**
@@ -343,16 +422,18 @@ export function withDestinationSystemContext<T>(
  * no resolver, no connection, or the context was already applied around this
  * call; with the configured values when the system gave no information
  * on-premise — when the call states a user (the connection's
- * `SAP_USERNAME`, else the request scope's login). A lookup that fails (on
- * ABAP Cloud, any answer without the information), or no information
- * on-premise with no user stated (`system_user_unknown`), is the call's
- * error (`systemLookupRefusal`): `fn` does not run, and nothing
- * failed is kept — the next call asks again.
+ * `SAP_USERNAME`, else the request scope's login). No information on ABAP
+ * Cloud, or on-premise with no user stated (`system_user_unknown`), is the
+ * call's error (`systemLookupRefusal`), and a credential failure is the
+ * call's as it came: `fn` does not run. The recipe is applied by the
+ * connection's kind (`systemType`: the stated one, for a connection the
+ * factory did not build), whatever the resolver.
  */
 export async function withResolvedSystemContext<T>(
   connection: IAbapConnection | null | undefined,
   fn: () => Promise<T> | T,
   resolver: SystemContextResolver | null = defaultSystemContextResolver,
+  systemType?: string,
 ): Promise<T> {
   if (!resolver || !connection || applied.getStore() === true) return fn();
 
@@ -363,6 +444,7 @@ export async function withResolvedSystemContext<T>(
       resolver,
       connection,
       statedUserOf(connection, getRequestContext()?.login),
+      systemType,
     );
   } catch (error) {
     throw systemLookupRefusal(error, (message) => logger.warn(message));

@@ -38,7 +38,6 @@ export type FailureCode =
   | 'background_run_not_available'
   | 'background_run_running'
   | 'background_run_limit'
-  | 'background_run_caller_unknown'
   | 'system_lookup_failed'
   | 'cloud_without_systeminformation'
   | 'system_user_unknown'

@@ -192,11 +192,13 @@ An answer naming the user is taken; no information (a `404`, an answer without t
 error) is, on ABAP Cloud, one step to the error — a `404` `cloud_without_systeminformation` (the
 configuration or headers are inconsistent), anything else `system_lookup_failed` (the ABAP
 system's problem) —, on-premise the configuration when the call states a user, else
-`system_user_unknown` (`systemContextResolverFor`, `resolveForCall`); a chain failure as it is.
+`system_user_unknown` — the server's recipe around any resolver, by the connection's stated kind
+(`systemForCall`); a credential failure (a chain failure, a `401`) is the call's as it came, on
+both kinds, never a reason for the configuration.
 One mapping, `systemLookupRefusal`, shared with `withResolvedSystemContext`, so
 `HandlerExporter`'s handlers refuse the same way and do not run. The tool does not run, and
-only an answer naming the user is kept: a failure (no information included) never is, so the
-next call asks again. The lookup is awaited to its end whatever the call's
+only an answer naming the user — and on-premise a `404` — is kept: anything else never is, so
+the next call asks again. The lookup is awaited to its end whatever the call's
 signal says: the call's turn and its tracking last until it settled, so the next request on the
 connection waits for it; the instance's close and the shutdown do not wait for it — they log the
 connection off under it. A replacement of a connection of the same credential keeps the answer
@@ -350,7 +352,7 @@ their answers are kept is the host's: a strategy.
   information when the shipped resolver already asked it, else `systemUserOf` on the instance's
   connection, cached per credential — on both kinds, over the request's stated user; that one
   — `SAP_USERNAME`, `x-sap-login` — only where an on-premise system gives no information; an injected
-  connection's URL from `getBaseUrl()`, its user SAP's; none at all → `background_run_caller_unknown`);
+  connection's URL from `getBaseUrl()`, its user SAP's; none at all → `system_user_unknown`);
   registered in the registry of live tools under the calling instance (`"<tool> (background)"`) —
   refused there once the shutdown latched; its own connection opened by `openFreshConnection` and
   re-owned by the **strategy** (role `background`), stateless; `strategy.start` (a limit refusal

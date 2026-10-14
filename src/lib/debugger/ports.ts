@@ -15,7 +15,10 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import { endConnection, own } from '../ownedConnections';
 import { openFreshConnection } from '../packageSessions';
 import { getRequestContext } from '../requestContext';
-import { systemLookupRefusal } from '../requestSystemResolution';
+import {
+  SystemUserUnknownError,
+  systemLookupRefusal,
+} from '../requestSystemResolution';
 import { ourClassExecutor, ourProgramExecutor } from '../strategies/resultSets';
 import { systemUserOf } from '../systemUser';
 import type { AmdpSessionPorts } from './AmdpSession';
@@ -26,11 +29,11 @@ import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
  * every kind of system, over any configured login. When the system gives no
  * information: on ABAP Cloud the call's error (a `404`
  * `cloud_without_systeminformation`, any other `system_lookup_failed`);
- * on-premise (a `404`, an answer without the user, an error) the login — the
- * request scope's before the process's, never the responsible — stands in.
- * A chain failure goes through to the caller as it came. The kind is the
- * connection's (`systemType`: the server's stated one, for a connection the
- * factory did not build).
+ * on-premise the login — the request scope's before the process's, never
+ * the responsible — stands in, and with none stated the call's
+ * `system_user_unknown`. A credential failure goes through to the caller as
+ * it came. The kind is the connection's (`systemType`: the server's stated
+ * one, for a connection the factory did not build).
  */
 export async function requestUserOf(
   connection: IAbapConnection,
@@ -44,9 +47,7 @@ export async function requestUserOf(
   }
   const user = named || getRequestContext()?.login || process.env.SAP_USERNAME;
   if (!user?.trim()) {
-    throw new Error(
-      'the ABAP user of this connection is unknown: the system names none and no login is configured',
-    );
+    throw systemLookupRefusal(new SystemUserUnknownError(), undefined);
   }
   return user.trim().toUpperCase();
 }

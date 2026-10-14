@@ -208,8 +208,15 @@ connection it was asked on: the whole cache is forgotten whenever the instance's
 replaced (`forgetCallers`), and an answer asked on a connection replaced meanwhile is not
 kept. The leftover tools ask nothing of SAP: their caller is the instance's destination. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
 reaches its tool. An embedder's own registry that is not a `CompositeHandlersRegistry`
-(`registerAllTools(trackingRegistrations())`) gets no main-flow queue: its tools take no place in
-the flow. The instance close and the process shutdown interrupt every call — the queued ones
+(`registerAllTools(trackingRegistrations())`) takes its turn too: the server it is handed is the
+instance itself (every member bound, `getConnection` and `onMainConnection` among them) and a
+subclass's registry may call its protected members, so its callbacks can reach the instance's
+connection. Each call enters the flow before its callback runs and leaves it when the callback
+settled, except the tools on the same list as a handler group's (`worksOnOwnConnection`: a run
+tool with `background: true`, a listed long read, a debugger tool on the debugger's own
+connections), matched by name. The turn is marked held without a connection (`inHeldTurn`): a
+send through `onMainConnection` from inside it takes the instance's connection there and runs at
+once instead of queueing behind its own call. The instance close and the process shutdown interrupt every call — the queued ones
 leave without sending — and log the connection off at once, under the running call. Once in the flow, a queued call
 checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives
 the spent connection back (`connectionReleased`) and takes the replacement (`getConnection`)

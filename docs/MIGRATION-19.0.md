@@ -961,7 +961,16 @@ transport's options only:
   a stateful request is adt-clients' to mark, for the one `LOCK` or `UNLOCK`.
 - **An instance's calls on its connection run one at a time** (`BaseMcpServer`'s main flow): a
   subclass that calls a tool's handler itself, outside the registered wrapper, takes no place in
-  it. `sessionUtils`' `makeAdtRequestWithSession` / `makeAdtRequestStateless` (not
+  it. The tools your own registry registers itself (`registerAllTools`, a registry that is not a
+  `CompositeHandlersRegistry`) take their turn too: the server handed to the registry is the
+  instance, so a callback can reach its connection (`getConnection`, `onMainConnection`, or a
+  subclass's protected members). Two calls of such tools sent at once run one after the other;
+  each leaves the flow when its callback settled. The same tools as a handler group's stay out
+  of it — a run tool asked for `background: true`, a listed long read, a debugger tool on the
+  debugger's own connections — by name, so a tool of yours named like one of them is trusted to
+  work on a connection of its own. Inside its turn, `onMainConnection(signal, send)` sends at
+  once, on the connection it takes there; a callback that calls `getConnection` itself calls
+  `connectionReleased` once for it. `sessionUtils`' `makeAdtRequestWithSession` / `makeAdtRequestStateless` (not
   exported) are gone too.
 - **`IAuthBrokerFactoryConfig.loginTimeoutStated?`** names the bound in D10's sentence (the
   launcher passes the form the user set, `` `--login-timeout=300` ``); absent, the sentence names

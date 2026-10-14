@@ -147,9 +147,31 @@ interface BuiltConnection {
  * entered its instance's flow runs inside it, so a send on the instance's
  * connection made from within (an identity lookup) runs directly instead of
  * queueing behind itself. The value is the connection the holding call works
- * on.
+ * on; `null` when the holder took its turn without a connection (a tool its
+ * own registry registered), so a send made from within takes the instance's
+ * connection itself, inside that turn.
  */
-const heldFlows = new AsyncLocalStorage<ReadonlyMap<object, AbapConnection>>();
+const heldFlows = new AsyncLocalStorage<
+  ReadonlyMap<object, AbapConnection | null>
+>();
+
+/**
+ * Whether a call of `tool` works on a connection of its own and takes no
+ * place in the instance's main flow: a background run, a listed long read,
+ * a debugger tool whose SAP work is on the debugger's own connections. One
+ * list for both registration paths.
+ */
+function worksOnOwnConnection(
+  tool: string,
+  args: unknown,
+  inBackground: boolean,
+): boolean {
+  return (
+    inBackground ||
+    (isLongTool(tool) && isLongRead(tool, args)) ||
+    isDebuggerOwnConnectionTool(tool)
+  );
+}
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -712,19 +734,43 @@ export abstract class BaseMcpServer extends McpServer {
     send: (connection: AbapConnection) => Promise<T>,
   ): Promise<T> {
     const held = heldFlows.getStore()?.get(this);
+    // Held without a connection: the turn is this call's already.
+    if (held === null) return this.sendInTurn(signal, send);
     if (held !== undefined) return send(held);
     // Its turn: no timeout; a wait whose session ended leaves at once.
     const leave = await this.enterMainFlow(signal);
     try {
-      const connection = await this.getConnection(signal);
-      try {
-        return await this.inHeldFlow(true, connection, () => send(connection));
-      } finally {
-        this.connectionReleased(connection);
-      }
+      return await this.sendInTurn(signal, send);
     } finally {
       leave();
     }
+  }
+
+  /**
+   * Inside a turn of the main flow: `send` on the instance's connection,
+   * taken now (`getConnection`) and given back when it is done.
+   */
+  private async sendInTurn<T>(
+    signal: AbortSignal,
+    send: (connection: AbapConnection) => Promise<T>,
+  ): Promise<T> {
+    const connection = await this.getConnection(signal);
+    try {
+      return await this.inHeldFlow(true, connection, () => send(connection));
+    } finally {
+      this.connectionReleased(connection);
+    }
+  }
+
+  /**
+   * Runs `fn` with this instance's flow marked held without a connection:
+   * a send made from within (`onMainConnection`) takes the instance's
+   * connection inside this turn instead of queueing behind it.
+   */
+  private inHeldTurn<T>(fn: () => T): T {
+    const held = new Map(heldFlows.getStore() ?? []);
+    held.set(this, null);
+    return heldFlows.run(held, fn);
   }
 
   /**
@@ -1018,11 +1064,11 @@ export abstract class BaseMcpServer extends McpServer {
               // debugger tools whose SAP work is on the debugger's own
               // connections — their sends on this one (`onMainConnection`)
               // still take their turn.
-              const ownConnection =
-                runsInBackground ||
-                (isLongTool(entry.toolDefinition.name) &&
-                  isLongRead(entry.toolDefinition.name, args)) ||
-                isDebuggerOwnConnectionTool(entry.toolDefinition.name);
+              const ownConnection = worksOnOwnConnection(
+                entry.toolDefinition.name,
+                args,
+                runsInBackground,
+              );
               if (!ownConnection) {
                 leaveFlow = await this.enterMainFlow(signal);
                 // The connection this call took before it waited may be one
@@ -1246,7 +1292,7 @@ export abstract class BaseMcpServer extends McpServer {
       // A registry that registers its own tools: no connection is injected,
       // but every tool it registers goes through the same call tracking —
       // its request signal, the registry of live calls, the request signal
-      // scope, and D5 — as the tools above.
+      // scope, D5, and its turn in the main flow — as the tools above.
       handlersRegistry.registerAllTools(this.trackingRegistrations());
     }
   }
@@ -1679,6 +1725,15 @@ export abstract class BaseMcpServer extends McpServer {
    * the tools of a handler group — its request signal, the registry of live
    * calls, the request signal scope — and a call whose signal aborted before
    * the tool starts ends without reaching it (D5).
+   *
+   * Such a callback can reach the instance's connection: the server it is
+   * handed is this instance (every member bound, `getConnection` and
+   * `onMainConnection` included), and a subclass's own registry may call its
+   * protected members. So each call takes its turn in the main flow, as a
+   * handler group's does — by the same list of tools that work on a
+   * connection of their own (`worksOnOwnConnection`) — and leaves it when
+   * the callback settled. Inside the turn a send through `onMainConnection`
+   * runs at once, on the connection it takes there.
    */
   private trackingRegistrations(): McpServer {
     const track =
@@ -1693,15 +1748,34 @@ export abstract class BaseMcpServer extends McpServer {
             typeof last === 'object' && last !== null
               ? [...callbackArgs.slice(0, -1), { ...last, signal }]
               : callbackArgs;
+          // The tool's arguments: the first of `(args, extra)`, none for
+          // `(extra)`.
+          const toolArgs =
+            callbackArgs.length >= 2 ? callbackArgs[0] : undefined;
+          let leaveFlow: (() => void) | undefined;
           try {
             throwIfRequestAborted(signal);
-            return await runWithRequestSignal(signal, async () =>
-              callback(...args),
+            const ownConnection = worksOnOwnConnection(
+              name,
+              toolArgs,
+              isBackgroundTool(name) && readBackground(toolArgs) === true,
             );
+            if (!ownConnection) leaveFlow = await this.enterMainFlow(signal);
+            const run = () =>
+              runWithRequestSignal(signal, async () => {
+                // Its turn came after the session ended: it never runs.
+                throwIfRequestAborted(signal);
+                return callback(...args);
+              });
+            return await (leaveFlow !== undefined
+              ? this.inHeldTurn(run)
+              : run());
           } catch (error) {
             const read = readGuarded((t) => this.readFailure(t), error);
             if (read !== undefined) return answerRead(read);
             throw error;
+          } finally {
+            leaveFlow?.();
           }
         });
       };

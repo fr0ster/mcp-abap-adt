@@ -396,7 +396,7 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 <a id="listleftoversessions-read-only-leftover-session"></a>
 #### ListLeftoverSessions (Read-Only / Leftover Session)
-**Description:** [session] Lists the SAP sessions of this server's destination that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user (none for a token login) and when it was last recorded. Read from the session records alone: nothing is sent to SAP. Sessions of a running process are not listed. Resume one or log it off by its handle; nothing happens to them otherwise.
+**Description:** [session] Lists the SAP sessions of this server's destination that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user (none for a token login) and when it was last recorded. Read from the session records alone: nothing is sent to SAP. Sessions of a running process are not listed. Log one off by its handle. A server process that starts while exactly one instance session (built) of its destination is left is born on it, before any tool call; with several, none is taken and they stay here.
 
 **Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
 

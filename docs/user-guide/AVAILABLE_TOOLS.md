@@ -4,11 +4,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 262
+- Total tools: 261
 - Read-only tools: 68
 - High-level tools: 161
 - Debug tools: 30
-- Session tools: 3
+- Session tools: 2
 
 ## Handler Sets
 
@@ -341,7 +341,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Leftover Session](#session-leftover-session)
     - [ListLeftoverSessions](#listleftoversessions-session-leftover-session)
     - [LogoffLeftoverSession](#logoffleftoversession-session-leftover-session)
-    - [ResumeLeftoverSession](#resumeleftoversession-session-leftover-session)
 
 ---
 
@@ -3934,7 +3933,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listleftoversessions-session-leftover-session"></a>
 #### ListLeftoverSessions (Session / Leftover Session)
-**Description:** [session] Lists the SAP sessions of this server's destination that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user (none for a token login) and when it was last recorded. Read from the session records alone: nothing is sent to SAP. Sessions of a running process are not listed. Resume one or log it off by its handle; nothing happens to them otherwise.
+**Description:** [session] Lists the SAP sessions of this server's destination that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user (none for a token login) and when it was last recorded. Read from the session records alone: nothing is sent to SAP. Sessions of a running process are not listed. Log one off by its handle. A server process that starts while exactly one instance session (built) of its destination is left is born on it, before any tool call; with several, none is taken and they stay here.
 
 **Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
 
@@ -3948,17 +3947,6 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [session] Logs off a leftover SAP session (any role): the session ends, and every lock it holds is released. Only the logoff is sent, with no credential. The session record is deleted afterwards.
 
 **Source:** `src/handlers/leftover_session/session/handleLogoffLeftoverSession.ts`
-
-**Parameters:**
-- `handle` (string, required) - The handle of a leftover session, as the list of leftover sessions answers it.
-
----
-
-<a id="resumeleftoversession-session-leftover-session"></a>
-#### ResumeLeftoverSession (Session / Leftover Session)
-**Description:** [session] Continues a leftover SAP session (role built only) as this server's own connection instead of a logon: the locks it holds and their lock handles work again, so an object locked there can be finished or unlocked. Possible only before this server has connected to SAP — call it before any other SAP tool; once the server has a connection, the resume is refused and nothing is replaced. If SAP answers that the old session has ended (much time passed), a new session is started with the normal logon instead, and its locks are gone. Either way the answer is resumed, with session picked_up or new, and the record stays this server's. The server checks and repairs nothing after a resume: a session that ended or locks that are gone show in SAP's answers, and the requests are yours to redo. Any other failure (the credential refused, SAP unreachable) is the error, as SAP gave it.
-
-**Source:** `src/handlers/leftover_session/session/handleResumeLeftoverSession.ts`
 
 **Parameters:**
 - `handle` (string, required) - The handle of a leftover session, as the list of leftover sessions answers it.

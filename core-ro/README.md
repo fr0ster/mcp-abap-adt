@@ -16,8 +16,8 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 - the **leftover-session list and logoff** (`ListLeftoverSessions`, `LogoffLeftoverSession`): the
   SAP sessions a killed server process left open, only the caller's own.
 
-68 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger,
-background runs and the resume of a leftover session — those are
+68 tools in all (listed against an on-premise system; `--system-type` leaves out what a system does not offer). **Not here:** the high tools (create, update, delete, activate), the debugger
+and background runs — those are
 `mcp-abap-adt`'s ([`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)).
 
 **Running code is reading here.** `RuntimeRunClass` and `RuntimeRunProgram` are system tools and

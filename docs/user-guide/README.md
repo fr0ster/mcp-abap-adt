@@ -108,22 +108,19 @@ cannot log off, so its SAP sessions — and the locks a lock tool took in them �
 SAP's idle timeout. A stdio server keeps a record of the HTTP sessions it holds in
 `<config dir>/runtime/` (`~/.config/mcp-abap-adt/runtime`, `Documents\mcp-abap-adt\runtime` on
 Windows; `--auth-broker-path` moves it) and deletes each record once that session's logoff is
-written, so only a killed process leaves records behind. From a later stdio server process, three
-tools act on the leftover sessions of the destination the server serves, and nothing else does:
+written, so only a killed process leaves records behind. A later stdio server process of the same
+destination **starts on the one it finds**: at its start, before your MCP client sees its tools, it
+connects on that session instead of logging on, so a `lock_handle` taken there works again —
+finish the write, or unlock. If SAP says the old session has ended (much time passed), it logs on
+normally and starts a new session instead; its locks are gone. The record stays the server's
+either way. With several records, none is picked: the server logs on normally and leaves them for
+the tools below. A debugger's session is never taken up. After a start on a leftover session the
+server checks and repairs nothing: if the session ended or its locks are gone, SAP's answers say
+so, and you redo your requests. Two tools act on the leftover sessions of the destination the
+server serves:
 
 - `ListLeftoverSessions` (compact `HandlerLeftoverSessionList`) — the handle, role, destination,
   user and time of each session a dead process left; never a cookie, and nothing is sent to SAP.
-- `ResumeLeftoverSession { handle }` (compact `HandlerLeftoverSessionResume`) — the server's
-  connection is built on that session instead of logging on, so a `lock_handle` taken there works
-  again: finish the write, or unlock. Call it first, before any other SAP tool: once the server
-  has a connection, a resume is refused ("a leftover session can be resumed only before this
-  server has connected to SAP; it already has a connection, and a resume never replaces it").
-  Served only by the write binaries (`mcp-abap-adt`, `mcp-abap-adt-compact`), never by a `-ro`
-  one. A debugger's session cannot be resumed. If SAP says the old session has ended (much
-  time passed), the server logs on normally and starts a new session instead — answered `resumed`
-  with `session: "new"`; its locks are gone — and the record stays the server's either way. After a resume the server checks and
-  repairs nothing: if the session ended or its locks are gone, SAP's answers say so, and you redo
-  your requests.
 - `LogoffLeftoverSession { handle }` (compact `HandlerLeftoverSessionLogoff`) — logs the session off
   (every lock in it is released) — one request, the logoff, with no credential and nothing sent
   before it — and deletes the record.

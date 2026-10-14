@@ -28,7 +28,7 @@ From 17.0.0 the HTTPS server certificate is verified — see the
 [migration note](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-17.0.md).
 
 **The binary fixes the tool set (19.0.0).** `mcp-abap-adt` serves readonly (with system and search),
-high, the debugger, the leftover sessions (list, resume, logoff) and background runs; the readonly
+high, the debugger, the leftover sessions (list, logoff) and background runs; the readonly
 tools alone are [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro) (`mcp-abap-adt-ro`). There is no
 `--exposition`: passing it, or a config file's `exposition`, stops the start with a sentence naming
 the binary to install instead.

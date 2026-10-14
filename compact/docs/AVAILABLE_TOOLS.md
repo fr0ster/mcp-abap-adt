@@ -3,18 +3,18 @@
 Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
-- Tools: 37
+- Tools: 36
 - Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
-- Leftover-session tools: `@mcp-abap-adt/lib`, on stdio only (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`): the list and the logoff in both, the resume in the write binary only; no `-compact-http` or `-compact-sse` binary serves them
+- Leftover-session tools: `@mcp-abap-adt/lib`, on stdio only (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`): the list and the logoff in both; no `-compact-http` or `-compact-sse` binary serves them
 - Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)
 - Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`, the same without the leftover-session tools)
 
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 37 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 36 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 
@@ -668,29 +668,17 @@ per request.
 
 ### HandlerLeftoverSessionList
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both, the resume in the write binary)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both)
 
-**Description:** Lists the SAP sessions of this server's destination an ended server process left open (it was killed before logging them off): handle, role (built or debugger), destination, user, when recorded. Nothing is sent to SAP. Sessions of a running process are not listed.
+**Description:** Lists the SAP sessions of this server's destination an ended server process left open (it was killed before logging them off): handle, role (built or debugger), destination, user, when recorded. Nothing is sent to SAP. Sessions of a running process are not listed. A server starting while exactly one built session of its destination is left is born on it; with several, none is taken.
 
 **Available in:** all
 
 **Parameters:** none
 
-### HandlerLeftoverSessionResume
-
-**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both, the resume in the write binary)
-
-**Description:** Continues a leftover SAP session (role built only) as this server's connection instead of a logon, so its locks and lock handles work again. Only before the server has connected to SAP: refused once it has a connection, which is never replaced. If SAP answers the old session has ended, a new one is started with the normal logon (its locks are gone): answered resumed, session picked_up or new. Nothing is checked or repaired after it: an ended session or lost locks show in SAP's answers, and the requests are yours to redo. Any other failure is the error, as SAP gave it.
-
-**Available in:** all
-
-**Parameters:**
-
-- `handle` (required) — The handle of a leftover session, as the list answers it.
-
 ### HandlerLeftoverSessionLogoff
 
-**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both, the resume in the write binary)
+**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both)
 
 **Description:** Logs off a leftover SAP session (any role), releasing every lock it holds; only the logoff is sent, with no credential. Its record is deleted afterwards.
 

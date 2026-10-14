@@ -142,17 +142,21 @@ a crash outside a tool (`uncaughtException`, `unhandledRejection`, registered be
 in lib's `shutdownSequence.ts`): one fixed-words line naming the failure by its class, exit `1`; a
 crash during a shutdown forces it, and a second crash joins the forced close under way. A killed
 process (`SIGKILL`, out of memory) cannot log off: SAP's idle timeout ends its sessions and locks,
-unless the user resumes or logs them off from a later process (below).
+unless a later stdio process of the same destination starts on it, or the user logs them off
+(below).
 
 **One main flow per instance** (D56): the registered tool wrapper runs the calls that work on
 the instance's connection one after another (`enterMainFlow`), whatever the client sends at once;
 a background run, a listed long read and the debugger tools that work on the debugger's own
 connections (`ownConnectionTools.ts`: every `Debug*`, `AmdpDebug*`, `HandlerDebug*` tool) take no
-place in it. The ABAP Cloud system-context lookup is part of the connect (`lookupSystem`, once per
-connection, before any tool; a failure fails nothing — the connection carries no system context,
-and only a tool the guard refuses for want of a responsible asks again from inside the flow,
-`retryLookup`, refused `system_lookup_failed` when that fails too); the wrapper reads it
-(`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
+place in it. The ABAP Cloud system-context lookup is asked once per connection before a tool
+runs on it, never after — no tool runs twice: on stdio at the start (`bornAtStart` →
+`requireSystem`, or the leftover session's file), a failure ending the process; elsewhere by the
+first call on a connection without it (`systemBeforeTool` → `requireSystem`), inside the flow — a
+call outside the flow takes a turn in it for the lookup alone — its failure that call's answer (a
+chain failure as it is, else `system_lookup_failed`), the tool not run, nothing failed kept, so
+the next call asks again. A replacement of a connection of the same credential keeps the answer
+(`buildConnection(…, known)`). The wrapper reads it (`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
 outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
 handlers as `HandlerContext.onMainConnection(send)` — directly from a call that holds the flow, on
 the connection that call holds, else in turn, on the connection `getConnection` hands inside the
@@ -186,8 +190,9 @@ logoff. The forced close also awaits, to its write, every logoff an orderly end 
 
 ### Leftover sessions: the runtime files
 
-What a killed process leaves behind is the user's to see and to settle, through three explicit
-tools; the server decides nothing by itself (session-resume spec).
+What a killed process leaves behind is the next stdio process's to start on — the one leftover
+session of its destination, at its start — and otherwise the user's to see and log off, through
+two explicit tools; with several the server picks none.
 
 - **The owner** (`LeftoverSessions`, `src/lib/leftoverSessions/`): one per process, created by the
   host — core's launcher (stdio); http's and sse's create none, since one such server holds the
@@ -198,12 +203,14 @@ tools; the server decides nothing by itself (session-resume spec).
 - **One file per owned HTTP connection that holds a session**, named by a random 128-bit handle:
   `getConnection`'s connection once connected (`track(connection, 'built', identity)`) and each
   debugger connection (`openStateful` → `trackSibling(connection, 'debugger', origin)`, the
-  origin's identity). Contents (`format: 2`; another format is not read): pid and start time
+  origin's identity). Contents (`format: 3`; another format is not read): pid and start time
   (`ProcessProbe`: `/proc` on Linux, the pid alone elsewhere), role, the destination's name and
   where it points (URL, client, system kind, wire), the backend user the destination states
-  (`null` for a token credential, shown and never matched), `sessionCookies()`. The settings and
-  the credential a resume needs come from the destination the process serves; the file adds only
-  the cookies. Directory `0700`, file `0600`, written atomically (a `.partial` renamed).
+  (`null` for a token credential, shown and never matched), `system` (the system information the
+  session was looked up with — `describeSystem(connection, system)`, written once known; `null`
+  until then and on-premise), `sessionCookies()`. The settings and the credential a resume needs
+  come from the destination the process serves; the file adds the cookies and the system
+  information, so a resume asks SAP nothing more. Directory `0700`, file `0600`, written atomically (a `.partial` renamed).
   Rewritten after a request whose answer changed the cookies (the owner wraps
   `makeAdtRequest`); deleted from inside the connection's end once its `disconnect()` resolved —
   `whenLoggedOff` in `ownedConnections.ts` — so the terminal close, a replacement and the forced
@@ -211,36 +218,41 @@ tools; the server decides nothing by itself (session-resume spec).
   logged, never in an answer. RFC keeps no file, and neither does an instance that serves no
   destination (`ConnectionContext.destination`, set by `StdioServer`). Nothing is asked of SAP
   to write it (`sessionOf` → `sessionIdentity(destination, settings, login)`).
-- **The tools** (`ListLeftoverSessions` / `ResumeLeftoverSession` / `LogoffLeftoverSession`;
-  compact `HandlerLeftoverSession{List,Resume,Logoff}`) — the list and the logoff in every stdio
-  binary, the resume only in the write ones (none of the `-ro` ones), none in an http or sse
-  binary (`ToolSet.groups(context, transport)`) — are
-  `connectionless` entries: the tool wrapper calls them without `getConnection` (a resume must
-  not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
+- **The tools** (`ListLeftoverSessions` / `LogoffLeftoverSession`; compact
+  `HandlerLeftoverSession{List,Logoff}`) — in every stdio binary, none in an http or sse binary
+  (`ToolSet.groups(context, transport)`), and no resume tool anywhere — are
+  `connectionless` entries: the tool wrapper calls them without `getConnection` (a list or a
+  logoff must not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
   resolves the caller from the instance's source (`resolveCaller`) and destination
   (`leftoverCaller`), sending nothing to SAP and building no connection, and a file is the
   caller's when it names the same destination pointing to the same place (the user is not
   read); an unknown handle, another destination's file, a live process's file and one another live process claimed are refused alike
   (`leftover_session_not_available`).
 - **Claims.** Before acting, `claim` renames the file to `<handle>.claimed.<pid>.<start>` — the
-  atomic step two processes race on; the loser finds nothing. `adopt` (resumed), `forget` (logged off) or `release` (anything else: back to `<handle>`) ends the claim; a claimed file
+  atomic step two processes race on; the loser finds nothing (a start that loses logs on). `adopt` (taken up), `forget` (logged off) or `release` (anything else: back to `<handle>`) ends the claim; a claimed file
   whose claimer died is listed and claimable again. Off Linux liveness is the pid alone.
-- **Resume** (`built` only) is the instance's connection's birth, not a call in the main flow:
-  refused once the instance has a connection (`built` set — connecting, ready or spent;
-  `leftover_session_connector_exists`), before the handle is read. Otherwise, in the same turn as
-  that check, the claim and `buildConnection(credential, resumedSession)`: the entry is `built` at
-  once, so a tool call asking meanwhile waits for it. `resumedSession` builds the connection with
+- **The start** (stdio only): `StdioServer.connectAtStart(destination)`, called by the launcher
+  before it opens the transport, runs `bornAtStart(signal)`: the source resolved, then
+  `claimTheOne(identity)` — the one dead process's file of the destination with role `built`
+  (debugger files are not counted), claimed; none, or more than one, is `undefined` and the
+  start logs on (`buildConnection(credential, logOn)`), leaving several untouched. With one,
+  `buildConnection(credential, resumedSession)`: `resumedSession` builds the connection with
   `createAbapConnection(…, session)`, owns it as `built`, connects (connection 17's takeover: one
-  request in the session, without the credential), and makes the file this process's (`adopt`,
-  same handle); the system lookup follows as for a logon. SAP's "gone" — `401`, or an
-  answer not the session's (a `2xx`), read by status from connection's error (`sapAnswerOf`, `sessionGone`)
-  — ends the spent takeover instance (it logged nothing on) and builds a new one with the normal
-  logon (`connectedLogon`, connection's "a new session is a new instance"), adopted under the same
-  handle: answered `resumed`, `session: 'new'` (else `'picked_up'`). Any other failure (a redirect included), the new
-  logon's included, is the call's error and gives the file back; the instance has no connection. The list
-  and the logoff take no turn either — neither touches the instance's connection. After a resume
-  the server checks and repairs nothing (no lock probing, no replay): an ended session or lost
-  locks reach the model as SAP answers.
+  request in the session, without the credential), makes the file this process's (`adopt`, same
+  handle), and takes the file's system information when it carries it. SAP's "gone" — `401`, or
+  an answer not the session's (a `2xx`), read by status from connection's error (`sapAnswerOf`,
+  `sessionGone`) — ends the spent takeover instance (it logged nothing on) and builds a new one
+  with the normal logon (`connectedLogon`, connection's "a new session is a new instance"),
+  adopted under the same handle: `{ session: 'new', handle }` (else `'picked_up'`; a logon is
+  `{ session: 'logged_on' }`). Then `requireSystem` when the system information is not known.
+  Any failure rejects the start — the launcher ends the process with exit `1` before the transport
+  opens: another answer from the old session (a redirect included) or the new logon's failure
+  gives the file back; a failed system lookup logs off a logon made for the start and leaves a
+  picked-up session as it is. A tool call afterwards gets this connection from `getConnection`
+  (the source answers the same credential). The list and the logoff take no turn — neither
+  touches the instance's connection. After a start on a leftover session the server checks and
+  repairs nothing (no lock probing, no replay): an ended session or lost locks reach the model as
+  SAP answers. An embedder's instance has no start: it connects at its first tool call.
 - **Logoff** builds a connection on the session (role `fresh`) and disconnects it without
   `connect()` (connection 17.1): one request, the ICF logoff, with the session's cookies but no
   `sap-contextid`, no credential (its `prepare()` is never called) and no CSRF fetch before it;

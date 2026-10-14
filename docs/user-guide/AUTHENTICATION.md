@@ -154,8 +154,9 @@ key, never the value). See [YAML Configuration](../configuration/YAML_CONFIG.md)
 ## Browser login (JWT / `authorization_code`)
 
 When there is no valid token, the server opens the system's login page and waits for the
-redirect on a local callback port. A `jwt` / `authorization_code` destination with no session
-logs in on its first tool call; the token is then renewed as `--renewal` says.
+redirect on a local callback port. On stdio a `jwt` / `authorization_code` destination with no
+session logs in **at the start**, before the MCP transport opens (the server connects then); a
+login that fails ends the process with exit `1`. The token is then renewed as `--renewal` says.
 
 - `--browser=<name>` (or `MCP_BROWSER`, YAML `browser`) picks the browser, mapped by the
   platform to one of `@mcp-abap-adt/auth-providers`' browsers:
@@ -247,9 +248,12 @@ change made to it while the server runs is not picked up.
 A create (or a transport without an `owner`) that finds no responsible person — on-premise over SNC or
 with a token you hold, with no `SAP_RESPONSIBLE` anywhere — is refused by the server before any request
 is made: the answer is `"error": "system_context_missing"` with words naming `SAP_RESPONSIBLE`, the
-`x-sap-responsible` header and the login. When a cloud system could not be reached to name the user (the
-lookup failed), the same error carries other fixed words: the system is unreachable, retry when it is
-available. It does not advise `SAP_RESPONSIBLE` — the create would fail on an unreachable system anyway. Nothing is
+`x-sap-responsible` header and the login. The servers ask a cloud system for its user before a
+tool runs: when that lookup fails, the call answers `"error": "system_lookup_failed"` (the system
+could not be asked; retry when it is available) and its tool does not run — on stdio the start
+fails instead, and the process ends. The next call asks again. `HandlerExporter`, which asks inside
+the tool, answers a create in that case with `system_context_missing` in other fixed words: the
+system is unreachable, retry when it is available. Nothing is
 sent with an empty responsible. A missing master
 system is never refused: the attribute is left out and the system applies itself, as in 15.x. A read is
 never refused for either.

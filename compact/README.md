@@ -58,10 +58,10 @@ set, so remove it; the compact tools that change nothing are served by `mcp-abap
 
 **Leftover sessions, in both.** `HandlerLeftoverSessionList` and
 `HandlerLeftoverSessionLogoff` are served by `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro`
-alike (a logoff is a system action, not a data change), `HandlerLeftoverSessionResume` by
-`mcp-abap-adt-compact` only — the SAP sessions a killed
-server process left open (and the locks in them), listed, resumed or logged off by the user, only
-the caller's own:
+alike (a logoff is a system action, not a data change) — the SAP sessions a killed
+server process left open (and the locks in them), listed or logged off by the user, only
+the caller's own; no tool resumes one: a stdio server takes up the one leftover session of its
+destination at its start:
 [Leftover SAP sessions](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#leftover-sap-sessions-of-a-killed-process). They are stdio's: `-compact-http` and `-compact-sse`
 (and their `-ro`) serve none and write no session file, since one such server holds the sessions of
 many users.

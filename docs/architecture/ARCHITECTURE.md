@@ -309,18 +309,20 @@ replacement. Outside the order,
 because they work on a connection of their own: a background run, a listed long read
 (its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one
-`connect()`; once in the flow, a queued call checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed). A connection retired because another credential's call took the instance (Streamable HTTP) stays the queued call's own. A leftover-session resume takes no turn in the flow: it is the instance's connection's birth (`resumeLeftover` → `buildConnection`), possible only while the instance has no connection, so no call is in the flow then, and a call that asks meanwhile waits for the resumed connection; once the instance has one, a resume is refused (`leftover_session_connector_exists`) and nothing is replaced. The list and the logoff take no turn either: neither touches the instance's connection. The connections that are shared this way are stdio's kept one and an
+`connect()`; once in the flow, a queued call checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed). A connection retired because another credential's call took the instance (Streamable HTTP) stays the queued call's own. On stdio the instance's connection is born at the process's start, before the transport opens (`StdioServer.connectAtStart` → `bornAtStart` → `buildConnection`): the destination's one leftover session taken up (`resumedSession`; with none or several, a logon), so no call is in the flow then; there is no resume tool. The list and the logoff take no turn: neither touches the instance's connection. The connections that are shared this way are stdio's kept one and an
 SSE connection's; Streamable HTTP builds one per request. The ABAP Cloud system-context lookup (`systeminformation`, the
-responsible and master system a create fills) is part of the connect: once per
-connection, inside `getConnection` (`lookupSystem`, shared by every caller of the
-connect), before any tool proceeds; the tool wrapper reads its answer
-(`withKnownSystemContext`) and sends nothing. A lookup that fails fails nothing: the
-connect succeeds and the connection carries no system context. Only a tool that needs the context — one the guard refuses for want of a responsible: a create that writes `adtcore:responsible` (service definition, message class, behavior implementation, transport, …), never a read, a search or a run — asks
-again when it runs, from inside the main flow it holds (`retryLookup` through
-`onMainConnection`), and runs again with the answer (the guard refuses before the
-change is sent); a retry that fails too refuses that tool, `system_lookup_failed`, as
-only such tools failed before. A tool outside the flow never asks; on-premise nothing
-is asked.
+responsible and master system a create fills) is asked once per connection, before a
+tool runs on it, and never after: **no tool runs twice**. On stdio it is part of the
+start (`bornAtStart` → `requireSystem`), or read from the leftover session's file; a
+failure ends the process before the transport opens. On http, sse and an embedder's
+instance the first call on a connection without it asks (`systemBeforeTool` →
+`requireSystem`, concurrent askers sharing one request through `resolveOnce`) inside
+the main flow — a call outside the flow takes a turn in it for the lookup alone. A
+failure is that call's answer (a chain failure as it is, else `system_lookup_failed`)
+and its tool does not run; nothing failed is kept, so the next call asks again. A
+replacement of a connection of the same credential keeps its answer. The tool wrapper
+reads the answer (`withKnownSystemContext`) and sends nothing; on-premise nothing is
+asked.
 
 - **Compact's `HandlerLock`** keeps the lock across calls until `HandlerUnlock` —
   the consumer's choice — where the connection lives across calls (stdio, SSE): the

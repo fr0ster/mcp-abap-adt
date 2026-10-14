@@ -19,7 +19,7 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
 
 18 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
 is in the tool list at all, so a client cannot call one; nor the four debugger verbs, the
-background-run tools or the resume of a leftover session — those are `mcp-abap-adt-compact`'s ([`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact)).
+background-run tools — those are `mcp-abap-adt-compact`'s ([`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact)).
 
 ## Running it
 

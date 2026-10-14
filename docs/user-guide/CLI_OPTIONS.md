@@ -236,8 +236,9 @@ forced close: every ADT session is logged off, one stderr line names the failure
 exit `1`. A process that is killed (`SIGKILL`, out of memory) cannot log off: SAP's own idle
 timeout ends its sessions and their locks — unless you act first. On stdio its HTTP sessions are
 recorded in `<config dir>/runtime/` (`--auth-broker-path` moves it), and a later stdio server
-process lists them (`ListLeftoverSessions`, compact `HandlerLeftoverSessionList`) and resumes or
-logs off the one you choose: [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process).
+process of the same destination starts on the one it finds (with several it logs on normally),
+lists them (`ListLeftoverSessions`, compact `HandlerLeftoverSessionList`) and logs off the one you
+choose: [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process).
 An http or sse server records none: one such server holds the sessions of many users.
 
 ```bash
@@ -404,9 +405,9 @@ binary serves the tools you want:
 
 | Kind | Binaries | Tools |
 |---|---|---|
-| core | `mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse` | readonly (with system and search), high, debug, background runs; on stdio the leftover sessions (list, resume, logoff) |
+| core | `mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse` | readonly (with system and search), high, debug, background runs; on stdio the leftover-session list and logoff |
 | core-ro | `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro` | readonly (with system and search); on stdio the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the 27 compact tools, the four debugger verbs, background runs; on stdio the leftover sessions |
+| compact | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the 27 compact tools, the four debugger verbs, background runs; on stdio the leftover-session list and logoff |
 | compact-ro | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the 16 compact tools that change nothing; on stdio the leftover-session list and logoff |
 
 `--exposition` in either spelling, with any value or none, and the YAML key `exposition`, stop

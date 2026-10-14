@@ -77,8 +77,9 @@ http:            # or sse:
 - **SAP sessions** are held in the server process. Their cookies never reach
   the model, an answer or a log line. On stdio one copy leaves the process on
   purpose: the **runtime files** in `<config dir>/runtime/`, one per SAP
-  session the server holds, so that a killed process's sessions can be resumed
-  or logged off later by their user (the leftover-session tools). Each file is
+  session the server holds, so that a killed process's session can be taken up
+  by the next stdio process of the same destination at its start, or logged
+  off later by their user (the leftover-session tools). Each file is
   deleted once its session's logoff is written. An HTTP or SSE server writes
   none and serves no leftover-session tool: it holds the sessions of many users.
   - **A runtime file is a bearer secret.** Its cookies act as that SAP user for
@@ -91,8 +92,10 @@ http:            # or sse:
     synchronised folders and images, and do not share it between OS users.
   - A file holds the writing process (pid, start time), the role, the
     destination's name and where it points (URL, client, system kind), the
-    SAP user the destination states (none for a token credential) and the
-    session's cookies — no password, token or other credential.
+    SAP user the destination states (none for a token credential), the
+    system information the session was looked up with (on ABAP Cloud the
+    session user and the system id) and the session's cookies — no password,
+    token or other credential.
   - The tools act only on files of the destination the process serves (its
     name, pointing where it points): on stdio the user and the credential
     are fixed for the process, so whoever controls the computer controls

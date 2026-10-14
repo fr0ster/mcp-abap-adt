@@ -8,13 +8,14 @@ HTTP and SSE, each `-ro` binary a package of its own:
 
 | Kind | stdio | Streamable HTTP | SSE | Tools |
 |---|---|---|---|---|
-| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs; on stdio every leftover-session tool |
+| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs; on stdio the leftover-session list and logoff |
 | core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search); on stdio the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger, background runs; on stdio every leftover-session tool |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger, background runs; on stdio the leftover-session list and logoff |
 | compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing; on stdio the leftover-session list and logoff |
 
-No `-ro` binary carries a debugger, a background run or the resume of a leftover session, and
-no http or sse binary any leftover-session tool: one such server holds the sessions of many users,
+No `-ro` binary carries a debugger or a background run, no binary a resume of a leftover session
+(a stdio server takes up the one leftover session of its destination at its start), and no http or
+sse binary any leftover-session tool: one such server holds the sessions of many users,
 so it writes no runtime session file. A
 write binary keeps every readonly tool: writing needs reading (in core a `Read<X>` gives way to
 the high group's `Get<X>` of the same object, see the dedup below).
@@ -128,11 +129,11 @@ stdio); compact-ro 18 / 16 (16, + the leftover-session list and logoff on stdio)
 
 8. **leftover sessions** - In every stdio binary (compact too), in no http or sse one
    - `ListLeftoverSessions` and `LogoffLeftoverSession` in every stdio binary (the `-ro` ones
-     included: a logoff is a system action, not a data change); `ResumeLeftoverSession` only in
-     the write binary. Compact: `HandlerLeftoverSessionList`, `HandlerLeftoverSessionLogoff`,
-     and `HandlerLeftoverSessionResume` in the compact write binary only
-   - The SAP sessions a killed server process left open, listed, resumed or logged off by the
-     user; they act only on the caller's own sessions.
+     included: a logoff is a system action, not a data change). Compact:
+     `HandlerLeftoverSessionList`, `HandlerLeftoverSessionLogoff`
+   - The SAP sessions a killed server process left open, listed or logged off by the user; they
+     act only on the caller's own sessions. No tool resumes one: a stdio server takes up the one
+     leftover session of its destination at its start
    - [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-process)
 
 ## Usage

@@ -210,8 +210,8 @@ dump feed, profiler traces, … — the list in
 [MIGRATION-19.0](docs/MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own))
 run on an ABAP session of their own and take an optional `timeout` in seconds, with no default.
 When it passes the read is cancelled — its session logged off — and nothing was changed. Set it
-below your MCP client's request limit (the TypeScript SDK's client cancels at 60 s): **a cancel
-does nothing to SAP**. No other tool takes a `timeout`: a unit test, ATC, class or program run
+below your MCP client's request limit (the TypeScript SDK's client cancels at 60 s): **a tool call
+cannot be cancelled** — a client's cancel aborts nothing, the call runs to its end. No other tool takes a `timeout`: a unit test, ATC, class or program run
 goes on to its end.
 
 ## Registries
@@ -426,7 +426,7 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--browser-program=<program>` - The program that opens the login URL instead (excludes `--browser`)
 - `--renewal=<mode>` - `refresh-then-login` (default) or `refresh-only` (never a login)
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
-- `--login-timeout=<seconds>` - Ends a browser login not finished after this many seconds, 1-86400; no default (a login ends on its answer, the IdP's refusal or its request's cancel)
+- `--login-timeout=<seconds>` - Ends a browser login not finished after this many seconds, 1-86400; no default (a login ends on its answer, the IdP's refusal or the end of its session; a cancel ends nothing)
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`
 - `--unsafe` - Write named destinations' sessions to disk. By default they are kept in memory (one login per process). A `.env` you name is written back either way
 

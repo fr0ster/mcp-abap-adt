@@ -71,7 +71,8 @@ mcp-abap-adt-http --port=3000
 4. **Long reads take a `timeout`** (seconds, no default) — the approved list, each on an ABAP
    session of its own. When it passes the read is cancelled (its session logged off) and nothing
    was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels
-   at 60 s — because a cancel does nothing to SAP. No run (unit test, ATC, class, program) takes
+   at 60 s — because a tool call cannot be cancelled: a client's cancel aborts nothing, the call
+   runs to its end. No run (unit test, ATC, class, program) takes
    one. The list:
    [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own).
 5. **A class or program run may go on in the background** (`background: true`): it cannot be

@@ -180,11 +180,10 @@ login that fails ends the process with exit `1`. The token is then renewed as `-
 - `--browser-auth-port=<port>` (or `MCP_BROWSER_AUTH_PORT`, YAML `browser-auth-port`):
   the callback port, **default `61001`** for every transport. A value that is not an integer
   from 1 to 65535 is refused at startup.
-- The login waits until the browser answers, the identity provider refuses, or the request is
-  cancelled: there is no built-in timeout. **A cancelled request ends its login**: a client that
-  cancels the tool call (or closes its connection) ends the login it started, once no other
-  request waits for it; a request that arrives just after starts a login of its own. The callback
-  port is free again as soon as a login ends, cancelled or not.
+- The login waits until the browser answers, the identity provider refuses, or the session ends:
+  there is no built-in timeout. **A tool call cannot be cancelled**, so a cancel ends no login; a
+  client that closes its connection ends the login it started, once no other request waits for
+  it. The callback port is free again as soon as a login ends.
 - `--login-timeout=<seconds>` (or `MCP_LOGIN_TIMEOUT`, YAML `login-timeout`; 1 to 86400) bounds
   each login, opt-in: a login still waiting then ends `aborted`, answered with "The login was
   ended by the server's login timeout (`--login-timeout=<n>`)." — the bound named in the form it

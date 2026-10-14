@@ -54,7 +54,8 @@ reach into the connection's session.
   next request's credential retires the lock's connection and its logoff releases the
   lock: lock, write and unlock in one call there (`HandlerUpdate` without a
   `lock_handle`).
-- **A cancel does nothing to SAP**: no logoff, no new session.
+- **A tool call cannot be cancelled**: a client's cancel aborts nothing — the call
+  runs to its end; no logoff, no new session.
 - **A reopen only when SAP lost the session**: stdio keeps its connection for the
   instance's life.
 - **The debugger's session is its own**: a debug session opens connections of its

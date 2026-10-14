@@ -56,15 +56,18 @@ Setting it reads nothing and sends nothing.
   settings — and it is connected once per
   credential object. It is kept while the source answers the same credential object. The
   credential renews itself, since a `401` reaches its `rejected()`.
-- **A shared connect:** every caller that asks while a connect runs shares it. Each caller's wait
-  races its own signal: a cancelled caller settles at once, while the connect runs on for the
-  others. A connect that succeeds after every caller cancelled is still the instance's connection:
-  kept, used by the next call, and closed only by the instance's terminal close. A cancel causes no
-  logoff.
+- **A shared connect:** every caller that asks while a connect runs shares it, and awaits it to
+  its end whatever its signal says: the connect is a send on the instance's connection, so a call
+  whose session ended still waits for it, and the instance's close comes after it (no logoff under
+  it). A login inside it ends with the session: its party is the call's signal. A connect that
+  succeeds is the instance's connection: kept, used by the next call, and closed only by the
+  instance's terminal close.
 - **Nothing in the chain takes a signal.** connection 16, interfaces-adt-connection 3,
   interfaces-adt 16 and adt-clients 31 have no request signal: the request's signal ends only the
-  server's own waits (the connect, the provider, the login, the system lookup) and keeps a call
-  whose tool has not started from reaching it. A started tool runs to its end.
+  server's own waits that send nothing on the instance's connection (the provider, the login, the
+  queue of the main flow) and keeps a call whose tool has not started from reaching it. A request
+  already sent (the connect, the system lookup) is awaited to its end. A started tool runs to its
+  end.
 
 ### The tool wrapper
 
@@ -72,8 +75,12 @@ Setting it reads nothing and sends nothing.
 through one wrapper. A registry that registers its own tools (`registerAllTools`) is tracked the
 same way.
 
-1. **A request signal per call.** It aborts when the MCP request's `extra.signal` aborts (the
-   client cancelled, or its transport closed) and when the call ends — nothing else aborts it. The
+1. **A request signal per call.** It aborts when the session ends — the instance's transport
+   closed (the protocol's `onclose`) — and when the call ends; nothing else aborts it. **A tool
+   call cannot be cancelled:** the MCP request's `extra.signal`, which the SDK also aborts for a
+   client's `notifications/cancelled`, is not read, so a cancel aborts nothing (the SDK then sends
+   no answer to the cancelled request); a registry's own tool gets the call's signal as
+   `extra.signal`. The
    call is registered at its entry, before any connection is built, in the one process-wide
    registry of live tools (`src/lib/activeTools.ts`: `activeTools()`, `settled(instance?)`,
    `latch(instance?)`, `pending()`), with its instance. The registry aborts nothing: a started
@@ -153,9 +160,12 @@ place in it. The ABAP Cloud system-context lookup is asked once per connection b
 runs on it, never after — no tool runs twice: on stdio at the start (`bornAtStart` →
 `requireSystem`, or the leftover session's file), a failure ending the process; elsewhere by the
 first call on a connection without it (`systemBeforeTool` → `requireSystem`), inside the flow — a
-call outside the flow takes a turn in it for the lookup alone — its failure that call's answer (a
-chain failure as it is, else `system_lookup_failed`), the tool not run, nothing failed kept, so
-the next call asks again. A replacement of a connection of the same credential keeps the answer
+call outside the flow takes a turn in it for the lookup alone — its failure that call's answer (an
+answer that names no user `system_without_user` — `requiringUser`: not a valid ABAP system for
+this server —, a chain failure as it is, else `system_lookup_failed`), the tool not run, nothing
+failed kept, so the next call asks again. The lookup is awaited to its end whatever the call's
+signal says: the call's turn and its tracking last until it settled, so the next request on the
+connection waits for it and the instance's close logs nothing off under it. A replacement of a connection of the same credential keeps the answer
 (`buildConnection(…, known)`). The wrapper reads it (`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
 outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
 handlers as `HandlerContext.onMainConnection(send)` — directly from a call that holds the flow, on
@@ -185,8 +195,8 @@ off once no call works on it any more — each call's use is counted when `getCo
 connection out, before any await, and ends with `connectionReleased(connection)` — called
 **exactly once per `getConnection`** (the tool wrapper calls it; a subclass that calls
 `getConnection` itself calls it too; a missing release keeps a replaced connection open until the
-terminal close, a second one ends it under another call). A cancelled call causes no
-logoff. The forced close also awaits, to its write, every logoff an orderly end already began.
+terminal close, a second one ends it under another call). A tool call cannot be cancelled, and
+the end of a call's session causes no logoff of its own. The forced close also awaits, to its write, every logoff an orderly end already began.
 
 ### Leftover sessions: the runtime files
 
@@ -324,8 +334,8 @@ await server.start('trial'); // the destination the process serves; undefined: i
   broker's cached provider while the destination is unchanged.
 - **Inspection-only.** Without destinations the tools are listed, and a tool call answers
   `inspection_only` before any connection is built.
-- **A login ended by another caller.** A request that joined a connect whose login another
-  request's cancel ended retries once.
+- **No retry of a login.** A login ends with its result, the server (the bound, the shutdown) or
+  the session — never by another call's cancel — so a request that joined it answers its outcome.
 
 ### StreamableHttpServer (`@mcp-abap-adt/http`)
 

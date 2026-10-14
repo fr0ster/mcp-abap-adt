@@ -134,8 +134,9 @@ session your other calls use).
 When the `timeout` passes, **the read is cancelled**: its session is logged off at once, and the
 call answers a tool error (`isError: true`) whose JSON carries `timed_out: true`, `timeout` and
 "The request was cancelled; nothing was changed." **Set `timeout` below your MCP client's own
-request limit** — the TypeScript SDK's client cancels at 60 s — because **a cancel does nothing to
-SAP**: no request is recalled, no session is logged off or reopened.
+request limit** — the TypeScript SDK's client cancels at 60 s — because **a tool call cannot be
+cancelled**: a client's cancel aborts nothing, the call runs to its end (the client just stops
+waiting for its answer), and no request is recalled, no session is logged off or reopened.
 
 A tool not on the list takes no `timeout` and runs to its end — above all the ones whose work
 goes on in SAP whoever waits: the ABAP Unit and ATC runs (`Run*UnitTest`, `RunATC`,
@@ -352,8 +353,12 @@ sends (its session record) come before any tool can use the connection, and the 
 lookup before the first tool runs (below). An embedder's own registry that is not a `CompositeHandlersRegistry` (it registers its
 tools itself) gets no main-flow queue. Outside the order, because they work
 on a connection of their own: a background run (`background: true`), a listed long read (on its
-fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow). A call you cancel while it waits leaves the queue at
-once and never reaches SAP. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the order,
+fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow). **A tool call cannot be cancelled**: it ends with
+its result or with the session. A cancel your client sends aborts nothing — a queued call keeps
+its place, a running call keeps running, and the server's answer to a cancelled request is not
+sent (the MCP SDK drops it). When the session ends (the transport closes), a call still finishes
+the requests it already sent before the instance closes, the system lookup included: nothing is
+logged off under a request in flight. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the order,
 a queued call checks its connection again: when the call ahead found the session lost, it takes the
 replacement connection before its tool runs, so only the call that met the loss fails (it is not
 retried). On stdio the connection is born at the start, before the transport opens, so no call
@@ -370,12 +375,18 @@ tool, never after a refusal.
   the transport opens — exit `1`, and on stderr `[MCP] Destination "<name>": the ABAP Cloud system
   could not be asked for the session user and system id (systeminformation), which the start
   needs; the server did not start. Start it again when the system is available` — and logs off the
-  logon made for it.
+  logon made for it. A system that answers `systeminformation` but names no user (the user
+  missing, empty, blank or not a string, or a body that is no JSON) is not a valid ABAP system for
+  this server: exit `1` the same way, with `[MCP] Destination "<name>": the system answered
+  systeminformation without a user, so it is not a valid ABAP system for this server; the server
+  did not start`.
 - **Streamable HTTP and SSE:** the first call that reaches the system asks, before its tool runs,
   inside the main flow (a call outside the flow — a background run, a listed long read, a debugger
   tool — takes a turn in it for the lookup alone). If the lookup fails, that call answers the error
-  — a chain failure as it is, any other `system_lookup_failed` — and its tool did not run, a read
-  included. The following calls are not barred: each call on a connection without the information
+  — a chain failure as it is, an answer that names no user `system_without_user` ("the ABAP Cloud
+  system answered systeminformation without a user, so it is not a valid ABAP system for this
+  server; the tool did not run"), any other `system_lookup_failed` — and its tool did not run, a
+  read included. Nothing of a refused answer is kept. The following calls are not barred: each call on a connection without the information
   asks again (the system may have been restarted or fixed). An embedder's instance does the same.
 
 On-premise nothing is asked. (Before this, a failed lookup failed nothing: a create that needed it
@@ -795,18 +806,20 @@ transport's options only:
 - **The startup check builds the credential.** A destination the broker refuses (a missing client
   field, say) now stops the start, exit `1`, instead of failing the first tool call.
 - **There is no 30-second login timeout.** A login waits until the browser answers, the identity
-  provider refuses, or the request is cancelled — a cancelled request (or a client that closed
-  its connection) ends the login it started once no other request waits for it. To bound a login,
+  provider refuses, or the session ends — a client that closed its connection ends the login it
+  started once no other request waits for it; a cancel ends nothing. To bound a login,
   set **`--login-timeout=<seconds>`** (`MCP_LOGIN_TIMEOUT`, YAML `login-timeout`; a whole number
   from 1 to 86400, no default): a login still waiting then ends `aborted`, answered with "The
   login was ended by the server's login timeout (`--login-timeout=<n>`)." (the bound named in the
   form you set it).
-- **A cancelled request does not reach its tool**, on every transport: once its client cancels
-  it (or closes its connection), its waits end — a shared connect or login goes on for the other
-  requests waiting for it — and its tool is never called. A tool already running runs to its end,
-  and a cancel does nothing to SAP: no logoff, no new session. A connect that completes after
-  every request waiting for it was cancelled is kept as the server's connection and used by the
-  next request.
+- **A tool call cannot be cancelled**, on every transport: it ends with its result or with the
+  session. A client's cancel (`notifications/cancelled`) aborts nothing: the call keeps its place
+  in the queue, its connect, login and system lookup run on, its tool runs, and the MCP SDK sends
+  no answer to the cancelled request. When the session ends (the client closed its connection,
+  or over Streamable HTTP its request), the call's waits end and its tool is never called — but a
+  request it already sent to SAP (its connect, the system lookup) is finished first, and the
+  instance's close waits for it. Nothing of this sends anything to SAP: no logoff, no new
+  session.
 - **`npm run auth` is gone.** Write a `.env` with `mcp-auth` from
   `@mcp-abap-adt/auth-broker-cli`: `npm install -g @mcp-abap-adt/auth-broker-cli`, then
   `mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap` (`--type xsuaa` for an
@@ -858,17 +871,19 @@ transport's options only:
   (auth-providers 6's `browserCallbackStrategy` fits), a required `promptLogger`
   (`promptLogger(stderr, diagnostics)`), `renewal?: 'refresh-then-login' | 'refresh-only'`, and
   `loginTimeoutMs?` (`--login-timeout` in milliseconds; absent: no bound).
-- **Each tool call has a request signal** (`BaseMcpServer`): aborted when the MCP request's
-  `extra.signal` aborts, and when the call ends. The handler runs inside the request
-  signal scope — `currentRequestSignal()` reads it; nothing sent to SAP carries it — and a call
-  cancelled before its tool starts ends with `RequestAbortedError` without reaching it (there is no
-  `request_aborted` answer); the tools a registry
-  registers itself (`registerAllTools`) are tracked the same way. A
+- **Each tool call has a request signal** (`BaseMcpServer`): aborted when the session ends — the
+  instance's transport closed — and when the call ends; never by a client's cancel (the MCP
+  request's `extra.signal`, which the SDK aborts for a cancel too, is not read). The handler runs
+  inside the request signal scope — `currentRequestSignal()` reads it; nothing sent to SAP
+  carries it — and a call whose session ended before its tool starts ends with
+  `RequestAbortedError` without reaching it (there is no `request_aborted` answer); the tools a
+  registry registers itself (`registerAllTools`) are tracked the same way, and their callback's
+  `extra.signal` is the call's signal. A
   `ConnectionSource.resolve(signal)` gets it and should race its own waits against it
   (`raceRequestSignal(work, signal)`). All of these come from `@mcp-abap-adt/lib/embeddable`.
 - **Nothing aborts a call that runs.** `activeTools()` (`@mcp-abap-adt/lib/embeddable`) lists the
-  calls of every instance; a tool already running runs to its end, and a cancelled call ends only
-  its waits. The process's shutdown machinery (the latch, the settlement, the shutdown sequence) is
+  calls of every instance; a tool already running runs to its end, and a call whose session ended
+  ends only its waits — not a request it already sent. The process's shutdown machinery (the latch, the settlement, the shutdown sequence) is
   the launchers', not the embeddable entry's.
 - **Ending an instance has two parts.** `BaseMcpServer.dispose()` stays the state undo — callable
   again, each call retrying what is left — and closes no connection. Beside it,
@@ -941,7 +956,10 @@ transport's options only:
   `background_run_running`, `background_run_limit` and `background_run_caller_unknown` (a caller
   whose backend user neither the request nor SAP names); and `system_lookup_failed` (a call on an
   ABAP Cloud connection whose `systeminformation` lookup, asked before the tool, failed: the tool
-  did not run, and the next call asks again). `withKnownSystemContext(resolved, fn)` applies a
+  did not run, and the next call asks again), and `system_without_user` (the same lookup answered
+  but named no user: not a valid ABAP system for this server). `requiringUser(resolver)` and
+  `SystemWithoutUserError` (`requestSystemResolution`) are how the server checks it, whatever
+  resolver you give. `withKnownSystemContext(resolved, fn)` applies a
   resolution the server made before the tool (its third parameter is gone); `withResolvedSystemContext` (which looks up) is still there for
   `HandlerExporter` and `BaseHandlerGroup`. `ConnectionRole` adds `background`: the
   run's connection is owned by the strategy, so no instance's terminal close cuts it.

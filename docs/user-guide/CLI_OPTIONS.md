@@ -253,9 +253,9 @@ was ended by the server's login timeout (`--login-timeout=<n>`)." — naming the
 you set it (`MCP_LOGIN_TIMEOUT=<n>`, or `login-timeout: <n>` in the configuration file). A whole
 number from 1 to
 86400; `0`, `86401`, `1.5` or `abc` are refused at startup. **There is no default**: without it a
-login ends when the browser answers, the identity provider refuses, or the request that waits for
-it ends — a client that cancels its request, or closes its connection, ends the login it started
-when no other request waits for it.
+login ends when the browser answers, the identity provider refuses, or the session of the request
+that waits for it ends — a client that closes its connection ends the login it started when no
+other request waits for it. A tool call cannot be cancelled: a cancel ends no login.
 
 ```bash
 mcp-abap-adt --mcp=TRIAL --login-timeout=300

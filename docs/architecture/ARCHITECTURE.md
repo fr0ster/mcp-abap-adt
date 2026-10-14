@@ -290,8 +290,10 @@ being asked goes stateless once another call's window closed (both seen against 
 stand-in). So the server does not trust the client: the calls of an instance that
 work on its connection run strictly one after another (`BaseMcpServer.enterMainFlow`,
 in the registered tool wrapper). The next waits until the previous settled, with no
-timeout; a call cancelled while it waits leaves the queue at once and never reaches
-its tool. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
+timeout. **A tool call cannot be cancelled**: it ends with its result or with the
+session — a client's cancel aborts nothing, a queued call keeps its place. When the
+session ends, a call still finishes the requests it already sent (its connect, the
+system lookup) before the instance closes: no logoff under a request in flight. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
 main-flow queue. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals.
 Every send on the instance's connection is inside the order: the identity lookups
 (`systeminformation`) of the background-run tools and the
@@ -318,8 +320,9 @@ failure ends the process before the transport opens. On http, sse and an embedde
 instance the first call on a connection without it asks (`systemBeforeTool` →
 `requireSystem`, concurrent askers sharing one request through `resolveOnce`) inside
 the main flow — a call outside the flow takes a turn in it for the lookup alone. A
-failure is that call's answer (a chain failure as it is, else `system_lookup_failed`)
-and its tool does not run; nothing failed is kept, so the next call asks again. A
+failure is that call's answer (an answer that names no user `system_without_user` —
+not a valid ABAP system for this server —, a chain failure as it is, else
+`system_lookup_failed`) and its tool does not run; nothing failed is kept, so the next call asks again. A
 replacement of a connection of the same credential keeps its answer. The tool wrapper
 reads the answer (`withKnownSystemContext`) and sends nothing; on-premise nothing is
 asked.
@@ -331,8 +334,8 @@ asked.
   latest the instance's logoff ends it: a logoff releases the session's locks. Over
   Streamable HTTP the next request's credential retires the lock's connection, and
   that connection's logoff releases the lock.
-- **A cancel does nothing to SAP.** A started tool runs to its end; nothing is
-  logged off and no session is reopened because a request was cancelled.
+- **A tool call cannot be cancelled.** A client's cancel aborts nothing: the call
+  runs to its end; nothing is logged off and no session is reopened.
 - **A reopen only when SAP already lost the session.** stdio keeps its connection
   for the instance's life; http builds one per request (a pooled instance too, from
   that request's headers), sse one per SSE connection.

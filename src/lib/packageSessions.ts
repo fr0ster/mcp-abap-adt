@@ -34,12 +34,15 @@
  * when its operation ends, on every path, or by the instance's terminal close.
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { isLatched } from './activeTools';
+import { ClosedInstanceRefusal } from './auth/failures';
 import { ServerRefusal } from './auth/serverRefusal';
 import { createAbapConnection, siblingRecordOf } from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
 import type { HandlerContext } from './handlers/interfaces';
 import {
   endConnection,
+  isEnded,
   own,
   refuseIfClosed,
   refuseWhenClosed,
@@ -166,6 +169,11 @@ async function connectedOrClosed(
   logger: Logger,
 ): Promise<IAbapConnection> {
   const connectable = fresh as { connect?: () => Promise<void> };
+  // Right before the connect, with no await between: a close that ended this
+  // connection after it was recorded (its instance's sweep, or the cut of the
+  // background runs that instance started) leaves nothing to connect.
+  if (isEnded(fresh)) throw new ClosedInstanceRefusal(isLatched());
+  refuseWhenClosed(fresh);
   try {
     if (typeof connectable.connect === 'function') await connectable.connect();
   } catch (error) {

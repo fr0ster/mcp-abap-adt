@@ -67,7 +67,8 @@ the way it was always documented:
   `system-type`; precedence as before — the CLI flag, then the environment, then YAML. A
   service-key destination (`--mcp=<name>`) has no `.env` of its own: state the kind on the command
   line, in the environment or in YAML.
-- An embedder: `EmbeddableMcpServer`'s `systemType` option, else `SAP_SYSTEM_TYPE`.
+- An embedder: `EmbeddableMcpServer`'s or `HandlerExporter`'s `systemType` option, else
+  `SAP_SYSTEM_TYPE`.
 - `legacy` stays a kind of its own for the tools offered and connects as on-premise. Any other
   value is refused like a missing one.
 
@@ -80,24 +81,36 @@ What each answers without it:
   not start`. (A value other than the three was already refused at start: `SAP_SYSTEM_TYPE
   (environment or env file) must be onprem, cloud or legacy`.) Inspection-only mode — no
   destination — needs no kind: it connects nowhere.
-- **Streamable HTTP and SSE**: no request header states the kind; it is the process's parameter
-  (`--system-type`, `SAP_SYSTEM_TYPE`, YAML). Without it every call that would reach the system is
-  refused before anything is sent: `"error": "system_type_required"`, "the SAP system type is not
-  stated: set --system-type, SAP_SYSTEM_TYPE (the environment or the --env file) or system-type
-  (YAML) to onprem, cloud or legacy — an embedding host passes systemType; nothing was sent to the
-  system".
+- **Streamable HTTP and SSE** (`mcp-abap-adt-http`, `mcp-abap-adt-sse` and their `-ro` and compact
+  binaries): no request header states the kind; it is the process's parameter (`--system-type`,
+  `SAP_SYSTEM_TYPE`, YAML `system-type`; the CLI flag, then the environment, then YAML). Without
+  it the start ends before anything listens — exit `1`, and on stderr `[MCP] The SAP system type
+  is required — set --system-type, SAP_SYSTEM_TYPE (the environment) or system-type (YAML) to
+  onprem, cloud or legacy; the server did not start` — so no tool list is ever offered for a kind
+  nobody stated. Only an embedder's own host of the exported `StreamableHttpServer` / `SseServer`
+  classes, which read `SAP_SYSTEM_TYPE` at each call, can still let a call through without it:
+  that call is refused before anything is sent, `"error": "system_type_required"`, "the SAP
+  system type is not stated: set --system-type, SAP_SYSTEM_TYPE (the environment or the --env
+  file) or system-type (YAML) to onprem, cloud or legacy — an embedding host passes systemType;
+  nothing was sent to the system".
 - **An embedder**: `new EmbeddableMcpServer(...)` throws that same `ServerRefusal`
   (`system_type_required`) at construction — the kind decides the tools it registers and how the
   system's answers are read, so the host learns it before any client sees a tool. A connection
   the factory built (`createAbapConnection`) is refused the same way when `SAP_SYSTEM_TYPE` is not
-  set, before it connects. `HandlerExporter` has no `systemType` option: without
-  `SAP_SYSTEM_TYPE` the system lookup of a connection answering `404` fails, and a create is
-  refused as the system being unreachable — set `SAP_SYSTEM_TYPE`, or pass your own
-  `systemContextResolver`.
+  set, before it connects. `new HandlerExporter(...)` (and `createDefaultHandlerExporter(logger,
+  systemType)`) takes a `systemType` option and throws the same refusal at construction without it
+  and without `SAP_SYSTEM_TYPE` — whatever `systemContextResolver` is given: the kind decides how a
+  system's answer to its lookup is read.
+- A fresh connection opened beside one the server built (a package session, a lock's own session)
+  is built for the kind recorded for that connection — never for what `SAP_SYSTEM_TYPE` says when
+  it is opened.
 - `ServerRefusalCode` / `FailureCode` add `system_type_required`.
 
-The tools offered still follow the same parameter; where none is stated (Streamable HTTP and SSE
-started without it, inspection-only stdio) the list is cloud's, as before.
+The tools offered follow the same parameter, with no default: 18.x listed cloud's tools when none
+was stated; now, where none is stated — inspection-only stdio, which has no system, or an
+embedder's own transport host that states none — nothing is filtered: every tool of the binary's
+set is listed (inspection shows what the binary serves; a call that would reach a system is
+refused all the same).
 
 ## Every binary: `--exposition` is gone — the binary fixes its tool set
 

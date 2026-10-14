@@ -46,8 +46,11 @@ destination, no service key, no session file, no login, no auth broker.
   with it until it ends.
 - The system kind follows `--system-type` / `SAP_SYSTEM_TYPE` (`cloud`, `onprem`, `legacy`) and is
   required — no request header states it: it decides the tools offered and how the system's
-  `systeminformation` is read. Without it every call that would reach the system is refused
-  (`system_type_required`), nothing sent.
+  `systeminformation` is read. Without it the binary does not start: exit `1` before anything
+  listens, on stderr `[MCP] The SAP system type is required — set --system-type, SAP_SYSTEM_TYPE (the environment) or system-type
+  (YAML) to onprem, cloud or legacy; the server did not start`. (An embedder's own host of the
+  exported server class reads `SAP_SYSTEM_TYPE` at each call: a call without it is refused
+  `system_type_required`, nothing sent.)
 
 Per request, beside the credential: `x-sap-responsible`, `x-sap-master-system`, `x-sap-language`,
 and the debugger's `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` (then `SAP_RESPONSIBLE`,

@@ -278,7 +278,7 @@ The `SAP_SYSTEM_TYPE` environment variable controls which tools are available an
 
 **On `legacy`:** no tool declares that environment, so a server started with `SAP_SYSTEM_TYPE=legacy` offers none. Support for legacy systems is parked on the `parked/legacy-support` branch until it can be tried against a live one — it was declared on 142 tools and had never been run against such a system, which is a claim rather than a fact.
 
-**Without it** `mcp-abap-adt` does not start a destination (exit `1`, naming the parameter), `mcp-abap-adt-http` / `mcp-abap-adt-sse` refuse every call that would reach the system (`system_type_required`, nothing sent; no request header states the kind), and `EmbeddableMcpServer` throws `system_type_required` at construction. A value other than the three is refused the same way. Where no kind is stated (Streamable HTTP and SSE started without it, inspection-only stdio) the tools listed are cloud's.
+**Without it** `mcp-abap-adt` does not start a destination (exit `1`, naming the parameter), `mcp-abap-adt-http` / `mcp-abap-adt-sse` (and their `-ro` and compact binaries) do not start (exit `1` before anything listens; no request header states the kind), and `EmbeddableMcpServer` and `HandlerExporter` throw `system_type_required` at construction. A value other than the three is refused the same way. Inspection-only stdio (no destination) needs no kind: it filters nothing and lists every tool of its set — there is no `cloud` default.
 
 You can also set this via CLI: `--system-type=onprem`, or YAML `system-type: onprem`. Precedence: the CLI flag, then the environment — which the `--env` / `--env-path` `.env` value joins, never over one already set — then YAML.
 

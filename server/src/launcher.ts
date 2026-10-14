@@ -126,9 +126,10 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    Precedence: --connection-type, then the environment
                                    (this file joins it, never over a value set), then YAML
     SAP_SYSTEM_TYPE                SAP system type: cloud | onprem | legacy (same as --system-type)
-                                   Tools offered: default cloud (e.g. Programs need onprem)
-                                   Connector and master-system lookup: default cloud for a
-                                   jwt destination, else onprem — never guessed from the URL
+                                   Required for a destination: no default, never guessed (not
+                                   from the auth type, not from the URL); it decides the tools
+                                   offered (e.g. Programs need onprem), the connector and how
+                                   the system's answers are read
     SAP_USERNAME                   SAP username (required for basic auth)
     SAP_PASSWORD                   SAP password (required for basic auth)
     SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)

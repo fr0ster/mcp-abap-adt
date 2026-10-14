@@ -545,6 +545,7 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
   `compact`, `system`, `search`), or takes `handlersRegistry`.
 - **Availability.** A tool is registered only if its `available_in` includes the instance's
   system type: the `systemType` option, else `SAP_SYSTEM_TYPE` — required: `EmbeddableMcpServer`
-  without either throws `system_type_required` at construction (a base server without one, as
-  http/sse started without `--system-type`, lists cloud's tools and refuses every call that would
-  reach the system).
+  without either throws `system_type_required` at construction, and so does `HandlerExporter`;
+  the http/sse binaries do not start without one. A base server with none stated (stdio's
+  inspection-only mode, an embedder's own transport host) filters nothing — every tool of its set
+  is listed, no `cloud` default — and refuses every call that would reach the system.

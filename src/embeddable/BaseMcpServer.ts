@@ -892,8 +892,10 @@ export abstract class BaseMcpServer extends McpServer {
    * process's settings and credential, and starts a new session. Either way
    * the file is this process's under the same handle (`adopt`), rewritten
    * with the connection's cookies; `outcome.session` says which. The system
-   * information the file carries is the connection's (same destination, same
-   * system): nothing is looked up. Any other failure — the old session's
+   * information the file carries is reused only for the session picked up
+   * (the same session, the same user): a new session's is asked
+   * (`requireSystem`) and checked before the file is adopted, and its
+   * failure ends the start like the logon's. Any other failure — the old session's
    * answer or the new logon's — is the start's, as SAP gave it, and gives
    * the file back as a leftover. So does a close (the process shutdown, the
    * instance's) that latched while either connected: the connection is not
@@ -947,8 +949,22 @@ export abstract class BaseMcpServer extends McpServer {
         owner.release(claimed);
         throw logonError;
       }
+      // A new session is not the old one: the file's system information
+      // (whose user may no longer be this logon's) is not reused. The new
+      // connection's is asked and checked before the file is this
+      // process's; a failure logs the new session off, gives the file back
+      // as a leftover and ends the start.
+      try {
+        await this.requireSystem(fresh);
+        refuseWhenClosed(fresh);
+      } catch (lookupError) {
+        await endConnection(fresh);
+        owner.release(claimed);
+        throw lookupError;
+      }
       owner.adopt(claimed, fresh, identity);
-      if (claimed.system !== undefined) this.knowSystem(fresh, claimed.system);
+      const asked = this.systems.get(fresh);
+      if (asked !== undefined) this.knowSystem(fresh, asked);
       outcome.session = 'new';
       return fresh;
     }

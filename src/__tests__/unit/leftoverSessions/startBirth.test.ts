@@ -206,6 +206,21 @@ describe('one leftover session of the destination', () => {
   });
 });
 
+describe('on-premise: a new session after a gone leftover', () => {
+  it('a 404 for its system information: the configured settings apply, the file carries none of the old', async () => {
+    stand = await leftoverStand();
+    const { handle, session } = await stand.leftover({
+      system: { responsible: 'USER_A', masterSystem: 'SYA' },
+    });
+    stand.standIn.answer((r) => r.session === session, 401);
+    stand.standIn.answer(isLookup, 404);
+    const from = stand.standIn.requests.length;
+    expect(await stand.start()).toEqual({ session: 'new', handle });
+    expect(stand.standIn.requests.slice(from).filter(isLookup)).toHaveLength(1);
+    expect(stand.file(handle)).toMatchObject({ pid: OUR_PID, system: null });
+  });
+});
+
 describe('no leftover session, or several', () => {
   it('none: a normal logon at the start, and a tool afterwards runs on it with no further logon', async () => {
     stand = await leftoverStand();
@@ -321,14 +336,74 @@ describe('ABAP Cloud: the system information at the start', () => {
     expect(stand.files()).toEqual([]);
   });
 
-  it('a gone leftover whose new logon then finds no system information: the start fails, and the new session is logged off', async () => {
-    stand = await leftoverStand();
-    const { session } = await stand.leftover();
+  it('a gone leftover of user A, the new logon answered as user B: the start uses B, asked in the new session, and the file says B', async () => {
+    stand = await leftoverStand({ extra: [needsResponsible] });
+    const { handle, session } = await stand.leftover({
+      system: { responsible: 'USER_A', masterSystem: 'SYA' },
+    });
     stand.standIn.answer((r) => r.session === session, 401);
-    stand.standIn.answer(isLookup, 500);
-    await expect(stand.start()).rejects.toBeDefined();
-    await until(() => stand.standIn.logoffs() === 1);
-    expect(stand.files()).toEqual([]);
+    stand.standIn.body(
+      isLookup,
+      JSON.stringify({ userName: 'USER_B', systemID: 'SYB' }),
+    );
+    const from = stand.standIn.requests.length;
+    expect(await stand.start()).toEqual({ session: 'new', handle });
+    const fresh = [...logons(from)];
+    expect(fresh).toHaveLength(1);
+    const lookups = stand.standIn.requests.slice(from).filter(isLookup);
+    expect(lookups).toHaveLength(1);
+    expect(lookups[0]?.session).toBe(fresh[0]);
+    expect(stand.file(handle)).toMatchObject({
+      pid: OUR_PID,
+      system: { responsible: 'USER_B', master_system: 'SYB' },
+    });
+    const created = await stand.call('NeedsResponsible');
+    expect(created).toEqual({ text: 'USER_B', isError: false });
+  });
+
+  it.each([
+    ['answers 500', (s: LeftoverStand) => s.standIn.answer(isLookup, 500)],
+    ['answers 404', (s: LeftoverStand) => s.standIn.answer(isLookup, 404)],
+    [
+      'names no user',
+      (s: LeftoverStand) =>
+        s.standIn.body(isLookup, JSON.stringify({ systemID: 'SYB' })),
+    ],
+  ])(
+    'a gone leftover whose new logon then %s for its system information: the start fails, the new session is logged off, the file a leftover again',
+    async (_case, lookupFails) => {
+      stand = await leftoverStand();
+      const { handle, session } = await stand.leftover({
+        system: { responsible: 'USER_A', masterSystem: 'SYA' },
+      });
+      stand.standIn.answer((r) => r.session === session, 401);
+      lookupFails(stand);
+      const from = stand.standIn.requests.length;
+      await expect(stand.start()).rejects.toBeDefined();
+      expect(stand.standIn.requests.slice(from).filter(isLookup)).toHaveLength(
+        1,
+      );
+      await until(() => stand.standIn.logoffs() === 1);
+      expect(stand.standIn.loggedOff()).not.toContain(session);
+      expect(stand.files()).toEqual([handle]);
+      expect(stand.file(handle)).toMatchObject({
+        pid: 111,
+        system: { responsible: 'USER_A', master_system: 'SYA' },
+      });
+      expect(ownedConnections(stand.server)).toEqual([]);
+    },
+  );
+
+  it('a gone leftover whose new logon names no user: refused as system_without_user', async () => {
+    stand = await leftoverStand();
+    const { session } = await stand.leftover({
+      system: { responsible: 'USER_A', masterSystem: 'SYA' },
+    });
+    stand.standIn.answer((r) => r.session === session, 401);
+    stand.standIn.body(isLookup, JSON.stringify({ userName: ' ' }));
+    await expect(stand.start()).rejects.toMatchObject({
+      serverRefusal: 'system_without_user',
+    });
   });
 
   it('latched while its system information is asked: the start is refused, and the picked-up session ends with its logoff', async () => {

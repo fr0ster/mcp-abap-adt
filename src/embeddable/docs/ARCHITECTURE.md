@@ -134,7 +134,8 @@ Ending an instance has two parts, kept apart:
   callable again, each call retrying what the state could not undo. It closes no connection.
 - **The terminal close** — `terminalClose()` (lib's `closeOwnedConnections(instance)`): the
   `disconnect()` of every connection the instance owns, each once, a failure logged in fixed
-  words; it waits for no request in flight. The pool and the idle bound run it after the undo was
+  words, joined with the instance's logoffs already under way; it waits for no request in
+  flight. The pool and the idle bound run it after the undo was
   tried, **never conditional on the undo succeeding**: a failed undo is reported, never a reason to
   keep a session — or a lock — open.
 
@@ -144,8 +145,14 @@ its connection: in the tick it begins `latch(instance)`, the terminal close and
 `interrupt(instance)` — every connection logged off under any request in flight, every call of
 the instance interrupted (a queued one never starts), no running tool awaited, no state undo
 sent (the logoff ends the state) —; then `letGoOfState()` (no idle bound any more) and the MCP
-server and its transport closed. An SSE close uses it; the pool runs the undo and the terminal
-close when an instance leaves it.
+server and its transport closed. **A transport close that ends the session is the instance's
+close**: unless the host states `transportCloseEndsSession: false` (a transport per request, as
+Streamable HTTP), `BaseMcpServer` wires the protocol's `onclose` to `closeInstance(this)` — stdio's
+transport, an SSE stream, an embedder's connected transport. Every other path joins the same
+promise: the SSE stream-close wrapper (which also takes the session out of its routing map), the
+stdio launcher's shutdown (its process-wide `logOffAtOnce` first; the logoffs already under way
+are joined, never sent twice), and a later `terminalClose()`, which also waits for the instance's
+logoffs under way. The pool runs the undo and the terminal close when an instance leaves it.
 
 **A closed instance opens nothing.** The sweep runs once, so from the latch on — the instance's
 or the process's — no connection is opened or owned for it (`ownedConnections.ts`):

@@ -890,8 +890,9 @@ transport's options only:
   (`promptLogger(stderr, diagnostics)`), `renewal?: 'refresh-then-login' | 'refresh-only'`, and
   `loginTimeoutMs?` (`--login-timeout` in milliseconds; absent: no bound).
 - **Each tool call has a request signal** (`BaseMcpServer`): aborted when the session ends — the
-  instance's transport closed; a host that connects a transport per request (as Streamable HTTP
-  does) passes `transportCloseEndsSession: false`, and its transport's close aborts nothing —, at
+  instance's transport closed, which is the instance's close (`closeInstance`, below); a host
+  that connects a transport per request (as Streamable HTTP does) passes
+  `transportCloseEndsSession: false`, and its transport's close aborts nothing —, at
   the instance's close (`closeInstance`) and the process shutdown, and when the call ends; never by a client's cancel (the MCP
   request's `extra.signal`, which the SDK aborts for a cancel too, is not read). The handler runs
   inside the request signal scope — `currentRequestSignal()` reads it; nothing sent to SAP
@@ -911,7 +912,15 @@ transport's options only:
   **`terminalClose()`** closes every connection the instance owns — the one it built, held
   state's own, package lock sessions, fresh connections still open — each with its one
   `disconnect()` (the logoff, which releases its SAP locks), whatever the undo answered; a
-  connection you injected is never closed. When your client closed, call
+  connection you injected is never closed. **With the default `transportCloseEndsSession`, the
+  close of the transport you connected is the instance's close**: when your client disconnects
+  (or you close the server or its transport), `closeInstance` runs on its own — every connection
+  the instance owns is logged off at once, its running calls are interrupted, its state let go;
+  nothing to call. A host that connects a transport per request passes
+  `transportCloseEndsSession: false` and ends the instance itself. A later `closeInstance`,
+  `terminalClose()` or `close()` joins the close already under way: no second logoff, and
+  `terminalClose()` then resolves once those logoffs are written. When your client closed on a
+  path the transport does not see, call
   **`closeInstance(instance)`** (`@mcp-abap-adt/lib/embeddable`): in one tick no new call of the
   instance starts, every connection it owns is logged off and its calls are interrupted — no
   running tool is awaited, no state undo is sent (the logoff ends the state) —; then its state is

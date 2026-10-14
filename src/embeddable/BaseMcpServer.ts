@@ -114,11 +114,6 @@ export type StartedConnection =
   | { session: 'logged_on' }
   | { session: 'picked_up' | 'new'; handle: string };
 
-/** What the SDK hands a tool callback beside its arguments: the request's signal. */
-interface ToolCallExtra {
-  readonly signal?: AbortSignal;
-}
-
 /**
  * A connection being built, shared by every call that asks for it while it
  * is (D13, D32). A connect that completes after every caller left is still
@@ -298,6 +293,22 @@ export abstract class BaseMcpServer extends McpServer {
           ? systemContextResolverFor(options.systemType)
           : defaultSystemContextResolver
         : options.systemContextResolver;
+    // The session's end: the transport closed (the SDK calls the protocol's
+    // `onclose` once per transport). Every live call's signal aborts then —
+    // and only then: a client's cancel aborts nothing (`trackCall`).
+    const previousOnClose = this.server.onclose;
+    this.server.onclose = () => {
+      previousOnClose?.();
+      this.sessionEnded();
+    };
+  }
+
+  /** The controllers of this instance's live calls (`trackCall`). */
+  private readonly liveCalls = new Set<AbortController>();
+
+  /** The session's end: every live call's request signal aborts. */
+  private sessionEnded(): void {
+    for (const controller of this.liveCalls) controller.abort();
   }
 
   /**
@@ -409,12 +420,12 @@ export abstract class BaseMcpServer extends McpServer {
    * `rejected()`), so nothing is looked up here for refreshing.
    *
    * The connect is shared by every call that asks while it runs, and each
-   * caller's wait races its own signal (D32): a cancelled caller settles at
-   * once, the connect runs on for the others, its late rejection is handled,
-   * and a late success is the instance's connection — kept and used by the
-   * next call even when every caller that waited for it cancelled (D56: a
-   * cancel causes no logoff). It is closed only by the instance's terminal
-   * close (spec §6.4).
+   * caller awaits it to its end whatever its signal says: it is a send on
+   * the instance's connection, so a call whose session ended still waits for
+   * it, and the instance's close comes after (no logoff under it). A login
+   * inside it ends with the session (its party is the call's signal). A
+   * success is the instance's connection, kept and used by the next call; it
+   * is closed only by the instance's terminal close (spec §6.4).
    *
    * Every connection it returns is a use the caller must end with exactly
    * one `connectionReleased(connection)`.
@@ -472,7 +483,11 @@ export abstract class BaseMcpServer extends McpServer {
     held.users += 1;
     let connection: AbapConnection;
     try {
-      connection = await raceRequestSignal(held.connection, signal);
+      // Awaited whatever the signal says: the connect is a send on the
+      // instance's connection, and a session that ends meanwhile still
+      // waits for it (no logoff under it). A login inside it ends with the
+      // session: its party is the call's signal.
+      connection = await held.connection;
     } catch (error) {
       this.release(held);
       throw error;
@@ -485,12 +500,13 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * The instance's main flow: the calls that work on its connection, one
    * after another. Resolves with the call's `leave` once every call queued
-   * before it has left; no timeout on the wait. A call whose signal aborts
-   * while it waits leaves the queue at once — its place passes on, and it
-   * answers `aborted` without reaching its tool (D5). A shutdown or an
-   * instance close aborts no call (D55): it waits for the running call and
-   * every queued one to run to their end; only an SSE close, whose transport
-   * aborts the request signals, makes the queued calls leave.
+   * before it has left; no timeout on the wait. A client's cancel aborts
+   * nothing (`trackCall`): the call keeps its place. A call whose session
+   * ended while it waits (its signal aborted) leaves the queue at once — its
+   * place passes on, and it ends without reaching its tool (D5). A shutdown
+   * or an instance close aborts no call (D55): it waits for the running call
+   * and every queued one to run to their end; only an SSE close, whose
+   * transport closing ends the session, makes the queued calls leave.
    */
   private enterMainFlow(signal: AbortSignal): Promise<() => void> {
     const before = this.mainFlow;
@@ -536,23 +552,21 @@ export abstract class BaseMcpServer extends McpServer {
    * Cloud `systeminformation`; on-premise the resolver sends nothing. A
    * failure is the caller's: a chain failure as it is, any other the
    * server's `system_lookup_failed`. Nothing failed is kept, so the next
-   * caller asks again. Concurrent askers share one request (`resolveOnce`);
-   * an answer that arrives after its caller left is kept all the same.
+   * caller asks again. Concurrent askers share one request (`resolveOnce`).
    */
-  private async requireSystem(
-    connection: AbapConnection,
-    signal: AbortSignal,
-  ): Promise<void> {
+  private async requireSystem(connection: AbapConnection): Promise<void> {
     const resolver = this.systemContextResolver;
     if (resolver === null || this.systems.has(connection)) return;
     const asked = resolveOnce(resolver, connection).then((system) => {
       this.knowSystem(connection, system);
     });
     try {
-      await raceRequestSignal(asked, signal);
+      // Awaited whatever the signal says: the lookup is a send on the
+      // instance's connection, and the call — its turn in the main flow, its
+      // tracking — lasts until it settled, so nothing overlaps it and no
+      // logoff comes under it when the session ends.
+      await asked;
     } catch (error) {
-      asked.catch(() => undefined);
-      if (signal.aborted) throw error;
       if (readGuarded(failureOf, error) !== undefined) throw error;
       // The class only: a lookup's message may quote what the system
       // answered (H4).
@@ -578,7 +592,7 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<AbapConnection> {
     if (!this.lacksSystem(connection)) return connection;
     if (holdsFlow) {
-      await this.requireSystem(connection, signal);
+      await this.requireSystem(connection);
       return connection;
     }
     const leave = await this.enterMainFlow(signal);
@@ -593,7 +607,7 @@ export abstract class BaseMcpServer extends McpServer {
         current = await this.getConnection(signal);
         taken(current);
       }
-      await this.requireSystem(current, signal);
+      await this.requireSystem(current);
       return current;
     } finally {
       leave();
@@ -655,7 +669,7 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<T> {
     const held = heldFlows.getStore()?.get(this);
     if (held !== undefined) return send(held);
-    // Its turn: no timeout, a cancelled wait leaves at once.
+    // Its turn: no timeout; a wait whose session ended leaves at once.
     const leave = await this.enterMainFlow(signal);
     try {
       const connection = await this.getConnection(signal);
@@ -878,10 +892,10 @@ export abstract class BaseMcpServer extends McpServer {
             this.resumedSession(resolved, owner, claimed, identity, outcome),
           )
         : this.buildConnection(resolved.credential, () => this.logOn(resolved));
-    const connection = await raceRequestSignal(entry.connection, signal);
+    const connection = await entry.connection;
     this.systemContexts.set(connection, resolved.systemContext);
     try {
-      await this.requireSystem(connection, signal);
+      await this.requireSystem(connection);
     } catch (error) {
       if (this.built === entry) this.built = undefined;
       if (outcome.session !== 'picked_up') await endConnection(connection);
@@ -936,7 +950,7 @@ export abstract class BaseMcpServer extends McpServer {
                 ? withoutBackground(args)
                 : args;
               // Get connection from context (this.connectionContext), with
-              // the request's signal: a cancelled call settles at once.
+              // the call's signal (the session's end).
               let connection = await this.getConnection(signal);
               inUse = connection;
               // One instance, one connection, one main flow: a call that works
@@ -1129,8 +1143,8 @@ export abstract class BaseMcpServer extends McpServer {
 
           // Tracked from its entry, with its own request signal (`trackCall`).
           const toolName = entry.toolDefinition.name;
-          const wrappedHandler = (args: unknown, extra?: ToolCallExtra) =>
-            this.trackCall(toolName, extra, (signal) => runCall(args, signal));
+          const wrappedHandler = (args: unknown) =>
+            this.trackCall(toolName, (signal) => runCall(args, signal));
 
           // Convert JSON Schema to Zod if needed, otherwise pass as-is
           const zodSchema =
@@ -1542,9 +1556,12 @@ export abstract class BaseMcpServer extends McpServer {
    * counts: it pauses while the call runs and counts from its end.
    *
    * Each call has a request signal of its own (§5.1): aborted when the
-   * request's `extra.signal` aborts (the client cancelled, its transport
-   * closed) and when the call ends whatever its outcome (D4: the broker
-   * releases the party it attached only then). Nothing else aborts it: the
+   * session ends — the instance's transport closed (`sessionEnded`) — and
+   * when the call ends whatever its outcome (D4: the broker releases the
+   * party it attached only then). A tool call cannot be cancelled: the
+   * request's `extra.signal`, which the SDK also aborts for a client's
+   * `notifications/cancelled`, is not read — the call runs to its end (the
+   * SDK then sends no answer to a cancelled request). Nothing else aborts it: the
    * registry of live calls, where the call is registered here before
    * anything else, keeps its settlement for the shutdown and the instance
    * close to await (D55). Once the process or this instance is latched, the
@@ -1556,7 +1573,6 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private trackCall<T>(
     name: string,
-    extra: ToolCallExtra | undefined,
     run: (signal: AbortSignal) => Promise<T>,
   ): Promise<T> {
     const controller = new AbortController();
@@ -1567,16 +1583,13 @@ export abstract class BaseMcpServer extends McpServer {
     if (unregister === undefined) {
       return Promise.resolve(shutdownRefusalAnswer() as T);
     }
-    const requestSignal = extra?.signal;
-    const onRequestAbort = () => controller.abort();
-    if (requestSignal?.aborted) controller.abort();
-    else requestSignal?.addEventListener('abort', onRequestAbort);
+    this.liveCalls.add(controller);
     this.state.callStarted();
     const call = runAsOwner(this, () => run(controller.signal));
     this.inFlight.add(call);
     call
       .finally(() => {
-        requestSignal?.removeEventListener('abort', onRequestAbort);
+        this.liveCalls.delete(controller);
         controller.abort();
         unregister();
         this.inFlight.delete(call);
@@ -1597,15 +1610,19 @@ export abstract class BaseMcpServer extends McpServer {
     const track =
       (name: string, callback: (...callbackArgs: unknown[]) => unknown) =>
       (...callbackArgs: unknown[]) => {
-        // The SDK passes `extra` last: `(args, extra)` or `(extra)`.
-        const extra = callbackArgs[callbackArgs.length - 1] as
-          | ToolCallExtra
-          | undefined;
-        return this.trackCall(name, extra, async (signal) => {
+        return this.trackCall(name, async (signal) => {
+          // The SDK passes `extra` last: `(args, extra)` or `(extra)`. The
+          // callback sees the call's own signal there — the session's end —
+          // never the SDK's, which a client's cancel aborts.
+          const last = callbackArgs[callbackArgs.length - 1];
+          const args =
+            typeof last === 'object' && last !== null
+              ? [...callbackArgs.slice(0, -1), { ...last, signal }]
+              : callbackArgs;
           try {
             throwIfRequestAborted(signal);
             return await runWithRequestSignal(signal, async () =>
-              callback(...callbackArgs),
+              callback(...args),
             );
           } catch (error) {
             const read = readGuarded((t) => this.readFailure(t), error);

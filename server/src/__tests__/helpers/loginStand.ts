@@ -406,7 +406,6 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
     },
     {
       sentenceFor: (e) => factory.sentenceFor(e),
-      abortedByServer: (e) => factory.abortedByServer(e),
     },
   );
 

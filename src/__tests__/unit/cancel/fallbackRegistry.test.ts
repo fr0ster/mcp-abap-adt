@@ -1,9 +1,11 @@
 /**
- * D5 on `BaseMcpServer`'s other registration path: a handlers registry that
- * is not a `CompositeHandlersRegistry` registers its own tools
- * (`registerAllTools`). Those tools go through the same wrapper — the
- * request's signal, the registry of live calls, the request signal scope —
- * so a cancelled request never reaches them either.
+ * `BaseMcpServer`'s other registration path: a handlers registry that is not
+ * a `CompositeHandlersRegistry` registers its own tools (`registerAllTools`).
+ * Those tools go through the same wrapper — the call's own signal, the
+ * registry of live calls, the request signal scope. A tool call cannot be
+ * cancelled: a client's cancel aborts nothing, and the callback is handed
+ * the call's signal (the session's end), never the SDK's, which the cancel
+ * aborts.
  *
  * The request and its cancel notification are delivered back to back on an
  * in-memory transport, so the cancel is processed before the tool would run.
@@ -21,14 +23,19 @@ import { currentRequestSignal } from '../../../lib/requestSignal';
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
 /** A registry that registers its tools itself, through `registerTool`. */
-function ownRegistry(reached: jest.Mock): IHandlersRegistry {
+function ownRegistry(
+  reached: jest.Mock,
+  seen?: (extraSignal: AbortSignal | undefined) => void,
+): IHandlersRegistry {
   return {
     registerAllTools(server: McpServer) {
       server.registerTool(
         'OwnTool',
         { description: 'registered by its own registry' },
-        async () => {
-          reached(currentRequestSignal());
+        async (extra: { signal?: AbortSignal }) => {
+          seen?.(extra.signal);
+          const signal = currentRequestSignal();
+          reached(signal, signal?.aborted ?? false);
           return { content: [{ type: 'text', text: 'reached' }] };
         },
       );
@@ -76,8 +83,11 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-async function serve(reached: jest.Mock) {
-  const server = new OwnRegistryServer(ownRegistry(reached));
+async function serve(
+  reached: jest.Mock,
+  seen?: (extraSignal: AbortSignal | undefined) => void,
+) {
+  const server = new OwnRegistryServer(ownRegistry(reached, seen));
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const answers: JSONRPCMessage[] = [];
   clientSide.onmessage = (message) => {
@@ -105,9 +115,12 @@ it('(control) a call reaches a tool its own registry registered, inside the requ
   await server.close();
 });
 
-it('a cancelled call never reaches a tool its own registry registered', async () => {
+it('a cancel aborts nothing: the tool its own registry registered runs, its signal not aborted', async () => {
   const reached = jest.fn();
-  const { server, clientSide, call } = await serve(reached);
+  let extraSignal: AbortSignal | undefined;
+  const { server, clientSide, call } = await serve(reached, (signal) => {
+    extraSignal = signal;
+  });
   const sent = clientSide.send(call(2));
   const cancelled = clientSide.send({
     jsonrpc: '2.0',
@@ -115,9 +128,12 @@ it('a cancelled call never reaches a tool its own registry registered', async ()
     params: { requestId: 2, reason: 'the client cancelled' },
   });
   await Promise.all([sent, cancelled]);
-  // The call ended on the server, without reaching its tool.
   await until(() => ended === 1);
   await until(() => activeTools().length === 0);
-  expect(reached).not.toHaveBeenCalled();
+  expect(reached).toHaveBeenCalledTimes(1);
+  // Neither the scope's signal nor the one in `extra` was aborted while the
+  // tool ran.
+  expect(reached.mock.calls[0][1]).toBe(false);
+  expect(extraSignal).toBe(reached.mock.calls[0][0]);
   await server.close();
 });

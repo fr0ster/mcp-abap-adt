@@ -1,11 +1,12 @@
 /**
- * RF1 — a late connection is the instance's (D32 as amended by D56, spec
- * §5.3): the sole caller of stdio's shared `connect()` is cancelled while the
- * connect is held; the connect then completes. A cancel causes no logoff: the
- * completed connection is kept as the instance's `built` entry — no
- * `disconnect()`, no logoff at the stand-in — and the next call uses it
- * without a new connect. It is closed only by the instance's terminal close
- * (spec §6.4), which is A10's to wire.
+ * The connect is a send on the instance's connection (D56, spec §5.3): the
+ * sole caller of stdio's shared `connect()` is sent a cancel while the
+ * connect is held — which aborts nothing (a tool call cannot be cancelled):
+ * the connect completes, the call's tool runs on it, nothing is logged off,
+ * and the next call uses it without a new connect. The session's end while
+ * the connect is held: the shutdown sends no logoff before the connect's
+ * request was answered. The connection is closed only by the instance's
+ * terminal close (spec §6.4).
  *
  * The hold is the ADT stand-in's, on the connect's own session request: the
  * connect's requests carry no signal (connection 16 takes none), so the
@@ -31,22 +32,23 @@ afterEach(async () => {
 
 const isLogoff = (url: string) => url.includes('logoff');
 
-it('the sole caller cancels while connect() is held: the late connection is kept, no logoff, and the next call uses it', async () => {
+it('the sole caller is sent a cancel while connect() is held: it runs on the late connection, no logoff, and the next call uses it', async () => {
   const hold = s.adt.hold(() => true);
   const r1 = s.call('r1');
   await hold.arrived;
 
   r1.cancel();
-  await until(() => s.active() === 0);
   expect(await r1.done).toBe('cancelled');
+  await turns(50);
+  expect(s.active()).toBe(1);
 
   hold.release();
-  // The connect completes: its session request was answered and nothing
-  // else follows it — no logoff reaches the system.
-  await turns(50);
+  // The connect completes and the call's tool runs on it; no logoff
+  // reaches the system.
+  await until(() => s.reached('r1'));
+  await until(() => s.active() === 0);
   const connectRequests = s.adt.requests.length;
   expect(s.adt.requests.some((r) => isLogoff(r.url))).toBe(false);
-  expect(s.reached('r1')).toBe(false);
 
   // Kept: the next request sends its probe alone, on the late connection —
   // no new connect before it.
@@ -62,4 +64,28 @@ it('the sole caller cancels while connect() is held: the late connection is kept
   await until(() => s.adt.logoffs() === 1);
   await turns(20);
   expect(s.adt.logoffs()).toBe(1);
+});
+
+it('the session ends while connect() is held: no logoff before the connect’s request was answered', async () => {
+  const hold = s.adt.hold(() => true);
+  const r1 = s.call('r1');
+  await hold.arrived;
+
+  // The session's end: the client's transport closes, then the shutdown.
+  await s.client.close();
+  expect(await r1.done).toBe('cancelled');
+  s.processLike.emit('SIGTERM');
+  await turns(50);
+  expect(s.adt.logoffs()).toBe(0);
+  // The call is tracked until its connect settled: the shutdown waits for it.
+  expect(s.active()).toBe(1);
+
+  const held = s.adt.requests.length;
+  hold.release();
+  expect(await s.exited).toBe(0);
+  await until(() => s.adt.logoffs() === 1);
+  // The logoff came after the held request; the tool never ran.
+  const logoff = s.adt.requests.findIndex((r) => isLogoff(r.url));
+  expect(logoff).toBeGreaterThanOrEqual(held);
+  expect(s.reached('r1')).toBe(false);
 });

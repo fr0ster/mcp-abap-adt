@@ -56,7 +56,6 @@ import { brokerLogger, type LoginBound, loginBound } from './serverLogin';
 import {
   type RenewalMode,
   type ServerState,
-  serverEndedLogin,
   serverSentence,
 } from './serverSentences';
 import { type VettedAuthentication, vetMeans } from './vocabulary';
@@ -185,15 +184,6 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       shuttingDown: this.shutdownBegan || this.gate.closed,
       ...(this.bound !== undefined && { loginBound: this.bound }),
     };
-  }
-
-  /**
-   * Whether the server itself ended the login `error` reports — the login
-   * bound fired (D10) or the shutdown began — so that it is answered as it
-   * is, never retried as another caller's abort (D7).
-   */
-  abortedByServer(error: IAuthProviderError): boolean {
-    return serverEndedLogin(error, this.state());
   }
 
   /**

@@ -1,10 +1,9 @@
 /**
- * The cancelled caller settles first (D32, spec §5.3, §14.4.6): two requests
+ * A cancel aborts nothing (a tool call cannot be cancelled): two requests
  * wait in stdio's one shared `connect()` — a browser login whose code
- * exchange the token endpoint holds. R1 is cancelled: it settles `aborted`
- * before the endpoint answers, and its tool is never reached; the login goes
- * on for R2, which gets its token and its answer once the endpoint answers.
- * Nothing rejects unhandled.
+ * exchange the token endpoint holds. R1 is sent a cancel: it stays a live
+ * call; once the endpoint answers, the one login serves both and both tools
+ * run. Nothing rejects unhandled.
  */
 
 import { type Stand, stand, turns, until } from '../helpers/loginStand';
@@ -28,7 +27,7 @@ afterEach(async () => {
   process.off('unhandledRejection', onUnhandled);
 });
 
-it('R1 settles aborted before the token endpoint answers; R2 gets its token after', async () => {
+it('R1 is sent a cancel while both wait in the connect: both run to their end on the one login', async () => {
   s.tokens.holdCodes(true);
   const r1 = s.call('r1');
   const r2 = s.call('r2');
@@ -39,14 +38,16 @@ it('R1 settles aborted before the token endpoint answers; R2 gets its token afte
   expect(s.active()).toBe(2);
 
   r1.cancel();
-  // R1 settled on the server while the endpoint still held the code.
-  await until(() => s.active() === 1);
-  expect(s.tokens.grants).toEqual(['authorization_code']);
   expect(await r1.done).toBe('cancelled');
+  // R1 is still a live call while the endpoint holds the code.
+  await turns(50);
+  expect(s.active()).toBe(2);
+  expect(s.tokens.grants).toEqual(['authorization_code']);
 
   s.tokens.releaseCodes();
   expect(await r2.done).toEqual({ text: 'r2', isError: false });
-  expect(s.reached('r1')).toBe(false);
+  await until(() => s.active() === 0);
+  expect(s.reached('r1')).toBe(true);
   expect(s.reached('r2')).toBe(true);
   expect(s.logins).toEqual(['ok']);
   await turns();

@@ -12,9 +12,8 @@
  *   tool that is not in the background waits;
  * - the crossing measured before the flow (F2): an `UNLOCK` whose credential
  *   is still being asked (an `authorize` that awaits I/O) while another call's
- *   `LOCK` ends — it now goes out stateful, in the lock's context;
- * - a call cancelled while it waits leaves the queue at once, and never
- *   reaches SAP.
+ *   `LOCK` ends — it now goes out stateful, in the lock's context.
+ * (A cancel sent to a queued call aborts nothing: `noCallCancel.test.ts`.)
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -24,7 +23,6 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { IDestinations } from '../../../../server/src/auth/IAuthBrokerFactory';
 import { StdioServer } from '../../../../server/src/StdioServer';
-import { activeTools } from '../../../lib/activeTools';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import { callerOn, isClassRun } from '../backgroundRuns/harness';
@@ -241,53 +239,6 @@ describe('one main flow per instance', () => {
       expect(sent).toHaveLength(1);
       expect(sent.every(isStateful)).toBe(true);
       expect(sent.every(carriesContext)).toBe(true);
-    } finally {
-      await s.close();
-    }
-  });
-
-  it('a call cancelled while it waits leaves the queue at once, never reaches SAP, and the flow goes on', async () => {
-    const s = await statefulStand(['UpdateClass']);
-    try {
-      const held = s.standIn.hold((r) => isLock(r) && of('ZCL_HOLDER')(r));
-      const holder = s.call('UpdateClass', {
-        class_name: 'ZCL_HOLDER',
-        source_code: SOURCE,
-      });
-      await held.arrived;
-      const cancel = new AbortController();
-      const queued = s
-        .callWith(
-          'UpdateClass',
-          { class_name: 'ZCL_CANCELLED', source_code: SOURCE },
-          cancel.signal,
-        )
-        .then(
-          () => 'answered',
-          () => 'cancelled',
-        );
-      await settleWhile();
-      expect(activeTools()).toHaveLength(2);
-      cancel.abort();
-      expect(await queued).toBe('cancelled');
-      // On the server too, before the holder ends: the cancelled call left
-      // the queue at once — only the holder is still running.
-      await until(() => activeTools().length === 1);
-      expect(activeTools().every((tool) => !tool.signal.aborted)).toBe(true);
-      held.release();
-      await holder;
-      const after = await s.call('UpdateClass', {
-        class_name: 'ZCL_AFTER',
-        source_code: SOURCE,
-      });
-      expect(after.isError).not.toBe(true);
-      expect(firstIndex(s.standIn, of('ZCL_CANCELLED'))).toBe(-1);
-      expect(firstIndex(s.standIn, of('ZCL_AFTER'))).toBeGreaterThan(
-        lastIndex(
-          s.standIn,
-          (r) => isUnlock(r as never) && of('ZCL_HOLDER')(r),
-        ),
-      );
     } finally {
       await s.close();
     }

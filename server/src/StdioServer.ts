@@ -1,10 +1,6 @@
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
-import {
-  failureOf,
-  type ReadFailure,
-  ServerRefusal,
-} from '@mcp-abap-adt/lib/auth';
+import { type ReadFailure, ServerRefusal } from '@mcp-abap-adt/lib/auth';
 import {
   BaseMcpServer,
   type IBackgroundRuns,
@@ -34,11 +30,6 @@ export interface StdioServerOptions {
   /** The server's own sentence beside a chain failure (§7.4): the factory's `sentenceFor`. */
   sentenceFor?: (error: IAuthProviderError) => string | undefined;
   /**
-   * Whether the server itself ended a login (the bound, the shutdown): the
-   * factory's `abortedByServer`. Such a login is not retried (D7).
-   */
-  abortedByServer?: (error: IAuthProviderError) => boolean;
-  /**
    * The owner of the process's runtime session files (the launcher's): the
    * SAP sessions this server holds, kept until their logoff is written, and
    * the leftover-session tools. Absent: none kept, the tools not available.
@@ -67,9 +58,6 @@ export class StdioServer extends BaseMcpServer {
   private readonly sentenceFor:
     | ((error: IAuthProviderError) => string | undefined)
     | undefined;
-  private readonly abortedByServer:
-    | ((error: IAuthProviderError) => boolean)
-    | undefined;
   /** The destination served, named by a refusal whose error does not carry it. */
   private destination: string | undefined;
 
@@ -93,7 +81,6 @@ export class StdioServer extends BaseMcpServer {
       }),
     });
     this.sentenceFor = opts?.sentenceFor;
-    this.abortedByServer = opts?.abortedByServer;
   }
 
   /** The destination layer's failures first, then lib's reader (§7.1). */
@@ -160,24 +147,16 @@ export class StdioServer extends BaseMcpServer {
   }
 
   /**
-   * Inspection-only mode refuses here, before any connection is built.
-   *
-   * One retry after another caller's abort (D7): a request that joined a
-   * connect whose login another request's cancel ended — inside that abort
-   * window — fails `interactive-login` `aborted` although its own signal is
-   * live; it starts afresh, once. Read by `kind`, never by words; a login the
-   * server itself ended (the bound, the shutdown) is answered as it is.
+   * Inspection-only mode refuses here, before any connection is built. A
+   * login ends with its result, the server (the bound, the shutdown) or the
+   * session — never by another call's cancel, since a tool call cannot be
+   * cancelled — so nothing is retried.
    */
   protected override async getConnection(
     signal: AbortSignal,
   ): Promise<AbapConnection> {
     if (!this.destinations) throw new ServerRefusal('inspection_only');
-    try {
-      return await super.getConnection(signal);
-    } catch (error) {
-      if (signal.aborted || !this.loginAbortedByAnother(error)) throw error;
-      return super.getConnection(signal);
-    }
+    return super.getConnection(signal);
   }
 
   /** Inspection-only mode refuses the leftover-session tools too, before anything is read. */
@@ -186,15 +165,5 @@ export class StdioServer extends BaseMcpServer {
   ): Promise<ResolvedConnection> {
     if (!this.destinations) throw new ServerRefusal('inspection_only');
     return super.resolveCaller(signal);
-  }
-
-  /** Whether `thrown` is a login another caller's abort ended. */
-  private loginAbortedByAnother(thrown: unknown): boolean {
-    const chain = failureOf(thrown)?.authError;
-    if (chain?.kind !== 'interactive-login') return false;
-    if ((chain.facts as { outcome?: unknown }).outcome !== 'aborted') {
-      return false;
-    }
-    return !(this.abortedByServer?.(chain) ?? false);
   }
 }

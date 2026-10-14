@@ -1,19 +1,19 @@
 /**
- * A cancelled request does not reach its tool (D5, spec §5.3, §14.4.5), in
- * core (stdio), Streamable HTTP, SSE and an embedded server.
+ * A tool call cannot be cancelled; it ends with its result or with the
+ * session. In core (stdio), SSE and an embedded server a client's MCP cancel
+ * aborts nothing: the call runs to its end and reaches its tool. Over
+ * Streamable HTTP, whose requests are each their own, the client closing its
+ * request ends that request's session: the call does not reach its tool
+ * (D5, spec §5.3, §14.4.5).
  *
  * Each server runs a probe tool against an ADT stand-in on an ABAP Cloud
  * system type, so before the tool runs the call asks the system for its
  * responsible person (`systeminformation`) on the connection it acquired. The
  * stand-in holds that request; the client cancels the call while it is held
- * — after the connection is ready — and the stand-in then answers. The tool
- * is never called: no probe request reaches the stand-in. A control call, held and released the same way
- * without a cancel, reaches its tool. Each case runs on a server of its own,
- * since the lookup is made once per connection.
- *
- * How a client cancels is its transport's: an MCP cancel notification over
- * stdio, SSE and the embedded server; over Streamable HTTP, whose requests are
- * each their own, the client closing its request.
+ * — after the connection is ready — and the stand-in then answers. A
+ * control call, held and released the same way without a cancel, reaches
+ * its tool. Each case runs on a server of its own, since the lookup is made
+ * once per connection.
  */
 
 import type { Server } from 'node:http';
@@ -54,8 +54,13 @@ async function until(done: () => boolean, limit = 2_000): Promise<void> {
 
 /** What a server under test offers the scenario. */
 interface Served {
-  /** Calls the probe; `cancel()` cancels it the transport's way. */
+  /**
+   * Calls the probe; `cancel()` cancels it the transport's way: an MCP
+   * cancel, or (`endsSession`) the request closed.
+   */
   call(id: string): { cancel(): void; done: Promise<unknown> };
+  /** Whether the transport's cancel ends the request's session (Streamable HTTP). */
+  endsSession?: boolean;
   close(): Promise<void>;
 }
 
@@ -175,6 +180,7 @@ const SERVERS: Record<string, () => Promise<Served>> = {
           .catch((error: unknown) => error);
         return { cancel: () => controller.abort(), done };
       },
+      endsSession: true,
       close: async () => {
         await mcp.stop().catch(() => undefined);
         await closeServer(http);
@@ -235,10 +241,16 @@ describe.each(Object.keys(SERVERS))('%s', (name) => {
     await hold.arrived;
     if (cancel) {
       call.cancel();
-      // The server has seen the cancel: the call's signal is aborted (or the
-      // call already settled — the lookup is part of its connect, which a
-      // cancelled caller leaves at once).
-      await until(() => activeTools().every((tool) => tool.signal.aborted));
+      if (served.endsSession === true) {
+        // The request closed: the session's end aborts the call's signal.
+        await until(() => activeTools().every((tool) => tool.signal.aborted));
+      } else {
+        // An MCP cancel aborts nothing: the call is live, its signal not
+        // aborted.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        expect(activeTools()).toHaveLength(1);
+        expect(activeTools()[0]?.signal.aborted).toBe(false);
+      }
     }
     hold.release();
     // The call has settled on the server.
@@ -259,13 +271,16 @@ describe.each(Object.keys(SERVERS))('%s', (name) => {
     }
   });
 
-  it('a call cancelled after its connection is ready never reaches its tool', async () => {
+  it('a call cancelled after its connection is ready: an MCP cancel aborts nothing and the tool runs; a closed request (the session’s end) never reaches it', async () => {
     const served = await SERVERS[name]();
     try {
-      await heldCall(served, 'never-reached', true);
-      expect(standIn.requests.map((r) => r.url)).not.toContain(
-        `${PROBE_PATH}never-reached`,
-      );
+      await heldCall(served, 'cancelled', true);
+      const urls = standIn.requests.map((r) => r.url);
+      if (served.endsSession === true) {
+        expect(urls).not.toContain(`${PROBE_PATH}cancelled`);
+      } else {
+        expect(urls).toContain(`${PROBE_PATH}cancelled`);
+      }
     } finally {
       await served.close();
     }

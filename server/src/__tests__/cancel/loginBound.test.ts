@@ -1,8 +1,8 @@
 /**
  * The login bound (D10, spec §5.6, §14.4.10): `--login-timeout=1` ends a
- * login with the chain's words and the server's sentence, and is not retried
- * as another caller's abort would be (D7); without it the login waits until
- * the request ends it. A bounded login that completes leaves no timer
+ * login with the chain's words and the server's sentence, and is not
+ * retried; without it the login waits until the session ends it (a tool
+ * call cannot be cancelled). A bounded login that completes leaves no timer
  * pending, and a later login is unaffected by an earlier bound.
  */
 
@@ -122,7 +122,7 @@ describe('through the server', () => {
     }
   });
 
-  it('without --login-timeout the login waits until the request ends it', async () => {
+  it('without --login-timeout the login waits — a cancel aborts nothing — until the session ends it', async () => {
     s = await stand({ auth: 'jwt' });
     s.browser.answering(false);
     const r1 = s.call('r1');
@@ -131,8 +131,14 @@ describe('through the server', () => {
     expect(s.logins).toEqual([]);
     expect(s.active()).toBe(1);
     r1.cancel();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(s.logins).toEqual([]);
+    expect(s.active()).toBe(1);
+    // The session's end: the client's transport closes.
+    await s.client.close();
     await until(() => s?.logins.length === 1);
     expect(s.logins).toEqual(['aborted']);
+    expect(await r1.done).toBe('cancelled');
   });
 });
 

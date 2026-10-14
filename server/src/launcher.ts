@@ -680,7 +680,6 @@ export async function launch(
       stateLogger: stateLoggerForTransport,
       logger: loggerForTransport,
       sentenceFor: (error) => factory.sentenceFor(error),
-      abortedByServer: (error) => factory.abortedByServer(error),
     },
   );
   activeServer = server;

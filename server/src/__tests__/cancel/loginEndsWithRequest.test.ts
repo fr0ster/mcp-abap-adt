@@ -1,8 +1,10 @@
 /**
- * stdio's login ends with its request (spec §14.4.9): an MCP cancel during a
- * browser login — auth-providers' real loopback strategy on port `0`, a fake
- * browser that does not answer — ends the login `aborted`; the callback port
- * binds afterwards; the next request logs in.
+ * stdio's login ends with the session (spec §14.4.9): during a browser login
+ * — auth-providers' real loopback strategy on port `0`, a fake browser that
+ * does not answer — an MCP cancel aborts nothing (a tool call cannot be
+ * cancelled): the login goes on, its port held. The session's end (the
+ * client's transport closes) ends it `aborted`, and the callback port binds
+ * afterwards.
  */
 
 import { bindsFree, type Stand, stand, until } from '../helpers/loginStand';
@@ -19,22 +21,23 @@ afterEach(async () => {
   await s.close();
 });
 
-it('a cancel during the login ends it aborted, frees the port, and the next request logs in', async () => {
+it('a cancel during the login aborts nothing; the session’s end ends it aborted and frees the port', async () => {
   s.browser.answering(false);
   const r1 = s.call('r1');
   await s.browser.opened(1);
   r1.cancel();
+  expect(await r1.done).toBe('cancelled');
 
+  // The login goes on: no outcome, the call live.
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  expect(s.logins).toEqual([]);
+  expect(s.active()).toBe(1);
+
+  await s.client.close();
   await until(() => s.logins.length === 1);
   expect(s.logins).toEqual(['aborted']);
   await until(() => s.active() === 0);
-  expect(await r1.done).toBe('cancelled');
   await bindsFree(s.browser.ports[0]);
   expect(s.tokens.grants).toEqual([]);
-
-  s.browser.answering(true);
-  expect(await s.call('r2').done).toEqual({ text: 'r2', isError: false });
-  expect(s.logins).toEqual(['aborted', 'ok']);
-  expect(s.tokens.grants).toEqual(['authorization_code']);
   expect(s.reached('r1')).toBe(false);
 });

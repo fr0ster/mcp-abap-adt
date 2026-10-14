@@ -11,8 +11,10 @@
  * factory receives it (D55, D56). Nothing reads it to abort a running tool:
  * a started tool runs to its end, and a shutdown awaits it.
  *
- * Also here: what a cancelled request ends with, and the race a server's own
- * wait runs against the request's signal (D32).
+ * Also here: what a request whose signal aborted ends with, and the race a
+ * server's own wait that sends nothing runs against the request's signal
+ * (D32). The signal aborts at the end of the call's session, never at a
+ * client's cancel: a tool call cannot be cancelled (`BaseMcpServer`).
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -30,7 +32,8 @@ export function currentRequestSignal(): AbortSignal | undefined {
 }
 
 /**
- * What a cancelled request ends with: the server's own error, in fixed words.
+ * What a request whose signal aborted (its session ended) ends with: the
+ * server's own error, in fixed words.
  * It carries nothing else — no code, no reason, no cause. (D56: there is no
  * `request_aborted` answer; connection 16 has no aborted-request code.)
  */

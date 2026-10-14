@@ -23,6 +23,13 @@ jest.mock('../../../src/lib/connectionFactory', () => ({
         connection.connected = true;
       },
       isConnected: () => connection.connected,
+      // An on-premise system without systeminformation: the lookup before
+      // the first tool answers 404, and the configuration applies.
+      makeAdtRequest: async () => {
+        throw Object.assign(new Error('Request failed with status code 404'), {
+          response: { status: 404 },
+        });
+      },
     };
     connections.set(connection.tag, connection);
     return connection;
@@ -100,7 +107,7 @@ beforeEach(() => {
   connections.clear();
   build.mockClear();
   previousType = process.env.SAP_SYSTEM_TYPE;
-  process.env.SAP_SYSTEM_TYPE = 'onprem'; // no system lookup on the stand-in
+  process.env.SAP_SYSTEM_TYPE = 'onprem';
 });
 afterEach(() => {
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;

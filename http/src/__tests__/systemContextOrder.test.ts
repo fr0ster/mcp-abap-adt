@@ -1,6 +1,7 @@
 /**
  * Who creates objects (responsible) and on which system (master system), per
- * request, over Streamable HTTP. Each its own variable first: the request's
+ * request, over Streamable HTTP, where an on-premise system has no
+ * systeminformation (a 404). Each its own variable first: the request's
  * `x-sap-responsible` / `x-sap-master-system` headers; the process
  * environment. Then, for the responsible only, the login: the request's
  * `x-sap-login`, the process `SAP_USERNAME`. Each request sees its own
@@ -10,10 +11,19 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 
-// The connector, without a wire.
+// The connector, without a wire: an on-premise system without
+// systeminformation (its lookup answers 404), so the configured order below
+// applies — where the system names its user, its answer wins over all of it.
 jest.mock('../../../src/lib/connectionFactory', () => ({
   ...jest.requireActual('../../../src/lib/connectionFactory'),
-  createAbapConnection: () => ({ connect: async () => {} }),
+  createAbapConnection: () => ({
+    connect: async () => {},
+    makeAdtRequest: async () => {
+      throw Object.assign(new Error('Request failed with status code 404'), {
+        response: { status: 404 },
+      });
+    },
+  }),
 }));
 
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';

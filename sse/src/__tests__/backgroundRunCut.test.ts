@@ -71,6 +71,8 @@ const loggedOff = (session: string) =>
   s.standIn.requests.some((r) => isLogoff(r.url) && r.session === session);
 
 it('the stream closes: the run it started is logged off at once and ends in the store; another stream’s run keeps running', async () => {
+  // The runs' caller is the user the system names.
+  s.standIn.systemInformation('SHUTDOWN_USER');
   const closing = await s.open();
   const other = await s.open();
   const holdA = s.standIn.hold(runOf('ZCL_RUN_A'));

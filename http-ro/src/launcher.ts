@@ -15,8 +15,7 @@ import { type LauncherEdges, processEdges } from '@mcp-abap-adt/lib/config';
 import { fullReadOnlyToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 
 /**
- * The read-only tool set: readonly (with system and search), and the
- * leftover-session list and logoff. No high, no debugger, no background run,
+ * The read-only tool set: readonly (with system and search). No high, no debugger, no background run,
  * no resume.
  */
 export const readOnlyToolSet: ToolSet = fullReadOnlyToolSet;

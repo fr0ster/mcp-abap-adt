@@ -91,8 +91,14 @@ it('a resume whose request is cancelled while it waits in the flow leaves at onc
     controller.signal,
   );
   await new Promise((resolve) => setTimeout(resolve, 50));
+  const inFlight = () =>
+    (stand.server as unknown as { inFlight: Set<unknown> }).inFlight.size;
+  expect(inFlight()).toBe(2);
   controller.abort();
   await expect(resume).rejects.toBeDefined();
+  // At once: the resume's call is over while the running call still holds
+  // the flow (it is not waiting for its turn to notice the cancellation).
+  await until(() => inFlight() === 1);
   held.release();
   expect((await running).isError).toBe(false);
   // Nothing sent in the leftover session; its file is still a leftover.

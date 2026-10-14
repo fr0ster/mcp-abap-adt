@@ -21,8 +21,7 @@ import {
 import { main as sseMain } from '@mcp-abap-adt/sse/launcher';
 
 /**
- * The read-only compact tool set: the half that changes nothing, and the
- * leftover-session list and logoff. No modify half, no debugger, no
+ * The read-only compact tool set: the half that changes nothing. No modify half, no debugger, no
  * background run, no resume.
  */
 export const readOnlyToolSet: ToolSet = compactReadOnlyToolSetOf(

@@ -14,7 +14,7 @@ import { type LauncherEdges, processEdges } from '@mcp-abap-adt/lib/config';
 import { compactToolSetOf, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { main as sseMain } from '@mcp-abap-adt/sse/launcher';
 
-/** The compact tool set: both halves, the debugger, the leftover sessions and background runs. */
+/** The compact tool set: both halves, the debugger and background runs. */
 export const compactToolSet: ToolSet = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
   modify: compactModifyEntries,

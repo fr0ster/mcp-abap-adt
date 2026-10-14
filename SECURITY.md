@@ -76,7 +76,7 @@ http:            # or sse:
   them.
 - **SAP sessions** are held in the server process. Their cookies never reach
   the model, an answer or a log line. On stdio one copy leaves the process on
-  purpose: the **runtime files** in `<config dir>/runtime/`, one per HTTP
+  purpose: the **runtime files** in `<config dir>/runtime/`, one per SAP
   session the server holds, so that a killed process's sessions can be resumed
   or logged off later by their user (the leftover-session tools). Each file is
   deleted once its session's logoff is written. An HTTP or SSE server writes

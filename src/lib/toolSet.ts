@@ -18,7 +18,7 @@
  * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs; on stdio the leftover sessions |
  * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half; on stdio the leftover-session list and logoff |
  *
- * **The leftover-session tools are stdio's** (the owner, fix round 14): the
+ * **The leftover-session tools are stdio's**: the
  * runtime session files exist for stdio, where the process serves one user.
  * An http or sse server holds many sessions of different users: it writes no
  * session file, and none of its binaries lists a leftover-session tool — the

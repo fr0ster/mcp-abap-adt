@@ -405,7 +405,7 @@ export abstract class BaseMcpServer extends McpServer {
    * race it), and the connection is built and connected once per credential
    * object — kept while the source answers the same one (D13), replaced
    * only when SAP already lost the session or the source answers another
-   * credential object (http, sse: the request's). On stdio the source
+   * credential object (http: the request's; sse: fixed per connection). On stdio the source
    * answers the same provider for the process's life: the user is fixed, and
    * a renewed token (refresh, or a new login when the refresh fails) lives
    * inside that provider. The credential renews itself (a 401 reaches its
@@ -444,7 +444,7 @@ export abstract class BaseMcpServer extends McpServer {
       held.credential !== resolved.credential ||
       (held.ready !== undefined && isSpent(held.ready))
     ) {
-      // A new credential (http, sse: the request's), or a session SAP
+      // A new credential (http: the request's; sse: fixed per connection), or a session SAP
       // already lost (D56): the connection is replaced, and the replaced one
       // ends with its logoff — once no call works on it any more (spec §6.4).
       // stdio's source answers the same provider for the process's life, so
@@ -632,10 +632,8 @@ export abstract class BaseMcpServer extends McpServer {
    * no longer the instance's connection for that call once the call's turn
    * came: one this instance built (not a host's) whose session SAP already
    * lost (the next `getConnection` replaces it), or one replaced meanwhile by
-   * another connection for the same credential — a resume (`takeAsBuilt`) or
-   * the replacement of a lost session. One retired because another
-   * credential's call took the instance (http, sse: a pooled instance) is
-   * still this call's own: its session is the one its credential holds.
+   * another connection — a resume (`takeAsBuilt`) or the replacement of a lost
+   * session.
    */
   private isStaleBuilt(connection: AbapConnection): boolean {
     if (this.connectionContext?.kind !== 'built') return false;
@@ -643,11 +641,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (entry === undefined) return false;
     if (isSpent(connection)) return true;
     const current = this.built;
-    return (
-      current !== undefined &&
-      current !== entry &&
-      current.credential === entry.credential
-    );
+    return current !== undefined && current !== entry;
   }
 
   /**

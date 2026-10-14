@@ -10,7 +10,6 @@ import type {
 import {
   BaseMcpServer,
   type IBackgroundRuns,
-  type LeftoverSessions,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -94,13 +93,6 @@ export interface StreamableHttpServerOptions {
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
   /**
-   * The owner of the process's runtime session files, handed to every
-   * per-request instance: the SAP sessions they hold, kept until their
-   * logoff is written, and the leftover-session tools. Absent: none kept,
-   * the tools not available.
-   */
-  leftoverSessions?: LeftoverSessions;
-  /**
    * Where background runs and their answers are kept, handed to every
    * instance (the launcher's `InMemoryBackgroundRuns` of
    * `@mcp-abap-adt/background-runs-memory`). Absent:
@@ -148,7 +140,6 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly pool = new InstancePool<PerRequestServerApi>();
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
-  private readonly sessionFilesOwner: LeftoverSessions | undefined;
   private readonly backgroundRunsStore: IBackgroundRuns | undefined;
 
   constructor(
@@ -166,7 +157,6 @@ export class StreamableHttpServer extends BaseMcpServer {
     });
     this.stateIdleMinutes = opts?.stateIdleMinutes;
     this.stateLogger = stateLoggerOf(opts ?? {});
-    this.sessionFilesOwner = opts?.leftoverSessions;
     this.backgroundRunsStore = opts?.backgroundRuns;
     this.version = opts?.version ?? HTTP_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
@@ -477,7 +467,6 @@ export class StreamableHttpServer extends BaseMcpServer {
         state: {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
-          leftoverSessions?: LeftoverSessions;
           backgroundRuns?: IBackgroundRuns;
         },
       ) {
@@ -505,9 +494,6 @@ export class StreamableHttpServer extends BaseMcpServer {
       {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
-        ...(this.sessionFilesOwner !== undefined && {
-          leftoverSessions: this.sessionFilesOwner,
-        }),
         ...(this.backgroundRunsStore !== undefined && {
           backgroundRuns: this.backgroundRunsStore,
         }),

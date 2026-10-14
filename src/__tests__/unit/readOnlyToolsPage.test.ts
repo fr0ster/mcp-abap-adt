@@ -41,7 +41,7 @@ function documented(): Map<string, string[]> {
 }
 
 const served = fullReadOnlyToolSet
-  .groups({ connection: undefined as never, logger: undefined })
+  .groups({ connection: undefined as never, logger: undefined }, 'stdio')
   .flatMap((group) => group.getHandlers());
 
 describe('the read-only tool page lists exactly what mcp-abap-adt-ro serves', () => {

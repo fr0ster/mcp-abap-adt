@@ -51,8 +51,12 @@ describe('the object-oriented handler sets an embedder combines', () => {
   });
 });
 
-/** The binary fixes its set (C23): the resume only in a write binary. */
-describe('the binaries', () => {
+/**
+ * The binary fixes its set (C23): the resume only in a write binary. The
+ * leftover-session tools are stdio's only (fix round 14): an http or sse
+ * binary lists none (`toolSet.test.ts`).
+ */
+describe('the stdio binaries', () => {
   it.each<[string, ToolSet, string[]]>([
     ['core', fullToolSet, FULL],
     [
@@ -61,7 +65,7 @@ describe('the binaries', () => {
       ['ListLeftoverSessions', 'LogoffLeftoverSession'],
     ],
   ])('%s serves %j', (_kind, set, expected) => {
-    const tools = registryOf(set)
+    const tools = registryOf(set, 'stdio')
       .getHandlerGroups()
       .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
     expect(leftoverOf(tools, FULL)).toEqual(expected);
@@ -82,7 +86,7 @@ describe('the binaries', () => {
       COMPACT,
     ],
   ])('%s serves %j', (_kind, set, expected) => {
-    const tools = registryOf(set)
+    const tools = registryOf(set, 'stdio')
       .getHandlerGroups()
       .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
     expect(leftoverOf(tools, COMPACT)).toEqual(expected);

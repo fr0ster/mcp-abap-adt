@@ -1395,9 +1395,10 @@ export abstract class BaseMcpServer extends McpServer {
     // A known identity is answered without entering the main flow: the one
     // the owner keeps for the instance's current connection (read, nothing
     // sent), or the user SAP already named for this credential.
-    // Only a connection built for this call's own credential: over HTTP a
-    // pooled instance reached with another request's credential still holds
-    // the previous caller's connection, whose identity is not this caller's.
+    // Only a connection built for this call's own credential: an instance a
+    // host reaches with another request's credential (an embedder serving
+    // several users with one owner) still holds the previous caller's
+    // connection, whose identity is not this caller's.
     const built = this.built;
     const current =
       built !== undefined && built.credential === resolved.credential
@@ -1424,9 +1425,10 @@ export abstract class BaseMcpServer extends McpServer {
     // runs in SAP as that user. On stdio the user is fixed for the process:
     // the session is renewed (refresh token, or a new login when the refresh
     // fails) and written back by the same provider, and a replacement after a
-    // lost session logs on with it — the same user. HTTP and SSE never keep a
-    // connection across credentials: a new credential builds a new
-    // connection, so this lookup always runs on the caller's own.
+    // lost session logs on with it — the same user. (http and sse hand their
+    // instances no owner: the leftover sessions are stdio's.) A host that
+    // hands an instance several credentials builds a new connection for a
+    // new credential, so this lookup always runs on the caller's own.
     const identity = await this.onMainConnection(signal, async (connection) => {
       const generation = this.callerGeneration;
       const tracked = owner.identityOf(connection);

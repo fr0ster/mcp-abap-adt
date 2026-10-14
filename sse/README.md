@@ -11,10 +11,15 @@ SSE. A client that speaks Streamable HTTP wants
 [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http).
 
 **The binary fixes the tool set (19.0.0).** `mcp-abap-adt-sse` serves readonly (with system and search),
-high, the debugger, the leftover sessions (list, resume, logoff) and background runs; the readonly
+high, the debugger and background runs; the readonly
 tools alone are [`@mcp-abap-adt/sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/sse-ro) (`mcp-abap-adt-sse-ro`). There is no
 `--exposition`: passing it, or a config file's `exposition`, stops the start with a sentence naming
 the binary to install instead.
+
+**No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many
+users, so it writes no runtime session file and serves no leftover-session tool; those are the
+stdio binaries' (`mcp-abap-adt`, `mcp-abap-adt-ro`). Resuming a SAP session here is yours to do if you hold what it takes;
+otherwise SAP ends it on its own timeout, which releases its locks: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#stdio-leftover-sap-sessions-of-a-killed-process).
 
 **No low set (19.0.0).** `--exposition=…,low` stops the start with D56's sentence: *"the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations are compact's — see [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
 

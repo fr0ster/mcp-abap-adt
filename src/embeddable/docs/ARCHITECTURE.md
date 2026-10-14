@@ -167,8 +167,8 @@ kept per credential object (a host's injected connection for its own) and valid 
 connection it was asked on: the whole cache is forgotten whenever the instance's connection is
 replaced or resumed (`forgetCallers`), and an answer asked on a connection replaced meanwhile is not
 kept; the leftover tools read the identity the
-owner keeps for the current connection only when it was built for the caller's own credential (a
-pooled HTTP instance reached with another request's credential answers for that request, never for
+owner keeps for the current connection only when it was built for the caller's own credential (an
+embedder's instance reached with another request's credential answers for that request, never for
 the previous one). The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
 reaches its tool. An embedder's own registry that is not a `CompositeHandlersRegistry`
 (`registerAllTools(trackingRegistrations())`) gets no main-flow queue: its tools take no place in
@@ -193,7 +193,8 @@ What a killed process leaves behind is the user's to see and to settle, through 
 tools; the server decides nothing by itself (session-resume spec).
 
 - **The owner** (`LeftoverSessions`, `src/lib/leftoverSessions/`): one per process, created by the
-  host — each launcher; an embedder decides whether to give one — and handed to the instances as
+  host — core's launcher (stdio); http's and sse's create none, since one such server holds the
+  sessions of many users; an embedder decides whether to give one — and handed to the instances as
   `leftoverSessions`. It holds no module global. The directory is `runtimeDirectory(base?)`:
   `<config dir>/runtime`, the same config dir as `sessions/` (`--auth-broker-path`, else
   `AUTH_BROKER_PATH`'s first entry, else the platform's).
@@ -212,8 +213,9 @@ tools; the server decides nothing by itself (session-resume spec).
   `connect()` (`keepSession` → `systemUserOf`, `src/lib/systemUser.ts`, shared with the
   debugger's `requestUserOf`); a system that names none keeps no file.
 - **The tools** (`ListLeftoverSessions` / `ResumeLeftoverSession` / `LogoffLeftoverSession`;
-  compact `HandlerLeftoverSession{List,Resume,Logoff}`) — the list and the logoff in every
-  binary, the resume only in the write binaries (none of the `-ro` ones) — are
+  compact `HandlerLeftoverSession{List,Resume,Logoff}`) — the list and the logoff in every stdio
+  binary, the resume only in the write ones (none of the `-ro` ones), none in an http or sse
+  binary (`ToolSet.groups(context, transport)`) — are
   `connectionless` entries: the tool wrapper calls them without `getConnection` (a resume must
   not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
   resolves the caller from the instance's source (`resolveCaller`) — a token caller's user from
@@ -447,10 +449,12 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
 - **Tool sets.** A binary's tools are its `ToolSet` (`@mcp-abap-adt/lib/tool-set`), fixed by the
   binary (C23; there is no `--exposition`): its groups, the TOOLS section of its help, its removed
   `--exposition` and whether it serves background runs. `fullToolSet` covers readonly, high, debug,
-  search, the leftover sessions and background runs; `fullReadOnlyToolSet` readonly, search and
-  the leftover-session list and logoff; `compactToolSetOf({ readOnly, modify })` is the compact
-  facade's, `compactReadOnlyToolSetOf(readOnly)` its read-only half's. `registryOf(toolSet)`
-  builds the registry.
+  search, background runs and, on stdio, the leftover sessions; `fullReadOnlyToolSet` readonly,
+  search and, on stdio, the leftover-session list and logoff; `compactToolSetOf({ readOnly, modify })`
+  is the compact facade's, `compactReadOnlyToolSetOf(readOnly)` its read-only half's. The
+  transport is a set's one other dimension: `groups(context, transport)` builds the
+  leftover-session group for `'stdio'` only, and `registryOf(toolSet, transport)` builds the
+  registry.
 - **Embedders.** `EmbeddableMcpServer` builds its registry from `exposition` (`readonly`, `high`,
   `compact`, `system`, `search`), or takes `handlersRegistry`.
 - **Availability.** A tool is registered only if its `available_in` includes the instance's

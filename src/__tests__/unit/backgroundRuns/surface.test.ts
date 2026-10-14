@@ -214,8 +214,10 @@ describe('where the background-run tools are served: beside the run tools', () =
     ['core', fullToolSet, true],
     ['core-ro', fullReadOnlyToolSet, false],
   ])('%s: served %s', (_kind, set, served) => {
-    const tools = namesOf(registryOf(set).getHandlerGroups());
-    for (const name of FULL) expect(tools.includes(name)).toBe(served);
+    for (const transport of ['stdio', 'http', 'sse'] as const) {
+      const tools = namesOf(registryOf(set, transport).getHandlerGroups());
+      for (const name of FULL) expect(tools.includes(name)).toBe(served);
+    }
     expect(set.backgroundRuns).toBe(served);
   });
 
@@ -230,10 +232,12 @@ describe('where the background-run tools are served: beside the run tools', () =
       true,
     ],
   ])('%s: served %s, as HandlerProfileRun is', (_kind, set, served) => {
-    const tools = namesOf(registryOf(set).getHandlerGroups());
     expect(set.backgroundRuns).toBe(served);
-    expect(tools.includes('HandlerProfileRun')).toBe(served);
-    for (const name of COMPACT) expect(tools.includes(name)).toBe(served);
+    for (const transport of ['stdio', 'http', 'sse'] as const) {
+      const tools = namesOf(registryOf(set, transport).getHandlerGroups());
+      expect(tools.includes('HandlerProfileRun')).toBe(served);
+      for (const name of COMPACT) expect(tools.includes(name)).toBe(served);
+    }
   });
 
   it('an embedder’s exporter serves them beside the system group', () => {

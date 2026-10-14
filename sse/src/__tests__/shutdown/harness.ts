@@ -13,7 +13,6 @@ import * as net from 'node:net';
 import {
   CompositeHandlersRegistry,
   type IHandlerGroup,
-  leftoverSessionEntries,
 } from '@mcp-abap-adt/lib/handlers';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import {
@@ -91,11 +90,7 @@ export async function sseStand(
   const stateErrors: string[] = [];
   const sse = new SseServer(
     new CompositeHandlersRegistry([
-      probeGroup([
-        ...shutdownTools(),
-        // With an owner, the leftover-session tools beside the others.
-        ...(options.server?.leftoverSessions ? leftoverSessionEntries() : []),
-      ]),
+      probeGroup(shutdownTools()),
       ...(options.groups ?? []),
     ]),
     {

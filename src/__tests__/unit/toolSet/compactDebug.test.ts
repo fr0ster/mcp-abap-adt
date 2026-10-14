@@ -49,7 +49,9 @@ describe('compact debug', () => {
   });
   it('the debug group is in the compact tool set, always, and in no compact -ro set', () => {
     const names = (set: typeof compactToolSet) =>
-      set.groups({ connection: undefined } as never).map((g) => g.getName());
+      set
+        .groups({ connection: undefined } as never, 'stdio')
+        .map((g) => g.getName());
     expect(names(compactToolSet)).toEqual([
       'CompactHandlers',
       'CompactDebugHandlers',

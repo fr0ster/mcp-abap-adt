@@ -25,7 +25,9 @@ describe('the debug set', () => {
   // The binary fixes its set (C23): always in core, never in core-ro.
   describe('the binaries', () => {
     const groupsOf = (set: typeof fullToolSet) =>
-      set.groups({ connection: undefined } as any).map((g) => g.getName());
+      set
+        .groups({ connection: undefined } as any, 'stdio')
+        .map((g) => g.getName());
 
     it('mcp-abap-adt (and -http, -sse) serves it always', () => {
       expect(groupsOf(fullToolSet)).toContain('DebugHandlers');

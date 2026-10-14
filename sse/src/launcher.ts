@@ -14,10 +14,6 @@ import {
   processEdges,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
-import {
-  LeftoverSessions,
-  runtimeDirectory,
-} from '@mcp-abap-adt/lib/embeddable';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import { stderrStateLogger } from '@mcp-abap-adt/lib/state';
@@ -143,7 +139,7 @@ export async function launch(
   // The connector and the tool filter read the system kind from the
   // environment (`resolveSystemKind`).
   if (config.systemType) process.env.SAP_SYSTEM_TYPE = config.systemType;
-  const server = new SseServer(registryOf(options.toolSet), {
+  const server = new SseServer(registryOf(options.toolSet, 'sse'), {
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,
     // The state's lines go to stderr whatever the transport logger says.
@@ -157,10 +153,8 @@ export async function launch(
     allowedHosts: config.allowedHosts,
     allowedOrigins: config.allowedOrigins,
     enableDnsRebindingProtection: config.enableDnsRebindingProtection,
-    // The process's runtime session files: the platform's config dir (or
-    // AUTH_BROKER_PATH's first entry) — this binary takes no
-    // --auth-broker-path.
-    leftoverSessions: new LeftoverSessions({ directory: runtimeDirectory() }),
+    // No runtime session file and no leftover-session tool: one server holds
+    // the sessions of many users, so they are stdio's only (fix round 14).
     // Background runs of the run tools, kept in this process's memory and
     // handed to every SSE session's instance; they end with the process.
     // Only where the set serves them: a -ro command has none, so a run's

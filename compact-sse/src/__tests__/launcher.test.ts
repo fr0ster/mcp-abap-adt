@@ -51,11 +51,16 @@ describe('mcp-abap-adt-compact-sse', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the compact tool set: the 27 tools, the four debugger verbs, the three background-run tools and the three leftover-session tools', () => {
+  it("serves the compact tool set: the 27 tools, the four debugger verbs and the three background-run tools — no leftover-session tool, which is stdio's", () => {
     const tools = compactToolSet
-      .groups({ connection: undefined as never, logger: undefined })
+      .groups({ connection: undefined as never, logger: undefined }, 'sse')
       .flatMap((group) => group.getHandlers());
-    expect(tools).toHaveLength(37);
+    expect(tools).toHaveLength(34);
+    expect(
+      tools
+        .map((entry) => entry.toolDefinition.name)
+        .filter((name) => name.includes('LeftoverSession')),
+    ).toEqual([]);
   });
 
   it('stops on --exposition, naming the binary its words ask for', async () => {

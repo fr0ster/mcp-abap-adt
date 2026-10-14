@@ -34,7 +34,7 @@ async function stopped(argv: string[]) {
 
 const shape = (set: typeof readOnlyToolSet) =>
   set
-    .groups({ connection: undefined as never, logger: undefined })
+    .groups({ connection: undefined as never, logger: undefined }, 'stdio')
     .map((group) => ({
       group: group.getName(),
       tools: group.getHandlers().map((entry) => entry.toolDefinition.name),

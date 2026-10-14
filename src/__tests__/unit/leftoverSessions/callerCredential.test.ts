@@ -3,8 +3,8 @@
  * (C15 round 9, I-R5a, m-R5b, m-R5c).
  *
  * - An instance whose connection was built for credential A, reached with
- *   credential B (an HTTP pooled instance taking another request's
- *   headers), never answers B as A: B does not see, resume or log off A's
+ *   credential B (a host's instance taking another request's credential —
+ *   an embedder's; http and sse hand no owner), never answers B as A: B does not see, resume or log off A's
  *   leftover session.
  * - A user SAP already named for this credential is answered without
  *   entering the main flow, also when the instance's connection is spent.

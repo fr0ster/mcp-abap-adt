@@ -6,7 +6,6 @@ import type {
   ConnectionContext,
   IBackgroundRuns,
   IHttpApplication,
-  LeftoverSessions,
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
 import { BaseMcpServer, closeInstance } from '@mcp-abap-adt/lib/embeddable';
@@ -89,13 +88,6 @@ export interface SseServerOptions {
   /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
   enableDnsRebindingProtection?: boolean;
   /**
-   * The owner of the process's runtime session files, handed to every SSE
-   * session's instance: the SAP sessions they hold, kept until their logoff
-   * is written, and the leftover-session tools. Absent: none kept, the tools
-   * not available.
-   */
-  leftoverSessions?: LeftoverSessions;
-  /**
    * Where background runs and their answers are kept, handed to every
    * instance (the launcher's `InMemoryBackgroundRuns` of
    * `@mcp-abap-adt/background-runs-memory`). Absent:
@@ -154,7 +146,6 @@ export class SseServer {
   private readonly enableDnsRebindingProtection?: boolean;
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
-  private readonly leftoverSessions: LeftoverSessions | undefined;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
 
   constructor(
@@ -179,7 +170,6 @@ export class SseServer {
         : parseStateIdleMinutes(opts.stateIdleMinutes, 'stateIdleMinutes');
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
-    this.leftoverSessions = opts?.leftoverSessions;
     this.backgroundRuns = opts?.backgroundRuns;
   }
 
@@ -377,7 +367,6 @@ export class SseServer {
         state: {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
-          leftoverSessions?: LeftoverSessions;
           backgroundRuns?: IBackgroundRuns;
         },
       ) {
@@ -402,9 +391,6 @@ export class SseServer {
       {
         stateIdleMinutes: this.stateIdleMinutes,
         stateLogger: this.stateLogger,
-        ...(this.leftoverSessions !== undefined && {
-          leftoverSessions: this.leftoverSessions,
-        }),
         ...(this.backgroundRuns !== undefined && {
           backgroundRuns: this.backgroundRuns,
         }),

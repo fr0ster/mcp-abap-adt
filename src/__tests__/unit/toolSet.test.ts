@@ -82,7 +82,8 @@ function shape(groups: readonly IHandlerGroup[]) {
 const namesOf = (groups: readonly IHandlerGroup[]) =>
   groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
-const toolsOf = (set: ToolSet) => namesOf(set.groups(context));
+const toolsOf = (set: ToolSet, transport: ServedTransport = 'stdio') =>
+  namesOf(set.groups(context, transport));
 
 const compact = compactToolSetOf({
   readOnly: compactReadOnlyEntries,
@@ -104,7 +105,7 @@ describe('the four tool sets', () => {
       new HighLevelHandlersGroup(context),
       new DebugHandlersGroup(context),
     ];
-    expect(shape(fullToolSet.groups(context))).toEqual(
+    expect(shape(fullToolSet.groups(context, 'stdio'))).toEqual(
       shape([
         new ReadOnlyHandlersGroup(
           context,
@@ -121,7 +122,7 @@ describe('the four tool sets', () => {
   });
 
   it('core-ro: readonly (with system), search, the leftover-session list and logoff', () => {
-    expect(shape(fullReadOnlyToolSet.groups(context))).toEqual(
+    expect(shape(fullReadOnlyToolSet.groups(context, 'stdio'))).toEqual(
       shape([
         new ReadOnlyHandlersGroup(
           context,
@@ -141,7 +142,7 @@ describe('the four tool sets', () => {
       new CompactModifyHandlersGroup(context),
     ]);
     expect(both).toHaveLength(27);
-    expect(shape(compact.groups(context))).toEqual([
+    expect(shape(compact.groups(context, 'stdio'))).toEqual([
       { group: 'CompactHandlers', tools: both },
       {
         group: 'CompactDebugHandlers',
@@ -174,7 +175,7 @@ describe('the four tool sets', () => {
   it('compact-ro: the 16 that change nothing, the leftover-session list and logoff', () => {
     const half = namesOf([new CompactReadOnlyHandlersGroup(context)]);
     expect(half).toHaveLength(16);
-    expect(shape(compactRo.groups(context))).toEqual([
+    expect(shape(compactRo.groups(context, 'stdio'))).toEqual([
       { group: 'CompactReadOnlyHandlers', tools: half },
       {
         group: 'CompactLeftoverSessionHandlers',
@@ -185,7 +186,11 @@ describe('the four tool sets', () => {
 
   it('a registry of a set lists the same tools', () => {
     for (const [, set] of SETS) {
-      expect(namesOf(registryOf(set).getHandlerGroups())).toEqual(toolsOf(set));
+      for (const transport of ['stdio', 'http', 'sse'] as const) {
+        expect(namesOf(registryOf(set, transport).getHandlerGroups())).toEqual(
+          toolsOf(set, transport),
+        );
+      }
     }
   });
 
@@ -207,6 +212,88 @@ describe('the four tool sets', () => {
         kind,
         twice: names.filter((n, i) => names.indexOf(n) !== i),
       }).toEqual({ kind, twice: [] });
+    }
+  });
+});
+
+/**
+ * The leftover-session tools are stdio's only (the owner, fix round 14): the
+ * runtime files exist for stdio, where the process serves one user. An http
+ * or sse server holds many sessions of different users, so none of its
+ * binaries — compact ones included — lists a leftover-session tool, and its
+ * help names none. stdio keeps them: every one on a write set, the list and
+ * the logoff on a -ro set.
+ */
+describe('the leftover-session tools are served on stdio only', () => {
+  const LEFTOVER = [
+    'ListLeftoverSessions',
+    'ResumeLeftoverSession',
+    'LogoffLeftoverSession',
+    'HandlerLeftoverSessionList',
+    'HandlerLeftoverSessionResume',
+    'HandlerLeftoverSessionLogoff',
+  ];
+  const leftoverOf = (set: ToolSet, transport: ServedTransport) =>
+    toolsOf(set, transport).filter((n) => LEFTOVER.includes(n));
+
+  it('stdio: each set keeps its leftover-session tools', () => {
+    expect(SETS.map(([kind, set]) => [kind, leftoverOf(set, 'stdio')])).toEqual(
+      [
+        [
+          'core',
+          [
+            'ListLeftoverSessions',
+            'ResumeLeftoverSession',
+            'LogoffLeftoverSession',
+          ],
+        ],
+        ['core-ro', ['ListLeftoverSessions', 'LogoffLeftoverSession']],
+        [
+          'compact',
+          [
+            'HandlerLeftoverSessionList',
+            'HandlerLeftoverSessionResume',
+            'HandlerLeftoverSessionLogoff',
+          ],
+        ],
+        [
+          'compact-ro',
+          ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'],
+        ],
+      ],
+    );
+  });
+
+  it.each(['http', 'sse'] as const)(
+    '%s: no set lists a leftover-session tool, and no help names one',
+    (transport) => {
+      for (const [kind, set] of SETS) {
+        expect({ kind, tools: leftoverOf(set, transport) }).toEqual({
+          kind,
+          tools: [],
+        });
+        expect({
+          kind,
+          named: set.toolsHelp(transport).includes('leftover'),
+        }).toEqual({ kind, named: false });
+        // The rest of the set is stdio's, unchanged.
+        expect({
+          kind,
+          rest: toolsOf(set, transport),
+        }).toEqual({
+          kind,
+          rest: toolsOf(set, 'stdio').filter((n) => !LEFTOVER.includes(n)),
+        });
+      }
+    },
+  );
+
+  it('stdio: each help names the leftover sessions', () => {
+    for (const [kind, set] of SETS) {
+      expect({
+        kind,
+        named: set.toolsHelp('stdio').includes('the leftover SAP sessions'),
+      }).toEqual({ kind, named: true });
     }
   });
 });
@@ -313,7 +400,7 @@ describe('the run tools of a -ro set offer no background', () => {
   const RUN_TOOLS = ['RuntimeRunClass', 'RuntimeRunProgram'];
   const runTools = (set: ToolSet) =>
     set
-      .groups(context)
+      .groups(context, 'stdio')
       .flatMap((g) => g.getHandlers())
       .filter((e) => RUN_TOOLS.includes(e.toolDefinition.name))
       .map((e) => ({

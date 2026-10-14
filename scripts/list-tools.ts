@@ -150,17 +150,20 @@ const SETS: ReadonlyArray<readonly [string, ToolSet]> = [
   ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries)],
 ];
 
-const visibilityBySet: Record<string, { group: string; name: string }[]> =
-  {};
-for (const [kind, set] of SETS) {
-  const visible = set.groups(ctx).flatMap((group) =>
-    group.getHandlers().map((entry) => ({
-      group: group.getName(),
-      name: entry.toolDefinition.name,
-    })),
-  );
-  console.error(kind, visible.length);
-  visibilityBySet[kind] = visible;
+const visibilityBySet: Record<string, { group: string; name: string }[]> = {};
+// Per transport: the leftover-session tools are stdio's only.
+for (const transport of ['stdio', 'http', 'sse'] as const) {
+  for (const [kind, set] of SETS) {
+    const visible = set.groups(ctx, transport).flatMap((group) =>
+      group.getHandlers().map((entry) => ({
+        group: group.getName(),
+        name: entry.toolDefinition.name,
+      })),
+    );
+    const key = transport === 'stdio' ? kind : `${kind} (${transport})`;
+    console.error(key, visible.length);
+    visibilityBySet[key] = visible;
+  }
 }
 
 console.error('---VISIBILITY-JSON-START---');

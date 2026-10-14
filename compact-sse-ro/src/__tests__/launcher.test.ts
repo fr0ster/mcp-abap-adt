@@ -1,6 +1,6 @@
 /**
  * `mcp-abap-adt-compact-sse-ro`: the read-only tool set over HTTP+SSE (sse's launcher), and
- * this package's own name and version — nothing else (C23): the 16 compact tools that change nothing and the leftover-session list and logoff.
+ * this package's own name and version — nothing else (C23): the 16 compact tools that change nothing — no leftover-session tool, which is stdio's.
  * The behaviour beside the write binary is
  * `src/__tests__/parity/toolSetParity.test.ts`'s.
  */
@@ -35,7 +35,7 @@ async function stopped(argv: string[]) {
 
 const shape = (set: typeof readOnlyToolSet) =>
   set
-    .groups({ connection: undefined as never, logger: undefined })
+    .groups({ connection: undefined as never, logger: undefined }, 'sse')
     .map((group) => ({
       group: group.getName(),
       tools: group.getHandlers().map((entry) => entry.toolDefinition.name),
@@ -69,12 +69,18 @@ describe('mcp-abap-adt-compact-sse-ro', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it('serves the read-only set: 18 tools, none of a background run', () => {
+  it('serves the read-only set: 16 tools, none of a background run or a leftover session', () => {
     expect(shape(readOnlyToolSet)).toEqual(
       shape(compactReadOnlyToolSetOf(compactReadOnlyEntries)),
     );
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(18);
+    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(16);
     expect(readOnlyToolSet.backgroundRuns).toBe(false);
+    // The leftover-session tools are stdio's (fix round 14).
+    expect(
+      shape(readOnlyToolSet)
+        .flatMap((g) => g.tools)
+        .filter((name) => name.includes('LeftoverSession')),
+    ).toEqual([]);
   });
 
   it('stops on --exposition, naming the write binary its words ask for', async () => {

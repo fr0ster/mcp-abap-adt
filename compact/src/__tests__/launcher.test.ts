@@ -53,7 +53,7 @@ describe('mcp-abap-adt-compact', () => {
 
   it('serves the compact tool set: the 27 tools, the four debugger verbs, the three background-run tools and the three leftover-session tools', () => {
     const tools = compactToolSet
-      .groups({ connection: undefined as never, logger: undefined })
+      .groups({ connection: undefined as never, logger: undefined }, 'stdio')
       .flatMap((group) => group.getHandlers());
     expect(tools).toHaveLength(37);
   });

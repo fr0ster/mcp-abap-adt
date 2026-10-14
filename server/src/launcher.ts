@@ -550,7 +550,7 @@ export async function launch(
   config = { ...config, connectionType, systemType };
 
   // The command's tool set: fixed by the command, never by a flag.
-  const handlersRegistry = registryOf(options.toolSet);
+  const handlersRegistry = registryOf(options.toolSet, 'stdio');
 
   // The browser of a login, mapped by the platform (D9); a choice that
   // cannot be served stops the start before anything is read.

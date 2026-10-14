@@ -439,11 +439,30 @@ const seenSince = (from: number) => [
   ),
 ];
 
-/** One call with the stand-in answering, then one with it refusing the credential. */
-async function callTwice(client: Client, set: SetName) {
+/** The runtime session files of the launcher's process (`AUTH_BROKER_PATH`). */
+const runtimeDir = () => path.join(workdir, 'runtime');
+
+/**
+ * What the runtime folder holds: absent when nothing was ever written (the
+ * owner makes the folder with its first file and leaves it), else its files.
+ */
+const runtimeState = (): 'absent' | string[] =>
+  fs.existsSync(runtimeDir()) ? fs.readdirSync(runtimeDir()) : 'absent';
+
+/**
+ * One call with the stand-in answering, then one with it refusing the
+ * credential; `between` runs after the first answer, while its connection is
+ * held.
+ */
+async function callTwice(
+  client: Client,
+  set: SetName,
+  between: () => void = () => {},
+) {
   const from = standIn.requests.length;
   const answered = outcomeOf(await client.callTool(READ_CALL[set]));
   const presented = seenSince(from);
+  between();
   standIn.refuse(true);
   try {
     const refused = outcomeOf(await client.callTool(READ_CALL[set]));
@@ -484,7 +503,13 @@ async function serveStdio(launcher: Launcher, set: SetName) {
     '--system-type=onprem',
   ]);
   const tools = await names(destination.client);
-  const calls = await callTwice(destination.client, set);
+  // stdio keeps its runtime files: the destination's connection holds its
+  // session, so its file is there after the first answer.
+  let runtimeFiles: 'absent' | number = 'absent';
+  const calls = await callTwice(destination.client, set, () => {
+    const state = runtimeState();
+    runtimeFiles = state === 'absent' ? state : state.length;
+  });
   await destination.client.close();
   const destinationExit = await destination.started.stop();
 
@@ -499,6 +524,7 @@ async function serveStdio(launcher: Launcher, set: SetName) {
     tools,
     observed: {
       credential: calls.presented,
+      runtimeFiles,
       answered: calls.answered,
       refused: calls.refused,
       destinationExit,
@@ -592,7 +618,12 @@ async function serveHttpLike(
   const started = await run(launcher, [...listen, '--system-type=onprem']);
   const basicClient = await clientWith(basicHeaders());
   const tools = await names(basicClient);
-  const basic = await callTwice(basicClient, set);
+  // http and sse write no runtime file (fix round 14): not while a request's
+  // connection is held, not after.
+  const runtime: Array<'absent' | string[]> = [];
+  const basic = await callTwice(basicClient, set, () =>
+    runtime.push(runtimeState()),
+  );
   await basicClient.close();
   const tokenClient = await clientWith(tokenHeaders());
   const token = await callTwice(tokenClient, set);
@@ -622,10 +653,12 @@ async function serveHttpLike(
   const sseOnly =
     transportName === 'sse' ? await ssePosts(endpoint, set) : undefined;
   const exit = await started.stop();
+  runtime.push(runtimeState());
 
   return {
     tools,
     observed: {
+      runtime,
       basic,
       token,
       noCredentials,
@@ -747,6 +780,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           basicOf('PARITY_USER', 'parity-password'),
         ]);
         expect(served.answered).toEqual({ ok: true });
+        expect(served.runtimeFiles).toBe(1);
         expect(served.refused).toMatchObject(USER_REFUSED);
         expect(served.inspectionOnly).toMatchObject({
           ok: false,
@@ -755,6 +789,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       } else {
         const basic = served.basic as Record<string, unknown>;
         const token = served.token as Record<string, unknown>;
+        expect(served.runtime).toEqual(['absent', 'absent']);
         expect(basic.presented).toEqual([
           basicOf('PARITY_USER', 'parity-password'),
         ]);
@@ -798,27 +833,54 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       expect(full.tools).toContain('GetClass');
       expect(full.tools).not.toContain('HandlerGet');
       expect(compact.tools).not.toContain('GetClass');
-      // core: the debugger, high, background runs and the resume, always.
+      // The leftover-session tools are stdio's (fix round 14): every one on
+      // a write binary and the list and logoff on a -ro one there; none on
+      // any http or sse binary, compact ones included.
+      const onStdio = transportName === 'stdio';
+      const leftover = (tools: string[]) =>
+        tools.filter((n) => n.includes('LeftoverSession'));
+      expect({
+        full: leftover(full.tools),
+        fullRo: leftover(fullRo.tools),
+        compact: leftover(compact.tools),
+        compactRo: leftover(compactRo.tools),
+      }).toEqual(
+        onStdio
+          ? {
+              full: [
+                'ListLeftoverSessions',
+                'LogoffLeftoverSession',
+                'ResumeLeftoverSession',
+              ],
+              fullRo: ['ListLeftoverSessions', 'LogoffLeftoverSession'],
+              compact: [
+                'HandlerLeftoverSessionList',
+                'HandlerLeftoverSessionLogoff',
+                'HandlerLeftoverSessionResume',
+              ],
+              compactRo: [
+                'HandlerLeftoverSessionList',
+                'HandlerLeftoverSessionLogoff',
+              ],
+            }
+          : { full: [], fullRo: [], compact: [], compactRo: [] },
+      );
+      // core: the debugger, high and background runs, always.
+      expect(full.tools).toHaveLength(onStdio ? 252 : 249);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
           'DebugStop',
           'CreateClass',
           'GetBackgroundRun',
-          'ResumeLeftoverSession',
         ]),
       );
-      // core-ro: the readonly tools with system and search, the list and
-      // the logoff; no write, debugger, background run or resume.
-      expect(fullRo.tools).toHaveLength(68);
+      // core-ro: the readonly tools with system and search (and, on stdio,
+      // the list and the logoff); no write, debugger, background run or
+      // resume.
+      expect(fullRo.tools).toHaveLength(onStdio ? 68 : 66);
       expect(fullRo.tools).toEqual(
-        expect.arrayContaining([
-          'ReadClass',
-          'GetWhereUsed',
-          'SearchObject',
-          'ListLeftoverSessions',
-          'LogoffLeftoverSession',
-        ]),
+        expect.arrayContaining(['ReadClass', 'GetWhereUsed', 'SearchObject']),
       );
       for (const name of [
         'CreateClass',
@@ -832,13 +894,15 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         });
       }
       // compact: the 27, the four debugger verbs, the three background-run
-      // tools beside the run tool, and the three leftover-session tools.
-      expect(compact.tools).toHaveLength(27 + 4 + 3 + 3);
+      // tools beside the run tool, and on stdio the three leftover-session
+      // tools.
+      expect(compact.tools).toHaveLength(27 + 4 + 3 + (onStdio ? 3 : 0));
       expect(compact.tools).toEqual(
         expect.arrayContaining([...COMPACT_RW, ...COMPACT_DEBUG]),
       );
-      // compact-ro: the 16 that change nothing, the list and the logoff.
-      expect(compactRo.tools).toHaveLength(16 + 2);
+      // compact-ro: the 16 that change nothing, and on stdio the list and
+      // the logoff.
+      expect(compactRo.tools).toHaveLength(16 + (onStdio ? 2 : 0));
       expect(compactRo.tools).toContain('HandlerGet');
       for (const name of [
         ...COMPACT_RW.filter((n) => n !== 'HandlerGet'),

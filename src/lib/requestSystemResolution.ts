@@ -89,6 +89,48 @@ export const defaultSystemContextResolver: SystemContextResolver =
   systemContextResolverFor(undefined);
 
 /**
+ * A system that answered its lookup but named no user — on ABAP Cloud a
+ * `systeminformation` whose user is missing, empty, blank or not a string,
+ * or a body that is no JSON: not a valid ABAP system for this server.
+ */
+export class SystemWithoutUserError extends Error {
+  constructor() {
+    super('the system answered systeminformation without a user');
+    this.name = 'SystemWithoutUserError';
+  }
+}
+
+const requiringUserOf = new WeakMap<
+  SystemContextResolver,
+  SystemContextResolver
+>();
+
+/**
+ * `resolver`, refusing an answer that names no user (`SystemWithoutUserError`):
+ * `null` (nothing asked: on-premise) passes; any other answer must carry a
+ * responsible that is a non-blank string. One wrapper per resolver, so
+ * `resolveOnce` still makes one lookup per connection — and a refused one is
+ * not kept, so the next caller asks again.
+ */
+export function requiringUser(
+  resolver: SystemContextResolver,
+): SystemContextResolver {
+  const known = requiringUserOf.get(resolver);
+  if (known) return known;
+  const checked: SystemContextResolver = async (connection) => {
+    const system = await resolver(connection);
+    if (system === null) return null;
+    const user: unknown = system.responsible;
+    if (typeof user !== 'string' || user.trim() === '') {
+      throw new SystemWithoutUserError();
+    }
+    return system;
+  };
+  requiringUserOf.set(resolver, checked);
+  return checked;
+}
+
+/**
  * Set around a call whose cloud lookup threw: the guard then refuses a
  * missing responsible as a failure to retry, not as a key to set.
  */

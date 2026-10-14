@@ -73,6 +73,15 @@ export interface AdtStandIn {
   close(): Promise<void>;
 }
 
+/**
+ * What `systeminformation` answers when a suite states nothing: a valid
+ * system, naming its user and system id.
+ */
+export const DEFAULT_SYSTEM_INFORMATION = JSON.stringify({
+  userName: 'STAND_IN_USER',
+  systemID: 'STD',
+});
+
 /** Whether `url` is the platform's logoff (`/sap/public/bc/icf/logoff`). */
 export const isLogoff = (url: string): boolean => url.includes('logoff');
 
@@ -181,7 +190,13 @@ export async function adtStandIn(): Promise<AdtStandIn> {
         res.end('');
         return;
       }
-      const said = bodies.find((b) => b.match(request));
+      // A valid ABAP system's systeminformation names the session's user:
+      // the default when a suite states none (`body`, `systemInformation`).
+      const said =
+        bodies.find((b) => b.match(request)) ??
+        (request.url.startsWith('/sap/bc/adt/core/http/systeminformation')
+          ? { text: DEFAULT_SYSTEM_INFORMATION, headers: undefined }
+          : undefined);
       // A cookie a suite has the answer set (`body`'s headers) goes beside
       // the session's own.
       const { 'set-cookie': extraCookie, ...saidHeaders } = said?.headers ?? {};

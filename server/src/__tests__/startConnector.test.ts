@@ -36,7 +36,11 @@ import {
 } from '../../../src/__tests__/helpers/leftoverSession';
 import { resetProcessLatchForTests } from '../../../src/lib/activeTools';
 import { readCoreConfig } from '../config/coreParameters';
-import { launch, startLookupFailedWords } from '../launcher.js';
+import {
+  launch,
+  startLookupFailedWords,
+  startSystemWithoutUserWords,
+} from '../launcher.js';
 
 jest.setTimeout(30_000);
 
@@ -277,6 +281,34 @@ it('ABAP Cloud without its system information: exit 1 naming it, the transport n
   expect(standIn.logoffs()).toBe(1);
   expect(runtimeFiles(runtime)).toEqual([]);
 });
+
+/** systeminformation answers that name no user: missing, empty, blank, not a string, not JSON. */
+const WITHOUT_USER: Array<[string, string]> = [
+  ['no userName', JSON.stringify({ systemID: 'CLD' })],
+  ['an empty userName', JSON.stringify({ userName: '', systemID: 'CLD' })],
+  ['a blank userName', JSON.stringify({ userName: '  ', systemID: 'CLD' })],
+  ['a userName that is no string', JSON.stringify({ userName: 42 })],
+  ['a body that is no JSON', 'not json'],
+];
+
+it.each(WITHOUT_USER)(
+  'ABAP Cloud, systeminformation with %s: exit 1 in its own words, the transport never opens, and the logon is logged off',
+  async (_what, body) => {
+    standIn.body(isLookup, body);
+    const s = await start({ kind: 'cloud' });
+    expect(s.exits).toEqual([1]);
+    expect(s.opened()).toBe(0);
+    expect(s.stderr).toContain(
+      `[MCP] ${startSystemWithoutUserWords('default')}`,
+    );
+    const end = Date.now() + 10_000;
+    while (standIn.logoffs() === 0 && Date.now() < end) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(standIn.logoffs()).toBe(1);
+    expect(runtimeFiles(runtime)).toEqual([]);
+  },
+);
 
 it('ABAP Cloud: the system information is asked at the start, and a tool asks no more', async () => {
   standIn.body(

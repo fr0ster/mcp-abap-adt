@@ -471,6 +471,14 @@ export function startLookupFailedWords(destination: string): string {
 }
 
 /**
+ * The start's words for a system that answered systeminformation without a
+ * user: not a valid ABAP system for this server.
+ */
+export function startSystemWithoutUserWords(destination: string): string {
+  return `Destination "${destination}": the system answered systeminformation without a user, so it is not a valid ABAP system for this server; the server did not start`;
+}
+
+/**
  * The words the connection at start failed in: what the failure reader
  * makes of it (a chain failure, the server's own refusal — a system lookup
  * that failed — or the destination layer's), else the destination, the
@@ -490,6 +498,9 @@ export function startConnectionWords(
   const read = destinationFailureOf(error, { ...options, destination });
   if (read?.error === 'system_lookup_failed') {
     return startLookupFailedWords(destination);
+  }
+  if (read?.error === 'system_without_user') {
+    return startSystemWithoutUserWords(destination);
   }
   if (read !== undefined) {
     return destinationFailureWords(error, destination, options);

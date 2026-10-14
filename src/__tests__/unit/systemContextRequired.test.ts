@@ -443,7 +443,7 @@ describe('cloud', () => {
     expect(createBody(stated)).toContain('adtcore:responsible="STATED_USER"');
   });
 
-  it('a cloud system that answers no user: the process login does not stand in, the create is refused', async () => {
+  it('a cloud system that answers no user: not a valid system — the process login does not stand in, the call is refused system_without_user, nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
     lookup.mockResolvedValue(null);
@@ -454,7 +454,8 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
+    expect(textOf(result)).toContain('system_without_user');
+    expect(textOf(result)).not.toContain('PROCESS_LOGIN');
     expect(connection.requests).toEqual([]);
   });
 
@@ -513,7 +514,7 @@ describe('cloud', () => {
     expect(connection.requests).toEqual([]);
   });
 
-  it('a system that answers nothing leaves the create refused, nothing sent', async () => {
+  it('a system that answers nothing is not a valid system: the call is refused system_without_user, nothing sent', async () => {
     lookup.mockResolvedValue(null);
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
@@ -522,7 +523,7 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
+    expect(textOf(result)).toContain('system_without_user');
     expect(connection.requests).toEqual([]);
   });
 });

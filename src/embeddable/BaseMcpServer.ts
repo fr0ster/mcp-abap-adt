@@ -80,8 +80,10 @@ import {
 import {
   defaultSystemContextResolver,
   type ResolvedSystemContext,
+  requiringUser,
   resolveOnce,
   type SystemContextResolver,
+  SystemWithoutUserError,
   systemContextResolverFor,
   withDestinationSystemContext,
   withKnownSystemContext,
@@ -550,16 +552,20 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * `connection`'s system information, asked when it has none — on ABAP
    * Cloud `systeminformation`; on-premise the resolver sends nothing. A
-   * failure is the caller's: a chain failure as it is, any other the
-   * server's `system_lookup_failed`. Nothing failed is kept, so the next
-   * caller asks again. Concurrent askers share one request (`resolveOnce`).
+   * failure is the caller's: an answer that names no user (an invalid
+   * system, `requiringUser`) the server's `system_without_user`, a chain
+   * failure as it is, any other the server's `system_lookup_failed`. Nothing
+   * failed is kept, so the next caller asks again. Concurrent askers share
+   * one request (`resolveOnce`).
    */
   private async requireSystem(connection: AbapConnection): Promise<void> {
     const resolver = this.systemContextResolver;
     if (resolver === null || this.systems.has(connection)) return;
-    const asked = resolveOnce(resolver, connection).then((system) => {
-      this.knowSystem(connection, system);
-    });
+    const asked = resolveOnce(requiringUser(resolver), connection).then(
+      (system) => {
+        this.knowSystem(connection, system);
+      },
+    );
     try {
       // Awaited whatever the signal says: the lookup is a send on the
       // instance's connection, and the call — its turn in the main flow, its
@@ -567,6 +573,12 @@ export abstract class BaseMcpServer extends McpServer {
       // logoff comes under it when the session ends.
       await asked;
     } catch (error) {
+      if (error instanceof SystemWithoutUserError) {
+        this.logger?.warn?.(
+          'The system answered systeminformation without a user: not a valid ABAP system for this server',
+        );
+        throw new ServerRefusal('system_without_user');
+      }
       if (readGuarded(failureOf, error) !== undefined) throw error;
       // The class only: a lookup's message may quote what the system
       // answered (H4).

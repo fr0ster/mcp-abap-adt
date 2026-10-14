@@ -232,11 +232,11 @@ tools; the server decides nothing by itself (session-resume spec).
   once, so a tool call asking meanwhile waits for it. `resumedSession` builds the connection with
   `createAbapConnection(…, session)`, owns it as `built`, connects (connection 17's takeover: one
   request in the session, without the credential), and makes the file this process's (`adopt`,
-  same handle); the system lookup follows as for a logon. SAP's "gone" — `401`, a redirect, an
-  answer not the session's, read by status from connection's error (`sapAnswerOf`, `sessionGone`)
+  same handle); the system lookup follows as for a logon. SAP's "gone" — `401`, or an
+  answer not the session's (a `2xx`), read by status from connection's error (`sapAnswerOf`, `sessionGone`)
   — ends the spent takeover instance (it logged nothing on) and builds a new one with the normal
   logon (`connectedLogon`, connection's "a new session is a new instance"), adopted under the same
-  handle: answered `resumed`, `session: 'new'` (else `'picked_up'`). Any other failure, the new
+  handle: answered `resumed`, `session: 'new'` (else `'picked_up'`). Any other failure (a redirect included), the new
   logon's included, is the call's error and gives the file back; the instance has no connection. The list
   and the logoff take no turn either — neither touches the instance's connection. After a resume
   the server checks and repairs nothing (no lock probing, no replay): an ended session or lost

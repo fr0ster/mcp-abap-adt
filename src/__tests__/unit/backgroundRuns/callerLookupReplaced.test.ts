@@ -31,7 +31,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-it('CR11: a lookup asked on a connection replaced meanwhile is not kept — the next caller asks again', async () => {
+it('a lookup asked on a connection replaced meanwhile is not kept — the next caller asks again', async () => {
   const standIn = await adtStandIn();
   standIn.systemInformation('USER_A');
   const previous = process.env.SAP_SYSTEM_TYPE;

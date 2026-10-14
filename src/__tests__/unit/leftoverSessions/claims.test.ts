@@ -115,6 +115,53 @@ describe('the owner', () => {
     if (taken) a.forget(taken);
     expect(fs.readdirSync(dir)).toEqual([]);
   });
+
+  describe('adopt', () => {
+    /** A connection as the owner reads it: its cookies, and a request. */
+    const connection = (cookies: string | null) => {
+      const held = { cookies };
+      return {
+        held,
+        sessionCookies: () => held.cookies,
+        makeAdtRequest: async () => undefined,
+      };
+    };
+
+    it('removes the claimed file once the file under the handle is written', () => {
+      const a = owner(222);
+      const claimed = a.claim(HANDLE, IDENTITY);
+      if (!claimed) throw new Error('not claimed');
+      a.adopt(claimed, connection('SAP_SESSIONID_X01_100=fresh'), IDENTITY);
+      expect(fs.readdirSync(dir)).toEqual([HANDLE]);
+      expect(
+        JSON.parse(fs.readFileSync(path.join(dir, HANDLE), 'utf8')).pid,
+      ).toBe(222);
+    });
+
+    it('keeps the claimed file while the connection holds no cookie, and removes it when the first write lands', async () => {
+      const a = owner(222);
+      const claimed = a.claim(HANDLE, IDENTITY);
+      if (!claimed) throw new Error('not claimed');
+      const adopted = connection(null);
+      a.adopt(claimed, adopted, IDENTITY);
+      expect(fs.readdirSync(dir)).toEqual([claimed.file]);
+      adopted.held.cookies = 'SAP_SESSIONID_X01_100=fresh';
+      await adopted.makeAdtRequest();
+      expect(fs.readdirSync(dir)).toEqual([HANDLE]);
+    });
+
+    it('keeps the claimed file when the write failed', () => {
+      const a = owner(222);
+      const claimed = a.claim(HANDLE, IDENTITY);
+      if (!claimed) throw new Error('not claimed');
+      // A directory where the partial file goes: the write cannot succeed.
+      fs.mkdirSync(path.join(dir, `${HANDLE}.partial`));
+      a.adopt(claimed, connection('SAP_SESSIONID_X01_100=fresh'), IDENTITY);
+      expect(fs.readdirSync(dir).sort()).toEqual(
+        [claimed.file, `${HANDLE}.partial`].sort(),
+      );
+    });
+  });
 });
 
 describe('through the tools', () => {

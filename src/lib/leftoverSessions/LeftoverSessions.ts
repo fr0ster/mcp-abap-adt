@@ -138,6 +138,8 @@ interface Tracked {
   cookies: string | null;
   /** Its logoff was written: nothing is written for it any more. */
   ended: boolean;
+  /** The claimed file of a resumed session, kept until `<handle>` landed. */
+  claimedFile?: string;
 }
 
 /** The fixed words of a runtime file that could not be written or deleted. */
@@ -454,7 +456,9 @@ export class LeftoverSessions {
   /**
    * A resumed session is this process's now: `connection` (built on it)
    * keeps the same handle, its file is written as this process's, and the
-   * claimed one is deleted.
+   * claimed one is deleted — only after that file landed: when the write
+   * failed, or the connection holds no cookie yet, the claimed file stays,
+   * so a crash still leaves a record.
    */
   adopt(
     claimed: ClaimedSession,
@@ -462,7 +466,10 @@ export class LeftoverSessions {
     identity: SessionIdentity,
   ): void {
     this.track(connection, claimed.role, identity, claimed.handle);
-    this.removeFile(claimed.file);
+    const entry = this.tracked.get(connection);
+    if (entry === undefined) return;
+    entry.claimedFile = claimed.file;
+    this.dropClaimedFile(entry);
   }
 
   /** Writes again whatever changed in `connection`'s cookies. */
@@ -471,7 +478,17 @@ export class LeftoverSessions {
     if (entry === undefined || entry.ended || isEnded(connection)) return;
     const cookies = cookiesOf(connection);
     if (cookies === null || cookies === entry.cookies) return;
-    if (this.write(entry, cookies)) entry.cookies = cookies;
+    if (this.write(entry, cookies)) {
+      entry.cookies = cookies;
+      this.dropClaimedFile(entry);
+    }
+  }
+
+  /** The claimed file is deleted once the file under the handle is written. */
+  private dropClaimedFile(entry: Tracked): void {
+    if (entry.claimedFile === undefined || entry.cookies === null) return;
+    this.removeFile(entry.claimedFile);
+    delete entry.claimedFile;
   }
 
   /**

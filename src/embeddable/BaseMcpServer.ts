@@ -1662,13 +1662,13 @@ export const LEFTOVER_LOGOFF_NOT_WRITTEN_WORDS =
 /**
  * Whether SAP's answer to the request in a resumed session says the session
  * is gone (connection 17, read by status from the error's `response`, never
- * its words): a `401`, a redirect (not followed), or an answer that is not
- * that session's (a `2xx` naming another session, none, or no token). Any
- * other status — a server failure — is the call's error: the session may
- * still live.
+ * its words): a `401`, or an answer that is not that session's (a `2xx`
+ * naming another session, none, or no token). Any other status — a redirect
+ * (not followed), a server failure — is the call's error as SAP gave it: the
+ * session may still live.
  */
 function sessionGone(status: number): boolean {
-  return status === 401 || (status >= 200 && status < 400);
+  return status === 401 || (status >= 200 && status < 300);
 }
 
 /** `url` without its trailing slashes. Plain code. */

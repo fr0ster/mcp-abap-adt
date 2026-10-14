@@ -145,6 +145,36 @@ describe('ResumeLeftoverSession', () => {
     expect(stand.files()).toEqual([handle]);
   });
 
+  it('a 2xx that names another session than the old one: a new one is started, and the file is kept under its handle', async () => {
+    stand = await leftoverStand();
+    const { handle, session } = await stand.leftover();
+    stand.standIn.body((r) => r.session === session, '', {
+      'set-cookie': 'SAP_SESSIONID_X01_100=another-session; path=/',
+    });
+    const answer = await stand.call('ResumeLeftoverSession', { handle });
+    expect(answer.isError).toBe(false);
+    expect(json(answer.text)).toEqual({
+      handle,
+      state: 'resumed',
+      session: 'new',
+    });
+    expect(stand.files()).toEqual([handle]);
+  });
+
+  it('a redirect is not "gone": the call’s error as SAP gave it, and the file is kept', async () => {
+    stand = await leftoverStand();
+    const { handle, session } = await stand.leftover();
+    const from = stand.standIn.requests.length;
+    stand.standIn.answer((r) => r.session === session, 302);
+    const answer = await stand.call('ResumeLeftoverSession', { handle });
+    expect(answer.isError).toBe(true);
+    expect(stand.files()).toEqual([handle]);
+    // No new logon was tried: nothing but the takeover's request ran.
+    expect(
+      stand.standIn.requests.slice(from).some((r) => r.authorization),
+    ).toBe(false);
+  });
+
   it('is the call’s error, and keeps the file, when SAP answers something other than "gone" (a 500)', async () => {
     stand = await leftoverStand();
     const { handle, session } = await stand.leftover();

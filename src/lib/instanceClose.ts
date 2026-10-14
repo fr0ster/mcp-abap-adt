@@ -29,7 +29,9 @@
  *
  * A background run's connection is the host strategy's, but the instance
  * close cuts the runs this instance started (`cutBackgroundRuns`): their
- * connections get their logoff in step 2's tick, as at the process's end.
+ * connections get their logoff in step 2's tick, as at the process's end —
+ * one still connecting too (tracked from its birth; connection 17 queues the
+ * logoff behind the connect), and the run's start is then refused.
  * Another instance's runs are untouched.
  */
 

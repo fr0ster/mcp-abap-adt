@@ -327,7 +327,10 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
   answers live in the server's memory and **end with the process**.
 - **The ends.** An SSE stream is networked stdio: **when the stream closes, the runs it started are
   cut** — each run's session gets its logoff at once, in the same moment as the stream's other ADT
-  sessions, without waiting for SAP's answer; a run another stream started is untouched. Over
+  sessions, without waiting for SAP's answer; a run another stream started is untouched. A run
+  still starting is cut too: its session's logoff is asked while its logon is under way, and a session
+  `freshConnection` hands over after the close is never logged on; either way the start is refused
+  and nothing is kept. Over
   Streamable HTTP a dropped request, the pool's idle bound and its eviction cut nothing: a run goes on
   to SAP's answer. The process's end — a signal, or stdio's client closing stdin — **logs every run's
   session off at once, which cuts it**, as it does every other ADT session of the process; the forced

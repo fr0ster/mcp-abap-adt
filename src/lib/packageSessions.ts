@@ -92,10 +92,17 @@ export function registerFreshConnectionFactory(
  * shutdown), nothing is built and the host's factory is not called:
  * `ClosedInstanceRefusal`, nothing sent. A latch that closes while the
  * factory or the connect runs ends the connection and refuses the same way.
+ *
+ * `born`, when given, is handed the connection as soon as it exists — once
+ * owned, before its `connect()`: a background run hands it to the instance
+ * that started it, whose close then reaches it while it still connects. A
+ * `born` that throws (that instance closed while the host's factory ran)
+ * refuses the open: the connection is ended unconnected, nothing sent.
  */
 export async function openFreshConnection(
   connection: IAbapConnection,
   logger: Logger,
+  born?: (connection: IAbapConnection) => void,
 ): Promise<IAbapConnection> {
   refuseIfClosed();
   const record = siblingRecordOf(connection);
@@ -106,6 +113,7 @@ export async function openFreshConnection(
       logger ?? null,
     );
     own(built, { role: 'fresh' });
+    await bornOrEnded(built, born, logger);
     return connectedOrClosed(built, logger);
   }
   const factory = hostFactories.get(connection);
@@ -114,7 +122,26 @@ export async function openFreshConnection(
   // connection the server built.
   const given = await factory();
   own(given, { role: 'fresh' });
+  await bornOrEnded(given, born, logger);
   return connectedOrClosed(given, logger);
+}
+
+/**
+ * Hands a fresh connection, not yet connected, to `born`; if that throws,
+ * ends it (nothing was sent on it) and throws what `born` threw.
+ */
+async function bornOrEnded(
+  fresh: IAbapConnection,
+  born: ((connection: IAbapConnection) => void) | undefined,
+  logger: Logger,
+): Promise<void> {
+  if (born === undefined) return;
+  try {
+    born(fresh);
+  } catch (error) {
+    await closeQuietly(fresh, logger, 'A fresh connection');
+    throw error;
+  }
 }
 
 /**

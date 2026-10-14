@@ -13,7 +13,9 @@
  * - **cut by its instance's close, as by the process's end** — the run is
  *   registered in the registry of live tools (`activeTools`) under the
  *   instance whose call started it, and its connection is handed to that
- *   instance's tracking (`track`) once owned: the instance close
+ *   instance's tracking (`track`) as soon as it exists, before its
+ *   `connect()` (an instance closed while the host's factory ran refuses it
+ *   there, nothing sent): the instance close
  *   (`closeInstance` — an SSE stream that closed, stdio's transport, an
  *   embedder's session-ending transport) logs it off at once with the
  *   instance's own, in the same tick, which cuts it. A run of another
@@ -37,7 +39,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { registerActiveTool } from '../activeTools';
 import { backgroundRunLimitWords, ServerRefusal } from '../auth/serverRefusal';
 import type { HandlerContext } from '../handlers/interfaces';
-import { isEnded, own, runAsOwner } from '../ownedConnections';
+import { isEnded, own, refuseIfClosed, runAsOwner } from '../ownedConnections';
 import { closeQuietly, openFreshConnection } from '../packageSessions';
 import type {
   BackgroundRunAnswer,
@@ -60,7 +62,8 @@ export interface StartBackgroundRunOptions {
   instance: object;
   /**
    * The instance's tracking of the runs it started: handed the run's own
-   * connection once it is owned, before the strategy keeps the run; answers
+   * connection as soon as it exists — before its `connect()` and before the
+   * strategy keeps the run; answers
    * the untracking, called when the run ended. It may throw (the instance
    * closed meanwhile): the start is refused, its connection ended.
    */
@@ -120,12 +123,24 @@ export async function startBackgroundRun(
     // The strategy's connection, not the instance's: no instance's terminal
     // close (`closeOwnedConnections`, the pool's) reaches it; the instance
     // close does through `track`, the process's logoffs (`forceClose`) do.
-    connection = await runAsOwner(strategy, () =>
-      openFreshConnection(options.connection, logger),
-    );
-    own(connection, { owner: strategy, role: 'background' });
-    // The instance's from now on to cut: its close logs it off.
-    untrack = options.track?.(connection);
+    // Tracked as soon as it exists, before its connect: the instance's close
+    // while it connects asks its logoff at once (queued behind the connect),
+    // and an instance closed while the host's factory ran refuses it here,
+    // before anything is sent.
+    try {
+      connection = await runAsOwner(strategy, () =>
+        openFreshConnection(options.connection, logger, (born) => {
+          own(born, { owner: strategy, role: 'background' });
+          untrack = options.track?.(born);
+        }),
+      );
+    } catch (error) {
+      // A connect its instance's close cut short: the close's refusal.
+      refuseIfClosed(options.instance);
+      throw error;
+    }
+    // Its instance closed while it connected: the close cut it.
+    refuseIfClosed(options.instance);
     // Stateless (§5.7): a fresh connection is, and a host's factory's is made so.
     const typed = connection as { setSessionType?: (type: string) => void };
     if (typeof typed.setSessionType === 'function') {

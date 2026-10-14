@@ -1561,8 +1561,9 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * `sapUserOf`'s lookup: `undefined` when SAP names no user on-premise; on
-   * a cloud system, no user is `system_without_user`.
+   * `sapUserOf`'s lookup: `undefined` when the system has no
+   * `systeminformation` endpoint (`404`); an answer that names no user is
+   * `system_without_user`.
    */
   private async callerUserOf(
     signal: AbortSignal,

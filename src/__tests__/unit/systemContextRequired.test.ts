@@ -14,12 +14,11 @@
  * Master system: its own variable, else the cloud system's `systemID`;
  * otherwise it is left out of the request — never refused.
  */
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  getSystemInformation: jest.fn(),
+jest.mock('../../lib/systemInformation', () => ({
+  ...jest.requireActual('../../lib/systemInformation'),
+  readSystemInformation: jest.fn(),
 }));
 
-import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationHigh } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
@@ -44,9 +43,10 @@ import {
   MISSING_RESPONSIBLE,
   RESPONSIBLE_LOOKUP_FAILED,
 } from '../../lib/systemContextGuard';
+import { readSystemInformation } from '../../lib/systemInformation';
 import { recordingConnection } from '../helpers/recordingConnection';
 
-const lookup = getSystemInformation as jest.Mock;
+const lookup = readSystemInformation as jest.Mock;
 
 const KEYS = [
   'SAP_MASTER_SYSTEM',
@@ -389,7 +389,11 @@ describe('cloud', () => {
     )._registeredTools;
 
   it('nothing stated: both from systeminformation, and the create carries them', async () => {
-    lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
+    lookup.mockResolvedValue({
+      kind: 'answered',
+      user: 'CB_USER',
+      systemId: 'CLD',
+    });
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -406,7 +410,11 @@ describe('cloud', () => {
   it('the process SAP_USERNAME is not a cloud login: systeminformation is the responsible', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
-    lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
+    lookup.mockResolvedValue({
+      kind: 'answered',
+      user: 'CB_USER',
+      systemId: 'CLD',
+    });
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -419,7 +427,11 @@ describe('cloud', () => {
   });
 
   it('a scope login is not a cloud login either; a stated SAP_RESPONSIBLE still wins on cloud', async () => {
-    lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
+    lookup.mockResolvedValue({
+      kind: 'answered',
+      user: 'CB_USER',
+      systemId: 'CLD',
+    });
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -446,7 +458,11 @@ describe('cloud', () => {
   it('a cloud system that answers no user: not a valid system — the process login does not stand in, the call is refused system_without_user, nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
-    lookup.mockResolvedValue(null);
+    lookup.mockResolvedValue({
+      kind: 'answered',
+      user: undefined,
+      systemId: 'CLD',
+    });
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -465,7 +481,11 @@ describe('cloud', () => {
   ] as const)(
     'a host scope carrying both keys as undefined (%s): cloud asks the system, on-premise is refused',
     async (systemType, filled) => {
-      lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
+      lookup.mockResolvedValue({
+        kind: 'answered',
+        user: 'CB_USER',
+        systemId: 'CLD',
+      });
       const connection = recordingConnection();
       const server = new EmbeddableMcpServer({
         connection: connection as never,
@@ -514,8 +534,10 @@ describe('cloud', () => {
     expect(connection.requests).toEqual([]);
   });
 
-  it('a system that answers nothing is not a valid system: the call is refused system_without_user, nothing sent', async () => {
-    lookup.mockResolvedValue(null);
+  it('a cloud system without the endpoint (404): a failed lookup, system_lookup_failed — the process login does not stand in, nothing sent', async () => {
+    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+    systemContextFromConfiguration();
+    lookup.mockResolvedValue({ kind: 'absent' });
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -523,7 +545,11 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(textOf(result)).toContain('system_without_user');
+    expect(JSON.parse(textOf(result))).toMatchObject({
+      error: 'system_lookup_failed',
+    });
+    expect(textOf(result)).not.toContain('system_without_user');
+    expect(textOf(result)).not.toContain('PROCESS_LOGIN');
     expect(connection.requests).toEqual([]);
   });
 });

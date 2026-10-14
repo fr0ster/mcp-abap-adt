@@ -1,7 +1,8 @@
 /**
  * A system whose `systeminformation` answers but names no user — the field
- * missing, empty, blank, not a string, or a body that is no JSON — is not a
- * valid ABAP system for this server: an error, as a failed lookup is. On a
+ * missing, empty, blank, not a string, a body that is no JSON or JSON that
+ * is no object — is not a valid ABAP system for this server: an error, as a
+ * failed lookup is. On a
  * built instance (http, sse) the call answers `system_without_user` and its
  * tool does not run; nothing of the answer is kept, so the next call asks
  * again and, once the system names its user, its tool runs once. (A stdio
@@ -67,6 +68,9 @@ const WITHOUT_USER: Array<[string, string]> = [
   ['a userName that is no string', JSON.stringify({ userName: 42 })],
   ['a body that is no JSON', 'not json'],
   ['an empty body', ''],
+  ['a JSON array', JSON.stringify([{ userName: 'ARRAY_USER' }])],
+  ['a JSON number', '42'],
+  ['JSON null', 'null'],
 ];
 
 it.each(WITHOUT_USER)(

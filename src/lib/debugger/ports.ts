@@ -25,9 +25,10 @@ import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
 /**
  * The user whose requests are caught: what the system says, else the login —
  * the request scope's before the process's — never the responsible.
- * `getSystemInformation` answers null only when the endpoint is absent; an
- * answer that names no user is the call's `system_without_user`; any other
- * failure (authentication, network) goes through to the caller.
+ * The login stands in only when the system has no `systeminformation`
+ * endpoint (`404`); an answer that names no user is the call's
+ * `system_without_user`; any other failure (`405`, `501`, authentication,
+ * network) goes through to the caller.
  */
 export async function requestUserOf(
   connection: IAbapConnection,

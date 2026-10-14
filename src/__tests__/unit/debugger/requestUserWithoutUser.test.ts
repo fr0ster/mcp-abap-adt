@@ -1,8 +1,9 @@
 /**
  * The debugger's request user: a `systeminformation` answer that names no
  * user is not a valid ABAP system — the call's `system_without_user`, with no
- * fallback to the login — while a system without the endpoint (`404`) falls
- * back to the configured login.
+ * fallback to the login — while a system without the endpoint (`404`, and
+ * only `404`) falls back to the configured login. Any other failure (`405`,
+ * `501`, `500`) is the call's error, with no fallback either.
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -32,26 +33,65 @@ afterEach(() => {
   else process.env.SAP_USERNAME = saved;
 });
 
-it('an answer without a user is system_without_user, the login not used', async () => {
-  const { standIn, connection } = await onPremise();
-  try {
-    standIn.body(
-      (r) => r.url.startsWith(SYSTEM_INFORMATION),
-      JSON.stringify({ systemID: 'SID' }),
-    );
-    const error = await requestUserOf(connection).then(
-      () => undefined,
-      (thrown: unknown) => thrown,
-    );
-    expect(error).toBeInstanceOf(ServerRefusal);
-    expect((error as ServerRefusal).serverRefusal).toBe('system_without_user');
-  } finally {
-    await (connection as unknown as { disconnect(): Promise<void> })
-      .disconnect()
-      .catch(() => undefined);
-    await standIn.close();
-  }
-});
+/** `systeminformation` answers that name no user. */
+const WITHOUT_USER: Array<[string, string]> = [
+  ['no userName', JSON.stringify({ systemID: 'SID' })],
+  ['a blank userName', JSON.stringify({ userName: '  ', systemID: 'SID' })],
+  ['a userName that is no string', JSON.stringify({ userName: 42 })],
+  ['a body that is no JSON', 'not json'],
+  ['an empty body', ''],
+  ['a JSON array', JSON.stringify([{ userName: 'ARRAY_USER' }])],
+  ['a JSON number', '42'],
+  ['a JSON string', JSON.stringify('STRING_USER')],
+  ['JSON null', 'null'],
+];
+
+it.each(WITHOUT_USER)(
+  'an answer with %s is system_without_user, the login not used',
+  async (_what, body) => {
+    const { standIn, connection } = await onPremise();
+    try {
+      standIn.body((r) => r.url.startsWith(SYSTEM_INFORMATION), body);
+      const error = await requestUserOf(connection).then(
+        () => undefined,
+        (thrown: unknown) => thrown,
+      );
+      expect(error).toBeInstanceOf(ServerRefusal);
+      expect((error as ServerRefusal).serverRefusal).toBe(
+        'system_without_user',
+      );
+    } finally {
+      await (connection as unknown as { disconnect(): Promise<void> })
+        .disconnect()
+        .catch(() => undefined);
+      await standIn.close();
+    }
+  },
+);
+
+it.each([405, 501, 500])(
+  'systeminformation answered %i: the call fails with it, the login not used',
+  async (status) => {
+    const { standIn, connection } = await onPremise();
+    try {
+      standIn.answer((r) => r.url.startsWith(SYSTEM_INFORMATION), status);
+      const error = await requestUserOf(connection).then(
+        () => undefined,
+        (thrown: unknown) => thrown,
+      );
+      expect(error).toBeDefined();
+      expect(error).not.toBeInstanceOf(ServerRefusal);
+      expect(
+        (error as { response?: { status?: number } }).response?.status,
+      ).toBe(status);
+    } finally {
+      await (connection as unknown as { disconnect(): Promise<void> })
+        .disconnect()
+        .catch(() => undefined);
+      await standIn.close();
+    }
+  },
+);
 
 it('no systeminformation endpoint: the configured login', async () => {
   const { standIn, connection } = await onPremise();

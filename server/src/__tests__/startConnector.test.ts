@@ -446,27 +446,39 @@ it('a logon SAP refuses: exit 1 with the failure on stderr, and the transport ne
   expect(s.stderr.join('\n')).not.toContain('start-password');
 });
 
-it('ABAP Cloud without its system information: exit 1 naming it, the transport never opens, and the logon is logged off', async () => {
-  standIn.answer(isLookup, 500);
-  const s = await start({ kind: 'cloud' });
-  expect(s.exits).toEqual([1]);
-  expect(s.opened()).toBe(0);
-  expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
-  const end = Date.now() + 10_000;
-  while (standIn.logoffs() === 0 && Date.now() < end) {
-    await new Promise((r) => setTimeout(r, 5));
-  }
-  expect(standIn.logoffs()).toBe(1);
-  expect(runtimeFiles(runtime)).toEqual([]);
-});
+// An absent endpoint (`404`) is a failed lookup on ABAP Cloud — never an
+// answer without a user, never the login in its place — as `405`, `501` and
+// `500` are.
+it.each([500, 404, 405, 501])(
+  'ABAP Cloud, systeminformation answered %i: exit 1 naming the lookup, the transport never opens, and the logon is logged off',
+  async (status) => {
+    standIn.answer(isLookup, status);
+    const s = await start({ kind: 'cloud' });
+    expect(s.exits).toEqual([1]);
+    expect(s.opened()).toBe(0);
+    expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
+    expect(s.stderr).not.toContain(
+      `[MCP] ${startSystemWithoutUserWords('default')}`,
+    );
+    const end = Date.now() + 10_000;
+    while (standIn.logoffs() === 0 && Date.now() < end) {
+      await new Promise((r) => setTimeout(r, 5));
+    }
+    expect(standIn.logoffs()).toBe(1);
+    expect(runtimeFiles(runtime)).toEqual([]);
+  },
+);
 
-/** systeminformation answers that name no user: missing, empty, blank, not a string, not JSON. */
+/** systeminformation answers that name no user: missing, empty, blank, not a string, not JSON, JSON that is no object. */
 const WITHOUT_USER: Array<[string, string]> = [
   ['no userName', JSON.stringify({ systemID: 'CLD' })],
   ['an empty userName', JSON.stringify({ userName: '', systemID: 'CLD' })],
   ['a blank userName', JSON.stringify({ userName: '  ', systemID: 'CLD' })],
   ['a userName that is no string', JSON.stringify({ userName: 42 })],
   ['a body that is no JSON', 'not json'],
+  ['a JSON array', JSON.stringify([{ userName: 'ARRAY_USER' }])],
+  ['a JSON number', '42'],
+  ['JSON null', 'null'],
 ];
 
 it.each(WITHOUT_USER)(

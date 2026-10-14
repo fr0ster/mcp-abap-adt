@@ -9,10 +9,13 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
   AdtClient: jest.fn(),
   AdtClientLegacy: jest.fn(),
-  getSystemInformation: jest.fn(),
+}));
+jest.mock('../../lib/systemInformation', () => ({
+  ...jest.requireActual('../../lib/systemInformation'),
+  readSystemInformation: jest.fn(),
 }));
 
-import { AdtClient, getSystemInformation } from '@mcp-abap-adt/adt-clients';
+import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
@@ -40,8 +43,12 @@ import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
+import {
+  readSystemInformation,
+  SystemInformationAbsentError,
+} from '../../lib/systemInformation';
 
-const lookup = getSystemInformation as jest.Mock;
+const lookup = readSystemInformation as jest.Mock;
 
 const credential: IAuthProvider = {
   kind: 'test',
@@ -103,7 +110,11 @@ beforeEach(() => {
   setSystemContext({});
   (AdtClient as jest.Mock).mockClear();
   lookup.mockReset();
-  lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
+  lookup.mockResolvedValue({
+    kind: 'answered',
+    user: 'CB_USER',
+    systemId: 'CLD',
+  });
 });
 
 describe('defaultSystemContextResolver', () => {
@@ -153,11 +164,23 @@ describe('defaultSystemContextResolver', () => {
     },
   );
 
-  it('a cloud system that answers nothing is {} — asked, so no login stands in — not null', async () => {
-    lookup.mockResolvedValue(null);
-    await expect(defaultSystemContextResolver(cloudConn())).resolves.toEqual(
-      {},
-    );
+  it('a cloud system that answers without a user has no responsible — asked, so no login stands in — not null', async () => {
+    lookup.mockResolvedValue({
+      kind: 'answered',
+      user: undefined,
+      systemId: 'CLD',
+    });
+    await expect(defaultSystemContextResolver(cloudConn())).resolves.toEqual({
+      responsible: undefined,
+      masterSystem: 'CLD',
+    });
+  });
+
+  it('a cloud system without the endpoint (404) is a failed lookup, not an answer', async () => {
+    lookup.mockResolvedValue({ kind: 'absent' });
+    await expect(
+      defaultSystemContextResolver(cloudConn()),
+    ).rejects.toBeInstanceOf(SystemInformationAbsentError);
   });
 });
 

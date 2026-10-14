@@ -6,7 +6,6 @@
  * answers the same credential object and built anew for a new one (D13).
  */
 
-import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
@@ -15,9 +14,9 @@ jest.mock('../../../lib/connectionFactory', () => ({
   // The connect's system lookup asks the kind: on-premise sends nothing.
   systemKindOf: jest.fn(() => 'onprem'),
 }));
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  getSystemInformation: jest.fn(),
+jest.mock('../../../lib/systemInformation', () => ({
+  ...jest.requireActual('../../../lib/systemInformation'),
+  readSystemInformation: jest.fn(),
 }));
 jest.mock('../../../lib/credentialSources', () => {
   const actual = jest.requireActual('../../../lib/credentialSources');
@@ -46,11 +45,12 @@ import {
   resetSystemContextCache,
   setSystemContext,
 } from '../../../lib/systemContext';
+import { readSystemInformation } from '../../../lib/systemInformation';
 
 const build = createAbapConnection as jest.MockedFunction<
   typeof createAbapConnection
 >;
-const lookup = getSystemInformation as jest.Mock;
+const lookup = readSystemInformation as jest.Mock;
 const fromHeaders = credentialFromHeaders as jest.MockedFunction<
   typeof credentialFromHeaders
 >;

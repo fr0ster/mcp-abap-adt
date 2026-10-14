@@ -187,7 +187,8 @@ runs on it, never after — no tool runs twice: on stdio at the start (`bornAtSt
 first call on a connection without it (`systemBeforeTool` → `requireSystem`), inside the flow — a
 call outside the flow takes a turn in it for the lookup alone — its failure that call's answer (an
 answer that names no user `system_without_user` — `requiringUser`: not a valid ABAP system for
-this server —, a chain failure as it is, else `system_lookup_failed`), the tool not run, nothing
+this server —, a chain failure as it is, else — no endpoint (`404`) included:
+`readSystemInformation` tells it from an answer — `system_lookup_failed`), the tool not run, nothing
 failed kept, so the next call asks again. The lookup is awaited to its end whatever the call's
 signal says: the call's turn and its tracking last until it settled, so the next request on the
 connection waits for it; the instance's close and the shutdown do not wait for it — they log the

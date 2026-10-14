@@ -20,7 +20,6 @@
  * or from the process context always wins.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { errorClassOf } from './auth/errors';
 import { systemKindOf } from './connectionFactory';
@@ -30,11 +29,16 @@ import {
   getEffectiveSystemContext,
   getStatedSystemContext,
 } from './systemContext';
+import {
+  readSystemInformation,
+  SystemInformationAbsentError,
+} from './systemInformation';
 
 /**
  * Resolved values; `null` when the connection is not asked (on-premise — the
- * login then stands as the responsible). A cloud system that answers nothing
- * is `{}`: on a cloud connection the login never stands in for its user.
+ * login then stands as the responsible). A cloud system that answers without
+ * a user has no `responsible`: on a cloud connection the login never stands
+ * in for its user.
  */
 export type ResolvedSystemContext = {
   responsible?: string;
@@ -49,11 +53,12 @@ export type SystemContextResolver = (
 /**
  * Default resolver. On-premise it sends nothing and answers `null`
  * (configuration, the request scope, the tool arguments or the login supply
- * the values); on ABAP Cloud it asks the system's own `systeminformation` —
- * the user name as responsible, the system id as master system — or answers
- * `{}` when the system gives none. Which of the two is
- * the kind the connection was built for (`systemKindOf`), never a guess from
- * its URL.
+ * the values); on ABAP Cloud it asks the system's own `systeminformation`
+ * (`readSystemInformation`) — the user name as responsible, the system id as
+ * master system, neither when the answer carries none. No endpoint (`404`)
+ * there is a failed lookup (`SystemInformationAbsentError`), as any other
+ * failure is, thrown as it came. Which of the two is the kind the connection
+ * was built for (`systemKindOf`), never a guess from its URL.
  */
 /**
  * One resolver per stated kind, for the process: `resolveOnce` memoises per
@@ -77,9 +82,11 @@ export function systemContextResolverFor(
     if (systemKindOf(connection, process.env, systemType) !== 'cloud') {
       return null;
     }
-    const info = await getSystemInformation(connection);
-    if (!info) return {};
-    return { responsible: info.userName, masterSystem: info.systemID };
+    const info = await readSystemInformation(connection);
+    // On ABAP Cloud the system information is required: no endpoint is a
+    // failed lookup, never an answer without a user.
+    if (info.kind === 'absent') throw new SystemInformationAbsentError();
+    return { responsible: info.user, masterSystem: info.systemId };
   };
   resolversByKind.set(systemType, resolver);
   return resolver;
@@ -89,9 +96,10 @@ export const defaultSystemContextResolver: SystemContextResolver =
   systemContextResolverFor(undefined);
 
 /**
- * A system that answered its lookup but named no user — on ABAP Cloud a
+ * A system that answered its lookup but named no user — a
  * `systeminformation` whose user is missing, empty, blank or not a string,
- * or a body that is no JSON: not a valid ABAP system for this server.
+ * a body that is no JSON or JSON that is no object: not a valid ABAP system
+ * for this server.
  */
 export class SystemWithoutUserError extends Error {
   constructor() {

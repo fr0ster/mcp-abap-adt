@@ -404,7 +404,10 @@ tool, never after a refusal.
   read included. Nothing of a refused answer is kept. The following calls are not barred: each call on a connection without the information
   asks again (the system may have been restarted or fixed). An embedder's instance does the same.
 
-On-premise nothing is asked. (Before this, a failed lookup failed nothing: a create that needed it
+On-premise nothing is asked before a tool. Where the server does ask `systeminformation` for a
+user — the debugger's request user, a background run's caller of a token login — an answer that
+names no user is `system_without_user` on every system kind, with no fallback to the login; only a
+system without the endpoint (`404`) falls back to the configured login. (Before this, a failed lookup failed nothing: a create that needed it
 asked again inside the tool and ran the tool once more with the answer — a tool that had sent
 something before its guarded create, as `CreateCdsUnitTest` does, sent it twice.)
 

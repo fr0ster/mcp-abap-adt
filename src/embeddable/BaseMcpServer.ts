@@ -1574,18 +1574,19 @@ export abstract class BaseMcpServer extends McpServer {
       // Asked on the connection the flow handed: kept unless that
       // connection was replaced meanwhile.
       const generation = this.callerGeneration;
-      const asked = await systemUserOf(connection);
-      // The per-call lookup's rule (`requireSystem`): on a cloud system an
-      // answer that names no user is not a valid ABAP system. Nothing kept.
-      if (
-        asked === undefined &&
-        this.systemContextResolver !== null &&
-        systemKindOf(connection, process.env, this.systemType) === 'cloud'
-      ) {
-        this.logger?.warn?.(
-          'The system answered systeminformation without a user: not a valid ABAP system for this server',
-        );
-        throw new ServerRefusal('system_without_user');
+      let asked: string | undefined;
+      try {
+        asked = await systemUserOf(connection);
+      } catch (error) {
+        // The per-call lookup's rule (`requireSystem`): an answer that names
+        // no user is not a valid ABAP system. Nothing kept.
+        if (error instanceof SystemWithoutUserError) {
+          this.logger?.warn?.(
+            'The system answered systeminformation without a user: not a valid ABAP system for this server',
+          );
+          throw new ServerRefusal('system_without_user');
+        }
+        throw error;
       }
       this.keepCallerUser(key, asked, generation);
       return asked;

@@ -12,9 +12,11 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
+import { ServerRefusal } from '../auth/serverRefusal';
 import { endConnection, own } from '../ownedConnections';
 import { openFreshConnection } from '../packageSessions';
 import { getRequestContext } from '../requestContext';
+import { SystemWithoutUserError } from '../requestSystemResolution';
 import { ourClassExecutor, ourProgramExecutor } from '../strategies/resultSets';
 import { systemUserOf } from '../systemUser';
 import type { AmdpSessionPorts } from './AmdpSession';
@@ -23,16 +25,25 @@ import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
 /**
  * The user whose requests are caught: what the system says, else the login —
  * the request scope's before the process's — never the responsible.
- * `getSystemInformation` answers null only when the endpoint is absent; any
- * other failure (authentication, network) goes through to the caller.
+ * `getSystemInformation` answers null only when the endpoint is absent; an
+ * answer that names no user is the call's `system_without_user`; any other
+ * failure (authentication, network) goes through to the caller.
  */
 export async function requestUserOf(
   connection: IAbapConnection,
 ): Promise<string> {
-  const user =
-    (await systemUserOf(connection)) ||
-    getRequestContext()?.login ||
-    process.env.SAP_USERNAME;
+  let named: string | undefined;
+  try {
+    named = await systemUserOf(connection);
+  } catch (error) {
+    // An answer without a user is not a valid ABAP system: no fallback to
+    // the login, the call's refusal.
+    if (error instanceof SystemWithoutUserError) {
+      throw new ServerRefusal('system_without_user');
+    }
+    throw error;
+  }
+  const user = named || getRequestContext()?.login || process.env.SAP_USERNAME;
   if (!user?.trim()) {
     throw new Error(
       'the ABAP user of this connection is unknown: the system names none and no login is configured',

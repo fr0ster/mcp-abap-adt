@@ -7,7 +7,7 @@ How a release of this repository is made. Two things happen, and only one of the
 - **The GitHub Release is automated**: pushing a `v*.*.*` tag runs `.github/workflows/release.yml`,
   which tests the tag and creates a GitHub Release with generated notes. It attaches no files.
 
-## The sixteen packages
+## The seventeen packages
 
 In publish order (`scripts/publish-all.sh`), which is dependency order:
 
@@ -15,11 +15,12 @@ In publish order (`scripts/publish-all.sh`), which is dependency order:
 |---|---|---|
 | `.` | `@mcp-abap-adt/lib` | — |
 | `background-runs-memory/` | `@mcp-abap-adt/background-runs-memory` | `lib` |
+| `responsible-rules/` | `@mcp-abap-adt/responsible-rules` | `lib` |
 | `compact-readonly-entries/` | `@mcp-abap-adt/compact-readonly-entries` | `lib` |
 | `compact-modify/` | `@mcp-abap-adt/compact-modify` | `lib` |
-| `server/` | `@mcp-abap-adt/core` (bin `mcp-abap-adt`) | `lib`, `background-runs-memory` |
-| `http/` | `@mcp-abap-adt/http` (bin `mcp-abap-adt-http`) | `lib`, `background-runs-memory` |
-| `sse/` | `@mcp-abap-adt/sse` (bin `mcp-abap-adt-sse`) | `lib`, `background-runs-memory` |
+| `server/` | `@mcp-abap-adt/core` (bin `mcp-abap-adt`) | `lib`, `background-runs-memory`, `responsible-rules` |
+| `http/` | `@mcp-abap-adt/http` (bin `mcp-abap-adt-http`) | `lib`, `background-runs-memory`, `responsible-rules` |
+| `sse/` | `@mcp-abap-adt/sse` (bin `mcp-abap-adt-sse`) | `lib`, `background-runs-memory`, `responsible-rules` |
 | `compact/` | `@mcp-abap-adt/compact` (bin `mcp-abap-adt-compact`) | `lib`, `core`, `compact-readonly-entries`, `compact-modify` |
 | `compact-http/` | `@mcp-abap-adt/compact-http` (bin `mcp-abap-adt-compact-http`) | `lib`, `http`, `compact-readonly-entries`, `compact-modify` |
 | `compact-sse/` | `@mcp-abap-adt/compact-sse` (bin `mcp-abap-adt-compact-sse`) | `lib`, `sse`, `compact-readonly-entries`, `compact-modify` |
@@ -38,8 +39,8 @@ so that no package goes out on top of a dependency that is missing.
 
 ## Steps
 
-1. **Bump every manifest** — the sixteen above — and in each, the ranges on sibling packages
-   (`@mcp-abap-adt/lib`, `background-runs-memory`, `core`, `http`, `sse`,
+1. **Bump every manifest** — the seventeen above — and in each, the ranges on sibling packages
+   (`@mcp-abap-adt/lib`, `background-runs-memory`, `responsible-rules`, `core`, `http`, `sse`,
    `compact-readonly-entries`, `compact-modify`) so they accept the new versions. A manifest left at an old version is silently skipped by the
    publish script ("already on npm"). Then refresh the lockfile:
    ```bash
@@ -63,13 +64,14 @@ so that no package goes out on top of a dependency that is missing.
 4. **Build and test**:
    ```bash
    npm ci
-   npm run build          # all sixteen packages
+   npm run build          # all seventeen packages
    npm run test:check
-   npm test               # includes binSmoke: packs all sixteen, installs them, runs the twelve bins
+   npm test               # includes binSmoke: packs all seventeen, installs them, runs the twelve bins
    npm --prefix server run test:check && npm --prefix server test
    npm --prefix http run test:check && npm --prefix http test
    npm --prefix sse run test:check && npm --prefix sse test
    npm --prefix background-runs-memory run test:check && npm --prefix background-runs-memory test
+   npm --prefix responsible-rules run test:check && npm --prefix responsible-rules test
    ```
 5. **Rehearse the publish**:
    ```bash
@@ -108,8 +110,8 @@ so that no package goes out on top of a dependency that is missing.
 
 - `ci.yml` (push and pull request to `main` / `develop`): Ubuntu, macOS and Windows × Node 22 and
   24 — Biome lint (root and each package's `lint:check`), build, test type-check, tests, the
-  server, http, sse and background-runs-memory tests; on Ubuntu / Node 22 also
-  `npm audit --omit=dev --audit-level=high`, `npm pack` of all sixteen packages, and an install of
+  server, http, sse, background-runs-memory and responsible-rules tests; on Ubuntu / Node 22 also
+  `npm audit --omit=dev --audit-level=high`, `npm pack` of all seventeen packages, and an install of
   the tarballs that runs each of the twelve bins' `--version` and `--help`.
 - `release.yml` (tag `v*.*.*`): the same lint, build and tests on Ubuntu × Node 22 and 24, then a
   GitHub Release (`softprops/action-gh-release`, generated notes).

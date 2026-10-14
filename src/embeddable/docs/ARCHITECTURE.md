@@ -182,28 +182,30 @@ unless a later stdio process of the same destination starts on it, or the user l
 the instance's connection one after another (`enterMainFlow`), whatever the client sends at once;
 a background run, a listed long read and the debugger tools that work on the debugger's own
 connections (`ownConnectionTools.ts`: every `Debug*`, `AmdpDebug*`, `HandlerDebug*` tool) take no
-place in it. The system-context lookup is asked once per destination (the resolved credential and its
-target system: a new session of them — a replacement after a lost session, a new logon after a gone
-leftover — keeps the answer), on ABAP Cloud and on-premise alike, before a tool runs on it, never after — no tool runs twice: on stdio at the start (`bornAtStart` →
-`requireSystem`, or the leftover session's file), a failure ending the process; elsewhere by the
-first call on a connection without it (`systemBeforeTool` → `requireSystem`), inside the flow — a
-call outside the flow takes a turn in it for the lookup alone — its failure that call's answer.
-An answer naming the user is taken; no information (a `404`, an answer without the user, an
-error) is, on ABAP Cloud, one step to the error — a `404` `cloud_without_systeminformation` (the
-configuration or headers are inconsistent), anything else `system_lookup_failed` (the ABAP
-system's problem) —, on-premise the configuration when the call states a user, else
-`system_user_unknown` — the server's recipe around any resolver, by the connection's stated kind
-(`systemForCall`); a credential failure (a chain failure, a `401`) is the call's as it came, on
-both kinds, never a reason for the configuration.
-One mapping, `systemLookupRefusal`, shared with `withResolvedSystemContext`, so
-`HandlerExporter`'s handlers refuse the same way and do not run. The tool does not run, and
-only an answer naming the user — and on-premise a `404` — is kept: anything else never is, so
-the next call asks again. The lookup is awaited to its end whatever the call's
-signal says: the call's turn and its tracking last until it settled, so the next request on the
-connection waits for it; the instance's close and the shutdown do not wait for it — they log the
-connection off under it. A replacement of a connection of the same credential keeps the answer
-(`buildConnection(…, known)`). The wrapper reads it (`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
-outside a tool's own run (an identity lookup) goes through `onMainConnection` — also handed to
+place in it. A connection's **parameters** — the responsible and master system its calls take, which also name
+the debugger's request user and a background run's caller — are made once, with the connection,
+per destination (the resolved credential and its target system: a new session of them — a
+replacement after a lost session, a new logon after a gone leftover — keeps them): on stdio at the
+start (`bornAtStart`, or the leftover session's file), a failure ending the process; on SSE once
+per stream and on Streamable HTTP when the pooled instance's connection is created
+(`buildConnection` → `requireSystem`), a failure that call's answer — the connection ends, nothing
+is kept, and the next call that creates one asks again. Only a host's (injected) connection, or a
+lookup whose parameters were not kept, is asked by the first call on it (`systemBeforeTool` →
+`requireSystem`), inside the flow — a call outside the flow takes a turn in it for the lookup
+alone. With no resolver (`systemContextResolver`, default none) nothing is looked up. The lookup
+(`parametersOnce`: one in flight per connection) answers the information, no information, or a
+credential failure — passed through as it came; what the parameters are is the host's rules'
+(`SystemContextRules.parametersFor`, `src/lib/requestSystemResolution.ts`): core, http and sse pass
+`@mcp-abap-adt/responsible-rules` (the information wins; ABAP Cloud one step to its error,
+on-premise the stated responsible, else the login, else `system_user_unknown`; no kind
+`system_type_required`), lib applies none — without rules the information is applied, no
+information leaves the configured values, and nothing is refused for it; only parameters the rules
+made, or the information, are kept. `withResolvedSystemContext` is the same mechanism for
+`HandlerExporter`'s handlers and a group registered on its own, each with the resolver and rules
+its host passes. No tool runs twice: the parameters come before the tool. The lookup is awaited to
+its end whatever the call's signal says; the instance's close and the shutdown do not wait for it
+— they log the connection off under it. The wrapper applies them (`withKnownSystemContext`) and sends nothing. A send on the instance's connection made
+outside a tool's own run goes through `onMainConnection` — also handed to
 handlers as `HandlerContext.onMainConnection(send)` — directly from a call that holds the flow, on
 the connection that call holds, else in turn, on the connection `getConnection` hands inside the
 flow (a session the call ahead lost already replaced), given back when the send is done; a holder
@@ -212,11 +214,8 @@ connection it took before it waited (`isStaleBuilt`): a spent one is given back 
 taken; a connection retired because another credential's call took the instance stays the queued
 call's own. `send` is
 handed that connection and must capture none of its own (`context.connection` may be the spent
-one). A caller already known is answered without entering the flow: the backend user SAP named is
-kept per credential object (a host's injected connection for its own) and valid only for the
-connection it was asked on: the whole cache is forgotten whenever the instance's connection is
-replaced (`forgetCallers`), and an answer asked on a connection replaced meanwhile is not
-kept. The leftover tools ask nothing of SAP: their caller is the instance's destination. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
+one). A caller is its destination's parameters, answered without entering the flow when known
+(else made with the instance's connection, through the flow). The leftover tools ask nothing of SAP: their caller is the instance's destination. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
 reaches its tool. An embedder's own registry that is not a `CompositeHandlersRegistry`
 (`registerAllTools(trackingRegistrations())`) takes its turn too: the server it is handed is the
 instance itself (every member bound, `getConnection` and `onMainConnection` among them) and a
@@ -224,8 +223,8 @@ subclass's registry may call its protected members, so its callbacks can reach t
 connection. Every call enters the flow before its callback runs and leaves it when the callback
 settled, whatever its name or arguments: the list a handler group's tools are read by
 (`worksOnOwnConnection`) exempts none of them, since a name cannot prove a callback works on a
-connection of its own. Inside its turn the instance's connection is taken and its system
-information asked before the callback runs (`systemBeforeTool`), as for a handler group's tool: a
+connection of its own. Inside its turn the instance's connection is taken and its parameters made
+before the callback runs when it has none (`systemBeforeTool`), as for a handler group's tool: a
 failure is that call's answer, the callback does not run, and
 the next call asks again. The callback runs in the same system context scope
 (`withDestinationSystemContext`, `withKnownSystemContext`), and the turn is marked held on that
@@ -304,8 +303,8 @@ two explicit tools; with several the server picks none.
   with the normal logon (`connectedLogon`, connection's "a new session is a new instance"),
   adopted under the same handle: `{ session: 'new', handle }` (else `'picked_up'`; a logon is
   `{ session: 'logged_on' }`). The file's system information is reused for the session picked up
-  and for the new one (the same destination). Then `requireSystem` when the system information is
-  not known.
+  and for the new one (the same destination), read by the rules. Else `requireSystem` makes the
+  parameters (core passes `@mcp-abap-adt/responsible-rules`: a refusal ends the start).
   Any failure rejects the start — the launcher ends the process with exit `1` before the transport
   opens: another answer from the old session (a redirect included) or the new logon's failure
   gives the file back; a failed system lookup logs off a logon made for the start and leaves a
@@ -348,11 +347,10 @@ their answers are kept is the host's: a strategy.
   and to the three tools.
 - **The run** (`startBackgroundRun`, `src/lib/backgroundRuns/run.ts`), from the tool wrapper:
   refused at once without a fresh connection to be had (`freshConnectionAvailable`; D20's words);
-  the caller resolved (`backgroundCaller`: the user SAP names — the call's connection's system
-  information when the shipped resolver already asked it, else `systemUserOf` on the instance's
-  connection, cached per credential — on both kinds, over the request's stated user; that one
-  — `SAP_USERNAME`, `x-sap-login` — only where an on-premise system gives no information; an injected
-  connection's URL from `getBaseUrl()`, its user SAP's; none at all → `system_user_unknown`);
+  the caller resolved (`backgroundCaller`: the user its destination's parameters name — made with
+  the connection, no lookup of its own —, else the stated responsible, else the login
+  — `SAP_USERNAME`, `x-sap-login`; an injected connection's URL from `getBaseUrl()`; none at all →
+  `system_user_unknown`);
   registered in the registry of live tools under the calling instance (`"<tool> (background)"`) —
   refused there once the shutdown latched; its own connection opened by `openFreshConnection` and
   re-owned by the **strategy** (role `background`), stateless; `strategy.start` (a limit refusal
@@ -553,8 +551,9 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
 - **Embedders.** `EmbeddableMcpServer` builds its registry from `exposition` (`readonly`, `high`,
   `compact`, `system`, `search`), or takes `handlersRegistry`.
 - **Availability.** A tool is registered only if its `available_in` includes the instance's
-  system type: the `systemType` option, else `SAP_SYSTEM_TYPE` — required: `EmbeddableMcpServer`
-  without either throws `system_type_required` at construction, and so does `HandlerExporter`;
-  the http/sse binaries do not start without one. A base server with none stated (stdio's
+  system type: the `systemType` option, else `SAP_SYSTEM_TYPE` — not required by lib (an
+  embedder or `HandlerExporter` constructs without one); the binaries require it
+  (`@mcp-abap-adt/responsible-rules`' `SYSTEM_TYPE_ROW`): stdio and the http/sse binaries do not
+  start without one. A base server with none stated (stdio's
   inspection-only mode, an embedder's own transport host) filters nothing — every tool of its set
   is listed, no `cloud` default — and refuses every call that would reach the system.

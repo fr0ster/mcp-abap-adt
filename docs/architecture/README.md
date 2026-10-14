@@ -4,13 +4,14 @@ Technical documentation about the system architecture, design decisions, and int
 
 ## Packages
 
-The repository holds sixteen npm packages (not npm workspaces; each is built and published by path):
+The repository holds seventeen npm packages (not npm workspaces; each is built and published by path):
 
 | Directory | Package | Role |
 |---|---|---|
 | `src/` (root) | `@mcp-abap-adt/lib` | Handlers, handler groups, configuration, auth, connection factory — everything an embedding server needs |
 | `server/` | `@mcp-abap-adt/core` | The `mcp-abap-adt` command: launcher and transports |
 | `background-runs-memory/` | `@mcp-abap-adt/background-runs-memory` | The in-memory store of background runs (`IBackgroundRuns` of lib); core, http and sse create it |
+| `responsible-rules/` | `@mcp-abap-adt/responsible-rules` | The rules that make a connection's responsible, user and system from its `systeminformation` (`SystemContextRules` of lib), and the system type the binaries require; core, http and sse pass them, lib applies none |
 | `compact-readonly-entries/`, `compact-modify/` | `@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify` | The two halves of the compact tool set |
 | `http/`, `sse/` | `@mcp-abap-adt/http`, `@mcp-abap-adt/sse` | The `mcp-abap-adt-http` and `mcp-abap-adt-sse` commands |
 | `compact/`, `compact-http/`, `compact-sse/` | `@mcp-abap-adt/compact`, `compact-http`, `compact-sse` | The compact commands: each transport's launcher with the compact tool list |

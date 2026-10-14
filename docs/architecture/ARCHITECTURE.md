@@ -321,33 +321,28 @@ because they work on a connection of their own: a background run, a listed long 
 (its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one
 `connect()`; once in the flow, a queued call checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed). A connection retired because another credential's call took the instance (Streamable HTTP) stays the queued call's own. On stdio the instance's connection is born at the process's start, before the transport opens (`StdioServer.connectAtStart` → `bornAtStart` → `buildConnection`): the destination's one leftover session taken up (`resumedSession`; with none or several, a logon), so no call is in the flow then; there is no resume tool. The list and the logoff take no turn: neither touches the instance's connection. The connections that are shared this way are stdio's kept one and an
-SSE connection's; Streamable HTTP builds one per request. The system-context lookup (`systeminformation`, the
-responsible and master system a create fills — the system's answer over anything configured,
-the configuration only on-premise when the system gives no information) is asked once per destination — the resolved
-credential and its target system (URL, client, wire), not the session —, on ABAP Cloud and
-on-premise alike, before a tool runs on it, and never after: **no tool runs twice**. On stdio it is part of the
-start (`bornAtStart` → `requireSystem`), or read from the leftover session's file; a
-failure ends the process before the transport opens. On http, sse and an embedder's
-instance the first call on a connection without it asks (`systemBeforeTool` →
-`requireSystem`, concurrent askers sharing one request through `resolveOnce`) inside
-the main flow — a call outside the flow takes a turn in it for the lookup alone. A
-failure is that call's answer and its tool does not run. The resolver only answers the
-information, no information, or a credential failure; the recipe is the server's, around any
-resolver, by the connection's stated kind (`systemForCall`): an answer naming the user is taken;
-no information — a `404`, an answer without the user, an error — is, on ABAP Cloud, one step to
-the error (a `404` `cloud_without_systeminformation`: the configuration or headers are
-inconsistent; anything else `system_lookup_failed`: the ABAP system's problem), on-premise `null`,
-admitted only when the call states a responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`, the destination's) or,
-none, a login (the destination's `SAP_USERNAME`, else its `x-sap-login`; for a host's connection its parameters,
-else the request scope's login), else
-`system_user_unknown`; a credential failure (a chain failure, a `401`) is not a
-`systeminformation` failure and is the call's as it came, on both kinds. An answer naming the
-user is kept, and on-premise a `404` (an older system without the endpoint: a later call sends no
-lookup); anything else never is, so the next call asks again. A
-new session of the same destination — a replacement after a lost session, a new logon after a gone
-leftover (the file's) — keeps its answer (`destinationSystems`); another credential (an HTTP
-request's headers) asks its own. The tool wrapper
-reads the answer (`withKnownSystemContext`) and sends nothing.
+SSE connection's; Streamable HTTP builds one per request. A connection's **parameters** — the
+responsible and master system a create fills, which also name the debugger's request user and a
+background run's caller — are made once, together with the connection, per destination (the
+resolved credential and its target system — URL, client, wire —, not the session): on stdio at the
+start (`bornAtStart`, or the leftover session's file), a failure ending the process before the
+transport opens; on SSE once per stream, on Streamable HTTP when the pooled instance's connection is
+created (`buildConnection` → `requireSystem`), a failure that call's answer — the connection ends
+and nothing is kept, so the next call that creates one asks again. Never after a tool: **no tool
+runs twice**. The lookup (`systeminformation`, through the resolver the host passes; none by
+default) answers only the information, no information, or a credential failure (a chain failure, a
+`401`: the call's as it came); what the parameters are is the rules' the host passes
+(`SystemContextRules`): core, http and sse pass `@mcp-abap-adt/responsible-rules` — the information
+wins; no information is, on ABAP Cloud, one step to the error (a `404`
+`cloud_without_systeminformation`: the configuration or headers are inconsistent; anything else
+`system_lookup_failed`), on-premise the stated responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`,
+the destination's), else the login (the destination's `SAP_USERNAME`, else its `x-sap-login`),
+else `system_user_unknown`; no kind `system_type_required`. lib applies none: an embedder gets a
+lookup only with a resolver, and the rules only when it passes them. A new session of the same
+destination — a replacement after a lost session, a new logon after a gone leftover (the file's) —
+keeps its parameters (`destinationSystems`); another credential (an HTTP request's headers) makes
+its own. The tool wrapper applies them (`withKnownSystemContext`) and sends nothing; a host's
+injected connection has them made by its first call (`systemBeforeTool`), inside the main flow.
 
 - **Compact's `HandlerLock`** keeps the lock across calls until `HandlerUnlock` —
   the consumer's choice — where the connection lives across calls (stdio, SSE): the

@@ -278,7 +278,7 @@ The `SAP_SYSTEM_TYPE` environment variable controls which tools are available an
 
 **On `legacy`:** no tool declares that environment, so a server started with `SAP_SYSTEM_TYPE=legacy` offers none. Support for legacy systems is parked on the `parked/legacy-support` branch until it can be tried against a live one — it was declared on 142 tools and had never been run against such a system, which is a claim rather than a fact.
 
-**Without it** `mcp-abap-adt` does not start a destination (exit `1`, naming the parameter), `mcp-abap-adt-http` / `mcp-abap-adt-sse` (and their `-ro` and compact binaries) do not start (exit `1` before anything listens; no request header states the kind), and `EmbeddableMcpServer` and `HandlerExporter` throw `system_type_required` at construction. A value other than the three is refused the same way. Inspection-only stdio (no destination) needs no kind: it filters nothing and lists every tool of its set — there is no `cloud` default.
+**Without it** `mcp-abap-adt` does not start a destination (exit `1`, naming the parameter), `mcp-abap-adt-http` / `mcp-abap-adt-sse` (and their `-ro` and compact binaries) do not start (exit `1` before anything listens; no request header states the kind), A value other than the three is refused the same way. `EmbeddableMcpServer` and `HandlerExporter` require none (see below). Inspection-only stdio (no destination) needs no kind: it filters nothing and lists every tool of its set — there is no `cloud` default.
 
 You can also set this via CLI: `--system-type=onprem`, or YAML `system-type: onprem`. Precedence: the CLI flag, then the environment — which the `--env` / `--env-path` `.env` value joins, never over one already set — then YAML.
 
@@ -296,7 +296,7 @@ new EmbeddableMcpServer({
 
 Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe and is not required.
 
-**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE`; neither is refused at construction (`system_type_required`). That order picks the tools and states the kind of the injected connection for reading its `systeminformation` (asked on every kind; no information on-premise falls to the configuration, and on `cloud` it is the call's error — a `404` `cloud_without_systeminformation`, anything else `system_lookup_failed`), never the URL.
+**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE`; neither is required (without both, every tool is listed). That order picks the tools and states the kind of the injected connection, by which the rules you pass (`systemContextRules`, below) read its `systeminformation` — never the URL.
 
 ### System Context for On-Premise Systems
 
@@ -351,22 +351,21 @@ How the scope combines with the process context:
 
 | Key in the scope | Result for this request |
 |---|---|
-| `responsible` present (even `undefined`) | The scope's value, else the scope's `login` — never a process value (neither `SAP_RESPONSIBLE`, `setSystemContext` nor `SAP_USERNAME`); the system's answer replaces it wherever the system answers (below) |
-| `responsible` absent | The process value (`SAP_RESPONSIBLE`, or what `setSystemContext` / `systemContext` stated), else the scope's `login`, else the process `SAP_USERNAME` |
-| `login` | The user the request is logged on as: the responsible only when none is stated, and only on a connection that is not cloud |
+| `responsible` present (even `undefined`) | The scope's value — never a process value (neither `SAP_RESPONSIBLE` nor `setSystemContext`); the connection's parameters replace it where they are made (below) |
+| `responsible` absent | The process value (`SAP_RESPONSIBLE`, or what `setSystemContext` / `systemContext` stated) |
+| `login` | The user the request is logged on as: never the responsible by itself — only the rules (below) make it one |
 | `masterSystem` present (even `undefined`) / absent | The scope's value / the process value |
 | `masterLanguage` | Always the scope's value inside a scope, never the process value |
 
-Outside any scope (stdio) the process values apply: `SAP_RESPONSIBLE` (or `setSystemContext`), else `SAP_USERNAME`.
+Outside any scope (stdio) the process values apply: `SAP_RESPONSIBLE` (or `setSystemContext`).
 
-**The system's answer wins; the scope applies only where an on-premise system gives no information.** Before a tool runs, the library asks the connection's system (`systeminformation`) on every kind of system, and its answer replaces the scope's `responsible`, `masterSystem` and `login`:
+**The connection's parameters win, where your host makes them.** The library looks nothing up and applies no rule by default. Pass a resolver (`systemContextResolver: defaultSystemContextResolver`, `@mcp-abap-adt/lib/request-context`, asks `systeminformation`) and the rules (`systemContextRules: responsibleRules`, `@mcp-abap-adt/responsible-rules` — what core, http and sse pass) to `EmbeddableMcpServer` or `HandlerExporter`, and the connection's parameters are made once, before its first tool (a `HandlerExporter` handler: before the call it wraps), and kept:
 
-- `responsible` ← the system's user name, `masterSystem` ← its system id.
-- Asked before the handler runs: `EmbeddableMcpServer` before a tool on a connection whose answer is not known, `HandlerExporter`'s handlers (`getHandlerEntries()`) before the call they wrap. An answer naming the user is kept for the connection, and on-premise a `404` (an older system without the endpoint); nothing else is kept, so the next call asks again.
-- An on-premise system that gives no information (no `systeminformation`, an answer without the user, an error): the table above applies as it stands, when the call states a responsible or, none, a login; else `system_user_unknown`.
-- On ABAP Cloud no information is the call's error, and the tool or handler does not run: a `404` `cloud_without_systeminformation` (the configuration is inconsistent — the scope never stands in); anything else `system_lookup_failed`. A resolver that answers nothing or throws is `system_lookup_failed` on ABAP Cloud (a thrown `404` `cloud_without_systeminformation`) and the configuration on-premise — the rule by kind is the server's, around any resolver; a credential failure (a chain failure, a `401`) is the call's as it came, on both kinds. `EmbeddableMcpServer` answers it as the tool's error; a `HandlerExporter` handler throws it (a `ServerRefusal` carrying the code and fixed words).
+- the system names its user: `responsible` ← the system's user name, `masterSystem` ← its system id;
+- an on-premise system that gives no information (no `systeminformation`, an answer without the user, an error): the stated responsible, else the login (the connection's `SAP_USERNAME`, the request scope's `login`, the process `SAP_USERNAME`), with the stated master system; neither is `system_user_unknown`;
+- on ABAP Cloud no information is the call's error, and the tool or handler does not run: a `404` `cloud_without_systeminformation` (the configuration is inconsistent); anything else `system_lookup_failed`. A credential failure (a chain failure, a `401`) is the call's as it came, on both kinds. `EmbeddableMcpServer` answers it as the tool's error; a `HandlerExporter` handler throws it (a `ServerRefusal` carrying the code and fixed words). A failure keeps nothing: the next call asks again.
 
-Turn it off with `systemContextResolver: null` on `EmbeddableMcpServer` or `HandlerExporter` (or pass your own resolver).
+With a resolver and no rules, the information is applied and no information leaves the table above as it stands; without a resolver nothing is looked up.
 
 **Example `.env` for on-premise:**
 ```env

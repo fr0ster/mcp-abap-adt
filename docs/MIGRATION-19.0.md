@@ -12,6 +12,7 @@ The packages, all at **19.0.0**:
 | `@mcp-abap-adt/http` | `http/` | `mcp-abap-adt-http` | Streamable HTTP |
 | `@mcp-abap-adt/sse` | `sse/` | `mcp-abap-adt-sse` | HTTP+SSE |
 | `@mcp-abap-adt/background-runs-memory` | `background-runs-memory/` | — | the in-memory store of background runs (new; core, http and sse depend on it) |
+| `@mcp-abap-adt/responsible-rules` | `responsible-rules/` | — | the rules that name a call's responsible, user and system, and the system type the binaries require (new; core, http and sse depend on it; lib applies none — see "Embedders: no rules by default") |
 | `@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify` | `compact-readonly-entries/`, `compact-modify/` | — | the compact tool set's halves (`compact-readonly-entries` was `@mcp-abap-adt/compact-readonly`, renamed) |
 | `@mcp-abap-adt/compact` | `compact/` | `mcp-abap-adt-compact` | the compact tool set over stdio |
 | `@mcp-abap-adt/compact-http` | `compact-http/` | `mcp-abap-adt-compact-http` | the compact tool set over Streamable HTTP |
@@ -54,7 +55,7 @@ The packages, all at **19.0.0**:
 - `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, `--system-type` and
   `--conf` are in every binary's table, unchanged. `--exposition` is gone: see the next section.
 
-## BREAKING — every binary and every embedder: the system type is required
+## BREAKING — every binary: the system type is required
 
 **The system's kind — `onprem`, `cloud` or `legacy` — must be stated; it is no longer guessed.**
 18.x picked the connector from the credential when nothing was stated (a `jwt` destination
@@ -68,7 +69,7 @@ the way it was always documented:
   service-key destination (`--mcp=<name>`) has no `.env` of its own: state the kind on the command
   line, in the environment or in YAML.
 - An embedder: `EmbeddableMcpServer`'s or `HandlerExporter`'s `systemType` option, else
-  `SAP_SYSTEM_TYPE`.
+  `SAP_SYSTEM_TYPE` — not required by lib (see "Embedders: no rules by default").
 - `legacy` stays a kind of its own for the tools offered and connects as on-premise. Any other
   value is refused like a missing one.
 
@@ -93,14 +94,13 @@ What each answers without it:
   system type is not stated: set --system-type, SAP_SYSTEM_TYPE (the environment or the --env
   file) or system-type (YAML) to onprem, cloud or legacy — an embedding host passes systemType;
   nothing was sent to the system".
-- **An embedder**: `new EmbeddableMcpServer(...)` throws that same `ServerRefusal`
-  (`system_type_required`) at construction — the kind decides the tools it registers and how the
-  system's answers are read, so the host learns it before any client sees a tool. A connection
-  the factory built (`createAbapConnection`) is refused the same way when `SAP_SYSTEM_TYPE` is not
-  set, before it connects. `new HandlerExporter(...)` (and `createDefaultHandlerExporter(logger,
-  systemType)`) takes a `systemType` option and throws the same refusal at construction without it
-  and without `SAP_SYSTEM_TYPE` — whatever `systemContextResolver` is given: the kind decides how a
-  system's answer to its lookup is read.
+- **An embedder** is not refused at construction: `new EmbeddableMcpServer(...)` and `new
+  HandlerExporter(...)` take a `systemType` option and require none — without a kind every tool is
+  listed, and what a missing kind means for a lookup is the rules' (with
+  `@mcp-abap-adt/responsible-rules`: `system_type_required` when the connection's parameters are
+  made). A connection the factory built (`createAbapConnection`) is still refused
+  (`system_type_required`) when `SAP_SYSTEM_TYPE` is not set, before it connects: the connector
+  needs a kind.
 - A fresh connection opened beside one the server built (a package session, a lock's own session)
   is built for the kind recorded for that connection — never for what `SAP_SYSTEM_TYPE` says when
   it is opened.
@@ -375,8 +375,8 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
   (a package of its own, installed with `@mcp-abap-adt/core`, `http` and `sse`): the process's memory.
 - **Only your own.** A run is its caller's: the destination (URL, client) and the backend user the
   request resolved — the one it states (`SAP_USERNAME`, `x-sap-login`), else, for a token
-  credential, the one SAP answers for the session (`systeminformation`, as for the leftover
-  sessions). Someone else's handle and an unknown one get the same answer:
+  credential, the one the connection's parameters name (`systeminformation`, made with the
+  connection). Someone else's handle and an unknown one get the same answer:
   `background_run_not_available`. Over Streamable HTTP each request's instance is new; a run is
   found again by any later request with the same caller.
 - **16 runs per caller**, running and kept together; a 17th is refused (`background_run_limit`),
@@ -412,12 +412,12 @@ waits, with no timeout, until the previous one settled. So a call never runs ins
 lock, and an `UNLOCK` is never sent outside its lock's session because another call ended its own.
 Where it matters: stdio (one instance for the process) and SSE (one instance per SSE connection).
 Over Streamable HTTP each request has its instance and connection, so its calls never met anyway.
-Every send a call makes on the instance's connection is inside the order — also the
-`systeminformation` lookup a background run or the debugger makes for its
-caller's user (run directly when the call that makes it already holds the flow, else on the
-connection taken in its turn, so a session lost ahead of it is already replaced); the connect's own
-sends (its session record) come before any tool can use the connection, and the system
-lookup before the first tool runs (below). An embedder's own registry that is not a `CompositeHandlersRegistry` (it registers its
+Every send a call makes on the instance's connection is inside the order (`onMainConnection`: run
+directly when the call that makes it already holds the flow, else on the connection taken in its
+turn, so a session lost ahead of it is already replaced); the connect's own sends (its session
+record) and the system lookup come with the connection, before any tool can use it (below). A
+background run's caller and the debugger's request user send nothing: they are the connection's
+parameters. An embedder's own registry that is not a `CompositeHandlersRegistry` (it registers its
 tools itself) takes its turn in the order for every call, whatever the tool's name. Outside the order, because they work
 on a connection of their own: a background run (`background: true`), a listed long read (on its
 fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow). **A tool call cannot be cancelled**: it ends with
@@ -438,9 +438,12 @@ retried). On stdio the connection is born at the start, before the transport ope
 can be in the order then. The list and the logoff of leftover sessions take no turn: they do not touch the instance's connection (a logoff works
 on a dead process's session only).
 
-**The system is asked once per destination — its credentials and its target system — before a
-tool runs on it, on ABAP Cloud and on-premise alike** (`systeminformation`: the user as the
-responsible, the system id as the master system). The same credentials on the same system answer
+**The system is asked once per destination — its credentials and its target system — when its
+connection is created, on ABAP Cloud and on-premise alike** (`systeminformation`: the user as the
+responsible, the system id as the master system). Together with the connection the server makes
+its parameters by the rules below — the responsible and the master system, which also name the
+debugger's request user and a background run's caller — and keeps them with the connection;
+every call takes them from there. The same credentials on the same system answer
 the same, so a new session of them is never asked again: a connection that replaces one whose
 session SAP lost, or a new logon after a leftover session SAP ended, keeps what was known. Another
 credential or another system (over HTTP: another request's headers) is another destination, asked
@@ -453,7 +456,7 @@ configuration always applied; now there is one extra request per destination
 (`GET /sap/bc/adt/core/http/systeminformation`), and where the system answers, a configured
 responsible or master system no longer applies. A tool argument that names the value (a
 transport's `owner`, say) still states it for that call. **No tool ever runs twice**: the lookup
-comes before the tool, never after a refusal.
+comes with the connection, before the tool, never after a refusal.
 
 A destination is the credentials and the ABAP system. On stdio it is set once, at the start; over
 Streamable HTTP and SSE it comes from the request's headers. The kind of system is the one the
@@ -490,14 +493,17 @@ systems have `systeminformation`, older ones do not, ABAP Cloud always has it:
   both kinds — never replaced with another error, and on-premise never a reason to go to the
   headers / start parameters.
 
-An answer naming the user is kept for the destination, and so is an on-premise `404` (an older
-system without the endpoint): a later call on the same destination sends no `systeminformation`
-(on-premise, the headers are still read per call). Anything else is never kept, so the next call
-asks again.
+The parameters made are kept for the destination: a later call on the same destination — a new
+session of it included — sends no `systeminformation` and reads no header again; the headers'
+values are inputs read when the connection is created. A failure keeps nothing: that call's
+connection ends, and the next call that creates one asks again (an on-premise `404` with no user
+stated included).
 
 The resolver (the shipped one, or an embedder's `systemContextResolver`) only answers the
-information, no information, or a credential failure; the rule by kind above is the server's,
-applied around any resolver by the connection's stated kind.
+information, no information, or a credential failure; the rules by kind above are
+`@mcp-abap-adt/responsible-rules`, which core, http and sse pass to their instances, applied
+around any resolver by the connection's stated kind. lib itself applies none (see "Embedders: no
+rules by default").
 
 - **stdio:** asked at the start, with the connection (or taken from the leftover session's file,
   which carries the system information asked for the same destination — also when SAP ended that
@@ -511,20 +517,20 @@ applied around any resolver by the connection's stated kind.
   the system gave no session user (systeminformation) and the destination states no user: set
   SAP_RESPONSIBLE or SAP_USERNAME in the destination or the environment, so the session user is
   known; the server did not start`.
-- **Streamable HTTP and SSE:** asked by a call before its tool runs, inside the main flow (a call
-  outside it — a background run, a listed long read, a debugger tool — takes a turn for the lookup
-  alone). An error is that call's answer, and its tool did not run. Each HTTP request is its own
-  destination; an SSE session's destination is its connection's. An embedder's instance does the
-  same, and so does each handler `HandlerExporter`'s `getHandlerEntries()` hands out: the wrapped
-  handler throws the same code and words and does not run. (Before this, its handler ran anyway,
-  with no responsible.)
+- **Streamable HTTP and SSE:** asked when the instance's connection is created — on SSE once per
+  stream (the long `GET` that opens it), on Streamable HTTP when the pooled instance's connection
+  is created — with the request's headers as they are then. An error is the answer of the call
+  that created the connection, its tool did not run, and nothing is kept. Each HTTP credential is
+  its own destination; an SSE session's destination is its connection's. An embedder's instance
+  and each handler `HandlerExporter`'s `getHandlerEntries()` hands out do the same only when the
+  embedder passes the rules (see "Embedders: no rules by default").
 
-The same rule names **the debugger's request user and a background run's caller** (its management
-tools included): on ABAP Cloud the same errors; on-premise the responsible if stated (`x-sap-responsible`, `SAP_RESPONSIBLE`), else the configured
-login (the request's — `x-sap-login`, a destination's `SAP_USERNAME` — then the process's), with neither
+The same parameters name **the debugger's request user and a background run's caller** (its
+management tools included), with no lookup of their own: on ABAP Cloud the system's user; on-premise
+the responsible if stated (`x-sap-responsible`, `SAP_RESPONSIBLE`), else the configured login (the
+request's — `x-sap-login`, a destination's `SAP_USERNAME` — then the process's), with neither
 `system_user_unknown`, the same code and words as a tool's call (before, the debugger threw a plain
-error and a background run answered `background_run_caller_unknown`, which is gone). A background run
-started by a tool reuses the answer its connection's lookup already got: no second request. (Before
+error and a background run answered `background_run_caller_unknown`, which is gone). (Before
 this, a failed lookup failed nothing: a create that needed it asked again inside the tool and ran
 the tool once more with the answer — a tool that had sent something before its guarded create, as
 `CreateCdsUnitTest` does, sent it twice.)
@@ -553,6 +559,59 @@ design. Send a long run to the background where the tool offers it.
 - **The debugger's sessions are its own**, stateful for their life, and end with the debug session.
 - Every site that turns a session type is listed in `tools/stateful-sites.json`.
 
+
+## BREAKING — embedders: no rules by default
+
+The rules that name a call's responsible, user and system (above) are the servers', not the
+library's: they moved out of `@mcp-abap-adt/lib` into **`@mcp-abap-adt/responsible-rules`**, which
+core, http and sse pass to their instances (the compact and `-ro` binaries through their
+transport's package). lib keeps the mechanism — the `systeminformation` reader, the resolver hook,
+the per-destination store, the main flow — and applies no rule of its own. An
+`EmbeddableMcpServer`, a `HandlerExporter` and a handler group registered on its own therefore,
+unless you pass otherwise:
+
+- **require no system kind** at construction (18.x and earlier 19.0 builds threw
+  `system_type_required`);
+- **look nothing up**: `systemContextResolver` defaults to none (it was the shipped resolver); the
+  responsible a create sends is what is stated — the tool argument, `x-sap-responsible`,
+  `SAP_RESPONSIBLE` — and no login stands in for it (that is the rules' second step); a create
+  with none is refused (`system_context_missing`, its words now name only what to state);
+- with a resolver and no rules, **apply the information** the system gives and refuse nothing
+  for its absence: no information leaves the configured values as they are;
+- name **the debugger's request user and a background run's caller** by the stated value: the
+  responsible, else the login (the request scope's, then `SAP_USERNAME`); none is
+  `system_user_unknown`.
+
+To apply the servers' rules, pass them — the resolver and the rules together:
+
+```ts
+import { EmbeddableMcpServer } from '@mcp-abap-adt/lib/embeddable';
+import { defaultSystemContextResolver } from '@mcp-abap-adt/lib/request-context';
+import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
+
+const server = new EmbeddableMcpServer({
+  connection,
+  systemType: 'onprem',
+  systemContextResolver: defaultSystemContextResolver,
+  systemContextRules: responsibleRules,
+});
+```
+
+`HandlerExporter` takes the same two options; a group you register on a plain `McpServer` reads
+them from its `HandlerContext` (`systemContextResolver`, `systemContextRules`). Your own rules are
+a `SystemContextRules` (`parametersFor(lookup, call)`: the parameters, or a throw that is the
+call's refusal), called once when a connection's parameters are made.
+
+What changed in the public surface:
+
+- `@mcp-abap-adt/lib/request-context`: `withResolvedSystemContext(connection, fn, resolver = null,
+  systemType?, rules?)` — the resolver defaults to none (was the shipped one), the rules are its
+  fifth parameter; it exports the types `SystemContextRules`, `SystemCall` and `SystemLookup`
+  beside `defaultSystemContextResolver`, `ResolvedSystemContext` and `SystemContextResolver`.
+- `BaseMcpServer`, `EmbeddableMcpServer` and `HandlerExporter` take `systemContextRules`;
+  `HandlerContext` has `systemContextResolver?` and `systemContextRules?`.
+- `SYSTEM_TYPE_ROW` and `listenerSystemTypeRequiredWords` left `@mcp-abap-adt/lib/config` for
+  `@mcp-abap-adt/responsible-rules`.
 ## The low set leaves the full binaries
 
 **`mcp-abap-adt`, `mcp-abap-adt-http` and `mcp-abap-adt-sse` serve no low set.**
@@ -1101,8 +1160,8 @@ transport's options only:
   its name or arguments: no tool of yours is exempt — not one named like a debugger tool or a long
   read, not a run tool called with `background: true`; a callback that works on a connection of its
   own still waits for the call ahead. Before the callback runs, its turn takes the instance's
-  connection and asks its system information when it has none (`systeminformation`),
-  as before a handler group's tool: a failed lookup is that
+  connection and, given a resolver, asks its system information when it has none
+  (`systeminformation`), as before a handler group's tool: a failed lookup is that
   call's error answer and your callback is not called; the next call asks again. The callback runs
   in the same system context scope as a handler group's tool. Inside its turn,
   `onMainConnection(signal, send)` sends at once, on the connection the turn holds; a callback that
@@ -1157,16 +1216,18 @@ transport's options only:
   with an error — a problem of the ABAP system; also a resolver of yours that answered nothing),
   `cloud_without_systeminformation` (an ABAP Cloud system answered that lookup `404`: the
   configuration or the headers are inconsistent) and `system_user_unknown` (an on-premise system
-  gave no information and the call states neither a responsible — `x-sap-responsible`,
-  `SAP_RESPONSIBLE` — nor a login — the connection's `SAP_USERNAME`, the request's `x-sap-login`); each time the tool did not run, and the next call asks again; the
-  stdio start ends with them. A resolver's `null`, an answer without a user, or a throw other
-  than a credential failure (a chain failure, a `401` — thrown as it came) is no information, a
-  thrown `404` the endpoint absent; the rule by kind is the server's around any resolver
-  (`withResolvedSystemContext` takes the kind as its fourth parameter), and the shipped resolver
-  is one for every kind (`systemContextResolverFor` is gone). `withKnownSystemContext(resolved, fn)` applies a
-  resolution the server made before the tool (its third parameter is gone);
+  gave no information and the connection states neither a responsible — `x-sap-responsible`,
+  `SAP_RESPONSIBLE` — nor a login — the connection's `SAP_USERNAME`, the request's `x-sap-login`);
+  each time the tool did not run, and the next call asks again; the stdio start ends with them.
+  These four codes stay lib's (`ServerRefusalCode`, `FailureCode`); `@mcp-abap-adt/responsible-rules`
+  mints them. A resolver's `null`, an answer without a user, or a throw other than a credential
+  failure (a chain failure, a `401` — thrown as it came) is no information, a thrown `404` the
+  endpoint absent; the rules read it by kind around any resolver (`withResolvedSystemContext`
+  takes the kind as its fourth parameter and the rules as its fifth), and the shipped resolver is
+  one for every kind (`systemContextResolverFor` is gone). `withKnownSystemContext(resolved, fn)`
+  applies parameters the server already made (its third parameter is gone);
   `withResolvedSystemContext` (which looks up) is still there for `HandlerExporter` and
-  `BaseHandlerGroup`: it refuses with the server's codes (a chain failure as it is) instead of
+  `BaseHandlerGroup`: with rules it refuses with their codes (a chain failure as it is) instead of
   running its callback with no responsible. `ConnectionRole` adds `background`: the
   run's connection is owned by the strategy, so no instance's terminal close cuts it.
 - **`HandlerEntry.connectionless?: true`** marks a tool that works on no connection of the
@@ -1310,8 +1371,8 @@ transport's options only:
   (`@mcp-abap-adt/core`), `readHttpConfig` / `HTTP_PARAMETERS` (`@mcp-abap-adt/http`),
   `readSseConfig` / `SSE_PARAMETERS` (`@mcp-abap-adt/sse`). lib's `readParameters(table, argv,
   env, yaml)`, `parameterSource`, `generateHelp(table, …)`, `readStartupConfig(table, …)` and the
-  shared rows (`CONF_ROW`, `SYSTEM_TYPE_ROW`, `STATE_IDLE_ROW`, `tlsRows`) build
-  a table of your own; a refusal is a `ParameterRefusal` carrying its `words`.
+  shared rows (`CONF_ROW`, `STATE_IDLE_ROW`, `tlsRows`; `SYSTEM_TYPE_ROW` from
+  `@mcp-abap-adt/responsible-rules`) build a table of your own; a refusal is a `ParameterRefusal` carrying its `words`.
   `loadYamlConfig(table, path)`, `validateYamlConfig(table, config)`,
   `generateYamlConfigTemplate(table)` and `generateConfigTemplateIfNeeded(table, path)` take the
   table; `parseConfigArg(argv?)` reads `--conf` / `--config`.

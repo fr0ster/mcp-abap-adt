@@ -1,9 +1,9 @@
 /**
- * A known caller is answered without entering the main flow (C15 round 8,
- * I-R4a). Work outside the flow — a background start, a leftover-session
- * tool — that needs its caller's backend user asks SAP once (through the
+ * A known caller is answered without entering the main flow. A background
+ * start that needs its caller's backend user asks SAP once (through the
  * flow); once known, it answers at once, also while a call holds the flow,
- * and sends no lookup.
+ * and sends no lookup. A leftover-session tool asks SAP nothing at all: its
+ * caller is the destination the instance serves.
  *
  * Against the stand-in, with a token credential (it states no user, so the
  * user is SAP's `systeminformation` answer).
@@ -86,26 +86,25 @@ it('a second background start with a token credential answers at once while a ca
   }
 });
 
-it('a leftover-session tool with a token credential answers at once while a call holds the flow, and asks nothing', async () => {
+it('a leftover-session tool with a token credential answers at once while a call holds the flow, and sends nothing', async () => {
   const stand: LeftoverStand = await leftoverStand({
     token: { tokenUser: 'TOKEN_USER' },
   });
   try {
     // The instance's connection, its identity kept by the owner.
     await stand.call('ProbeAdt', { id: 'warm' });
-    const lookups = stand.standIn.requests.filter(isLookup).length;
-
     const held = stand.standIn.hold((r) => r.url === `${PROBE_PATH}holder`);
     const holder = stand.call('ProbeAdt', { id: 'holder' });
     await held.arrived;
+    const sent = stand.standIn.requests.length;
 
     const listed = stand.call('ListLeftoverSessions');
     const outcome = await settlesWithin(listed, 2_000);
+    expect(stand.standIn.requests.length).toBe(sent);
     held.release();
     await holder;
     expect(outcome).toBe('settled');
     expect((await listed).isError).toBe(false);
-    expect(stand.standIn.requests.filter(isLookup).length).toBe(lookups);
   } finally {
     await stand.close();
   }

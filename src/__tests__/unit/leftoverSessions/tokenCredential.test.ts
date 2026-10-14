@@ -1,69 +1,73 @@
 /**
- * A token credential states no backend user (owner's decision on C21): the
- * user is asked of SAP after `connect()` — `systeminformation`'s
- * `userName`, the debugger's way (`systemUserOf`) — so such a session keeps
- * a runtime file under the user SAP answered, and the leftover-session
- * tools answer the caller for that user. A system that names none keeps no
- * file, and its caller owns none.
+ * A token credential states no backend user. Its session keeps a runtime
+ * file all the same — under the destination, with no user — and the
+ * leftover-session tools answer its caller from the files and the
+ * destination alone: SAP is asked nothing to keep, list or log off.
  */
 
-import { json, type LeftoverStand, leftoverStand } from './harness';
+import {
+  DESTINATION,
+  json,
+  type LeftoverStand,
+  leftoverStand,
+} from './harness';
 
 jest.setTimeout(30_000);
 
+const isLookup = (r: { url: string }) => r.url.includes('systeminformation');
+
 let stand: LeftoverStand;
+let previousType: string | undefined;
 
 beforeEach(() => {
+  previousType = process.env.SAP_SYSTEM_TYPE;
   jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });
 
 afterEach(async () => {
   await stand?.close();
+  if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
+  else process.env.SAP_SYSTEM_TYPE = previousType;
   jest.restoreAllMocks();
 });
 
-it('writes the file under the user SAP answered', async () => {
-  stand = await leftoverStand({ token: { tokenUser: 'token_user' } });
+it('writes the file under the destination, with no user, asking SAP no user', async () => {
+  // On-premise: the connect itself looks nothing up, so any lookup would be
+  // the file's.
+  process.env.SAP_SYSTEM_TYPE = 'onprem';
+  stand = await leftoverStand({ token: { tokenUser: 'TOKEN_USER' } });
   await stand.call('ProbeAdt', { id: 'one' });
   const [handle] = stand.files();
   expect(stand.file(handle ?? '')).toMatchObject({
     role: 'built',
-    user: 'TOKEN_USER',
-    destination: { url: stand.standIn.url, client: '100', system: 'cloud' },
+    user: null,
+    destination: {
+      name: DESTINATION,
+      url: stand.standIn.url,
+      client: '100',
+      system: 'onprem',
+    },
   });
+  expect(stand.standIn.requests.filter(isLookup)).toEqual([]);
 });
 
-it("ownership checks against SAP's user: its own leftover is listed and logged off, another's is not", async () => {
-  stand = await leftoverStand({ token: { tokenUser: 'TOKEN_USER' } });
+it("lists and logs off the destination's leftover without a request to SAP but the logoff", async () => {
   process.env.SAP_SYSTEM_TYPE = 'cloud';
-  try {
-    const mine = await stand.leftover({ user: 'TOKEN_USER' });
-    const other = await stand.leftover({ user: 'OTHER_USER' });
-    const listed = json((await stand.call('ListLeftoverSessions')).text)
-      .sessions as Array<{ handle: string; user: string }>;
-    expect(listed.map((s) => s.handle)).toEqual([mine.handle]);
-    expect(listed[0]?.user).toBe('TOKEN_USER');
-    const foreign = await stand.call('LogoffLeftoverSession', {
-      handle: other.handle,
-    });
-    expect(json(foreign.text).error).toBe('leftover_session_not_available');
-    const off = await stand.call('LogoffLeftoverSession', {
-      handle: mine.handle,
-    });
-    expect(json(off.text)).toEqual({
-      handle: mine.handle,
-      state: 'logged_off',
-    });
-  } finally {
-    delete process.env.SAP_SYSTEM_TYPE;
-  }
-});
-
-it('a system that names no user: no file, and nothing is the caller’s', async () => {
   stand = await leftoverStand({ token: {} });
-  await stand.call('ProbeAdt', { id: 'one' });
-  expect(stand.files()).toEqual([]);
+  const mine = await stand.leftover();
+  const other = await stand.leftover({ destination: 'OTHER_DEST' });
+  const from = stand.standIn.requests.length;
   const listed = json((await stand.call('ListLeftoverSessions')).text)
-    .sessions as unknown[];
-  expect(listed).toEqual([]);
+    .sessions as Array<{ handle: string }>;
+  expect(listed.map((s) => s.handle)).toEqual([mine.handle]);
+  const foreign = await stand.call('LogoffLeftoverSession', {
+    handle: other.handle,
+  });
+  expect(json(foreign.text).error).toBe('leftover_session_not_available');
+  expect(stand.standIn.requests.length).toBe(from);
+  const off = await stand.call('LogoffLeftoverSession', {
+    handle: mine.handle,
+  });
+  expect(json(off.text)).toEqual({ handle: mine.handle, state: 'logged_off' });
+  expect(stand.files()).toEqual([other.handle]);
 });

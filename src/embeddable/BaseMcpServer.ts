@@ -47,11 +47,8 @@ import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import {
   type ClaimedSession,
   type LeftoverSessions,
-  type SessionDestination,
   type SessionIdentity,
-  sessionDestination,
   sessionIdentity,
-  withUser,
 } from '../lib/leftoverSessions/LeftoverSessions.js';
 import {
   type LeftoverSessionTools,
@@ -131,12 +128,6 @@ interface BuiltConnection {
   users: number;
   /** Replaced: it ends with its logoff once no call works on it. */
   retired: boolean;
-  /**
-   * Its connect looked the system up (`buildConnection`); absent for a
-   * connection taken without a connect of ours (a resumed session), which
-   * `getConnection` looks up on first use.
-   */
-  lookedUpAtConnect?: true;
 }
 
 /**
@@ -144,12 +135,9 @@ interface BuiltConnection {
  * entered its instance's flow runs inside it, so a send on the instance's
  * connection made from within (an identity lookup) runs directly instead of
  * queueing behind itself. The value is the connection the holding call works
- * on; `undefined` while the holder works on none yet (a resume, which takes
- * the instance's connection only to ask whose session it is).
+ * on.
  */
-const heldFlows = new AsyncLocalStorage<
-  ReadonlyMap<object, AbapConnection | undefined>
->();
+const heldFlows = new AsyncLocalStorage<ReadonlyMap<object, AbapConnection>>();
 
 /**
  * Base MCP Server class that extends SDK McpServer
@@ -224,7 +212,7 @@ export abstract class BaseMcpServer extends McpServer {
    * none), keyed by the credential object a built source resolved, or by the
    * host's injected connection. A cached user is valid only for the
    * connection it was asked on: whenever the instance's connection is
-   * replaced or resumed, the whole cache is forgotten (`forgetCallers`) —
+   * replaced, the whole cache is forgotten (`forgetCallers`) —
    * every credential's entry, whatever credential the old or the new
    * connection was built for — and an answer asked on a connection that was
    * replaced meanwhile is not kept (the generation it was asked in). A known
@@ -455,10 +443,8 @@ export abstract class BaseMcpServer extends McpServer {
         // on: asked again on the replacement.
         this.forgetCallers();
       }
-      held = this.buildConnection(
-        resolved.credential,
-        () => createAbapConnection(resolved.settings, resolved.credential),
-        this.sessionOf(resolved),
+      held = this.buildConnection(resolved.credential, () =>
+        this.logOn(resolved),
       );
     }
     // This call is the entry's user from now on — counted before the await,
@@ -470,17 +456,6 @@ export abstract class BaseMcpServer extends McpServer {
     } catch (error) {
       this.release(held);
       throw error;
-    }
-    // A connection taken without a connect of ours (a resumed session) is
-    // looked up here, before any tool on it proceeds; a built one was looked
-    // up by its connect.
-    if (held.lookedUpAtConnect !== true) {
-      try {
-        await raceRequestSignal(this.lookupSystem(connection), signal);
-      } catch (error) {
-        this.release(held);
-        throw error;
-      }
     }
     this.entries.set(connection, held);
     this.systemContexts.set(connection, resolved.systemContext);
@@ -629,19 +604,17 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * Whether `connection`, taken before its call waited in the main flow, is
-   * no longer the instance's connection for that call once the call's turn
-   * came: one this instance built (not a host's) whose session SAP already
-   * lost (the next `getConnection` replaces it), or one replaced meanwhile by
-   * another connection — a resume (`takeAsBuilt`) or the replacement of a lost
-   * session.
+   * no longer usable once the call's turn came: one this instance built (not
+   * a host's) whose session SAP already lost — the next `getConnection`
+   * replaces it. On stdio nothing else replaces the instance's connection
+   * (its credential is fixed for the process); a host that hands an instance
+   * another credential builds a connection for it, and a call queued with
+   * its own credential's connection keeps that one.
    */
   private isStaleBuilt(connection: AbapConnection): boolean {
     if (this.connectionContext?.kind !== 'built') return false;
-    const entry = this.entries.get(connection);
-    if (entry === undefined) return false;
-    if (isSpent(connection)) return true;
-    const current = this.built;
-    return current !== undefined && current !== entry;
+    if (!this.entries.has(connection)) return false;
+    return isSpent(connection);
   }
 
   /**
@@ -661,8 +634,8 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * A send on the instance's connection made outside a tool's own run — an
-   * identity lookup (`systeminformation`) of the leftover-session or
-   * background-run tools, or of the debugger. `send` is handed the
+   * identity lookup (`systeminformation`) of the background-run tools, or of
+   * the debugger. `send` is handed the
    * connection to send on, and captures none of its own: inside a call that
    * holds the flow it runs directly, on the connection that call holds;
    * outside, it takes its turn in the main flow and then takes the
@@ -675,34 +648,15 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<T> {
     const held = heldFlows.getStore()?.get(this);
     if (held !== undefined) return send(held);
-    return this.inMainFlow(signal, async () => {
+    // Its turn: no timeout, a cancelled wait leaves at once.
+    const leave = await this.enterMainFlow(signal);
+    try {
       const connection = await this.getConnection(signal);
       try {
         return await this.inHeldFlow(true, connection, () => send(connection));
       } finally {
         this.connectionReleased(connection);
       }
-    });
-  }
-
-  /**
-   * Runs `fn` as the holder of the instance's main flow: directly when the
-   * current context already holds it, else once its turn came (`enterMainFlow`:
-   * no timeout, a cancelled wait leaves at once), the flow left when `fn`
-   * settles. Inside, `onMainConnection` sends run directly — on the
-   * connection the holder works on, or, while it works on none, on the
-   * instance's connection taken inside the flow.
-   */
-  private async inMainFlow<T>(
-    signal: AbortSignal,
-    fn: () => Promise<T>,
-  ): Promise<T> {
-    if (heldFlows.getStore()?.has(this) === true) return fn();
-    const leave = await this.enterMainFlow(signal);
-    try {
-      const held = new Map(heldFlows.getStore() ?? []);
-      held.set(this, undefined);
-      return await heldFlows.run(held, fn);
     } finally {
       leave();
     }
@@ -741,43 +695,26 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Connects what `create` builds for `credential`, kept as `built`; once
-   * connected, its session is kept in a runtime file when the host gave an
-   * owner (`session`): under the backend user the request names, else the
-   * one SAP answers for the session (a token credential names none).
+   * The instance's connection is born: `birth` makes it — a logon
+   * (`logOn`), or a leftover session taken up (`resumedSession`) — and it is
+   * kept as `built` for `credential`. Its system context (ABAP Cloud:
+   * `systeminformation`) is part of the birth: once per connection, before
+   * any tool proceeds, never a send outside the main flow; a failed lookup
+   * fails nothing. Set as `built` in the turn it is called, so every call
+   * that asks for a connection meanwhile waits for this one.
    */
   private buildConnection(
     credential: IAuthProvider,
-    create: () => AbapConnection,
-    session: KnownSession | undefined,
+    birth: () => Promise<AbapConnection>,
   ): BuiltConnection {
     const entry: BuiltConnection = {
       credential,
       connection: Promise.resolve() as unknown as Promise<AbapConnection>,
       users: 0,
       retired: false,
-      lookedUpAtConnect: true,
     };
     entry.connection = (async () => {
-      const connection = create();
-      // The instance's own from here on: it ends with a logoff (§6.4, D55).
-      own(connection, { owner: this, role: 'built' });
-      // Establish session (CSRF token + cookies) before first request.
-      // RFC needs this for the stateful session; HTTP needs it because some
-      // SAP systems reject the very first request (403) when no session
-      // cookie is present.
-      try {
-        await connection.connect();
-      } catch (error) {
-        // A failed connect is not kept, and still ends with its one
-        // `disconnect()` (connection 16 logs off a session it received).
-        await endConnection(connection);
-        throw error;
-      }
-      if (session !== undefined) await this.keepSession(connection, session);
-      // The system context (ABAP Cloud: `systeminformation`), part of the
-      // connect: once per connection, before any tool proceeds, never a send
-      // outside the main flow. A failed lookup fails nothing.
+      const connection = await birth();
       await this.lookupSystem(connection);
       entry.ready = connection;
       return connection;
@@ -789,6 +726,80 @@ export abstract class BaseMcpServer extends McpServer {
       if (this.built === entry) this.built = undefined;
     });
     return entry;
+  }
+
+  /**
+   * A logon: the connection built from `resolved` and connected; once
+   * connected, its session is kept in a runtime file when the instance keeps
+   * them (`sessionOf`).
+   */
+  private async logOn(resolved: ResolvedConnection): Promise<AbapConnection> {
+    const connection = createAbapConnection(
+      resolved.settings,
+      resolved.credential,
+    ) as AbapConnection;
+    // The instance's own from here on: it ends with a logoff (§6.4, D55).
+    own(connection, { owner: this, role: 'built' });
+    // Establish session (CSRF token + cookies) before first request.
+    // RFC needs this for the stateful session; HTTP needs it because some
+    // SAP systems reject the very first request (403) when no session
+    // cookie is present.
+    try {
+      await connection.connect();
+    } catch (error) {
+      // A failed connect is not kept, and still ends with its one
+      // `disconnect()` (connection 16 logs off a session it received).
+      await endConnection(connection);
+      throw error;
+    }
+    const identity = this.sessionOf(resolved);
+    if (identity !== undefined) {
+      this.leftoverSessions?.track(connection, 'built', identity);
+    }
+    return connection;
+  }
+
+  /**
+   * A leftover session taken up: the connection built from `resolved` on the
+   * session's cookies (connection 17's `session`) — `connect()` logs on
+   * nowhere and asks SAP, without the credential, whether the session lives.
+   * Taken: its file is this process's (`adopt`). SAP's answer that it is
+   * gone deletes the file; any other failure gives it back as a leftover.
+   */
+  private async resumedSession(
+    resolved: ResolvedConnection,
+    owner: LeftoverSessions,
+    claimed: ClaimedSession,
+    identity: SessionIdentity,
+  ): Promise<AbapConnection> {
+    let connection: AbapConnection;
+    try {
+      connection = createAbapConnection(
+        resolved.settings,
+        resolved.credential,
+        undefined,
+        undefined,
+        claimed.cookies,
+      ) as AbapConnection;
+    } catch (error) {
+      owner.release(claimed);
+      throw error;
+    }
+    // The instance's own from here on, like any built connection (§6.4).
+    own(connection, { owner: this, role: 'built' });
+    try {
+      await connection.connect();
+    } catch (error) {
+      // Spent either way; connection logs nothing off for a session it
+      // did not take.
+      await endConnection(connection);
+      const sap = sapAnswerOf(error);
+      if (sap !== undefined && sessionGone(sap.status)) owner.forget(claimed);
+      else owner.release(claimed);
+      throw error;
+    }
+    owner.adopt(claimed, connection, identity);
+    return connection;
   }
 
   /**
@@ -854,14 +865,11 @@ export abstract class BaseMcpServer extends McpServer {
                 isDebuggerOwnConnectionTool(entry.toolDefinition.name);
               if (!ownConnection) {
                 leaveFlow = await this.enterMainFlow(signal);
-                // The connection this call took before it waited may no
-                // longer be the instance's: the call ahead met a session SAP
-                // already lost, or a resume ahead took another session as the
-                // instance's connection. It is given back and the current one
-                // taken — inside the flow, before the tool runs — so a queued
-                // batch does not fail on the one lost session, and a call
-                // queued after a resume (an UNLOCK with the resumed session's
-                // lock handle) runs in the resumed session.
+                // The connection this call took before it waited may be one
+                // whose session SAP already lost while the call ahead ran. It
+                // is given back and the instance's connection taken again —
+                // inside the flow, before the tool runs — so a queued batch
+                // does not fail on the one lost session.
                 if (this.isStaleBuilt(connection)) {
                   inUse = undefined;
                   this.connectionReleased(connection);
@@ -1320,52 +1328,31 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * What a request's session is kept as, when the host gave an owner: the
-   * destination, and the backend user the request names (absent for a token
-   * credential: SAP answers it after `connect()`). None over RFC.
+   * What a session opened from `resolved` is kept as, when the instance
+   * keeps runtime files — the host gave an owner and the instance serves a
+   * destination (`ConnectionContext.destination`): the destination's name,
+   * where its settings point, and the user they state (none for a token
+   * credential). Read from the destination alone: nothing is asked of SAP.
+   * None over RFC.
    */
-  private sessionOf(resolved: ResolvedConnection): KnownSession | undefined {
+  private sessionOf(resolved: ResolvedConnection): SessionIdentity | undefined {
     if (this.leftoverSessions === undefined) return undefined;
-    const destination = sessionDestination(resolved.settings);
-    if (destination === undefined) return undefined;
-    const stated = sessionIdentity(
+    const context = this.connectionContext;
+    if (context?.kind !== 'built' || context.destination === undefined) {
+      return undefined;
+    }
+    return sessionIdentity(
+      context.destination,
       resolved.settings,
       resolved.systemContext?.login,
     );
-    return stated === undefined
-      ? { destination }
-      : { destination, user: stated.user };
   }
 
   /**
-   * Keeps `connection`'s session in a runtime file: under the stated user,
-   * else the one SAP answers (`systemUserOf`, as the debugger's request user
-   * is read). A system that names none, or a failed question, keeps no file
-   * and fails nothing.
-   */
-  private async keepSession(
-    connection: AbapConnection,
-    session: KnownSession,
-  ): Promise<void> {
-    const owner = this.leftoverSessions;
-    if (owner === undefined) return;
-    let user = session.user;
-    if (user === undefined) {
-      try {
-        user = await systemUserOf(connection);
-      } catch {
-        user = undefined;
-      }
-    }
-    const identity = withUser(session.destination, user);
-    if (identity !== undefined) owner.track(connection, 'built', identity);
-  }
-
-  /**
-   * The owner, the caller's resolution and identity; refused without an
-   * owner. A request that names no backend user (a token credential) is
-   * asked of SAP: the user of the instance's own connection — which this
-   * builds, with its logon, when the instance holds none yet.
+   * The owner, the caller's resolution and identity — the destination the
+   * instance serves, where its settings point (`sessionOf`): nothing is
+   * asked of SAP and no connection is built. Refused without an owner, and
+   * on an instance that serves no destination.
    */
   private async leftoverCaller(signal: AbortSignal): Promise<{
     owner: LeftoverSessions;
@@ -1377,66 +1364,11 @@ export abstract class BaseMcpServer extends McpServer {
       throw new ServerRefusal('leftover_sessions_unavailable');
     }
     const resolved = await this.resolveCaller(signal);
-    const session = this.sessionOf(resolved);
-    if (session === undefined) return { owner, resolved, identity: undefined };
-    if (session.user !== undefined) {
-      return {
-        owner,
-        resolved,
-        identity: withUser(session.destination, session.user),
-      };
+    const context = this.connectionContext;
+    if (context?.kind !== 'built' || context.destination === undefined) {
+      throw new ServerRefusal('leftover_sessions_unavailable');
     }
-    // A known identity is answered without entering the main flow: the one
-    // the owner keeps for the instance's current connection (read, nothing
-    // sent), or the user SAP already named for this credential.
-    // Only a connection built for this call's own credential: an instance a
-    // host reaches with another request's credential (an embedder serving
-    // several users with one owner) still holds the previous caller's
-    // connection, whose identity is not this caller's.
-    const built = this.built;
-    const current =
-      built !== undefined && built.credential === resolved.credential
-        ? built.ready
-        : undefined;
-    const kept =
-      current !== undefined && !isSpent(current)
-        ? owner.identityOf(current)
-        : undefined;
-    if (kept !== undefined) return { owner, resolved, identity: kept };
-    const known = this.callerUsers.get(resolved.credential);
-    if (known !== undefined) {
-      return {
-        owner,
-        resolved,
-        identity: withUser(session.destination, known),
-      };
-    }
-    // Else on the connection the main flow hands the send: built with its
-    // logon when the instance holds none yet, replaced when the call ahead
-    // lost its session.
-    //
-    // The caller is the user of the session the instance holds: every tool
-    // runs in SAP as that user. On stdio the user is fixed for the process:
-    // the session is renewed (refresh token, or a new login when the refresh
-    // fails) and written back by the same provider, and a replacement after a
-    // lost session logs on with it — the same user. (http and sse hand their
-    // instances no owner: the leftover sessions are stdio's.) A host that
-    // hands an instance several credentials builds a new connection for a
-    // new credential, so this lookup always runs on the caller's own.
-    const identity = await this.onMainConnection(signal, async (connection) => {
-      const generation = this.callerGeneration;
-      const tracked = owner.identityOf(connection);
-      if (tracked !== undefined) {
-        // The connection handed for this credential: its user is kept for
-        // the next caller, until the connection changes.
-        this.keepCallerUser(resolved.credential, tracked.user, generation);
-        return tracked;
-      }
-      const user = await systemUserOf(connection);
-      this.keepCallerUser(resolved.credential, user, generation);
-      return withUser(session.destination, user);
-    });
-    return { owner, resolved, identity };
+    return { owner, resolved, identity: this.sessionOf(resolved) };
   }
 
   /** The leftover-session tools' port for one call. */
@@ -1444,7 +1376,7 @@ export abstract class BaseMcpServer extends McpServer {
     return {
       list: async () => {
         const { owner, identity } = await this.leftoverCaller(signal);
-        // A caller whose backend user is not stated owns no file.
+        // Over RFC no session is kept, and none is the caller's.
         return identity === undefined ? [] : owner.list(identity);
       },
       resume: (handle) => this.resumeLeftover(handle, signal),
@@ -1453,85 +1385,55 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /** The caller's leftover session `handle`, claimed; refused the same way whatever the reason. */
-  private async claimLeftover(
+  private claimLeftover(
+    owner: LeftoverSessions,
+    identity: SessionIdentity | undefined,
     handle: string,
-    signal: AbortSignal,
-  ): Promise<{
-    owner: LeftoverSessions;
-    resolved: ResolvedConnection;
-    identity: SessionIdentity;
-    claimed: ClaimedSession;
-  }> {
-    const { owner, resolved, identity } = await this.leftoverCaller(signal);
+  ): ClaimedSession {
     const claimed =
       identity === undefined ? undefined : owner.claim(handle, identity);
-    if (identity === undefined || claimed === undefined) {
+    if (claimed === undefined) {
       throw new ServerRefusal('leftover_session_not_available');
     }
-    return { owner, resolved, identity, claimed };
+    return claimed;
   }
 
   /**
-   * Resume (`built` role only): this instance's own connection is built on
-   * the session instead of logging on (connection 17's `session`), and the
-   * file is this process's from then on. SAP's answer that the session is
-   * gone is the call's answer, and the file is deleted. A connection the
-   * instance already held is ended as a replaced one: its logoff after the
-   * last call that uses it.
+   * Resume (`built` role only): how the instance's connection is born when
+   * it has none yet — built on the session instead of logging on
+   * (`resumedSession`), and the instance's connection from then on, as a
+   * logon's would be. It takes no place in the main flow and never replaces
+   * a connection: an instance that already has one refuses, before the
+   * handle is read (`leftover_session_connector_exists`). The connection is
+   * set as the instance's in the same turn as that check, so a tool call
+   * asking meanwhile waits for it. SAP's answer that the session is gone is
+   * the call's answer, the file deleted, and the instance still has no
+   * connection.
    */
-  private resumeLeftover(
+  private async resumeLeftover(
     handle: string,
     signal: AbortSignal,
   ): Promise<ResumeOutcome> {
-    // A resume changes the instance's connection: it takes its turn in the
-    // main flow — after the call ahead, before the calls queued after it,
-    // which then run on the resumed connection. The claim too is made in
-    // turn: a resume cancelled while it waits claims nothing.
-    return this.inMainFlow(signal, () => this.resumeInFlow(handle, signal));
-  }
-
-  private async resumeInFlow(
-    handle: string,
-    signal: AbortSignal,
-  ): Promise<ResumeOutcome> {
-    const { owner, resolved, identity, claimed } = await this.claimLeftover(
-      handle,
-      signal,
-    );
-    let settled = false;
-    try {
-      if (claimed.role !== 'built') {
-        throw new ServerRefusal('leftover_session_not_resumable');
-      }
-      const connection = createAbapConnection(
-        resolved.settings,
-        resolved.credential,
-        undefined,
-        undefined,
-        claimed.cookies,
-      ) as AbapConnection;
-      // The instance's own from here on, like any built connection (§6.4).
-      own(connection, { owner: this, role: 'built' });
-      try {
-        await connection.connect();
-      } catch (error) {
-        // Spent either way; connection logs nothing off for a session it
-        // did not take.
-        await endConnection(connection);
-        const sap = sapAnswerOf(error);
-        if (sap === undefined || !sessionGone(sap.status)) throw error;
-        owner.forget(claimed);
-        settled = true;
-        return { handle: claimed.handle, state: 'gone', sap };
-      }
-      owner.adopt(claimed, connection, identity);
-      settled = true;
-      this.takeAsBuilt(resolved, connection);
-      return { handle: claimed.handle, state: 'resumed' };
-    } finally {
-      // Not settled: the session stays a leftover, its file named again.
-      if (!settled) owner.release(claimed);
+    const { owner, resolved, identity } = await this.leftoverCaller(signal);
+    if (this.built !== undefined) {
+      throw new ServerRefusal('leftover_session_connector_exists');
     }
+    const claimed = this.claimLeftover(owner, identity, handle);
+    if (claimed.role !== 'built' || identity === undefined) {
+      owner.release(claimed);
+      throw new ServerRefusal('leftover_session_not_resumable');
+    }
+    const entry = this.buildConnection(resolved.credential, () =>
+      this.resumedSession(resolved, owner, claimed, identity),
+    );
+    try {
+      await raceRequestSignal(entry.connection, signal);
+    } catch (error) {
+      const sap = sapAnswerOf(error);
+      if (sap === undefined || !sessionGone(sap.status)) throw error;
+      return { handle: claimed.handle, state: 'gone', sap };
+    }
+    return { handle: claimed.handle, state: 'resumed' };
   }
 
   /**
@@ -1540,16 +1442,15 @@ export abstract class BaseMcpServer extends McpServer {
    * an instance built on the session and disconnected without `connect()`:
    * the logoff and nothing else — no CSRF fetch before it, the credential's
    * `prepare()` never called — resolving once it is written. Its answer is
-   * not read, so whether the session still lived is SAP's to know.
+   * not read, so whether the session still lived is SAP's to know. It
+   * touches neither the instance's connection nor its main flow.
    */
   private async logoffLeftover(
     handle: string,
     signal: AbortSignal,
   ): Promise<LogoffOutcome> {
-    const { owner, resolved, claimed } = await this.claimLeftover(
-      handle,
-      signal,
-    );
+    const { owner, resolved, identity } = await this.leftoverCaller(signal);
+    const claimed = this.claimLeftover(owner, identity, handle);
     let settled = false;
     try {
       const connection = createAbapConnection(
@@ -1572,29 +1473,6 @@ export abstract class BaseMcpServer extends McpServer {
     } finally {
       if (!settled) owner.release(claimed);
     }
-  }
-
-  /**
-   * A resumed connection becomes this instance's own (`built`): the one it
-   * held before is retired — ended with its logoff once no call uses it.
-   */
-  private takeAsBuilt(
-    resolved: ResolvedConnection,
-    connection: AbapConnection,
-  ): void {
-    const previous = this.built;
-    if (previous) {
-      this.retire(previous);
-      this.forgetCallers();
-    }
-    this.built = {
-      credential: resolved.credential,
-      connection: Promise.resolve(connection),
-      ready: connection,
-      users: 0,
-      retired: false,
-    };
-    this.systemContexts.set(connection, resolved.systemContext);
   }
 
   /**
@@ -1749,13 +1627,6 @@ function isSpent(connection: AbapConnection): boolean {
   } catch {
     return false;
   }
-}
-
-/** What a request's session is kept as: its destination, and the user it names. */
-interface KnownSession {
-  destination: SessionDestination;
-  /** Absent for a token credential: SAP answers it after `connect()`. */
-  user?: string;
 }
 
 /** The fixed words of a leftover session's logoff that was not written. */

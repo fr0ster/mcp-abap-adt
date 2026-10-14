@@ -5,7 +5,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'ResumeLeftoverSession',
   description:
-    "[session] Continues a leftover SAP session (role built only) as this server's own connection, without a new logon: the locks it holds and their lock handles work again, so an object locked there can be finished or unlocked. A session this server already held is ended with its logoff once no call uses it. When SAP answers that the session is gone, the answer is SAP's and the session's record is deleted.",
+    "[session] Continues a leftover SAP session (role built only) as this server's own connection instead of a logon: the locks it holds and their lock handles work again, so an object locked there can be finished or unlocked. Possible only before this server has connected to SAP — call it before any other SAP tool; once the server has a connection, the resume is refused and nothing is replaced. The server checks and repairs nothing after a resume: a session that ended or locks that are gone show in SAP's answers, and the requests are yours to redo. When SAP answers that the session is gone, the answer is SAP's, the session's record is deleted, and the next call logs on.",
   inputSchema: {
     type: 'object',
     properties: {

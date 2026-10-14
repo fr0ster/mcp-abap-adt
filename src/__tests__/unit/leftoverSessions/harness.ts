@@ -41,6 +41,9 @@ import { fakeProbe } from '../../helpers/leftoverSession';
 
 export const OUR_PID = 222;
 
+/** The destination the stand serves: who calls, for its leftover sessions. */
+export const DESTINATION = 'LEFT_DEST';
+
 export { fakeProbe };
 
 export const settingsFor = (url: string, user: string): SapConfig => ({
@@ -56,6 +59,7 @@ class StandServer extends BaseMcpServer {
       kind: 'built',
       source: { resolve: async () => source },
       sessionId: 'leftover-stand',
+      destination: DESTINATION,
     });
   }
   register(registry: CompositeHandlersRegistry): void {
@@ -94,6 +98,8 @@ export interface LeftoverStand {
     pid?: number;
     user?: string;
     role?: LeftoverRole;
+    /** The destination it was opened for; default the stand's. */
+    destination?: string;
   }): Promise<{ handle: string; session: string }>;
   close(): Promise<void>;
 }
@@ -106,7 +112,8 @@ export async function leftoverStand(
     /**
      * A token credential: settings with no user (`authType: jwt`), the
      * token on the wire. SAP's `systeminformation` answers `tokenUser` —
-     * none when absent (the endpoint answers 404).
+     * none when absent (the endpoint answers 404) — for the tools that ask
+     * it (the background runs, the debugger).
      */
     token?: { tokenUser?: string };
     /** Extra tools beside the leftover-session ones and the probe. */
@@ -199,7 +206,10 @@ export async function leftoverStand(
         new BasicAuthProvider(leftUser, 'left-password'),
       );
       await (connection as unknown as { connect(): Promise<void> }).connect();
-      const identity = sessionIdentity(settings);
+      const identity = sessionIdentity(
+        made.destination ?? DESTINATION,
+        settings,
+      );
       if (!identity) throw new Error('no identity');
       killed.track(connection, made.role ?? 'built', identity);
       const handle = files().find((f) => !before.has(f));

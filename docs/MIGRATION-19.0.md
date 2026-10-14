@@ -198,8 +198,10 @@ timeout, which releases its locks.
 `sessions/` and `service-keys/`, and `AUTH_BROKER_PATH`'s first entry moves it for every stdio
 binary. One file per HTTP connection the server owns and that holds a session — an instance's own connection
 (role `built`) and each debugger connection (role `debugger`) — named by a random 128-bit handle.
-It holds the process id and its start time, the role, the destination (URL, client, system kind,
-wire), the backend user and the session's cookies. It is written once the connection holds a
+It holds everything a resume needs beside what the process already has from its destination: the
+process id and its start time, the role, the destination's name and where it points (URL, client,
+system kind, wire), the backend user the destination states (`null` for a token credential: shown
+in the list, never matched) and the session's cookies — no credential. It is written once the connection holds a
 session and again after a request that changed the session's cookies (a stateful request's
 context cookie), and deleted once that connection's logoff is written — at every end: a tool's
 end, a replacement, the instance's close, the shutdown, the forced close and a crash's. So a file
@@ -209,13 +211,15 @@ still lives.
 
 - **No file over RFC**: an RFC session is its conversation and cannot be picked up by another
   process (and SAP ends it within seconds of the process's death — measured).
-- **The backend user.** A file is matched to its caller by the destination and the backend user:
-  the one the destination states (its `SAP_USERNAME`), else — for a token credential (a service
-  key, a browser login), which states none — the
-  one SAP answers for the session (`systeminformation`'s `userName`, asked once after
-  `connect()`, the way the debugger reads its request user). For such a caller the tools ask the
-  same of the instance's own connection, logging on first if the instance holds none yet. A
-  system that names no user keeps no file, and such a caller owns none.
+- **Who calls is the destination.** On stdio the user and the credential are fixed for the
+  process, so a file is matched to its caller by the destination the process serves: its name
+  (`--mcp=<name>`; `default` for an `--env` file) and where it points (URL, client, system kind,
+  wire). The match reads the file and the destination alone: **listing, resuming and logging off
+  send no request to SAP** to learn who calls — no logon, no `systeminformation` — also for a
+  token credential (a service key, a browser login), whose file carries no user.
+- **Format.** The files are `format: 2`. A file of another format — `format: 1`, written by a
+  19.0.0 pre-release, which named no destination — is not read: never listed, resumed or logged
+  off. Delete such a file by hand; SAP ends its session on its own idle timeout.
 
 **Security: the files are bearer secrets.** The cookies in a file act as that SAP user for as long
 as the session lives — anyone who can read the file can work in the session, the locks it holds
@@ -231,16 +235,20 @@ the write ones, since a resumed session is for finishing a write or an unlock:
 
 | Full binaries | Compact binaries | What it does |
 |---|---|---|
-| `ListLeftoverSessions` | `HandlerLeftoverSessionList` | your sessions a killed process left: `handle`, `role`, `destination` (`url`, `client`, `system`), `user`, `written_at` — never a cookie |
-| `ResumeLeftoverSession` `{ handle }` | `HandlerLeftoverSessionResume` | role `built` only: this server's connection is built on that session instead of logging on, so its locks and their `lock_handle`s work again; the file is this process's from then on. It takes its turn in the main flow: it waits for the call ahead, and the calls sent after it run in the resumed session. A session this server held before is logged off once no call uses it. SAP answering that the session is gone (`401`, a redirect, another session) is the answer, as SAP gave it (`state: "gone"`, `sap.status`), and the file is deleted |
+| `ListLeftoverSessions` | `HandlerLeftoverSessionList` | the sessions of this server's destination a killed process left: `handle`, `role`, `destination` (`name`, `url`, `client`, `system`), `user` (`null` for a token credential), `written_at` — never a cookie; nothing is sent to SAP |
+| `ResumeLeftoverSession` `{ handle }` | `HandlerLeftoverSessionResume` | role `built` only: **how this server's connection is born** when it has none yet — built on that session instead of logging on, so its locks and their `lock_handle`s work again; the file is this process's from then on, and the connection is the server's for the rest of its life. Call it before any other SAP tool; once the server has a connection the resume is refused (`leftover_session_connector_exists`: "a leftover session can be resumed only before this server has connected to SAP; it already has a connection, and a resume never replaces it"): nothing is claimed, sent or replaced. A tool call sent while the resume connects waits for it and runs in the resumed session. SAP answering that the session is gone (`401`, a redirect, another session) is the answer, as SAP gave it (`state: "gone"`, `sap.status`), the file is deleted, and the next call logs on |
 | `LogoffLeftoverSession` `{ handle }` | `HandlerLeftoverSessionLogoff` | any role: one request — the platform's ICF logoff with the session's cookies, no credential, no discovery or CSRF fetch before it (connection 17.1's `disconnect()` without `connect()`); every lock of the session is released. It answers `state: "logged_off"` once the logoff is written — SAP's answer is not read, so a session that had already ended is answered the same — and the file is deleted |
 
-- **Only your own.** A file is yours when its destination and backend user equal what your request
-  resolved. Someone else's file, an unknown handle and a file whose process still runs (process id
+- **Only your own.** A file is yours when it names the destination this process serves, pointing
+  where it points. Another destination's file, an unknown handle and a file whose process still runs (process id
   and start time) all get the same answer: `leftover_session_not_available`. A running process's
   files — this one's included — are never listed or touched.
 - **Resuming a debugger session is refused** (`leftover_session_not_resumable`): its listener,
   breakpoints and poll lived in the ended process. Log it off instead.
+- **After a resume, the session and its locks are yours to judge.** The only thing that can be
+  wrong after a resume is that the old session has ended or its locks are gone; you know a resume
+  happened, and you redo your requests. The server checks and repairs nothing — no lock probing,
+  no replay — and SAP's answers reach the model as they are.
 - **One process at a time.** Before a resume or a logoff, a process claims the file by renaming
   it to a name carrying its own process id (`<handle>.claimed.<pid>.<start>`), an atomic rename:
   of two processes acting on one leftover session at once, one acts and the other answers
@@ -310,7 +318,7 @@ lock, and an `UNLOCK` is never sent outside its lock's session because another c
 Where it matters: stdio (one instance for the process) and SSE (one instance per SSE connection).
 Over Streamable HTTP each request has its instance and connection, so its calls never met anyway.
 Every send a call makes on the instance's connection is inside the order — also the
-`systeminformation` lookup a background run, a leftover-session tool or the debugger makes for its
+`systeminformation` lookup a background run or the debugger makes for its
 caller's user (run directly when the call that makes it already holds the flow, else on the
 connection taken in its turn, so a session lost ahead of it is already replaced); the connect's own
 sends (its session record, the ABAP Cloud system lookup) come before any tool can use the
@@ -321,11 +329,11 @@ fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on
 once and never reaches SAP. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the order,
 a queued call checks its connection again: when the call ahead found the session lost, it takes the
 replacement connection before its tool runs, so only the call that met the loss fails (it is not
-retried). **A resume (`ResumeLeftoverSession`) takes its turn in the order too**, because it changes
-the instance's connection: it waits for the call ahead, and the calls queued after it run in the
-resumed session — an `UNLOCK` you send right after the resume, with the resumed session's
-`lock_handle`, goes to that session. The list and the logoff of leftover sessions take no turn:
-they do not touch the instance's connection (a logoff works on a dead process's session only).
+retried). **A resume (`ResumeLeftoverSession`) takes no turn in the order**: it is how the
+instance's connection is born, so it runs only while the instance has none — then no call is in
+the order — and a call sent meanwhile waits for the resumed connection. The list and the logoff of
+leftover sessions take no turn either: they do not touch the instance's connection (a logoff works
+on a dead process's session only).
 
 **On ABAP Cloud the system is asked once per connection, when it connects** (`systeminformation`:
 the user as responsible, the system id as master system, for what a create needs and the request
@@ -668,8 +676,8 @@ transport's options only:
   the session is renewed — with the refresh token, or by a new login when the refresh fails — and
   written back, the same user, and the broker answers the same provider throughout. The connection
   is replaced only when SAP already lost its session, built with that same provider. The caller of
-  the leftover-session and background-run tools is the user of the session the instance keeps —
-  every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials (and
+  the background-run tools is the user of the session the instance keeps — every tool runs in SAP
+  as that user; the caller of the leftover-session tools is the destination the process serves. HTTP and SSE never keep a connection across credentials (and
   serve no leftover-session tool).
 - **The auth chain is 6.0.** The server runs on `@mcp-abap-adt/auth-broker` 5,
   `@mcp-abap-adt/auth-providers` 6 and `@mcp-abap-adt/auth-stores` 5. Service keys keep working
@@ -849,9 +857,11 @@ transport's options only:
   takes `leftoverSessions?: LeftoverSessions` (`@mcp-abap-adt/lib/embeddable`): one per process,
   created by you — `new LeftoverSessions({ directory: runtimeDirectory() })` — and handed to every
   instance; no module global. With it, each HTTP connection an instance builds and holds a session
-  on keeps a runtime file until its logoff is written, and the three leftover-session tools work;
-  without it they answer `leftover_sessions_unavailable`, as they do on an instance whose
-  connection you injected. `StdioServer` takes the same option, and core's launcher passes one;
+  on keeps a runtime file until its logoff is written, and the three leftover-session tools work —
+  when the instance also serves a destination: `ConnectionContext.destination` (new, optional), who
+  its leftover sessions belong to; `StdioServer` sets it to the destination it serves. Without the
+  owner or the destination they answer `leftover_sessions_unavailable` and no file is kept, as on an
+  instance whose connection you injected. `StdioServer` takes the same option, and core's launcher passes one;
   `StreamableHttpServer` and `SseServer` take none — one such server holds the sessions of many
   users, so the leftover sessions are stdio's (an embedder of `BaseMcpServer` may still give its
   own instances an owner). The server's `resolveCaller(signal)` (protected) is who the tools
@@ -888,7 +898,8 @@ transport's options only:
   absent. The leftover-session tools are such tools (their resume must not log on). `HandlerContext`
   has `sessionFiles?` (the owner, which keeps a debugger's own connection) and `leftoverSessions?`
   (the tools' port). `ServerRefusalCode` / `FailureCode` add `leftover_sessions_unavailable`,
-  `leftover_session_not_available` and `leftover_session_not_resumable`.
+  `leftover_session_not_available`, `leftover_session_not_resumable` and
+  `leftover_session_connector_exists`.
 - **`createAbapConnection(settings, credential, logger?, sessionId?, session?)`**: `session` builds
   the connection on an existing SAP session (connection 17's `createConnection({ …, session })`):
   `connect()` logs on nowhere and asks SAP, without the credential, whether that session lives.

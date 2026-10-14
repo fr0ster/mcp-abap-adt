@@ -15,12 +15,18 @@ import {
   type SessionIdentity,
 } from '../../../lib/leftoverSessions/LeftoverSessions';
 import { fakeProbe } from '../../helpers/leftoverSession';
-import { json, type LeftoverStand, leftoverStand } from './harness';
+import {
+  DESTINATION,
+  json,
+  type LeftoverStand,
+  leftoverStand,
+} from './harness';
 
 jest.setTimeout(30_000);
 
 const HANDLE = '0123456789abcdef0123456789abcdef';
 const IDENTITY: SessionIdentity = {
+  destination: 'PLACEHOLDER_DEST',
   url: 'http://placeholder.invalid',
   client: '100',
   system: 'onprem',
@@ -34,11 +40,12 @@ function leftover(dir: string, handle = HANDLE): void {
   fs.writeFileSync(
     path.join(dir, handle),
     JSON.stringify({
-      format: 1,
+      format: 2,
       pid: 111,
       start: 'start-111',
       role: 'built',
       destination: {
+        name: IDENTITY.destination,
         url: IDENTITY.url,
         client: IDENTITY.client,
         system: IDENTITY.system,
@@ -133,6 +140,7 @@ describe('through the tools', () => {
         report: () => {},
       });
       const identity = {
+        destination: DESTINATION,
         url: stand.standIn.url,
         client: '100',
         system: 'onprem' as const,

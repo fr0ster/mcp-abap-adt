@@ -670,7 +670,7 @@ per request.
 
 **Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both, the resume in the write binary)
 
-**Description:** Lists your SAP sessions an ended server process left open (it was killed before logging them off): handle, role (built or debugger), destination, user, when recorded. Sessions of a running process are not listed.
+**Description:** Lists the SAP sessions of this server's destination an ended server process left open (it was killed before logging them off): handle, role (built or debugger), destination, user, when recorded. Nothing is sent to SAP. Sessions of a running process are not listed.
 
 **Available in:** all
 
@@ -680,7 +680,7 @@ per request.
 
 **Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both, the resume in the write binary)
 
-**Description:** Continues a leftover SAP session (role built only) as this server's connection, without a new logon, so its locks and lock handles work again. A session already held here ends with its logoff once unused. If SAP answers the session is gone, the answer is SAP's and its record is deleted.
+**Description:** Continues a leftover SAP session (role built only) as this server's connection instead of a logon, so its locks and lock handles work again. Only before the server has connected to SAP: refused once it has a connection, which is never replaced. Nothing is checked or repaired after it: an ended session or lost locks show in SAP's answers, and the requests are yours to redo. If SAP answers the session is gone, its record is deleted and the next call logs on.
 
 **Available in:** all
 

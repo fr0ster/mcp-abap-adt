@@ -5,7 +5,7 @@
  * `null`). Any other failure (authentication, network) goes to the caller.
  *
  * The one place this is asked: the debugger's request user
- * (`requestUserOf`) and the leftover-session records of a token credential,
+ * (`requestUserOf`) and a background run's caller of a token credential,
  * whose request states no user.
  */
 

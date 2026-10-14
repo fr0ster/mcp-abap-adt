@@ -3,6 +3,8 @@
  * session is its conversation and cannot be picked up by another process.
  * The connection here answers a session cookie whatever its wire, so only
  * the settings' `connectionType` decides: `http` writes a file, `rfc` none.
+ * An instance that serves no destination keeps none either: the
+ * destination is who its leftover sessions belong to.
  */
 
 import * as fs from 'node:fs';
@@ -34,7 +36,11 @@ import { probeGroup } from '../../helpers/adtStandIn';
 import { fakeProbe, OUR_PID } from './harness';
 
 class Server extends BaseMcpServer {
-  constructor(owner: LeftoverSessions, settings: SapConfig) {
+  constructor(
+    owner: LeftoverSessions,
+    settings: SapConfig,
+    destination: string | undefined,
+  ) {
     super({
       name: 'rfc-no-file',
       leftoverSessions: owner,
@@ -45,6 +51,7 @@ class Server extends BaseMcpServer {
       kind: 'built',
       source: { resolve: async () => source },
       sessionId: 'rfc',
+      ...(destination !== undefined ? { destination } : {}),
     });
     this.registerHandlers(new CompositeHandlersRegistry([probeGroup()]));
   }
@@ -56,18 +63,25 @@ beforeEach(() => {
 });
 afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-async function filesAfterACall(connectionType: 'http' | 'rfc') {
+async function filesAfterACall(
+  connectionType: 'http' | 'rfc',
+  destination: string | null = 'PLACEHOLDER_DEST',
+) {
   const owner = new LeftoverSessions({
     directory: dir,
     probe: fakeProbe(OUR_PID, new Set()),
   });
-  const server = new Server(owner, {
-    url: 'http://placeholder.invalid',
-    client: '100',
-    authType: 'basic',
-    username: 'PLACEHOLDER_USER',
-    connectionType,
-  });
+  const server = new Server(
+    owner,
+    {
+      url: 'http://placeholder.invalid',
+      client: '100',
+      authType: 'basic',
+      username: 'PLACEHOLDER_USER',
+      connectionType,
+    },
+    destination ?? undefined,
+  );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'rfc', version: '1.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
@@ -84,4 +98,8 @@ it('an HTTP connection holding a session writes its file (the control)', async (
 
 it('an RFC connection writes none', async () => {
   expect(await filesAfterACall('rfc')).toEqual([]);
+});
+
+it('an instance that serves no destination writes none', async () => {
+  expect(await filesAfterACall('http', null)).toEqual([]);
 });

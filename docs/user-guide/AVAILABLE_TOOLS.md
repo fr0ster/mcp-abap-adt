@@ -3934,7 +3934,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listleftoversessions-session-leftover-session"></a>
 #### ListLeftoverSessions (Session / Leftover Session)
-**Description:** [session] Lists the SAP sessions of yours that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user and when it was last recorded. Sessions of a running process are not listed. Resume one or log it off by its handle; nothing happens to them otherwise.
+**Description:** [session] Lists the SAP sessions of this server's destination that an ended server process left open (it was killed before it could log them off), with the locks they may hold: handle, role (built: an instance connection; debugger: a debug session connection), destination, user (none for a token login) and when it was last recorded. Read from the session records alone: nothing is sent to SAP. Sessions of a running process are not listed. Resume one or log it off by its handle; nothing happens to them otherwise.
 
 **Source:** `src/handlers/leftover_session/session/handleListLeftoverSessions.ts`
 
@@ -3956,7 +3956,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="resumeleftoversession-session-leftover-session"></a>
 #### ResumeLeftoverSession (Session / Leftover Session)
-**Description:** [session] Continues a leftover SAP session (role built only) as this server's own connection, without a new logon: the locks it holds and their lock handles work again, so an object locked there can be finished or unlocked. A session this server already held is ended with its logoff once no call uses it. When SAP answers that the session is gone, the answer is SAP's and the session's record is deleted.
+**Description:** [session] Continues a leftover SAP session (role built only) as this server's own connection instead of a logon: the locks it holds and their lock handles work again, so an object locked there can be finished or unlocked. Possible only before this server has connected to SAP — call it before any other SAP tool; once the server has a connection, the resume is refused and nothing is replaced. The server checks and repairs nothing after a resume: a session that ended or locks that are gone show in SAP's answers, and the requests are yours to redo. When SAP answers that the session is gone, the answer is SAP's, the session's record is deleted, and the next call logs on.
 
 **Source:** `src/handlers/leftover_session/session/handleResumeLeftoverSession.ts`
 

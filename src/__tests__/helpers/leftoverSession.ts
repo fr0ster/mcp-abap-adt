@@ -39,12 +39,18 @@ export function runtimeFiles(dir: string): string[] {
 
 /**
  * The session a killed process `pid` left: `user`'s, on `url` client `100`,
- * kept in `dir`. Answers its handle.
+ * opened for `destination`, kept in `dir`. Answers its handle.
  */
 export async function killedProcessSession(
   url: string,
   dir: string,
-  options: { user: string; pid?: number; role?: LeftoverRole },
+  options: {
+    user: string;
+    /** The destination it was opened for. */
+    destination: string;
+    pid?: number;
+    role?: LeftoverRole;
+  },
 ): Promise<string> {
   const killed = new LeftoverSessions({
     directory: dir,
@@ -63,7 +69,7 @@ export async function killedProcessSession(
     new BasicAuthProvider(options.user, 'left-password'),
   );
   await (connection as unknown as { connect(): Promise<void> }).connect();
-  const identity = sessionIdentity(settings);
+  const identity = sessionIdentity(options.destination, settings);
   if (identity === undefined) throw new Error('no identity');
   killed.track(connection, options.role ?? 'built', identity);
   const handle = runtimeFiles(dir).find((f) => !before.has(f));

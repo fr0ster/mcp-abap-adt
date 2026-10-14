@@ -18,6 +18,7 @@ export type ServerRefusalCode =
   | 'leftover_sessions_unavailable'
   | 'leftover_session_not_available'
   | 'leftover_session_not_resumable'
+  | 'leftover_session_connector_exists'
   | 'background_runs_unavailable'
   | 'background_run_not_available'
   | 'background_run_running'
@@ -59,6 +60,13 @@ export const LEFTOVER_SESSION_NOT_AVAILABLE_WORDS =
 /** A resume of a debugger's session: only an instance's own session resumes. */
 export const LEFTOVER_SESSION_NOT_RESUMABLE_WORDS =
   "a debugger's session cannot be resumed (its listener, breakpoints and poll lived in the ended process); log it off instead";
+
+/**
+ * A resume on an instance that already has its connection to SAP: a resume
+ * is how the connection is born, never a replacement of one.
+ */
+export const LEFTOVER_SESSION_CONNECTOR_EXISTS_WORDS =
+  'a leftover session can be resumed only before this server has connected to SAP; it already has a connection, and a resume never replaces it';
 
 /**
  * `background: true` on an instance whose host gave no store for background
@@ -115,6 +123,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   leftover_sessions_unavailable: LEFTOVER_SESSIONS_UNAVAILABLE_WORDS,
   leftover_session_not_available: LEFTOVER_SESSION_NOT_AVAILABLE_WORDS,
   leftover_session_not_resumable: LEFTOVER_SESSION_NOT_RESUMABLE_WORDS,
+  leftover_session_connector_exists: LEFTOVER_SESSION_CONNECTOR_EXISTS_WORDS,
   background_runs_unavailable: BACKGROUND_RUNS_UNAVAILABLE_WORDS,
   background_run_not_available: BACKGROUND_RUN_NOT_AVAILABLE_WORDS,
   background_run_running: BACKGROUND_RUN_RUNNING_WORDS,

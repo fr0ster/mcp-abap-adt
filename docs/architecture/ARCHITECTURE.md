@@ -294,22 +294,22 @@ timeout; a call cancelled while it waits leaves the queue at once and never reac
 its tool. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
 main-flow queue. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals.
 Every send on the instance's connection is inside the order: the identity lookups
-(`systeminformation`) of the background-run and leftover-session tools and the
+(`systeminformation`) of the background-run tools and the
 debugger's request user go through `onMainConnection` — directly from a call that
 already holds the flow (an `AsyncLocalStorage` mark), on the connection that call holds,
 else in turn, on the connection taken inside the flow (so a session the call ahead lost
 is already replaced); the send is handed its connection and captures none. A caller
-already known — the user SAP named for the credential, or the identity the owner keeps
-for the current connection when that connection was built for this caller's credential —
-is answered at once, without entering the flow, so a background run or a leftover-session
-tool never waits for a lookup it does not send. A cached user is valid only for the
-connection it was asked on: whenever the instance's connection is replaced or resumed,
+already known — the user SAP named for the credential — is answered at once, without
+entering the flow, so a background run never waits for a lookup it does not send; the
+leftover-session tools send none at all (their caller is the destination the instance
+serves). A cached user is valid only for the
+connection it was asked on: whenever the instance's connection is replaced,
 the whole cache is forgotten, every credential's entry, and asked again on the
 replacement. Outside the order,
 because they work on a connection of their own: a background run, a listed long read
 (its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one
-`connect()`; once in the flow, a queued call checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed); when a resume ahead took another session as the instance's connection for the same credential, it gives the retired one back and runs in the resumed session. A connection retired because another credential's call took the instance (Streamable HTTP) stays the queued call's own. A leftover-session resume takes its turn in the flow (`resumeLeftover` → `inMainFlow`), since it changes the instance's connection: it waits for the call ahead, claims the file in its turn (a resume cancelled while it waits claims nothing), and its own identity lookup (`onMainConnection`) runs directly inside its turn. The list and the logoff take no turn: neither touches the instance's connection. The connections that are shared this way are stdio's kept one and an
+`connect()`; once in the flow, a queued call checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed). A connection retired because another credential's call took the instance (Streamable HTTP) stays the queued call's own. A leftover-session resume takes no turn in the flow: it is the instance's connection's birth (`resumeLeftover` → `buildConnection`), possible only while the instance has no connection, so no call is in the flow then, and a call that asks meanwhile waits for the resumed connection; once the instance has one, a resume is refused (`leftover_session_connector_exists`) and nothing is replaced. The list and the logoff take no turn either: neither touches the instance's connection. The connections that are shared this way are stdio's kept one and an
 SSE connection's; Streamable HTTP builds one per request. The ABAP Cloud system-context lookup (`systeminformation`, the
 responsible and master system a create fills) is part of the connect: once per
 connection, inside `getConnection` (`lookupSystem`, shared by every caller of the
@@ -336,9 +336,10 @@ is asked.
   that request's headers), sse one per SSE connection.
 - **On stdio the caller is the kept session's user.** The user is fixed for the
   process: the session is renewed (refresh token, or a new login when the refresh
-  fails) and written back — the same user — so the caller of the leftover-session and
-  background-run tools is always the user of the session the instance keeps — every
-  tool runs in SAP as that user. HTTP and SSE never keep a connection across
+  fails) and written back — the same user — so the caller of the background-run tools
+  is always the user of the session the instance keeps — every tool runs in SAP as that
+  user — and the caller of the leftover-session tools is the destination the process
+  serves. HTTP and SSE never keep a connection across
   credentials, and keep no runtime session file: the leftover-session tools are stdio's
   (one http or sse server holds the sessions of many users).
 

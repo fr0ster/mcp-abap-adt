@@ -157,23 +157,20 @@ outside a tool's own run (an identity lookup) goes through `onMainConnection` �
 handlers as `HandlerContext.onMainConnection(send)` — directly from a call that holds the flow, on
 the connection that call holds, else in turn, on the connection `getConnection` hands inside the
 flow (a session the call ahead lost already replaced), given back when the send is done; a holder
-that works on no connection yet (a resume) sends on the connection taken inside its turn. A queued
-call re-checks the connection it took before it waited against the instance's current one
-(`isStaleBuilt`): a spent one, or one replaced meanwhile for the same credential (a resume, a lost
-session's replacement), is given back and the current one taken. `send` is
+that holds no mark sends on the connection taken inside its turn. A queued call re-checks the
+connection it took before it waited (`isStaleBuilt`): a spent one is given back and the current one
+taken; a connection retired because another credential's call took the instance stays the queued
+call's own. `send` is
 handed that connection and must capture none of its own (`context.connection` may be the spent
 one). A caller already known is answered without entering the flow: the backend user SAP named is
 kept per credential object (a host's injected connection for its own) and valid only for the
 connection it was asked on: the whole cache is forgotten whenever the instance's connection is
-replaced or resumed (`forgetCallers`), and an answer asked on a connection replaced meanwhile is not
-kept; the leftover tools read the identity the
-owner keeps for the current connection only when it was built for the caller's own credential (an
-embedder's instance reached with another request's credential answers for that request, never for
-the previous one). The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
+replaced (`forgetCallers`), and an answer asked on a connection replaced meanwhile is not
+kept. The leftover tools ask nothing of SAP: their caller is the instance's destination. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never
 reaches its tool. An embedder's own registry that is not a `CompositeHandlersRegistry`
 (`registerAllTools(trackingRegistrations())`) gets no main-flow queue: its tools take no place in
 the flow. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the flow, a queued call
-checks its connection again (`isSpentBuilt`): when the call ahead found the session lost, it gives
+checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives
 the spent connection back (`connectionReleased`) and takes the replacement (`getConnection`)
 before its tool runs, so only the call that met the loss fails; it is not replayed.
 
@@ -201,42 +198,47 @@ tools; the server decides nothing by itself (session-resume spec).
 - **One file per owned HTTP connection that holds a session**, named by a random 128-bit handle:
   `getConnection`'s connection once connected (`track(connection, 'built', identity)`) and each
   debugger connection (`openStateful` → `trackSibling(connection, 'debugger', origin)`, the
-  origin's identity). Contents: pid and start time (`ProcessProbe`: `/proc` on Linux, the pid
-  alone elsewhere), role, destination identity (URL, client, system kind, wire), backend user,
-  `sessionCookies()`. Directory `0700`, file `0600`, written atomically (a `.partial` renamed).
+  origin's identity). Contents (`format: 2`; another format is not read): pid and start time
+  (`ProcessProbe`: `/proc` on Linux, the pid alone elsewhere), role, the destination's name and
+  where it points (URL, client, system kind, wire), the backend user the destination states
+  (`null` for a token credential, shown and never matched), `sessionCookies()`. The settings and
+  the credential a resume needs come from the destination the process serves; the file adds only
+  the cookies. Directory `0700`, file `0600`, written atomically (a `.partial` renamed).
   Rewritten after a request whose answer changed the cookies (the owner wraps
   `makeAdtRequest`); deleted from inside the connection's end once its `disconnect()` resolved —
   `whenLoggedOff` in `ownedConnections.ts` — so the terminal close, a replacement and the forced
   close all delete it after the logoff is written, and a logoff that failed keeps it. Never
-  logged, never in an answer. RFC keeps no file. The backend user is the request's
-  (`sessionIdentity`), else — a token credential names none — the one SAP answers after
-  `connect()` (`keepSession` → `systemUserOf`, `src/lib/systemUser.ts`, shared with the
-  debugger's `requestUserOf`); a system that names none keeps no file.
+  logged, never in an answer. RFC keeps no file, and neither does an instance that serves no
+  destination (`ConnectionContext.destination`, set by `StdioServer`). Nothing is asked of SAP
+  to write it (`sessionOf` → `sessionIdentity(destination, settings, login)`).
 - **The tools** (`ListLeftoverSessions` / `ResumeLeftoverSession` / `LogoffLeftoverSession`;
   compact `HandlerLeftoverSession{List,Resume,Logoff}`) — the list and the logoff in every stdio
   binary, the resume only in the write ones (none of the `-ro` ones), none in an http or sse
   binary (`ToolSet.groups(context, transport)`) — are
   `connectionless` entries: the tool wrapper calls them without `getConnection` (a resume must
   not log on) and hands them the instance's port (`HandlerContext.leftoverSessions`). The port
-  resolves the caller from the instance's source (`resolveCaller`) — a token caller's user from
-  the instance's own connection (`leftoverCaller`, which builds it when there is none) — and a
-  file is the caller's when its identity equals the caller's; an unknown handle, someone else's
-  file, a live process's file and one another live process claimed are refused alike
+  resolves the caller from the instance's source (`resolveCaller`) and destination
+  (`leftoverCaller`), sending nothing to SAP and building no connection, and a file is the
+  caller's when it names the same destination pointing to the same place (the user is not
+  read); an unknown handle, another destination's file, a live process's file and one another live process claimed are refused alike
   (`leftover_session_not_available`).
 - **Claims.** Before acting, `claim` renames the file to `<handle>.claimed.<pid>.<start>` — the
   atomic step two processes race on; the loser finds nothing. `adopt` (resumed), `forget` (gone,
   logged off) or `release` (anything else: back to `<handle>`) ends the claim; a claimed file
   whose claimer died is listed and claimable again. Off Linux liveness is the pid alone.
-- **Resume** (`built` only) takes its turn in the main flow (`inMainFlow`): it changes the
-  instance's connection, so it waits for the call ahead and claims the file in its turn; a call
-  queued after it took the old connection before it waited, and inside the flow gives it back and
-  takes the resumed one (`isStaleBuilt`: spent, or replaced for the same credential). The list
-  and the logoff take no turn — neither touches the instance's connection. The resume builds the
-  instance's connection with `createAbapConnection(…,
-  session)`, records it as `built` before `connect()`, and on success makes it the instance's
-  (`takeAsBuilt`: the previous one retired, ended after its last call) and the file this
-  process's (`adopt`, same handle). SAP's "gone" — `401`, a redirect, an answer not the session's —
-  ends the spent connection and deletes the file; any other failure keeps it.
+- **Resume** (`built` only) is the instance's connection's birth, not a call in the main flow:
+  refused once the instance has a connection (`built` set — connecting, ready or spent;
+  `leftover_session_connector_exists`), before the handle is read. Otherwise, in the same turn as
+  that check, the claim and `buildConnection(credential, resumedSession)`: the entry is `built` at
+  once, so a tool call asking meanwhile waits for it. `resumedSession` builds the connection with
+  `createAbapConnection(…, session)`, owns it as `built`, connects (connection 17's takeover: one
+  request in the session, without the credential), and makes the file this process's (`adopt`,
+  same handle); the system lookup follows as for a logon. SAP's "gone" — `401`, a redirect, an
+  answer not the session's — ends the spent connection, deletes the file, and leaves the instance
+  without a connection (the next call logs on); any other failure gives the file back. The list
+  and the logoff take no turn either — neither touches the instance's connection. After a resume
+  the server checks and repairs nothing (no lock probing, no replay): an ended session or lost
+  locks reach the model as SAP answers.
 - **Logoff** builds a connection on the session (role `fresh`) and disconnects it without
   `connect()` (connection 17.1): one request, the ICF logoff, with the session's cookies but no
   `sap-contextid`, no credential (its `prepare()` is never called) and no CSRF fetch before it;

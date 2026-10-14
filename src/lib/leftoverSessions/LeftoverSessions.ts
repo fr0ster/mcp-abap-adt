@@ -14,9 +14,12 @@
  * directory `0700`, each file `0600`, named by its session's handle (128
  * random bits). One per owned HTTP connection that holds a session: an
  * instance's own (`built`) and each debugger connection (`debugger`). It
- * holds the writing process (pid and start time), the role, the destination
- * identity (URL, client, system kind, wire), the backend user and the
- * session's cookies (`sessionCookies()`). Written once the connection holds
+ * holds everything a resume needs beside what the process already has from
+ * its destination: the writing process (pid and start time), the role, the
+ * destination's name and where it points (URL, client, system kind, wire),
+ * the backend user the destination states (none for a token credential:
+ * shown in the listing only) and the session's cookies (`sessionCookies()`)
+ * — no credential. Written once the connection holds
  * a session and again after a request whose answer changed its cookies;
  * deleted once that connection's logoff is written — so it survives only a
  * process that died without its logoff. Never logged, never shown to the
@@ -25,8 +28,11 @@
  * RFC connections get no file: an RFC session is its conversation (a
  * socket) and cannot be picked up by another process.
  *
- * **Whose file.** A file is the caller's when its destination identity and
- * backend user equal what the caller's request resolved; someone else's file
+ * **Whose file.** A file is the caller's when it names the caller's
+ * destination — its name and where it points (URL, client, system kind,
+ * wire) — read from the file and the destination alone: nothing is asked of
+ * SAP to list, resume or log off. On stdio the destination is who calls: the
+ * user and the credential are fixed for the process. Someone else's file
  * and an unknown handle get the same answer: not available. A file whose
  * process is alive (pid and start time) is never listed or touched — it is
  * that process's, this one's included. No TTL: a file stays until the user
@@ -37,9 +43,8 @@
  * two processes one acts and the other answers "not available". A claimed
  * file whose claimer died is available again, as any dead process's file.
  *
- * **The backend user** is the one the request names (`SAP_USERNAME`,
- * `x-sap-login`); a token credential names none, and the user is then the
- * one SAP answers for the session (`systemUserOf`, asked after `connect()`).
+ * **Format.** `format: 2`. A file of another format (format 1 named no
+ * destination) is not read: never listed, resumed or logged off.
  */
 
 import { randomBytes } from 'node:crypto';
@@ -57,8 +62,13 @@ import {
 /** What a held session is to its instance. */
 export type LeftoverRole = 'built' | 'debugger';
 
-/** Who a session belongs to: the destination and the backend user. */
+/**
+ * Whose a session is: the destination it was opened for — its name and where
+ * it points — and, for the listing only, the backend user it states.
+ */
 export interface SessionIdentity {
+  /** The destination's name, as the process serves it. */
+  destination: string;
   /** The system's URL, without a trailing slash. */
   url: string;
   /** The client; `''` when none is stated. */
@@ -66,16 +76,24 @@ export interface SessionIdentity {
   system: 'onprem' | 'cloud';
   /** Only HTTP sessions are kept. */
   wire: 'http';
-  /** The backend user, upper case. */
-  user: string;
+  /**
+   * The backend user the destination states, upper case; `null` when it
+   * states none (a token credential). Shown, never matched.
+   */
+  user: string | null;
 }
 
 /** A leftover session, as the list tool shows it: no cookie. */
 export interface LeftoverListing {
   handle: string;
   role: LeftoverRole;
-  destination: { url: string; client: string; system: 'onprem' | 'cloud' };
-  user: string;
+  destination: {
+    name: string;
+    url: string;
+    client: string;
+    system: 'onprem' | 'cloud';
+  };
+  user: string | null;
   written_at: string;
 }
 
@@ -93,22 +111,20 @@ export interface ClaimedSession {
   file: string;
 }
 
-/** Where a session's destination is, without its user. */
-export type SessionDestination = Omit<SessionIdentity, 'user'>;
-
 /** What the file holds. */
 interface RuntimeFile {
-  format: 1;
+  format: 2;
   pid: number;
   start: string | null;
   role: LeftoverRole;
   destination: {
+    name: string;
     url: string;
     client: string;
     system: 'onprem' | 'cloud';
     wire: 'http';
   };
-  user: string;
+  user: string | null;
   cookies: string;
   written_at: string;
 }
@@ -148,49 +164,28 @@ function withoutTrailingSlashes(url: string): string {
 }
 
 /**
- * The identity a request resolved: its settings and its login (the
- * destination's `SAP_USERNAME`, an `x-sap-login`). `undefined` over RFC, and
- * when no backend user is stated — a token credential names none — so such
- * a session keeps no file and such a caller owns none.
+ * The identity of a session opened for `destination` with `settings`: where
+ * they point, and the backend user they state (`SAP_USERNAME`, or the
+ * destination's login) — `null` when none (a token credential). `undefined`
+ * over RFC — an RFC session is its conversation and keeps no file — and
+ * without a URL.
  */
 export function sessionIdentity(
+  destination: string,
   settings: SapConfig,
   login?: string,
 ): SessionIdentity | undefined {
-  const destination = sessionDestination(settings);
-  return destination === undefined
-    ? undefined
-    : withUser(destination, settings.username ?? login);
-}
-
-/**
- * The destination a request's settings name (URL, client, system kind, the
- * HTTP wire), without a user; `undefined` over RFC — an RFC session is its
- * conversation and keeps no file.
- */
-export function sessionDestination(
-  settings: SapConfig,
-): SessionDestination | undefined {
   if (settings.connectionType === 'rfc') return undefined;
   if (typeof settings.url !== 'string') return undefined;
+  const user = (settings.username ?? login ?? '').trim().toUpperCase();
   return {
+    destination,
     url: withoutTrailingSlashes(settings.url.trim()),
     client: (settings.client ?? '').trim(),
     system: resolveSystemKind(settings),
     wire: 'http',
+    user: user === '' ? null : user,
   };
-}
-
-/**
- * `destination` with its backend user — stated by the request, or answered
- * by SAP for a token credential (`systemUserOf`); `undefined` without one.
- */
-export function withUser(
-  destination: SessionDestination,
-  user: string | undefined,
-): SessionIdentity | undefined {
-  const named = (user ?? '').trim().toUpperCase();
-  return named === '' ? undefined : { ...destination, user: named };
 }
 
 /** A runtime file's name: `<handle>`, or `<handle>.claimed.<pid>.<start in hex>`. */
@@ -235,13 +230,14 @@ function parseName(name: string): FileName | undefined {
   };
 }
 
-function sameIdentity(a: SessionIdentity, b: SessionIdentity): boolean {
+/** Whether two sessions are the same caller's: the same destination, pointing to the same place. The user is not read. */
+function sameCaller(a: SessionIdentity, b: SessionIdentity): boolean {
   return (
+    a.destination === b.destination &&
     a.url === b.url &&
     a.client === b.client &&
     a.system === b.system &&
-    a.wire === b.wire &&
-    a.user === b.user
+    a.wire === b.wire
   );
 }
 
@@ -273,17 +269,18 @@ function parseFile(text: string): RuntimeFile | undefined {
   if (
     file === null ||
     typeof file !== 'object' ||
-    file.format !== 1 ||
+    file.format !== 2 ||
     typeof file.pid !== 'number' ||
     !(file.start === null || typeof file.start === 'string') ||
     (file.role !== 'built' && file.role !== 'debugger') ||
     typeof destination !== 'object' ||
     destination === null ||
+    typeof destination.name !== 'string' ||
     typeof destination.url !== 'string' ||
     typeof destination.client !== 'string' ||
     (destination.system !== 'onprem' && destination.system !== 'cloud') ||
     destination.wire !== 'http' ||
-    typeof file.user !== 'string' ||
+    !(file.user === null || typeof file.user === 'string') ||
     typeof file.cookies !== 'string' ||
     file.cookies === '' ||
     typeof file.written_at !== 'string'
@@ -295,6 +292,7 @@ function parseFile(text: string): RuntimeFile | undefined {
 
 function identityOfFile(file: RuntimeFile): SessionIdentity {
   return {
+    destination: file.destination.name,
     url: file.destination.url,
     client: file.destination.client,
     system: file.destination.system,
@@ -333,11 +331,6 @@ export class LeftoverSessions {
       ((line) => {
         process.stderr.write(`${line}\n`);
       });
-  }
-
-  /** The identity `connection` was built for, if it was recorded. */
-  identityOf(connection: object): SessionIdentity | undefined {
-    return this.identities.get(connection);
   }
 
   /**
@@ -387,12 +380,13 @@ export class LeftoverSessions {
       if (seen.has(entry.handle)) continue;
       const file = this.read(entry.name);
       if (file === undefined || this.alive(file)) continue;
-      if (!sameIdentity(identityOfFile(file), identity)) continue;
+      if (!sameCaller(identityOfFile(file), identity)) continue;
       seen.add(entry.handle);
       listed.push({
         handle: entry.handle,
         role: file.role,
         destination: {
+          name: file.destination.name,
           url: file.destination.url,
           client: file.destination.client,
           system: file.destination.system,
@@ -423,7 +417,7 @@ export class LeftoverSessions {
     if (entry === undefined) return undefined;
     const file = this.read(entry.name);
     if (file === undefined || this.alive(file)) return undefined;
-    if (!sameIdentity(identityOfFile(file), identity)) return undefined;
+    if (!sameCaller(identityOfFile(file), identity)) return undefined;
     const mine = claimedName(handle, this.probe.self());
     try {
       fs.renameSync(
@@ -503,11 +497,12 @@ export class LeftoverSessions {
   private write(entry: Tracked, cookies: string): boolean {
     const self: ProcessStamp = this.probe.self();
     const file: RuntimeFile = {
-      format: 1,
+      format: 2,
       pid: self.pid,
       start: self.start,
       role: entry.role,
       destination: {
+        name: entry.identity.destination,
         url: entry.identity.url,
         client: entry.identity.client,
         system: entry.identity.system,

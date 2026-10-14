@@ -1,13 +1,13 @@
 /**
- * A resumed session's system context (C15 rounds 3–6): a connection taken
- * without a connect of ours — `ResumeLeftoverSession` builds it on the
- * leftover session's cookies — is looked up by `getConnection` on its first
- * use, before any tool on it proceeds. On ABAP Cloud a create then has the
- * responsible the system names.
+ * A resumed session's system context: a resume is the instance's
+ * connection's birth, and the system lookup is part of the birth as it is of
+ * a logon's — after the resume's own connect, in the resumed session, before
+ * any tool on it proceeds. On ABAP Cloud a create then has the responsible
+ * the system names.
  *
- * Against the stand-in: after the resume, the first tool's call sends one
- * `systeminformation` in the resumed session, before the tool's own request,
- * and the tool reads the responsible it answered.
+ * Against the stand-in: the resume sends one `systeminformation` in the
+ * resumed session, after its connect; the first tool sends none and reads
+ * the responsible it answered.
  */
 
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
@@ -57,27 +57,29 @@ afterEach(async () => {
   else process.env.SAP_SYSTEM_TYPE = previousType;
 });
 
-it('ABAP Cloud: a resumed session is looked up on first use, before its first create', async () => {
+it('ABAP Cloud: a resumed session is looked up at its birth, before its first create', async () => {
   stand = await leftoverStand({ extra: [needsResponsible] });
   stand.standIn.body(
     isLookup,
     JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
   );
   const { handle, session } = await stand.leftover();
+  const from = stand.standIn.requests.length;
   const resumed = await stand.call('ResumeLeftoverSession', { handle });
   expect(resumed.isError).toBe(false);
-  const from = stand.standIn.requests.length;
+  const birth = stand.standIn.requests.slice(from);
+  const lookups = birth.filter(isLookup);
+  expect(lookups).toHaveLength(1);
+  expect(lookups[0]?.session).toBe(session);
+  // After the resume's own connect: not the first request.
+  expect(birth.findIndex(isLookup)).toBeGreaterThan(0);
 
+  const before = stand.standIn.requests.length;
   const created = await stand.call('NeedsResponsible');
   expect(created.isError).toBe(false);
   expect(created.text).toBe('CLOUD_USER');
-
-  const after = stand.standIn.requests.slice(from);
-  const lookups = after.filter(isLookup);
-  expect(lookups).toHaveLength(1);
-  expect(lookups[0]?.session).toBe(session);
-  const lookup = after.findIndex(isLookup);
+  const after = stand.standIn.requests.slice(before);
+  expect(after.filter(isLookup)).toEqual([]);
   const create = after.findIndex((r) => r.url === `${PROBE_PATH}CLOUD_USER`);
-  expect(create).toBeGreaterThan(lookup);
   expect(after[create]?.session).toBe(session);
 });

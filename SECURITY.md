@@ -89,8 +89,15 @@ http:            # or sse:
     (the default `Documents\mcp-abap-adt`) and do not move it to a folder
     other accounts can read. Everywhere: keep the directory out of backups,
     synchronised folders and images, and do not share it between OS users.
-  - The tools act only on files whose destination and SAP user match the
-    caller's; any other handle is answered as unknown.
+  - A file holds the writing process (pid, start time), the role, the
+    destination's name and where it points (URL, client, system kind), the
+    SAP user the destination states (none for a token credential) and the
+    session's cookies — no password, token or other credential.
+  - The tools act only on files of the destination the process serves (its
+    name, pointing where it points): on stdio the user and the credential
+    are fixed for the process, so whoever controls the computer controls
+    them. They ask SAP nothing to decide it; any other handle is answered as
+    unknown.
 - **State handles.** A tool that creates state outliving one call, such as a
   debug session, returns a `state_handle`, and later calls send it back. The
   handle identifies an LLM session's state.

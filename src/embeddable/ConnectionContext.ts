@@ -51,6 +51,14 @@ export type Source =
 export type ConnectionContext = Source & {
   /** Session ID for this connection context. */
   sessionId: string;
+  /**
+   * The destination the instance serves for its life (stdio's): who calls,
+   * for its leftover sessions — a runtime file is the caller's when it names
+   * this destination and points where the source's settings point. Absent:
+   * the instance keeps no runtime file, and its leftover-session tools are
+   * not available.
+   */
+  destination?: string;
   /** Optional metadata for additional context information. */
   metadata?: Record<string, unknown>;
 };

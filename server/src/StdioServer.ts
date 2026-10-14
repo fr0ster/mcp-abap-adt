@@ -118,6 +118,9 @@ export class StdioServer extends BaseMcpServer {
         // only when SAP lost its session (D13, D56).
         source: destinationSource(destination, this.destinations),
         sessionId: destination,
+        // Who calls, for the leftover sessions: on stdio the destination —
+        // its user and credential are fixed for the process.
+        destination,
         metadata: { destination },
       });
     }

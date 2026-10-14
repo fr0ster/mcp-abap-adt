@@ -2,8 +2,9 @@
  * The three leftover-session tools (session-resume spec): list, resume and
  * log off the SAP sessions a killed process left, through an MCP client,
  * against the ADT stand-in. Each tool answers only for the caller's own
- * sessions — someone else's file and an unknown handle get the same answer
- * — and never for a live process's. Resume builds the instance's connection
+ * sessions — those of the destination the instance serves; another
+ * destination's file and an unknown handle get the same answer — and never
+ * for a live process's. Resume builds the instance's connection
  * on the session (no logon: no credential, no new session at the stand-in);
  * SAP's "gone" deletes the file. Logoff sends the ICF logoff with the
  * session's cookies and no `Authorization`, then deletes the file.
@@ -13,6 +14,7 @@ import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { LEFTOVER_SESSION_NOT_AVAILABLE_WORDS } from '../../../lib/auth/serverRefusal';
 import { isLogoff, PROBE_PATH } from '../../helpers/adtStandIn';
 import {
+  DESTINATION,
   json,
   type LeftoverStand,
   leftoverStand,
@@ -45,6 +47,7 @@ describe('ListLeftoverSessions', () => {
         handle,
         role: 'built',
         destination: {
+          name: DESTINATION,
           url: stand.standIn.url,
           client: '100',
           system: 'onprem',
@@ -57,16 +60,24 @@ describe('ListLeftoverSessions', () => {
     expect(answer.text).not.toContain('session-');
   });
 
-  it("hides a live process's file and someone else's", async () => {
+  it("hides a live process's file and another destination's", async () => {
     stand = await leftoverStand();
     stand.alive.add(333);
     await stand.leftover({ pid: 333 });
-    await stand.leftover({ user: 'OTHER_USER' });
+    await stand.leftover({ destination: 'OTHER_DEST' });
     const mine = await stand.leftover({ role: 'debugger' });
     const listed = json((await stand.call('ListLeftoverSessions')).text)
       .sessions as Array<{ handle: string; role: string }>;
     expect(listed.map((s) => s.handle)).toEqual([mine.handle]);
     expect(listed[0]?.role).toBe('debugger');
+  });
+
+  it('matches on the destination, not on the user: who calls is the destination the instance serves', async () => {
+    stand = await leftoverStand();
+    const { handle } = await stand.leftover({ user: 'OTHER_USER' });
+    const listed = json((await stand.call('ListLeftoverSessions')).text)
+      .sessions as Array<{ handle: string; user: string }>;
+    expect(listed).toMatchObject([{ handle, user: 'OTHER_USER' }]);
   });
 
   it('lists none of its own process’s files: they belong to a running process', async () => {
@@ -113,22 +124,6 @@ describe('ResumeLeftoverSession', () => {
     expect(stand.files()).toEqual([handle]);
     expect(stand.file(handle)).toMatchObject({ pid: OUR_PID, role: 'built' });
     expect(stand.standIn.logoffs()).toBe(0);
-  });
-
-  it('ends the session the instance held before, as a replaced connection', async () => {
-    stand = await leftoverStand();
-    await stand.call('ProbeAdt', { id: 'before' });
-    const held = stand.standIn.requests.find(
-      (r) => r.url === `${PROBE_PATH}before`,
-    )?.session;
-    const { handle, session } = await stand.leftover();
-    await stand.call('ResumeLeftoverSession', { handle });
-    // Written when the resume answered; the stand-in reads it a moment later.
-    await until(() => stand.standIn.logoffs() === 1);
-    expect(stand.standIn.loggedOff()).toEqual([held]);
-    expect(held).not.toBe(session);
-    // Its file went with its logoff; the resumed one stays.
-    expect(stand.files()).toEqual([handle]);
   });
 
   it('answers SAP’s 401 as it is, and deletes the file', async () => {
@@ -215,7 +210,7 @@ describe('a handle that is not the caller’s', () => {
     '%s answers an unknown, a foreign and a live one the same, sending nothing',
     async (tool) => {
       stand = await leftoverStand();
-      const foreign = await stand.leftover({ user: 'OTHER_USER' });
+      const foreign = await stand.leftover({ destination: 'OTHER_DEST' });
       stand.alive.add(444);
       const live = await stand.leftover({ pid: 444 });
       const from = stand.standIn.requests.length;

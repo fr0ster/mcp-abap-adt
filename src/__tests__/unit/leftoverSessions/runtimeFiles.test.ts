@@ -25,6 +25,7 @@ import {
 import { endConnection, forceClose, own } from '../../../lib/ownedConnections';
 import { PROBE_PATH } from '../../helpers/adtStandIn';
 import {
+  DESTINATION,
   fakeProbe,
   type LeftoverStand,
   leftoverStand,
@@ -54,7 +55,7 @@ const mode = (file: string) => fs.statSync(file).mode & 0o777;
 const onPosix = process.platform !== 'win32';
 const posixIt = onPosix ? it : it.skip;
 
-it('the instance’s connection: written after connect, 0600 in a 0700 directory', async () => {
+it('the instance’s connection: written after connect, 0600 in a 0700 directory; it carries the destination, where it points, the stated user and the cookies — nothing else', async () => {
   stand = await leftoverStand();
   expect(stand.files()).toEqual([]);
   await stand.call('ProbeAdt', { id: 'first' });
@@ -65,11 +66,12 @@ it('the instance’s connection: written after connect, 0600 in a 0700 directory
     expect(mode(path.join(stand.dir, handle ?? ''))).toBe(0o600);
   }
   expect(stand.file(handle ?? '')).toEqual({
-    format: 1,
+    format: 2,
     pid: OUR_PID,
     start: `start-${OUR_PID}`,
     role: 'built',
     destination: {
+      name: DESTINATION,
       url: stand.standIn.url,
       client: '100',
       system: 'onprem',
@@ -153,7 +155,7 @@ describe('a debugger connection', () => {
     );
     await (origin as unknown as { connect(): Promise<void> }).connect();
     own(origin, { role: 'built' });
-    const identity = sessionIdentity(settings);
+    const identity = sessionIdentity(DESTINATION, settings);
     if (!identity) throw new Error('no identity');
     owner.track(origin, 'built', identity);
     const context = {
@@ -188,9 +190,9 @@ describe('the owner, without a server', () => {
   });
   afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
 
-  it('keeps no identity over RFC, and none without a backend user', () => {
+  it('keeps no identity over RFC; a token credential’s states no user', () => {
     expect(
-      sessionIdentity({
+      sessionIdentity('PLACEHOLDER_DEST', {
         url: 'http://placeholder.invalid',
         authType: 'basic',
         username: 'PLACEHOLDER_USER',
@@ -198,10 +200,14 @@ describe('the owner, without a server', () => {
       }),
     ).toBeUndefined();
     expect(
-      sessionIdentity({ url: 'http://placeholder.invalid', authType: 'jwt' }),
-    ).toBeUndefined();
+      sessionIdentity('PLACEHOLDER_DEST', {
+        url: 'http://placeholder.invalid',
+        authType: 'jwt',
+      }),
+    ).toMatchObject({ destination: 'PLACEHOLDER_DEST', user: null });
     expect(
       sessionIdentity(
+        'PLACEHOLDER_DEST',
         { url: 'http://placeholder.invalid/', authType: 'jwt' },
         'placeholder_login',
       ),
@@ -211,6 +217,42 @@ describe('the owner, without a server', () => {
     });
   });
 
+  it('reads no file of another format: a format-1 file is never listed or claimed', () => {
+    const identity = sessionIdentity('PLACEHOLDER_DEST', {
+      url: 'http://placeholder.invalid',
+      client: '100',
+      authType: 'basic',
+      username: 'PLACEHOLDER_USER',
+    });
+    if (!identity) throw new Error('no identity');
+    const handle = '0123456789abcdef0123456789abcdef';
+    fs.writeFileSync(
+      path.join(dir, handle),
+      JSON.stringify({
+        format: 1,
+        pid: 111,
+        start: 'start-111',
+        role: 'built',
+        destination: {
+          url: identity.url,
+          client: identity.client,
+          system: identity.system,
+          wire: 'http',
+        },
+        user: 'PLACEHOLDER_USER',
+        cookies: 'SAP_SESSIONID_X01_100=placeholder',
+        written_at: '2026-10-13T00:00:00.000Z',
+      }),
+    );
+    const owner = new LeftoverSessions({
+      directory: dir,
+      probe: fakeProbe(OUR_PID, new Set()),
+    });
+    expect(owner.list(identity)).toEqual([]);
+    expect(owner.claim(handle, identity)).toBeUndefined();
+    expect(fs.readdirSync(dir)).toEqual([handle]);
+  });
+
   it('writes nothing for a connection holding no session (an RFC wire answers null)', () => {
     const owner = new LeftoverSessions({
       directory: dir,
@@ -218,6 +260,7 @@ describe('the owner, without a server', () => {
     });
     const rfcLike = { sessionCookies: () => null, disconnect: async () => {} };
     owner.track(rfcLike, 'built', {
+      destination: 'PLACEHOLDER_DEST',
       url: 'http://placeholder.invalid',
       client: '',
       system: 'onprem',

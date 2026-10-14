@@ -302,8 +302,10 @@ connection, its system lookup or its turn, or running — runs to its end, and t
 instance as before. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
 main-flow queue.
 Every send on the instance's connection is inside the order: the identity lookups
-(`systeminformation`) of the background-run tools and the
-debugger's request user go through `onMainConnection` — directly from a call that
+(`systeminformation`, asked by the system's kind — `systemUserOf` reads `systemKindOf`,
+the resolver's source: on ABAP Cloud only, where any status but a `2xx` is the call's
+error and the login never stands in; on-premise never, the configured login the user)
+of the background-run tools and the debugger's request user go through `onMainConnection` — directly from a call that
 already holds the flow (an `AsyncLocalStorage` mark), on the connection that call holds,
 else in turn, on the connection taken inside the flow (so a session the call ahead lost
 is already replaced); the send is handed its connection and captures none. A caller
@@ -327,8 +329,8 @@ instance the first call on a connection without it asks (`systemBeforeTool` →
 `requireSystem`, concurrent askers sharing one request through `resolveOnce`) inside
 the main flow — a call outside the flow takes a turn in it for the lookup alone. A
 failure is that call's answer (an answer that names no user `system_without_user` —
-not a valid ABAP system for this server —, a chain failure as it is, else — no
-endpoint (`404`) included: `readSystemInformation` tells it from an answer —
+not a valid ABAP system for this server —, a chain failure as it is, else — any
+status but a `2xx`, `404` included: the endpoint exists only on ABAP Cloud —
 `system_lookup_failed`) and its tool does not run; nothing failed is kept, so the next call asks again. A
 replacement of a connection of the same credential keeps its answer. The tool wrapper
 reads the answer (`withKnownSystemContext`) and sends nothing; on-premise nothing is

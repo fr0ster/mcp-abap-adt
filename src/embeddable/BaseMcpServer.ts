@@ -1383,6 +1383,15 @@ export abstract class BaseMcpServer extends McpServer {
     // Else on the connection the main flow hands the send: built with its
     // logon when the instance holds none yet, replaced when the call ahead
     // lost its session.
+    //
+    // The owner's decision (C15 round 11, option a): the caller is the user
+    // of the session the instance holds, because every tool runs in SAP as
+    // that user. On stdio (`keepsConnection`) a provider switch keeps the
+    // session — and so the caller — until a restart or a lost session; then
+    // the replacement logs on with the new provider, and its user is the
+    // caller. Nothing is refused for the switch. HTTP and SSE never keep a
+    // connection across credentials: a new credential builds a new
+    // connection, so this lookup always runs on the caller's own.
     const identity = await this.onMainConnection(signal, async (connection) => {
       const generation = this.callerGeneration;
       const tracked = owner.identityOf(connection);

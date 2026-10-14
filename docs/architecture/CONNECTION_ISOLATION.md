@@ -18,7 +18,7 @@ In previous versions, the server used a global connection cache that could be ov
 
 A connection belongs to the `BaseMcpServer` instance that built it, and that instance belongs to one session or one request:
 
-- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built on the first tool call and kept for the instance's life (D13 as amended by D56): a new provider the broker builds does not reopen it; only a session SAP already lost does.
+- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built on the first tool call and kept for the instance's life (D13 as amended by D56): a new provider the broker builds does not reopen it; only a session SAP already lost does (a changed destination needs a restart). Until then the caller is the user of the session the instance holds — every tool runs in SAP as that user — so the leftover-session and background-run tools answer for that session's user even after the destination's provider changed; nothing is refused for the switch. HTTP and SSE never keep a connection across credentials.
 - **SSE** (`@mcp-abap-adt/sse`): one instance per SSE connection, its credential from the `GET` that opened it.
 - **HTTP (streamable)** (`@mcp-abap-adt/http`): one instance per request, or the pooled one its `state_handle` names; either way the request's own headers give its credential, so a request never sees another request's.
 

@@ -334,6 +334,12 @@ is asked.
 - **A reopen only when SAP already lost the session.** stdio keeps its connection
   for the instance's life; http builds one per request (a pooled instance too, from
   that request's headers), sse one per SSE connection.
+- **On stdio the caller is the held session's user.** A destination edited
+  mid-process needs a restart: a new provider does not reopen the kept session, and
+  until a restart or a lost session the caller of the leftover-session and
+  background-run tools is the user of the session the instance holds, because every
+  tool runs in SAP as that user; nothing is refused for the switch. HTTP and SSE never
+  keep a connection across credentials.
 
 #### Composition Roots
 

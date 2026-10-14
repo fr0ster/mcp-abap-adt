@@ -342,16 +342,16 @@ it in the connection's own words, with its hint.
 
 ## Shutdown
 
-On `SIGTERM`, `SIGINT` or the end of stdin (its `end` and `close` are one trigger) the server,
-in this order:
+On `SIGTERM`, `SIGINT` or the end of stdin (its `end` and `close` are one trigger: your client
+closed the transport) the server, in this order:
 
 1. stops taking calls: a call read from now on is answered `interactive-login` `aborted` with
    "The server is shutting down.", and reaches no tool; no interactive login starts any more;
-2. **waits for every running tool to finish** — none is aborted, however long it takes: a
-   started write runs to its `UNLOCK`, its requests still authorized with the credential held
-   (a refresh included);
-3. undoes the held state (a debug session's stop), then **logs off every ADT session it opened**
-   — whatever the undo answered: the logoff is what releases a lock a tool left;
+2. **logs off every ADT session it opened, at once** — the logoff is what releases a lock a tool
+   holds — and interrupts the running tools: **nothing waits for a running tool**, a queued call
+   never starts, and a started write's `UNLOCK` that was still to come never goes out (its lock
+   goes with the logoff). No state undo is sent: the logoff ends the held state (a debug session);
+3. closes the MCP server;
 4. closes the credential gate, ends the logins, waits for the provider calls in flight and
    writes every pending session secret.
 
@@ -359,16 +359,15 @@ There is **no deadline** (18.x gave up after 30 s). It exits `0` when everything
 exits `1`, with one stderr line per fact (never a secret, an error's message or anything read
 from a file), when:
 
-- the held state could not be undone (`State not undone at shutdown: <what>`);
 - a secret could not be stored (`Session secrets not stored: "<destination>": <reason>`);
 - settling itself failed (`Shutdown did not settle: <ErrorClass>`).
 
 **Ending the waiting early.** A second `SIGTERM` / `SIGINT`, or `--shutdown-timeout=<seconds>`
 (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; no default), is the forced close: nothing more
-is waited for — not a tool, not the undo, not a write —, every ADT session is still logged off,
-and the exit is `1` with `Still running at the forced close: <tool>` per tool and `Not finished at
-the forced close: <step>`. What it costs: a tool cut short, a session write lost (a discarded
-refresh token can come back on the next start).
+is waited for — not a logoff still being written, not a write —, every ADT session is still
+logged off, and the exit is `1` with `Still running at the forced close: <tool>` per tool and `Not
+finished at the forced close: <step>`. What it costs: a session write lost (a discarded refresh
+token can come back on the next start).
 
 Nothing is written to stdout.
 

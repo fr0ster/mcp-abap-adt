@@ -403,12 +403,14 @@ ends by:
   the listener was stopped still succeeds, and a caught debuggee nobody attaches
   is held by the system for about 30 seconds and then runs on.
 - **`AmdpDebugStop`**: the AMDP part only (below).
-- **the host**: stdio at exit, SSE when its connection closes, the pool when it lets the
-  instance go and at shutdown — each does the same complete stop, **after the instance's running
-  tool calls have finished** (none is aborted: a debugger call in flight runs to its end first),
-  and reports what it could not undo. Then every ADT session the instance opened — the session's
-  own connections included — is logged off, **whatever the stop answered**: a stop that failed is
-  reported, never a reason to keep a session open.
+- **the client's close and the shutdown**: when stdio's client closes stdin, when an SSE
+  connection closes, and at the process shutdown (every transport), every ADT session the instance
+  opened — the debug session's own connections included — is logged off **at once**, and its
+  running tool calls are interrupted: no stop is sent and nothing waits for a debugger call in
+  flight; the logoff ends the debug session in the system.
+- **the pool**, when it lets a Streamable HTTP instance go (a stop tool emptied it): the complete
+  stop, then every ADT session the instance opened is logged off, **whatever the stop answered**:
+  a stop that failed is reported, never a reason to keep a session open.
 - **the idle bound's stop and a failed undo**: after the idle bound's stop the session's own
   connections are logged off whatever the stop answered (over Streamable HTTP, where the pooled
   instance ends with its state, every connection of the instance).

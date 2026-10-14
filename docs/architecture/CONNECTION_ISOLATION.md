@@ -83,8 +83,10 @@ the instance (Streamable HTTP) stays the queued call's own: its session is its c
   connection, and its logoff releases the lock.
 - **A tool call cannot be cancelled**: it ends with its result or with the session.
   A client's cancel aborts nothing — a queued call keeps its place, a running one
-  runs to its end; no logoff, no new session. When the session ends, a call still
-  finishes the requests it already sent before the instance closes.
+  runs to its end; no logoff, no new session. When the client closes its connection
+  (stdio's stdin, an SSE stream) and at the process shutdown, the instance's sessions
+  are logged off at once and its calls interrupted — nothing waits for a running tool
+  or a request in flight; over Streamable HTTP a dropped request closes nothing.
 - **A reopen only when SAP lost the session**: stdio's source answers the same
   provider for the process's life (the user is fixed; the session is renewed and
   written back by that provider), so its connection is replaced only then; a

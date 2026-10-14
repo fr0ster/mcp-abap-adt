@@ -134,14 +134,13 @@ the container and mount the session with `--unsafe`, or hand a token per request
 **Health:** `GET /mcp/health` answers `{"status":"ok",…}`; the images and compose files probe it.
 
 **Stopping a container:** `docker stop` sends `SIGTERM`. The server then takes no new request,
-**waits for every running tool to finish** — a write still sends its `UNLOCK` —, and **logs off
-every ADT session** it opened (the logoff releases any lock left), then exits. It has no deadline
-of its own, so docker's stop grace (`--time`, `stop_grace_period`, 10 s by default) or
-Kubernetes' `terminationGracePeriodSeconds` decides when it is killed — a kill sends no logoff,
-and SAP keeps the sessions and their locks until its own timeout. Set `--shutdown-timeout`
-(`MCP_SHUTDOWN_TIMEOUT`) a few seconds below that grace: at the timeout the server stops waiting,
-logs off every session and exits `1`; a tool still running is cut short. Raise the grace if your
-tools run long.
+**logs off every ADT session** it opened **at once** (the logoff releases any lock a tool holds)
+and interrupts the running tools — it does not wait for them: a write whose `UNLOCK` was still to
+come never sends it, and its lock goes with the logoff —, then exits `0`. It has no deadline of
+its own; docker's stop grace (`--time`, `stop_grace_period`, 10 s by default) or Kubernetes'
+`terminationGracePeriodSeconds` only has to cover the logoffs' writes — a kill sends no logoff,
+and SAP keeps the sessions and their locks until its own timeout. `--shutdown-timeout`
+(`MCP_SHUTDOWN_TIMEOUT`) bounds that wait: at the timeout the server stops waiting and exits `1`.
 
 **Debugging:** `NODE_OPTIONS=--inspect=0.0.0.0:9229` in `environment:` and a published `9229`.
 The inspector runs any code it is sent: never expose it beyond your own machine.

@@ -213,22 +213,24 @@ mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
 
 ### Shutdown
 
-On `SIGTERM`, `SIGINT` (and, for `mcp-abap-adt`, the end of stdin) a binary stops taking calls —
-a call arriving from then on is answered "The server is shutting down." and reaches no tool —,
-**waits for every running tool to finish** (none is aborted: a write runs to its `UNLOCK`),
-undoes the held state, **logs off every ADT session it opened** (whatever the undo answered: the
-logoff releases any lock a tool left), and — `mcp-abap-adt` only — writes the pending session
-secrets. Then it exits `0`, or `1` with one stderr line per fact not done. **There is no deadline**
-(18.x gave up after 30 s).
+On `SIGTERM`, `SIGINT` (and, for `mcp-abap-adt`, the end of stdin: your client closed the
+transport) a binary stops taking calls — a call arriving from then on is answered "The server is
+shutting down." and reaches no tool —, **logs off every ADT session it opened at once** — the
+logoff is what releases any lock a tool holds — and interrupts the running tools: **nothing waits
+for a running tool**, a queued call never starts, and a write whose `UNLOCK` was still to come
+never sends it (its lock goes with the logoff). No state undo is sent: the logoff ends the held
+state (a debug session included). Then — `mcp-abap-adt` only — it writes the pending session
+secrets. It exits `0`, or `1` with one stderr line per fact not done. **There is no deadline**
+(18.x gave up after 30 s). An SSE connection that closes is handled the same way for its own
+sessions; over Streamable HTTP a client that drops its request closes nothing.
 
 `--shutdown-timeout=<seconds>` (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; a whole number
 from 1 to 86400, **no default**) ends the waiting after that long, and so does a second `SIGTERM`
-/ `SIGINT`: the forced close. Nothing more is waited for — not a running tool, not the state's
-undo, not a session write —, every ADT session is still logged off, and the exit is `1`, naming
-each tool still running (`Still running at the forced close: <tool>`) and the step cut short.
-**What it costs**: a tool cut short mid-write (its object half written, its lock released by the
-logoff), and a session write lost — a refresh token the token endpoint refused can come back on
-the next start. Set it against the time your supervisor waits before it kills the process (a
+/ `SIGINT`: the forced close. Nothing more is waited for — not a logoff still being written, not
+a session write —, every ADT session is still logged off, and the exit is `1`, naming each tool
+still running (`Still running at the forced close: <tool>`) and the step cut short.
+**What it costs**: a session write lost — a refresh token the token endpoint refused can come back
+on the next start. Set it against the time your supervisor waits before it kills the process (a
 container's stop grace, a service manager's `TimeoutStopSec`), a few seconds below it.
 
 A crash outside a tool (an uncaught exception, an unhandled promise rejection) runs the same

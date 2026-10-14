@@ -325,10 +325,11 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
   naming the limit and `DiscardBackgroundRun` (compact: `HandlerBackgroundRunDiscard`), before
   anything is sent. No expiry: a kept answer stays until you discard it — or the process ends: the
   answers live in the server's memory and **end with the process**.
-- **The ends.** The orderly shutdown and an instance's close (an SSE connection's, stdio's at
-  exit) **wait for a running background run** — it may write — as they wait for a running tool; it is
-  logged off after its answer. The forced close (a second `SIGTERM` / `SIGINT`,
-  `--shutdown-timeout`) logs its session off at once, which cuts it, and names it on stderr
+- **The ends.** A run's session is the host's, not its instance's: an SSE connection that closes
+  (or an HTTP request's instance that leaves) neither waits for it nor logs it off — its answer stays
+  reachable through another connection of the same caller. The process's end — a signal, or stdio's
+  client closing stdin — **logs its session off at once, which cuts it**, as it does every other ADT
+  session of the process; the forced close names it on stderr
   (`Still running at the forced close: RuntimeRunClass (background)`).
 - **No session of its own to be had** — an embedded server given a connection without
   `freshConnection` — refuses the start with the fresh-connection words, as the listed long reads.
@@ -356,9 +357,14 @@ on a connection of their own: a background run (`background: true`), a listed lo
 fresh connection, `timeout` or not) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow). **A tool call cannot be cancelled**: it ends with
 its result or with the session. A cancel your client sends aborts nothing — a queued call keeps
 its place, a running call keeps running, and the server's answer to a cancelled request is not
-sent (the MCP SDK drops it). When the session ends (the transport closes), a call still finishes
-the requests it already sent before the instance closes, the system lookup included: nothing is
-logged off under a request in flight. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals. Once in the order,
+sent (the MCP SDK drops it). **When the client closes its connection** — stdio's stdin, an SSE
+stream — and **at the process shutdown** (a signal), the running tools are interrupted, the calls
+queued in the order never start, and every ADT session the instance owns is logged off **at once**:
+its connection, the debugger's, a long read's own. Nothing waits for a running tool; the logoff is
+what releases its locks, a running tool's later requests fail against the ended session, and
+nobody reads their answer. Over Streamable HTTP a client that drops its request closes nothing:
+the request's tool runs to its end, and its instance ends as the pool says (after its work, or at
+its state's stop or idle bound). Once in the order,
 a queued call checks its connection again: when the call ahead found the session lost, it takes the
 replacement connection before its tool runs, so only the call that met the loss fails (it is not
 retried). On stdio the connection is born at the start, before the transport opens, so no call
@@ -627,12 +633,17 @@ first; a function module, service definition or service binding activates throug
   ends (its stop tool or the idle bound). An instance whose undo fails is kept for a retry, its
   sessions open, until a later undo succeeds or shutdown — which logs them off whatever the undo
   answered (the idle bound's stop logs a pooled instance off even when its undo failed).
-- **Shutdown waits for the running tools** (no 30-second deadline): `SIGTERM` / `SIGINT` stops new
-  requests (`503`), waits for every running tool on every instance — none aborted —, then disposes
-  the pool's instances and logs off their sessions; exit `0`, or `1` with one line per instance
-  whose state could not be undone (named by its ordinal). A second signal or
-  **`--shutdown-timeout=<seconds>`** ends the waiting: every session is still logged off, exit `1`
-  naming the requests still running. In a container, set it below the orchestrator's kill grace.
+- **A client that drops its request closes nothing.** Its tool runs to its end (there is no
+  per-call cancel against ABAP); a request's instance that holds nothing is disposed after that
+  work, its session logged off then; a pooled instance keeps its state and its sessions until its
+  stop tool or the idle bound.
+- **Shutdown logs off at once** (no 30-second deadline, and no wait for a running tool):
+  `SIGTERM` / `SIGINT` stops new requests (`503`), logs off every ADT session of every instance —
+  pooled ones and their held state's included, no state undo sent: the logoff ends it — and
+  interrupts the running tools; exit `0`. Their later requests fail against the ended sessions.
+  A second signal or **`--shutdown-timeout=<seconds>`** only matters while a logoff is still being
+  written: exit `1` naming the requests still running. In a container, set it below the
+  orchestrator's kill grace.
 
 ## SSE users
 
@@ -657,14 +668,17 @@ first; a function module, service definition or service binding activates throug
   connection closes, its stop tool runs or the idle bound ends it. Its ids come from the opening
   `GET`'s `x-sap-debug-*` headers, then `SAP_DEBUG_*` of the environment; a destination's `.env` is
   read only by `mcp-abap-adt` (stdio).
-- **A closed SSE connection's instance is disposed after its tools finished.** Its running tools
-  run to their end (18.x undid the state while they ran), then its held state is undone and its
-  ADT sessions are logged off — whatever the undo answered —, then its stream is closed. A `POST`
-  for a closing connection reaches no tool. A connection that closes, or fails, while it is being
-  set up is disposed too (18.x left it).
-- **Shutdown waits for the running tools**, as for HTTP: every open connection's instance is closed
-  after its tools settled, its sessions logged off, its stream ended; `--shutdown-timeout` and a
-  second signal end the waiting the same way.
+- **A closed SSE connection closes as stdio's does** (an SSE connection is one long stream with
+  the credentials of its opening `GET`, one instance per stream): its running tools are
+  interrupted, its queued calls never start, and every ADT session its instance owns — its
+  connection, the debugger's, a long read's own — is logged off **at once**, without waiting for a
+  tool and without a state undo (the logoff ends the held state); then the instance is disposed and
+  its stream closed. A `POST` for a closing connection reaches no tool. A connection that closes, or
+  fails, while it is being set up is disposed too (18.x left it). A background run is not the
+  connection's: it runs on, and the process's end logs it off.
+- **Shutdown logs off at once**, as for HTTP: every open connection's sessions logged off, its
+  tools interrupted, exit `0`; `--shutdown-timeout` and a second signal matter only while a logoff
+  is still being written.
 
 ## compact users
 
@@ -783,21 +797,23 @@ transport's options only:
   named destination's failed write (`--unsafe`) lets the request go on and writes one stderr line,
   `[MCP] A session write did not land: …`, **whatever `DEBUG_AUTH_LOG` says** (18.x: only with
   `DEBUG_AUTH_LOG=true`).
-- **There is no shutdown deadline** (18.x gave up after 30 seconds). On `SIGTERM`, `SIGINT` or the
-  end of stdin the server stops taking calls (a call read from then on is answered "The server is
-  shutting down."), **waits for every running tool to finish** — none is aborted, so a write's
-  `UNLOCK` still goes out —, undoes its held state, **logs off every ADT session it opened** (the
-  logoff is what releases a lock a tool left), then writes the pending session secrets and exits
-  `0`, or `1` with one stderr line per fact not done. stdin's `end` and `close` are one trigger.
-  No interactive login starts once the shutdown began.
+- **The client's close and the shutdown log off at once** (18.x gave up after 30 seconds). On the
+  end of stdin (your client closed the transport), `SIGTERM` or `SIGINT` the server stops taking
+  calls (a call read from then on is answered "The server is shutting down."), **logs off every ADT
+  session it opened at once** — its connection, the debugger's, a long read's, a background run's
+  (the logoff is what releases a lock a tool left) —, interrupts the running tools and drops the
+  queued calls: **nothing waits for a running tool**, so a write's `UNLOCK` that was still to come
+  never goes out, and its lock is released by the logoff. No state undo is sent: the logoff ends
+  the held state. Then it writes the pending session secrets and exits `0`, or `1` with one stderr
+  line per fact not done. stdin's `end` and `close` are one trigger. No interactive login starts
+  once the shutdown began.
 - **Ending the waiting early**: a second `SIGTERM` / `SIGINT`, or **`--shutdown-timeout=<seconds>`**
   (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; 1-86400, no default). Either is the forced
-  close: no more waiting on a tool, a state undo or a session write; every ADT session is still
-  logged off; exit `1` with a line per tool still running and the step that was cut short. The
+  close: no more waiting on a session write; every ADT session is still logged off; exit `1` with a
+  line per tool still running and the step that was cut short. The
   forced close does wait for each logoff to be written: a logoff whose write never completes (a
   system that never takes the bytes) keeps the process until it is killed (`SIGKILL`). What it
-  costs: a tool cut short mid-write, a session write lost — a discarded refresh token can come
-  back on the next start.
+  costs: a session write lost — a discarded refresh token can come back on the next start.
 - **A crash outside a tool logs off too** (every binary): an uncaught exception or an unhandled
   promise rejection runs the forced close — every ADT session logged off, one stderr line
   `[MCP] The process failed (<ErrorClass>): …`, exit `1` (18.x exited with Node's default and
@@ -815,11 +831,11 @@ transport's options only:
 - **A tool call cannot be cancelled**, on every transport: it ends with its result or with the
   session. A client's cancel (`notifications/cancelled`) aborts nothing: the call keeps its place
   in the queue, its connect, login and system lookup run on, its tool runs, and the MCP SDK sends
-  no answer to the cancelled request. When the session ends (the client closed its connection,
-  or over Streamable HTTP its request), the call's waits end and its tool is never called — but a
-  request it already sent to SAP (its connect, the system lookup) is finished first, and the
-  instance's close waits for it. Nothing of this sends anything to SAP: no logoff, no new
-  session.
+  no answer to the cancelled request. When the client closes its connection (stdio, SSE), the
+  call is interrupted and its sessions are logged off at once — a request it already sent (its
+  connect, the system lookup) is not waited for. Over Streamable HTTP a dropped request ends the
+  call's waits (its tool is never called if it had not started), sends nothing and closes
+  nothing.
 - **`npm run auth` is gone.** Write a `.env` with `mcp-auth` from
   `@mcp-abap-adt/auth-broker-cli`: `npm install -g @mcp-abap-adt/auth-broker-cli`, then
   `mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap` (`--type xsuaa` for an
@@ -881,19 +897,22 @@ transport's options only:
   `extra.signal` is the call's signal. A
   `ConnectionSource.resolve(signal)` gets it and should race its own waits against it
   (`raceRequestSignal(work, signal)`). All of these come from `@mcp-abap-adt/lib/embeddable`.
-- **Nothing aborts a call that runs.** `activeTools()` (`@mcp-abap-adt/lib/embeddable`) lists the
-  calls of every instance; a tool already running runs to its end, and a call whose session ended
-  ends only its waits — not a request it already sent. The process's shutdown machinery (the latch, the settlement, the shutdown sequence) is
-  the launchers', not the embeddable entry's.
+- **A client's cancel aborts no call.** `activeTools()` (`@mcp-abap-adt/lib/embeddable`) lists the
+  calls of every instance; a call whose session ended ends only its waits — not a request it
+  already sent. `closeInstance(instance)` (below) and the launchers' shutdown interrupt the calls
+  and log their connections off at once. The process's shutdown machinery (the latch, the logoffs
+  at once, the shutdown sequence) is the launchers', not the embeddable entry's.
 - **Ending an instance has two parts.** `BaseMcpServer.dispose()` stays the state undo — callable
   again, each call retrying what is left — and closes no connection. Beside it,
   **`terminalClose()`** closes every connection the instance owns — the one it built, held
   state's own, package lock sessions, fresh connections still open — each with its one
   `disconnect()` (the logoff, which releases its SAP locks), whatever the undo answered; a
-  connection you injected is never closed. To let your own instance go, call
-  **`closeInstance(instance)`** (`@mcp-abap-adt/lib/embeddable`): it runs the whole close in order
-  (no new call of the instance, its calls settle, the undo, the terminal close, the MCP server's
-  close), once per instance, and answers what the undo could not undo.
+  connection you injected is never closed. When your client closed, call
+  **`closeInstance(instance)`** (`@mcp-abap-adt/lib/embeddable`): in one tick no new call of the
+  instance starts, every connection it owns is logged off and its calls are interrupted — no
+  running tool is awaited, no state undo is sent (the logoff ends the state) —; then its state is
+  let go (`letGoOfState()`: no idle bound any more) and its MCP server closed; once per instance.
+  To undo the state first instead, call `shutdownState()` yourself before it.
 - **`connectionReleased(connection)`**: a subclass that calls `getConnection` itself calls it
   exactly once per `getConnection` when its work on the connection is done; a connection replaced
   meanwhile is logged off only then.
@@ -1017,7 +1036,8 @@ transport's options only:
     it, holds it for the operation (or under the package lock's handle until the unlock), and closes
     it with `disconnect()`. Build the connection with its own credential.
   - **The factory receives no signal.** It is called with no argument: a fresh connection is made
-    inside a started tool, which runs to its end. A package lock's connection and a debug session's
+    inside a started tool, and the server ends it with a logoff (at the latest when the client
+    closes or the process ends). A package lock's connection and a debug session's
     connection outlive the request that opened them.
   - **The latest injection of a connection object decides.** Injecting the same object again
     without `freshConnection` clears the earlier factory.

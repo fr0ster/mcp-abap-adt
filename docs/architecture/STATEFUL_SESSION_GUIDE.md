@@ -55,7 +55,9 @@ reach into the connection's session.
   lock: lock, write and unlock in one call there (`HandlerUpdate` without a
   `lock_handle`).
 - **A tool call cannot be cancelled**: a client's cancel aborts nothing — the call
-  runs to its end; no logoff, no new session.
+  runs to its end; no logoff, no new session. The client's close (stdio, SSE) and the
+  process shutdown log the instance's sessions off at once — the locks go with them —
+  and interrupt its calls; over Streamable HTTP a dropped request closes nothing.
 - **A reopen only when SAP lost the session**: stdio keeps its connection for the
   instance's life.
 - **The debugger's session is its own**: a debug session opens connections of its

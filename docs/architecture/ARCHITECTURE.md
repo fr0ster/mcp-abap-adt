@@ -292,9 +292,14 @@ work on its connection run strictly one after another (`BaseMcpServer.enterMainF
 in the registered tool wrapper). The next waits until the previous settled, with no
 timeout. **A tool call cannot be cancelled**: it ends with its result or with the
 session — a client's cancel aborts nothing, a queued call keeps its place. When the
-session ends, a call still finishes the requests it already sent (its connect, the
-system lookup) before the instance closes: no logoff under a request in flight. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
-main-flow queue. A shutdown or an instance's close lets the running call and every queued call run to their end before it goes on (D55: no started call is aborted); only an SSE close makes the queued calls leave, because that transport aborts their request signals.
+client closes its connection (stdio's stdin, an SSE stream) and at the process
+shutdown, the running calls are interrupted, the queued ones never start, and every
+connection the instance owns is logged off at once (`closeInstance`, `logOffAtOnce`):
+nothing waits for a running tool or a request in flight — the logoff releases the locks,
+and a tool's later requests fail against the ended session. Over Streamable HTTP a
+dropped request closes nothing: its tool runs to its end, and the pool ends its
+instance as before. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
+main-flow queue.
 Every send on the instance's connection is inside the order: the identity lookups
 (`systeminformation`) of the background-run tools and the
 debugger's request user go through `onMainConnection` — directly from a call that
@@ -335,7 +340,9 @@ asked.
   Streamable HTTP the next request's credential retires the lock's connection, and
   that connection's logoff releases the lock.
 - **A tool call cannot be cancelled.** A client's cancel aborts nothing: the call
-  runs to its end; nothing is logged off and no session is reopened.
+  runs to its end; nothing is logged off and no session is reopened. The client's
+  close (stdio, SSE) and the process shutdown are what end a running tool: its
+  sessions logged off at once.
 - **A reopen only when SAP already lost the session.** stdio keeps its connection
   for the instance's life; http builds one per request (a pooled instance too, from
   that request's headers), sse one per SSE connection.

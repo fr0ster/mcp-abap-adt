@@ -20,6 +20,8 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { errorClassOf } from './auth/errors';
+import { failureOf, readGuarded } from './auth/failures';
+import { ServerRefusal } from './auth/serverRefusal';
 import { systemKindOf } from './connectionFactory';
 import { logger } from './logger';
 import { getRequestContext, runWithRequestContext } from './requestContext';
@@ -157,10 +159,29 @@ export function requiringUser(
 }
 
 /**
- * Set around a call whose lookup threw: the guard then refuses a missing
- * responsible as a failure to retry, not as a key to set.
+ * What a failed lookup is to the call that needed it — the same on every
+ * path that asks before a handler runs (the server's, `HandlerExporter`'s):
+ * an answer that names no user (`requiringUser`) the server's
+ * `system_without_user`, a chain failure as it is, any other the server's
+ * `system_lookup_failed`. `warn` gets fixed words, or the error's class
+ * only: a lookup's message may quote what the system answered (H4).
  */
-const lookupFailed = new AsyncLocalStorage<true>();
+export function systemLookupRefusal(
+  error: unknown,
+  warn: ((message: string) => void) | undefined,
+): unknown {
+  if (error instanceof SystemWithoutUserError) {
+    warn?.(
+      'The system answered systeminformation without a user: not a valid ABAP system for this server',
+    );
+    return new ServerRefusal('system_without_user');
+  }
+  if (readGuarded(failureOf, error) !== undefined) return error;
+  warn?.(
+    `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
+  );
+  return new ServerRefusal('system_lookup_failed');
+}
 
 /**
  * Set around a call whose system context was already applied (by the
@@ -168,11 +189,6 @@ const lookupFailed = new AsyncLocalStorage<true>();
  * neither asks a second time nor replaces it.
  */
 const applied = new AsyncLocalStorage<true>();
-
-/** Whether this call's lookup threw (see `withResolvedSystemContext`). */
-export function systemLookupFailed(): boolean {
-  return lookupFailed.getStore() === true;
-}
 
 const memo = new WeakMap<
   SystemContextResolver,
@@ -276,11 +292,12 @@ export function withDestinationSystemContext<T>(
 /**
  * Run `fn` with the responsible person and master system the connection's
  * system names (`ResolvedSystemContext`). `fn` runs unchanged when there is
- * no resolver, no connection, the context was already applied around this
- * call, or the system has no `systeminformation` function on-premise (the
- * configured values apply). A lookup that fails never makes the call fail:
- * `fn` runs with no responsible and no master system — nothing configured
- * stands in — and a change it attempts is refused as a lookup to retry.
+ * no resolver, no connection, or the context was already applied around this
+ * call; with the configured values when the system has no
+ * `systeminformation` function on-premise (a `404`). A lookup that fails, or
+ * an answer that names no user (`requiringUser`), is the call's error
+ * (`systemLookupRefusal`): `fn` does not run, and nothing failed is kept —
+ * the next call asks again.
  */
 export async function withResolvedSystemContext<T>(
   connection: IAbapConnection | null | undefined,
@@ -291,18 +308,12 @@ export async function withResolvedSystemContext<T>(
 
   const effective = getEffectiveSystemContext();
   let resolved: ResolvedSystemContext;
-  let failed = false;
   try {
-    resolved = await resolveOnce(resolver, connection);
+    resolved = await resolveOnce(requiringUser(resolver), connection);
   } catch (error) {
-    failed = true;
-    // The class only: a lookup's message may quote what the system answered (H4).
-    logger.warn(
-      `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
-    );
-    resolved = {};
+    throw systemLookupRefusal(error, (message) => logger.warn(message));
   }
-  return applyResolved(resolved, failed, effective, fn);
+  return applyResolved(resolved, effective, fn);
 }
 
 /**
@@ -316,12 +327,11 @@ export async function withKnownSystemContext<T>(
   fn: () => Promise<T> | T,
 ): Promise<T> {
   if (resolved === undefined) return fn();
-  return applyResolved(resolved, false, getEffectiveSystemContext(), fn);
+  return applyResolved(resolved, getEffectiveSystemContext(), fn);
 }
 
 function applyResolved<T>(
   resolved: ResolvedSystemContext,
-  failed: boolean,
   effective: ReturnType<typeof getEffectiveSystemContext>,
   fn: () => Promise<T> | T,
 ): Promise<T> | T {
@@ -330,21 +340,19 @@ function applyResolved<T>(
 
   // The system's answer wins over everything configured: the stated
   // responsible and master system, and the login that would stand in.
-  const scoped = () =>
-    runWithRequestContext(
-      {
-        ...getRequestContext(),
-        login: undefined,
-        responsible: resolved.responsible,
-        masterSystem: resolved.masterSystem,
-        // The effective value, not the scope's: inside a scope it IS the
-        // scope's value, so an outer scope's language is kept; outside any
-        // scope it is the process language, which entering this new scope
-        // would otherwise drop, since a scope's masterLanguage never falls
-        // back to the process.
-        masterLanguage: effective.masterLanguage,
-      },
-      () => applied.run(true, fn),
-    );
-  return failed ? lookupFailed.run(true, scoped) : scoped();
+  return runWithRequestContext(
+    {
+      ...getRequestContext(),
+      login: undefined,
+      responsible: resolved.responsible,
+      masterSystem: resolved.masterSystem,
+      // The effective value, not the scope's: inside a scope it IS the
+      // scope's value, so an outer scope's language is kept; outside any
+      // scope it is the process language, which entering this new scope
+      // would otherwise drop, since a scope's masterLanguage never falls
+      // back to the process.
+      masterLanguage: effective.masterLanguage,
+    },
+    () => applied.run(true, fn),
+  );
 }

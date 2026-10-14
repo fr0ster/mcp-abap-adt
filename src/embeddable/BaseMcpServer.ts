@@ -10,7 +10,6 @@ import {
 } from '../lib/activeTools.js';
 import { answerRead } from '../lib/auth/answerFailure.js';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
-import { errorClassOf } from '../lib/auth/errors.js';
 import {
   failureOf,
   type ReadFailure,
@@ -92,6 +91,7 @@ import {
   type SystemContextResolver,
   SystemWithoutUserError,
   systemContextResolverFor,
+  systemLookupRefusal,
   withDestinationSystemContext,
   withKnownSystemContext,
 } from '../lib/requestSystemResolution.js';
@@ -633,19 +633,9 @@ export abstract class BaseMcpServer extends McpServer {
       // logoff comes under it when the session ends.
       await asked;
     } catch (error) {
-      if (error instanceof SystemWithoutUserError) {
-        this.logger?.warn?.(
-          'The system answered systeminformation without a user: not a valid ABAP system for this server',
-        );
-        throw new ServerRefusal('system_without_user');
-      }
-      if (readGuarded(failureOf, error) !== undefined) throw error;
-      // The class only: a lookup's message may quote what the system
-      // answered (H4).
-      this.logger?.warn?.(
-        `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
+      throw systemLookupRefusal(error, (message) =>
+        this.logger?.warn?.(message),
       );
-      throw new ServerRefusal('system_lookup_failed');
     }
   }
 

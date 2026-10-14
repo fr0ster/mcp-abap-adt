@@ -14,11 +14,10 @@
  * request (adt-clients omits the attribute), and the system applies itself.
  *
  * The words are fixed and name only keys: no value reaches them (H4). A call
- * whose system lookup threw gets its own words: the system is unreachable,
- * so a retry, not a key to set (setting one would not help).
+ * whose system lookup failed never gets here: the lookup's failure is the
+ * call's answer, and its handler does not run.
  */
 
-import { systemLookupFailed } from './requestSystemResolution';
 import {
   getEffectiveSystemContext,
   type IAdtSystemContext,
@@ -27,23 +26,17 @@ import {
 export const MISSING_RESPONSIBLE =
   'No responsible person for this change: the responsible is the user the system names (systeminformation); only where an on-premise system has no such function, set SAP_RESPONSIBLE (the destination .env or the environment), or send the x-sap-responsible header, or pass the tool argument where the tool has one. Without them the login is the responsible there: SAP_USERNAME, or x-sap-login with x-sap-url. ADT changes are not made without one';
 
-export const RESPONSIBLE_LOOKUP_FAILED =
-  'No responsible person for this change: the system could not be reached to name the responsible person, so nothing was sent. Retry when the system is available';
-
 /** The refusal of a change that lacks a responsible person. */
 export class SystemContextMissingError extends Error {
-  /** `lookupFailed`: the system could not be reached — retry when it is available. */
-  constructor(lookupFailed = systemLookupFailed()) {
-    super(lookupFailed ? RESPONSIBLE_LOOKUP_FAILED : MISSING_RESPONSIBLE);
+  constructor() {
+    super(MISSING_RESPONSIBLE);
     this.name = 'SystemContextMissingError';
   }
 }
 
 /** Whether a failure's words are this refusal's (adt-clients keeps only the message). */
 export function isSystemContextRefusal(message: unknown): boolean {
-  return (
-    message === MISSING_RESPONSIBLE || message === RESPONSIBLE_LOOKUP_FAILED
-  );
+  return message === MISSING_RESPONSIBLE;
 }
 
 /**

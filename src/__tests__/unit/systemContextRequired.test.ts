@@ -42,10 +42,7 @@ import {
   setSystemContext,
   systemContextFromConfiguration,
 } from '../../lib/systemContext';
-import {
-  MISSING_RESPONSIBLE,
-  RESPONSIBLE_LOOKUP_FAILED,
-} from '../../lib/systemContextGuard';
+import { MISSING_RESPONSIBLE } from '../../lib/systemContextGuard';
 import { readSystemInformation } from '../../lib/systemInformation';
 import { recordingConnection } from '../helpers/recordingConnection';
 
@@ -162,7 +159,6 @@ describe('on-premise', () => {
     // On-premise the login is SAP_USERNAME, or x-sap-login with x-sap-url;
     // on ABAP Cloud only the system's user.
     expect(textOf(result)).toContain('x-sap-login with x-sap-url');
-    expect(textOf(result)).not.toContain(RESPONSIBLE_LOOKUP_FAILED);
     expect((result as { isError?: boolean }).isError).toBe(true);
     expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
     expect(textOf(result)).toContain('SAP_RESPONSIBLE');

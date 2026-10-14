@@ -29,6 +29,7 @@ import type {
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { LONG_TOOLS } from '../../../lib/longTools';
+import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -171,6 +172,7 @@ export async function longStand(
     ]),
     systemType: 'onprem',
     logger: silent,
+    systemContextResolver: defaultSystemContextResolver,
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'long-tools', version: '1.0.0' });

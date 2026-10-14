@@ -22,11 +22,13 @@ import {
 } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import {
+  defaultSystemContextResolver,
   requestContextFromHeaders,
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
 import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
+import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
 import { HTTP_VERSION } from './httpVersion.js';
@@ -154,6 +156,9 @@ export class StreamableHttpServer extends BaseMcpServer {
       stateIdleMinutes: opts?.stateIdleMinutes,
       // From the options as given: the silent default above is never the state's.
       stateLogger: stateLoggerOf(opts ?? {}),
+      // The responsible rules, once per connection, when it is created.
+      systemContextResolver: defaultSystemContextResolver,
+      systemContextRules: responsibleRules,
     });
     this.stateIdleMinutes = opts?.stateIdleMinutes;
     this.stateLogger = stateLoggerOf(opts ?? {});
@@ -467,6 +472,10 @@ export class StreamableHttpServer extends BaseMcpServer {
           logger,
           ...state,
           transportCloseEndsSession: false,
+          // The responsible rules, once, when the instance's connection is
+          // created: kept with it in the pool.
+          systemContextResolver: defaultSystemContextResolver,
+          systemContextRules: responsibleRules,
         });
         this.registerHandlers(this.registry);
       }

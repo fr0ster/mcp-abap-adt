@@ -31,6 +31,7 @@ const PACKAGES = [
   'http/src',
   'sse/src',
   'background-runs-memory/src',
+  'responsible-rules/src',
   'core-ro/src',
   'http-ro/src',
   'sse-ro/src',

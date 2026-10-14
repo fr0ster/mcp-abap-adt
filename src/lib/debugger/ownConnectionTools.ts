@@ -5,9 +5,9 @@
  * as a background run does not (spec §5.7). Each was audited (C15 round 3):
  * its handler reads no `context.connection` — it reaches the debugger through
  * `requireDebugger` / the compact `branchByKind` — and the debugger touches
- * the instance's connection only for the request user (`requestUserOf`, which
- * goes through the flow, `HandlerContext.onMainConnection`) and to open its own
- * (`openFreshConnection`, which sends nothing on it).
+ * the instance's connection only to open its own (`openFreshConnection`,
+ * which sends nothing on it); the request user is the call's stated context
+ * (`requestUserOf`, which sends nothing).
  * `src/__tests__/unit/sources/debuggerOwnConnection.test.ts` holds each listed
  * handler to that. The memory-snapshot tools (`MemorySnapshotList`, `…Get`,
  * `…Delta`) read the instance's connection and stay in the flow.

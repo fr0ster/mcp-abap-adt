@@ -4,6 +4,10 @@ import type { BackgroundRunTools } from '../lib/backgroundRuns/port';
 import type { DebuggerInstance } from '../lib/debugger/DebuggerInstance';
 import type { LeftoverSessions } from '../lib/leftoverSessions/LeftoverSessions';
 import type { LeftoverSessionTools } from '../lib/leftoverSessions/port';
+import type {
+  SystemContextResolver,
+  SystemContextRules,
+} from '../lib/requestSystemResolution';
 import type { InstanceState } from '../lib/state/InstanceState';
 
 /**
@@ -43,8 +47,16 @@ export interface HandlerContext {
   /**
    * The system kind the server states (its `systemType` option), for a
    * connection the factory did not build; absent where none is stated
-   * (`SAP_SYSTEM_TYPE` then decides; neither is `system_type_required` —
-   * see `systemKindOf`).
+   * (`SAP_SYSTEM_TYPE` then decides — see `systemKindOf`).
    */
   systemType?: string;
+  /**
+   * For a handler group registered on its own (`registerHandlers` on a
+   * plain McpServer): the resolver its tools ask before they run, and the
+   * rules that make the connection's parameters from it. Absent: nothing is
+   * looked up, no rule applied. The server's own instances use their
+   * options, not these.
+   */
+  systemContextResolver?: SystemContextResolver;
+  systemContextRules?: SystemContextRules;
 }

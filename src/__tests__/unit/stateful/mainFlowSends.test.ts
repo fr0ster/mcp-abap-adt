@@ -2,11 +2,10 @@
  * Every send on the instance's connection is inside its main flow; only work
  * on a connection of its own is outside it (spec §5.7).
  *
- * - The identity lookups (`systeminformation`) made by tools outside the flow
- *   — a background run's caller, the debugger's request user — take their
- *   turn: sent only after the call holding the flow ended.
- * - From inside a call that holds the flow, such a send runs directly: no
- *   wait behind itself.
+ * - A background run's caller and the debugger's request user are the
+ *   connection's parameters, made with it: no lookup of their own.
+ * - From inside a call that holds the flow, a send (`onMainConnection`) runs
+ *   directly: no wait behind itself.
  * - The debugger tools whose SAP work is on the debugger's own connections
  *   (here a `DebugWait` that holds) do not block a parallel `ReadClass`.
  */
@@ -19,7 +18,7 @@ import type {
   IHandlerGroup,
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
-import { systemUserOf } from '../../../lib/systemUser';
+import { readSystemInformation } from '../../../lib/systemInformation';
 import { adtStandIn, type StandInRequest } from '../../helpers/adtStandIn';
 import { callerOn } from '../backgroundRuns/harness';
 import { isLock, isUnlock, oneToolGroup, statefulStand } from './harness';
@@ -88,51 +87,7 @@ const text = (value: string) => ({
   content: [{ type: 'text', text: value }],
 });
 
-it("a background run's caller lookup takes its turn behind the call holding the flow", async () => {
-  const standIn = await adtStandIn();
-  // The caller is asked of SAP.
-  const caller = await callerOn(standIn, new InMemoryBackgroundRuns(), {
-    tokenUser: 'RUN_USER',
-  });
-  (
-    caller.server as unknown as {
-      register(registry: CompositeHandlersRegistry): void;
-    }
-  ).register(new CompositeHandlersRegistry([oneToolGroup('UpdateClass')]));
-  try {
-    const held = standIn.hold((r) => isLock(r) && of('ZCL_HOLDER')(r));
-    const holder = caller.call('UpdateClass', {
-      class_name: 'ZCL_HOLDER',
-      source_code: SOURCE,
-    });
-    await held.arrived;
-    const lookupsBefore = standIn.requests.filter(isLookup).length;
-    // A management tool: its caller is asked of SAP in a turn of the flow
-    // (a run tool's caller is its connection's system information, asked
-    // before the tool).
-    const background = caller.call('ListBackgroundRuns', {});
-    await settleWhile();
-    // The lookup waits for the flow: nothing of it reached SAP yet.
-    expect(standIn.requests.filter(isLookup).length).toBe(lookupsBefore);
-    held.release();
-    await holder;
-    await background;
-    const unlock = indexOf(
-      standIn.requests,
-      (r) => isUnlock(r) && of('ZCL_HOLDER')(r),
-    );
-    const lookups = standIn.requests
-      .map((r, i) => (isLookup(r) ? i : -1))
-      .filter((i) => i >= 0);
-    expect(lookups.length).toBeGreaterThan(lookupsBefore);
-    expect(lookups.at(-1)).toBeGreaterThan(unlock);
-  } finally {
-    await caller.close();
-    await standIn.close();
-  }
-});
-
-it("the debugger's request-user lookup takes its turn; a holding DebugWait blocks no ReadClass", async () => {
+it('a holding DebugWait blocks no ReadClass; the request user sends nothing', async () => {
   onCloud();
   let releaseWait!: () => void;
   const waiting = new Promise<void>((resolve) => {
@@ -169,29 +124,11 @@ it("the debugger's request-user lookup takes its turn; a holding DebugWait block
     releaseWait();
     await wait;
 
-    // The request user waits for the call that holds the flow.
-    const held = s.standIn.hold((r) => isLock(r) && of('ZCL_HOLDER')(r));
-    const holder = s.call('UpdateClass', {
-      class_name: 'ZCL_HOLDER',
-      source_code: SOURCE,
-    });
-    await held.arrived;
+    // The request user: the connection's parameters, nothing sent.
     const lookupsBefore = s.standIn.requests.filter(isLookup).length;
-    const start = s.call('DebugStartListener', {});
-    await settleWhile();
+    const start = await s.call('DebugStartListener', {});
+    expect(start.isError).not.toBe(true);
     expect(s.standIn.requests.filter(isLookup).length).toBe(lookupsBefore);
-    held.release();
-    await holder;
-    await start;
-    const unlock = indexOf(
-      s.standIn.requests,
-      (r) => isUnlock(r) && of('ZCL_HOLDER')(r),
-    );
-    const last = s.standIn.requests
-      .map((r, i) => (isLookup(r) ? i : -1))
-      .filter((i) => i >= 0)
-      .at(-1);
-    expect(last).toBeGreaterThan(unlock);
   } finally {
     releaseWait();
     await s.close();
@@ -207,7 +144,10 @@ it('a lookup from inside a call that holds the flow runs directly, without waiti
         LookupInside: async (context, _args) => {
           const send = context.onMainConnection;
           if (!send) throw new Error('no onMainConnection');
-          const user = await send((connection) => systemUserOf(connection));
+          const user = await send(
+            async (connection) =>
+              (await readSystemInformation(connection)).user,
+          );
           return text(user ?? 'none');
         },
       }),

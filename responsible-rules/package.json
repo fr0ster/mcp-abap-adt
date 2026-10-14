@@ -1,0 +1,118 @@
+{
+  "name": "@mcp-abap-adt/responsible-rules",
+  "version": "18.1.0",
+  "description": "The rules of the MCP ABAP ADT servers that name a call's responsible, user and system: a SystemContextRules of @mcp-abap-adt/lib making each connection's parameters from its systeminformation by the system kind, and the system type the transports require.",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
+  },
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "mcp",
+    "responsible"
+  ],
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=9.0.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npx tsc -p tsconfig.json",
+    "test": "jest --passWithNoTests",
+    "test:check": "npx tsc --noEmit -p tsconfig.test.json",
+    "lint:check": "npx biome check src",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/lib": "^18.1.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/src"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ],
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.test.json"
+        }
+      ]
+    },
+    "moduleNameMapper": {
+      "^@mcp-abap-adt/lib$": "<rootDir>/../src/index.ts",
+      "^@mcp-abap-adt/lib/handlers$": "<rootDir>/../src/lib/handlers/index.ts",
+      "^@mcp-abap-adt/lib/handlers/read$": "<rootDir>/../src/lib/handlers/read.ts",
+      "^@mcp-abap-adt/lib/handlers/write$": "<rootDir>/../src/lib/handlers/write.ts",
+      "^@mcp-abap-adt/lib/compact-shared$": "<rootDir>/../src/lib/compact/index.ts",
+      "^@mcp-abap-adt/lib/debugger$": "<rootDir>/../src/lib/debugger/index.ts",
+      "^@mcp-abap-adt/lib/state$": "<rootDir>/../src/lib/state/index.ts",
+      "^@mcp-abap-adt/lib/utils$": "<rootDir>/../src/lib/utils.ts",
+      "^@mcp-abap-adt/lib/config$": "<rootDir>/../src/lib/config/index.ts",
+      "^@mcp-abap-adt/lib/embeddable$": "<rootDir>/../src/embeddable/index.ts",
+      "^@mcp-abap-adt/lib/logger$": "<rootDir>/../src/lib/handlerLogger.ts",
+      "^@mcp-abap-adt/lib/request-context$": "<rootDir>/../src/lib/requestContext.ts",
+      "^@mcp-abap-adt/lib/auth$": "<rootDir>/../src/lib/auth/index.ts",
+      "^@mcp-abap-adt/lib/http-transport$": "<rootDir>/../src/lib/httpTransport/index.ts",
+      "^@mcp-abap-adt/lib/tool-set$": "<rootDir>/../src/lib/toolSet.ts",
+      "^@mcp-abap-adt/background-runs-memory$": "<rootDir>/../background-runs-memory/src/index.ts",
+      "^@mcp-abap-adt/compact-readonly-entries$": "<rootDir>/../compact-readonly-entries/src/index.ts",
+      "^@mcp-abap-adt/compact-modify$": "<rootDir>/../compact-modify/src/index.ts",
+      "^@mcp-abap-adt/core/launcher$": "<rootDir>/../server/src/launcher.ts",
+      "^@mcp-abap-adt/core/auth$": "<rootDir>/../server/src/auth/index.ts",
+      "^@mcp-abap-adt/http$": "<rootDir>/../http/src/index.ts",
+      "^@mcp-abap-adt/sse$": "<rootDir>/../sse/src/index.ts",
+      "^@mcp-abap-adt/compact-readonly-entries/routes$": "<rootDir>/../compact-readonly-entries/src/handlers/compactReadRoutes.ts",
+      "^@mcp-abap-adt/compact-modify/routes$": "<rootDir>/../compact-modify/src/handlers/compactWriteRoutes.ts",
+      "^@mcp-abap-adt/http/launcher$": "<rootDir>/../http/src/launcher.ts",
+      "^@mcp-abap-adt/sse/launcher$": "<rootDir>/../sse/src/launcher.ts",
+      "^@mcp-abap-adt/compact/launcher$": "<rootDir>/../compact/src/launcher.ts",
+      "^@mcp-abap-adt/compact-http/launcher$": "<rootDir>/../compact-http/src/launcher.ts",
+      "^@mcp-abap-adt/compact-sse/launcher$": "<rootDir>/../compact-sse/src/launcher.ts",
+      "^@mcp-abap-adt/core-ro/launcher$": "<rootDir>/../core-ro/src/launcher.ts",
+      "^@mcp-abap-adt/http-ro/launcher$": "<rootDir>/../http-ro/src/launcher.ts",
+      "^@mcp-abap-adt/sse-ro/launcher$": "<rootDir>/../sse-ro/src/launcher.ts",
+      "^@mcp-abap-adt/compact-ro/launcher$": "<rootDir>/../compact-ro/src/launcher.ts",
+      "^@mcp-abap-adt/compact-http-ro/launcher$": "<rootDir>/../compact-http-ro/src/launcher.ts",
+      "^@mcp-abap-adt/compact-sse-ro/launcher$": "<rootDir>/../compact-sse-ro/src/launcher.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    },
+    "setupFilesAfterEnv": [
+      "<rootDir>/../src/__tests__/integration/helpers/closeConnectionsAfterAll.ts"
+    ]
+  },
+  "devDependencies": {
+    "@types/jest": "*",
+    "@types/node": "*",
+    "jest": "*",
+    "ts-jest": "*",
+    "typescript": "*"
+  }
+}

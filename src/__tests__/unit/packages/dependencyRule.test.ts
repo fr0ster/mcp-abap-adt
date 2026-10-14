@@ -134,6 +134,13 @@ const PACKAGES: Row[] = [
     forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES],
     required: ['@mcp-abap-adt/lib'],
   },
+  // The responsible rules: lib's hook, nothing else of ours.
+  {
+    name: '@mcp-abap-adt/responsible-rules',
+    dir: 'responsible-rules',
+    forbidden: [...CHAIN_STATE, ...TRANSPORTS, ...HALVES],
+    required: ['@mcp-abap-adt/lib'],
+  },
   {
     name: '@mcp-abap-adt/http',
     dir: 'http',
@@ -218,6 +225,7 @@ const PACKAGES: Row[] = [
 const SIBLING_DIRS = [
   '.',
   'background-runs-memory',
+  'responsible-rules',
   'server',
   'http',
   'sse',

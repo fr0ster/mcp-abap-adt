@@ -31,6 +31,7 @@ import type { IHttpApplication } from '../../../embeddable/IHttpApplication';
 import { activeTools } from '../../../lib/activeTools';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -219,6 +220,8 @@ const SERVERS: Record<string, () => Promise<Served>> = {
       connection,
       handlersRegistry: registry(),
       systemType: 'cloud',
+      // An embedder that asks the system before its first tool.
+      systemContextResolver: defaultSystemContextResolver,
     });
     const client = await inMemory(server);
     return {

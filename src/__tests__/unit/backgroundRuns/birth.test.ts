@@ -14,6 +14,7 @@ import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { closeInstance } from '../../../lib/instanceClose';
 import { ownedConnections } from '../../../lib/ownedConnections';
+import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import { adtStandIn } from '../../helpers/adtStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
 import { clientOf, shippedGroups, silent, until } from './harness';
@@ -80,6 +81,7 @@ async function embedder(factory: () => Promise<IAbapConnection>) {
     systemType: 'cloud',
     logger: silent,
     backgroundRuns: strategy,
+    systemContextResolver: defaultSystemContextResolver,
   });
   const client = await clientOf(server);
   return {

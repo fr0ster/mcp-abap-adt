@@ -8,8 +8,8 @@
 
 import { EventEmitter } from 'node:events';
 import { createServer } from 'node:net';
-import { listenerSystemTypeRequiredWords } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { listenerSystemTypeRequiredWords } from '@mcp-abap-adt/responsible-rules';
 import { main } from '../launcher';
 
 jest.setTimeout(30_000);

@@ -20,6 +20,7 @@ import {
 } from '@mcp-abap-adt/lib/http-transport';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import {
+  defaultSystemContextResolver,
   type RequestContext,
   requestContextFromHeaders,
   runWithRequestContext,
@@ -31,6 +32,7 @@ import {
   stateLoggerOf,
 } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
+import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
 import { SSE_VERSION } from './sseVersion.js';
@@ -360,6 +362,10 @@ export class SseServer {
           version: ver,
           logger: loggerImpl,
           ...state,
+          // The responsible rules, once per stream, when its connection is
+          // created.
+          systemContextResolver: defaultSystemContextResolver,
+          systemContextRules: responsibleRules,
         });
       }
 

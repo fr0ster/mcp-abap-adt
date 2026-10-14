@@ -1,30 +1,52 @@
 /**
- * The debugger's request user. `systeminformation` is asked of every
- * system: an answer naming its user is the user, over any configured login.
- * Anything else is no information. On-premise (a `404`, an answer without a
- * user, another status) the responsible if stated, else the configured login
- * (the request scope's, then the process's) stands in, none → `system_user_unknown`, the tool path's code
- * and words. A `404` is kept for the connection: asked once. A `401` is the
- * credential failure as it came, on both kinds. On ABAP Cloud, which
- * always has it, one step to the call's error: a `404`
+ * The debugger's request user: the responsible of its connection's
+ * parameters, made once by the rules (`userOf`: lib's hook with
+ * `responsibleRules`). `systeminformation` is asked of every system: an
+ * answer naming its user is the user, over any configured login. Anything
+ * else is no information. On-premise (a `404`, an answer without a user,
+ * another status) the responsible if stated, else the configured login (the
+ * request scope's, then the process's) stands in, none →
+ * `system_user_unknown`, the tool path's code and words. The parameters are
+ * made once per connection: asked once, the same user after. A `401` is the
+ * credential failure as it came, on both kinds. On ABAP Cloud, which always
+ * has it, one step to the call's error: a `404`
  * `cloud_without_systeminformation` (the configuration is inconsistent),
  * anything else `system_lookup_failed` — never the login in its place.
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
-import { failureOf } from '../../../lib/auth/failures';
+import {
+  adtStandIn,
+  type StandInRequest,
+} from '../../../../src/__tests__/helpers/adtStandIn';
+import { failureOf } from '../../../../src/lib/auth/failures';
 import {
   ServerRefusal,
   SYSTEM_USER_UNKNOWN_WORDS,
-} from '../../../lib/auth/serverRefusal';
-import { createAbapConnection } from '../../../lib/connectionFactory';
-import { requestUserOf } from '../../../lib/debugger/ports';
-import { runWithRequestContext } from '../../../lib/requestContext';
+} from '../../../../src/lib/auth/serverRefusal';
+import { createAbapConnection } from '../../../../src/lib/connectionFactory';
+import { requestUserOf } from '../../../../src/lib/debugger/ports';
+import {
+  defaultSystemContextResolver,
+  runWithRequestContext,
+  withResolvedSystemContext,
+} from '../../../../src/lib/requestContext';
 import {
   resetSystemContextCache,
   systemContextFromConfiguration,
-} from '../../../lib/systemContext';
-import { adtStandIn, type StandInRequest } from '../../helpers/adtStandIn';
+} from '../../../../src/lib/systemContext';
+import { responsibleRules } from '../../index';
+
+/** The debugger's request user, its connection's parameters made by the rules. */
+function userOf(connection: object) {
+  return withResolvedSystemContext(
+    connection as never,
+    async () => requestUserOf(),
+    defaultSystemContextResolver,
+    undefined,
+    responsibleRules,
+  );
+}
 
 const SYSTEM_INFORMATION = '/sap/bc/adt/core/http/systeminformation';
 const isLookup = (r: StandInRequest) => r.url.startsWith(SYSTEM_INFORMATION);
@@ -90,7 +112,7 @@ describe('on-premise', () => {
     try {
       standIn.body(isLookup, JSON.stringify({ userName: 'system_user' }));
       await runWithRequestContext({ login: 'scopelogin' }, async () => {
-        await expect(requestUserOf(connection)).resolves.toBe('SYSTEM_USER');
+        await expect(userOf(connection)).resolves.toBe('SYSTEM_USER');
       });
       expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     } finally {
@@ -102,7 +124,7 @@ describe('on-premise', () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 404);
-      await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
+      await expect(userOf(connection)).resolves.toBe('LOGIN_USER');
       expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     } finally {
       await closeBoth(standIn, connection);
@@ -114,7 +136,7 @@ describe('on-premise', () => {
     try {
       standIn.answer(isLookup, 404);
       await runWithRequestContext({ login: 'scopelogin' }, async () => {
-        await expect(requestUserOf(connection)).resolves.toBe('SCOPELOGIN');
+        await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
       });
     } finally {
       await closeBoth(standIn, connection);
@@ -126,9 +148,7 @@ describe('on-premise', () => {
     try {
       standIn.answer(isLookup, 404);
       delete process.env.SAP_USERNAME;
-      await expect(requestUserOf(connection)).rejects.toMatchObject(
-        USER_UNKNOWN,
-      );
+      await expect(userOf(connection)).rejects.toMatchObject(USER_UNKNOWN);
     } finally {
       await closeBoth(standIn, connection);
     }
@@ -152,7 +172,7 @@ describe('on-premise', () => {
         if (processLogin === undefined) delete process.env.SAP_USERNAME;
         else process.env.SAP_USERNAME = processLogin;
         await runWithRequestContext(scope, async () => {
-          await expect(requestUserOf(connection)).resolves.toBe(expected);
+          await expect(userOf(connection)).resolves.toBe(expected);
         });
       } finally {
         await closeBoth(standIn, connection);
@@ -166,7 +186,7 @@ describe('on-premise', () => {
     systemContextFromConfiguration();
     try {
       standIn.answer(isLookup, 404);
-      await expect(requestUserOf(connection)).resolves.toBe('PROCESS_RESP');
+      await expect(userOf(connection)).resolves.toBe('PROCESS_RESP');
     } finally {
       delete process.env.SAP_RESPONSIBLE;
       resetSystemContextCache();
@@ -179,7 +199,7 @@ describe('on-premise', () => {
     try {
       standIn.body(isLookup, JSON.stringify({ userName: 'system_user' }));
       await runWithRequestContext({ responsible: 'resp_user' }, async () => {
-        await expect(requestUserOf(connection)).resolves.toBe('SYSTEM_USER');
+        await expect(userOf(connection)).resolves.toBe('SYSTEM_USER');
       });
     } finally {
       await closeBoth(standIn, connection);
@@ -190,12 +210,11 @@ describe('on-premise', () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 404);
-      await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
-      await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
+      await expect(userOf(connection)).resolves.toBe('LOGIN_USER');
+      await expect(userOf(connection)).resolves.toBe('LOGIN_USER');
+      // Made once: the login gone later changes nothing.
       delete process.env.SAP_USERNAME;
-      await expect(requestUserOf(connection)).rejects.toMatchObject(
-        USER_UNKNOWN,
-      );
+      await expect(userOf(connection)).resolves.toBe('LOGIN_USER');
       expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     } finally {
       await closeBoth(standIn, connection);
@@ -209,13 +228,25 @@ describe('on-premise', () => {
       try {
         standIn.body(isLookup, body);
         await runWithRequestContext({ login: 'scopelogin' }, async () => {
-          await expect(requestUserOf(connection)).resolves.toBe('SCOPELOGIN');
+          await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
         });
-        await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
-        delete process.env.SAP_USERNAME;
-        await expect(requestUserOf(connection)).rejects.toMatchObject(
-          USER_UNKNOWN,
-        );
+        // Made once, with the connection: the same user after.
+        await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
+        // Another connection: the process login, else unknown.
+        const second = await standConnection();
+        const third = await standConnection();
+        try {
+          second.standIn.body(isLookup, body);
+          third.standIn.body(isLookup, body);
+          await expect(userOf(second.connection)).resolves.toBe('LOGIN_USER');
+          delete process.env.SAP_USERNAME;
+          await expect(userOf(third.connection)).rejects.toMatchObject(
+            USER_UNKNOWN,
+          );
+        } finally {
+          await closeBoth(second.standIn, second.connection);
+          await closeBoth(third.standIn, third.connection);
+        }
       } finally {
         await closeBoth(standIn, connection);
       }
@@ -229,13 +260,25 @@ describe('on-premise', () => {
       try {
         standIn.answer(isLookup, status);
         await runWithRequestContext({ login: 'scopelogin' }, async () => {
-          await expect(requestUserOf(connection)).resolves.toBe('SCOPELOGIN');
+          await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
         });
-        await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
-        delete process.env.SAP_USERNAME;
-        await expect(requestUserOf(connection)).rejects.toMatchObject(
-          USER_UNKNOWN,
-        );
+        // Made once, with the connection: the same user after.
+        await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
+        // Another connection: the process login, else unknown.
+        const second = await standConnection();
+        const third = await standConnection();
+        try {
+          second.standIn.answer(isLookup, status);
+          third.standIn.answer(isLookup, status);
+          await expect(userOf(second.connection)).resolves.toBe('LOGIN_USER');
+          delete process.env.SAP_USERNAME;
+          await expect(userOf(third.connection)).rejects.toMatchObject(
+            USER_UNKNOWN,
+          );
+        } finally {
+          await closeBoth(second.standIn, second.connection);
+          await closeBoth(third.standIn, third.connection);
+        }
       } finally {
         await closeBoth(standIn, connection);
       }
@@ -252,7 +295,7 @@ describe('ABAP Cloud', () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.body(isLookup, JSON.stringify({ userName: 'cloud_user' }));
-      await expect(requestUserOf(connection)).resolves.toBe('CLOUD_USER');
+      await expect(userOf(connection)).resolves.toBe('CLOUD_USER');
       expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     } finally {
       await closeBoth(standIn, connection);
@@ -265,7 +308,7 @@ describe('ABAP Cloud', () => {
       const { standIn, connection } = await standConnection();
       try {
         standIn.body(isLookup, body);
-        const error = await requestUserOf(connection).then(
+        const error = await userOf(connection).then(
           () => undefined,
           (thrown: unknown) => thrown,
         );
@@ -283,7 +326,7 @@ describe('ABAP Cloud', () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 404);
-      await expect(requestUserOf(connection)).rejects.toMatchObject({
+      await expect(userOf(connection)).rejects.toMatchObject({
         serverRefusal: 'cloud_without_systeminformation',
         message:
           'the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration or the headers are inconsistent; the tool did not run',
@@ -300,7 +343,7 @@ describe('ABAP Cloud', () => {
       const { standIn, connection } = await standConnection();
       try {
         standIn.answer(isLookup, status);
-        await expect(requestUserOf(connection)).rejects.toMatchObject({
+        await expect(userOf(connection)).rejects.toMatchObject({
           serverRefusal: 'system_lookup_failed',
         });
         expect(standIn.requests.filter(isLookup)).toHaveLength(1);
@@ -320,7 +363,7 @@ describe.each([
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 401);
-      const error = await requestUserOf(connection).then(
+      const error = await userOf(connection).then(
         () => undefined,
         (thrown: unknown) => thrown,
       );

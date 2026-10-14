@@ -16,26 +16,29 @@
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
-import type {
-  HandlerEntry,
-  IHandlerGroup,
-} from '../../../lib/handlers/interfaces';
-import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
-import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
 import {
   type AdtStandIn,
   adtStandIn,
   isLogoff,
   type StandInRequest,
-} from '../../helpers/adtStandIn';
+} from '../../../../src/__tests__/helpers/adtStandIn';
 import {
   clientOf,
   isClassRun,
-  StandServer,
   shippedGroups,
   silent,
-} from '../backgroundRuns/harness';
-import { oneToolGroup, statefulStand } from './harness';
+} from '../../../../src/__tests__/unit/backgroundRuns/harness';
+import {
+  oneToolGroup,
+  statefulStand,
+} from '../../../../src/__tests__/unit/stateful/harness';
+import type {
+  HandlerEntry,
+  IHandlerGroup,
+} from '../../../../src/lib/handlers/interfaces';
+import { CompositeHandlersRegistry } from '../../../../src/lib/handlers/registry/CompositeHandlersRegistry';
+import { requireSystemContextForCreate } from '../../../../src/lib/systemContextGuard';
+import { responsibleRules, StandServer } from '../helpers/withRules';
 
 jest.setTimeout(30_000);
 
@@ -160,6 +163,7 @@ it('ABAP Cloud: a debugger wait sends no lookup; the injected connection is look
   // environment: cloud.
   process.env.SAP_SYSTEM_TYPE = 'cloud';
   const s = await statefulStand(['ReadClass'], {
+    systemContextRules: responsibleRules,
     systemType: 'cloud',
     groups: [
       {
@@ -205,15 +209,15 @@ it.each([
     (standIn: AdtStandIn) => standIn.answer(isLookup, 404),
     1,
   ],
-  ['an error (500)', (standIn: AdtStandIn) => standIn.answer(isLookup, 500), 2],
+  ['an error (500)', (standIn: AdtStandIn) => standIn.answer(isLookup, 500), 1],
   [
     'an answer without a user',
     (standIn: AdtStandIn) =>
       standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' })),
-    2,
+    1,
   ],
 ] as const)(
-  'on-premise, %s: the stated user is taken and the tools run; only a 404 is kept for the destination, anything else asked again',
+  'on-premise, %s: the stated user is taken and the tools run; the parameters made are kept for the destination, asked once',
   async (_case, answer, lookups) => {
     const standIn = await adtStandIn();
     answer(standIn);
@@ -423,6 +427,7 @@ it('ABAP Cloud, the lookup refused: a tool outside the flow is refused before it
   } as unknown as HandlerEntry;
   process.env.SAP_SYSTEM_TYPE = 'cloud';
   const s = await statefulStand(['ReadClass'], {
+    systemContextRules: responsibleRules,
     systemType: 'cloud',
     groups: [
       {
@@ -513,78 +518,6 @@ it('a replacement after a lost session asks no lookup: the same credential on th
     )?.session;
     expect(replaced).toBeDefined();
     expect(replaced).not.toBe(lost);
-  } finally {
-    await s.close();
-    await standIn.close();
-  }
-});
-
-it('ABAP Cloud: a tool outside the flow that waits for its turn to ask is given the replacement of a connection the call ahead lost', async () => {
-  const standIn = await adtStandIn();
-  standIn.body(
-    isLookup,
-    JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
-  );
-  const s = await builtStand(standIn, 'cloud');
-  type Sender = { makeAdtRequest(o: object): Promise<unknown> };
-  const losing: HandlerEntry = {
-    toolDefinition: {
-      name: 'LoseSession',
-      description: 'LoseSession',
-      inputSchema: { type: 'object', properties: {} },
-    },
-    handler: (async (
-      context: { connection: Sender & { isConnected?: () => boolean } },
-      _args: unknown,
-    ) => {
-      await context.connection.makeAdtRequest({
-        url: '/sap/bc/adt/probe/lose',
-        method: 'GET',
-        timeout: 10_000,
-      });
-      context.connection.isConnected = () => false;
-      throw new Error('the session was lost');
-    }) as never,
-  } as unknown as HandlerEntry;
-  const outside: HandlerEntry = {
-    toolDefinition: {
-      name: 'DebugWait',
-      description: 'DebugWait',
-      inputSchema: { type: 'object', properties: {} },
-    },
-    handler: (async (context: { connection: Sender }, _args: unknown) => {
-      await context.connection.makeAdtRequest({
-        url: '/sap/bc/adt/probe/outside',
-        method: 'GET',
-        timeout: 10_000,
-      });
-      return { content: [{ type: 'text', text: 'waited' }] };
-    }) as never,
-  } as unknown as HandlerEntry;
-  s.register({
-    getName: () => 'lose-and-wait',
-    getHandlers: () => [losing, outside],
-    registerHandlers: () => {},
-  } as unknown as IHandlerGroup);
-  try {
-    const held = standIn.hold(isLookup);
-    const first = s.call('LoseSession', {});
-    await held.arrived;
-    // Taken on the first connection, which has no system information yet.
-    const second = s.call('DebugWait', {});
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    held.release();
-    expect((await first).isError).toBe(true);
-    expect((await second).isError).toBeFalsy();
-    const lostSession = standIn.requests.find((r) =>
-      r.url.endsWith('/probe/lose'),
-    )?.session;
-    const outsideSession = standIn.requests.find((r) =>
-      r.url.endsWith('/probe/outside'),
-    )?.session;
-    expect(lostSession).toBeDefined();
-    expect(outsideSession).toBeDefined();
-    expect(outsideSession).not.toBe(lostSession);
   } finally {
     await s.close();
     await standIn.close();

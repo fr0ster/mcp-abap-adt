@@ -12,63 +12,30 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IDebuggeeIds } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
+import { ServerRefusal } from '../auth/serverRefusal';
 import { endConnection, own } from '../ownedConnections';
 import { openFreshConnection } from '../packageSessions';
 import { getRequestContext } from '../requestContext';
-import {
-  SystemUserUnknownError,
-  statedResponsibleOf,
-  systemLookupRefusal,
-} from '../requestSystemResolution';
+import { statedResponsibleOf } from '../requestSystemResolution';
 import { ourClassExecutor, ourProgramExecutor } from '../strategies/resultSets';
-import { systemUserOf } from '../systemUser';
 import type { AmdpSessionPorts } from './AmdpSession';
 import type { DebugSessionPorts, RunOutcome, RunTarget } from './DebugSession';
 
 /**
- * The user whose requests are caught: what `systeminformation` names, on
- * every kind of system, over any configured login. When the system gives no
- * information: on ABAP Cloud the call's error (a `404`
- * `cloud_without_systeminformation`, any other `system_lookup_failed`);
- * on-premise the responsible if stated (`x-sap-responsible`,
- * `SAP_RESPONSIBLE`), else the login — the request scope's before the
- * process's — stands in, and with neither stated the call's
- * `system_user_unknown`. A credential failure goes through to the caller as
- * it came. The kind is the connection's (`systemType`: the server's stated
- * one, for a connection the factory did not build).
+ * The user whose requests are caught: the responsible the call reads — the
+ * connection's parameters where a host's rules made them (the system's
+ * user, else on-premise the stated responsible, else the login), else the
+ * stated responsible (`x-sap-responsible`, `SAP_RESPONSIBLE`) — else the
+ * login, the request scope's before the process's (`SAP_USERNAME`); upper
+ * case. None is the call's `system_user_unknown`. Sends nothing.
  */
-export async function requestUserOf(
-  connection: IAbapConnection,
-  systemType?: string,
-): Promise<string> {
-  let named: string | undefined;
-  try {
-    named = await systemUserOf(connection, systemType);
-  } catch (error) {
-    throw systemLookupRefusal(error, undefined);
-  }
+export function requestUserOf(): string {
   const user =
-    named ||
     statedResponsibleOf() ||
     getRequestContext()?.login ||
     process.env.SAP_USERNAME;
-  if (!user?.trim()) {
-    throw systemLookupRefusal(new SystemUserUnknownError(), undefined);
-  }
+  if (!user?.trim()) throw new ServerRefusal('system_user_unknown');
   return user.trim().toUpperCase();
-}
-
-/**
- * The request user's lookup goes on the instance's connection, so it takes
- * its turn in the instance's main flow (`onMainConnection`).
- */
-function onMain<T>(
-  context: HandlerContext,
-  send: (connection: IAbapConnection) => Promise<T>,
-): Promise<T> {
-  return context.onMainConnection
-    ? context.onMainConnection(send)
-    : send(context.connection);
 }
 
 async function openStateful(context: HandlerContext): Promise<IAbapConnection> {
@@ -151,10 +118,7 @@ export function liveDebugPorts(): DebugSessionPorts<HandlerContext> {
     },
     abapDebugger: (c, onConflict: IDebuggerListenerConflict) =>
       new AbapDebugger(c, undefined, undefined, { onConflict }),
-    requestUser: (context) =>
-      onMain(context, (connection) =>
-        requestUserOf(connection, context.systemType),
-      ),
+    requestUser: async () => requestUserOf(),
     run,
   };
 }
@@ -164,10 +128,7 @@ export function liveAmdpPorts(): AmdpSessionPorts<HandlerContext> {
     openConnection: openStateful,
     closeConnection: closeOwn,
     amdpDebugger: (c) => new AmdpDebugger(c),
-    requestUser: (context) =>
-      onMain(context, (connection) =>
-        requestUserOf(connection, context.systemType),
-      ),
+    requestUser: async () => requestUserOf(),
     run,
   };
 }

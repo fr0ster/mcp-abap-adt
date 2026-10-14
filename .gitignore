@@ -95,6 +95,7 @@ package.json
 !/http/package.json
 !/sse/package.json
 !/background-runs-memory/package.json
+!/responsible-rules/package.json
 !/compact-readonly-entries/package.json
 !/compact-modify/package.json
 !/compact/package.json

@@ -21,7 +21,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../lib/clients';
 import { runWithRequestContext } from '../../lib/requestContext';
 import {
-  getEffectiveSystemContext,
+  getStatedSystemContext,
   resetSystemContextCache,
   setSystemContext,
 } from '../../lib/systemContext';
@@ -105,11 +105,11 @@ describe('responsible and master system are request-scoped', () => {
     expect(lastOptions()?.responsible).toBe('PROC_USER');
   });
 
-  it('getEffectiveSystemContext applies the same rule for other readers', () => {
-    expect(getEffectiveSystemContext().responsible).toBe('PROC_USER');
+  it('getStatedSystemContext applies the same rule for other readers', () => {
+    expect(getStatedSystemContext().responsible).toBe('PROC_USER');
     runWithRequestContext({ responsible: 'ALICE' }, () => {
-      expect(getEffectiveSystemContext().responsible).toBe('ALICE');
-      expect(getEffectiveSystemContext().masterSystem).toBe('PROC_SYS');
+      expect(getStatedSystemContext().responsible).toBe('ALICE');
+      expect(getStatedSystemContext().masterSystem).toBe('PROC_SYS');
     });
   });
 });

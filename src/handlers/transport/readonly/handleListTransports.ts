@@ -22,7 +22,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { parseStructure } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { MAX_SEARCH_CONFIGURATIONS } from '../../../lib/strategies/transportSearch';
-import { getEffectiveSystemContext } from '../../../lib/systemContext';
+import { getStatedSystemContext } from '../../../lib/systemContext';
 
 export const TOOL_DEFINITION = {
   name: 'ListTransports',
@@ -181,15 +181,14 @@ export async function handleListTransports(
 ) {
   const { connection, logger } = context;
   const modifiableOnly = args?.modifiable_only !== false;
-  // `getEffectiveSystemContext`, not `getSystemContext`: the responsible a
+  // `getStatedSystemContext`, not `getSystemContext`: the responsible a
   // request carries wins over the process-wide one, so a host serving several
   // SAP users from one process does not hand every concurrent request
   // whichever user resolved last. Arrived on `main` while this branch was
   // open (#202, #206); the migrated body below is this branch's.
-  // The effective context alone: it already falls back to the login
-  // (SAP_USERNAME included) where the login counts, and not on a cloud
-  // connection, where the system's user does.
-  const user = args?.user || getEffectiveSystemContext().responsible || '';
+  // The stated context alone: the connection's parameters, where a host's
+  // rules made them, are in it.
+  const user = args?.user || getStatedSystemContext().responsible || '';
 
   logger?.debug(
     `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,

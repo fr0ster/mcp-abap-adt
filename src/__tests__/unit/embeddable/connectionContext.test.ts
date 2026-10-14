@@ -41,7 +41,7 @@ import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { headerContext } from '../../../lib/httpTransport/headerSource';
 import {
-  getEffectiveSystemContext,
+  getStatedSystemContext,
   getSystemContext,
   resetSystemContextCache,
   setSystemContext,
@@ -78,7 +78,7 @@ const reportingRegistry = new CompositeHandlersRegistry([
       {
         toolDefinition: { name: 'Report', description: 'd' } as never,
         handler: (async () => {
-          const seen = getEffectiveSystemContext();
+          const seen = getStatedSystemContext();
           return {
             content: [
               {

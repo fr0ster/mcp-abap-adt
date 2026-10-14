@@ -13,18 +13,20 @@
  * The master system is not guarded: when none is known it is left out of the
  * request (adt-clients omits the attribute), and the system applies itself.
  *
- * The words are fixed and name only keys: no value reaches them (H4). A call
- * whose system lookup failed never gets here: the lookup's failure is the
- * call's answer, and its handler does not run.
+ * The words are fixed and name only keys: no value reaches them (H4). The
+ * responsible is what the call states — the connection's parameters, where
+ * a host's rules made them, included. A call whose parameters could not be
+ * made never gets here: that failure is the call's answer, and its handler
+ * does not run.
  */
 
 import {
-  getEffectiveSystemContext,
+  getStatedSystemContext,
   type IAdtSystemContext,
 } from './systemContext';
 
 export const MISSING_RESPONSIBLE =
-  'No responsible person for this change: the responsible is the user the system names (systeminformation); only where an on-premise system has no such function, set SAP_RESPONSIBLE (the destination .env or the environment), or send the x-sap-responsible header, or pass the tool argument where the tool has one. Without them the login is the responsible there: SAP_USERNAME, or x-sap-login with x-sap-url. ADT changes are not made without one';
+  'No responsible person for this change: state one — SAP_RESPONSIBLE (the destination .env or the environment), the x-sap-responsible header, or the tool argument where the tool has one. ADT changes are not made without one';
 
 /** The refusal of a change that lacks a responsible person. */
 export class SystemContextMissingError extends Error {
@@ -69,7 +71,7 @@ export function requireSystemContextForCreate(): {
   responsible: string;
   masterSystem: string | undefined;
 } {
-  const { responsible, masterSystem } = getEffectiveSystemContext();
+  const { responsible, masterSystem } = getStatedSystemContext();
   if (!responsible) throw new SystemContextMissingError();
   return { responsible, masterSystem: masterSystem || undefined };
 }

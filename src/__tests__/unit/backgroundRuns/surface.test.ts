@@ -32,6 +32,7 @@ import type {
   ToolDefinition,
 } from '../../../lib/handlers/interfaces';
 import { registryForExposition } from '../../../lib/handlers/registry/expositionRegistry';
+import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import {
   compactReadOnlyToolSetOf,
   compactToolSetOf,
@@ -79,6 +80,7 @@ describe('an embedder', () => {
       systemType: 'cloud',
       logger: silent,
       backgroundRuns: strategy,
+      systemContextResolver: defaultSystemContextResolver,
     });
     const client = await clientOf(server);
     try {
@@ -136,6 +138,7 @@ describe('an embedder', () => {
       systemType: 'onprem',
       logger: silent,
       backgroundRuns: strategy,
+      systemContextResolver: defaultSystemContextResolver,
     });
     const client = await clientOf(server);
     try {

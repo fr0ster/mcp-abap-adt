@@ -116,9 +116,18 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
             }
             args = withoutBackground(given);
           }
-          // A request that lacks responsible/master system gets them from an
-          // ABAP Cloud connection — see src/lib/requestSystemResolution.ts.
+          // The connection's parameters, when the registrant's context
+          // carries a resolver (and rules) — see
+          // src/lib/requestSystemResolution.ts; else nothing is looked up.
           const context = this.context;
+          const withParameters = <T>(fn: () => Promise<T>) =>
+            withResolvedSystemContext(
+              context?.connection,
+              fn,
+              context?.systemContextResolver ?? null,
+              context?.systemType,
+              context?.systemContextRules ?? null,
+            );
           let result: any;
           const listed = isLongTool(toolName);
           const read = listed && isLongRead(toolName, args);
@@ -139,7 +148,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
                 content: { type: 'text'; text: string }[];
               };
             }
-            result = await withResolvedSystemContext(context?.connection, () =>
+            result = await withParameters(() =>
               runLongCall({
                 name: toolName,
                 connection: context.connection,
@@ -167,9 +176,7 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
               }),
             );
           } else {
-            result = await withResolvedSystemContext(context?.connection, () =>
-              handler(context, args),
-            );
+            result = await withParameters(() => handler(context, args));
           }
 
           // Same normalizer as BaseMcpServer — see src/lib/toolResult.ts.

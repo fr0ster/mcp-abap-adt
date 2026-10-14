@@ -14,16 +14,19 @@
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
-import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
-import { createAbapConnection } from '../../../lib/connectionFactory';
-import type { IHandlersRegistry } from '../../../lib/handlers/interfaces';
-import { getEffectiveSystemContext } from '../../../lib/systemContext';
 import {
   type AdtStandIn,
   adtStandIn,
   type StandInRequest,
-} from '../../helpers/adtStandIn';
-import { clientOf, StandServer, silent } from '../backgroundRuns/harness';
+} from '../../../../src/__tests__/helpers/adtStandIn';
+import {
+  clientOf,
+  silent,
+} from '../../../../src/__tests__/unit/backgroundRuns/harness';
+import { createAbapConnection } from '../../../../src/lib/connectionFactory';
+import type { IHandlersRegistry } from '../../../../src/lib/handlers/interfaces';
+import { getStatedSystemContext } from '../../../../src/lib/systemContext';
+import { EmbeddableMcpServer, StandServer } from '../helpers/withRules';
 
 jest.setTimeout(30_000);
 
@@ -49,7 +52,7 @@ function ownRegistry(seen: Seen): IHandlersRegistry {
           inputSchema: { id: z.string() },
         },
         async (args: { id: string }, extra: { signal: AbortSignal }) => {
-          seen.push(getEffectiveSystemContext().responsible);
+          seen.push(getStatedSystemContext().responsible);
           const reach = server as unknown as {
             getConnection(signal: AbortSignal): Promise<{
               makeAdtRequest(options: object): Promise<unknown>;

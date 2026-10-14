@@ -5,9 +5,9 @@ import {
   generateYamlConfigTemplate,
   type ParameterTable,
   readParameters,
-  SYSTEM_TYPE_ROW,
   validateYamlConfig as validateTable,
 } from '@mcp-abap-adt/lib/config';
+import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
 import { load } from 'js-yaml';
 import {
   CORE_PARAMETERS,

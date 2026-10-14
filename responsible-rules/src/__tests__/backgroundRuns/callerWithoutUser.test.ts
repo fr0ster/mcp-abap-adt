@@ -12,14 +12,19 @@
 
 import { TokenAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
-import type { DestinationSystemContext } from '../../../lib/auth/destinationSystemContext';
-import { SYSTEM_USER_UNKNOWN_WORDS } from '../../../lib/auth/serverRefusal';
 import {
   type AdtStandIn,
   adtStandIn,
   type StandInRequest,
-} from '../../helpers/adtStandIn';
-import { clientOf, StandServer, shippedGroups, silent } from './harness';
+} from '../../../../src/__tests__/helpers/adtStandIn';
+import {
+  clientOf,
+  shippedGroups,
+  silent,
+} from '../../../../src/__tests__/unit/backgroundRuns/harness';
+import type { DestinationSystemContext } from '../../../../src/lib/auth/destinationSystemContext';
+import { SYSTEM_USER_UNKNOWN_WORDS } from '../../../../src/lib/auth/serverRefusal';
+import { StandServer } from '../helpers/withRules';
 
 jest.setTimeout(30_000);
 
@@ -217,14 +222,14 @@ describe('on-premise', () => {
         'an answer without a user',
         (standIn) =>
           standIn.body(isLookup, JSON.stringify({ systemID: 'SID' })),
-        2,
+        1,
       ],
-      ['an error (405)', (standIn) => standIn.answer(isLookup, 405), 2],
-      ['an error (500)', (standIn) => standIn.answer(isLookup, 500), 2],
+      ['an error (405)', (standIn) => standIn.answer(isLookup, 405), 1],
+      ['an error (500)', (standIn) => standIn.answer(isLookup, 500), 1],
     ];
 
   it.each(NO_INFORMATION)(
-    '%s: the configured login; only a 404 is kept, anything else asked again',
+    '%s: the configured login; the parameters made with the connection are kept, asked once',
     async (_case, answer, lookups) => {
       const standIn = await adtStandIn();
       answer(standIn);

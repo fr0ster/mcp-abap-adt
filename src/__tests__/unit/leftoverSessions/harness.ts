@@ -37,6 +37,10 @@ import {
   sessionIdentity,
 } from '../../../lib/leftoverSessions/LeftoverSessions';
 import {
+  defaultSystemContextResolver,
+  type SystemContextRules,
+} from '../../../lib/requestSystemResolution';
+import {
   type AdtStandIn,
   adtStandIn,
   probeGroup,
@@ -59,6 +63,13 @@ export const settingsFor = (url: string, user: string): SapConfig => ({
 });
 
 class StandServer extends BaseMcpServer {
+  /**
+   * A host's instance: the shipped resolver asks the system unless the
+   * case says otherwise; no rules unless the case passes them.
+   */
+  constructor(options: ConstructorParameters<typeof BaseMcpServer>[0]) {
+    super({ systemContextResolver: defaultSystemContextResolver, ...options });
+  }
   use(source: { settings: SapConfig; credential: IAuthProvider }): void {
     this.setConnectionContext({
       kind: 'built',
@@ -136,6 +147,8 @@ export async function leftoverStand(
     };
     /** Extra tools beside the leftover-session ones and the probe. */
     extra?: Parameters<typeof probeGroup>[0];
+    /** The rules a host passes (core passes responsible-rules); none by default. */
+    systemContextRules?: SystemContextRules;
   } = {},
 ): Promise<LeftoverStand> {
   const standIn = await adtStandIn();
@@ -152,6 +165,9 @@ export async function leftoverStand(
     name: 'leftover-stand',
     logger: silent,
     ...(options.noOwner ? {} : { leftoverSessions: owner }),
+    ...(options.systemContextRules !== undefined && {
+      systemContextRules: options.systemContextRules,
+    }),
   });
   const user = options.user ?? 'LEFT_USER';
   if (options.token !== undefined) {

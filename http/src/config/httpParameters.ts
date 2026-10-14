@@ -18,7 +18,6 @@ import {
   SHUTDOWN_TIMEOUT_ROW,
   SSE_OPTIONS_REMOVED,
   STATE_IDLE_ROW,
-  SYSTEM_TYPE_ROW,
   type TlsConfig,
   tlsConfigOf,
   tlsRows,
@@ -26,6 +25,7 @@ import {
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
 
 const HTTP = 'STREAMABLE HTTP';
 

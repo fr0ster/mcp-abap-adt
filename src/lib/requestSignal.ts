@@ -4,7 +4,7 @@
  *
  * Its own `AsyncLocalStorage` — not the system-context request scope
  * (`requestContext.ts`), which stdio does not enter and whose presence
- * changes what `getEffectiveSystemContext` answers. The tool wrapper runs
+ * changes what `getStatedSystemContext` answers. The tool wrapper runs
  * the handler inside `runWithRequestSignal(signal, …)`. It is for the
  * server's own waits (D32) and D5's check only: a tool's sends carry no
  * request signal — nothing sent to SAP carries it, and no `freshConnection`

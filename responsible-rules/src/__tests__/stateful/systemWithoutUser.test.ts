@@ -11,14 +11,18 @@
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
-import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import {
   type AdtStandIn,
   adtStandIn,
   type StandInRequest,
-} from '../../helpers/adtStandIn';
-import { clientOf, StandServer, silent } from '../backgroundRuns/harness';
-import { oneToolGroup } from './harness';
+} from '../../../../src/__tests__/helpers/adtStandIn';
+import {
+  clientOf,
+  silent,
+} from '../../../../src/__tests__/unit/backgroundRuns/harness';
+import { oneToolGroup } from '../../../../src/__tests__/unit/stateful/harness';
+import { CompositeHandlersRegistry } from '../../../../src/lib/handlers/registry/CompositeHandlersRegistry';
+import { StandServer } from '../helpers/withRules';
 
 jest.setTimeout(30_000);
 

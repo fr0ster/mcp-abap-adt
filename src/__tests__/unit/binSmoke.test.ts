@@ -97,12 +97,13 @@ describe('the published bins start from an installed package', () => {
 
     workdir = mkdtempSync(join(tmpdir(), 'mcp-bin-smoke-'));
 
-    // Pack all sixteen, because each depends on the others by version and the
+    // Pack all seventeen, because each depends on the others by version and the
     // versions being released are not on the registry yet. Every bin is a
     // chance to ship a launcher that cannot find its own manifest.
     installPackedRelease(workdir, [
       '.',
       'background-runs-memory',
+      'responsible-rules',
       'http',
       'sse',
       'server',

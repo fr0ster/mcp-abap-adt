@@ -42,7 +42,7 @@ import {
 } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
 import {
-  getEffectiveSystemContext,
+  getStatedSystemContext,
   resetSystemContextCache,
 } from '../../../src/lib/systemContext';
 import { SseServer } from '../SseServer.js';
@@ -63,7 +63,7 @@ const whoAmI: IHandlerGroup = {
       } as never,
       handler: (async (_context: unknown, args: { delayMs?: number }) => {
         await new Promise((r) => setTimeout(r, args?.delayMs ?? 0));
-        const seen = getEffectiveSystemContext();
+        const seen = getStatedSystemContext();
         return {
           content: [
             {
@@ -283,7 +283,7 @@ describe('SseServer: responsible and master system per session', () => {
       { ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' },
     ],
   ])(
-    '%s states no user: system_user_unknown, the tool not run; the 404 is kept, so the next call on the session sends no lookup',
+    '%s states no user: system_user_unknown, the tool not run; the connection fails with its parameters, nothing is kept, so the next call asks again',
     async (_case, headers) => {
       delete process.env.SAP_RESPONSIBLE;
       resetSystemContextCache();
@@ -297,7 +297,7 @@ describe('SseServer: responsible and master system per session', () => {
           error: 'system_user_unknown',
         });
       }
-      expect(mockLookups.count - before).toBe(1);
+      expect(mockLookups.count - before).toBe(2);
     },
   );
 

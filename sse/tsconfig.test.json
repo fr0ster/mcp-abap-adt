@@ -25,6 +25,9 @@
       "@mcp-abap-adt/background-runs-memory": [
         "../background-runs-memory/src/index.ts"
       ],
+      "@mcp-abap-adt/responsible-rules": [
+        "../responsible-rules/src/index.ts"
+      ],
       "@mcp-abap-adt/lib": [
         "../src/index.ts"
       ],

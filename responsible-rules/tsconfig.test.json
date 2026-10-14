@@ -1,0 +1,137 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": [
+      "es2022"
+    ],
+    "module": "node16",
+    "moduleResolution": "node16",
+    "isolatedModules": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": [
+      "node",
+      "jest"
+    ],
+    "rootDir": "..",
+    "outDir": "./dist",
+    "noImplicitAny": false,
+    "paths": {
+      "@mcp-abap-adt/lib": [
+        "../src/index.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers": [
+        "../src/lib/handlers/index.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers/read": [
+        "../src/lib/handlers/read.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers/write": [
+        "../src/lib/handlers/write.ts"
+      ],
+      "@mcp-abap-adt/lib/compact-shared": [
+        "../src/lib/compact/index.ts"
+      ],
+      "@mcp-abap-adt/lib/debugger": [
+        "../src/lib/debugger/index.ts"
+      ],
+      "@mcp-abap-adt/lib/state": [
+        "../src/lib/state/index.ts"
+      ],
+      "@mcp-abap-adt/lib/utils": [
+        "../src/lib/utils.ts"
+      ],
+      "@mcp-abap-adt/lib/config": [
+        "../src/lib/config/index.ts"
+      ],
+      "@mcp-abap-adt/lib/embeddable": [
+        "../src/embeddable/index.ts"
+      ],
+      "@mcp-abap-adt/lib/logger": [
+        "../src/lib/handlerLogger.ts"
+      ],
+      "@mcp-abap-adt/lib/request-context": [
+        "../src/lib/requestContext.ts"
+      ],
+      "@mcp-abap-adt/lib/auth": [
+        "../src/lib/auth/index.ts"
+      ],
+      "@mcp-abap-adt/lib/http-transport": [
+        "../src/lib/httpTransport/index.ts"
+      ],
+      "@mcp-abap-adt/lib/tool-set": [
+        "../src/lib/toolSet.ts"
+      ],
+      "@mcp-abap-adt/background-runs-memory": [
+        "../background-runs-memory/src/index.ts"
+      ],
+      "@mcp-abap-adt/compact-readonly-entries": [
+        "../compact-readonly-entries/src/index.ts"
+      ],
+      "@mcp-abap-adt/compact-readonly-entries/routes": [
+        "../compact-readonly-entries/src/handlers/compactReadRoutes.ts"
+      ],
+      "@mcp-abap-adt/compact-modify": [
+        "../compact-modify/src/index.ts"
+      ],
+      "@mcp-abap-adt/compact-modify/routes": [
+        "../compact-modify/src/handlers/compactWriteRoutes.ts"
+      ],
+      "@mcp-abap-adt/core/launcher": [
+        "../server/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/core/auth": [
+        "../server/src/auth/index.ts"
+      ],
+      "@mcp-abap-adt/http": [
+        "../http/src/index.ts"
+      ],
+      "@mcp-abap-adt/sse": [
+        "../sse/src/index.ts"
+      ],
+      "@mcp-abap-adt/http/launcher": [
+        "../http/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/sse/launcher": [
+        "../sse/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/compact/launcher": [
+        "../compact/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/compact-http/launcher": [
+        "../compact-http/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/compact-sse/launcher": [
+        "../compact-sse/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/core-ro/launcher": [
+        "../core-ro/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/http-ro/launcher": [
+        "../http-ro/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/sse-ro/launcher": [
+        "../sse-ro/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/compact-ro/launcher": [
+        "../compact-ro/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/compact-http-ro/launcher": [
+        "../compact-http-ro/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/compact-sse-ro/launcher": [
+        "../compact-sse-ro/src/launcher.ts"
+      ]
+    },
+    "noEmit": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": []
+}

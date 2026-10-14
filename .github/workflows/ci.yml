@@ -55,6 +55,9 @@ jobs:
       - name: Run Biome lint (background-runs-memory)
         run: npm --prefix background-runs-memory run lint:check
 
+      - name: Run Biome lint (responsible-rules)
+        run: npm --prefix responsible-rules run lint:check
+
       # Their suites run in the root `npm test` (its Jest roots name them).
       - name: Run Biome lint (compact-http)
         run: npm --prefix compact-http run lint:check
@@ -163,11 +166,18 @@ jobs:
       - name: Run background-runs-memory tests
         run: npm --prefix background-runs-memory test
 
+      # The responsible rules' own tests.
+      - name: Type-check responsible-rules tests
+        run: npm --prefix responsible-rules run test:check
+
+      - name: Run responsible-rules tests
+        run: npm --prefix responsible-rules test
+
       - name: Security audit (production deps, high+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high
 
-      # All sixteen packages. 10.0.0 split them: the repository root is
+      # All seventeen packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
       # one carrying the `mcp-abap-adt` binary. `npm pack` at the root produces
       # `mcp-abap-adt-lib-*.tgz`, so the install step below looked for a file
@@ -182,7 +192,7 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
           npm pack
-          npm pack ./background-runs-memory ./compact-readonly-entries ./compact-modify ./http ./sse ./server ./compact ./compact-http ./compact-sse ./core-ro ./http-ro ./sse-ro ./compact-ro ./compact-http-ro ./compact-sse-ro
+          npm pack ./background-runs-memory ./responsible-rules ./compact-readonly-entries ./compact-modify ./http ./sse ./server ./compact ./compact-http ./compact-sse ./core-ro ./http-ro ./sse-ro ./compact-ro ./compact-http-ro ./compact-sse-ro
 
       # **Both tarballs in one install, or this step cannot pass a release.**
       # `core` depends on `lib` by range, so installing the core tarball alone
@@ -225,7 +235,7 @@ jobs:
           node -e "const {readFileSync,existsSync}=require('node:fs');
             const nm='node_modules/@mcp-abap-adt/';
             const pkg=n=>JSON.parse(readFileSync(nm+n+'/package.json','utf8'));
-            const ours=['lib','background-runs-memory','http','sse','core','compact','compact-http','compact-sse','compact-readonly-entries','compact-modify','core-ro','http-ro','sse-ro','compact-ro','compact-http-ro','compact-sse-ro'];
+            const ours=['lib','background-runs-memory','responsible-rules','http','sse','core','compact','compact-http','compact-sse','compact-readonly-entries','compact-modify','core-ro','http-ro','sse-ro','compact-ro','compact-http-ro','compact-sse-ro'];
             let bad=0;
             for (const p of ours) for (const d of Object.keys(pkg(p).dependencies||{})) {
               const n=d.replace('@mcp-abap-adt/','');

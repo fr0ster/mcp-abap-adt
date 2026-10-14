@@ -1,5 +1,5 @@
 /**
- * The package set (C23): sixteen packages, twelve of them a binary each.
+ * The package set: seventeen packages, twelve of them a binary each.
  *
  * Every package of this repository builds (its `dist` entry is there after
  * `npm run build`), each binary package declares exactly its bin and ships
@@ -19,6 +19,7 @@ const ROOT = path.join(__dirname, '..', '..', '..', '..');
 const PACKAGES: ReadonlyArray<readonly [string, string, string | null]> = [
   ['.', '@mcp-abap-adt/lib', null],
   ['background-runs-memory', '@mcp-abap-adt/background-runs-memory', null],
+  ['responsible-rules', '@mcp-abap-adt/responsible-rules', null],
   ['compact-readonly-entries', '@mcp-abap-adt/compact-readonly-entries', null],
   ['compact-modify', '@mcp-abap-adt/compact-modify', null],
   ['server', '@mcp-abap-adt/core', 'mcp-abap-adt'],
@@ -128,9 +129,9 @@ function accepts(range: string, version: string): boolean {
 }
 
 describe('the package set', () => {
-  it('is sixteen packages, every manifest kept by .gitignore’s exceptions', () => {
+  it('is seventeen packages, every manifest kept by .gitignore’s exceptions', () => {
     const ignore = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
-    expect(PACKAGES).toHaveLength(16);
+    expect(PACKAGES).toHaveLength(17);
     for (const [dir, name] of PACKAGES) {
       expect(manifestOf(dir).name).toBe(name);
       expect(manifestOf(dir).workspaces).toBeUndefined();

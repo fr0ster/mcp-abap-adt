@@ -10,7 +10,6 @@ import {
   answerVersionOrHelp,
   generateHelp,
   type LauncherEdges,
-  listenerSystemTypeRequiredWords,
   processEdges,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
@@ -22,6 +21,7 @@ import {
   registryOf,
   type ToolSet,
 } from '@mcp-abap-adt/lib/tool-set';
+import { listenerSystemTypeRequiredWords } from '@mcp-abap-adt/responsible-rules';
 import {
   type HttpConfig,
   httpParameters,

@@ -19,12 +19,12 @@ import {
   SHUTDOWN_TIMEOUT_ROW,
   SSE_OPTIONS_REMOVED,
   STATE_IDLE_ROW,
-  SYSTEM_TYPE_ROW,
   TLS_OPTIONS_REMOVED,
   transportRemoved,
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
 import { resolveEnvFilePath } from './envResolver';
 
 const DESTINATION = 'DESTINATION AND LOGIN';

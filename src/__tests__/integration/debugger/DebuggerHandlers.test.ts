@@ -67,8 +67,16 @@ import {
 } from '../../../lib/debugger/DebuggerInstance';
 import type { Debugger } from '../../../lib/debugger/DebugSession';
 import { newDebuggerId } from '../../../lib/debugger/ids';
-import { requestUserOf } from '../../../lib/debugger/ports';
 import { openFreshConnection } from '../../../lib/packageSessions';
+import { readSystemInformation } from '../../../lib/systemInformation';
+
+/** The SAP user a connection's session belongs to, as the system names it. */
+async function requestUserOf(connection: IAbapConnection): Promise<string> {
+  const { user } = await readSystemInformation(connection);
+  if (user === undefined) throw new Error('the system named no user');
+  return user.trim().toUpperCase();
+}
+
 import {
   InstanceState,
   stderrStateLogger,

@@ -29,6 +29,7 @@ import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/Backgro
 import { SystemHandlersGroup } from '../../../lib/handlers/groups/SystemHandlersGroup';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -47,6 +48,13 @@ export const isProgramRun = (r: StandInRequest): boolean =>
   r.method === 'POST' && r.url.includes('/programs/programrun/');
 
 export class StandServer extends BaseMcpServer {
+  /**
+   * A host's instance: the shipped resolver asks the system unless the
+   * case says otherwise; no rules unless the case passes them.
+   */
+  constructor(options: ConstructorParameters<typeof BaseMcpServer>[0]) {
+    super({ systemContextResolver: defaultSystemContextResolver, ...options });
+  }
   use(source: {
     settings: SapConfig;
     credential: IAuthProvider;

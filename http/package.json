@@ -67,6 +67,7 @@
     "@mcp-abap-adt/background-runs-memory": "^18.1.0",
     "@mcp-abap-adt/lib": "^18.1.0",
     "@mcp-abap-adt/logger": "^0.4.1",
+    "@mcp-abap-adt/responsible-rules": "^18.1.0",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "express": "^5.2.1"
   },
@@ -89,6 +90,7 @@
     },
     "moduleNameMapper": {
       "^@mcp-abap-adt/background-runs-memory$": "<rootDir>/../background-runs-memory/src/index.ts",
+      "^@mcp-abap-adt/responsible-rules$": "<rootDir>/../responsible-rules/src/index.ts",
       "^@mcp-abap-adt/lib$": "<rootDir>/../src/index.ts",
       "^@mcp-abap-adt/lib/handlers$": "<rootDir>/../src/lib/handlers/index.ts",
       "^@mcp-abap-adt/lib/http-transport$": "<rootDir>/../src/lib/httpTransport/index.ts",

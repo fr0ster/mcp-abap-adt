@@ -36,7 +36,7 @@ import {
 } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
 import {
-  getEffectiveSystemContext,
+  getStatedSystemContext,
   resetSystemContextCache,
 } from '../../../src/lib/systemContext';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
@@ -57,7 +57,7 @@ const whoAmI: IHandlerGroup = {
       } as never,
       handler: (async (_context: unknown, args: { delayMs?: number }) => {
         await new Promise((r) => setTimeout(r, args?.delayMs ?? 0));
-        const seen = getEffectiveSystemContext();
+        const seen = getStatedSystemContext();
         return {
           content: [
             {

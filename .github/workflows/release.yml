@@ -46,6 +46,9 @@ jobs:
       - name: Run Biome lint (background-runs-memory)
         run: npm --prefix background-runs-memory run lint:check
 
+      - name: Run Biome lint (responsible-rules)
+        run: npm --prefix responsible-rules run lint:check
+
       # Their suites run in the root `npm test` (its Jest roots name them).
       - name: Run Biome lint (compact-http)
         run: npm --prefix compact-http run lint:check
@@ -113,6 +116,13 @@ jobs:
 
       - name: Run background-runs-memory tests
         run: npm --prefix background-runs-memory test
+
+      # The responsible rules' own tests.
+      - name: Type-check responsible-rules tests
+        run: npm --prefix responsible-rules run test:check
+
+      - name: Run responsible-rules tests
+        run: npm --prefix responsible-rules test
 
   release:
     needs: test

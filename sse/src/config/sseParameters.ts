@@ -19,7 +19,6 @@ import {
   readParameters,
   SHUTDOWN_TIMEOUT_ROW,
   STATE_IDLE_ROW,
-  SYSTEM_TYPE_ROW,
   type TlsConfig,
   tlsConfigOf,
   tlsRows,
@@ -27,6 +26,7 @@ import {
   type YamlConfig,
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
 
 const SSE = 'SSE';
 

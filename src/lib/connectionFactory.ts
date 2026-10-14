@@ -280,21 +280,21 @@ const records = new WeakMap<object, ConnectionRecord>();
 
 /**
  * The system kind a connection was built for: the kind the factory
- * recorded when it built it (`resolveSystemKind` then). A connection the factory did not build (an
- * embedder's own) has no settings: the kind the server states for it
- * (`declared`, the server's `systemType` option) wins, then
- * `SAP_SYSTEM_TYPE`. Neither is refused (`system_type_required`): the kind
- * is never guessed, not from the URL either.
+ * recorded when it built it (`resolveSystemKind` then). A connection the
+ * factory did not build (an embedder's own) has no settings: the kind the
+ * server states for it (`declared`, the server's `systemType` option) wins,
+ * then `SAP_SYSTEM_TYPE`; `undefined` when neither states one — the kind is
+ * never guessed, not from the URL either. What a missing kind means is the
+ * host's rules'.
  */
 export function systemKindOf(
   connection: object,
   env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
   declared?: string,
-): AbapSystemKind {
+): AbapSystemKind | undefined {
   const record = records.get(connection);
   if (record) return record.kind;
-  const stated = declared ? { SAP_SYSTEM_TYPE: declared } : env;
-  return resolveSystemKind({} as SapConfig, stated);
+  return statedSystemKind(declared ? declared : env.SAP_SYSTEM_TYPE);
 }
 
 /**

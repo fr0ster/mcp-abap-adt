@@ -3,7 +3,7 @@
  * (`/sap/bc/adt/core/http/systeminformation`), read here with its status
  * rather than through adt-clients' `getSystemInformation`, which answers
  * `null` both for a failed request and for a successful body it could not
- * read — and the server's rules need the two apart.
+ * read — and a host's rules need the two apart.
  *
  * The endpoint answers on ABAP Cloud and on-premise alike, so its presence
  * does not tell the system's kind (that comes from the connection's
@@ -18,7 +18,7 @@
  *   `SystemInformationStatusError`. A `401` is the credentials refused
  *   (`isCredentialRefusedStatus`), not a `systeminformation` failure; a
  *   `404` is the endpoint absent (`isSystemInformationUnavailable`); how
- *   the server reads each is its recipe (`systemForCall`).
+ *   each is read is a host's rules' (`SystemContextRules`).
  *
  * The request is the helper's: GET, the same `Accept`, no timeout, the
  * cache-busting parameter Eclipse sends.

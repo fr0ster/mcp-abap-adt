@@ -10,8 +10,8 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
   AdtClient: jest.fn(),
   AdtClientLegacy: jest.fn(),
 }));
-jest.mock('../../lib/systemInformation', () => ({
-  ...jest.requireActual('../../lib/systemInformation'),
+jest.mock('../../../src/lib/systemInformation', () => ({
+  ...jest.requireActual('../../../src/lib/systemInformation'),
   readSystemInformation: jest.fn(),
 }));
 
@@ -20,30 +20,34 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
-import type { HandlerContext } from '../../handlers/interfaces';
-import { createAdtClient } from '../../lib/clients';
-import { createAbapConnection } from '../../lib/connectionFactory';
-import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
-import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
+import type { HandlerContext } from '../../../src/handlers/interfaces';
+import { createAdtClient } from '../../../src/lib/clients';
+import { createAbapConnection } from '../../../src/lib/connectionFactory';
 import type {
   HandlerEntry,
   IHandlerGroup,
-} from '../../lib/handlers/interfaces';
-import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
-import { logger } from '../../lib/logger';
+} from '../../../src/lib/handlers/interfaces';
+import { CompositeHandlersRegistry } from '../../../src/lib/handlers/registry/CompositeHandlersRegistry';
+import { logger } from '../../../src/lib/logger';
 import {
   defaultSystemContextResolver,
   runWithRequestContext,
   type SystemContextResolver,
-  withResolvedSystemContext,
-} from '../../lib/requestContext';
+} from '../../../src/lib/requestContext';
 import {
-  getEffectiveSystemContext,
+  getStatedSystemContext,
   resetSystemContextCache,
   setSystemContext,
-} from '../../lib/systemContext';
-import { readSystemInformation } from '../../lib/systemInformation';
+} from '../../../src/lib/systemContext';
+import { readSystemInformation } from '../../../src/lib/systemInformation';
+
+import {
+  BaseHandlerGroup,
+  EmbeddableMcpServer,
+  HandlerExporter,
+  withResolvedSystemContext,
+  withRules,
+} from './helpers/withRules';
 
 const lookup = readSystemInformation as jest.Mock;
 
@@ -116,7 +120,7 @@ function lastOptions(): Options {
 }
 
 function seen() {
-  const ctx = getEffectiveSystemContext();
+  const ctx = getStatedSystemContext();
   return {
     responsible: ctx.responsible,
     masterSystem: ctx.masterSystem,
@@ -267,7 +271,7 @@ describe('the recipe around the resolver, by the kind', () => {
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
-  it('on-premise, a kept 404 with no user stated: system_user_unknown each call, still asked once', async () => {
+  it('on-premise, a 404 with no user stated: system_user_unknown each call, nothing kept — asked again until the parameters are made', async () => {
     const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
     lookup.mockRejectedValue(status(404));
     const connection = onPremConn();
@@ -281,7 +285,11 @@ describe('the recipe around the resolver, by the kind', () => {
         withResolvedSystemContext(connection, () => 'ran'),
       ),
     ).resolves.toBe('ran');
-    expect(lookup).toHaveBeenCalledTimes(1);
+    // Made then, and kept: no further lookup.
+    await expect(
+      withResolvedSystemContext(connection, () => 'ran'),
+    ).resolves.toBe('ran');
+    expect(lookup).toHaveBeenCalledTimes(3);
     warn.mockRestore();
   });
 
@@ -445,7 +453,7 @@ describe('withResolvedSystemContext', () => {
     });
   });
 
-  it('on-premise without the function (404), no user stated: system_user_unknown, fn never runs; the 404 is kept, so the next call sends no lookup', async () => {
+  it('on-premise without the function (404), no user stated: system_user_unknown, fn never runs; nothing is kept, so the next call asks again', async () => {
     const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
     lookup.mockRejectedValue(
       Object.assign(new Error('placeholder'), { response: { status: 404 } }),
@@ -460,7 +468,7 @@ describe('withResolvedSystemContext', () => {
       ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
     }
     expect(fn).not.toHaveBeenCalled();
-    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(lookup).toHaveBeenCalledTimes(2);
     warn.mockRestore();
   });
 
@@ -478,7 +486,7 @@ describe('withResolvedSystemContext', () => {
       await expect(
         runWithRequestContext(scope, () =>
           withResolvedSystemContext(onPremConn(), () => {
-            seen.push(getEffectiveSystemContext().responsible);
+            seen.push(getStatedSystemContext().responsible);
             return 'ran';
           }),
         ),
@@ -597,7 +605,7 @@ describe('withResolvedSystemContext', () => {
     [
       'an answer without a user',
       () => lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' }),
-      2,
+      1,
     ],
     [
       'an error (500)',
@@ -607,12 +615,12 @@ describe('withResolvedSystemContext', () => {
             response: { status: 500 },
           }),
         ),
-      2,
+      1,
     ],
   ] as const;
 
   it.each(onPremNoInformation)(
-    'on-premise, %s: the stated values are taken, fn runs; asked again only when not a 404',
+    'on-premise, %s: the stated values are taken, fn runs; the parameters made are kept, asked once',
     async (_case, answer, lookups) => {
       answer();
       const connection = onPremConn();
@@ -730,7 +738,8 @@ describe('withResolvedSystemContext', () => {
       { responsible: undefined, masterSystem: undefined },
       () => withResolvedSystemContext(onPremUserConn(), seen),
     );
-    expect(result.responsible).toBeUndefined();
+    // The connection's login (the rules' second step), never PROC_USER.
+    expect(result.responsible).toBe('STATED');
     expect(result.masterSystem).toBeUndefined();
   });
 
@@ -764,7 +773,7 @@ describe('withResolvedSystemContext', () => {
     expect(result.responsible).toBeUndefined();
   });
 
-  it('a throwing lookup logs a warning with its class only, and fn does not run', async () => {
+  it('a throwing lookup logs a warning in fixed words, and fn does not run', async () => {
     const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
     lookup.mockRejectedValue(new Error('ICM down'));
     const fn = jest.fn(seen);
@@ -775,8 +784,7 @@ describe('withResolvedSystemContext', () => {
     expect(String((refused as Error).message)).not.toContain('ICM down');
     expect(fn).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledTimes(1);
-    // The class only: a lookup's message may quote what the system answered (H4).
-    expect(String(warn.mock.calls[0][0])).toContain('Error');
+    // Fixed words: a lookup's message may quote what the system answered (H4).
     expect(String(warn.mock.calls[0][0])).not.toContain('ICM down');
     warn.mockRestore();
   });
@@ -952,7 +960,7 @@ describe('HandlerExporter.getHandlerEntries', () => {
         'cloud_without_systeminformation',
       ],
     ])(
-      '%s: the call fails with the server refusal, no handler runs; the next call asks again, but for an on-premise 404',
+      '%s: the call fails with the server refusal, no handler runs; nothing is kept, the next call asks again',
       async (_case, conn, answer, code) => {
         const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
         answer();
@@ -960,9 +968,7 @@ describe('HandlerExporter.getHandlerEntries', () => {
         await expect(call()).rejects.toMatchObject({ serverRefusal: code });
         await expect(call()).rejects.toMatchObject({ serverRefusal: code });
         expect(ran).not.toHaveBeenCalled();
-        expect(lookup).toHaveBeenCalledTimes(
-          _case === 'an on-premise 404 with no user stated' ? 1 : 2,
-        );
+        expect(lookup).toHaveBeenCalledTimes(2);
         warn.mockRestore();
       },
     );
@@ -1017,7 +1023,7 @@ class ReportingGroup extends BaseHandlerGroup {
 
 describe('BaseHandlerGroup.registerToolOnServer', () => {
   it('fills values from the group context connection', async () => {
-    const group = new ReportingGroup({ connection: cloudConn() });
+    const group = new ReportingGroup(withRules({ connection: cloudConn() }));
     let callback: ((args: unknown) => Promise<unknown>) | undefined;
     const server = {
       registerTool: (_n: string, _c: unknown, cb: typeof callback) => {
@@ -1182,7 +1188,7 @@ describe('BaseMcpServer.registerHandlers', () => {
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
-  it('an injected on-premise connection, a 404, no user stated: system_user_unknown, the tool does not run; the 404 is kept, the next call sends no lookup', async () => {
+  it('an injected on-premise connection, a 404, no user stated: system_user_unknown, the tool does not run; nothing is kept, the next call asks again', async () => {
     const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
     lookup.mockRejectedValue(
       Object.assign(new Error('placeholder'), { response: { status: 404 } }),
@@ -1202,7 +1208,7 @@ describe('BaseMcpServer.registerHandlers', () => {
       expect(result.content[0]?.text).toContain('system_user_unknown');
     }
     expect(group.observed).toBeUndefined();
-    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(lookup).toHaveBeenCalledTimes(2);
     warn.mockRestore();
   });
 

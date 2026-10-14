@@ -31,6 +31,10 @@ import type {
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import {
+  defaultSystemContextResolver,
+  type SystemContextRules,
+} from '../../../lib/requestSystemResolution';
+import {
   type AdtStandIn,
   adtStandIn,
   isLogoff,
@@ -110,6 +114,8 @@ export async function statefulStand(
     groups?: IHandlerGroup[];
     /** The system kind the server states; on-premise by default. */
     systemType?: 'onprem' | 'cloud';
+    /** The rules a host passes (responsible-rules); none by default. */
+    systemContextRules?: SystemContextRules;
   } = {},
 ): Promise<StatefulStand> {
   const standIn = await adtStandIn();
@@ -133,6 +139,10 @@ export async function statefulStand(
     ]),
     systemType: options.systemType ?? 'onprem',
     logger: silent,
+    systemContextResolver: defaultSystemContextResolver,
+    ...(options.systemContextRules !== undefined && {
+      systemContextRules: options.systemContextRules,
+    }),
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'stateful-window', version: '1.0.0' });

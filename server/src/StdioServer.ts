@@ -10,8 +10,10 @@ import {
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
+import { defaultSystemContextResolver } from '@mcp-abap-adt/lib/request-context';
 import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
+import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { destinationFailureOf } from './auth/destinationFailure';
@@ -79,6 +81,9 @@ export class StdioServer extends BaseMcpServer {
       ...(opts?.backgroundRuns !== undefined && {
         backgroundRuns: opts.backgroundRuns,
       }),
+      // The responsible rules, once, at the start (`connectAtStart`).
+      systemContextResolver: defaultSystemContextResolver,
+      systemContextRules: responsibleRules,
     });
     this.sentenceFor = opts?.sentenceFor;
   }

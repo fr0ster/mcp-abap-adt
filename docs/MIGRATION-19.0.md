@@ -656,11 +656,12 @@ transport's options only:
   with mcp-auth*. Send the token in `x-sap-jwt-token` to `mcp-abap-adt-http` / `mcp-abap-adt-sse`,
   or create the session with `mcp-auth` (a `jwt` / `authorization_code` destination). stdio serves
   three authentications: `basic`, `snc`, `jwt` / `authorization_code`.
-- **The connection is kept for the process's life.** A new provider the broker builds (it builds
-  one when what it read for the destination changed — a service key, the destination's `.env`)
-  no longer reopens the connection: a reopen would leave a lock held in the old session. The kept
-  connection is replaced only when SAP already lost its session. To take a changed destination,
-  restart the server. On stdio the credentials are loaded once at start and cannot change while the process runs, so the caller of the leftover-session and background-run tools is always the user of the session the instance keeps — every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
+- **The connection is kept for the process's life.** On stdio the user is fixed for the process:
+  the session is renewed — with the refresh token, or by a new login when the refresh fails — and
+  written back, the same user, and the broker answers the same provider throughout. The connection
+  is replaced only when SAP already lost its session, built with that same provider. The caller of
+  the leftover-session and background-run tools is the user of the session the instance keeps —
+  every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
 - **The auth chain is 6.0.** The server runs on `@mcp-abap-adt/auth-broker` 5,
   `@mcp-abap-adt/auth-providers` 6 and `@mcp-abap-adt/auth-stores` 5. Service keys keep working
   as they are; a destination's means in a `.env` too.
@@ -815,9 +816,8 @@ transport's options only:
 - **The server replaces its connection only when SAP lost its session** (or, where the
   credential is the request's — http, sse — a new credential arrives): the next call gets a new
   connection instance, the spent one is logged off; the call that met the loss gets the
-  connection's error as it is. A built source may say it keeps its connection
-  (`{ kind: 'built', source, keepsConnection: true }`, what stdio's `StdioServer` sets): a new
-  credential object from `resolve` then does not replace it.
+  connection's error as it is. A built source's connection is kept while `resolve` answers the
+  same credential object; stdio's answers the same provider for the process's life.
 - **`restoreSessionInConnection` is gone from `@mcp-abap-adt/lib/utils`.** It switched the
   connection to stateful and never back, and overwrote the shared connection's
   `sap-adt-connection-id` with the caller's `session_id` (`setSessionId`) for every request after;

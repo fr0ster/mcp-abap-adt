@@ -252,13 +252,13 @@ interface ConnectionSource {
   resolve(signal: AbortSignal): Promise<{ settings: SapConfig; credential: IAuthProvider; systemContext? }>;
 }
 type Source =
-  | { kind: 'built'; source: ConnectionSource; keepsConnection?: boolean } // core: a destination (kept); http, sse: the headers
+  | { kind: 'built'; source: ConnectionSource }        // core: a destination; http, sse: the headers
   | { kind: 'injected'; connection: AbapConnection };  // embedded: the consumer's, used as given
 ```
 
 | Package | Source | Connection |
 |:---|:---|:---|
-| core (stdio) | `destinationSource(destination, factory)`: `settingsFor`, `getProvider(destination, { signal })`, `systemContextFor` | kept for the instance's life (`keepsConnection`): a new provider from `getProvider` does not reopen it; replaced only when SAP already lost the session, then built with the provider that call resolved |
+| core (stdio) | `destinationSource(destination, factory)`: `settingsFor`, `getProvider(destination, { signal })`, `systemContextFor` | kept for the instance's life: `getProvider` answers the same provider for the process (the user is fixed; the session is renewed and written back by that provider); replaced only when SAP already lost the session, built with that same provider |
 | http | `headerSource(req.headers)` per request, on a new instance or the pooled one its `state_handle` names | one per request |
 | sse | `headerSource` of the `GET` that opened the connection | one per SSE connection |
 | embedder | `{ kind: 'injected', connection }` (`EmbeddableMcpServer`) | the consumer's, never connected or wrapped |
@@ -304,8 +304,8 @@ for the current connection when that connection was built for this caller's cred
 is answered at once, without entering the flow, so a background run or a leftover-session
 tool never waits for a lookup it does not send. A cached user is valid only for the
 connection it was asked on: whenever the instance's connection is replaced or resumed,
-the whole cache is forgotten, every credential's entry (a renewable credential, or a new
-provider on a kept session, may log on as another user). Outside the order,
+the whole cache is forgotten, every credential's entry, and asked again on the
+replacement. Outside the order,
 because they work on a connection of their own: a background run, a listed long read
 (its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one
@@ -334,11 +334,12 @@ is asked.
 - **A reopen only when SAP already lost the session.** stdio keeps its connection
   for the instance's life; http builds one per request (a pooled instance too, from
   that request's headers), sse one per SSE connection.
-- **On stdio the caller is the kept session's user.** The credentials are loaded once
-  at start and cannot change while the process runs (a changed destination needs a
-  restart), so the caller of the leftover-session and background-run tools is always
-  the user of the session the instance keeps — every tool runs in SAP as that user.
-  HTTP and SSE never keep a connection across credentials.
+- **On stdio the caller is the kept session's user.** The user is fixed for the
+  process: the session is renewed (refresh token, or a new login when the refresh
+  fails) and written back — the same user — so the caller of the leftover-session and
+  background-run tools is always the user of the session the instance keeps — every
+  tool runs in SAP as that user. HTTP and SSE never keep a connection across
+  credentials.
 
 #### Composition Roots
 

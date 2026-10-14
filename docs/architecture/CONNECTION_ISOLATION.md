@@ -18,7 +18,7 @@ In previous versions, the server used a global connection cache that could be ov
 
 A connection belongs to the `BaseMcpServer` instance that built it, and that instance belongs to one session or one request:
 
-- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built on the first tool call and kept for the instance's life (D13 as amended by D56): a new provider the broker builds does not reopen it; only a session SAP already lost does (a changed destination needs a restart). On stdio the credentials are loaded once at start and cannot change while the process runs, so the caller of the leftover-session and background-run tools is always the user of the session the instance keeps — every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
+- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built on the first tool call and kept for the instance's life (D13 as amended by D56): only a session SAP already lost replaces it. On stdio the user is fixed for the process: the session is renewed (refresh token, or a new login when the refresh fails) and written back by the same provider — the same user — so the caller of the leftover-session and background-run tools is always the user of the session the instance keeps — every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
 - **SSE** (`@mcp-abap-adt/sse`): one instance per SSE connection, its credential from the `GET` that opened it.
 - **HTTP (streamable)** (`@mcp-abap-adt/http`): one instance per request, or the pooled one its `state_handle` names; either way the request's own headers give its credential, so a request never sees another request's.
 
@@ -44,7 +44,7 @@ Values that belong to one request, such as the master language of created object
 
 #### 3. Connection construction
 
-`BaseMcpServer.getConnection(signal)` resolves the source, then builds the connector in one place (`src/lib/connectionFactory.ts`) from the settings and credential, and calls `connect()` — once per credential object: kept while the source answers the same one, built anew for a new one (http, sse). stdio's source keeps its connection (`keepsConnection`): a new provider does not replace it, and a session SAP already lost is replaced with the provider that call resolved. The factory builds no credential from `settings.authType`.
+`BaseMcpServer.getConnection(signal)` resolves the source, then builds the connector in one place (`src/lib/connectionFactory.ts`) from the settings and credential, and calls `connect()` — once per credential object: kept while the source answers the same one, built anew for a new one (http, sse). stdio's source answers the same provider for the process's life, so only a session SAP already lost replaces its connection, built with that same provider. The factory builds no credential from `settings.authType`.
 
 ### Session Lifecycle
 
@@ -79,9 +79,11 @@ tool runs, so only the call that met the loss fails (it is not replayed).
   connection, and its logoff releases the lock.
 - **A cancel does nothing to SAP**: no logoff, no new session; the started tool runs
   to its end. A call cancelled while it waits for the flow never reaches SAP.
-- **A reopen only when SAP lost the session**: stdio never replaces its connection
-  for a new provider; a lock held in the session would be left behind, or collide
-  with the next one.
+- **A reopen only when SAP lost the session**: stdio's source answers the same
+  provider for the process's life (the user is fixed; the session is renewed and
+  written back by that provider), so its connection is replaced only then; a
+  reopen of a live session would leave a lock held in it behind, or collide with the
+  next one.
 
 ### Benefits
 

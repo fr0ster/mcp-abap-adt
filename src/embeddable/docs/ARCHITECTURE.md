@@ -174,8 +174,8 @@ the spent connection back (`connectionReleased`) and takes the replacement (`get
 before its tool runs, so only the call that met the loss fails; it is not replayed.
 
 **A connection is replaced only when SAP lost its session** (D56), or when a new credential
-arrives where the credential is the request's (http, sse) — never for a source that keeps its
-connection (`keepsConnection`: stdio, D13): `getConnection` builds a new instance for the next call, and the replaced one is logged
+arrives where the credential is the request's (http, sse); stdio's source answers the same
+provider for the process's life (D13): `getConnection` builds a new instance for the next call, and the replaced one is logged
 off once no call works on it any more — each call's use is counted when `getConnection` hands the
 connection out, before any await, and ends with `connectionReleased(connection)` — called
 **exactly once per `getConnection`** (the tool wrapper calls it; a subclass that calls

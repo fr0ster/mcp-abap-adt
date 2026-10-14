@@ -22,7 +22,6 @@ import {
 } from '../../auth/serverLogin';
 import {
   loginTimeoutSentence,
-  serverEndedLogin,
   serverSentence,
 } from '../../auth/serverSentences';
 import { statedLoginTimeout } from '../../config/coreParameters';
@@ -235,12 +234,10 @@ describe('serverLogin with a bound', () => {
     expect(serverSentence(ended, state)).toBe(
       loginTimeoutSentence('`loginTimeoutMs: 100`'),
     );
-    expect(serverEndedLogin(ended, state)).toBe(true);
     // Another aborted login, not the bound's, is not marked.
     const other = authError['interactive-login']({ outcome: 'aborted' });
     expect(bound.ended(other)).toBe(false);
     expect(serverSentence(other, state)).toBeUndefined();
-    expect(serverEndedLogin(other, state)).toBe(false);
   });
 
   it("the request's own signal still ends a bounded login, and the bound marks nothing", async () => {

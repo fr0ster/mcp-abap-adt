@@ -80,7 +80,9 @@ same way.
    call cannot be cancelled:** the MCP request's `extra.signal`, which the SDK also aborts for a
    client's `notifications/cancelled`, is not read, so a cancel aborts nothing (the SDK then sends
    no answer to the cancelled request); a registry's own tool gets the call's signal as
-   `extra.signal`. The
+   `extra.signal`. The server hooks
+   `server.server.onclose` for the session's end; an embedder that sets it replaces the hook and
+   must chain the previous one. The
    call is registered at its entry, before any connection is built, in the one process-wide
    registry of live tools (`src/lib/activeTools.ts`: `activeTools()`, `settled(instance?)`,
    `latch(instance?)`, `pending()`), with its instance. The registry aborts nothing: a started

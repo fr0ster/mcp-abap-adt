@@ -8,8 +8,8 @@
  * 1. `latch(instance)` — synchronous, in the tick the close begins: a call
  *    routed to the instance from here on is refused before any connection;
  * 2. await `settled(instance)` — its calls run to their end, none aborted
- *    (D55; the SDK's transport close aborts their `extra.signal`, which ends
- *    only their waits);
+ *    (D55; the session's end — the server's `onclose`, when the transport
+ *    closes — aborts their signals, which ends only their waits);
  * 3. `shutdownState()` — the state undo (main's), its leftovers answered;
  * 4. **the terminal close**, whatever the undo answered — every connection
  *    the instance owns closed with a logoff;

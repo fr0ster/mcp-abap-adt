@@ -74,18 +74,3 @@ export function serverSentence(
   }
   return undefined;
 }
-
-/**
- * Whether the server itself ended the login `error` reports — the shutdown,
- * or the login bound (D10) — rather than the requests that waited for it.
- */
-export function serverEndedLogin(
-  error: IAuthProviderError,
-  state: ServerState,
-): boolean {
-  return (
-    error.kind === 'interactive-login' &&
-    error.facts.outcome === 'aborted' &&
-    (state.shuttingDown || state.loginBound?.ended(error) === true)
-  );
-}

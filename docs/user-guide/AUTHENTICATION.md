@@ -231,7 +231,7 @@ user exists only inside the system. For each request the server takes each from 
 |-------|-------------|---------------|
 | 1 | the tool's own argument, where the tool has one (`CreateTransport`'s `owner`) | the tool's own argument, where a tool has one (none does today) |
 | 2 | the system's user (`systeminformation`), on any system that answers it | the system id (`systeminformation`) |
-| | *Only on an on-premise system without the function (it answers `404`):* | |
+| | *Only on an on-premise system that gives no information (no `systeminformation`, an answer without the user, an error):* | |
 | 3 | the request's `x-sap-responsible` header | the request's `x-sap-master-system` header |
 | 4 | `SAP_RESPONSIBLE` in the destination's own `.env` (stdio) | `SAP_MASTER_SYSTEM` in the destination's own `.env` (stdio) |
 | 5 | `SAP_RESPONSIBLE` in the process environment | `SAP_MASTER_SYSTEM` in the process environment |
@@ -244,14 +244,15 @@ destination's own `.env` (stdio) is the `--env` / `--env-path` file, or `session
 for a named destination (`--mcp`). The system is asked once per destination — its credentials and
 its target system; over HTTP each request's headers are a destination of their own — on the connected
 connection — one request (`GET /sap/bc/adt/core/http/systeminformation`). Its answer is read by the
-system's kind (the rule above, never its URL): an answer naming a user is used on both kinds; an
-answer without a user is not a valid ABAP system for this server (`system_without_user`); a `404` is
-the function unavailable — on-premise steps 3–8 apply when the call states a user (the
-destination's or the environment's `SAP_USERNAME`, or `x-sap-login` of an `x-sap-url` basic
-connection); with none the call is refused `system_user_unknown` (the session user is unknown; the
-tool does not run, and the next call asks again; at a stdio start the server does not start) —; every ABAP Cloud system has it, so on a cloud
-system the destination is not a valid ABAP Cloud system (`cloud_without_systeminformation`); any
-other status is a failed lookup on both kinds. On a cloud system steps 3–8 never count. `x-sap-login`
+system's kind (the rule above, never its URL): an answer naming a user is used on both kinds.
+Anything else — a `404` (no endpoint), an answer without the user, an error — is no information:
+on-premise steps 3–8 apply when the call states a user (the destination's or the environment's
+`SAP_USERNAME`, or `x-sap-login` of an `x-sap-url` basic connection); with none the call is
+refused `system_user_unknown` (the session user is unknown; the tool does not run, and the next
+call asks again; at a stdio start the server does not start). Every ABAP Cloud system has it, so
+on a cloud system it is one step to the error: a `404` is `cloud_without_systeminformation` (the
+configuration or headers are inconsistent), anything else `system_lookup_failed` (a problem of the
+ABAP system). On a cloud system steps 3–8 never count. `x-sap-login`
 is the login only of an `x-sap-url` basic connection, which logs on with it; a token connection states
 no login. The process environment (`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_USERNAME`) is read
 once: a change made to it while the server runs is not picked up.
@@ -261,11 +262,12 @@ system without `systeminformation`, over SNC or with a token you hold, with no `
 anywhere — is refused by the server before any request
 is made: the answer is `"error": "system_context_missing"` with words naming `SAP_RESPONSIBLE`, the
 `x-sap-responsible` header and the login. The servers ask the system for its user before a
-tool runs: when that lookup fails, the call answers `"error": "system_lookup_failed"` (the system
-could not be asked; retry when it is available), an ABAP Cloud `404` `"error":
-"cloud_without_systeminformation"` ("the ABAP Cloud system answered without systeminformation,
-which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system"), and its tool
-does not run — on stdio the start fails instead, and the process ends. The next call asks again.
+tool runs: on ABAP Cloud, when the system gives no information, the call answers `"error":
+"system_lookup_failed"` (the ABAP system answered without the user or with an error: its problem,
+with a valid configuration) or, for a `404`, `"error": "cloud_without_systeminformation"` ("the
+destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every
+ABAP Cloud system has: the configuration or the headers are inconsistent"), and its tool does not
+run — on stdio the start fails instead, and the process ends. The next call asks again.
 `HandlerExporter`'s handlers do the same: the failed lookup is thrown with the same code and words,
 and the handler does not run. Nothing is
 sent with an empty responsible. A missing master

@@ -302,11 +302,9 @@ connection, its system lookup or its turn, or running — runs to its end, and t
 instance as before. An embedder's own registry that is not a `CompositeHandlersRegistry` gets no
 main-flow queue.
 Every send on the instance's connection is inside the order: the identity lookups
-(`systeminformation`, asked on every kind of system — its user wins over any configured
-login; `systemUserOf` reads `systemKindOf`, the resolver's source, only for a `404`: on-premise
-the function unavailable, the configured login the user; on ABAP Cloud, where every system
-has it, `cloud_without_systeminformation` — the destination is not a valid ABAP Cloud system;
-any other status but a `2xx` the call's error on both kinds)
+(`systeminformation`, asked on every kind of system through the shipped resolver — its user
+wins over any configured login; no information on-premise: the configured login; on ABAP Cloud
+a `404` `cloud_without_systeminformation`, anything else `system_lookup_failed`)
 of the background-run tools and the debugger's request user go through `onMainConnection` — directly from a call that
 already holds the flow (an `AsyncLocalStorage` mark), on the connection that call holds,
 else in turn, on the connection taken inside the flow (so a session the call ahead lost
@@ -324,7 +322,7 @@ is entered after the connection is ready, so concurrent callers still share one
 `connect()`; once in the flow, a queued call checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed). A connection retired because another credential's call took the instance (Streamable HTTP) stays the queued call's own. On stdio the instance's connection is born at the process's start, before the transport opens (`StdioServer.connectAtStart` → `bornAtStart` → `buildConnection`): the destination's one leftover session taken up (`resumedSession`; with none or several, a logon), so no call is in the flow then; there is no resume tool. The list and the logoff take no turn: neither touches the instance's connection. The connections that are shared this way are stdio's kept one and an
 SSE connection's; Streamable HTTP builds one per request. The system-context lookup (`systeminformation`, the
 responsible and master system a create fills — the system's answer over anything configured,
-the configuration only for an on-premise `404`) is asked once per destination — the resolved
+the configuration only on-premise when the system gives no information) is asked once per destination — the resolved
 credential and its target system (URL, client, wire), not the session —, on ABAP Cloud and
 on-premise alike, before a tool runs on it, and never after: **no tool runs twice**. On stdio it is part of the
 start (`bornAtStart` → `requireSystem`), or read from the leftover session's file; a
@@ -332,14 +330,15 @@ failure ends the process before the transport opens. On http, sse and an embedde
 instance the first call on a connection without it asks (`systemBeforeTool` →
 `requireSystem`, concurrent askers sharing one request through `resolveOnce`) inside
 the main flow — a call outside the flow takes a turn in it for the lookup alone. A
-failure is that call's answer (an answer that names no user `system_without_user` —
-not a valid ABAP system for this server —, an ABAP Cloud `404`
-`cloud_without_systeminformation` — every ABAP Cloud system has the function, so the destination
-is not a valid one; on-premise a `404` is the function unavailable and the resolver answers
-`null` — admitted only when the call states a user (the destination's `SAP_USERNAME`, else its
-`x-sap-login`; for a host's connection its parameters, else the request scope's login), else
-`system_user_unknown`, the `null` not kept (`resolveForCall`) —, a chain failure as it is, else — any other status but a `2xx` —
-`system_lookup_failed`) and its tool does not run; nothing failed is kept, so the next call asks again. A
+failure is that call's answer and its tool does not run. The recipe (`systemContextResolverFor`,
+`resolveForCall`): an answer naming the user is taken; no information — a `404`, an answer
+without the user, an error — is, on ABAP Cloud, one step to the error (a `404`
+`cloud_without_systeminformation`: the configuration or headers are inconsistent; anything else
+`system_lookup_failed`: the ABAP system's problem), on-premise `null`, admitted only when the
+call states a user (the destination's `SAP_USERNAME`, else its `x-sap-login`; for a host's
+connection its parameters, else the request scope's login), else `system_user_unknown`; a chain
+failure as it is. Only an answer naming the user is kept; a failure (`null` included) never is,
+so the next call asks again. A
 new session of the same destination — a replacement after a lost session, a new logon after a gone
 leftover (the file's) — keeps its answer (`destinationSystems`); another credential (an HTTP
 request's headers) asks its own. The tool wrapper

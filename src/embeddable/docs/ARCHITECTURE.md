@@ -99,7 +99,7 @@ same way.
    before its tool starts never reaches the tool. The
    responsible person and master system are resolved first: what the system names
    (`systeminformation`, on ABAP Cloud and on-premise), over anything configured; the destination's
-   `.env` and the request's headers only where an on-premise system has no such function (`404`).
+   `.env` and the request's headers only where an on-premise system gives no information.
 4. **The answer.** A failure is read by `readFailure(thrown)`, which is lib's `failureOf`; core
    reads the destination layer's failures first. A failure it knows is answered as JSON `{ error,
    kind?, message, hint?, … }`: `authentication_failed`, `destination_refused`, or one of the
@@ -187,14 +187,16 @@ target system: a new session of them — a replacement after a lost session, a n
 leftover — keeps the answer), on ABAP Cloud and on-premise alike, before a tool runs on it, never after — no tool runs twice: on stdio at the start (`bornAtStart` →
 `requireSystem`, or the leftover session's file), a failure ending the process; elsewhere by the
 first call on a connection without it (`systemBeforeTool` → `requireSystem`), inside the flow — a
-call outside the flow takes a turn in it for the lookup alone — its failure that call's answer (an
-answer that names no user `system_without_user` — `requiringUser`: not a valid ABAP system for
-this server —, an ABAP Cloud `404` `cloud_without_systeminformation` — every ABAP Cloud system
-has the function, so the destination is not a valid one —, a chain failure as it is, else — any
-other status but a `2xx`; on-premise a `404` is the function unavailable and the configuration
-applies when the call states a user, else `system_user_unknown` (`resolveForCall`) — `system_lookup_failed`; one mapping, `systemLookupRefusal`, shared with
-`withResolvedSystemContext`, so `HandlerExporter`'s handlers refuse the same way and do not run), the tool not run, nothing
-failed kept, so the next call asks again. The lookup is awaited to its end whatever the call's
+call outside the flow takes a turn in it for the lookup alone — its failure that call's answer.
+An answer naming the user is taken; no information (a `404`, an answer without the user, an
+error) is, on ABAP Cloud, one step to the error — a `404` `cloud_without_systeminformation` (the
+configuration or headers are inconsistent), anything else `system_lookup_failed` (the ABAP
+system's problem) —, on-premise the configuration when the call states a user, else
+`system_user_unknown` (`systemContextResolverFor`, `resolveForCall`); a chain failure as it is.
+One mapping, `systemLookupRefusal`, shared with `withResolvedSystemContext`, so
+`HandlerExporter`'s handlers refuse the same way and do not run. The tool does not run, and
+only an answer naming the user is kept: a failure (no information included) never is, so the
+next call asks again. The lookup is awaited to its end whatever the call's
 signal says: the call's turn and its tracking last until it settled, so the next request on the
 connection waits for it; the instance's close and the shutdown do not wait for it — they log the
 connection off under it. A replacement of a connection of the same credential keeps the answer
@@ -222,7 +224,7 @@ settled, whatever its name or arguments: the list a handler group's tools are re
 (`worksOnOwnConnection`) exempts none of them, since a name cannot prove a callback works on a
 connection of its own. Inside its turn the instance's connection is taken and its system
 information asked before the callback runs (`systemBeforeTool`), as for a handler group's tool: a
-failure — `system_without_user` included — is that call's answer, the callback does not run, and
+failure is that call's answer, the callback does not run, and
 the next call asks again. The callback runs in the same system context scope
 (`withDestinationSystemContext`, `withKnownSystemContext`), and the turn is marked held on that
 connection (`inHeldFlow`): a send through `onMainConnection` from inside it runs at once on it
@@ -263,7 +265,7 @@ two explicit tools; with several the server picks none.
   where it points (URL, client, system kind, wire), the backend user the destination states
   (`null` for a token credential, shown and never matched), `system` (the system information the
   session was looked up with — `describeSystem(connection, system)`, written once known; `null`
-  until then and on an on-premise system without the function), `sessionCookies()`. The settings and the credential a resume needs
+  until then and while an on-premise system gives no information), `sessionCookies()`. The settings and the credential a resume needs
   come from the destination the process serves; the file adds the cookies and the system
   information, so a resume asks SAP nothing more. Directory `0700`, file `0600`, written atomically (a `.partial` renamed).
   Rewritten after a request whose answer changed the cookies (the owner wraps
@@ -299,10 +301,9 @@ two explicit tools; with several the server picks none.
   `sessionGone`) — ends the spent takeover instance (it logged nothing on) and builds a new one
   with the normal logon (`connectedLogon`, connection's "a new session is a new instance"),
   adopted under the same handle: `{ session: 'new', handle }` (else `'picked_up'`; a logon is
-  `{ session: 'logged_on' }`). The file's system information is reused only for the session
-  picked up; the new session's is asked (`requireSystem`, `requiringUser`) before it is adopted,
-  and its failure logs the new session off and gives the file back as a leftover. Then
-  `requireSystem` when the system information is not known.
+  `{ session: 'logged_on' }`). The file's system information is reused for the session picked up
+  and for the new one (the same destination). Then `requireSystem` when the system information is
+  not known.
   Any failure rejects the start — the launcher ends the process with exit `1` before the transport
   opens: another answer from the old session (a redirect included) or the new logon's failure
   gives the file back; a failed system lookup logs off a logon made for the start and leaves a
@@ -348,7 +349,7 @@ their answers are kept is the host's: a strategy.
   the caller resolved (`backgroundCaller`: the user SAP names — the call's connection's system
   information when the shipped resolver already asked it, else `systemUserOf` on the instance's
   connection, cached per credential — on both kinds, over the request's stated user; that one
-  — `SAP_USERNAME`, `x-sap-login` — only for an on-premise `404`; an injected
+  — `SAP_USERNAME`, `x-sap-login` — only where an on-premise system gives no information; an injected
   connection's URL from `getBaseUrl()`, its user SAP's; none at all → `background_run_caller_unknown`);
   registered in the registry of live tools under the calling instance (`"<tool> (background)"`) —
   refused there once the shutdown latched; its own connection opened by `openFreshConnection` and

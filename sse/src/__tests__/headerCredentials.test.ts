@@ -172,7 +172,7 @@ describe("a connection's credential is its opening GET's", () => {
 });
 
 describe('a request the server does not serve', () => {
-  it('no SAP_SYSTEM_TYPE: a call is refused system_type_required, nothing sent', async () => {
+  it('an embedder’s own SseServer host with no SAP_SYSTEM_TYPE (the binary does not start without it): a call is refused system_type_required, nothing sent', async () => {
     delete process.env.SAP_SYSTEM_TYPE;
     const session = await connect(basic('USER_A', 'pass-a'));
     const answer = await session.probe('k1');

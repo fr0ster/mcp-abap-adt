@@ -651,8 +651,17 @@ export const SYSTEM_TYPE_ROW: Parameter = {
   kind: 'enum',
   values: ['onprem', 'cloud', 'legacy'],
   section: 'OPTIONS',
-  help: 'SAP system type: the tools offered (default cloud), the connector and whether the master system is asked of the system',
+  help: "SAP system type, required (no default, never guessed): the tools offered, the connector and how the system's answers are read",
 };
+
+/**
+ * The start's words for a listener (Streamable HTTP, SSE) whose system kind
+ * no parameter states: the same shape as stdio's, which names the
+ * destination and the `--env` file — a listener has neither.
+ */
+export function listenerSystemTypeRequiredWords(): string {
+  return 'The SAP system type is required — set --system-type, SAP_SYSTEM_TYPE (the environment) or system-type (YAML) to onprem, cloud or legacy; the server did not start';
+}
 
 export const STATE_IDLE_CLI = '--state-idle-minutes';
 export const STATE_IDLE_ENV = 'MCP_STATE_IDLE_MINUTES';

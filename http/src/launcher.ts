@@ -10,6 +10,7 @@ import {
   answerVersionOrHelp,
   generateHelp,
   type LauncherEdges,
+  listenerSystemTypeRequiredWords,
   processEdges,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
@@ -132,10 +133,19 @@ export async function launch(
   config: HttpConfig,
   options: HttpLauncherOptions,
   deps: HttpLauncherDeps,
-): Promise<StreamableHttpServer> {
+): Promise<StreamableHttpServer | undefined> {
+  // The system kind is required, never guessed: stated by --system-type,
+  // SAP_SYSTEM_TYPE or YAML system-type (no request header states it).
+  // Without it the start ends here, before anything listens — so no tool
+  // list is filtered for a kind nobody stated.
+  if (config.systemType === undefined) {
+    deps.stderr(`[MCP] ${listenerSystemTypeRequiredWords()}`);
+    deps.exit(1);
+    return undefined;
+  }
   // The connector and the tool filter read the system kind from the
   // environment (`resolveSystemKind`).
-  if (config.systemType) process.env.SAP_SYSTEM_TYPE = config.systemType;
+  process.env.SAP_SYSTEM_TYPE = config.systemType;
   const server = new StreamableHttpServer(registryOf(options.toolSet, 'http'), {
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,

@@ -1,8 +1,10 @@
 /**
  * Over Streamable HTTP the system kind is the process's parameter
  * (`--system-type`, `SAP_SYSTEM_TYPE`, YAML) — no request header states it —
- * and it is required: without it a call that would reach the system is
- * refused `system_type_required`, before anything is sent.
+ * and it is required. The binaries do not start without it
+ * (`systemTypeAtStart.test.ts`); an embedder's own `StreamableHttpServer`
+ * host reads `SAP_SYSTEM_TYPE` at each call, so a call it lets through
+ * without one is refused `system_type_required`, before anything is sent.
  */
 
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../src/lib/auth/serverRefusal';

@@ -12,6 +12,7 @@ export {
   generateHelp,
   HTTP_ELSEWHERE,
   HTTP_OPTIONS_REMOVED,
+  listenerSystemTypeRequiredWords,
   type Parameter,
   type ParameterKind,
   ParameterRefusal,

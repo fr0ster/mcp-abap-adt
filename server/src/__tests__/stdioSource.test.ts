@@ -127,6 +127,8 @@ describe("stdio: the connection is kept while getProvider answers the session's 
       settingsFor: async () => ({
         url: 'https://system.example.invalid',
         authType: 'basic',
+        // The user an on-premise system without the function needs stated.
+        username: 'STDIO_USER',
       }),
       getProvider,
     };
@@ -156,6 +158,8 @@ describe("stdio: the connection is kept while getProvider answers the session's 
       settingsFor: async () => ({
         url: 'https://system.example.invalid',
         authType: 'basic',
+        // The user an on-premise system without the function needs stated.
+        username: 'STDIO_USER',
       }),
       getProvider,
     };

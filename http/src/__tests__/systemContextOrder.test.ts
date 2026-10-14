@@ -4,8 +4,10 @@
  * systeminformation (a 404). Each its own variable first: the request's
  * `x-sap-responsible` / `x-sap-master-system` headers; the process
  * environment. Then, for the responsible only, the login: the request's
- * `x-sap-login`, the process `SAP_USERNAME`. Each request sees its own
- * values — two concurrent requests never see each other's.
+ * `x-sap-login`. Each request sees its own values — two concurrent requests
+ * never see each other's. Such a system names no user, so the request must
+ * state one (`x-sap-login` of a basic connection): a token connection states
+ * none and is refused `system_user_unknown` before its tool.
  */
 
 import type { Server } from 'node:http';
@@ -131,10 +133,17 @@ afterEach(async () => {
   }
 });
 
-/** A token connection: the credential every request must carry, stating no login. */
+/** A token connection: a credential stating no login. */
 const TOKEN = {
   'x-sap-url': 'https://system.example.invalid',
   'x-sap-jwt-token': 'token-placeholder',
+};
+
+/** A basic connection: its `x-sap-login` states the user. */
+const BASIC = {
+  'x-sap-url': 'https://system.example.invalid',
+  'x-sap-login': 'HEADER_LOGIN',
+  'x-sap-password': 'placeholder-password',
 };
 
 describe('StreamableHttpServer: responsible and master system per request', () => {
@@ -154,6 +163,14 @@ describe('StreamableHttpServer: responsible and master system per request', () =
     id = 1,
     delayMs = 0,
   ): Promise<Seen> {
+    return JSON.parse((await answer(headers, id, delayMs)).text);
+  }
+
+  async function answer(
+    headers: Record<string, string>,
+    id = 1,
+    delayMs = 0,
+  ): Promise<{ text: string; isError: boolean }> {
     const res = await fetch(`${baseUrl}/mcp/stream/http`, {
       method: 'POST',
       headers: {
@@ -164,25 +181,28 @@ describe('StreamableHttpServer: responsible and master system per request', () =
       body: JSON.stringify(call(id, delayMs)),
     });
     const body = (await res.json()) as {
-      result: { content: { text: string }[] };
+      result: { content: { text: string }[]; isError?: boolean };
     };
-    return JSON.parse(body.result.content[0].text);
+    return {
+      text: body.result.content[0].text,
+      isError: body.result.isError === true,
+    };
   }
 
   it('the headers win over the process environment', async () => {
     await expect(
-      ask({ ...TOKEN, 'x-sap-responsible': 'HEADER_USER' }),
+      ask({ ...BASIC, 'x-sap-responsible': 'HEADER_USER' }),
     ).resolves.toEqual({
       responsible: 'HEADER_USER',
       masterSystem: 'PROCESS_SYS',
     });
     await expect(
-      ask({ ...TOKEN, 'x-sap-master-system': 'HEADER_SYS' }),
+      ask({ ...BASIC, 'x-sap-master-system': 'HEADER_SYS' }),
     ).resolves.toEqual({
       responsible: 'PROCESS_USER',
       masterSystem: 'HEADER_SYS',
     });
-    await expect(ask(TOKEN)).resolves.toEqual({
+    await expect(ask(BASIC)).resolves.toEqual({
       responsible: 'PROCESS_USER',
       masterSystem: 'PROCESS_SYS',
     });
@@ -191,13 +211,13 @@ describe('StreamableHttpServer: responsible and master system per request', () =
   it('two concurrent requests with different headers each see their own', async () => {
     const [a, b] = await Promise.all([
       ask(
-        { ...TOKEN, 'x-sap-responsible': 'FIRST', 'x-sap-master-system': 'S1' },
+        { ...BASIC, 'x-sap-responsible': 'FIRST', 'x-sap-master-system': 'S1' },
         1,
         60,
       ),
       ask(
         {
-          ...TOKEN,
+          ...BASIC,
           'x-sap-responsible': 'SECOND',
           'x-sap-master-system': 'S2',
         },
@@ -231,15 +251,23 @@ describe('StreamableHttpServer: responsible and master system per request', () =
       });
     });
 
-    it('a token connection states no login: the process SAP_USERNAME', async () => {
-      delete process.env.SAP_RESPONSIBLE;
-      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-      await expect(
-        ask({ ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' }),
-      ).resolves.toEqual({
-        responsible: 'PROCESS_LOGIN',
-        masterSystem: 'PROCESS_SYS',
-      });
-    });
+    it.each([
+      ['a token connection', TOKEN],
+      [
+        'a token connection with x-sap-login (it logs nobody on)',
+        { ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' },
+      ],
+    ])(
+      '%s states no user: system_user_unknown, the tool not run — the process SAP_USERNAME does not stand in',
+      async (_case, headers) => {
+        delete process.env.SAP_RESPONSIBLE;
+        process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+        const refused = await answer(headers);
+        expect(refused.isError).toBe(true);
+        expect(JSON.parse(refused.text)).toMatchObject({
+          error: 'system_user_unknown',
+        });
+      },
+    );
   });
 });

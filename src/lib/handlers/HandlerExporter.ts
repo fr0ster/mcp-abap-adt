@@ -70,8 +70,8 @@ export interface HandlerExporterOptions {
    * `SAP_SYSTEM_TYPE`: without either (or with a value other than `onprem`,
    * `cloud` or `legacy`) the constructor throws `ServerRefusal`
    * `system_type_required`, as `EmbeddableMcpServer` does. It decides how a
-   * system's answer to its lookup is read (a `404` is "no such function" on
-   * premise, `cloud_without_systeminformation` on ABAP Cloud) for a
+   * system's answer to its lookup is read (no information falls to the
+   * configuration on-premise, and is the call's error on ABAP Cloud) for a
    * connection the factory did not
    * build. Never guessed. Overrides `SAP_SYSTEM_TYPE`.
    */
@@ -79,18 +79,21 @@ export interface HandlerExporterOptions {
 
   /**
    * Asks the connection's system for the responsible person and master
-   * system. Its answer wins over anything configured: `null` means the
-   * system has no such function (an on-premise `404`) — the configuration
+   * system. An answer naming the user wins over anything configured. `null`,
+   * or an answer without a user, is no information: the configuration
    * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
    * `x-sap-url`) stands, when the call states a user (the connection's
    * `SAP_USERNAME`, else the request scope's login); with none the wrapped
-   * handler throws `system_user_unknown` and does not run. A non-null answer
-   * is the system's — nothing configured counts. It is asked before each wrapped handler runs, as the
-   * server asks before a tool: an answer that names no user (`{}` included)
-   * is `system_without_user`, a resolver that throws `system_lookup_failed`
-   * (the shipped one's ABAP Cloud `404` `cloud_without_systeminformation`,
-   * a chain failure as it is) — thrown by the wrapped handler, which does
-   * not run; nothing failed is kept, so the next call asks again. The default
+   * handler throws `system_user_unknown` and does not run. The shipped
+   * resolver answers no information for an on-premise system that has no
+   * `systeminformation`, answered without the user or with an error; on
+   * ABAP Cloud it throws instead — a `404` is
+   * `cloud_without_systeminformation`, any other `system_lookup_failed`. A
+   * resolver that throws makes the wrapped handler throw
+   * `system_lookup_failed` (a chain failure as it is), and the handler does
+   * not run. It is asked before each wrapped handler runs, as the server
+   * asks before a tool; nothing but an answer naming the user is kept, so
+   * the next call asks again. The default
    * asks every system (one lookup per connection). `null` as the option
    * disables it, and `getHandlerEntries()` then returns the groups' handlers
    * unwrapped.

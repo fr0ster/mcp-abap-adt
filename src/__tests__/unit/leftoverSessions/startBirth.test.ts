@@ -207,21 +207,43 @@ describe('one leftover session of the destination', () => {
   });
 });
 
-describe('on-premise without systeminformation: the start needs a stated user', () => {
-  it('a passwordless logon, a 404, no user stated: the start fails as system_user_unknown, the logon logged off, nothing owned', async () => {
-    stand = await leftoverStand({ token: {} });
-    stand.standIn.answer(isLookup, 404);
-    const refused = await stand.start().then(
-      () => undefined,
-      (error: unknown) => error,
-    );
-    expect(refused).toBeInstanceOf(ServerRefusal);
-    expect((refused as ServerRefusal).serverRefusal).toBe(
-      'system_user_unknown',
-    );
-    await until(() => stand.standIn.logoffs() === 1);
-    expect(ownedConnections(stand.server)).toEqual([]);
-  });
+/** What a system that gives no information answers. */
+const NO_INFORMATION: Array<[string, () => void]> = [
+  ['no systeminformation (404)', () => stand.standIn.systemInformation(null)],
+  [
+    'an answer without a user',
+    () => {
+      stand.standIn.systemInformation(undefined);
+      stand.standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' }));
+    },
+  ],
+  [
+    'an error (500)',
+    () => {
+      stand.standIn.systemInformation(undefined);
+      stand.standIn.answer(isLookup, 500);
+    },
+  ],
+];
+
+describe('on-premise without the information: the start needs a stated user', () => {
+  it.each(NO_INFORMATION)(
+    'a passwordless logon, %s, no user stated: the start fails as system_user_unknown, the logon logged off, nothing owned',
+    async (_case, answer) => {
+      stand = await leftoverStand({ token: {} });
+      answer();
+      const refused = await stand.start().then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      expect(refused).toBeInstanceOf(ServerRefusal);
+      expect((refused as ServerRefusal).serverRefusal).toBe(
+        'system_user_unknown',
+      );
+      await until(() => stand.standIn.logoffs() === 1);
+      expect(ownedConnections(stand.server)).toEqual([]);
+    },
+  );
 
   it('a blank user stated counts as none', async () => {
     stand = await leftoverStand({ token: { statedUser: '  ' } });
@@ -231,12 +253,15 @@ describe('on-premise without systeminformation: the start needs a stated user', 
     });
   });
 
-  it('the same with a user stated: the start succeeds', async () => {
-    stand = await leftoverStand({ token: { statedUser: 'STATED' } });
-    stand.standIn.answer(isLookup, 404);
-    expect(await stand.start()).toEqual({ session: 'logged_on' });
-    expect(stand.standIn.logoffs()).toBe(0);
-  });
+  it.each(NO_INFORMATION)(
+    '%s with a user stated: the start succeeds',
+    async (_case, answer) => {
+      stand = await leftoverStand({ token: { statedUser: 'STATED' } });
+      answer();
+      expect(await stand.start()).toEqual({ session: 'logged_on' });
+      expect(stand.standIn.logoffs()).toBe(0);
+    },
+  );
 });
 
 describe('no leftover session, or several', () => {
@@ -362,6 +387,40 @@ describe('ABAP Cloud: the system information at the start', () => {
       system: { responsible: 'CLOUD_USER', master_system: 'CLD' },
     });
   });
+
+  it.each([
+    [
+      'no systeminformation (404)',
+      () => stand.standIn.answer(isLookup, 404),
+      'cloud_without_systeminformation',
+    ],
+    [
+      'an answer without a user',
+      () => {
+        stand.standIn.systemInformation(undefined);
+        stand.standIn.body(isLookup, JSON.stringify({ systemID: 'CLD' }));
+      },
+      'system_lookup_failed',
+    ],
+    [
+      'an error (500)',
+      () => {
+        stand.standIn.systemInformation(undefined);
+        stand.standIn.answer(isLookup, 500);
+      },
+      'system_lookup_failed',
+    ],
+  ] as const)(
+    '%s: one step to the error — the start fails as $2, a stated user not used',
+    async (_case, answer, code) => {
+      stand = await leftoverStand({ token: { statedUser: 'STATED' } });
+      answer();
+      await expect(stand.start()).rejects.toMatchObject({
+        serverRefusal: code,
+      });
+      await until(() => stand.standIn.logoffs() === 1);
+    },
+  );
 
   it('no system information to be had: the start fails, and the logon made for it is logged off', async () => {
     stand = await leftoverStand();

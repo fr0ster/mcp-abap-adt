@@ -470,9 +470,12 @@ function startupWords(
   });
 }
 
-/** The start's words for a system that answered no system information. */
+/**
+ * The start's words for a system that gave no information where it must
+ * (ABAP Cloud): a problem of the ABAP system with a valid configuration.
+ */
 export function startLookupFailedWords(destination: string): string {
-  return `Destination "${destination}": the system could not be asked for the session user and system id (systeminformation), which the start needs; the server did not start. Start it again when the system is available`;
+  return `Destination "${destination}": the ABAP system gave no session user and system id: systeminformation answered without them or with an error, a problem of the ABAP system with a valid configuration; the server did not start`;
 }
 
 /**
@@ -483,30 +486,21 @@ export function startSystemTypeRequiredWords(destination: string): string {
 }
 
 /**
- * The start's words for a system that answered systeminformation without a
- * user: not a valid ABAP system for this server.
- */
-export function startSystemWithoutUserWords(destination: string): string {
-  return `Destination "${destination}": the system answered systeminformation without a user, so it is not a valid ABAP system for this server; the server did not start`;
-}
-
-/**
- * The start's words for an ABAP Cloud system that answered `404` for
- * systeminformation: every ABAP Cloud system has it, so the destination is
- * not a valid ABAP Cloud system.
+ * The start's words for an ABAP Cloud destination whose system has no
+ * systeminformation endpoint (`404`): the configuration is inconsistent.
  */
 export function startCloudWithoutSystemInformationWords(
   destination: string,
 ): string {
-  return `Destination "${destination}": the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the server did not start`;
+  return `Destination "${destination}": the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration is inconsistent; the server did not start`;
 }
 
 /**
- * The start's words for an on-premise system without systeminformation
- * whose connection states no user.
+ * The start's words for an on-premise system that gave no information
+ * whose destination states no user.
  */
 export function startSystemUserUnknownWords(destination: string): string {
-  return `Destination "${destination}": the system has no systeminformation and the destination states no user: set SAP_USERNAME in the destination, so the session user is known; the server did not start`;
+  return `Destination "${destination}": the system gave no session user (systeminformation) and the destination states no user: set SAP_USERNAME in the destination, so the session user is known; the server did not start`;
 }
 
 /**
@@ -529,9 +523,6 @@ export function startConnectionWords(
   const read = destinationFailureOf(error, { ...options, destination });
   if (read?.error === 'system_lookup_failed') {
     return startLookupFailedWords(destination);
-  }
-  if (read?.error === 'system_without_user') {
-    return startSystemWithoutUserWords(destination);
   }
   if (read?.error === 'cloud_without_systeminformation') {
     return startCloudWithoutSystemInformationWords(destination);

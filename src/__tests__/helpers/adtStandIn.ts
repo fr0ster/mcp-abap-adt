@@ -63,9 +63,10 @@ export interface AdtStandIn {
   /**
    * From now on `systeminformation` answers this user (and system id), as a
    * session of that SAP user would; a later call switches the user. `null`:
-   * the endpoint is absent (`404`). Takes precedence over `body`.
+   * the endpoint is absent (`404`); `undefined`: no longer set, so `answer`
+   * and `body` decide again. Takes precedence over `body`.
    */
-  systemInformation(user: string | null, systemId?: string): void;
+  systemInformation(user: string | null | undefined, systemId?: string): void;
   /** The logoffs received so far: `disconnect()` reached the system. */
   logoffs(): number;
   /** The sessions logged off so far, in order. */
@@ -252,7 +253,7 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       bodies.push({ match, text, headers });
     },
     systemInformation: (user, systemId = 'SID') => {
-      systemInfo = { user, systemId };
+      systemInfo = user === undefined ? undefined : { user, systemId };
     },
     logoffs: () => requests.filter((r) => isLogoff(r.url)).length,
     loggedOff: () =>

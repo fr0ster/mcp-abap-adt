@@ -1,12 +1,13 @@
 /**
- * A system whose `systeminformation` answers but names no user — the field
- * missing, empty, blank, not a string, a body that is no JSON or JSON that
- * is no object — is not a valid ABAP system for this server: an error, as a
- * failed lookup is. On a
- * built instance (http, sse) the call answers `system_without_user` and its
- * tool does not run; nothing of the answer is kept, so the next call asks
- * again and, once the system names its user, its tool runs once. (A stdio
- * start ends with its own words: `server/src/__tests__/startConnector.test.ts`.)
+ * An ABAP Cloud system whose `systeminformation` answers but names no user —
+ * the field missing, empty, blank, not a string, a body that is no JSON or
+ * JSON that is no object — gave no information: on ABAP Cloud, which always
+ * has it, one step to the error. On a built instance (http, sse) the call
+ * answers `system_lookup_failed` and its tool does not run; nothing of the
+ * answer is kept, so the next call asks again and, once the system names its
+ * user, its tool runs once. (On-premise the same answer goes to the stated
+ * values: `systemContextRequired.test.ts`; a stdio start ends with its own
+ * words: `server/src/__tests__/startConnector.test.ts`.)
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -74,7 +75,7 @@ const WITHOUT_USER: Array<[string, string]> = [
 ];
 
 it.each(WITHOUT_USER)(
-  'systeminformation with %s: the call answers system_without_user, its tool not run; the next call asks again',
+  'cloud, systeminformation with %s: the call answers system_lookup_failed, its tool not run; the next call asks again',
   async (_what, body) => {
     const standIn = await adtStandIn();
     // The first lookup is answered `body`; once the system is fixed, it names
@@ -89,12 +90,12 @@ it.each(WITHOUT_USER)(
     try {
       const first = await s.call('ReadClass', { class_name: 'ZCL_FIRST' });
       expect(first.isError).toBe(true);
-      expect(first.payload).toMatchObject({ error: 'system_without_user' });
+      expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
       expect(standIn.requests.some(of('ZCL_FIRST'))).toBe(false);
 
       // Nothing kept: still refused while the system names no user.
       const again = await s.call('ReadClass', { class_name: 'ZCL_AGAIN' });
-      expect(again.payload).toMatchObject({ error: 'system_without_user' });
+      expect(again.payload).toMatchObject({ error: 'system_lookup_failed' });
       expect(standIn.requests.filter(isLookup)).toHaveLength(2);
 
       fixed = true;

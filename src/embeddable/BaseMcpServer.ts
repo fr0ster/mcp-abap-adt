@@ -82,7 +82,6 @@ import {
 } from '../lib/requestSignal.js';
 import {
   defaultSystemContextResolver,
-  invalidSystemRefusal,
   isShippedResolver,
   type ResolvedSystemContext,
   resolveForCall,
@@ -251,11 +250,10 @@ export abstract class BaseMcpServer extends McpServer {
    * every credential's entry, whatever credential the old or the new
    * connection was built for — and an answer asked on a connection that was
    * replaced meanwhile is not kept (the generation it was asked in). A known
-   * user is answered without entering the flow; `null` is kept for a
-   * system without the function (an on-premise `404`), so it is not asked
-   * again.
+   * user is answered without entering the flow; no user (a system that gave
+   * no information on-premise) is not kept, so the next call asks again.
    */
-  private callerUsers = new WeakMap<object, string | null>();
+  private callerUsers = new WeakMap<object, string>();
   /** Bumped by `forgetCallers`: an answer asked before it is not kept. */
   private callerGeneration = 0;
 
@@ -271,8 +269,8 @@ export abstract class BaseMcpServer extends McpServer {
     user: string | undefined,
     generation: number,
   ): void {
-    if (generation === this.callerGeneration) {
-      this.callerUsers.set(key, user ?? null);
+    if (user !== undefined && generation === this.callerGeneration) {
+      this.callerUsers.set(key, user);
     }
   }
 
@@ -577,11 +575,11 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * Each connection's system information (`requireSystem`): what the
-   * resolver answered — the `systeminformation` user and system id, or
-   * `null` for an on-premise system without the function. A connection without an
-   * entry has none yet.
+   * resolver answered — the `systeminformation` user and system id. No
+   * information (`null`) is never kept: a connection without an entry is
+   * asked again by its next call.
    */
-  private readonly systems = new WeakMap<object, ResolvedSystemContext>();
+  private readonly systems = new WeakMap<object, KnownSystemContext>();
 
   /**
    * The system information known per destination: the resolved credential
@@ -591,7 +589,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private readonly destinationSystems = new WeakMap<
     IAuthProvider,
-    Map<string, ResolvedSystemContext>
+    Map<string, KnownSystemContext>
   >();
 
   /** The destination each built connection was born for (`buildConnection`). */
@@ -600,7 +598,7 @@ export abstract class BaseMcpServer extends McpServer {
   /** `destination`'s system information, when already known. */
   private destinationSystem(
     destination: Destination,
-  ): ResolvedSystemContext | undefined {
+  ): KnownSystemContext | undefined {
     return this.destinationSystems
       .get(destination.credential)
       ?.get(destination.target);
@@ -609,7 +607,7 @@ export abstract class BaseMcpServer extends McpServer {
   /** Keeps `system` as `destination`'s system information. */
   private knowDestinationSystem(
     destination: Destination,
-    system: ResolvedSystemContext,
+    system: KnownSystemContext,
   ): void {
     let targets = this.destinationSystems.get(destination.credential);
     if (targets === undefined) {
@@ -625,35 +623,33 @@ export abstract class BaseMcpServer extends McpServer {
    * same ones needs no lookup — and in its runtime file when the instance
    * keeps one (a resume then needs no lookup).
    */
-  private knowSystem(connection: object, system: ResolvedSystemContext): void {
+  private knowSystem(connection: object, system: KnownSystemContext): void {
     this.systems.set(connection, system);
     const destination = this.destinationOf.get(connection);
     if (destination !== undefined)
       this.knowDestinationSystem(destination, system);
-    if (system !== null)
-      this.leftoverSessions?.describeSystem(connection, system);
-  }
-
-  /** Whether a call on `connection` must ask for its system information first. */
-  private lacksSystem(connection: object): boolean {
-    return this.systemContextResolver !== null && !this.systems.has(connection);
+    this.leftoverSessions?.describeSystem(connection, system);
   }
 
   /**
-   * `connection`'s system information, asked when it has none —
-   * `systeminformation`, on every kind of system (an on-premise `404`
-   * answers `null`: the configuration applies, when the call states a user
-   * — the connection's `SAP_USERNAME`, else the request's `x-sap-login`). A
-   * failure is the caller's: an answer that names no user (an invalid
-   * system, `requiringUser`) the server's `system_without_user`, an
-   * on-premise `404` with no user stated `system_user_unknown`, a chain
-   * failure as it is, any other the server's `system_lookup_failed`. Nothing
-   * failed is kept, so the next caller asks again. Concurrent askers share
-   * one request (`resolveForCall`).
+   * `connection`'s system information for a call, asked when none is known
+   * — `systeminformation`, on every kind of system. An answer naming the
+   * user is kept (`knowSystem`); no information is `null` on-premise, when
+   * the call states a user (the connection's `SAP_USERNAME`, else the
+   * request's `x-sap-login`), and is not kept. A failure is the caller's:
+   * on-premise no information with no user stated `system_user_unknown`, a
+   * chain failure as it is, any other (on ABAP Cloud, no information) the
+   * server's `system_lookup_failed`. Nothing failed is kept, so the next
+   * caller asks again. Concurrent askers share one request
+   * (`resolveForCall`). `undefined`: nothing to resolve (no resolver).
    */
-  private async requireSystem(connection: AbapConnection): Promise<void> {
+  private async requireSystem(
+    connection: AbapConnection,
+  ): Promise<ResolvedSystemContext | undefined> {
     const resolver = this.systemContextResolver;
-    if (resolver === null || this.systems.has(connection)) return;
+    if (resolver === null) return undefined;
+    const known = this.systems.get(connection);
+    if (known !== undefined) return known;
     // The user a call states: a built connection's destination's (its
     // settings' `SAP_USERNAME`, else its source's login — `x-sap-login`);
     // a host's connection's parameters, else the request scope's login.
@@ -665,14 +661,15 @@ export abstract class BaseMcpServer extends McpServer {
         ? destination.user
         : statedUserOf(connection, getRequestContext()?.login),
     ).then((system) => {
-      this.knowSystem(connection, system);
+      if (system !== null) this.knowSystem(connection, system);
+      return system;
     });
     try {
       // Awaited whatever the signal says: the lookup is a send on the
       // instance's connection, and the call — its turn in the main flow, its
       // tracking — lasts until it settled, so nothing overlaps it and no
       // logoff comes under it when the session ends.
-      await asked;
+      return await asked;
     } catch (error) {
       throw systemLookupRefusal(error, (message) =>
         this.logger?.warn?.(message),
@@ -682,21 +679,29 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * Before a tool runs on `connection`: its system information, asked when
-   * it has none — never after the tool, so no tool runs twice. A call that
+   * none is known — never after the tool, so no tool runs twice. A call that
    * holds the main flow asks there; one outside it (a background run, a
    * long read, a debugger tool) takes a turn in the flow for the lookup
    * alone, so nothing is sent on the instance's connection outside it.
+   * Answers the connection the tool runs on and the call's system
+   * information (`requireSystem`).
    */
   private async systemBeforeTool(
     connection: AbapConnection,
     holdsFlow: boolean,
     signal: AbortSignal,
     taken: (connection: AbapConnection | undefined) => void,
-  ): Promise<AbapConnection> {
-    if (!this.lacksSystem(connection)) return connection;
+  ): Promise<{
+    connection: AbapConnection;
+    system: ResolvedSystemContext | undefined;
+  }> {
+    if (this.systemContextResolver === null) {
+      return { connection, system: undefined };
+    }
+    const known = this.systems.get(connection);
+    if (known !== undefined) return { connection, system: known };
     if (holdsFlow) {
-      await this.requireSystem(connection);
-      return connection;
+      return { connection, system: await this.requireSystem(connection) };
     }
     const leave = await this.enterMainFlow(signal);
     try {
@@ -710,20 +715,13 @@ export abstract class BaseMcpServer extends McpServer {
         current = await this.getConnection(signal);
         taken(current);
       }
-      await this.requireSystem(current);
-      return current;
+      return {
+        connection: current,
+        system: await this.requireSystem(current),
+      };
     } finally {
       leave();
     }
-  }
-
-  /**
-   * What is known of `connection`'s system: `undefined` when there is
-   * nothing to resolve (no resolver).
-   */
-  private systemOf(connection: object): ResolvedSystemContext | undefined {
-    if (this.systemContextResolver === null) return undefined;
-    return this.systems.get(connection);
   }
 
   /**
@@ -874,9 +872,9 @@ export abstract class BaseMcpServer extends McpServer {
       const connection = await birth();
       this.destinationOf.set(connection, destination);
       const born = this.systems.get(connection);
-      if (this.systems.has(connection)) {
+      if (born !== undefined) {
         // The birth knew it (a leftover's file): its destination's.
-        this.knowDestinationSystem(destination, born ?? null);
+        this.knowDestinationSystem(destination, born);
       } else {
         const known = this.destinationSystem(destination);
         if (known !== undefined) this.knowSystem(connection, known);
@@ -1063,21 +1061,9 @@ export abstract class BaseMcpServer extends McpServer {
     const connection = await entry.connection;
     this.systemContexts.set(connection, resolved.systemContext);
     try {
+      // On-premise without the information, the destination must state the
+      // user (`resolveForCall`): nothing stated, the start ends.
       await this.requireSystem(connection);
-      // An on-premise system without the function (`404`) names no user:
-      // the connection must (the login the later needs read — a
-      // background run's caller). Nothing stated, the start ends.
-      if (
-        this.systemContextResolver !== null &&
-        this.systems.get(connection) === null &&
-        (
-          resolved.settings.username ??
-          resolved.systemContext?.login ??
-          ''
-        ).trim() === ''
-      ) {
-        throw new ServerRefusal('system_user_unknown');
-      }
       // Closed meanwhile (no lookup, or during it): the start is refused —
       // the launcher never opens the transport — and the close's sweep has
       // the connection's logoff.
@@ -1170,7 +1156,7 @@ export abstract class BaseMcpServer extends McpServer {
               // The connection's system information, asked before the tool
               // runs when it has none; its failure is this call's answer, and
               // the tool never runs twice.
-              connection = await this.systemBeforeTool(
+              const before = await this.systemBeforeTool(
                 connection,
                 leaveFlow !== undefined,
                 signal,
@@ -1178,6 +1164,8 @@ export abstract class BaseMcpServer extends McpServer {
                   inUse = taken;
                 },
               );
+              connection = before.connection;
+              const system = before.system;
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,
@@ -1214,13 +1202,10 @@ export abstract class BaseMcpServer extends McpServer {
                       () =>
                         // Asked before the tool (`systemBeforeTool`):
                         // nothing is sent here.
-                        withKnownSystemContext(
-                          this.systemOf(context.connection),
-                          () => {
-                            throwIfRequestAborted(signal);
-                            return fn();
-                          },
-                        ),
+                        withKnownSystemContext(system, () => {
+                          throwIfRequestAborted(signal);
+                          return fn();
+                        }),
                     ),
                   ),
                 );
@@ -1586,7 +1571,7 @@ export abstract class BaseMcpServer extends McpServer {
    * the backend user SAP answers for the session (`systemUserOf`), on every
    * kind of system, over any login the request states. The stated login
    * (`SAP_USERNAME`, `x-sap-login`) stands in only on an on-premise system
-   * without the function (`404`). An injected connection names its URL; its
+   * that gave no information. An injected connection names its URL; its
    * user is SAP's. A user that cannot be determined is refused: a run is
    * kept only for a known caller. `on`: the instance's connection the call
    * already holds — its system information, asked before the tool, answers
@@ -1644,10 +1629,10 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * `sapUserOf`'s lookup (`systemUserOf`, with the server's stated
    * `systemType`): the user `systeminformation` names on every kind of
-   * system; `undefined` for an on-premise system without the function
-   * (`404`); an answer that names none `system_without_user`; on ABAP
-   * Cloud a `404` `cloud_without_systeminformation`; any other failure the
-   * call's error as it came.
+   * system; `undefined` for an on-premise system that gave no information
+   * (a `404`, an answer without the user, an error), not kept; on ABAP
+   * Cloud a `404` `cloud_without_systeminformation`, any other no
+   * information `system_lookup_failed`; a chain failure as it came.
    */
   private async callerUserOf(
     signal: AbortSignal,
@@ -1655,17 +1640,11 @@ export abstract class BaseMcpServer extends McpServer {
     on?: object,
   ): Promise<string | undefined> {
     const known = this.callerUsers.get(key);
-    if (known !== undefined) return known ?? undefined;
+    if (known !== undefined) return known;
     // The connection's system information, already asked before the tool by
     // the shipped resolver: the same systeminformation, so no second request.
-    if (
-      on !== undefined &&
-      isShippedResolver(this.systemContextResolver) &&
-      this.systems.has(on)
-    ) {
-      const system = this.systems.get(on);
-      if (system === null) return undefined;
-      const user: unknown = system?.responsible;
+    if (on !== undefined && isShippedResolver(this.systemContextResolver)) {
+      const user: unknown = this.systems.get(on)?.responsible;
       if (typeof user === 'string' && user.trim() !== '') {
         return user.trim().toUpperCase();
       }
@@ -1678,12 +1657,10 @@ export abstract class BaseMcpServer extends McpServer {
       try {
         asked = await systemUserOf(connection, this.systemType);
       } catch (error) {
-        // The per-call lookup's rule (`requireSystem`): an answer that names
-        // no user is not a valid ABAP system. Nothing kept.
-        throw (
-          invalidSystemRefusal(error, (message) =>
-            this.logger?.warn?.(message),
-          ) ?? error
+        // The per-call lookup's rule (`requireSystem`): on ABAP Cloud no
+        // information is the call's error. Nothing kept.
+        throw systemLookupRefusal(error, (message) =>
+          this.logger?.warn?.(message),
         );
       }
       this.keepCallerUser(key, asked, generation);
@@ -1887,7 +1864,7 @@ export abstract class BaseMcpServer extends McpServer {
    * handler group's tools, which are known). Inside the turn the instance's
    * connection is taken and its system information asked before the
    * callback runs, as before a handler group's tool (`systemBeforeTool`):
-   * a failure — `system_without_user` included — is that call's answer, the
+   * a failure is that call's answer, the
    * callback does not run, and the next call asks again. The callback runs
    * in the same system context scope, and a send through `onMainConnection`
    * runs at once on the connection its turn holds. An instance with no
@@ -1934,16 +1911,18 @@ export abstract class BaseMcpServer extends McpServer {
             // asks again.
             const connection = await this.getConnection(signal);
             inUse = connection;
-            await this.systemBeforeTool(connection, true, signal, (taken) => {
-              inUse = taken;
-            });
+            const { system } = await this.systemBeforeTool(
+              connection,
+              true,
+              signal,
+              (taken) => {
+                inUse = taken;
+              },
+            );
             return await this.inHeldFlow(true, connection, () =>
               withDestinationSystemContext(
                 this.systemContexts.get(connection),
-                () =>
-                  withKnownSystemContext(this.systemOf(connection), () =>
-                    run(),
-                  ),
+                () => withKnownSystemContext(system, () => run()),
               ),
             );
           } catch (error) {
@@ -2052,6 +2031,9 @@ function sessionGone(status: number): boolean {
  * A destination: the resolved credential object and the target system its
  * settings point at (`targetOf`) — what `systeminformation` answers for.
  */
+/** System information as kept: an answer naming the user, never `null`. */
+type KnownSystemContext = Exclude<ResolvedSystemContext, null>;
+
 interface Destination {
   credential: IAuthProvider;
   target: string;

@@ -13,14 +13,12 @@
  *   is a JSON object and `userName` a non-blank string (a body that is no
  *   JSON, JSON that is no object, a missing, empty, blank or non-string user
  *   is an answer without a user: `user` `undefined`);
- * - anything else (`404`, `405`, `501`, a `5xx`, an authentication or
- *   network failure) is thrown as it came — a status other than a `2xx` the
+ * - anything else is thrown as it came — a status other than a `2xx` the
  *   connection handed back instead of throwing as a
- *   `SystemInformationStatusError`. A `404` is the function unavailable
- *   (`isSystemInformationUnavailable`): on-premise the callers then take the
- *   configured settings; on ABAP Cloud, which always has it, the
- *   destination is not a valid ABAP Cloud system
- *   (`CloudWithoutSystemInformationError`).
+ *   `SystemInformationStatusError`. A `404` is the endpoint absent
+ *   (`isSystemInformationUnavailable`): on ABAP Cloud, which always has it,
+ *   the configuration or the headers are inconsistent; any other failure is
+ *   a problem of the ABAP system (`systemContextResolverFor`).
  *
  * The request is the helper's: GET, the same `Accept`, no timeout, the
  * cache-busting parameter Eclipse sends.
@@ -118,8 +116,8 @@ function statusOf(error: unknown): unknown {
 }
 
 /**
- * Whether `error` — what `readSystemInformation` threw — is the function
- * unavailable on the system: a `404`, and only a `404`.
+ * Whether `error` — what `readSystemInformation` threw — is the endpoint
+ * absent on the system: a `404`, and only a `404`.
  */
 export function isSystemInformationUnavailable(error: unknown): boolean {
   return statusOf(error) === 404;

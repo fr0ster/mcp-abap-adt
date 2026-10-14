@@ -114,10 +114,10 @@ export interface EmbeddableMcpServerOptions {
    * mutating `process.env.SAP_SYSTEM_TYPE` per instance is not safe.
    *
    * It also states the injected connection's kind for reading the system's
-   * `systeminformation` (asked on every kind): a `404` is the function
-   * unavailable on-premise (the configuration applies) and, on `'cloud'`,
-   * where every system has it, `cloud_without_systeminformation`. The URL
-   * is never consulted.
+   * `systeminformation` (asked on every kind): no information on-premise
+   * (the configuration applies) and, on `'cloud'`, where every system has
+   * it, the call's error (`cloud_without_systeminformation` for a `404`,
+   * else `system_lookup_failed`). The URL is never consulted.
    */
   systemType?: SapEnvironment;
 
@@ -140,18 +140,19 @@ export interface EmbeddableMcpServerOptions {
 
   /**
    * Asks the connection's system for the responsible person and master
-   * system. Its answer wins over anything configured: `null` means the
-   * system has no such function (an on-premise `404`) — the configuration
-   * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
-   * `x-sap-url`) stands, when the call states a user (the connection's
-   * `SAP_USERNAME`, else the request scope's login); with none the call
-   * fails with `system_user_unknown`. A non-null answer is the system's,
-   * and nothing configured counts. A non-null answer must name the user (`responsible`,
-   * a non-blank string): one that does not — `{}` included — is not a valid
-   * ABAP system for this server, and the call fails with
-   * `system_without_user`. A resolver that throws fails that call with
-   * `system_lookup_failed` (the shipped one's ABAP Cloud `404`:
-   * `cloud_without_systeminformation`). Either way its tool does not run, nothing is
+   * system. An answer naming the user (`responsible`, a non-blank string)
+   * wins over anything configured. `null`, or an answer without a user, is
+   * no information: the configuration (`SAP_RESPONSIBLE`, the login:
+   * `SAP_USERNAME`, or `x-sap-login` with `x-sap-url`) stands, when the call
+   * states a user (the connection's `SAP_USERNAME`, else the request scope's
+   * login); with none the call fails with `system_user_unknown`. The shipped
+   * resolver answers no information for an on-premise system that has no
+   * `systeminformation`, answered without the user or with an error; on
+   * ABAP Cloud it throws instead — a `404` is
+   * `cloud_without_systeminformation`, any other `system_lookup_failed`. A
+   * resolver that throws fails that call with `system_lookup_failed` (a
+   * chain failure as it is). Either way its tool does not run, nothing but
+   * an answer naming the user is
    * kept, and the next call asks again. The default asks every system (one
    * lookup per connection). `null` as the option disables it.
    * @default defaultSystemContextResolver

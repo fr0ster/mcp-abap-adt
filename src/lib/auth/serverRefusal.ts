@@ -23,7 +23,6 @@ export type ServerRefusalCode =
   | 'background_run_limit'
   | 'background_run_caller_unknown'
   | 'system_lookup_failed'
-  | 'system_without_user'
   | 'cloud_without_systeminformation'
   | 'system_user_unknown'
   | 'system_type_required'
@@ -80,43 +79,37 @@ export const BACKGROUND_RUN_RUNNING_WORDS =
   'this background run is still running and cannot be discarded: a started run cannot be stopped; discard it once it has finished';
 
 /**
- * A call on a connection without its system information: the
- * `systeminformation` lookup asked before the tool runs failed — for a
- * reason that is not a chain failure, and not an on-premise system without
- * the function (`404`), where the configuration applies. The tool did not run; the next call
- * asks again. On stdio the same failure at the start ends the process.
+ * A call whose system gave no information where it must (ABAP Cloud, which
+ * always has `systeminformation`): the endpoint answered without the
+ * session user, another error status, or failed — a problem of the ABAP
+ * system with a valid configuration (a `404` is
+ * `cloud_without_systeminformation`); also a custom resolver that threw.
+ * The tool did not run; the next call asks again. On stdio the same failure
+ * at the start ends the process.
  */
 export const SYSTEM_LOOKUP_FAILED_WORDS =
-  'the system could not be asked for the session user and system id (systeminformation), which a call needs before its tool runs; the tool did not run. Retry when the system is available';
+  'the ABAP system gave no session user and system id: systeminformation answered without them or with an error, a problem of the ABAP system with a valid configuration; a call needs them before its tool runs, so the tool did not run';
 
 /**
- * A call on a connection whose system answered `systeminformation`
- * without a user: not a valid ABAP system for this server. The tool did not
- * run; nothing of the answer is kept, so the next call asks again. On stdio
- * the same answer at the start ends the process.
- */
-export const SYSTEM_WITHOUT_USER_WORDS =
-  'the system answered systeminformation without a user, so it is not a valid ABAP system for this server; the tool did not run';
-
-/**
- * A call on an ABAP Cloud connection whose system answered `404` for
- * `systeminformation`: every ABAP Cloud system has the function, so its
- * absence is the destination's fault — not a system to retry, and nothing
- * configured stands in. The tool did not run; nothing is kept, so the next
- * call asks again. On stdio the same answer at the start ends the process.
+ * A call on an ABAP Cloud destination whose system has no
+ * `systeminformation` endpoint (a `404`): every ABAP Cloud system has it,
+ * so the configuration or the headers are inconsistent. The tool did not
+ * run; nothing is kept, so the next call asks again. On stdio the same
+ * answer at the start ends the process.
  */
 export const CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS =
-  'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run';
+  'the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration or the headers are inconsistent; the tool did not run';
 
 /**
- * A call on an on-premise system without `systeminformation` (a `404`) that
- * states no user — neither the connection's parameters (`SAP_USERNAME`) nor
- * the request's headers (`x-sap-login`): the session user is unknown, so the
- * tool does not run, and the next call asks again. The stdio start ends with
- * its own words (the launcher's).
+ * A call on an on-premise system that gave no information (no
+ * `systeminformation`, an answer without the user, an error) and states no
+ * user either — neither the connection's parameters (`SAP_USERNAME`) nor
+ * the request's headers (`x-sap-login`): the session user is unknown, so
+ * the tool does not run, and the next call asks again. The stdio start ends
+ * with its own words (the launcher's).
  */
 export const SYSTEM_USER_UNKNOWN_WORDS =
-  'the system has no systeminformation and the call states no user: set SAP_USERNAME (the destination or the environment), or send x-sap-login with x-sap-url, so the session user is known; the tool did not run';
+  'the system gave no session user (systeminformation) and the call states no user: set SAP_USERNAME (the destination or the environment), or send x-sap-login with x-sap-url, so the session user is known; the tool did not run';
 
 /**
  * The fixed words of a connection refused because its instance is closed
@@ -167,7 +160,6 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   background_run_running: BACKGROUND_RUN_RUNNING_WORDS,
   background_run_caller_unknown: BACKGROUND_RUN_CALLER_UNKNOWN_WORDS,
   system_lookup_failed: SYSTEM_LOOKUP_FAILED_WORDS,
-  system_without_user: SYSTEM_WITHOUT_USER_WORDS,
   cloud_without_systeminformation: CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS,
   system_user_unknown: SYSTEM_USER_UNKNOWN_WORDS,
   system_type_required: SYSTEM_TYPE_REQUIRED_WORDS,

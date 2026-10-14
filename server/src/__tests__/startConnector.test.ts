@@ -43,11 +43,11 @@ import { AuthBrokerFactory } from '../auth';
 import { readCoreConfig } from '../config/coreParameters';
 import {
   launch,
+  startCloudWithoutSystemInformationWords,
   startConnectionWords,
   startLookupFailedWords,
   startSystemTypeRequiredWords,
   startSystemUserUnknownWords,
-  startSystemWithoutUserWords,
 } from '../launcher.js';
 import { SHUTDOWN_BEFORE_START_LINE } from '../shutdown.js';
 
@@ -452,15 +452,15 @@ it('a logon SAP refuses: exit 1 with the failure on stderr, and the transport ne
   expect(s.stderr.join('\n')).not.toContain('start-password');
 });
 
-// On ABAP Cloud a `404` is a system without the function every ABAP Cloud
-// system has: the destination is not a valid ABAP Cloud system.
-it('ABAP Cloud, systeminformation answered 404: exit 1 naming an invalid ABAP Cloud destination, the transport never opens, and the logon is logged off', async () => {
+// On ABAP Cloud a `404` is a system without the endpoint every ABAP Cloud
+// system has: the configuration is inconsistent.
+it('ABAP Cloud, systeminformation answered 404: exit 1 naming an inconsistent configuration, the transport never opens, and the logon is logged off', async () => {
   standIn.answer(isLookup, 404);
   const s = await start({ kind: 'cloud' });
   expect(s.exits).toEqual([1]);
   expect(s.opened()).toBe(0);
   expect(s.stderr).toContain(
-    '[MCP] Destination "default": the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the server did not start',
+    '[MCP] Destination "default": the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration is inconsistent; the server did not start',
   );
   expect(s.stderr).not.toContain(`[MCP] ${startLookupFailedWords('default')}`);
   const end = Date.now() + 10_000;
@@ -471,8 +471,8 @@ it('ABAP Cloud, systeminformation answered 404: exit 1 naming an invalid ABAP Cl
   expect(runtimeFiles(runtime)).toEqual([]);
 });
 
-// Any other status but a `2xx` (`405`, `501`, `500`) is a failed lookup —
-// never an answer without a user, never the login in its place.
+// Any other status but a `2xx` (`405`, `501`, `500`) is the ABAP system's
+// problem with a valid configuration — never the login in its place.
 it.each([500, 405, 501])(
   'ABAP Cloud, systeminformation answered %i: exit 1 naming the lookup, the transport never opens, and the logon is logged off',
   async (status) => {
@@ -481,9 +481,6 @@ it.each([500, 405, 501])(
     expect(s.exits).toEqual([1]);
     expect(s.opened()).toBe(0);
     expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
-    expect(s.stderr).not.toContain(
-      `[MCP] ${startSystemWithoutUserWords('default')}`,
-    );
     const end = Date.now() + 10_000;
     while (standIn.logoffs() === 0 && Date.now() < end) {
       await new Promise((r) => setTimeout(r, 5));
@@ -506,15 +503,13 @@ const WITHOUT_USER: Array<[string, string]> = [
 ];
 
 it.each(WITHOUT_USER)(
-  'ABAP Cloud, systeminformation with %s: exit 1 in its own words, the transport never opens, and the logon is logged off',
+  'ABAP Cloud, systeminformation with %s: exit 1 naming the lookup, the transport never opens, and the logon is logged off',
   async (_what, body) => {
     standIn.body(isLookup, body);
     const s = await start({ kind: 'cloud' });
     expect(s.exits).toEqual([1]);
     expect(s.opened()).toBe(0);
-    expect(s.stderr).toContain(
-      `[MCP] ${startSystemWithoutUserWords('default')}`,
-    );
+    expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
     const end = Date.now() + 10_000;
     while (standIn.logoffs() === 0 && Date.now() < end) {
       await new Promise((r) => setTimeout(r, 5));
@@ -570,8 +565,9 @@ it('the --env file states it (SAP_SYSTEM_TYPE): the start goes on', async () => 
   }
 });
 
-// On-premise the system is asked at the start too; a `404` there is the
-// function unavailable, and the start goes on with the configuration.
+// On-premise the system is asked at the start too; no information there (a
+// `404`, an answer without a user, an error) and the start goes on with the
+// start parameters (the destination states the user).
 it('on-premise: the system information is asked at the start, and a tool asks no more', async () => {
   standIn.body(
     isLookup,
@@ -590,35 +586,27 @@ it('on-premise: the system information is asked at the start, and a tool asks no
   }
 });
 
-it('on-premise, systeminformation answered 404: the start goes on with the configuration', async () => {
-  standIn.answer(isLookup, 404);
-  const s = await start({ kind: 'onprem' });
-  try {
-    expect(s.exits).toEqual([]);
-    expect(s.opened()).toBe(1);
-  } finally {
-    await s.stop();
-  }
-});
-
-it.each([500, 405])(
-  'on-premise, systeminformation answered %i: exit 1 naming the lookup, the transport never opens',
-  async (status) => {
-    standIn.answer(isLookup, status);
+it.each<[string, () => void]>([
+  ['answered 404', () => standIn.answer(isLookup, 404)],
+  ['answered 500', () => standIn.answer(isLookup, 500)],
+  ['answered 405', () => standIn.answer(isLookup, 405)],
+  [
+    'without a user',
+    () => standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' })),
+  ],
+])(
+  'on-premise, systeminformation %s: the start goes on with the start parameters',
+  async (_case, answer) => {
+    answer();
     const s = await start({ kind: 'onprem' });
-    expect(s.exits).toEqual([1]);
-    expect(s.opened()).toBe(0);
-    expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
+    try {
+      expect(s.exits).toEqual([]);
+      expect(s.opened()).toBe(1);
+    } finally {
+      await s.stop();
+    }
   },
 );
-
-it('on-premise, systeminformation without a user: exit 1 in its own words', async () => {
-  standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' }));
-  const s = await start({ kind: 'onprem' });
-  expect(s.exits).toEqual([1]);
-  expect(s.opened()).toBe(0);
-  expect(s.stderr).toContain(`[MCP] ${startSystemWithoutUserWords('default')}`);
-});
 
 it.each<[string, ToolSet]>([
   ['mcp-abap-adt', fullToolSet],
@@ -638,6 +626,22 @@ it.each<[string, ToolSet]>([
     }
   },
 );
+
+it('the start words of the lookup refusals', () => {
+  const words = (
+    code: 'system_lookup_failed' | 'cloud_without_systeminformation',
+  ) =>
+    startConnectionWords(
+      new ServerRefusal(code),
+      'default',
+      { sentenceFor: () => undefined },
+      'linux',
+    );
+  expect(words('system_lookup_failed')).toBe(startLookupFailedWords('default'));
+  expect(words('cloud_without_systeminformation')).toBe(
+    startCloudWithoutSystemInformationWords('default'),
+  );
+});
 
 it('the start words of a refusal for an unknown session user name what to set', () => {
   expect(

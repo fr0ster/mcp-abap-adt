@@ -3,15 +3,14 @@
  * system its connection points at.
  *
  * The responsible person is the user the system names in its
- * `systeminformation`, and the master system its system id — on ABAP Cloud
- * and on-premise alike: with passwordless logon or a provisioned user, the
- * user exists only inside the system. What is configured (the request's
- * headers, a destination's `.env`, the process configuration, the login) is
- * used only when the function is unavailable on an on-premise system (a
- * `404`); on ABAP Cloud a `404` means the destination is not a valid ABAP
- * Cloud system (every one has the function). The
- * lookup is made here, inside the library — no host has to repeat it or
- * import adt-clients itself.
+ * `systeminformation`, and the master system its system id. When the system
+ * answers with them, they are taken from there. When it has no
+ * `systeminformation`, answers without the user, or answers an error: on
+ * ABAP Cloud (which always has it) that is the call's error; on-premise the
+ * configured values (the request's headers on HTTP/SSE, the start
+ * configuration on stdio) are taken, and the call's error only when they
+ * state no user either. The lookup is made here, inside the library — no
+ * host has to repeat it or import adt-clients itself.
  *
  * Resolution is keyed by the connection object: one connection belongs to one
  * user on one system, so its answer is the same for every request on it and
@@ -33,10 +32,10 @@ import {
 } from './systemInformation';
 
 /**
- * Resolved values; `null` when the system has no `systeminformation`
- * function (an on-premise `404`) — the configured values then stand as they
- * are. An answer without a user has no `responsible`: the system's answer
- * wins, so nothing configured stands in for it.
+ * Resolved values; `null` when the system gave no information (an
+ * on-premise system without `systeminformation`, one that answered without
+ * the user or answered an error) — the configured values then stand as they
+ * are.
  */
 export type ResolvedSystemContext = {
   responsible?: string;
@@ -48,17 +47,6 @@ export type SystemContextResolver = (
   connection: IAbapConnection,
 ) => Promise<ResolvedSystemContext>;
 
-/**
- * Default resolver: asks the system's own `systeminformation`
- * (`readSystemInformation`) on every kind of system — the user name as
- * responsible, the system id as master system, neither when the answer
- * carries none. A `404` on an on-premise system is the function unavailable:
- * `null`, and the configured values apply; on ABAP Cloud, where every system
- * has it, `CloudWithoutSystemInformationError`. Any other status but a
- * `2xx` is a failed lookup, thrown as it came. Which
- * kind is the kind the connection was built for (`systemKindOf`), never a
- * guess from its URL or from the answer.
- */
 /**
  * One resolver per stated kind, for the process: `resolveOnce` memoises per
  * resolver, so a host that builds a server per request still makes one
@@ -81,10 +69,46 @@ export function isShippedResolver(
 }
 
 /**
+ * An ABAP Cloud destination whose system has no `systeminformation`
+ * endpoint (a `404`): every ABAP Cloud system has it, so the configuration
+ * or the headers are inconsistent. The call's
+ * `cloud_without_systeminformation`.
+ */
+export class CloudWithoutSystemInformationError extends Error {
+  constructor() {
+    super('the ABAP Cloud destination has no systeminformation endpoint');
+    this.name = 'CloudWithoutSystemInformationError';
+  }
+}
+
+/**
+ * An ABAP Cloud system that has the endpoint but gave no information — an
+ * answer without the user, another error status, a failure: a problem of
+ * the ABAP system with a valid configuration. The call's
+ * `system_lookup_failed`.
+ */
+export class NoSystemInformationError extends Error {
+  constructor() {
+    super('the ABAP Cloud system gave no systeminformation');
+    this.name = 'NoSystemInformationError';
+  }
+}
+
+/**
  * The default resolver for a server that states its system kind
  * (`systemType`): for a connection the factory did not build, that kind wins
  * over `SAP_SYSTEM_TYPE`. A connection the factory built follows its
  * recorded settings either way. The same kind answers the same resolver.
+ *
+ * It asks the system's own `systeminformation` (`readSystemInformation`):
+ * an answer naming the user is the user as responsible and the system id as
+ * master system. Anything else — a `404`, an answer without the user, an
+ * error — is no information: on ABAP Cloud a `404` is
+ * `CloudWithoutSystemInformationError` (the configuration or headers are
+ * inconsistent) and any other `NoSystemInformationError` (the system's
+ * problem); on-premise `null` (the configured values apply). A chain
+ * failure is thrown as it came. The kind is the one the connection was built for
+ * (`systemKindOf`), never a guess from its URL or from the answer.
  */
 export function systemContextResolverFor(
   systemType: string | undefined,
@@ -92,22 +116,24 @@ export function systemContextResolverFor(
   const known = resolversByKind.get(systemType);
   if (known) return known;
   const resolver: SystemContextResolver = async (connection) => {
-    let info: Awaited<ReturnType<typeof readSystemInformation>>;
+    let user: string | undefined;
+    let systemId: string | undefined;
+    let absent = false;
     try {
-      info = await readSystemInformation(connection);
+      ({ user, systemId } = await readSystemInformation(connection));
     } catch (error) {
-      // On-premise without the function: the configuration applies. On
-      // ABAP Cloud every system has it: its absence is the destination's
-      // fault (`CloudWithoutSystemInformationError`), never a fallback.
-      if (isSystemInformationUnavailable(error)) {
-        if (systemKindOf(connection, process.env, systemType) !== 'cloud') {
-          return null;
-        }
-        throw new CloudWithoutSystemInformationError();
-      }
-      throw error;
+      if (readGuarded(failureOf, error) !== undefined) throw error;
+      absent = isSystemInformationUnavailable(error);
     }
-    return { responsible: info.user, masterSystem: info.systemId };
+    if (typeof user === 'string' && user.trim() !== '') {
+      return { responsible: user, masterSystem: systemId };
+    }
+    if (systemKindOf(connection, process.env, systemType) === 'cloud') {
+      throw absent
+        ? new CloudWithoutSystemInformationError()
+        : new NoSystemInformationError();
+    }
+    return null;
   };
   resolversByKind.set(systemType, resolver);
   shippedResolvers.add(resolver);
@@ -118,119 +144,42 @@ export const defaultSystemContextResolver: SystemContextResolver =
   systemContextResolverFor(undefined);
 
 /**
- * A system that answered its lookup but named no user — a
- * `systeminformation` whose user is missing, empty, blank or not a string,
- * a body that is no JSON or JSON that is no object: not a valid ABAP system
- * for this server.
- */
-export class SystemWithoutUserError extends Error {
-  constructor() {
-    super('the system answered systeminformation without a user');
-    this.name = 'SystemWithoutUserError';
-  }
-}
-
-/**
- * An ABAP Cloud system that answered `404` for `systeminformation`: every
- * ABAP Cloud system has the function, so the destination is not a valid
- * ABAP Cloud system. Nothing configured stands in.
- */
-export class CloudWithoutSystemInformationError extends Error {
-  constructor() {
-    super('the ABAP Cloud system answered without systeminformation');
-    this.name = 'CloudWithoutSystemInformationError';
-  }
-}
-
-/**
- * An on-premise system without `systeminformation` (a `404`) whose call
- * states no user — neither the connection's parameters (`SAP_USERNAME`) nor
- * the request's headers (`x-sap-login`): who the session is cannot be known.
+ * An on-premise system that gave no information whose call states no user
+ * either — neither the connection's parameters (`SAP_USERNAME`) nor the
+ * request's headers (`x-sap-login`): who the session is cannot be known.
  */
 export class SystemUserUnknownError extends Error {
   constructor() {
-    super('the system has no systeminformation and no user is stated');
+    super('the system gave no systeminformation and no user is stated');
     this.name = 'SystemUserUnknownError';
   }
 }
 
 /**
- * The server's refusal for a system whose answer disqualifies it — no user
- * (`system_without_user`), an ABAP Cloud system without the function
- * (`cloud_without_systeminformation`), an on-premise system without it
- * whose call states no user (`system_user_unknown`) — with its fixed
- * warning; `undefined` for any other failure.
- */
-export function invalidSystemRefusal(
-  error: unknown,
-  warn: ((message: string) => void) | undefined,
-): ServerRefusal | undefined {
-  if (error instanceof SystemWithoutUserError) {
-    warn?.(
-      'The system answered systeminformation without a user: not a valid ABAP system for this server',
-    );
-    return new ServerRefusal('system_without_user');
-  }
-  if (error instanceof CloudWithoutSystemInformationError) {
-    warn?.(
-      'The ABAP Cloud system answered without systeminformation: not a valid ABAP Cloud system',
-    );
-    return new ServerRefusal('cloud_without_systeminformation');
-  }
-  if (error instanceof SystemUserUnknownError) {
-    warn?.(
-      'The system has no systeminformation and the call states no user: the session user is unknown',
-    );
-    return new ServerRefusal('system_user_unknown');
-  }
-  return undefined;
-}
-
-const requiringUserOf = new WeakMap<
-  SystemContextResolver,
-  SystemContextResolver
->();
-
-/**
- * `resolver`, refusing an answer that names no user (`SystemWithoutUserError`):
- * `null` (the function unavailable on-premise) passes; any other answer must carry a
- * responsible that is a non-blank string. One wrapper per resolver, so
- * `resolveOnce` still makes one lookup per connection — and a refused one is
- * not kept, so the next caller asks again.
- */
-export function requiringUser(
-  resolver: SystemContextResolver,
-): SystemContextResolver {
-  const known = requiringUserOf.get(resolver);
-  if (known) return known;
-  const checked: SystemContextResolver = async (connection) => {
-    const system = await resolver(connection);
-    if (system === null) return null;
-    const user: unknown = system.responsible;
-    if (typeof user !== 'string' || user.trim() === '') {
-      throw new SystemWithoutUserError();
-    }
-    return system;
-  };
-  requiringUserOf.set(resolver, checked);
-  return checked;
-}
-
-/**
  * What a failed lookup is to the call that needed it — the same on every
  * path that asks before a handler runs (the server's, `HandlerExporter`'s):
- * an answer that names no user (`requiringUser`) the server's
- * `system_without_user`, an ABAP Cloud system without the function
- * `cloud_without_systeminformation`, a chain failure as it is, any other the server's
- * `system_lookup_failed`. `warn` gets fixed words, or the error's class
+ * an ABAP Cloud system without the endpoint
+ * `cloud_without_systeminformation`, an on-premise system with no
+ * information and no user stated `system_user_unknown`, a chain failure as
+ * it is, any other the server's `system_lookup_failed`. `warn` gets fixed words, or the error's class
  * only: a lookup's message may quote what the system answered (H4).
  */
 export function systemLookupRefusal(
   error: unknown,
   warn: ((message: string) => void) | undefined,
 ): unknown {
-  const invalid = invalidSystemRefusal(error, warn);
-  if (invalid !== undefined) return invalid;
+  if (error instanceof CloudWithoutSystemInformationError) {
+    warn?.(
+      'The ABAP Cloud destination has no systeminformation endpoint: the configuration or the headers are inconsistent',
+    );
+    return new ServerRefusal('cloud_without_systeminformation');
+  }
+  if (error instanceof SystemUserUnknownError) {
+    warn?.(
+      'The system gave no systeminformation and the call states no user: the session user is unknown',
+    );
+    return new ServerRefusal('system_user_unknown');
+  }
   if (readGuarded(failureOf, error) !== undefined) return error;
   warn?.(
     `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
@@ -252,9 +201,9 @@ const memo = new WeakMap<
 
 /**
  * One resolution per resolver and connection. Concurrent callers share the
- * in-flight promise; a `null` answer is kept (the function stays
- * unavailable); a
- * rejected lookup is dropped so the next request tries again.
+ * in-flight promise; an answer naming the user is kept; no information
+ * (`null`, an answer without a user — read as `null`) and a rejected lookup
+ * are dropped, so the next request asks again.
  */
 export function resolveOnce(
   resolver: SystemContextResolver,
@@ -269,14 +218,24 @@ export function resolveOnce(
   if (known) return known;
 
   // async wrapper: an injected resolver that throws synchronously rejects too.
-  const pending = (async () => resolver(connection))();
+  const pending = (async () => withUser(await resolver(connection)))();
   perConnection.set(connection, pending);
-  pending.catch(() => {
+  const drop = () => {
     if (perConnection.get(connection) === pending) {
       perConnection.delete(connection);
     }
-  });
+  };
+  pending.then((system) => {
+    if (system === null) drop();
+  }, drop);
   return pending;
+}
+
+/** An answer that names no user (a non-blank string) is no information. */
+function withUser(system: ResolvedSystemContext): ResolvedSystemContext {
+  if (system === null) return null;
+  const user: unknown = system.responsible;
+  return typeof user === 'string' && user.trim() !== '' ? system : null;
 }
 
 /**
@@ -297,20 +256,17 @@ export function statedUserOf(
  * `connection`'s system information for a call about to run on it — the
  * rule every path that asks before a handler applies (the server's,
  * `HandlerExporter`'s, the stdio start's): one lookup per connection
- * (`resolveOnce`) through `requiringUser`, and an on-premise `404` (`null`)
- * admits the call only when it states a user (`statedUser`, see
- * `statedUserOf`) — else `SystemUserUnknownError`, and the `null` is not
- * kept: the next call asks again.
+ * (`resolveOnce`); no information (`null`) admits the call only when it
+ * states a user (`statedUser`, see `statedUserOf`) — else
+ * `SystemUserUnknownError`.
  */
 export async function resolveForCall(
   resolver: SystemContextResolver,
   connection: IAbapConnection,
   statedUser: string | undefined,
 ): Promise<ResolvedSystemContext> {
-  const checked = requiringUser(resolver);
-  const system = await resolveOnce(checked, connection);
+  const system = await resolveOnce(resolver, connection);
   if (system === null && (statedUser ?? '').trim() === '') {
-    memo.get(checked)?.delete(connection);
     throw new SystemUserUnknownError();
   }
   return system;
@@ -385,12 +341,12 @@ export function withDestinationSystemContext<T>(
  * Run `fn` with the responsible person and master system the connection's
  * system names (`ResolvedSystemContext`). `fn` runs unchanged when there is
  * no resolver, no connection, or the context was already applied around this
- * call; with the configured values when the system has no
- * `systeminformation` function on-premise (a `404`) — when the call states
- * a user (the connection's `SAP_USERNAME`, else the request scope's login).
- * A lookup that fails, an answer that names no user (`requiringUser`), or
- * an on-premise `404` with no user stated (`system_user_unknown`), is the
- * call's error (`systemLookupRefusal`): `fn` does not run, and nothing
+ * call; with the configured values when the system gave no information
+ * on-premise — when the call states a user (the connection's
+ * `SAP_USERNAME`, else the request scope's login). A lookup that fails (on
+ * ABAP Cloud, any answer without the information), or no information
+ * on-premise with no user stated (`system_user_unknown`), is the call's
+ * error (`systemLookupRefusal`): `fn` does not run, and nothing
  * failed is kept — the next call asks again.
  */
 export async function withResolvedSystemContext<T>(

@@ -1,11 +1,12 @@
 /**
  * The debugger's request user. `systeminformation` is asked of every
- * system: an answer naming its user is the user, over any configured login;
- * an answer that names none is `system_without_user`. A `404` is the function
- * unavailable: on-premise the configured login (the request scope's, then the
- * process's) stands in, none → the user is unknown; on ABAP Cloud, which
- * always has it, the call's `cloud_without_systeminformation`. Any other status (`405`, `501`, `500`) is the call's error as
- * it came on both kinds — never the login in its place.
+ * system: an answer naming its user is the user, over any configured login.
+ * Anything else is no information. On-premise (a `404`, an answer without a
+ * user, another status) the configured login (the request scope's, then the
+ * process's) stands in, none → the user is unknown. On ABAP Cloud, which
+ * always has it, one step to the call's error: a `404`
+ * `cloud_without_systeminformation` (the configuration is inconsistent),
+ * anything else `system_lookup_failed` — never the login in its place.
  */
 
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
@@ -118,18 +119,18 @@ describe('on-premise', () => {
   });
 
   it.each(WITHOUT_USER)(
-    'an answer with %s is system_without_user, the login not used',
+    'an answer with %s: the request scope login, then the process login',
     async (_what, body) => {
       const { standIn, connection } = await standConnection();
       try {
         standIn.body(isLookup, body);
-        const error = await requestUserOf(connection).then(
-          () => undefined,
-          (thrown: unknown) => thrown,
-        );
-        expect(error).toBeInstanceOf(ServerRefusal);
-        expect((error as ServerRefusal).serverRefusal).toBe(
-          'system_without_user',
+        await runWithRequestContext({ login: 'scopelogin' }, async () => {
+          await expect(requestUserOf(connection)).resolves.toBe('SCOPELOGIN');
+        });
+        await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
+        delete process.env.SAP_USERNAME;
+        await expect(requestUserOf(connection)).rejects.toThrow(
+          'the ABAP user of this connection is unknown',
         );
       } finally {
         await closeBoth(standIn, connection);
@@ -138,19 +139,19 @@ describe('on-premise', () => {
   );
 
   it.each([405, 501, 500])(
-    'systeminformation answered %i: the call fails with it, the login not used',
+    'systeminformation answered %i: the request scope login, then the process login',
     async (status) => {
       const { standIn, connection } = await standConnection();
       try {
         standIn.answer(isLookup, status);
-        const error = await requestUserOf(connection).then(
-          () => undefined,
-          (thrown: unknown) => thrown,
+        await runWithRequestContext({ login: 'scopelogin' }, async () => {
+          await expect(requestUserOf(connection)).resolves.toBe('SCOPELOGIN');
+        });
+        await expect(requestUserOf(connection)).resolves.toBe('LOGIN_USER');
+        delete process.env.SAP_USERNAME;
+        await expect(requestUserOf(connection)).rejects.toThrow(
+          'the ABAP user of this connection is unknown',
         );
-        expect(error).not.toBeInstanceOf(ServerRefusal);
-        expect(
-          (error as { response?: { status?: number } }).response?.status,
-        ).toBe(status);
       } finally {
         await closeBoth(standIn, connection);
       }
@@ -175,7 +176,7 @@ describe('ABAP Cloud', () => {
   });
 
   it.each(WITHOUT_USER)(
-    'an answer with %s is system_without_user, the login not used',
+    'an answer with %s is system_lookup_failed, the login not used',
     async (_what, body) => {
       const { standIn, connection } = await standConnection();
       try {
@@ -186,7 +187,7 @@ describe('ABAP Cloud', () => {
         );
         expect(error).toBeInstanceOf(ServerRefusal);
         expect((error as ServerRefusal).serverRefusal).toBe(
-          'system_without_user',
+          'system_lookup_failed',
         );
       } finally {
         await closeBoth(standIn, connection);
@@ -194,14 +195,14 @@ describe('ABAP Cloud', () => {
     },
   );
 
-  it('systeminformation answered 404: not a valid ABAP Cloud system — cloud_without_systeminformation, the login not used', async () => {
+  it('systeminformation answered 404: the configuration is inconsistent — cloud_without_systeminformation, the login not used', async () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 404);
       await expect(requestUserOf(connection)).rejects.toMatchObject({
         serverRefusal: 'cloud_without_systeminformation',
         message:
-          'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run',
+          'the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration or the headers are inconsistent; the tool did not run',
       });
       expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     } finally {
@@ -210,20 +211,14 @@ describe('ABAP Cloud', () => {
   });
 
   it.each([405, 501, 500])(
-    'systeminformation answered %i: the call fails with it, the login not used',
+    'systeminformation answered %i: system_lookup_failed, the login not used',
     async (status) => {
       const { standIn, connection } = await standConnection();
       try {
         standIn.answer(isLookup, status);
-        const error = await requestUserOf(connection).then(
-          () => undefined,
-          (thrown: unknown) => thrown,
-        );
-        expect(error).toBeDefined();
-        expect(error).not.toBeInstanceOf(ServerRefusal);
-        expect(
-          (error as { response?: { status?: number } }).response?.status,
-        ).toBe(status);
+        await expect(requestUserOf(connection)).rejects.toMatchObject({
+          serverRefusal: 'system_lookup_failed',
+        });
         expect(standIn.requests.filter(isLookup)).toHaveLength(1);
       } finally {
         await closeBoth(standIn, connection);

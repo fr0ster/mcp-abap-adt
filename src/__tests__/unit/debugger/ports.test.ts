@@ -44,13 +44,13 @@ describe('the request user', () => {
     });
   });
   it.each([405, 501, 500])(
-    "on ABAP Cloud a %i handed back is the call's error, never the login",
+    "on ABAP Cloud a %i handed back is the call's system_lookup_failed, never the login",
     async (status) => {
       process.env.SAP_SYSTEM_TYPE = 'cloud';
       const conn = recordingConnection([{ status, data: '' }]);
       process.env.SAP_USERNAME = 'processlogin';
       await expect(requestUserOf(conn as any)).rejects.toMatchObject({
-        response: { status },
+        serverRefusal: 'system_lookup_failed',
       });
     },
   );
@@ -75,13 +75,11 @@ describe('the request user', () => {
     });
   });
   it.each([405, 501, 500])(
-    "on-premise a %i handed back is the call's error, never the login",
+    'on-premise a %i handed back: the login stands in',
     async (status) => {
       const conn = recordingConnection([{ status, data: '' }]);
       process.env.SAP_USERNAME = 'processlogin';
-      await expect(requestUserOf(conn as any)).rejects.toMatchObject({
-        response: { status },
-      });
+      await expect(requestUserOf(conn as any)).resolves.toBe('PROCESSLOGIN');
     },
   );
   it('the stated on-premise kind wins over SAP_SYSTEM_TYPE for a connection the factory did not build', async () => {

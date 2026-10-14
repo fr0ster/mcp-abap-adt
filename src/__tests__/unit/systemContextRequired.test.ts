@@ -451,7 +451,7 @@ describe('cloud', () => {
     expect(createBody(stated)).toContain('adtcore:responsible="CB_USER"');
   });
 
-  it('a cloud system that answers no user: not a valid system — the process login does not stand in, the call is refused system_without_user, nothing sent', async () => {
+  it('a cloud system that answers no user: one step to the error — the process login does not stand in, the call is refused system_lookup_failed, nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
     lookup.mockResolvedValue({
@@ -465,7 +465,9 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(textOf(result)).toContain('system_without_user');
+    expect(JSON.parse(textOf(result))).toMatchObject({
+      error: 'system_lookup_failed',
+    });
     expect(textOf(result)).not.toContain('PROCESS_LOGIN');
     expect(connection.requests).toEqual([]);
   });
@@ -516,6 +518,26 @@ describe('cloud', () => {
     },
   );
 
+  it('a cloud 500: system_lookup_failed — the process login does not stand in, nothing sent', async () => {
+    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+    systemContextFromConfiguration();
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 500 } }),
+    );
+    const connection = recordingConnection();
+    const server = new EmbeddableMcpServer({
+      connection: connection as never,
+      handlersRegistry: registry,
+      systemType: 'cloud',
+    });
+    const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
+    expect(JSON.parse(textOf(result))).toEqual({
+      error: 'system_lookup_failed',
+      message: SYSTEM_LOOKUP_FAILED_WORDS,
+    });
+    expect(connection.requests).toEqual([]);
+  });
+
   it('a lookup that fails: the connect fails in fixed words (system_lookup_failed), not as SAP_RESPONSIBLE missing; nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
@@ -540,7 +562,7 @@ describe('cloud', () => {
     expect(connection.requests).toEqual([]);
   });
 
-  it('a cloud system without the endpoint (404): not a valid ABAP Cloud system, cloud_without_systeminformation — the process login does not stand in, nothing sent', async () => {
+  it('a cloud system without the endpoint (404): the configuration is inconsistent, cloud_without_systeminformation — the process login does not stand in, nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
     lookup.mockRejectedValue(
@@ -556,7 +578,7 @@ describe('cloud', () => {
     expect(JSON.parse(textOf(result))).toEqual({
       error: 'cloud_without_systeminformation',
       message:
-        'the ABAP Cloud system answered without systeminformation, which every ABAP Cloud system has: the destination is not a valid ABAP Cloud system; the tool did not run',
+        'the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration or the headers are inconsistent; the tool did not run',
     });
     expect(textOf(result)).not.toContain('PROCESS_LOGIN');
     expect(connection.requests).toEqual([]);
@@ -648,17 +670,42 @@ describe('on-premise, through the server', () => {
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
-  it('an answer without a user: system_without_user, nothing configured stands in, nothing sent', async () => {
-    lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' });
-    const { connection, result } = await create();
-    expect(textOf(result)).toContain('system_without_user');
-    expect(connection.requests).toEqual([]);
-  });
+  it.each([
+    [
+      'an answer without a user',
+      () => lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' }),
+    ],
+    ['a lookup answered 500', () => lookup.mockRejectedValue(status(500))],
+  ] as const)(
+    '%s: the configured responsible and master system',
+    async (_case, answer) => {
+      answer();
+      const first = await create();
+      expect(createBody(first.connection)).toContain(
+        'adtcore:responsible="STATED_USER"',
+      );
+      expect(createBody(first.connection)).toContain(
+        'adtcore:masterSystem="STATED_SYSTEM"',
+      );
+      expect(lookup).toHaveBeenCalledTimes(1);
+    },
+  );
 
-  it('a lookup answered 500: system_lookup_failed, nothing configured stands in, nothing sent', async () => {
-    lookup.mockRejectedValue(status(500));
-    const { connection, result } = await create();
-    expect(textOf(result)).toContain(SYSTEM_LOOKUP_FAILED_WORDS);
-    expect(connection.requests).toEqual([]);
-  });
+  it.each([
+    [
+      'an answer without a user',
+      () => lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' }),
+    ],
+    ['a lookup answered 500', () => lookup.mockRejectedValue(status(500))],
+  ] as const)(
+    '%s and no user stated: system_user_unknown, nothing sent',
+    async (_case, answer) => {
+      answer();
+      const { connection, result } = await create({});
+      expect(JSON.parse(textOf(result))).toMatchObject({
+        error: 'system_user_unknown',
+      });
+      expect(connection.requests).toEqual([]);
+    },
+  );
 });

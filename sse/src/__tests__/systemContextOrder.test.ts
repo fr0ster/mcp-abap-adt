@@ -267,12 +267,12 @@ describe('SseServer: responsible and master system per session', () => {
     },
   );
 
-  it('a session that states its user asks once, and every call runs', async () => {
+  it('a session that states its user: every call runs, each asking again (no information is not kept)', async () => {
     const before = mockLookups.count;
     const next = await session(BASIC);
     expect((await next()).isError).toBe(false);
     expect((await next()).isError).toBe(false);
-    expect(mockLookups.count - before).toBe(1);
+    expect(mockLookups.count - before).toBe(2);
   });
 
   it('two concurrent sessions each see their own', async () => {

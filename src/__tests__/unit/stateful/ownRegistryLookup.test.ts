@@ -2,9 +2,9 @@
  * A tool its own registry registered (`registerAllTools`, not a
  * `CompositeHandlersRegistry`) gets the same system lookup before it runs as
  * a handler group's tool: on ABAP Cloud the instance's connection is asked
- * `systeminformation` before the callback is called. A failed lookup — a
- * refused request (`system_lookup_failed`) or an answer naming no user
- * (`system_without_user`) — is that call's error answer and the callback is
+ * `systeminformation` before the callback is called. A lookup that gives
+ * no information — a refused request or an answer naming no user — is
+ * that call's error answer (`system_lookup_failed`) and the callback is
  * not called; nothing is kept, so the next call asks again, and once the
  * system answers, the callback runs once, after the lookup, inside the
  * known system context. On a built instance (http-style) and on an
@@ -160,7 +160,7 @@ const FAILED: Array<
   ],
   [
     'answered without a user',
-    'system_without_user',
+    'system_lookup_failed',
     (standIn, failing) =>
       standIn.body(
         (r) => isLookup(r) && failing(),

@@ -199,26 +199,40 @@ it('on-premise: the lookup is sent once per connection, before the first tool re
   }
 });
 
-it('on-premise without the function (404): asked once, and the tools run', async () => {
-  const standIn = await adtStandIn();
-  standIn.answer(isLookup, 404);
-  const s = await builtStand(standIn, 'onprem');
-  try {
-    expect(
-      (await s.call('ReadClass', { class_name: 'ZCL_ONPREM' })).isError,
-    ).toBe(false);
-    expect(
-      (await s.call('ReadClass', { class_name: 'ZCL_ONPREM_TWO' })).isError,
-    ).toBe(false);
-    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
-    expect(
-      standIn.requests.filter((r) => !isLogoff(r.url)).length,
-    ).toBeGreaterThan(1);
-  } finally {
-    await s.close();
-    await standIn.close();
-  }
-});
+it.each([
+  [
+    'no systeminformation (404)',
+    (standIn: AdtStandIn) => standIn.answer(isLookup, 404),
+  ],
+  ['an error (500)', (standIn: AdtStandIn) => standIn.answer(isLookup, 500)],
+  [
+    'an answer without a user',
+    (standIn: AdtStandIn) =>
+      standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' })),
+  ],
+] as const)(
+  'on-premise, %s: the stated user is taken and the tools run; no information is not kept, so each call asks again',
+  async (_case, answer) => {
+    const standIn = await adtStandIn();
+    answer(standIn);
+    const s = await builtStand(standIn, 'onprem');
+    try {
+      expect(
+        (await s.call('ReadClass', { class_name: 'ZCL_ONPREM' })).isError,
+      ).toBe(false);
+      expect(
+        (await s.call('ReadClass', { class_name: 'ZCL_ONPREM_TWO' })).isError,
+      ).toBe(false);
+      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
+      expect(
+        standIn.requests.filter((r) => !isLogoff(r.url)).length,
+      ).toBeGreaterThan(2);
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  },
+);
 
 /**
  * A lookup that fails is the call's answer, asked before the tool runs —

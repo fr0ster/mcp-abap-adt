@@ -74,9 +74,11 @@ being set up — its session leaves the routing map at once (a later `POST` for 
 session) and its instance is closed: no call of it starts any more, **its ADT sessions are logged
 off at once** — its connection, the debugger's, a long read's own; the logoff releases a lock a
 tool holds — and its running tools are interrupted: **nothing waits for a running tool**, a queued
-call never starts, and no state undo is sent (the logoff ends the held state). Then its MCP server
-and stream are closed. Another connection's tools and instance are not touched, and a background
-run it started runs on (the process's end logs it off).
+call never starts, and no state undo is sent (the logoff ends the held state). A running tool
+whose next step would open an ADT session of its own (a debugger start, a package lock over RFC)
+is refused before it logs on: a closed connection's instance opens no new session. Then its MCP
+server and stream are closed. Another connection's tools and instance are not touched, and a
+background run it started runs on (the process's end logs it off).
 
 ## Shutdown
 
@@ -95,4 +97,9 @@ exit `1` naming the requests still running.
 
 `new SseServer(handlersRegistry, options)` — the same options, and `app` to register the routes on
 your own Express (or CAP) application. `main({ program, version })` is the binary's launcher
-(`@mcp-abap-adt/sse/launcher`).
+(`@mcp-abap-adt/sse/launcher`). An embedder that stops the server itself calls `stop()`: the listener
+closes and every open connection gets the close above — its ADT sessions logged off at once, its
+running tools interrupted, no state undo sent —, joined where one is already closing; it never
+rejects. The binary's own shutdown calls `stopListening()`, logs every session of the process off
+at once (lib's `installTransportShutdown`), then `releaseConnections()`, which closes the client
+connections left. There is no `lastStep()`.

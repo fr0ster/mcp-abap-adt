@@ -147,6 +147,15 @@ sent (the logoff ends the state) —; then `letGoOfState()` (no idle bound any m
 server and its transport closed. An SSE close uses it; the pool runs the undo and the terminal
 close when an instance leaves it.
 
+**A closed instance opens nothing.** The sweep runs once, so from the latch on — the instance's
+or the process's — no connection is opened or owned for it (`ownedConnections.ts`):
+`refuseIfClosed()` before `getConnection`'s logon, `openFreshConnection` (a host's factory is not
+called) and the leftover logoff build anything, and `own()` ends at once and refuses a connection
+recorded for a latched owner; both throw `ClosedInstanceRefusal`, answered as the shutdown
+refusal. A connection whose `connect()` was under way at the latch was swept with the rest
+(connection 17 writes its logoff once the connect settles) and is refused to its caller then
+(`refuseWhenClosed`).
+
 **The process's logoffs** (`logOffAtOnce()`, lib's `shutdownSequence.ts`): `forceClose()` — the
 logoff of every connection the process owns, background runs' included, joined where one is under
 way — and `interrupt()` of every live call, in one tick. Every launcher's shutdown begins with it

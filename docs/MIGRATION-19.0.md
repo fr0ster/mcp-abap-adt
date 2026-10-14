@@ -913,6 +913,24 @@ transport's options only:
   running tool is awaited, no state undo is sent (the logoff ends the state) —; then its state is
   let go (`letGoOfState()`: no idle bound any more) and its MCP server closed; once per instance.
   To undo the state first instead, call `shutdownState()` yourself before it.
+  `closeInstance` takes any **`ClosableInstance`** (exported from `@mcp-abap-adt/lib/embeddable`):
+  an object with `letGoOfState(): void` and `close(): Promise<void>` — `BaseMcpServer` is one; a
+  structural stand-in must provide both. It returns a `Promise<void>` that carries no value and
+  never rejects: it resolves once each logoff is written and `close()` settled, and waits for no
+  running tool; a second call returns the same promise. **From the close on, the instance opens
+  no new connection**: a running tool whose next step would log on — `getConnection`, a fresh
+  connection (`openFreshConnection`, a host's `freshConnection` factory is then not called), a
+  debugger's or a lock's session — is refused before anything is built or sent, answered as the
+  shutdown refusal ("The server is shutting down."); a connection whose `connect()` was under way
+  at the close is logged off with the rest and refused once it settles. The process shutdown's
+  latch does the same for every instance.
+- **`SseServer.stop()`** (`@mcp-abap-adt/sse`) is the instance close of every open connection —
+  logged off at once, its tools interrupted, no state undo — and never rejects; in 18.x it
+  disposed each instance's state and waited for the closing ones. `stopListening()` and
+  `releaseConnections()` are public, for a shutdown of your own: stop listening, log the sessions
+  off (`installTransportShutdown` does it at once), then close the client connections left.
+  `StreamableHttpServer.stop()` still waits for its requests and undoes each pooled instance's
+  state before the logoffs. Neither server has a `lastStep()`.
 - **`connectionReleased(connection)`**: a subclass that calls `getConnection` itself calls it
   exactly once per `getConnection` when its work on the connection is done; a connection replaced
   meanwhile is logged off only then.

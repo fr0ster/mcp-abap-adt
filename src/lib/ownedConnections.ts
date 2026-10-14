@@ -96,6 +96,13 @@ const logoffListeners = new WeakMap<OwnedConnection, Array<() => void>>();
  * it is written.
  */
 const writing = new Set<Promise<void>>();
+/**
+ * The same logoffs, per owner: a terminal close that comes after another
+ * end of the instance began (its transport's close, then a host's
+ * `terminalClose()`) joins them, so it too resolves only once they are
+ * written.
+ */
+const writingFor = new WeakMap<object, Set<Promise<void>>>();
 const ownerScope = new AsyncLocalStorage<object>();
 /** Each recorded connection's owner, kept past its end for `refuseWhenClosed`. */
 const owners = new WeakMap<OwnedConnection, object | undefined>();
@@ -231,7 +238,17 @@ export function endConnection(
   })();
   ending.set(connection, closing);
   writing.add(closing);
-  void closing.finally(() => writing.delete(closing));
+  const owner = owners.get(connection);
+  const ofOwner =
+    owner === undefined ? undefined : (writingFor.get(owner) ?? new Set());
+  if (owner !== undefined && ofOwner !== undefined) {
+    ofOwner.add(closing);
+    writingFor.set(owner, ofOwner);
+  }
+  void closing.finally(() => {
+    writing.delete(closing);
+    ofOwner?.delete(closing);
+  });
   const listeners = endListeners.get(connection) ?? [];
   endListeners.delete(connection);
   for (const listener of listeners) {
@@ -263,19 +280,23 @@ export function ownedConnections(
  * connection `instance` owns — or only those of `roles` — each once; a
  * failure logged in fixed words. Never conditional on a state undo: the
  * instance close runs it with none, the pool and the idle bound after
- * theirs, whatever it answered. Resolves once each logoff is written; it
- * waits for no request in flight. An injected connection was never
- * recorded, so it is never closed.
+ * theirs, whatever it answered. Resolves once each logoff is written — the
+ * whole close (no `roles`) also joins the instance's logoffs already under
+ * way, never a second `disconnect()`; it waits for no request in flight. An
+ * injected connection was never recorded, so it is never closed.
  */
 export async function closeOwnedConnections(
   instance: object,
   roles?: readonly ConnectionRole[],
 ): Promise<void> {
-  await Promise.all(
-    ownedConnections(instance, roles).map((connection) =>
+  const under =
+    roles === undefined ? [...(writingFor.get(instance) ?? [])] : [];
+  await Promise.all([
+    ...ownedConnections(instance, roles).map((connection) =>
       endConnection(connection),
     ),
-  );
+    ...under,
+  ]);
 }
 
 /**

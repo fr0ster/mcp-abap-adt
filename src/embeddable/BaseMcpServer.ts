@@ -47,6 +47,7 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
+import { closeInstance } from '../lib/instanceClose.js';
 import {
   type ClaimedSession,
   type LeftoverSessions,
@@ -284,7 +285,10 @@ export abstract class BaseMcpServer extends McpServer {
     /**
      * Whether the transport's close is the end of this instance's session
      * (default `true`): stdio's transport, an SSE stream, an embedder's
-     * connected transport — every live call's signal aborts then. `false`
+     * connected transport — its close is then the instance's close
+     * (`closeInstance`): the instance latched, the logoff sent at once to
+     * every connection it owns, every live call interrupted, its state let
+     * go. `false`
      * for a host that connects a transport per request (Streamable HTTP):
      * the client's disconnect closes that request's transport and ends no
      * call — an admitted call (waiting for its connection, its system
@@ -313,26 +317,21 @@ export abstract class BaseMcpServer extends McpServer {
           : defaultSystemContextResolver
         : options.systemContextResolver;
     // The session's end: the transport closed (the SDK calls the protocol's
-    // `onclose` once per transport). Every live call's signal aborts then —
-    // and only then: a client's cancel aborts nothing (`trackCall`). A host
-    // with a transport per request (http) states that its transport's close
-    // is no session's end: nothing is wired, and a dropped request ends no
-    // call.
+    // `onclose` once per transport). It is the instance's close
+    // (`closeInstance`), in that tick: the instance latched, every connection
+    // it owns sent its logoff, every live call interrupted, its state let go.
+    // A client's cancel aborts nothing (`trackCall`). The close is one per
+    // instance: a launcher's or an SSE stream's close joins it, nothing runs
+    // twice. A host with a transport per request (http) states that its
+    // transport's close is no session's end: nothing is wired, and a dropped
+    // request ends no call.
     if (options.transportCloseEndsSession !== false) {
       const previousOnClose = this.server.onclose;
       this.server.onclose = () => {
         previousOnClose?.();
-        this.sessionEnded();
+        void closeInstance(this);
       };
     }
-  }
-
-  /** The controllers of this instance's live calls (`trackCall`). */
-  private readonly liveCalls = new Set<AbortController>();
-
-  /** The session's end: every live call's request signal aborts. */
-  private sessionEnded(): void {
-    for (const controller of this.liveCalls) controller.abort();
   }
 
   /**
@@ -1630,7 +1629,7 @@ export abstract class BaseMcpServer extends McpServer {
    * counts: it pauses while the call runs and counts from its end.
    *
    * Each call has a request signal of its own (§5.1): aborted when the
-   * session ends — the instance's transport closed (`sessionEnded`), unless
+   * session ends — the instance's transport closed (`closeInstance`), unless
    * the host connects a transport per request (`transportCloseEndsSession:
    * false`, http: a dropped request ends no call) — and
    * when the call ends whatever its outcome (D4: the broker releases the
@@ -1660,13 +1659,11 @@ export abstract class BaseMcpServer extends McpServer {
     if (unregister === undefined) {
       return Promise.resolve(shutdownRefusalAnswer() as T);
     }
-    this.liveCalls.add(controller);
     this.state.callStarted();
     const call = runAsOwner(this, () => run(controller.signal));
     this.inFlight.add(call);
     call
       .finally(() => {
-        this.liveCalls.delete(controller);
         controller.abort();
         unregister();
         this.inFlight.delete(call);

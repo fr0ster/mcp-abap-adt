@@ -162,8 +162,10 @@ export interface EmbeddableMcpServerOptions {
   stateIdleMinutes?: number;
 
   /**
-   * Whether the transport's close ends this instance's session (every live
-   * call's signal aborts then). `false` for a host that connects a transport
+   * Whether the transport's close ends this instance's session — it is then
+   * the instance's close (`closeInstance`): every connection the server owns
+   * for it logged off at once, every live call interrupted, its state let
+   * go. `false` for a host that connects a transport
    * per request: the client's disconnect closes that request's transport and
    * ends no call; the instance's close or the process shutdown does.
    * @default true

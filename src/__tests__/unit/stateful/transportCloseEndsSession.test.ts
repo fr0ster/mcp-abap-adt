@@ -1,8 +1,9 @@
 /**
  * The transport's close and the session's end. By default (stdio, an SSE
  * stream, an embedder's connected transport) the transport's close is the
- * session's end: every live call's signal aborts, and a call still waiting
- * before its tool — here its system lookup — never reaches it. A host with a
+ * session's end — the instance's close: its connection is logged off, every
+ * live call's signal aborts, and a call still waiting before its tool — here
+ * its system lookup — never reaches it. A host with a
  * transport per request (Streamable HTTP) states `transportCloseEndsSession:
  * false`: the transport's close ends no call, and the waiting call runs its
  * tool once.
@@ -11,8 +12,9 @@
 import { TokenAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { activeTools } from '../../../lib/activeTools';
+import { activeTools, isLatched } from '../../../lib/activeTools';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { ownedConnections } from '../../../lib/ownedConnections';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -76,24 +78,26 @@ it.each([
   ['by default', undefined],
   ['stated true', true],
 ])(
-  '%s the transport’s close ends the session: the waiting call’s signal aborts and its tool never runs',
+  '%s the transport’s close ends the session: the instance’s close — its connection logged off, the waiting call’s signal aborts and its tool never runs',
   async (_label, option) => {
+    // Nothing here closes the instance but the transport.
     const s = await stand(option);
-    try {
-      const held = standIn.hold(isLookup);
-      await held.arrived;
-      await s.client.close();
-      expect(await s.call).toBe('the transport closed');
-      await settleWhile();
-      expect(live()).toHaveLength(1);
-      expect(live().every((tool) => tool.signal.aborted)).toBe(true);
-      held.release();
-      await until(() => live().length === 0);
-      await settleWhile();
-      expect(standIn.requests.some(of('ZCL_WAITS'))).toBe(false);
-    } finally {
-      await s.server.terminalClose();
-    }
+    const held = standIn.hold(isLookup);
+    await held.arrived;
+    expect(ownedConnections(s.server)).toHaveLength(1);
+    await s.client.close();
+    expect(isLatched(s.server)).toBe(true);
+    expect(ownedConnections(s.server)).toEqual([]);
+    expect(await s.call).toBe('the transport closed');
+    await until(() => standIn.logoffs() === 1);
+    await settleWhile();
+    expect(live()).toHaveLength(1);
+    expect(live().every((tool) => tool.signal.aborted)).toBe(true);
+    held.release();
+    await until(() => live().length === 0);
+    await settleWhile();
+    expect(standIn.requests.some(of('ZCL_WAITS'))).toBe(false);
+    expect(standIn.logoffs()).toBe(1);
   },
 );
 
@@ -103,6 +107,9 @@ it('stated false (a transport per request): the transport’s close ends no call
     const held = standIn.hold(isLookup);
     await held.arrived;
     await s.client.close();
+    // Nothing closed: the instance is open, its connection still its own.
+    expect(isLatched(s.server)).toBe(false);
+    expect(ownedConnections(s.server)).toHaveLength(1);
     expect(await s.call).toBe('the transport closed');
     await settleWhile();
     expect(live()).toHaveLength(1);
@@ -118,7 +125,9 @@ it('stated false (a transport per request): the transport’s close ends no call
     expect(standIn.requests.findIndex(of('ZCL_WAITS'))).toBeGreaterThan(
       standIn.requests.findIndex(isLookup),
     );
+    expect(standIn.logoffs()).toBe(0);
   } finally {
+    // Cleanup only: this case's subject is a close that ends nothing.
     await s.server.terminalClose();
   }
 });

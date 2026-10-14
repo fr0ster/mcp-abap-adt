@@ -72,6 +72,9 @@ it.each(triggers)(
     expect(s.adt.requests.some((r) => isLockOf('B')(r.url))).toBe(false);
     expect(s.adt.requests.some((r) => isUnlockOf('A')(r.url))).toBe(false);
     expect(s.shutdownLines).toEqual([]);
+    // The shutdown's logoffs and the transport's close are one close: one
+    // logoff per connection, after everything settled.
+    expect(s.adt.logoffs()).toBe(connects());
   },
 );
 

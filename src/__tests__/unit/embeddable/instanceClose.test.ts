@@ -13,7 +13,7 @@ import {
   resetProcessLatchForTests,
 } from '../../../lib/activeTools';
 import { closeInstance, isClosing } from '../../../lib/instanceClose';
-import { own } from '../../../lib/ownedConnections';
+import { closeOwnedConnections, own } from '../../../lib/ownedConnections';
 
 const turns = async (n = 10) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
@@ -98,4 +98,36 @@ it("another instance's calls are neither interrupted nor awaited, and its connec
   expect(theirs.signal.aborted).toBe(false);
   expect(other.order).toEqual([]);
   call?.();
+});
+
+it('a terminal close after the instance close began joins its logoffs: no second logoff, settled only once they are written', async () => {
+  let write: () => void = () => {};
+  const written = new Promise<void>((resolve) => {
+    write = resolve;
+  });
+  let logoffs = 0;
+  const self = {
+    letGoOfState: () => {},
+    close: async () => {},
+  };
+  own(
+    {
+      disconnect: async () => {
+        logoffs += 1;
+        await written;
+      },
+    },
+    { owner: self, role: 'built' },
+  );
+  void closeInstance(self);
+  let joined = false;
+  const terminal = closeOwnedConnections(self).then(() => {
+    joined = true;
+  });
+  await turns();
+  expect(logoffs).toBe(1);
+  expect(joined).toBe(false);
+  write();
+  await terminal;
+  expect(logoffs).toBe(1);
 });

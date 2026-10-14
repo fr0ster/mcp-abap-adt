@@ -1,7 +1,11 @@
 /**
  * **The instance close** (spec §6.4, D51): how an instance ends when its
- * client closed its connection — an SSE stream that closed, an embedder's
- * own close. One promise per instance; a second caller joins it.
+ * client closed its connection — a transport close that ends the session
+ * (`BaseMcpServer` wires its protocol's `onclose` here unless the host states
+ * `transportCloseEndsSession: false`: stdio's transport, an SSE stream, an
+ * embedder's connected transport), an SSE stream that closed, an embedder's
+ * own close. One promise per instance; a second caller joins it, so the
+ * launchers' and the SSE wrapper's closes add nothing: no second logoff.
  *
  * In this order, nothing waiting for a running tool:
  *

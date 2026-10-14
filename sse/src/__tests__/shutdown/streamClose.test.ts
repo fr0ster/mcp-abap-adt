@@ -76,6 +76,10 @@ it('the stream closes under a held update: connector and state logged off at onc
   await turns(20);
   expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
   expect(s.indexOf(isLockOf('B'))).toBe(-1);
+  // The stream's close and its transport's close are one close: one logoff
+  // per connection.
+  expect(loggedOff().filter((x) => x === toolSession)).toHaveLength(1);
+  expect(loggedOff().filter((x) => x === stateSession)).toHaveLength(1);
   // The other stream's instance keeps its session and still answers.
   expect(loggedOff()).not.toContain(otherSession);
   expect(await other.call('ProbeAdt', { id: 'other2' }, 2)).toBe(202);

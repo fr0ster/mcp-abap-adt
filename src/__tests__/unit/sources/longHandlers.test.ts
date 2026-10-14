@@ -42,6 +42,7 @@ function shippedDefinitions(): ToolDefinition[] {
   } as unknown as HandlerContext;
   return [
     ...new HandlerExporter({
+      systemType: 'onprem',
       includeReadOnly: true,
       includeHighLevel: true,
       includeSystem: true,

@@ -1,11 +1,14 @@
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../../handlers/interfaces.js';
+import { ServerRefusal } from '../auth/serverRefusal.js';
 import { noopLogger } from '../handlerLogger.js';
 import {
   defaultSystemContextResolver,
   type SystemContextResolver,
+  systemContextResolverFor,
   withResolvedSystemContext,
 } from '../requestSystemResolution.js';
+import { statedSystemKind } from '../systemKind.js';
 import { BackgroundRunHandlersGroup } from './groups/BackgroundRunHandlersGroup.js';
 import { DebugHandlersGroup } from './groups/DebugHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
@@ -17,6 +20,7 @@ import type {
   HandlerEntry,
   IHandlerGroup,
   IHandlersRegistry,
+  SapEnvironment,
   ToolHandler,
 } from './interfaces.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
@@ -62,6 +66,17 @@ export interface HandlerExporterOptions {
   includeDebug?: boolean;
 
   /**
+   * The SAP system kind the handlers serve — required, here or as
+   * `SAP_SYSTEM_TYPE`: without either (or with a value other than `onprem`,
+   * `cloud` or `legacy`) the constructor throws `ServerRefusal`
+   * `system_type_required`, as `EmbeddableMcpServer` does. It decides how a
+   * system's answer to its lookup is read (a `404` is "no such function" on
+   * premise, a failure on ABAP Cloud) for a connection the factory did not
+   * build. Never guessed. Overrides `SAP_SYSTEM_TYPE`.
+   */
+  systemType?: SapEnvironment;
+
+  /**
    * Asks the connection's system for the responsible person and master
    * system. Its answer wins over anything configured: `null` means the
    * system has no such function (an on-premise `404`) — the configuration
@@ -74,11 +89,10 @@ export interface HandlerExporterOptions {
    * disables it, and `getHandlerEntries()` then returns the groups' handlers
    * unwrapped.
    * MIGRATION (16.0.0): the kind of a connection the factory did not build is
-   * no longer guessed from its URL — it is `SAP_SYSTEM_TYPE` (19.0.0:
-   * required — unset, a `404` cannot be read and the lookup fails, so a
-   * create is refused as the system being unreachable); or pass your own
-   * `systemContextResolver`.
-   * @default defaultSystemContextResolver
+   * no longer guessed from its URL — it is `systemType`, else
+   * `SAP_SYSTEM_TYPE` (19.0.0: required, refused at construction without
+   * either); or pass your own `systemContextResolver`.
+   * @default the shipped resolver for `systemType`
    */
   systemContextResolver?: SystemContextResolver | null;
 }
@@ -95,6 +109,7 @@ export interface HandlerExporterOptions {
  *
  * // Create exporter with specific handlers
  * const exporter = new HandlerExporter({
+ *   systemType: 'onprem', // required here or as SAP_SYSTEM_TYPE
  *   includeReadOnly: true,
  *   includeHighLevel: true,
  * });
@@ -102,6 +117,7 @@ export interface HandlerExporterOptions {
  * // Use with EmbeddableMcpServer
  * const server = new EmbeddableMcpServer({
  *   connection: myConnection,
+ *   systemType: 'onprem',
  *   handlersRegistry: exporter.createRegistry(),
  * });
  * ```
@@ -112,10 +128,21 @@ export class HandlerExporter {
   private readonly systemContextResolver: SystemContextResolver | null;
 
   constructor(options?: HandlerExporterOptions) {
+    // The system kind is required (never guessed): stated by the option,
+    // else SAP_SYSTEM_TYPE; neither is refused here, before any handler is
+    // handed out.
+    if (
+      statedSystemKind(options?.systemType) === undefined &&
+      statedSystemKind(process.env.SAP_SYSTEM_TYPE) === undefined
+    ) {
+      throw new ServerRefusal('system_type_required');
+    }
     this.logger = options?.logger ?? noopLogger;
     this.systemContextResolver =
       options?.systemContextResolver === undefined
-        ? defaultSystemContextResolver
+        ? options?.systemType
+          ? systemContextResolverFor(options.systemType)
+          : defaultSystemContextResolver
         : options.systemContextResolver;
 
     // Create dummy context for group instantiation
@@ -123,6 +150,9 @@ export class HandlerExporter {
     const dummyContext: HandlerContext = {
       connection: null as any,
       logger: this.logger,
+      ...(options?.systemType !== undefined && {
+        systemType: options.systemType,
+      }),
     };
 
     // Build handler groups based on options
@@ -230,8 +260,15 @@ export class HandlerExporter {
 }
 
 /**
- * Create default handler exporter with all handler groups
+ * Create default handler exporter with all handler groups. The system kind
+ * is required: `systemType`, else `SAP_SYSTEM_TYPE` (refused without either).
  */
-export function createDefaultHandlerExporter(logger?: Logger): HandlerExporter {
-  return new HandlerExporter({ logger });
+export function createDefaultHandlerExporter(
+  logger?: Logger,
+  systemType?: SapEnvironment,
+): HandlerExporter {
+  return new HandlerExporter({
+    logger,
+    ...(systemType !== undefined && { systemType }),
+  });
 }

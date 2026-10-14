@@ -11,7 +11,7 @@ describe('the debug set', () => {
 
   it('HandlerExporter leaves it out unless asked, and gives it when asked', () => {
     const names = (o: any) =>
-      new HandlerExporter(o)
+      new HandlerExporter({ systemType: 'onprem', ...o })
         .getHandlerEntries()
         .map((e) => e.toolDefinition.name);
     expect(

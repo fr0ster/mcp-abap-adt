@@ -484,7 +484,8 @@ function exporterWith(
   groups: IHandlerGroup[],
   options?: ConstructorParameters<typeof HandlerExporter>[0],
 ): HandlerExporter {
-  const exporter = new HandlerExporter(options);
+  // The kind is required at construction; the connections here record their own.
+  const exporter = new HandlerExporter({ systemType: 'onprem', ...options });
   (exporter as unknown as { handlerGroups: IHandlerGroup[] }).handlerGroups =
     groups;
   return exporter;
@@ -492,7 +493,7 @@ function exporterWith(
 
 describe('HandlerExporter.getHandlerEntries', () => {
   it('keeps every handler arity the embedders branch on', () => {
-    const exporter = new HandlerExporter({});
+    const exporter = new HandlerExporter({ systemType: 'onprem' });
     const raw = (
       exporter as unknown as { handlerGroups: IHandlerGroup[] }
     ).handlerGroups.flatMap((g) => g.getHandlers());

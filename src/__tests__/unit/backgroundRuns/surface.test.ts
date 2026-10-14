@@ -255,10 +255,13 @@ describe('where the background-run tools are served: beside the run tools', () =
   });
 
   it('an embedder’s exporter serves them beside the system group', () => {
-    const names = new HandlerExporter().getToolNames();
+    const names = new HandlerExporter({ systemType: 'onprem' }).getToolNames();
     expect(names).toEqual(expect.arrayContaining(['RuntimeRunClass', ...FULL]));
     expect(
-      new HandlerExporter({ includeSystem: false }).getToolNames(),
+      new HandlerExporter({
+        systemType: 'onprem',
+        includeSystem: false,
+      }).getToolNames(),
     ).not.toContain('GetBackgroundRun');
   });
 });
@@ -267,6 +270,7 @@ describe('which tools take background', () => {
   /** Every tool definition the packages ship: full groups and compact. */
   const definitions: ToolDefinition[] = [
     ...new HandlerExporter({
+      systemType: 'onprem',
       includeReadOnly: true,
       includeHighLevel: true,
       includeSystem: true,

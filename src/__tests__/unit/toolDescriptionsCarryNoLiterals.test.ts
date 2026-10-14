@@ -134,6 +134,7 @@ const TAKES_NO_PARAMETERS = [
 describe('descriptions carry no incidental literals', () => {
   const tools = [
     ...new HandlerExporter({
+      systemType: 'onprem',
       includeReadOnly: true,
       includeHighLevel: true,
       includeSystem: true,

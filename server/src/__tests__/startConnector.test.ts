@@ -36,7 +36,7 @@ import {
 } from '../../../src/__tests__/helpers/leftoverSession';
 import { resetProcessLatchForTests } from '../../../src/lib/activeTools';
 import { readCoreConfig } from '../config/coreParameters';
-import { launch } from '../launcher.js';
+import { launch, startLookupFailedWords } from '../launcher.js';
 
 jest.setTimeout(30_000);
 
@@ -257,7 +257,8 @@ it('a logon SAP refuses: exit 1 with the failure on stderr, and the transport ne
   const s = await start();
   expect(s.exits).toEqual([1]);
   expect(s.opened()).toBe(0);
-  expect(s.stderr.join('\n')).toContain('[MCP] ');
+  // The chain failure's own words.
+  expect(s.stderr.at(-1)).toMatch(/^\[MCP\] the user or password was refused\n/);
   expect(s.stderr.join('\n')).not.toContain('start-password');
 });
 
@@ -266,7 +267,7 @@ it('ABAP Cloud without its system information: exit 1 naming it, the transport n
   const s = await start({ kind: 'cloud' });
   expect(s.exits).toEqual([1]);
   expect(s.opened()).toBe(0);
-  expect(s.stderr.join('\n')).toContain('systeminformation');
+  expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
   const end = Date.now() + 10_000;
   while (standIn.logoffs() === 0 && Date.now() < end) {
     await new Promise((r) => setTimeout(r, 5));

@@ -367,8 +367,10 @@ tool, never after a refusal.
 
 - **stdio:** at the start, with the connection (or from the leftover session's file, when it
   carries it); it is fixed for the process, like the user. A failed lookup ends the process before
-  the transport opens (exit `1`, `system_lookup_failed`'s words on stderr) and logs off the logon
-  made for it.
+  the transport opens — exit `1`, and on stderr `[MCP] Destination "<name>": the ABAP Cloud system
+  could not be asked for the session user and system id (systeminformation), which the start
+  needs; the server did not start. Start it again when the system is available` — and logs off the
+  logon made for it.
 - **Streamable HTTP and SSE:** the first call that reaches the system asks, before its tool runs,
   inside the main flow (a call outside the flow — a background run, a listed long read, a debugger
   tool — takes a turn in it for the lookup alone). If the lookup fails, that call answers the error

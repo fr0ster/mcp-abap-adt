@@ -465,6 +465,11 @@ function startupWords(
   });
 }
 
+/** The start's words for an ABAP Cloud system that answered no system information. */
+export function startLookupFailedWords(destination: string): string {
+  return `Destination "${destination}": the ABAP Cloud system could not be asked for the session user and system id (systeminformation), which the start needs; the server did not start. Start it again when the system is available`;
+}
+
 /**
  * The words the connection at start failed in: what the failure reader
  * makes of it (a chain failure, the server's own refusal — a system lookup
@@ -482,7 +487,11 @@ export function startConnectionWords(
     sentenceFor: (e: Parameters<AuthBrokerFactory['sentenceFor']>[0]) =>
       factory.sentenceFor(e),
   };
-  if (destinationFailureOf(error, { ...options, destination }) !== undefined) {
+  const read = destinationFailureOf(error, { ...options, destination });
+  if (read?.error === 'system_lookup_failed') {
+    return startLookupFailedWords(destination);
+  }
+  if (read !== undefined) {
     return destinationFailureWords(error, destination, options);
   }
   const sap = sapAnswerOf(error);

@@ -110,10 +110,15 @@ export async function openFreshConnection(
   refuseIfClosed();
   const record = siblingRecordOf(connection);
   if (record) {
+    // Built for the kind recorded for the connection it is a sibling of,
+    // never for what SAP_SYSTEM_TYPE says now.
     const built = createAbapConnection(
       record.settings,
       record.credential,
       logger ?? null,
+      undefined,
+      undefined,
+      record.kind,
     );
     own(built, { role: 'fresh' });
     await bornOrEnded(built, born, logger);

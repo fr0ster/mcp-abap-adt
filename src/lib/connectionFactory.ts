@@ -267,8 +267,11 @@ function withHttpWireLog<T>(connection: T): T {
 /** How a connection was built, so a sibling can be opened exactly like it. */
 export interface ConnectionRecord {
   settings: SapConfig;
-  /** The system kind it was built for, as stated when it was built. */
-  kind?: AbapSystemKind;
+  /**
+   * The system kind it was built for, as stated when it was built: a sibling
+   * is built for this kind, never for what `SAP_SYSTEM_TYPE` says later.
+   */
+  kind: AbapSystemKind;
   credential: IAuthProvider;
   logger?: ILogger | null;
 }
@@ -289,12 +292,16 @@ export function systemKindOf(
   declared?: string,
 ): AbapSystemKind {
   const record = records.get(connection);
-  if (record) return record.kind ?? resolveSystemKind(record.settings, env);
+  if (record) return record.kind;
   const stated = declared ? { SAP_SYSTEM_TYPE: declared } : env;
   return resolveSystemKind({} as SapConfig, stated);
 }
 
-/** The record of a connection this factory built; undefined for any other. */
+/**
+ * The record of a connection this factory built — its settings, credential
+ * and the kind it was built for, so a sibling is built exactly like it
+ * (`createAbapConnection(…, record.kind)`); undefined for any other.
+ */
 export function siblingRecordOf(
   connection: object,
 ): ConnectionRecord | undefined {
@@ -313,6 +320,13 @@ export function createAbapConnection(
    * session lives. HTTP only: over RFC connection refuses it.
    */
   session?: string,
+  /**
+   * The system kind to build for, when it is already known: a sibling of a
+   * connection this factory built passes the kind recorded for it
+   * (`siblingRecordOf`), never the current `SAP_SYSTEM_TYPE`. Absent, the
+   * kind is what `SAP_SYSTEM_TYPE` states now (`resolveSystemKind`).
+   */
+  kind: AbapSystemKind = resolveSystemKind(settings),
 ): IAbapConnection {
   // connection's `createConnection` with the system and the wire stated: the
   // choice is this server's, made from the settings as before; the connector
@@ -324,7 +338,6 @@ export function createAbapConnection(
     ...(sessionId !== undefined ? { sessionId } : {}),
   };
   const resumed = session !== undefined ? { session } : {};
-  const kind = resolveSystemKind(settings);
   const built = ((): IAbapConnection => {
     if (kind === 'cloud') {
       return withHttpWireLog(

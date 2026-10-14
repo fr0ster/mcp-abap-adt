@@ -103,13 +103,14 @@ export const CLOUD_WITHOUT_SYSTEMINFORMATION_WORDS =
 /**
  * A call on an on-premise system that gave no information (no
  * `systeminformation`, an answer without the user, an error) and states no
- * user either — neither the connection's parameters (`SAP_USERNAME`) nor
- * the request's headers (`x-sap-login`): the session user is unknown, so
+ * user either — no responsible (`SAP_RESPONSIBLE`, `x-sap-responsible`) and
+ * no login (the connection's `SAP_USERNAME`, `x-sap-login`): the session
+ * user is unknown, so
  * the tool does not run, and the next call asks again. The stdio start ends
  * with its own words (the launcher's).
  */
 export const SYSTEM_USER_UNKNOWN_WORDS =
-  'the system gave no session user (systeminformation) and the call states no user: set SAP_USERNAME (the destination or the environment), or send x-sap-login with x-sap-url, so the session user is known; the tool did not run';
+  'the system gave no session user (systeminformation) and the call states no user: set SAP_RESPONSIBLE or SAP_USERNAME (the destination or the environment), or send x-sap-responsible, or x-sap-login with x-sap-url, so the session user is known; the tool did not run';
 
 /**
  * The fixed words of a connection refused because its instance is closed

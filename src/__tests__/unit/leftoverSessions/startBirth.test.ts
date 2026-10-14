@@ -254,6 +254,35 @@ describe('on-premise without the information: the start needs a stated user', ()
   });
 
   it.each(NO_INFORMATION)(
+    '%s with a responsible stated and no login: the start succeeds',
+    async (_case, answer) => {
+      stand = await leftoverStand({ token: { statedResponsible: 'RESP' } });
+      answer();
+      expect(await stand.start()).toEqual({ session: 'logged_on' });
+      expect(stand.standIn.logoffs()).toBe(0);
+    },
+  );
+
+  it('a blank responsible stated and no login counts as none', async () => {
+    stand = await leftoverStand({ token: { statedResponsible: '  ' } });
+    stand.standIn.answer(isLookup, 404);
+    await expect(stand.start()).rejects.toMatchObject({
+      serverRefusal: 'system_user_unknown',
+    });
+  });
+
+  it.each(NO_INFORMATION)(
+    '%s with both a responsible and a login stated: the start succeeds',
+    async (_case, answer) => {
+      stand = await leftoverStand({
+        token: { statedUser: 'STATED', statedResponsible: 'RESP' },
+      });
+      answer();
+      expect(await stand.start()).toEqual({ session: 'logged_on' });
+    },
+  );
+
+  it.each(NO_INFORMATION)(
     '%s with a user stated: the start succeeds',
     async (_case, answer) => {
       stand = await leftoverStand({ token: { statedUser: 'STATED' } });

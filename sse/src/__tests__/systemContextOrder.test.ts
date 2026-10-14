@@ -244,6 +244,38 @@ describe('SseServer: responsible and master system per session', () => {
     });
   });
 
+  it('a stated x-sap-responsible is the user on the second step, with or without a login; the login only when none is stated', async () => {
+    delete process.env.SAP_RESPONSIBLE;
+    delete process.env.SAP_MASTER_SYSTEM;
+    resetSystemContextCache();
+    // (a) responsible only: a token connection states no login.
+    await expect(
+      ask({
+        ...TOKEN,
+        'x-sap-responsible': 'HEADER_RESP',
+        'x-sap-master-system': 'HEADER_SYS',
+      }),
+    ).resolves.toEqual({
+      responsible: 'HEADER_RESP',
+      masterSystem: 'HEADER_SYS',
+    });
+    // (b) login only.
+    await expect(ask(BASIC)).resolves.toEqual({
+      responsible: 'HEADER_LOGIN',
+      masterSystem: null,
+    });
+    // (c) both: the responsible.
+    await expect(
+      ask({ ...BASIC, 'x-sap-responsible': 'HEADER_RESP' }),
+    ).resolves.toEqual({ responsible: 'HEADER_RESP', masterSystem: null });
+    // (d) neither.
+    const refused = await (await session(TOKEN))();
+    expect(refused.isError).toBe(true);
+    expect(JSON.parse(refused.text)).toMatchObject({
+      error: 'system_user_unknown',
+    });
+  });
+
   it.each([
     ['a token connection', TOKEN],
     [
@@ -253,6 +285,8 @@ describe('SseServer: responsible and master system per session', () => {
   ])(
     '%s states no user: system_user_unknown, the tool not run; the 404 is kept, so the next call on the session sends no lookup',
     async (_case, headers) => {
+      delete process.env.SAP_RESPONSIBLE;
+      resetSystemContextCache();
       process.env.SAP_USERNAME = 'PROCESS_LOGIN';
       const before = mockLookups.count;
       const next = await session(headers);

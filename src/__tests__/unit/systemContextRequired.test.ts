@@ -662,7 +662,21 @@ describe('on-premise, through the server', () => {
     );
   });
 
-  it('without the function (404) and no user stated (only the process configuration): system_user_unknown, nothing sent', async () => {
+  it('without the function (404) and only a responsible (no login): the responsible and the master system', async () => {
+    lookup.mockRejectedValue(status(404));
+    const { connection } = await create({});
+    expect(createBody(connection)).toContain(
+      'adtcore:responsible="STATED_USER"',
+    );
+    expect(createBody(connection)).toContain(
+      'adtcore:masterSystem="STATED_SYSTEM"',
+    );
+  });
+
+  it('without the function (404) and neither a responsible nor a login: system_user_unknown, nothing sent', async () => {
+    delete process.env.SAP_RESPONSIBLE;
+    resetSystemContextCache();
+    systemContextFromConfiguration();
     lookup.mockRejectedValue(status(404));
     const first = await create({});
     expect(textOf(first.result)).toContain('system_user_unknown');
@@ -698,8 +712,11 @@ describe('on-premise, through the server', () => {
     ],
     ['a lookup answered 500', () => lookup.mockRejectedValue(status(500))],
   ] as const)(
-    '%s and no user stated: system_user_unknown, nothing sent',
+    '%s and neither a responsible nor a login: system_user_unknown, nothing sent',
     async (_case, answer) => {
+      delete process.env.SAP_RESPONSIBLE;
+      resetSystemContextCache();
+      systemContextFromConfiguration();
       answer();
       const { connection, result } = await create({});
       expect(JSON.parse(textOf(result))).toMatchObject({

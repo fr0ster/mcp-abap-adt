@@ -145,7 +145,7 @@ describe('on-premise: asked the same way; the headers when it gives no informati
         expect(JSON.parse(result.text)).toEqual({
           error: 'system_user_unknown',
           message:
-            'the system gave no session user (systeminformation) and the call states no user: set SAP_USERNAME (the destination or the environment), or send x-sap-login with x-sap-url, so the session user is known; the tool did not run',
+            'the system gave no session user (systeminformation) and the call states no user: set SAP_RESPONSIBLE or SAP_USERNAME (the destination or the environment), or send x-sap-responsible, or x-sap-login with x-sap-url, so the session user is known; the tool did not run',
         });
       }
       expect(s.standIn.requests.filter(isLookup)).toHaveLength(2);

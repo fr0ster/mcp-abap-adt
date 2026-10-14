@@ -27,7 +27,10 @@ import { ServerRefusal } from './auth/serverRefusal';
 import { siblingRecordOf, systemKindOf } from './connectionFactory';
 import { logger } from './logger';
 import { getRequestContext, runWithRequestContext } from './requestContext';
-import { getEffectiveSystemContext } from './systemContext';
+import {
+  getEffectiveSystemContext,
+  getStatedSystemContext,
+} from './systemContext';
 import {
   isCredentialRefusedStatus,
   isSystemInformationUnavailable,
@@ -301,8 +304,9 @@ export function systemOf(
 
 /**
  * The whole recipe for a call: `systemOf`, and on-premise no information
- * admits the call only when it states a user (`statedUser`, see
- * `statedUserOf`) — else `SystemUserUnknownError`.
+ * admits the call only when it states a user (`statedUser`: the
+ * responsible if stated (`statedResponsibleOf`), else the login
+ * (`statedUserOf`)) — else `SystemUserUnknownError`.
  */
 export function systemForCall(
   lookup: SystemLookup,
@@ -314,6 +318,24 @@ export function systemForCall(
     throw new SystemUserUnknownError();
   }
   return system;
+}
+
+/**
+ * The responsible a call states: the request's (`x-sap-responsible`), the
+ * process's (`SAP_RESPONSIBLE`) or, after them, `destinationResponsible` —
+ * the destination's own `SAP_RESPONSIBLE`; `undefined` when none is stated
+ * (absent or blank). Taken before the login (`statedUserOf`).
+ */
+export function statedResponsibleOf(
+  destinationResponsible?: string,
+): string | undefined {
+  for (const value of [
+    getStatedSystemContext().responsible,
+    destinationResponsible,
+  ]) {
+    if (typeof value === 'string' && value.trim() !== '') return value;
+  }
+  return undefined;
 }
 
 /**
@@ -443,7 +465,8 @@ export async function withResolvedSystemContext<T>(
     resolved = await resolveForCall(
       resolver,
       connection,
-      statedUserOf(connection, getRequestContext()?.login),
+      statedResponsibleOf() ??
+        statedUserOf(connection, getRequestContext()?.login),
       systemType,
     );
   } catch (error) {

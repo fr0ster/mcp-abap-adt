@@ -12,6 +12,7 @@
 
 import { TokenAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
+import type { DestinationSystemContext } from '../../../lib/auth/destinationSystemContext';
 import { SYSTEM_USER_UNKNOWN_WORDS } from '../../../lib/auth/serverRefusal';
 import {
   type AdtStandIn,
@@ -93,6 +94,7 @@ it.each(WITHOUT_USER)(
 async function standServerOn(
   standIn: { url: string },
   settings: Record<string, string>,
+  systemContext?: DestinationSystemContext,
 ) {
   const backgroundRuns = new InMemoryBackgroundRuns();
   const listed = jest.spyOn(backgroundRuns, 'list');
@@ -104,6 +106,7 @@ async function standServerOn(
   server.use({
     settings: { url: standIn.url, client: '100', authType: 'jwt', ...settings },
     credential: TokenAuthProvider.fixed('placeholder.token.sig'),
+    ...(systemContext !== undefined && { systemContext }),
   });
   server.register(shippedGroups());
   /** The caller user the last listing ran for. */
@@ -236,6 +239,47 @@ describe('on-premise', () => {
       } finally {
         await client.close();
         await server.terminalClose();
+        await standIn.close();
+      }
+    },
+  );
+
+  it.each(NO_INFORMATION)(
+    '%s: the responsible if stated, else the login',
+    async (_case, answer) => {
+      const standIn = await adtStandIn();
+      answer(standIn);
+      const onlyResponsible = await standServerOn(
+        standIn,
+        {},
+        {
+          responsible: 'resp_user',
+        },
+      );
+      try {
+        expect(
+          (await onlyResponsible.client.call('ListBackgroundRuns')).isError,
+        ).toBeFalsy();
+        expect(onlyResponsible.caller()).toBe('RESP_USER');
+      } finally {
+        await onlyResponsible.client.close();
+        await onlyResponsible.server.terminalClose();
+      }
+      const both = await standServerOn(
+        standIn,
+        { username: 'login_user' },
+        {
+          responsible: 'resp_user',
+        },
+      );
+      try {
+        expect(
+          (await both.client.call('ListBackgroundRuns')).isError,
+        ).toBeFalsy();
+        expect(both.caller()).toBe('RESP_USER');
+      } finally {
+        await both.client.close();
+        await both.server.terminalClose();
         await standIn.close();
       }
     },

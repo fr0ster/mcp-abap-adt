@@ -454,13 +454,51 @@ describe('withResolvedSystemContext', () => {
     const fn = jest.fn();
     for (let i = 0; i < 2; i += 1) {
       await expect(
-        runWithRequestContext({ responsible: 'ALICE' }, () =>
+        runWithRequestContext({ masterSystem: 'SID' }, () =>
           withResolvedSystemContext(conn, fn),
         ),
       ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
     }
     expect(fn).not.toHaveBeenCalled();
     expect(lookup).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it.each([
+    ['(a) responsible only', { responsible: 'ALICE' }],
+    ['(b) login only', { login: 'BOB' }],
+    ['(c) both', { responsible: 'ALICE', login: 'BOB' }],
+  ])(
+    'on-premise without the function (404), %s: fn runs, taking the responsible if stated, else the login',
+    async (_case, scope) => {
+      lookup.mockRejectedValue(
+        Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+      );
+      const seen: Array<string | undefined> = [];
+      await expect(
+        runWithRequestContext(scope, () =>
+          withResolvedSystemContext(onPremConn(), () => {
+            seen.push(getEffectiveSystemContext().responsible);
+            return 'ran';
+          }),
+        ),
+      ).resolves.toBe('ran');
+      expect(seen).toEqual([scope.responsible ?? scope.login]);
+    },
+  );
+
+  it('on-premise without the function (404), neither a responsible nor a login: system_user_unknown', async () => {
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    lookup.mockRejectedValue(
+      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+    );
+    const fn = jest.fn();
+    await expect(
+      runWithRequestContext({ masterSystem: 'SID' }, () =>
+        withResolvedSystemContext(onPremConn(), fn),
+      ),
+    ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
+    expect(fn).not.toHaveBeenCalled();
     warn.mockRestore();
   });
 
@@ -597,7 +635,7 @@ describe('withResolvedSystemContext', () => {
       answer();
       const fn = jest.fn(seen);
       await expect(
-        runWithRequestContext({ responsible: 'ALICE' }, () =>
+        runWithRequestContext({ masterSystem: 'SID' }, () =>
           withResolvedSystemContext(onPremConn(), fn),
         ),
       ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });

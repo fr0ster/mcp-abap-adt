@@ -86,8 +86,8 @@ export interface HandlerExporterOptions {
    * by the resolver `cloud_without_systeminformation`, anything else
    * `system_lookup_failed`); on-premise the configuration
    * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
-   * `x-sap-url`) stands, when the call states a user (the connection's
-   * `SAP_USERNAME`, else the request scope's login), and with none the
+   * `x-sap-url`) stands, when the call states a responsible or, none, a
+   * login (the connection's `SAP_USERNAME`, else the request scope's login), and with none the
    * wrapped handler throws `system_user_unknown`. A credential failure (a
    * chain failure, a `401`) is thrown as it came. In each case the handler
    * does not run. It is asked before each wrapped handler runs, as the

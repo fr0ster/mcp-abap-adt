@@ -22,6 +22,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
+import type { DestinationSystemContext } from '../../../lib/auth/destinationSystemContext';
 import type { IBackgroundRuns } from '../../../lib/backgroundRuns/contract';
 import { CompactBackgroundRunHandlersGroup } from '../../../lib/compact/backgroundRuns/group';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
@@ -46,7 +47,11 @@ export const isProgramRun = (r: StandInRequest): boolean =>
   r.method === 'POST' && r.url.includes('/programs/programrun/');
 
 export class StandServer extends BaseMcpServer {
-  use(source: { settings: SapConfig; credential: IAuthProvider }): void {
+  use(source: {
+    settings: SapConfig;
+    credential: IAuthProvider;
+    systemContext?: DestinationSystemContext;
+  }): void {
     stateSystemKind();
     this.setConnectionContext({
       kind: 'built',

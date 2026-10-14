@@ -92,6 +92,7 @@ import {
   type SystemContextResolver,
   type SystemLookup,
   SystemUserUnknownError,
+  statedResponsibleOf,
   statedUserOf,
   systemForCall,
   systemLookupRefusal,
@@ -648,8 +649,8 @@ export abstract class BaseMcpServer extends McpServer {
    * (`knowSystem`), so a later call sends nothing. Then the recipe, by the
    * connection's kind, whatever the resolver (`systemForCall`): the
    * information is the call's; no information is on ABAP Cloud the call's
-   * error, and on-premise `null` when the call states a user (the
-   * connection's `SAP_USERNAME`, else the request's `x-sap-login`), else
+   * error, and on-premise `null` when the call states a responsible or, none, a
+   * login (the connection's `SAP_USERNAME`, else the request's `x-sap-login`), else
    * `system_user_unknown`. A credential failure is the call's as it came
    * (`systemLookupRefusal`). Concurrent askers share one request
    * (`resolveOnce`). `undefined`: nothing to resolve (no resolver).
@@ -664,10 +665,12 @@ export abstract class BaseMcpServer extends McpServer {
     // settings' `SAP_USERNAME`, else its source's login — `x-sap-login`);
     // a host's connection's parameters, else the request scope's login.
     const destination = this.destinationOf.get(connection);
+    // The responsible stated, if any; else the login.
     const stated =
-      destination !== undefined
+      statedResponsibleOf(destination?.responsible) ??
+      (destination !== undefined
         ? destination.user
-        : statedUserOf(connection, getRequestContext()?.login);
+        : statedUserOf(connection, getRequestContext()?.login));
     try {
       let lookup = this.systems.get(connection);
       if (lookup === undefined) {
@@ -869,6 +872,7 @@ export abstract class BaseMcpServer extends McpServer {
       credential,
       target: targetOf(resolved.settings),
       user: resolved.settings.username ?? resolved.systemContext?.login,
+      responsible: resolved.systemContext?.responsible,
     };
     const entry: BuiltConnection = {
       credential,
@@ -1609,6 +1613,7 @@ export abstract class BaseMcpServer extends McpServer {
     const named = await this.callerUserOf(signal, resolved.credential, on);
     if (named !== undefined) return { url, client, user: named };
     const stated = (
+      statedResponsibleOf(resolved.systemContext?.responsible) ??
       resolved.settings.username ??
       resolved.systemContext?.login ??
       ''
@@ -2055,6 +2060,8 @@ interface Destination {
    * `systeminformation` needs. Not part of the key.
    */
   user: string | undefined;
+  /** The destination's own `SAP_RESPONSIBLE`, taken before `user`. */
+  responsible: string | undefined;
 }
 
 /**

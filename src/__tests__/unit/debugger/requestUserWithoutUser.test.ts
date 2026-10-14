@@ -2,8 +2,8 @@
  * The debugger's request user. `systeminformation` is asked of every
  * system: an answer naming its user is the user, over any configured login.
  * Anything else is no information. On-premise (a `404`, an answer without a
- * user, another status) the configured login (the request scope's, then the
- * process's) stands in, none → `system_user_unknown`, the tool path's code
+ * user, another status) the responsible if stated, else the configured login
+ * (the request scope's, then the process's) stands in, none → `system_user_unknown`, the tool path's code
  * and words. A `404` is kept for the connection: asked once. A `401` is the
  * credential failure as it came, on both kinds. On ABAP Cloud, which
  * always has it, one step to the call's error: a `404`
@@ -20,6 +20,10 @@ import {
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { requestUserOf } from '../../../lib/debugger/ports';
 import { runWithRequestContext } from '../../../lib/requestContext';
+import {
+  resetSystemContextCache,
+  systemContextFromConfiguration,
+} from '../../../lib/systemContext';
 import { adtStandIn, type StandInRequest } from '../../helpers/adtStandIn';
 
 const SYSTEM_INFORMATION = '/sap/bc/adt/core/http/systeminformation';
@@ -125,6 +129,58 @@ describe('on-premise', () => {
       await expect(requestUserOf(connection)).rejects.toMatchObject(
         USER_UNKNOWN,
       );
+    } finally {
+      await closeBoth(standIn, connection);
+    }
+  });
+
+  it.each([
+    ['responsible only', { responsible: 'resp_user' }, undefined, 'RESP_USER'],
+    ['login only', { login: 'scopelogin' }, undefined, 'SCOPELOGIN'],
+    [
+      'both: the responsible',
+      { responsible: 'resp_user', login: 'scopelogin' },
+      'PROCESS_LOGIN',
+      'RESP_USER',
+    ],
+  ])(
+    'without the function (404), %s: the responsible if stated, else the login',
+    async (_what, scope, processLogin, expected) => {
+      const { standIn, connection } = await standConnection();
+      try {
+        standIn.answer(isLookup, 404);
+        if (processLogin === undefined) delete process.env.SAP_USERNAME;
+        else process.env.SAP_USERNAME = processLogin;
+        await runWithRequestContext(scope, async () => {
+          await expect(requestUserOf(connection)).resolves.toBe(expected);
+        });
+      } finally {
+        await closeBoth(standIn, connection);
+      }
+    },
+  );
+
+  it('without the function (404), a responsible stated for the process (SAP_RESPONSIBLE) is taken over the login', async () => {
+    const { standIn, connection } = await standConnection();
+    process.env.SAP_RESPONSIBLE = 'process_resp';
+    systemContextFromConfiguration();
+    try {
+      standIn.answer(isLookup, 404);
+      await expect(requestUserOf(connection)).resolves.toBe('PROCESS_RESP');
+    } finally {
+      delete process.env.SAP_RESPONSIBLE;
+      resetSystemContextCache();
+      await closeBoth(standIn, connection);
+    }
+  });
+
+  it('with an answer naming its user, a stated responsible does not replace it', async () => {
+    const { standIn, connection } = await standConnection();
+    try {
+      standIn.body(isLookup, JSON.stringify({ userName: 'system_user' }));
+      await runWithRequestContext({ responsible: 'resp_user' }, async () => {
+        await expect(requestUserOf(connection)).resolves.toBe('SYSTEM_USER');
+      });
     } finally {
       await closeBoth(standIn, connection);
     }

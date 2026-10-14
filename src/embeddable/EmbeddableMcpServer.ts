@@ -149,8 +149,8 @@ export interface EmbeddableMcpServerOptions {
    * `cloud_without_systeminformation`, anything else
    * `system_lookup_failed`); on-premise the configuration
    * (`SAP_RESPONSIBLE`, the login: `SAP_USERNAME`, or `x-sap-login` with
-   * `x-sap-url`) stands, when the call states a user (the connection's
-   * `SAP_USERNAME`, else the request scope's login), and with none the call
+   * `x-sap-url`) stands, when the call states a responsible or, none, a
+   * login (the connection's `SAP_USERNAME`, else the request scope's login), and with none the call
    * fails with `system_user_unknown`. A credential failure (a chain
    * failure, a `401`) is the call's as it came. Either way its tool does
    * not run. An answer naming the user is kept per destination, and

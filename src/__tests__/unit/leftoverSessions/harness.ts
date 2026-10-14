@@ -128,7 +128,12 @@ export async function leftoverStand(
      * none when absent (the endpoint answers 404) — for the tools that ask
      * it (the background runs, the debugger).
      */
-    token?: { tokenUser?: string; statedUser?: string };
+    token?: {
+      tokenUser?: string;
+      statedUser?: string;
+      /** The destination's own `SAP_RESPONSIBLE`. */
+      statedResponsible?: string;
+    };
     /** Extra tools beside the leftover-session ones and the probe. */
     extra?: Parameters<typeof probeGroup>[0];
   } = {},
@@ -162,6 +167,9 @@ export async function leftoverStand(
           : {}),
       },
       credential: TokenAuthProvider.fixed('placeholder.token.sig'),
+      ...(options.token.statedResponsible !== undefined && {
+        systemContext: { responsible: options.token.statedResponsible },
+      }),
     });
   } else {
     server.use({

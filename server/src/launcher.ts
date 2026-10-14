@@ -500,7 +500,7 @@ export function startCloudWithoutSystemInformationWords(
  * whose destination states no user.
  */
 export function startSystemUserUnknownWords(destination: string): string {
-  return `Destination "${destination}": the system gave no session user (systeminformation) and the destination states no user: set SAP_USERNAME in the destination, so the session user is known; the server did not start`;
+  return `Destination "${destination}": the system gave no session user (systeminformation) and the destination states no user: set SAP_RESPONSIBLE or SAP_USERNAME in the destination or the environment, so the session user is known; the server did not start`;
 }
 
 /**

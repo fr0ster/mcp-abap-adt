@@ -33,6 +33,7 @@ import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -125,7 +126,7 @@ export async function handleRuntimeRunProgram(
     { tool: 'RuntimeRunProgram', detail: 'terse' },
     () =>
       pair(
-        () =>
+        atStep('schedule trace', () =>
           programExecutor.scheduleTrace({
             ...definedOnly({
               description: args.description,
@@ -145,11 +146,13 @@ export async function handleRuntimeRunProgram(
             }),
             analyse: analyseException,
           }),
-        (profilerId: string) =>
+        ),
+        atStep('run with profiler', (profilerId: string) =>
           programExecutor.runWithProfiler(
             { programName },
             { analyse: analyseException, profilerId },
           ),
+        ),
       ),
     ([profilerId, output]: [string, string]) => ({
       success: true,

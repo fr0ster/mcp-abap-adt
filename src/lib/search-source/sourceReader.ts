@@ -1,7 +1,9 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
+import { carryingFailure, methodFailureOf } from '../strategies/step';
 import { encodeSapObjectName, makeAdtRequest } from '../utils';
 import type { EnumeratedObject, ScanObjectType } from './packageEnumerator';
 
@@ -44,6 +46,9 @@ async function safe<T>(
   try {
     return await op();
   } catch (e: any) {
+    // SAP refused a read: the method's error as it is, with its step — the
+    // scan answers it, it is not skipped as if the source were empty.
+    if (methodFailureOf(e) !== undefined) throw e;
     logger?.debug?.(`[search-source] ${desc} failed: ${e?.message ?? e}`);
     return null;
   }
@@ -157,6 +162,19 @@ function parseFugrChildrenFromXml(xml: string): FugrChild[] {
   return out;
 }
 
+/**
+ * A failed read: a source that is not there (`404`) is skipped as before;
+ * any other refusal is thrown as the method's error, with the step.
+ */
+function refusedOrAbsent(
+  answer: { ok: false; getError(): IAdtError },
+  step: string,
+): null {
+  const error = answer.getError();
+  if (error.response?.status === 404) return null;
+  throw carryingFailure(new Error(error.message), error, step);
+}
+
 export function createSourceReaderDeps(
   ctx: HandlerContext,
 ): ReadSourceUnitsDeps {
@@ -174,7 +192,7 @@ export function createSourceReaderDeps(
       const r = await client
         .getProgram()
         .read({ programName }, version, { analyse: analyseException });
-      return r.ok ? r.getResult().value : null;
+      return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read program');
     },
     async readInclude(includeName) {
       const r = await makeAdtRequest(
@@ -191,13 +209,15 @@ export function createSourceReaderDeps(
       const r = await client
         .getClass()
         .read({ className }, version, { analyse: analyseException });
-      return r.ok ? r.getResult().value : null;
+      return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read class');
     },
     async fetchFugrStructure(fugrName) {
       const r = await client
         .getUtils()
         .getObjectStructure('FUGR/F', fugrName, { analyse: analyseException });
-      return r.ok ? parseFugrChildrenFromXml(r.getResult().value) : [];
+      if (r.ok) return parseFugrChildrenFromXml(r.getResult().value);
+      refusedOrAbsent(r, 'read function group structure');
+      return [];
     },
     async readFugrFm(fugrName, fmName) {
       const r = await makeAdtRequest(

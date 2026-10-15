@@ -18,6 +18,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep, carryingFailure } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import {
   resolveVersionedObject,
@@ -86,6 +87,7 @@ function diffSources(
  */
 function unwrapVersionSource(
   response: IAdtResponse<string, IAdtError>,
+  step: string,
 ): string | undefined {
   if (response.ok) return response.getResult().value;
   const error = response.getError();
@@ -93,7 +95,8 @@ function unwrapVersionSource(
     code?: string;
   };
   if (error.code !== undefined) failure.code = error.code;
-  throw failure;
+  // The method's error rides on the throw, as it is, with the step.
+  throw carryingFailure(failure, error, step);
 }
 
 /**
@@ -112,8 +115,8 @@ export async function buildVersionDiff(
     obj.getVersionSource(contentUriTo, { analyse: analyseException }),
   ]);
 
-  const rawFrom = unwrapVersionSource(respFrom);
-  const rawTo = unwrapVersionSource(respTo);
+  const rawFrom = unwrapVersionSource(respFrom, 'read version source (from)');
+  const rawTo = unwrapVersionSource(respTo, 'read version source (to)');
 
   return diffSources(contentUriFrom, contentUriTo, rawFrom, rawTo);
 }
@@ -199,14 +202,16 @@ export async function handleGetObjectVersionDiff(
       { tool: 'GetObjectVersionDiff', detail: 'terse' },
       () =>
         pair(
-          () =>
+          atStep('read version source (from)', () =>
             resolved.obj.getVersionSource(content_uri_from, {
               analyse: analyseException,
             }),
-          () =>
+          ),
+          atStep('read version source (to)', () =>
             resolved.obj.getVersionSource(content_uri_to, {
               analyse: analyseException,
             }),
+          ),
         ),
       ([srcFrom, srcTo]: [string, string]) => {
         const result = diffSources(

@@ -34,6 +34,7 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answerFailure, answerThrown } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -41,6 +42,7 @@ import {
   patchDataElementXml,
 } from '../../../lib/strategies/dataElementPatch';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
@@ -147,11 +149,12 @@ export async function handleUpdateDataElement(
       // different failures, and whichever comes back is the one the caller
       // sees, built by the strategy rather than summarised here.
       const written = await sequence(
-        () =>
+        atStep('read metadata', () =>
           client
             .getDataElement()
             .readMetadata({ dataElementName }, { analyse: analyseException }),
-        (current) =>
+        ),
+        atStep('update metadata', (current) =>
           client.getDataElement().updateMetadata(
             {
               dataElementName,
@@ -166,12 +169,17 @@ export async function handleUpdateDataElement(
               analyse: analyseException,
             },
           ),
+        ),
       );
 
       if (!written.ok) {
         const failure = written.getError();
         logger?.error(`UpdateDataElement refused: ${failure.message}`);
-        return return_error(new Error(failure.message));
+        // The method's error as it is, with the step it arose at.
+        return answerFailure(failure, {
+          tool: 'UpdateDataElementLow',
+          detail: 'terse',
+        });
       }
 
       logger?.info(`✅ UpdateDataElement completed: ${dataElementName}`);
@@ -200,9 +208,10 @@ export async function handleUpdateDataElement(
       logger?.error(
         `Error updating data element ${dataElementName}: ${message}`,
       );
-      return return_error(
-        new Error(`Failed to update data element: ${message}`),
-      );
+      return answerThrown(error, {
+        tool: 'UpdateDataElementLow',
+        detail: 'terse',
+      });
     }
   } catch (error: any) {
     return return_error(error);

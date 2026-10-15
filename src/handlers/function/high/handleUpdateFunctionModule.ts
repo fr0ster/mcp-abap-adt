@@ -34,6 +34,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -128,7 +129,7 @@ export async function handleUpdateFunctionModule(
           ),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
-            () =>
+            atStep('update', () =>
               obj.update(
                 {
                   functionModuleName,
@@ -141,10 +142,12 @@ export async function handleUpdateFunctionModule(
                   analyse: analyseException,
                 },
               ),
-            () =>
+            ),
+            atStep('check', () =>
               obj.check({ functionModuleName, functionGroupName }, undefined, {
                 analyse: analyseException,
               }),
+            ),
           ),
         (lockHandle) =>
           obj.unlock({ functionModuleName, functionGroupName }, lockHandle, {
@@ -168,10 +171,13 @@ export async function handleUpdateFunctionModule(
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate(
-          { functionModuleName, functionGroupName },
-          { analyse: analyseActivation },
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate(
+            { functionModuleName, functionGroupName },
+            { analyse: analyseActivation },
+          ),
         ),
       );
     },

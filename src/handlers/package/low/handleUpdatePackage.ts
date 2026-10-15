@@ -38,6 +38,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import { patchPackageXml } from '../../../lib/strategies/packagePatch';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
@@ -127,11 +128,12 @@ export async function handleUpdatePackage(
       // different failures, and whichever comes back is the one the caller
       // sees, built by the strategy rather than summarised here.
       const written = await sequence(
-        () =>
+        atStep('read metadata', () =>
           client
             .getPackage()
             .readMetadata({ packageName }, { analyse: analyseException }),
-        (current) =>
+        ),
+        atStep('update metadata', (current) =>
           client.getPackage().updateMetadata(
             {
               packageName,
@@ -148,6 +150,7 @@ export async function handleUpdatePackage(
               analyse: analyseException,
             },
           ),
+        ),
       );
 
       // A refusal goes out through `answer()`, with what SAP said (T100,

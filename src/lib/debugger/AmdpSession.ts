@@ -19,8 +19,9 @@ import type {
   AmdpDebugger,
   amdpDebuggerDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { carryingFailure, noteLeftBehind } from '../strategies/step';
 import {
   type AmdpBreakpointState,
   type AmdpEvent,
@@ -77,6 +78,7 @@ interface Open {
   /** What the last batch could not undo, set once its cleanup finished and was recorded. */
   lastBatchFailures?: string[];
   readFailed?: string; // the event read failed: a sync waiting for confirmation hears it at once
+  readFailedWith?: IAdtError; // the method's error behind `readFailed`, when the read answered one
   failureReported: boolean; // that failure was already thrown by a sync
 }
 
@@ -85,11 +87,29 @@ const bodyOf = (a: IAdtResponse<unknown>): string =>
 const messageOf = (a: IAdtResponse<unknown>): string =>
   a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const asFailure = (e: unknown) =>
-  ({
+/** A debug error that carries the method's error as it is, with its step. */
+const failedAt = <E extends Error>(
+  error: E,
+  a: IAdtResponse<unknown>,
+  step: string,
+): E =>
+  a.ok || fromThrow.has(a.getError())
+    ? error
+    : carryingFailure(error, a.getError(), step);
+/**
+ * A throw read as a failed answer, so the loops can handle both alike. No
+ * SAP answer is behind it: it is never carried as the method's error to the
+ * consumer as if SAP had answered (`failedAt` skips it).
+ */
+const fromThrow = new WeakSet<object>();
+const asFailure = (e: unknown) => {
+  const error = { origin: 'connection', message: thrown(e) };
+  fromThrow.add(error);
+  return {
     ok: false as const,
-    getError: () => ({ origin: 'connection', message: thrown(e) }),
-  }) as unknown as IAdtResponse<never>;
+    getError: () => error,
+  } as unknown as IAdtResponse<never>;
+};
 type Wire = { headers?: Record<string, unknown>; data?: unknown };
 const wireOf = (a: IAdtResponse<unknown>): Wire =>
   (a.ok ? (a.getResult().value ?? {}) : {}) as Wire;
@@ -106,6 +126,8 @@ export class AmdpSession<O = unknown> {
   private readonly abandoned = new Set<string>(); // syncs no call waits for any more
   private notices: AmdpState[] = [];
   private failure?: string;
+  /** The failed event read behind `failure`: the method's error, and what was not undone. */
+  private failedRead?: { error: IAdtError; failures: string[] };
   private cleanupFailures: string[] = [];
   /** Runs in flight, each its own token: stop() forgets them all, so a late end changes nothing. */
   private readonly runs = new Set<{ connection?: IAbapConnection }>();
@@ -211,7 +233,13 @@ export class AmdpSession<O = unknown> {
         const started = await onEvents.start(user, {
           stopExisting: options.stopExisting,
         });
-        if (!started.ok) throw new DebugListenerError(messageOf(started));
+        if (!started.ok) {
+          throw failedAt(
+            new DebugListenerError(messageOf(started)),
+            started,
+            'start',
+          );
+        }
         const { mainId, hanaSession } = readAmdpStart(wireOf(started));
         if (!mainId)
           throw new DebugListenerError(
@@ -273,7 +301,13 @@ export class AmdpSession<O = unknown> {
       open.mainId,
       breakpoints,
     );
-    if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+    if (!answer.ok) {
+      throw failedAt(
+        new DebugRequestError(messageOf(answer)),
+        answer,
+        'set breakpoints',
+      );
+    }
     const requestId = locationId(wireOf(answer));
     if (!requestId)
       throw new DebugRequestError(
@@ -304,7 +338,10 @@ export class AmdpSession<O = unknown> {
     if (event) return event.breakpoints;
     if (open.readFailed !== undefined) {
       open.failureReported = true;
-      throw new DebugListenerError(open.readFailed);
+      const failed = new DebugListenerError(open.readFailed);
+      throw open.readFailedWith !== undefined
+        ? carryingFailure(failed, open.readFailedWith, 'read events')
+        : failed;
     }
     this.abandoned.add(requestId); // a late confirmation is dropped, not kept
     throw new DebugRequestError(
@@ -355,6 +392,8 @@ export class AmdpSession<O = unknown> {
         }
         if (current && failed !== undefined) {
           open.readFailed = failed;
+          if (!answer.ok && !fromThrow.has(answer.getError()))
+            open.readFailedWith = answer.getError();
           this.notify(); // a sync waiting in the serial hears it now, not after its bound
         }
         await this.lastBatch(open, events);
@@ -392,10 +431,15 @@ export class AmdpSession<O = unknown> {
       const owed = this.closing === open;
       const failures = owed ? await this.finishClosing(open, events) : [];
       if (owed) this.cleanupFailures = failures;
-      if (failedHere && !open.failureReported)
+      if (failedHere && !open.failureReported) {
         this.failure = `${open.readFailed ?? 'the event read failed'}${
           failures.length ? `; not undone: ${failures.join('; ')}` : ''
         }`;
+        this.failedRead =
+          open.readFailedWith !== undefined
+            ? { error: open.readFailedWith, failures }
+            : undefined;
+      }
       // Last: a stop waiting for this batch returns only now, with what it could not undo.
       open.lastBatchFailures = failures;
     });
@@ -480,9 +524,17 @@ export class AmdpSession<O = unknown> {
     }
     if (this.failure !== undefined) {
       const message = this.failure;
+      const read = this.failedRead;
       this.failure = undefined;
+      this.failedRead = undefined;
       this.changed?.(); // consuming it may leave nothing held
-      throw new DebugListenerError(message);
+      const failed = new DebugListenerError(message);
+      if (read === undefined) throw failed;
+      carryingFailure(failed, read.error, 'read events');
+      if (read.failures.length > 0) {
+        noteLeftBehind(failed, `not undone: ${read.failures.join('; ')}`);
+      }
+      throw failed;
     }
     if (this.queue.length) {
       const events = this.queue.splice(0);
@@ -503,7 +555,13 @@ export class AmdpSession<O = unknown> {
       const debuggee = this.requireDebuggee();
       const breaksBefore = this.breaks;
       const answer = await open.onCommands.step(open.mainId, debuggee, step);
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'step',
+        );
+      }
       // Moving until the next ON_BREAK — unless one already arrived while the step was answered.
       if (this.breaks === breaksBefore) this.debuggeeId = undefined;
       return { value: 'moving', raw: '' };
@@ -526,7 +584,13 @@ export class AmdpSession<O = unknown> {
         rowNumber: 100,
         ...(query ? { query } : {}),
       });
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'read table',
+        );
+      }
       const raw = bodyOf(answer);
       return { value: readAmdpPreview(raw), raw };
     });
@@ -540,7 +604,13 @@ export class AmdpSession<O = unknown> {
         open.mainId,
         debuggee,
       );
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'cancel',
+        );
+      }
       open.released.add(debuggee);
       this.debuggeeId = undefined;
     });
@@ -678,6 +748,7 @@ export class AmdpSession<O = unknown> {
 function withNotUndone(error: unknown, failures: string[]): unknown {
   if (failures.length === 0) return error;
   const notUndone = `not undone: ${failures.join('; ')}`;
+  noteLeftBehind(error, notUndone);
   if (error instanceof Error) {
     error.message = `${error.message}; ${notUndone}`;
     return error;

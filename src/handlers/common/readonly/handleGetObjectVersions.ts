@@ -6,7 +6,6 @@
  * opaque contentUri, to be passed to GetObjectVersionSource). Closes #30.
  */
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -108,13 +107,6 @@ export async function handleGetObjectVersions(
         ),
       } as AxiosResponse);
     } catch (error: any) {
-      if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
-        return return_error(
-          new Error(
-            `Version history is not supported for object_type '${object_type}' (${object_name}).`,
-          ),
-        );
-      }
       return return_error(
         error instanceof Error ? error : new Error(String(error)),
       );

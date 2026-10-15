@@ -6,6 +6,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -52,8 +53,12 @@ export async function handleReadTable(
     { tool: 'ReadTable', detail: 'terse' },
     () =>
       pair(
-        () => obj.read({ tableName }, version, { analyse: analyseException }),
-        () => obj.readMetadata({ tableName }, { analyse: analyseException }),
+        atStep('read', () =>
+          obj.read({ tableName }, version, { analyse: analyseException }),
+        ),
+        atStep('read metadata', () =>
+          obj.readMetadata({ tableName }, { analyse: analyseException }),
+        ),
       ),
     ([source, metadata]: [AdtReading<string>, AdtReading<string>]) => ({
       success: true,

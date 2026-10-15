@@ -13,6 +13,7 @@ import { answerRead } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
+import { stepOf } from './strategies/step';
 import {
   isSystemContextRefusal,
   SystemContextMissingError,
@@ -69,6 +70,9 @@ function local(
   ) {
     payload.operation = 'succeeded';
   }
+  // The step the handler was doing when it threw (`atStep`).
+  const step = stepOf(thrown);
+  if (step !== undefined) payload.step = step;
 
   return json(payload, true);
 }
@@ -98,13 +102,21 @@ interface MessageCarrier {
  * circular references, and its body is reachable as `raw_body` at
  * `detail: 'raw'`.
  */
-function failurePayload(
+export function failurePayload(
   error: IAdtError & MessageCarrier,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     message: error.message,
     origin: error.origin,
   };
+  // Where the error arose, added by the handler (`atStep`) — beside the
+  // method's error, never in place of any of it.
+  const step = stepOf(error);
+  if (step !== undefined) payload.step = step;
+  // The status SAP answered with, when SAP answered: what tells a refusal by
+  // SAP from a failure with no answer behind it (no status, no `raw_body`).
+  const status = (error.response as { status?: unknown } | undefined)?.status;
+  if (typeof status === 'number') payload.status = status;
   if (error.code !== undefined) payload.code = error.code;
   if (error.adtType !== undefined) payload.adt_type = error.adtType;
   if (error.namespace !== undefined) payload.namespace = error.namespace;
@@ -160,23 +172,75 @@ function failurePayload(
   return payload;
 }
 
+/**
+ * A method's failed answer, as the consumer gets it: the method's error as it
+ * is, plus the step it arose at when the handler named one. The one rendering
+ * every handler shares — `return_answer` and a handler that works by throws
+ * (`methodFailureOf`) alike.
+ */
+export function answerFailure(
+  failed: IAdtError,
+  ctx?: AnswerContext,
+): McpResult {
+  const error = failed as IAdtError & MessageCarrier;
+  // A failure that carries a refusal (§7.2, P6): answered as the chain
+  // made it (§7.3), never rebuilt from the error's message.
+  const read = failureOf(error);
+  if (read !== undefined) return answerRead(read);
+  // Refused here, before any request: not a claim about the server.
+  if (ctx !== undefined && isSystemContextRefusal(error.message)) {
+    return local('system_context_missing', ctx, error.message);
+  }
+  return json(failurePayload(error), true);
+}
+
+/**
+ * Another handler's failed answer, delegated to, with the step it arose at
+ * added beside its payload — nothing of the payload changes. A success, a
+ * payload that already names a step, or text that is not a JSON object is
+ * returned as it is.
+ */
+export function failedAtStep(
+  result: { isError?: boolean; content?: unknown },
+  step: string,
+): { isError?: boolean; content?: unknown } {
+  if (result?.isError !== true || !Array.isArray(result.content)) return result;
+  const [first, ...rest] = result.content as Array<{
+    type?: string;
+    text?: unknown;
+  }>;
+  if (typeof first?.text !== 'string') return result;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(first.text);
+  } catch {
+    return result;
+  }
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
+    return result;
+  if ('step' in payload) return result;
+  return {
+    ...result,
+    content: [
+      {
+        ...first,
+        text: JSON.stringify(
+          { ...(payload as Record<string, unknown>), step },
+          null,
+          2,
+        ),
+      },
+      ...rest,
+    ],
+  };
+}
+
 export function return_answer<T>(
   answer: IAdtResponse<T, IAdtError>,
   project: (value: T) => unknown,
   ctx: AnswerContext,
 ): McpResult {
-  if (!answer.ok) {
-    const error = answer.getError() as IAdtError & MessageCarrier;
-    // A failure that carries a refusal (§7.2, P6): answered as the chain
-    // made it (§7.3), never rebuilt from the error's message.
-    const read = failureOf(error);
-    if (read !== undefined) return answerRead(read);
-    // Refused here, before any request: not a claim about the server.
-    if (isSystemContextRefusal(error.message)) {
-      return local('system_context_missing', ctx, error.message);
-    }
-    return json(failurePayload(error), true);
-  }
+  if (!answer.ok) return answerFailure(answer.getError(), ctx);
 
   const projected = project(answer.getResult().value);
 
@@ -219,6 +283,21 @@ function messageOf(thrown: unknown): string {
 }
 
 /**
+ * A throw from a handler's call, as the consumer gets it — the one rendering
+ * `answer()` and a handler that works by throws share.
+ */
+export function answerThrown(thrown: unknown, ctx: AnswerContext): McpResult {
+  // The failure reader first (§7.2): a thrown refusal is the chain's.
+  const read = failureOf(thrown);
+  if (read !== undefined) return answerRead(read);
+  // Refused here, before any request: not a claim about the server.
+  if (thrown instanceof SystemContextMissingError) {
+    return local('system_context_missing', ctx, thrown.message);
+  }
+  return local('client_threw', ctx, messageOf(thrown), thrown);
+}
+
+/**
  * The single entry point a handler uses.
  *
  * `IAdtResponse` covers what the server said; it does not cover a throw.
@@ -237,14 +316,7 @@ export async function answer<T>(
   try {
     response = await call();
   } catch (thrown) {
-    // The failure reader first (§7.2): a thrown refusal is the chain's.
-    const read = failureOf(thrown);
-    if (read !== undefined) return answerRead(read);
-    // Refused here, before any request: not a claim about the server.
-    if (thrown instanceof SystemContextMissingError) {
-      return local('system_context_missing', ctx, thrown.message);
-    }
-    return local('client_threw', ctx, messageOf(thrown), thrown);
+    return answerThrown(thrown, ctx);
   }
 
   try {

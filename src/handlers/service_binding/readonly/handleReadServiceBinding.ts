@@ -6,6 +6,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -47,11 +48,14 @@ export async function handleReadServiceBinding(
     { tool: 'ReadServiceBinding', detail: 'terse' },
     () =>
       pair(
-        () =>
+        atStep('read', () =>
           obj.read({ bindingName }, undefined, {
             analyse: analyseException,
           }),
-        () => obj.readMetadata({ bindingName }, { analyse: analyseException }),
+        ),
+        atStep('read metadata', () =>
+          obj.readMetadata({ bindingName }, { analyse: analyseException }),
+        ),
       ),
     ([source, metadata]: [AdtReading<string>, AdtReading<string>]) => ({
       success: true,

@@ -59,6 +59,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -147,7 +148,7 @@ export async function handleGetNodeStructure(
     () => {
       const client = createAdtClient(connection, logger);
       return sequence(
-        () =>
+        atStep('read node structure', () =>
           client
             .getUtils({ ...ourUtils, node: rawNodeStructureXml })
             .fetchNodeStructure(parent_type, parent_name, {
@@ -155,6 +156,7 @@ export async function handleGetNodeStructure(
               nodeId: node_id || '000000',
               withShortDescriptions: with_short_descriptions !== false,
             }),
+        ),
         async (rawXml) => {
           if (!isIndeterminateWalkAnswer(rawXml)) {
             return succeededLevel(nodeLevel({ data: rawXml }));
@@ -169,12 +171,14 @@ export async function handleGetNodeStructure(
           // The one existence check this tool can pay: the same one
           // GetPackageTree pays, over the same object, through the
           // already-migrated getPackage().readMetadata().
-          const packageRead = await client
-            .getPackage()
-            .readMetadata(
-              { packageName: parent_name.toUpperCase() },
-              { analyse: analyseException },
-            );
+          const packageRead = await atStep('read package metadata', () =>
+            client
+              .getPackage()
+              .readMetadata(
+                { packageName: parent_name.toUpperCase() },
+                { analyse: analyseException },
+              ),
+          )();
 
           if (!packageRead.ok) {
             // The package's own refusal, named — not a sentence this

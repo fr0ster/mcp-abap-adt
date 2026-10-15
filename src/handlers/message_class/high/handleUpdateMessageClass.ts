@@ -34,6 +34,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
 import { patchXmlAttribute } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -95,10 +96,9 @@ export async function handleUpdateMessageClass(
         resultsFor(messageClassDocuments),
       );
 
-      const current = await obj.readMetadata(
-        { name },
-        { analyse: analyseException },
-      );
+      const current = await atStep('read metadata', () =>
+        obj.readMetadata({ name }, { analyse: analyseException }),
+      )();
       if (!current.ok) return current as never;
       const edited = patchXmlAttribute(
         String(current.getResult().value.raw),
@@ -108,11 +108,12 @@ export async function handleUpdateMessageClass(
 
       return withLock(
         () => obj.lock({ name }, { analyse: analyseLock }),
-        (lockHandle) =>
+        atStep('update metadata', (lockHandle) =>
           obj.updateMetadata(
             { name, transportRequest: args.transport_request },
             { source: edited, lockHandle, analyse: analyseException },
           ),
+        ),
         (lockHandle) =>
           obj.unlock({ name }, lockHandle, { analyse: analyseException }),
       );

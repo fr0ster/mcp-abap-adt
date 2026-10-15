@@ -2,6 +2,7 @@ import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
+import { carryingFailure } from '../strategies/step';
 
 export interface SearchObjectsArgs {
   query: string;
@@ -85,7 +86,11 @@ export function createPackagePatternResolver(
       { analyse: analyseException },
     );
     if (!response.ok) {
-      throw new Error(response.getError().message);
+      throw carryingFailure(
+        new Error(response.getError().message),
+        response.getError(),
+        'search packages',
+      );
     }
     return response.getResult().value.map((hit) => hit.name);
   };

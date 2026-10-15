@@ -1,3 +1,4 @@
+import { failedAtStep } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { return_error } from '../../../lib/utils';
@@ -453,6 +454,38 @@ class SimpleAbapSemanticAnalyzer {
   }
 }
 
+/**
+ * A delegated read that SAP refused: the read's error as it is, with the
+ * step, ends the call. A symbol that is not there (`ExceptionResourceNotFound`)
+ * or a failure that is not a method's error stays what it was: not found.
+ */
+class SymbolReadRefused extends Error {
+  constructor(readonly result: ReturnType<typeof failedAtStep>) {
+    super('a symbol read was refused');
+  }
+}
+
+function refusalOf(
+  result: { isError?: boolean; content?: unknown } | undefined,
+  step: string,
+): SymbolReadRefused | undefined {
+  if (result?.isError !== true || !Array.isArray(result.content)) return;
+  const text = (result.content[0] as { text?: unknown } | undefined)?.text;
+  if (typeof text !== 'string') return;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return;
+  }
+  if (payload === null || typeof payload !== 'object') return;
+  if (
+    (payload as { adt_type?: unknown }).adt_type === 'ExceptionResourceNotFound'
+  )
+    return;
+  return new SymbolReadRefused(failedAtStep(result, step));
+}
+
 class AbapSystemSymbolResolver {
   public async resolveSymbols(
     context: HandlerContext,
@@ -472,6 +505,7 @@ class AbapSystemSymbolResolver {
           failedCount++;
         }
       } catch (error) {
+        if (error instanceof SymbolReadRefused) throw error;
         // If resolution fails, add original symbol with error info
         resolvedSymbols.push({
           ...symbol,
@@ -510,6 +544,7 @@ class AbapSystemSymbolResolver {
           return await this.resolveGenericSymbol(context, symbol);
       }
     } catch (error) {
+      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -529,6 +564,8 @@ class AbapSystemSymbolResolver {
       const classInfo = await handleGetClass(context, {
         class_name: symbol.name,
       });
+      const refused = refusalOf(classInfo, `read class ${symbol.name}`);
+      if (refused) throw refused;
       if (
         !classInfo ||
         classInfo.isError ||
@@ -575,6 +612,7 @@ class AbapSystemSymbolResolver {
         },
       };
     } catch (error) {
+      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -594,6 +632,11 @@ class AbapSystemSymbolResolver {
         function_module_name: symbol.name,
         function_group_name: '',
       });
+      const refused = refusalOf(
+        functionInfo,
+        `read function module ${symbol.name}`,
+      );
+      if (refused) throw refused;
       if (
         !functionInfo ||
         functionInfo.isError ||
@@ -631,6 +674,7 @@ class AbapSystemSymbolResolver {
         } as AbapSystemInfo,
       };
     } catch (error) {
+      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -650,6 +694,8 @@ class AbapSystemSymbolResolver {
         interface_name: symbol.name,
       });
 
+      const refused = refusalOf(interfaceInfo, `read interface ${symbol.name}`);
+      if (refused) throw refused;
       if (
         !interfaceInfo ||
         interfaceInfo.isError ||
@@ -697,6 +743,7 @@ class AbapSystemSymbolResolver {
         } as AbapSystemInfo,
       };
     } catch (error) {
+      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -725,6 +772,7 @@ class AbapSystemSymbolResolver {
         } as AbapSystemInfo,
       };
     } catch (error) {
+      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -781,6 +829,7 @@ export async function handleGetAbapSystemSymbols(
 
     return response;
   } catch (error) {
+    if (error instanceof SymbolReadRefused) return error.result;
     logger?.error('Failed to resolve ABAP system symbols', error as any);
     return {
       isError: true,

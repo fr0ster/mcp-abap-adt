@@ -30,6 +30,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -116,7 +117,7 @@ export async function handleUpdateMetadataExtension(
         ? await update(args.lock_handle)
         : await withLock(
             () => obj.lock({ name: ddlxName }, { analyse: analyseLock }),
-            update,
+            atStep('update', update),
             (lockHandle) =>
               obj.unlock({ name: ddlxName }, lockHandle, {
                 analyse: analyseException,
@@ -139,8 +140,11 @@ export async function handleUpdateMetadataExtension(
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ name: ddlxName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate({ name: ddlxName }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

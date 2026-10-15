@@ -1,8 +1,10 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { failurePayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { carryingFailure, methodFailureOf } from '../../../lib/strategies/step';
 import {
   encodeSapObjectName,
   logger,
@@ -400,10 +402,13 @@ async function getIncludesListInternal(
     );
 
     if (!rootResponse.ok) {
-      logger?.warn(
-        `Refused while fetching root node structure for ${objectName}`,
+      // SAP's refusal is the method's error as it is, with the step — not an
+      // empty list of includes.
+      throw carryingFailure(
+        new Error(rootResponse.getError().message),
+        rootResponse.getError(),
+        'read node structure',
       );
-      return [];
     }
 
     // Step 2: Find the includes (PROG/I) node id among the type folders.
@@ -430,8 +435,11 @@ async function getIncludesListInternal(
     );
 
     if (!includesResponse.ok) {
-      logger?.warn(`Refused while fetching includes list for ${objectName}`);
-      return [];
+      throw carryingFailure(
+        new Error(includesResponse.getError().message),
+        includesResponse.getError(),
+        'read includes node',
+      );
     }
 
     // Step 4: Names of the objects under that node — de-duplicated, matching
@@ -445,6 +453,7 @@ async function getIncludesListInternal(
     );
     return includeNames;
   } catch (error) {
+    if (methodFailureOf(error) !== undefined) throw error;
     logger?.error(
       `Failed to get includes list for ${objectType} '${objectName}':`,
       error,
@@ -726,7 +735,12 @@ export async function handleGetEnhancements(
                   type: mainEnhancementResponse.object_type,
                 },
                 include_nested: true,
-                error: error instanceof Error ? error.message : String(error),
+                // A refusal: the method's error as it is, with its step.
+                error: (() => {
+                  const carried = methodFailureOf(error);
+                  if (carried !== undefined) return failurePayload(carried);
+                  return error instanceof Error ? error.message : String(error);
+                })(),
                 partial_result: true,
                 total_objects_analyzed: 1,
                 total_enhancements_found:

@@ -36,6 +36,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
@@ -124,16 +125,18 @@ export async function handleCreateServiceDefinition(
         resultsFor(serviceDefinitionDocuments),
       );
 
-      const created = await obj.create(
-        {
-          serviceDefinitionName,
-          description: args.description || serviceDefinitionName,
-          packageName: args.package_name.toUpperCase(),
-          transportRequest: args.transport_request,
-          masterLanguage: args.master_language,
-        },
-        { analyse: analyseException },
-      );
+      const created = await atStep('create', () =>
+        obj.create(
+          {
+            serviceDefinitionName,
+            description: args.description || serviceDefinitionName,
+            packageName: args.package_name.toUpperCase(),
+            transportRequest: args.transport_request,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+      )();
 
       if (!created.ok) {
         return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
@@ -146,7 +149,7 @@ export async function handleCreateServiceDefinition(
       if (args.source_code) {
         written = await withLock(
           () => obj.lock({ serviceDefinitionName }, { analyse: analyseLock }),
-          (lockHandle) =>
+          atStep('update', (lockHandle) =>
             obj.update(
               {
                 serviceDefinitionName,
@@ -158,6 +161,7 @@ export async function handleCreateServiceDefinition(
                 analyse: analyseException,
               },
             ),
+          ),
           (lockHandle) =>
             obj.unlock({ serviceDefinitionName }, lockHandle, {
               analyse: analyseException,
@@ -169,8 +173,14 @@ export async function handleCreateServiceDefinition(
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ serviceDefinitionName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate(
+            { serviceDefinitionName },
+            { analyse: analyseActivation },
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

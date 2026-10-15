@@ -50,6 +50,7 @@ import {
 } from '../../../lib/strategies/resultSets';
 import { terseClassRun } from '../../../lib/strategies/runProjections';
 import { sequence, succeededWith } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -197,7 +198,9 @@ export async function handleRuntimeRunClass(
     async () => {
       // 1. The snapshot. A refused feed read is a refusal, not an empty feed —
       // reported as-is, before scheduling or running anything.
-      const snapshot = await profiler.list({ analyse: analyseException });
+      const snapshot = await atStep('list traces', () =>
+        profiler.list({ analyse: analyseException }),
+      )();
       if (!snapshot.ok) return snapshot;
       const before = new Set(
         snapshot.getResult().value.map((entry) => entry.id),
@@ -208,27 +211,30 @@ export async function handleRuntimeRunClass(
       // cannot reach back into a finished sequence.
       let profilerId = '';
       const ran = await sequence(
-        () =>
+        atStep('schedule trace', () =>
           classExecutor.scheduleTrace({
             ...profilerParameters,
             analyse: analyseException,
           }),
-        (id: string) => {
+        ),
+        atStep('run with profiler', (id: string) => {
           profilerId = id;
           return classExecutor.runWithProfiler(
             { className },
             { analyse: analyseException, profilerId: id },
           );
-        },
+        }),
       );
       if (!ran.ok) return ran;
 
       // 3. The search. A run that succeeded with no trace written yet is
       // still a successful run: the id is absent, not an error.
-      const found = await newTraceAfter(profiler, before, {
-        attempts: maxTraceAttempts,
-        delayMs: traceRetryDelayMs,
-      });
+      const found = await atStep('find trace', () =>
+        newTraceAfter(profiler, before, {
+          attempts: maxTraceAttempts,
+          delayMs: traceRetryDelayMs,
+        }),
+      )();
       if (!found.ok) return found;
 
       return succeededWith({

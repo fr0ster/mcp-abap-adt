@@ -23,6 +23,7 @@ import type {
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import {
   MAX_STATUS_POLLS,
   pollUntilFinished,
@@ -88,10 +89,12 @@ export async function runAndWait(
   objectName: string,
 ): Promise<IAdtResponse<RunAndWait, IAdtError>> {
   const runner = testRunner(context, carrier);
-  const started = await runner.run(objectName.toUpperCase(), {
-    // A run SAP did not start is a failure (adt-clients MIGRATION-23 §3).
-    analyse: analyseUnitTestStart,
-  });
+  const started = await atStep('run', () =>
+    runner.run(objectName.toUpperCase(), {
+      // A run SAP did not start is a failure (adt-clients MIGRATION-23 §3).
+      analyse: analyseUnitTestStart,
+    }),
+  )();
   if (!started.ok) {
     return started as unknown as IAdtResponse<RunAndWait, IAdtError>;
   }

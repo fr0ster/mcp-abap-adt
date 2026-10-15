@@ -31,6 +31,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -100,7 +101,7 @@ export async function handleUpdateServiceDefinition(
         () => obj.lock({ serviceDefinitionName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
-            () =>
+            atStep('update', () =>
               obj.update(
                 {
                   serviceDefinitionName,
@@ -112,10 +113,12 @@ export async function handleUpdateServiceDefinition(
                   analyse: analyseException,
                 },
               ),
-            () =>
+            ),
+            atStep('check', () =>
               obj.check({ serviceDefinitionName }, undefined, {
                 analyse: analyseException,
               }),
+            ),
           ),
         (lockHandle) =>
           obj.unlock({ serviceDefinitionName }, lockHandle, {
@@ -139,8 +142,14 @@ export async function handleUpdateServiceDefinition(
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ serviceDefinitionName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate(
+            { serviceDefinitionName },
+            { analyse: analyseActivation },
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

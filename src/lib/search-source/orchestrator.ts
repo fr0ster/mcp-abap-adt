@@ -91,19 +91,30 @@ async function runWithLimit<T>(
   shouldStop?: () => boolean,
 ): Promise<void> {
   let next = 0;
+  // The first failure ends the run: no pump takes another item, and the
+  // failure is answered once every pump has stopped — nothing runs on after
+  // the call has answered.
+  let failed: { error: unknown } | undefined;
   async function pump(): Promise<void> {
     while (true) {
+      if (failed) return;
       if (shouldStop?.()) {
         onStop?.();
         return;
       }
       const idx = next++;
       if (idx >= items.length) return;
-      await worker(items[idx]);
+      try {
+        await worker(items[idx]);
+      } catch (error) {
+        failed ??= { error };
+        return;
+      }
     }
   }
   const n = Math.max(1, Math.min(limit, items.length));
   await Promise.all(Array.from({ length: n }, () => pump()));
+  if (failed) throw failed.error;
 }
 
 export async function runSearchSource(

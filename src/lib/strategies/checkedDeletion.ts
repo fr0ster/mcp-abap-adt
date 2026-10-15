@@ -29,6 +29,7 @@ import type {
   IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
 import { absentPerCheck, analyseDeletion } from './deletionRefusal';
+import { atStep } from './step';
 
 export interface CheckedDeletable<C, V> {
   checkDeletion(
@@ -46,9 +47,9 @@ export async function deleteIfDeletable<C, V>(
   config: C,
   deleteAnalyse: IAnalyse<any> = analyseDeletion,
 ): Promise<IAdtResponse<V, IAdtError>> {
-  const check = await object.checkDeletion(config, {
-    analyse: analyseDeletion,
-  });
+  const check = await atStep('delete check', () =>
+    object.checkDeletion(config, { analyse: analyseDeletion }),
+  )();
   if (!check.ok) return check as unknown as IAdtResponse<V, IAdtError>;
   // Permitted, but not there: nothing to delete, so no delete is sent. The
   // check's answer is the result — `terseDeletion` reads it as `deleted:
@@ -59,5 +60,7 @@ export async function deleteIfDeletable<C, V>(
   if (absentPerCheck(reading?.raw)) {
     return check as unknown as IAdtResponse<V, IAdtError>;
   }
-  return object.delete(config, { analyse: deleteAnalyse });
+  return atStep('delete', () =>
+    object.delete(config, { analyse: deleteAnalyse }),
+  )();
 }

@@ -29,6 +29,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
@@ -109,16 +110,18 @@ export async function handleCreateMetadataExtension(
         resultsFor(metadataExtensionDocuments),
       );
 
-      const created = await obj.create(
-        {
-          name,
-          description: args.description || name,
-          packageName: args.package_name,
-          transportRequest: args.transport_request,
-          masterLanguage: args.master_language,
-        },
-        { analyse: analyseException },
-      );
+      const created = await atStep('create', () =>
+        obj.create(
+          {
+            name,
+            description: args.description || name,
+            packageName: args.package_name,
+            transportRequest: args.transport_request,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+      )();
       if (!created.ok) return created;
 
       const checked = await withLock(
@@ -127,7 +130,9 @@ export async function handleCreateMetadataExtension(
         // this runs between the write and the activation, so the only version
         // that exists yet is the unsaved one. The endpoint does not fall back
         // — asking for `active` here answers `notProcessed`.
-        () => obj.check({ name }, 'inactive', { analyse: analyseException }),
+        atStep('check', () =>
+          obj.check({ name }, 'inactive', { analyse: analyseException }),
+        ),
         (lockHandle) =>
           obj.unlock({ name }, lockHandle, { analyse: analyseException }),
       );
@@ -147,8 +152,11 @@ export async function handleCreateMetadataExtension(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(checked, () =>
-        obj.activate({ name }, { analyse: analyseActivation }),
+      return carryCleanup(
+        checked,
+        atStep('activate', () =>
+          obj.activate({ name }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

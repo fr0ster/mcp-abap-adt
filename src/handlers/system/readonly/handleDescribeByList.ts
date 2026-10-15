@@ -34,7 +34,9 @@ export const TOOL_DEFINITION = {
 
 // DescribeByList: Batch description for a list of ABAP objects
 
+import { failedAtStep } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 
 /**
@@ -88,11 +90,15 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
 
         if (tryWithoutType) {
           res = await handleSearchObject(context, { object_name: obj.name });
+          // A refusal is the search's error as it is, with the step — not an
+          // object skipped as if nothing were found.
+          if ((res as { isError?: boolean })?.isError === true) {
+            return failedAtStep(res, `search ${obj.name}`);
+          }
           parsed = typeof res === 'string' ? JSON.parse(res) : res;
-          // If it still fails or comes back empty, skip this object
+          // If it comes back empty, skip this object
           if (
             parsed == null ||
-            parsed.isError === true ||
             (parsed.content &&
               Array.isArray(parsed.content) &&
               parsed.content.length === 0)
@@ -147,6 +153,6 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
     };
   } catch (e) {
     logger?.error('Failed to describe objects list', e as any);
-    return { isError: true, content: [] };
+    return return_error(e);
   }
 }

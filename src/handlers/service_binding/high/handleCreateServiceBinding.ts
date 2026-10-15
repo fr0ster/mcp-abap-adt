@@ -45,6 +45,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils';
 
@@ -179,43 +180,49 @@ export async function handleCreateServiceBinding(
         resultsFor(serviceDocuments),
       );
 
-      const created = await obj.create(
-        {
-          bindingName: serviceBindingName,
-          packageName,
-          description: (args.description || serviceBindingName).trim(),
-          serviceDefinitionName,
-          serviceName,
-          serviceVersion,
-          bindingVariant,
-          transportRequest: args.transport_request,
-          masterLanguage: args.master_language,
-        },
-        { analyse: analyseException },
-      );
+      const created = await atStep('create', () =>
+        obj.create(
+          {
+            bindingName: serviceBindingName,
+            packageName,
+            description: (args.description || serviceBindingName).trim(),
+            serviceDefinitionName,
+            serviceName,
+            serviceVersion,
+            bindingVariant,
+            transportRequest: args.transport_request,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+      )();
 
       if (!created.ok || !shouldActivate) {
         return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      const activated = await obj.activate(
-        { bindingName: serviceBindingName },
-        { analyse: analyseActivation },
-      );
+      const activated = await atStep('activate', () =>
+        obj.activate(
+          { bindingName: serviceBindingName },
+          { analyse: analyseActivation },
+        ),
+      )();
       if (!activated.ok) {
         return activated as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      const group = await obj.getServiceGroup(
-        {
-          objectname: serviceBindingName,
-          serviceType,
-          servicename: serviceName,
-          serviceversion: serviceVersion,
-          srvdname: serviceDefinitionName,
-        },
-        { analyse: analyseException },
-      );
+      const group = await atStep('read service group', () =>
+        obj.getServiceGroup(
+          {
+            objectname: serviceBindingName,
+            serviceType,
+            servicename: serviceName,
+            serviceversion: serviceVersion,
+            srvdname: serviceDefinitionName,
+          },
+          { analyse: analyseException },
+        ),
+      )();
       if (!group.ok) {
         return group as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }

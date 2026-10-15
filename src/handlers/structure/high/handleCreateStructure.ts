@@ -50,6 +50,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -227,7 +228,7 @@ export async function handleCreateStructure(
       );
 
       const checked = await sequence(
-        () =>
+        atStep('validate', () =>
           obj.validate(
             {
               structureName,
@@ -236,7 +237,8 @@ export async function handleCreateStructure(
             },
             { analyse: analyseException },
           ),
-        () =>
+        ),
+        atStep('create', () =>
           obj.create(
             {
               structureName,
@@ -247,10 +249,12 @@ export async function handleCreateStructure(
             },
             { analyse: analyseException },
           ),
-        () =>
+        ),
+        atStep('check', () =>
           obj.check({ structureName }, 'inactive', {
             analyse: analyseException,
           }),
+        ),
       );
 
       if (!checked.ok || !shouldActivate) {

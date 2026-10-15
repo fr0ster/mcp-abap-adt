@@ -37,6 +37,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
@@ -147,10 +148,12 @@ export async function handleCreateTransportTask(
       const request = createAdtClient(connection, logger).getRequest(
         resultsFor(transportDocuments),
       );
-      const created = await request.createTask(args.transport_number, {
-        targetUser: args.target_user,
-        analyse: analyseException,
-      });
+      const created = await atStep('create task', () =>
+        request.createTask(args.transport_number, {
+          targetUser: args.target_user,
+          analyse: analyseException,
+        }),
+      )();
       // A reading, as `project` receives it: the parsed document is its value.
       const number = created.ok
         ? taskNumberOf(

@@ -43,6 +43,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -194,7 +195,7 @@ export async function handleCreateDomain(
       );
 
       const checked = await sequence(
-        () =>
+        atStep('validate', () =>
           obj.validate(
             {
               domainName,
@@ -203,7 +204,8 @@ export async function handleCreateDomain(
             },
             { analyse: analyseException },
           ),
-        () =>
+        ),
+        atStep('create', () =>
           obj.create(
             {
               domainName,
@@ -214,6 +216,7 @@ export async function handleCreateDomain(
             },
             { analyse: analyseException },
           ),
+        ),
         () =>
           withLock(
             () => obj.lock({ domainName }, { analyse: analyseLock }),
@@ -221,12 +224,13 @@ export async function handleCreateDomain(
               lockHandle,
             ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
               sequence(
-                () =>
+                atStep('read metadata', () =>
                   obj.readMetadata(
                     { domainName },
                     { analyse: analyseException },
                   ),
-                (current) =>
+                ),
+                atStep('update metadata', (current) =>
                   obj.updateMetadata(
                     {
                       domainName,
@@ -251,6 +255,7 @@ export async function handleCreateDomain(
                       analyse: analyseException,
                     },
                   ),
+                ),
               ),
             (lockHandle) =>
               obj.unlock({ domainName }, lockHandle, {
@@ -262,7 +267,7 @@ export async function handleCreateDomain(
         // meet a not-yet-ready object (see `xmlPatch.ts`), so the wait sits
         // immediately ahead of it, exactly where the pre-migration handler
         // put it (between `unlock` and `check`).
-        async () => {
+        atStep('check', async () => {
           await obj
             .readMetadata(
               { domainName },
@@ -272,15 +277,18 @@ export async function handleCreateDomain(
           return obj.check({ domainName }, undefined, {
             analyse: analyseException,
           });
-        },
+        }),
       );
 
       if (!checked.ok || !shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(checked, () =>
-        obj.activate({ domainName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        checked,
+        atStep('activate', () =>
+          obj.activate({ domainName }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

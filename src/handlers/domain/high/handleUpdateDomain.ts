@@ -49,6 +49,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -185,9 +186,10 @@ export async function handleUpdateDomain(
         () => obj.lock({ domainName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
-            () =>
+            atStep('read metadata', () =>
               obj.readMetadata({ domainName }, { analyse: analyseException }),
-            (current) =>
+            ),
+            atStep('update metadata', (current) =>
               obj.updateMetadata(
                 {
                   domainName,
@@ -212,10 +214,12 @@ export async function handleUpdateDomain(
                   analyse: analyseException,
                 },
               ),
-            () =>
+            ),
+            atStep('check', () =>
               obj.check({ domainName }, undefined, {
                 analyse: analyseException,
               }),
+            ),
           ),
         (lockHandle) =>
           obj.unlock({ domainName }, lockHandle, { analyse: analyseException }),
@@ -239,8 +243,11 @@ export async function handleUpdateDomain(
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ domainName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate({ domainName }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

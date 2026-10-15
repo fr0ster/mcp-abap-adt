@@ -1,5 +1,6 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtReading } from './reading';
+import { atStep } from './step';
 
 /**
  * `getWhereUsedList`'s replacement, composed — the guide's "Sequences are
@@ -166,10 +167,12 @@ export async function fetchWhereUsedReferences(
   let scopeXml: string | undefined;
 
   if (needsScope(params)) {
-    const scope = await utils.getWhereUsedScope({
-      object_name: params.object_name,
-      object_type: params.object_type,
-    });
+    const scope = await atStep('read where-used scope', () =>
+      utils.getWhereUsedScope({
+        object_name: params.object_name,
+        object_type: params.object_type,
+      }),
+    )();
     if (!scope.ok) {
       return scope as unknown as IAdtResponse<WhereUsedListResult, IAdtError>;
     }
@@ -181,11 +184,13 @@ export async function fetchWhereUsedReferences(
     });
   }
 
-  const result = await utils.getWhereUsed({
-    object_name: params.object_name,
-    object_type: params.object_type,
-    ...(scopeXml !== undefined ? { scopeXml } : {}),
-  });
+  const result = await atStep('read where-used', () =>
+    utils.getWhereUsed({
+      object_name: params.object_name,
+      object_type: params.object_type,
+      ...(scopeXml !== undefined ? { scopeXml } : {}),
+    }),
+  )();
   if (!result.ok) {
     return result as unknown as IAdtResponse<WhereUsedListResult, IAdtError>;
   }

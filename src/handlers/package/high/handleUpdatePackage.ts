@@ -28,6 +28,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -96,12 +97,13 @@ export async function handleUpdatePackage(
               lockHandle,
             ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
               sequence(
-                () =>
+                atStep('read metadata', () =>
                   pkg.readMetadata(
                     { packageName },
                     { analyse: analyseException },
                   ),
-                (current) =>
+                ),
+                atStep('update metadata', (current) =>
                   pkg.updateMetadata(
                     {
                       packageName,
@@ -118,6 +120,7 @@ export async function handleUpdatePackage(
                       analyse: analyseException,
                     },
                   ),
+                ),
               ),
             (lockHandle) =>
               pkg.unlock({ packageName }, lockHandle, {

@@ -24,10 +24,12 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answerFailure, answerThrown } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { patchDomainXml } from '../../../lib/strategies/domainPatch';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
@@ -106,11 +108,12 @@ export async function handleUpdateDomain(
       // different failures, and whichever comes back is the one the caller
       // sees, built by the strategy rather than summarised here.
       const written = await sequence(
-        () =>
+        atStep('read metadata', () =>
           client
             .getDomain()
             .readMetadata({ domainName }, { analyse: analyseException }),
-        (current) =>
+        ),
+        atStep('update metadata', (current) =>
           client.getDomain().updateMetadata(
             {
               domainName,
@@ -125,12 +128,17 @@ export async function handleUpdateDomain(
               analyse: analyseException,
             },
           ),
+        ),
       );
 
       if (!written.ok) {
         const failure = written.getError();
         logger?.error(`UpdateDomain refused: ${failure.message}`);
-        return return_error(new Error(failure.message));
+        // The method's error as it is, with the step it arose at.
+        return answerFailure(failure, {
+          tool: 'UpdateDomainLow',
+          detail: 'terse',
+        });
       }
 
       logger?.info(`✅ UpdateDomain completed: ${domainName}`);
@@ -157,7 +165,7 @@ export async function handleUpdateDomain(
       // checks for exactly this).
       const message = error?.message ?? String(error);
       logger?.error(`Error updating domain ${domainName}: ${message}`);
-      return return_error(new Error(`Failed to update domain: ${message}`));
+      return answerThrown(error, { tool: 'UpdateDomainLow', detail: 'terse' });
     }
   } catch (error: any) {
     return return_error(error);

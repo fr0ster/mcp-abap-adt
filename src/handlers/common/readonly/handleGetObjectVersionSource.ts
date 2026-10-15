@@ -6,7 +6,6 @@
  * getVersionSource(content_uri). Closes #30.
  */
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -86,13 +85,6 @@ export async function handleGetObjectVersionSource(
         data: JSON.stringify({ success: true, content_uri, source }, null, 2),
       } as AxiosResponse);
     } catch (error: any) {
-      if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
-        return return_error(
-          new Error(
-            `Version source is not supported for object_type '${object_type}'.`,
-          ),
-        );
-      }
       return return_error(
         error instanceof Error ? error : new Error(String(error)),
       );

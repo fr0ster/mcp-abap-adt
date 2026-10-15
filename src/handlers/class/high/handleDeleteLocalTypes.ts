@@ -24,6 +24,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -84,11 +85,12 @@ export async function handleDeleteLocalTypes(
 
       const deleted = await withLock(
         () => obj.lock({ className }, { analyse: analyseLock }),
-        (lockHandle) =>
+        atStep('update', (lockHandle) =>
           obj.update(
             { className, transportRequest: args.transport_request },
             { source: '', lockHandle, analyse: analyseException },
           ),
+        ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
       );
@@ -97,8 +99,11 @@ export async function handleDeleteLocalTypes(
         return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(deleted, () =>
-        obj.activate({ className }, { analyse: analyseActivation }),
+      return carryCleanup(
+        deleted,
+        atStep('activate', () =>
+          obj.activate({ className }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

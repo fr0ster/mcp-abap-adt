@@ -4,6 +4,7 @@ import { debugAnswer } from '../../../lib/debugger/answer';
 import { readSnapshotList } from '../../../lib/debugger/memoryReadings';
 import type { ArgsOf } from '../../../lib/handlers/argsOf';
 import { DETAIL_PROPERTY } from '../../../lib/strategies/detail';
+import { carryingFailure } from '../../../lib/strategies/step';
 import type { HandlerContext } from '../../interfaces';
 
 export const TOOL_DEFINITION = {
@@ -39,7 +40,13 @@ export async function handleMemorySnapshotList(
         ...(args.user ? { user: args.user.toUpperCase() } : {}),
         analyse: analyseException,
       });
-      if (!answer.ok) throw new Error(answer.getError().message);
+      if (!answer.ok) {
+        throw carryingFailure(
+          new Error(answer.getError().message),
+          answer.getError(),
+          'list memory snapshots',
+        );
+      }
       const raw = String(answer.getResult().value ?? '');
       return { value: raw, raw };
     },

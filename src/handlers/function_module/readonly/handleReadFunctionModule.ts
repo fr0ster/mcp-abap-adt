@@ -6,6 +6,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { assertFunctionGroupMatches } from '../shared/parseContainerGroup';
 
@@ -79,12 +80,13 @@ export async function handleReadFunctionModule(
     { tool: 'ReadFunctionModule', detail: 'terse' },
     () =>
       pair(
-        () =>
+        atStep('read metadata', () =>
           obj.readMetadata(
             { functionModuleName, functionGroupName },
             { analyse: analyseException },
           ),
-        (metadata: AdtReading<string>) => {
+        ),
+        atStep('read', (metadata: AdtReading<string>) => {
           realGroup = assertFunctionGroupMatches(
             metadata.raw,
             functionGroupName,
@@ -95,7 +97,7 @@ export async function handleReadFunctionModule(
             version,
             { analyse: analyseException },
           );
-        },
+        }),
       ),
     ([metadata, source]: [AdtReading<string>, AdtReading<string>]) => ({
       success: true,

@@ -20,6 +20,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { writeClassTests } from '../shared/writeTests';
 
@@ -92,13 +93,14 @@ export async function handleCreateCdsUnitTest(
     { tool: 'CreateCdsUnitTest', detail },
     () =>
       sequence(
-        () =>
+        atStep('check test doubles', () =>
           client
             .getDdl(resultsFor(ddlDocuments))
             .checkCdsTestDoubles(args.cds_view_name.toUpperCase(), {
               analyse: analyseCdsTestDoubles,
             }),
-        () =>
+        ),
+        atStep('create', () =>
           client.getClass(resultsFor(classDocuments)).create(
             {
               className,
@@ -109,6 +111,7 @@ export async function handleCreateCdsUnitTest(
             },
             { analyse: analyseException },
           ),
+        ),
         () =>
           writeClassTests(
             context,

@@ -40,6 +40,7 @@ import {
   sequence,
   succeededWith,
 } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 
 type Answer = IAdtResponse<AdtReading<unknown>, IAdtError>;
@@ -78,19 +79,23 @@ export async function writeClassTests(
   ).getLocalTestClass(resultsFor(classDocuments));
   const written = await withLock(
     () => tests.lock({ className: name }, { analyse: analyseLock }),
-    (lockHandle) =>
+    atStep('update', (lockHandle) =>
       tests.update(
         { className: name, transportRequest },
         { source, lockHandle, analyse: analyseException },
       ),
+    ),
     (lockHandle) =>
       tests.unlock({ className: name }, lockHandle, {
         analyse: analyseException,
       }),
   );
   if (!written.ok) return written as Answer;
-  return carryCleanup(written, () =>
-    tests.activate({ className: name }, { analyse: analyseActivation }),
+  return carryCleanup(
+    written,
+    atStep('activate', () =>
+      tests.activate({ className: name }, { analyse: analyseActivation }),
+    ),
   ) as Promise<Answer>;
 }
 
@@ -120,30 +125,35 @@ export async function writeProgramTests(
   const transportRequest = options.transportRequest;
 
   if (options.create) {
-    const metadata = await program.readMetadata(
-      { programName: name },
-      { analyse: analyseException },
-    );
+    const metadata = await atStep('read program metadata', () =>
+      program.readMetadata(
+        { programName: name },
+        { analyse: analyseException },
+      ),
+    )();
     if (!metadata.ok) return metadata as unknown as Answer;
-    const created = await include.create(
-      {
-        includeName,
-        packageName: packageOf(metadata.getResult().value.raw),
-        description: `ABAP Unit tests of ${name}`,
-        transportRequest,
-      },
-      { analyse: analyseException },
-    );
+    const created = await atStep('create include', () =>
+      include.create(
+        {
+          includeName,
+          packageName: packageOf(metadata.getResult().value.raw),
+          description: `ABAP Unit tests of ${name}`,
+          transportRequest,
+        },
+        { analyse: analyseException },
+      ),
+    )();
     if (!created.ok) return created as unknown as Answer;
   }
 
   const written = await withLock(
     () => include.lock({ includeName }, { analyse: analyseLock }),
-    (lockHandle) =>
+    atStep('update', (lockHandle) =>
       include.update(
         { includeName, transportRequest },
         { source, lockHandle, analyse: analyseException },
       ),
+    ),
     (lockHandle) =>
       include.unlock({ includeName }, lockHandle, {
         analyse: analyseException,
@@ -155,9 +165,12 @@ export async function writeProgramTests(
   // lock the write could not release still reaches the caller.
   const activateBoth = () =>
     sequence(
-      () => include.activate({ includeName }, { analyse: analyseActivation }),
-      () =>
+      atStep('activate include', () =>
+        include.activate({ includeName }, { analyse: analyseActivation }),
+      ),
+      atStep('activate program', () =>
         program.activate({ programName: name }, { analyse: analyseActivation }),
+      ),
     ) as Promise<Answer>;
 
   return carryCleanup(written, async (): Promise<Answer> => {
@@ -171,22 +184,26 @@ export async function writeProgramTests(
     const linked = await withLock(
       () => program.lock({ programName: name }, { analyse: analyseLock }),
       async (lockHandle): Promise<Answer> => {
-        const current = await program.read({ programName: name }, 'inactive', {
-          analyse: analyseException,
-        });
+        const current = await atStep('read program', () =>
+          program.read({ programName: name }, 'inactive', {
+            analyse: analyseException,
+          }),
+        )();
         if (!current.ok) return current as unknown as Answer;
         const reportSource = current.getResult().value.raw;
         if (pulledIn.test(reportSource)) {
           return current as unknown as Answer;
         }
-        return program.update(
-          { programName: name, transportRequest },
-          {
-            source: `${reportSource.replace(/\s*$/, '')}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
-            lockHandle,
-            analyse: analyseException,
-          },
-        ) as Promise<Answer>;
+        return atStep('update program', () =>
+          program.update(
+            { programName: name, transportRequest },
+            {
+              source: `${reportSource.replace(/\s*$/, '')}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        )() as Promise<Answer>;
       },
       (lockHandle) =>
         program.unlock({ programName: name }, lockHandle, {
@@ -220,31 +237,37 @@ export async function writeFunctionGroupTests(
   const transportRequest = options.transportRequest;
 
   if (options.create) {
-    const created = await include.create(
-      {
-        ...target,
-        description: `ABAP Unit tests of ${groupName}`,
-        transportRequest,
-      },
-      { analyse: analyseException },
-    );
+    const created = await atStep('create include', () =>
+      include.create(
+        {
+          ...target,
+          description: `ABAP Unit tests of ${groupName}`,
+          transportRequest,
+        },
+        { analyse: analyseException },
+      ),
+    )();
     if (!created.ok) return created as unknown as Answer;
   }
 
   const written = await withLock(
     () => include.lock(target, { analyse: analyseLock }),
-    (lockHandle) =>
+    atStep('update', (lockHandle) =>
       include.update(
         { ...target, transportRequest },
         { source, lockHandle, analyse: analyseException },
       ),
+    ),
     (lockHandle) =>
       include.unlock(target, lockHandle, { analyse: analyseException }),
   );
   if (!written.ok) return written as Answer;
 
-  return carryCleanup(written, () =>
-    activateWithMainProgram(client, groupName, includeName),
+  return carryCleanup(
+    written,
+    atStep('activate', () =>
+      activateWithMainProgram(client, groupName, includeName),
+    ),
   );
 }
 

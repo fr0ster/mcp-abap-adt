@@ -6,11 +6,13 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answerFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { assembleTree, walkPackage } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { withStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -110,10 +112,10 @@ export async function handleGetPackageTree(
       .getPackage()
       .readMetadata({ packageName }, { analyse: analyseException });
     if (!readResult.ok) {
-      return return_error(
-        new Error(
-          `Package ${packageName} could not be read: ${readResult.getError().message}`,
-        ),
+      // The method's error as it is, with the step it arose at.
+      return answerFailure(
+        withStep(readResult.getError(), 'read package metadata'),
+        { tool: 'GetPackageTree', detail: 'terse' },
       );
     }
 

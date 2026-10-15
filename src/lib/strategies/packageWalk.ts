@@ -1,4 +1,6 @@
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { carryingFailure } from './step';
 
 /**
  * The one call this walk needs, named structurally.
@@ -121,8 +123,19 @@ function levelOf(answer: unknown): NodeLevel {
     getResult?: () => { value: unknown };
     data?: unknown;
   };
+  if (a?.ok === false) {
+    const error = (answer as { getError: () => IAdtError }).getError();
+    // A level that is not there stays what it was: empty. Any other refusal
+    // is the method's error as it is, with the step — not an empty level that
+    // reads as "nothing here".
+    if (error?.response?.status === 404) return { objects: [], childNodes: [] };
+    throw carryingFailure(
+      new Error(error.message),
+      error,
+      'read package node structure',
+    );
+  }
   if (typeof a?.getResult === 'function') {
-    if (a.ok === false) return { objects: [], childNodes: [] };
     const value = a.getResult().value;
     // The injected reading may be ours, the library's own, or the raw wire;
     // each is recognised by what it carries, never assumed. Having

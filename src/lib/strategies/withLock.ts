@@ -1,5 +1,6 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { type Cleanup, safeRequest } from './safeFields';
+import { atStep, stepOf } from './step';
 
 export interface CleanupCarrier {
   cleanup?: Cleanup;
@@ -75,7 +76,8 @@ export async function withLock<H, T>(
   body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>,
   release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
 ): Promise<IAdtResponse<T, IAdtError>> {
-  const acquired = await acquire();
+  // The lock is a step of its own: a refused or thrown lock says so.
+  const acquired = await atStep('lock', acquire)();
   if (!acquired.ok) return acquired as unknown as IAdtResponse<T, IAdtError>;
   const handle = acquired.getResult().value;
   // A backstop. Every lock here is given `analyseLock`, which refuses a 2xx
@@ -87,6 +89,7 @@ export async function withLock<H, T>(
     return failure<T>({
       message: 'SAP answered the lock request without a lock handle',
       origin: 'refusal',
+      step: 'lock',
     } as IAdtError);
   }
 
@@ -181,6 +184,8 @@ function messageOf(thrown: unknown): string {
 export class LockNotReleased extends Error {
   readonly cleanup?: Cleanup;
   readonly operation?: 'succeeded';
+  /** The step the cause arose at (`atStep`), kept as it was. */
+  readonly step?: string;
   constructor(
     cause: unknown,
     extra: { cleanup?: Cleanup; operation?: 'succeeded' },
@@ -189,6 +194,8 @@ export class LockNotReleased extends Error {
     this.name = 'LockNotReleased';
     this.cleanup = extra.cleanup;
     this.operation = extra.operation;
+    const step = stepOf(cause);
+    if (step !== undefined) this.step = step;
   }
 }
 

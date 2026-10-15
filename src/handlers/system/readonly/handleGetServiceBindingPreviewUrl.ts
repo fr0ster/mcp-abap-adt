@@ -59,6 +59,7 @@ import {
   exposedEntitiesOf,
   serviceBindingFactsOf,
 } from '../../../lib/strategies/serviceBindingFacts';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -164,10 +165,11 @@ export async function handleGetServiceBindingPreviewUrl(
     { tool: 'GetServiceBindingPreviewUrl', detail: 'terse' },
     () =>
       sequence(
-        () =>
+        atStep('read binding', () =>
           binding.read({ bindingName }, undefined, {
             analyse: analyseException,
           }),
+        ),
         async (
           bindingSource: AdtReading<string>,
         ): Promise<IAdtResponse<Found, IAdtError>> => {
@@ -183,11 +185,13 @@ export async function handleGetServiceBindingPreviewUrl(
             });
           }
 
-          const srvd = await definition.read(
-            { serviceDefinitionName: facts.serviceDefinition },
-            'active',
-            { analyse: analyseException },
-          );
+          const srvd = await atStep('read service definition', () =>
+            definition.read(
+              { serviceDefinitionName: facts.serviceDefinition },
+              'active',
+              { analyse: analyseException },
+            ),
+          )();
           if (!srvd.ok)
             return srvd as unknown as IAdtResponse<Found, IAdtError>;
           const exposed = exposedEntitiesOf(

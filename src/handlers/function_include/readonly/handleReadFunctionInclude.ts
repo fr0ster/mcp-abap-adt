@@ -6,6 +6,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -64,15 +65,17 @@ export async function handleReadFunctionInclude(
     { tool: 'ReadFunctionInclude', detail: 'terse' },
     () =>
       pair(
-        () =>
+        atStep('read', () =>
           obj.read({ functionGroupName, includeName }, version, {
             analyse: analyseException,
           }),
-        () =>
+        ),
+        atStep('read metadata', () =>
           obj.readMetadata(
             { functionGroupName, includeName },
             { analyse: analyseException },
           ),
+        ),
       ),
     ([source, metadata]: [AdtReading<string>, AdtReading<string>]) => ({
       success: true,

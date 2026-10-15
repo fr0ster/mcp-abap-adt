@@ -28,6 +28,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -98,7 +99,7 @@ export async function handleUpdateLocalTypes(
 
       const written = await withLock(
         () => obj.lock({ className }, { analyse: analyseLock }),
-        (lockHandle) =>
+        atStep('update', (lockHandle) =>
           obj.update(
             { className, transportRequest: args.transport_request },
             {
@@ -107,6 +108,7 @@ export async function handleUpdateLocalTypes(
               analyse: analyseException,
             },
           ),
+        ),
         (lockHandle) =>
           obj.unlock({ className }, lockHandle, { analyse: analyseException }),
       );
@@ -115,8 +117,11 @@ export async function handleUpdateLocalTypes(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ className }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate({ className }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

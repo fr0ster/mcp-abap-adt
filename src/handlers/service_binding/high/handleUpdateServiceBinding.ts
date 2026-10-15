@@ -100,6 +100,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { analysePublicationLockAnswer } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils';
@@ -224,13 +225,12 @@ export async function handleUpdateServiceBinding(
         // the forgiveness is what makes an empty handle here mean exactly one
         // thing. With plain `analyseLock` this handler refused the `403` instead,
         // and a binding anybody had open could not be published at all.
-        const acquired = await obj.lock(
-          { bindingName },
-          { analyse: analysePublicationLockAnswer },
-        );
+        const acquired = await atStep('lock', () =>
+          obj.lock({ bindingName }, { analyse: analysePublicationLockAnswer }),
+        )();
         if (!acquired.ok) return acquired;
 
-        const publish = (lockHandle: string) =>
+        const publish = atStep('publish', (lockHandle: string) =>
           obj.update(
             // **V2 resolves the service by name and version; V4 does not.** The
             // job's body names the target by type (`SCGR`) and name, and for V2
@@ -255,7 +255,8 @@ export async function handleUpdateServiceBinding(
               timeout: 0,
               analyse: analysePublication,
             },
-          );
+          ),
+        );
 
         // No handle, so there is nothing to give back: an UNLOCK without one
         // answers 200 and changes nothing. `withLock` exists to release what was

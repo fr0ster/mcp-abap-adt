@@ -31,6 +31,7 @@ import type {
   IDebuggerStepToLineMethod,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { carryingFailure, noteLeftBehind } from '../strategies/step';
 import {
   type BreakpointNotPlaced,
   mergeDefinitions,
@@ -220,11 +221,29 @@ const bodyOf = (a: IAdtResponse<unknown>): string =>
 const messageOf = (a: IAdtResponse<unknown>): string =>
   a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const asFailure = (e: unknown) =>
-  ({
+/** A debug error that carries the method's error as it is, with its step. */
+const failedAt = <E extends Error>(
+  error: E,
+  a: IAdtResponse<unknown>,
+  step: string,
+): E =>
+  a.ok || fromThrow.has(a.getError())
+    ? error
+    : carryingFailure(error, a.getError(), step);
+/**
+ * A throw read as a failed answer, so the loops can handle both alike. No
+ * SAP answer is behind it: it is never carried as the method's error to the
+ * consumer as if SAP had answered (`failedAt` skips it).
+ */
+const fromThrow = new WeakSet<object>();
+const asFailure = (e: unknown) => {
+  const error = { origin: 'connection', message: thrown(e) };
+  fromThrow.add(error);
+  return {
     ok: false as const,
-    getError: () => ({ origin: 'connection', message: thrown(e) }),
-  }) as unknown as IAdtResponse<string>;
+    getError: () => error,
+  } as unknown as IAdtResponse<string>;
+};
 
 /** A condition on a breakpoint other than a line is refused before the wire, naming it. */
 export function refuseConditionOffLine(
@@ -272,11 +291,18 @@ function describePlaced(b: BreakpointReading): string {
 }
 
 /** A failed listener answer: the holder named when it is the system's conflict. */
-function listenerError(answer: IAdtResponse<unknown>): DebugListenerError {
+function listenerError(
+  answer: IAdtResponse<unknown>,
+  step: string,
+): DebugListenerError {
   const held = answer.ok ? undefined : readListenerConflict(answer.getError());
-  return held
-    ? new DebugConflictError(held.conflictText, held.ideUser)
-    : new DebugListenerError(messageOf(answer));
+  return failedAt(
+    held
+      ? new DebugConflictError(held.conflictText, held.ideUser)
+      : new DebugListenerError(messageOf(answer)),
+    answer,
+    step,
+  );
 }
 
 export class DebugSession<O = unknown> {
@@ -294,6 +320,8 @@ export class DebugSession<O = unknown> {
   protected listener?: Listener;
   protected current?: Stop;
   protected failure?: string;
+  /** The failed listen behind `failure`, carrying the method's error. */
+  private failedListen?: DebugListenerError;
   protected generation = 0;
   protected readonly notices: DebugState[] = [];
   private readonly waiters = new Set<() => void>();
@@ -399,10 +427,14 @@ export class DebugSession<O = unknown> {
       .checkListener(identity)
       .catch(asFailure);
     if (!checked.ok) {
-      const error = listenerError(checked);
+      const error = listenerError(checked, 'check listener');
       throw error instanceof DebugConflictError
         ? error
-        : new DebugRequestError(messageOf(checked));
+        : failedAt(
+            new DebugRequestError(messageOf(checked)),
+            checked,
+            'check listener',
+          );
     }
   }
   /** Closes the control connection; a close that throws is kept for the next stop and named. */
@@ -505,9 +537,17 @@ export class DebugSession<O = unknown> {
       // model as it is. Any other failure leaves the state unknown.
       if (refusesUser(answer)) {
         this.changed = changedBefore;
-        throw new DebugRefusedError(messageOf(answer));
+        throw failedAt(
+          new DebugRefusedError(messageOf(answer)),
+          answer,
+          'set breakpoints',
+        );
       }
-      throw new DebugRequestError(messageOf(answer));
+      throw failedAt(
+        new DebugRequestError(messageOf(answer)),
+        answer,
+        'set breakpoints',
+      );
     }
     const raw = bodyOf(answer);
     const pairing = pairRows(sent, earlier, readBreakpoints(raw));
@@ -543,7 +583,13 @@ export class DebugSession<O = unknown> {
         identity,
         id,
       );
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'delete breakpoint',
+        );
+      }
       this.forget(id);
     });
   }
@@ -684,16 +730,21 @@ export class DebugSession<O = unknown> {
           const placed = this.listBreakpoints();
           this.forgetAll();
           this.changed = false;
-          throw new DebugRefusedError(
-            placed.length
-              ? `${messageOf(first)}; the breakpoints placed stay on the system: ${placed.map(describePlaced).join(', ')}`
-              : messageOf(first),
-            placed,
+          const kept = `the breakpoints placed stay on the system: ${placed.map(describePlaced).join(', ')}`;
+          const refused = failedAt(
+            new DebugRefusedError(
+              placed.length ? `${messageOf(first)}; ${kept}` : messageOf(first),
+              placed,
+            ),
+            first,
+            'listen',
           );
+          if (placed.length) noteLeftBehind(refused, kept);
+          throw refused;
         }
         // The arming changed the system already, so any other failed listen
         // takes the cleanup after a change.
-        if (!first.ok) throw listenerError(first);
+        if (!first.ok) throw listenerError(first, 'listen');
         this.changed = true;
         const caught = readDebuggee(bodyOf(first));
         if (caught) await this.attachTo(caught, bodyOf(first), generation);
@@ -721,6 +772,7 @@ export class DebugSession<O = unknown> {
           this.settle(failures);
           if (failures.length === 0) throw error;
           const notClosed = `not closed: ${failures.join('; ')}`;
+          noteLeftBehind(error, notClosed);
           if (error instanceof Error) {
             error.message = `${error.message}; ${notClosed}`;
             throw error;
@@ -741,6 +793,7 @@ export class DebugSession<O = unknown> {
           ...(failures.length ? [`not undone: ${failures.join('; ')}`] : []),
         ];
         if (told.length === 0) throw error;
+        noteLeftBehind(error, told.join('; '));
         if (error instanceof Error) {
           error.message = `${error.message}; ${told.join('; ')}`;
           throw error;
@@ -796,7 +849,9 @@ export class DebugSession<O = unknown> {
     if (!this.owns(listener, generation)) return false; // a stop took it, and its answer
     listener.open = undefined; // handled here
     if (!answer.ok) {
-      this.failure = listenerError(answer).message;
+      const failed = listenerError(answer, 'listen');
+      this.failure = failed.message;
+      this.failedListen = failed;
       await this.dropListener();
       this.notify();
       return false;
@@ -981,9 +1036,13 @@ export class DebugSession<O = unknown> {
   protected report(): DebugState {
     if (this.failure !== undefined) {
       const message = this.failure;
+      const carried = this.failedListen;
       this.failure = undefined;
+      this.failedListen = undefined;
       this.observer?.(); // consuming it may leave nothing held
-      throw new DebugListenerError(message);
+      throw carried !== undefined && carried.message === message
+        ? carried
+        : new DebugListenerError(message);
     }
     const notice = this.notices.shift();
     if (notice) {
@@ -1014,8 +1073,11 @@ export class DebugSession<O = unknown> {
   private async afterMove(
     stop: Stop,
     answer: IAdtResponse<unknown>,
+    step: string,
   ): Promise<DebugState> {
-    if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+    if (!answer.ok) {
+      throw failedAt(new DebugRequestError(messageOf(answer)), answer, step);
+    }
     const end = readDebuggeeEnd(bodyOf(answer));
     if (end) {
       await this.releaseStop(stop);
@@ -1047,6 +1109,7 @@ export class DebugSession<O = unknown> {
       return this.afterMove(
         stop,
         await stop.debugger.step(method, { analyse: analyseDebuggeeEnd }),
+        'step',
       );
     });
   }
@@ -1062,6 +1125,7 @@ export class DebugSession<O = unknown> {
         await stop.debugger.stepToLine(method, uri, {
           analyse: analyseDebuggeeEnd,
         }),
+        'step to line',
       );
     });
   }
@@ -1073,7 +1137,13 @@ export class DebugSession<O = unknown> {
       const answer = await stop.debugger.terminateDebuggee({
         analyse: analyseDebuggeeEnd,
       });
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'terminate debuggee',
+        );
+      }
       await this.releaseStop(stop);
       return { state: 'ended', reason: 'terminated' };
     });
@@ -1084,7 +1154,13 @@ export class DebugSession<O = unknown> {
     return this.mutate(async () => {
       const stop = this.requireStop();
       const answer = await stop.debugger.detachDebugger();
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'detach',
+        );
+      }
       await this.leaveStop(stop, 'close');
       return this.report();
     });
@@ -1102,7 +1178,13 @@ export class DebugSession<O = unknown> {
       const answer = await stop.debugger.terminateDebugger({
         analyse: analyseDebuggerFreed,
       });
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'terminate debugger',
+        );
+      }
       await this.leaveStop(stop, 'drop');
       return this.report();
     });
@@ -1127,7 +1209,13 @@ export class DebugSession<O = unknown> {
     return this.mutate(async () => {
       const stop = this.requireStop();
       const stack = await stop.debugger.getStack();
-      if (!stack.ok) throw new DebugRequestError(messageOf(stack));
+      if (!stack.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(stack)),
+          stack,
+          'read stack',
+        );
+      }
       stop.view = {
         ...stop.view,
         stack: readStack(bodyOf(stack)),
@@ -1142,9 +1230,21 @@ export class DebugSession<O = unknown> {
     return this.mutate(async () => {
       const stop = this.requireStop();
       const moved = await stop.debugger.setStackPosition(position);
-      if (!moved.ok) throw new DebugRequestError(messageOf(moved));
+      if (!moved.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(moved)),
+          moved,
+          'set stack position',
+        );
+      }
       const stack = await stop.debugger.getStack();
-      if (!stack.ok) throw new DebugRequestError(messageOf(stack));
+      if (!stack.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(stack)),
+          stack,
+          'read stack',
+        );
+      }
       stop.view = {
         ...stop.view,
         stack: readStack(bodyOf(stack)),
@@ -1155,53 +1255,63 @@ export class DebugSession<O = unknown> {
   }
 
   private variables(
+    step: string,
     call: (d: Debugger) => Promise<IAdtResponse<string>>,
   ): Promise<DebugView<VariablesReading>> {
     return this.mutate(async () => {
       const answer = await call(this.requireStop().debugger);
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(new DebugRequestError(messageOf(answer)), answer, step);
+      }
       return { value: readVariables(bodyOf(answer)), raw: bodyOf(answer) };
     });
   }
   getVariables(names: string[]) {
-    return this.variables((d) =>
+    return this.variables('read variables', (d) =>
       d.getVariables(names.map((n) => n.toUpperCase())),
     );
   }
   getChildVariables(parents: string[]) {
-    return this.variables((d) =>
+    return this.variables('read child variables', (d) =>
       d.getChildVariables(parents.map((n) => n.toUpperCase())),
     );
   }
   setVariable(name: string, value: string) {
-    return this.variables((d) => d.setVariableValue(name.toUpperCase(), value));
+    return this.variables('set variable', (d) =>
+      d.setVariableValue(name.toUpperCase(), value),
+    );
   }
 
   private document(
+    step: string,
     call: (d: Debugger) => Promise<IAdtResponse<unknown>>,
   ): Promise<DebugView<string>> {
     return this.mutate(async () => {
       const answer = await call(this.requireStop().debugger);
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(new DebugRequestError(messageOf(answer)), answer, step);
+      }
       return { value: bodyOf(answer), raw: bodyOf(answer) };
     });
   }
   createWatchpoint(name: string, condition?: string) {
-    return this.document((d) =>
+    return this.document('create watchpoint', (d) =>
       d.createWatchpoint(name.toUpperCase(), condition ? { condition } : {}),
     );
   }
   listWatchpoints() {
-    return this.document((d) => d.listWatchpoints());
+    return this.document('list watchpoints', (d) => d.listWatchpoints());
   }
   async deleteWatchpoint(id: string) {
-    await this.document((d) => d.deleteWatchpoint(id));
+    await this.document('delete watchpoint', (d) => d.deleteWatchpoint(id));
   }
   getMemorySizes() {
-    return this.document((d) => d.getMemorySizes());
+    return this.document('read memory sizes', (d) => d.getMemorySizes());
   }
   createMemorySnapshot() {
-    return this.document((d) => d.createMemorySnapshot());
+    return this.document('create memory snapshot', (d) =>
+      d.createMemorySnapshot(),
+    );
   }
 
   // --- lifecycle -------------------------------------------------------------
@@ -1335,13 +1445,25 @@ export class DebugSession<O = unknown> {
   private async applySettings(stop: Stop): Promise<DebugView<SettingsReading>> {
     const first = !stop.settingsSent;
     let answer = await stop.debugger.setDebuggerSettings(this.preferences);
-    if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+    if (!answer.ok) {
+      throw failedAt(
+        new DebugRequestError(messageOf(answer)),
+        answer,
+        'set settings',
+      );
+    }
     // Only a call that succeeded counts as the first: after a failed one the
     // second send stays owed (an extra request is harmless, a missed one is not).
     stop.settingsSent = true;
     if (first && this.preferences.systemDebugging === false) {
       answer = await stop.debugger.setDebuggerSettings(this.preferences);
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'set settings',
+        );
+      }
     }
     const raw = bodyOf(answer);
     this.effective = readSettings(raw);

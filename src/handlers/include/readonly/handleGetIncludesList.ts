@@ -1,8 +1,11 @@
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import { failurePayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
@@ -137,7 +140,7 @@ function textOf(response: any): string {
 type SourceRead =
   | { kind: 'text'; text: string }
   | { kind: 'absent' }
-  | { kind: 'refused'; message: string };
+  | { kind: 'refused'; error: IAdtError };
 
 function readSource(response: any): SourceRead {
   if (response?.ok) return { kind: 'text', text: textOf(response) };
@@ -145,9 +148,7 @@ function readSource(response: any): SourceRead {
   const absent =
     error?.response?.status === 404 ||
     error?.adtType === 'ExceptionResourceNotFound';
-  return absent
-    ? { kind: 'absent' }
-    : { kind: 'refused', message: String(error?.message ?? 'no answer') };
+  return absent ? { kind: 'absent' } : { kind: 'refused', error };
 }
 
 export async function handleGetIncludesList(
@@ -188,7 +189,7 @@ export async function handleGetIncludesList(
     const utils = createAdtClient(connection, logger).getUtils(ourUtils) as any;
 
     /** What could not be read, and why — reported beside the tree. */
-    const unreadable: { name: string; message: string }[] = [];
+    const unreadable: Record<string, unknown>[] = [];
     const sourceOf = async (
       what: string,
       read: Promise<unknown>,
@@ -196,8 +197,12 @@ export async function handleGetIncludesList(
       const answer = await readSource(await read);
       if (answer.kind === 'text') return answer.text;
       if (answer.kind === 'refused') {
-        logger?.warn?.(`could not read ${what}: ${answer.message}`);
-        unreadable.push({ name: what, message: answer.message });
+        logger?.warn?.(`could not read ${what}: ${answer.error.message}`);
+        // The method's error as it is, with the step it arose at.
+        unreadable.push({
+          name: what,
+          ...failurePayload(withStep(answer.error, 'read source')),
+        });
       }
       return '';
     };
@@ -264,7 +269,13 @@ export async function handleGetIncludesList(
         parent.name,
         'FUGR/I',
       );
-      if (!listed.ok) throw new Error(listed.getError().message);
+      if (!listed.ok) {
+        throw carryingFailure(
+          new Error(listed.getError().message),
+          listed.getError(),
+          'list function group includes',
+        );
+      }
       const all: string[] = listed
         .getResult()
         .value.map((o: { name: string }) => o.name.toUpperCase());

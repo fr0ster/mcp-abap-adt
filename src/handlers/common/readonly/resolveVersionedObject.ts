@@ -25,8 +25,9 @@ import {
   analyseUnsupportedStatus,
   type IObjectVersion,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtVersionable } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtVersionable } from '@mcp-abap-adt/interfaces-adt';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { carryingFailure } from '../../../lib/strategies/step';
 
 /** object_type values supported for version history (same set as LockObject). */
 // Only object types whose adt-clients handler actually implements version
@@ -153,10 +154,12 @@ export function resolveVersionedObject(
  * that envelope as it was, and a response object serialises as `{"ok":true}` —
  * every version listing answered that and nothing else (on premise, 2026-09-26).
  */
-function thrown(error: { message: string; code?: string }): Error {
+function thrown(error: IAdtError, step: string): Error {
   const failure = new Error(error.message) as Error & { code?: string };
   if (error.code !== undefined) failure.code = error.code;
-  return failure;
+  // The method's error rides on the throw, as it is, with the step: the
+  // consumer gets it, not this message (`return_error`).
+  return carryingFailure(failure, error, step);
 }
 
 /**
@@ -170,7 +173,7 @@ export async function readVersions(
   const answered = await resolved.obj.getVersions(resolved.config, {
     analyse: analyseUnsupportedStatus([404, 406], 'version history'),
   });
-  if (!answered.ok) throw thrown(answered.getError());
+  if (!answered.ok) throw thrown(answered.getError(), 'read versions');
   return answered.getResult().value as IObjectVersion[];
 }
 
@@ -182,6 +185,6 @@ export async function readVersionSource(
   const answered = await resolved.obj.getVersionSource(contentUri, {
     analyse: analyseUnsupportedStatus([404, 406], 'version source'),
   });
-  if (!answered.ok) throw thrown(answered.getError());
+  if (!answered.ok) throw thrown(answered.getError(), 'read version source');
   return String(answered.getResult().value);
 }

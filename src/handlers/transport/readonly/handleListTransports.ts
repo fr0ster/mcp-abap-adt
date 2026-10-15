@@ -21,6 +21,7 @@ import { project } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { parseStructure } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { MAX_SEARCH_CONFIGURATIONS } from '../../../lib/strategies/transportSearch';
 import { getStatedSystemContext } from '../../../lib/systemContext';
 
@@ -251,9 +252,11 @@ export async function handleListTransports(
         searchConfigurations: transportSearchConfigurations,
       });
 
-      const answered = await request.searchConfigurations({
-        analyse: analyseException,
-      });
+      const answered = await atStep('read search configurations', () =>
+        request.searchConfigurations({
+          analyse: analyseException,
+        }),
+      )();
       // The endpoint's own refusal, forwarded — not a sentence composed here
       // about a call this handler made on the caller's behalf.
       if (!answered.ok) {
@@ -276,10 +279,12 @@ export async function handleListTransports(
 
       const readings: AdtReading<unknown>[] = [];
       for (const configuration of running) {
-        const listed = await request.list({
-          analyse: analyseException,
-          configUri: configuration.uri,
-        });
+        const listed = await atStep('list', () =>
+          request.list({
+            analyse: analyseException,
+            configUri: configuration.uri,
+          }),
+        )();
         // The failing search's own answer, untouched — the rule `sequence()`
         // follows, for the same reason: a sentence composed here would stand
         // beside the strategy's own account of the same refusal.

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { type SapConfig, sapConfigSignature } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AxiosError, type AxiosResponse } from 'axios';
+import { answerFailure } from './answer';
 import { answerRead } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
@@ -16,6 +17,7 @@ import { credentialFromSapConfig } from './credentialSources.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
 import { endConnection } from './ownedConnections.js';
+import { methodFailureOf } from './strategies/step';
 import { getSystemContext } from './systemContext';
 
 // Initialize connection variables before exports to avoid circular dependency issues
@@ -305,6 +307,10 @@ export function return_error(error: any) {
   // refusal is answered as §7.3 — never its message.
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
+  // A method's error carried on a throw: answered as it is, with its step —
+  // the same payload the `answer()` path gives.
+  const carried = methodFailureOf(error);
+  if (carried !== undefined) return answerFailure(carried);
 
   // Safely extract error message to avoid circular reference issues
   // Always extract only safe properties, never serialize the entire error object

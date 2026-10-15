@@ -15,7 +15,6 @@
  * (ReadOnly group) stay; these are HighLevel-only per-type equivalents.
  */
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import type {
   HandlerContext,
@@ -205,13 +204,6 @@ function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
           ),
         } as AxiosResponse);
       } catch (error: any) {
-        if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
-          return return_error(
-            new Error(
-              `Version history is not supported for object_type '${row.object_type}' (${String(name).toUpperCase()}).`,
-            ),
-          );
-        }
         return return_error(
           error instanceof Error ? error : new Error(String(error)),
         );
@@ -270,13 +262,6 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
           data: JSON.stringify({ success: true, content_uri, source }, null, 2),
         } as AxiosResponse);
       } catch (error: any) {
-        if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
-          return return_error(
-            new Error(
-              `Version source is not supported for object_type '${row.object_type}'.`,
-            ),
-          );
-        }
         return return_error(
           error instanceof Error ? error : new Error(String(error)),
         );
@@ -358,13 +343,6 @@ function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
           ),
         } as AxiosResponse);
       } catch (error: any) {
-        if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
-          return return_error(
-            new Error(
-              `Version diff is not supported for object_type '${row.object_type}'.`,
-            ),
-          );
-        }
         return return_error(
           error instanceof Error ? error : new Error(String(error)),
         );

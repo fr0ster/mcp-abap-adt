@@ -6,6 +6,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -52,8 +53,12 @@ export async function handleReadClass(
     { tool: 'ReadClass', detail: 'terse' },
     () =>
       pair(
-        () => obj.read({ className }, version, { analyse: analyseException }),
-        () => obj.readMetadata({ className }, { analyse: analyseException }),
+        atStep('read', () =>
+          obj.read({ className }, version, { analyse: analyseException }),
+        ),
+        atStep('read metadata', () =>
+          obj.readMetadata({ className }, { analyse: analyseException }),
+        ),
       ),
     ([source, metadata]: [AdtReading<string>, AdtReading<string>]) => ({
       success: true,

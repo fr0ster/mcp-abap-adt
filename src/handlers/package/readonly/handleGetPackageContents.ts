@@ -1,9 +1,11 @@
 import * as z from 'zod';
+import { answerFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
 import { assembleList, walkPackage } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { methodFailureOf } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -77,6 +79,9 @@ export async function handleGetPackageContents(
 
     return finalResult;
   } catch (error) {
+    // A refused level of the walk: the method's error as it is, with its step.
+    const carried = methodFailureOf(error);
+    if (carried !== undefined) return answerFailure(carried);
     return {
       isError: true,
       content: [

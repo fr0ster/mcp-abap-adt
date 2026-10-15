@@ -35,6 +35,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -113,16 +114,18 @@ export async function handleCreateFunctionGroup(
         resultsFor(functionGroupDocuments),
       );
 
-      let created = await obj.create(
-        {
-          functionGroupName,
-          description: args.description || functionGroupName,
-          packageName: args.package_name,
-          transportRequest: args.transport_request,
-          masterLanguage: args.master_language,
-        },
-        { analyse: analyseException },
-      );
+      let created = await atStep('create', () =>
+        obj.create(
+          {
+            functionGroupName,
+            description: args.description || functionGroupName,
+            packageName: args.package_name,
+            transportRequest: args.transport_request,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+      )();
 
       // SAP's one refusal that can accompany a create that landed: the
       // generated interface include was not created. Read the group back; if
@@ -147,10 +150,9 @@ export async function handleCreateFunctionGroup(
         return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate(
-        { functionGroupName },
-        { analyse: analyseActivation },
-      );
+      return atStep('activate', () =>
+        obj.activate({ functionGroupName }, { analyse: analyseActivation }),
+      )();
     },
     project(detail, terseWrite),
   );

@@ -6,6 +6,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -59,15 +60,17 @@ export async function handleReadBehaviorImplementation(
     { tool: 'ReadBehaviorImplementation', detail: 'terse' },
     () =>
       pair(
-        () =>
+        atStep('read', () =>
           obj.read({ className: behaviorImplementationName }, version, {
             analyse: analyseException,
           }),
-        () =>
+        ),
+        atStep('read metadata', () =>
           obj.readMetadata(
             { className: behaviorImplementationName },
             { analyse: analyseException },
           ),
+        ),
       ),
     ([source, metadata]: [AdtReading<string>, AdtReading<string>]) => ({
       success: true,

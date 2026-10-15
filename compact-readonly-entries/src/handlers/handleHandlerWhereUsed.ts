@@ -1,4 +1,7 @@
-import { compactWhereUsedSchema, withLongToolAdvice } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactWhereUsedSchema,
+  withLongToolAdvice,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleGetWhereUsed } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';

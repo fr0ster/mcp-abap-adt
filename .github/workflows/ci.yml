@@ -41,8 +41,8 @@ jobs:
       - name: Run Biome lint
         run: npx biome check src --diagnostic-level=error
 
-      # The root step covers `src` only; core, http, sse and the two compact
-      # packages over HTTP lint their own sources.
+      # The root step covers `src` only; every other package lints its own
+      # sources.
       - name: Run Biome lint (server)
         run: npm --prefix server run lint:check
 
@@ -51,6 +51,15 @@ jobs:
 
       - name: Run Biome lint (sse)
         run: npm --prefix sse run lint:check
+
+      - name: Run Biome lint (compact)
+        run: npm --prefix compact run lint:check
+
+      - name: Run Biome lint (compact-readonly-entries)
+        run: npm --prefix compact-readonly-entries run lint:check
+
+      - name: Run Biome lint (compact-modify)
+        run: npm --prefix compact-modify run lint:check
 
       - name: Run Biome lint (background-runs-memory)
         run: npm --prefix background-runs-memory run lint:check
@@ -65,7 +74,7 @@ jobs:
       - name: Run Biome lint (compact-sse)
         run: npm --prefix compact-sse run lint:check
 
-      # The six read-only packages (C23); their suites run in the root
+      # The six read-only packages; their suites run in the root
       # `npm test` (its Jest roots name them).
       - name: Run Biome lint (core-ro)
         run: npm --prefix core-ro run lint:check
@@ -167,9 +176,10 @@ jobs:
       # 14.0.0 added `compact`, `compact-readonly` (since 19.0.0
       # `compact-readonly-entries`) and `compact-modify`, which
       # this step did not pack — a compact package that could not be created
-      # or installed reached the release unseen. `http` and `sse` are `core`'s
-      # dependencies, so without their tarballs the install would ask the
-      # registry for them.
+      # or installed reached the release unseen. `http` and `sse` are packages
+      # of their own, not `core`'s dependencies; they are packed so that every
+      # package of the release is created and installed here, and so that the
+      # install asks the registry for none of the release's own packages.
       - name: Verify the packages can be created
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |

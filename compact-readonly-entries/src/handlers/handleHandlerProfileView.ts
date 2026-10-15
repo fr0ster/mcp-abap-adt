@@ -1,4 +1,7 @@
-import { compactProfileViewSchema, withLongToolAdvice } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactProfileViewSchema,
+  withLongToolAdvice,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   handleRuntimeAnalyzeProfilerTrace,

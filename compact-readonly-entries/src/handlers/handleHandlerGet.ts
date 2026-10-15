@@ -10,11 +10,7 @@ import {
   handleGetVirtualFolders,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
-import {
-  type CompactReadPart,
-  partsFor,
-  routeCompactPart,
-} from './compactPartRoutes';
+import { type CompactReadPart, routeCompactPart } from './compactPartRoutes';
 import { compactReadRouterMap, routeCompactRead } from './compactReadRoutes';
 
 export const TOOL_DEFINITION = {

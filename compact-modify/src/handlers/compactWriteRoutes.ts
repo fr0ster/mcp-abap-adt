@@ -73,12 +73,12 @@ import {
   handleUpdateLocalTestClass,
   handleUpdateLocalTypes,
   handleUpdateMetadataExtension,
+  handleUpdatePackage,
   handleUpdateProgram,
   handleUpdateServiceBinding,
   handleUpdateServiceDefinition,
   handleUpdateStructure,
   handleUpdateTable,
-  handleUpdatePackage,
   handleUpdateUnitTest,
 } from '@mcp-abap-adt/lib/handlers/write';
 

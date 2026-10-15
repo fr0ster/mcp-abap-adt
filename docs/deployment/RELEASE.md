@@ -84,7 +84,7 @@ so that no package goes out on top of a dependency that is missing.
    ```
 5. **Rehearse the publish**:
    ```bash
-   npm run release:dry    # must end with "Published: 16  Skipped: 0"
+   npm run release:dry    # must end with "Published: 17  Skipped: 0"
    ```
 6. **Merge**, then tag the merge commit and push the tag:
    ```bash

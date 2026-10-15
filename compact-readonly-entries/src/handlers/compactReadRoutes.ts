@@ -9,10 +9,7 @@
  * route cannot go missing by landing in neither file.
  */
 
-import type {
-  CompactCrudOperation,
-  CompactObjectType,
-} from '@mcp-abap-adt/lib/compact-shared';
+import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
   type CompactHandler,
   type CompactRouterMap,

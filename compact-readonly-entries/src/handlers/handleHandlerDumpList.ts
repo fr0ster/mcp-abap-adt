@@ -1,4 +1,7 @@
-import { compactDumpListSchema, withLongToolAdvice } from '@mcp-abap-adt/lib/compact-shared';
+import {
+  compactDumpListSchema,
+  withLongToolAdvice,
+} from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleRuntimeListFeeds } from '@mcp-abap-adt/lib/handlers/read';
 

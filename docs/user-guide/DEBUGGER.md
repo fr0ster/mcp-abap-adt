@@ -368,8 +368,11 @@ instance — is the system's to report and yours to resolve:
   refused if another debugger listens (see
   [The breakpoint set and its key](#the-breakpoint-set-and-its-key)).
 
-The error names who holds the user's debugging: the system's conflict text and,
-where it gives one, the IDE user.
+The error is the system's answer as it is, with the step (`check listener`,
+`listen`): SAP's document in `raw_body` names who holds the user's debugging —
+the conflict text and, where it gives one, the IDE user. A debugger tool's
+failure follows the same rule as every tool (see
+[AUTHENTICATION.md](AUTHENTICATION.md#a-tool-failure-the-methods-error-as-it-is-plus-the-step)).
 
 Taking over is for a case you mean, such as an IDE left holding the user's
 debugging. Close the IDE's debugger otherwise.

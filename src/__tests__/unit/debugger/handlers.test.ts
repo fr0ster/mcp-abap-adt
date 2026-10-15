@@ -447,15 +447,21 @@ describe('debugger handlers', () => {
     },
   );
 
-  it('a start the listener check refuses is a tool error naming another debugger, before any change', async () => {
+  it('a start the listener check refuses answers the error of the check as it is, with its step, before any change', async () => {
     const { world, context } = install();
     world.checkAnswers.push(CONFLICT_409);
     const r: any = await handleDebugStartListener(context as any, {
       breakpoints: BP,
     });
     expect(r.isError).toBe(true);
-    expect(r.content[0].text).toContain(
-      'another debugger holds this debugging',
+    const payload = JSON.parse(r.content[0].text);
+    // The method's error as the strategy made it — its message, origin and
+    // SAP's document, which names the other debugger — plus the step.
+    expect(payload.message).toBe('An exception was raised');
+    expect(payload.origin).toBe('refusal');
+    expect(payload.step).toBe('check listener');
+    expect(payload.raw_body).toBe(
+      (CONFLICT_409() as any).getError().response.data,
     );
     expect(world.calls).toEqual(['checkListener']);
   });

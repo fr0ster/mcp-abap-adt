@@ -80,24 +80,28 @@ describe('SHAPE 1 — a rename, still one call', () => {
       handleGetWhereUsed,
       { object_type: 'class', object_name: 'ZCL_X' },
       'getWhereUsed',
+      'read where-used',
     ],
     [
       'ListFunctionModules',
       handleListFunctionModules,
       { function_group_name: 'ZFG' },
       'fetchNodeStructure',
+      'read node structure',
     ],
     [
       'ListFunctionGroupIncludes',
       handleListFunctionGroupIncludes,
       { function_group_name: 'ZFG' },
       'fetchNodeStructure',
+      'read node structure',
     ],
     [
       'ValidateServiceBinding',
       handleValidateServiceBinding,
       { service_binding_name: 'ZSB', service_definition_name: 'ZSD' },
       'validate',
+      undefined,
     ],
     [
       'UpdateServiceBinding',
@@ -109,17 +113,20 @@ describe('SHAPE 1 — a rename, still one call', () => {
         service_name: 'ZSRV',
       },
       'update',
+      'publish',
     ],
   ])(
     '%s calls the member that replaced it and surfaces its refusal',
-    async (_n, handler, args, member) => {
+    async (_n, handler, args, member, step) => {
       fakeClient = fakeClientOf({
         [member as string]: async () => refusedResponse('Refused'),
       });
       const result: any = await (handler as any)(context as any, args);
       expect(result.isError).toBe(true);
       expect(JSON.parse(result.content[0].text).message).toBe('Refused');
-      expect(result.content[0].text).not.toContain('step');
+      // The refusal as it came; a handler of several steps adds the one it
+      // arose at, and a single call adds none.
+      expect(JSON.parse(result.content[0].text).step).toBe(step);
     },
   );
 

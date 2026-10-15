@@ -356,9 +356,39 @@ query, the login's `state`. The diagnostics go to stderr only, as one line per f
 `[MCP] <error>: <logFields>` (auth-errors' `logFields`: `error`, `kind`, `status`,
 `diagnostics`).
 
-A tool failure that is not one of these — an ADT error, a `403` with SAP's text included — is
-answered as before. So is an authentication failure inside a running tool: the handler answers
-it in the connection's own words, with its hint.
+### A tool failure: the method's error as it is, plus the step
+
+A tool failure that is not one of these is the error the ADT method returned, as it is — its
+words decided by the reading the tool gave the method — plus the step the tool was doing when
+it arose. A tool never rewrites it:
+
+```json
+{ "message": "Request failed with status code 403", "origin": "connection",
+  "step": "read", "status": 403, "adt_type": "ExceptionResourceNoAuthorization",
+  "namespace": "com.sap.adt", "request": { "method": "GET", "url": "…" },
+  "messages": [{ "type": "E", "text": "…SAP's text…" }], "raw_body": "<exc:exception …>" }
+```
+
+- **SAP refused** — SAP answered, with an error status or with a `2xx` the reading takes as a
+  refusal: `origin` (`refusal` or `connection`, as the method gave it), `status` when SAP
+  answered with one, `adt_type`, the T100 `messages` and SAP's document in `raw_body`. Never
+  turned into an empty result, a `null`, a warning or "not found"; only a `404` where a tool
+  defines what absence answers (a source or a package level that is not there) stays absence.
+- **No answer from SAP** — the connection failed: `origin: "connection"` with no `status`
+  and no `raw_body`.
+- **The method failed** — a throw in the client, a reading or the tool itself (a document it
+  could not parse, a defect): `error: "client_threw"` and the thrown message, with no `origin`
+  — it is not presented as SAP's answer.
+- `step` — where it arose, in the tool's own words (`lock`, `update`, `update metadata`,
+  `check`, `activate`, `read`, `delete check`, `delete`, …). A single-call tool adds none. What
+  a failed step left behind (a lock not released, cleanup not done) rides beside it as
+  `cleanup`.
+
+**An ADT authorization error is not a credential refusal.** A user who logged on but may not
+work with an object gets a `403` with SAP's exception document: it is answered as above, its
+`error` is never `authentication_failed`, and the credential is not asked to renew. A `401`
+reaches the client as it came — an authentication failure inside a running tool is answered in
+the connection's own words, with its hint, never replaced.
 
 ## Shutdown
 

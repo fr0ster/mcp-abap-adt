@@ -24,8 +24,9 @@
  *    opened meanwhile;
  * 5. exit `0`, or `1` with one stderr line per fact. A shutdown that began
  *    before the transport opened (`startBirth`: the connector still being
- *    born) waits for the start to end after the logoffs and exits `1` — the
- *    start failed; it is the process's one exit.
+ *    born) ends the composed logins beside the logoffs (`endLogins`: an
+ *    interactive login at the start ends with them), waits for the start to
+ *    end and exits `1` — the start failed; it is the process's one exit.
  *
  * Only a `SIGTERM` / `SIGINT` after the start, or `--shutdown-timeout` (no
  * default), ends the waiting early: the forced close (lib's
@@ -49,6 +50,8 @@ export type { ShutdownProcess };
 export interface ShutdownOptions {
   factory: {
     beginShutdown(): void;
+    /** Ends every login it composed: a start waiting on one ends with it. */
+    endLogins(): Promise<void>;
     settle(options?: { signal?: AbortSignal }): Promise<SettleReport>;
   };
   /** The stdio instance: its MCP server closed after the logoffs, before the gate. */
@@ -151,7 +154,14 @@ export function installShutdown(options: ShutdownOptions): () => Promise<void> {
       // Read in the trigger's turn: the transport cannot open after it.
       const beforeStart = birth !== undefined && !birth.opened();
       step('the logoffs');
-      await logOffAtOnce();
+      // Before the start: the logoff of the connection being born is queued
+      // behind its connect (connection 17), and an interactive login holds
+      // that connect until the login ends — so the logins end now, beside
+      // the logoffs, not at the session writes.
+      await Promise.all([
+        logOffAtOnce(),
+        beforeStart ? factory.endLogins() : undefined,
+      ]);
       if (beforeStart) {
         // The start ends with the logoffs; its own failure line first.
         step('the start');

@@ -100,6 +100,7 @@ describe('installShutdown (core)', () => {
     const run = installShutdown({
       factory: {
         beginShutdown: () => {},
+        endLogins: async () => {},
         settle: async () => {
           throw new FlushTrouble('a token, perhaps');
         },

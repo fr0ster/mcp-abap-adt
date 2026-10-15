@@ -295,16 +295,23 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     this.shutdownBegan = true;
   }
 
+  /**
+   * Every login composed ends (`disposed`): its listener is released, and a
+   * call waiting on it answers. A shutdown before the transport opened calls
+   * it beside its logoffs: the start's own login ends with it.
+   */
+  async endLogins(): Promise<void> {
+    await Promise.allSettled(
+      [...this.logins].map((login) => login.dispose?.()),
+    );
+  }
+
   async settle(options: BrokerCallOptions = {}): Promise<SettleReport> {
     this.shutdownBegan = true;
     // Closed first, before any await: a 401 answered from here on gets the
     // shutdown refusal instead of a renewal that would land after the flush.
     this.gate.close();
-    // Every login composed ends (`disposed`): its listener is released, and
-    // a call waiting on it answers.
-    await Promise.allSettled(
-      [...this.logins].map((login) => login.dispose?.()),
-    );
+    await this.endLogins();
     // No deadline (D33): the shutdown's forced close is the one escape.
     await this.gate.drained(options.signal);
     const builds = await Promise.allSettled(

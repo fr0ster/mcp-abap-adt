@@ -66,6 +66,7 @@ export function setup(
   const run = installShutdown({
     factory: {
       beginShutdown: () => order.push('begin'),
+      endLogins: async () => {},
       settle: async (o) => {
         signal = o?.signal;
         order.push('settle');

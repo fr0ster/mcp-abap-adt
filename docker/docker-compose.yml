@@ -34,11 +34,12 @@ x-stdio: &stdio
     - ./sessions:/app/sessions
   logging: *logging
 
-# Streamable HTTP on 3000; the image listens on 0.0.0.0 and checks its health.
+# Streamable HTTP on 3000; the image listens on 0.0.0.0 and checks its health. Published on the
+# host's loopback only — put TLS in front, or change the mapping, to reach it from elsewhere.
 x-http: &http
   restart: unless-stopped
   ports:
-    - "3000:3000"
+    - "127.0.0.1:3000:3000"
   environment:
     - SAP_SYSTEM_TYPE
   logging: *logging
@@ -47,7 +48,7 @@ x-http: &http
 x-sse: &sse
   restart: unless-stopped
   ports:
-    - "3001:3001"
+    - "127.0.0.1:3001:3001"
   environment:
     - SAP_SYSTEM_TYPE
   logging: *logging

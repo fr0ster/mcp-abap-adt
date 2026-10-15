@@ -229,7 +229,7 @@ section but one): it cannot be cut, so it gets no `timeout`.
   11 minutes), and none of the libraries' either: inside a lock window the connection applies no
   deadline at all (its 10-minute ceiling is gone, see below).
 - **No request carries a deadline of the libraries' either, and `SAP_TIMEOUT_*` are not read.**
-  With `@mcp-abap-adt/connection` 17 and `@mcp-abap-adt/adt-clients` 31.1, nothing reads
+  With `@mcp-abap-adt/connection` 17 and `@mcp-abap-adt/adt-clients` 32, nothing reads
   `SAP_TIMEOUT_DEFAULT`, `SAP_TIMEOUT_CSRF`, `SAP_TIMEOUT_LONG` or `SAP_TIMEOUT_CRITICAL`: the CSRF
   fetch and the cloud session preflight carry no 15 s bound, adt-clients' 120 s default for slow
   operations is gone, and inside a lock → write → unlock window a request carries no deadline at
@@ -403,7 +403,7 @@ off, and its write is lost. So instead of a `timeout`, a run may be started **in
 ## Every transport: only LOCK and UNLOCK are sent stateful, and an instance's calls run one at a time
 
 **Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go stateless**, as
-Eclipse sends them (adt-clients 31.1 marks the two requests, each for itself). Everything else
+Eclipse sends them (adt-clients 32 marks the two requests, each for itself). Everything else
 runs stateless.
 
 **One MCP session, one connection, one main flow.** The calls of one server instance that work on
@@ -588,6 +588,14 @@ texts reads the fields instead. See
   refused to read (`append_candidates_unread`); `GetEnhancements` with `include_nested` lists the
   includes whose request SAP refused (`includes_unread`); a debugger stop's cleanup failures are
   entries in the same shape, not text.
+- **The enhancement reads are adt-clients'.** `GetEnhancements`, `GetEnhancementSpot` and
+  `GetEnhancementImpl` read through adt-clients 32 (`readEnhancementElements` on the host,
+  `getEnhancement().readMetadata` under `enhsxsb`, `getEnhancement().read` under `enhoxhh`) and
+  fail with steps `read enhancements`, `read enhancement spot` and `read enhancement source`. Their
+  inputs are unchanged. `GetEnhancementImpl` reads source only under `enhancement_spot: "enhoxhh"`
+  (the one subtype with source): `enhoxhb`, `enhsxsb` and the class enhancement `enhoxh` are
+  refused before any request, any other name without a request after the repository search says
+  what the object is when it can; SAP answering no source is `status: "not_found"`.
 - **A credential failure ends the call, as it came.** A `401` inside a tool — in a batch too — ends
   the whole call with the connection's own words and hint, never replaced and never collected per
   item: the credential is the same for every item. A `403` with SAP's exception document is an ADT
@@ -1140,8 +1148,8 @@ build argument `VARIANT` (the package's name without its scope), installing that
 ## Embedders
 
 - **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **17.1**,
-  `@mcp-abap-adt/interfaces-adt-connection` **3**, `@mcp-abap-adt/interfaces-adt` **16**,
-  `@mcp-abap-adt/adt-clients` **31.1** (and `@mcp-abap-adt/adt-strategies` 0.11). None of them takes a
+  `@mcp-abap-adt/interfaces-adt-connection` **3**, `@mcp-abap-adt/interfaces-adt` **18**,
+  `@mcp-abap-adt/adt-clients` **32** (and `@mcp-abap-adt/adt-strategies` 0.12). None of them takes a
   signal: `IAbapRequestOptions.signal` and `IAdtClientOptions.signal` are gone, there is no
   `ADT_REQUEST_ERROR` / `ADT_REQUEST_ABORTED`, and `IAdtError` has no `refusal` — an
   authentication failure inside a tool reaches the model with the connection's own words. A
@@ -1160,6 +1168,11 @@ build argument `VARIANT` (the package's name without its scope), installing that
   stub of `makeAdtRequest` is declared generic (connection's `docs/MIGRATION-15.0.md`).
 - **The chain's own migrations.** From 18.x the chain moved several majors at once; each package's
   note says what a consumer of it changes:
+  - `@mcp-abap-adt/adt-clients` 30 → 32 and `@mcp-abap-adt/interfaces-adt` 15 → 18: adt-clients'
+    `docs/usage/MIGRATION-31.md` and `MIGRATION-32.md`. From 32, `EnhancementType` is `enhoxhb |
+    enhoxhh | enhsxsb` (`enhoxh` and `enhsxs` are gone; the codes are SAP's `ENHO/XHB`, `ENHO/XHH`,
+    `ENHS/XSB`), and a custom result set for a class, program, function group or include needs
+    `enhancementElements` and `enhancementOptions` — lib's `resultsFor` reads both `verbatim`;
   - `@mcp-abap-adt/connection` 11 → 17.1: `docs/MIGRATION-12.0.md` (the authentication error
     contract), `-13.0` (interfaces-auth 7, auth-errors 2, auth-providers 6), `-14.0` (the bundled
     `sap-abap-auth` command gone), `-15.0` (the `unknown` default above), `-16.0` (one instance is

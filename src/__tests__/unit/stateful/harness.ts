@@ -1,5 +1,5 @@
 /**
- * The stand the stateful-window suites run on (spec §5.7, §14.9, RF12): an
+ * The stand the stateful-window suites run on: an
  * embedded server on ONE connection the server's factory built — the shared
  * connection a stdio instance keeps, or a pooled HTTP instance's — connected
  * to the ADT stand-in, offering the shipped tools a case names, each taken

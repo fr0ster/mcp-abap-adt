@@ -1,5 +1,5 @@
 /**
- * The second signal and `--shutdown-timeout`, http (spec §6.4, §14.5): the
+ * The second signal and `--shutdown-timeout`, http: the
  * shutdown waits for no tool, so with an `UNLOCK` held at the stand-in the
  * first `SIGTERM` already ends with the logoff written and exit `0`; a
  * second signal after it changes nothing, and a `--shutdown-timeout` never

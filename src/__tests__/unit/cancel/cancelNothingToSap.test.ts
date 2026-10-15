@@ -1,5 +1,5 @@
 /**
- * A cancel does nothing to SAP (D56, §14.9): a tool call cannot be
+ * A cancel does nothing to SAP: a tool call cannot be
  * cancelled. A client's MCP cancel of a call whose tool already started —
  * its `LOCK` on the wire — aborts nothing: the tool runs to its end (the
  * update and the `UNLOCK` are sent), its handler runs exactly once and
@@ -13,7 +13,7 @@
  * "cancel" is its dropped request: on a pooled instance holding state, the
  * dropped call's tool runs to its end with no logoff, and the handle still
  * reaches the instance and its state. Each HTTP request builds its connection
- * from its own headers (D39), so the next request's tool runs on a
+ * from its own headers, so the next request's tool runs on a
  * connection of its own.
  */
 
@@ -382,7 +382,7 @@ describe('http, a pooled instance', () => {
       await held.arrived;
       // The session the dropped call's tool runs in. (The earlier request's
       // connection, which this request's credential replaced, ends once no
-      // call works on it — D39 — and is not counted here.)
+      // call works on it, and is not counted here.)
       const toolSession = sessionOf(isLockOf('H1'));
       expect(toolSession).toBeDefined();
       const ownLoggedOff = () =>

@@ -114,9 +114,9 @@ interface PerRequestServerApi extends Poolable {
 /**
  * The Streamable HTTP server. Each HTTP POST is an MCP session of its own, on
  * a new server instance or the pooled one its `state_handle` names.
- * Credentials come only from each request's `x-sap-*` headers (D39), through
+ * Credentials come only from each request's `x-sap-*` headers, through
  * lib's `headerSource`: nothing is stored, shared or cached across requests,
- * except the connections held state opened (§3.8). A request without them is
+ * except the connections held state opened. A request without them is
  * answered `400` (`ping` excepted), and so is one carrying
  * `x-mcp-destination` — destinations are core's (stdio).
  *
@@ -404,7 +404,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   }
 
   /**
-   * The shutdown's first step, in the latch's tick (spec §6.4): the pool stops
+   * The shutdown's first step, in the latch's tick: the pool stops
    * admitting — every later request is answered `503`.
    */
   beginShutdown(): void {
@@ -487,7 +487,7 @@ export class StreamableHttpServer extends BaseMcpServer {
       /**
        * A pooled instance ends with its state: after the idle bound's stop,
        * whatever its undo answered, every connection it owns is closed with
-       * a logoff (§3.8, §6.4) — not only the state's own.
+       * a logoff — not only the state's own.
        */
       protected override idleStopped(): Promise<void> {
         return this.terminalClose();

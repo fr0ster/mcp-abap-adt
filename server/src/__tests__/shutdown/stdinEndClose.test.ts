@@ -1,5 +1,5 @@
 /**
- * M7: stdin's `end` then `close` is one start, not a start and a second
+ * Stdin's `end` then `close` is one start, not a start and a second
  * trigger — the consumer closed the transport, and the same orderly close
  * runs: a held write still lands, exit 0. Only a signal after the start
  * forces.

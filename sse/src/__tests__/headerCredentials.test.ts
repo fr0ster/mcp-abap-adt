@@ -1,8 +1,8 @@
 /**
  * SSE takes credentials only from the `x-sap-*` headers of the `GET` that
- * opens each connection (D48, spec §4.2), through lib's `headerSource`: one
+ * opens each connection, through lib's `headerSource`: one
  * source per connection, shared with no other. A `POST` is routed by its
- * `sessionId` alone — its own `x-sap-*` headers change nothing (ruling 14).
+ * `sessionId` alone — its own `x-sap-*` headers change nothing.
  * Every case goes over real HTTP to a real connection against an ADT
  * stand-in, which records the `Authorization` each call put on the wire.
  */

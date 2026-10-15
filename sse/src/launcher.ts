@@ -1,5 +1,5 @@
 /**
- * `mcp-abap-adt-sse` — the HTTP+SSE binary (D48). Credentials come only
+ * `mcp-abap-adt-sse` — the HTTP+SSE binary. Credentials come only
  * from the `x-sap-*` headers of the `GET` that opens each SSE connection; no
  * destination, no broker, no store, no login. The tools are the `ToolSet`
  * the command passes.
@@ -31,7 +31,7 @@ import {
 import { SseServer } from './SseServer.js';
 
 /**
- * What a command passes sse's launcher (spec §3.5, D37, D49): the tools it
+ * What a command passes sse's launcher: the tools it
  * serves, and its own name and version — nothing else. Everything the
  * launcher does is sse's, the same for any tool set:
  * `mcp-abap-adt-sse` passes `fullToolSet`, `mcp-abap-adt-sse-ro`

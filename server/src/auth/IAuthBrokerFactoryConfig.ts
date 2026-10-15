@@ -1,7 +1,7 @@
 /**
  * Configuration of `AuthBrokerFactory`: where destinations live and what an
  * interactive login needs. The launcher builds it from the parameters; the
- * factory adds no default collaborator (H2).
+ * factory adds no default collaborator.
  */
 
 import type {
@@ -49,22 +49,22 @@ export interface IAuthBrokerFactoryConfig {
   browserAuthPort?: number;
   /** How the connector reaches the system (`--connection-type`). */
   connectionType?: 'http' | 'rfc';
-  /** `--renewal` (D11); absent: `refresh-then-login`. */
+  /** `--renewal`; absent: `refresh-then-login`. */
   renewal?: RenewalMode;
   /**
-   * `--login-timeout` in milliseconds (D10): each browser login is ended
+   * `--login-timeout` in milliseconds: each browser login is ended
    * `aborted` once it has run this long. Absent: no bound — a login ends on
    * its result, the user's refusal or its request's end.
    */
   loginTimeoutMs?: number;
   /**
-   * How the bound was set, as D10's sentence names it — the launcher's form
+   * How the bound was set, as the login-bound sentence names it — the launcher's form
    * as the user gave it (`` `--login-timeout=300` ``). Absent: the option
    * itself, `` `loginTimeoutMs: <ms>` ``.
    */
   loginTimeoutStated?: string;
   /**
-   * `--auth-debug` (D24): the brokers are built with `authDebug: true`, so a
+   * `--auth-debug`: the brokers are built with `authDebug: true`, so a
    * refused token request's debug line names its secrets' first and last four
    * characters. Absent: off. The caller routes `logger` to stderr with it.
    */

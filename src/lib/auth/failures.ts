@@ -1,5 +1,5 @@
 /**
- * One failure reader (spec §7.1, D14): what a thrown value is, as the
+ * One failure reader: what a thrown value is, as the
  * answer the MCP client gets — read by structure, through auth-errors.
  *
  * `failureOf` is total and reads nothing it should not: every property is
@@ -25,7 +25,7 @@ import { INSTANCE_CLOSED_WORDS, serverRefusalOf } from './serverRefusal';
 
 export { INSTANCE_CLOSED_WORDS };
 
-/** What a failure answers as its `error` (spec §7.3). */
+/** What a failure answers as its `error`. */
 export type FailureCode =
   | 'authentication_failed'
   | 'destination_refused'
@@ -45,7 +45,7 @@ export type FailureCode =
   | 'instance_closed';
 
 /**
- * A failure as it was read: the fields of the §7.3 answer, and the chain's
+ * A failure as it was read: the fields of the failure answer, and the chain's
  * error itself for the stderr line (`logFields`) and the server's sentence.
  */
 export interface ReadFailure {
@@ -57,7 +57,7 @@ export interface ReadFailure {
   readonly hint?: string;
   /** The kind of the chain error a destination refusal carries. */
   readonly causeKind?: AuthProviderErrorKind;
-  /** The server's own sentence beside a chain failure (§7.4). */
+  /** The server's own sentence beside a chain failure. */
   readonly server?: string;
   /** The chain's error: stderr only (`logFields`), never rendered whole. */
   readonly authError?: IAuthProviderError;
@@ -123,7 +123,7 @@ export function authenticationFailed(error: IAuthProviderError): ReadFailure {
  *
  * Nothing else: interfaces-adt 16 has no `IAdtError.refusal`, so an auth
  * failure inside a tool reaches the model with the connection's own words
- * (D56, spec §7.2).
+ *.
  */
 function chainErrorOf(thrown: unknown): IAuthProviderError | undefined {
   if (isAuthProviderFailure(thrown)) {
@@ -134,7 +134,7 @@ function chainErrorOf(thrown: unknown): IAuthProviderError | undefined {
   return classify(refusal, 'unfamiliar-error');
 }
 
-/** D17's sentence: the server's own words beside the shutdown refusal (§7.4). */
+/** The sentence: the server's own words beside the shutdown refusal. */
 export const SHUTDOWN_SENTENCE = 'The server is shutting down.';
 
 /**

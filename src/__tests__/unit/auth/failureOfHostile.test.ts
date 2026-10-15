@@ -1,5 +1,5 @@
 /**
- * RF3: `failureOf` is total. A thrown value whose `refusal`, `error` or
+ * `failureOf` is total. A thrown value whose `refusal`, `error` or
  * `code` is a throwing getter, a Proxy (revoked or with throwing traps), a
  * primitive or `null` never makes the reader throw: it answers `undefined`
  * or a classified failure, and no getter of the value is run.
@@ -48,7 +48,7 @@ function revoked(): object {
   return proxy;
 }
 
-describe('failureOf on hostile values (RF3)', () => {
+describe('failureOf on hostile values', () => {
   it.each(['refusal', 'error', 'code', 'name', 'message', 'kind'])(
     'a throwing getter on %s: never run, never throws',
     (key) => {

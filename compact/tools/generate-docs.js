@@ -206,7 +206,7 @@ function main() {
       .compactModifyEntries(context)
       .map((entry) => ({ half: 'modify', entry })),
     // The debugger verbs live in lib (`src/lib/compact/debug`), served by
-    // the compact write binaries (C23).
+    // the compact write binaries.
     ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
       .compactDebugEntries()
       .map((entry) => ({ half: 'debug', entry })),

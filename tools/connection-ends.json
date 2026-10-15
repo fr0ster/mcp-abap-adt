@@ -3,8 +3,8 @@
     "file": "src/embeddable/BaseMcpServer.ts",
     "function": "BaseMcpServer.getConnection",
     "site": "createAbapConnection",
-    "end": "the instance's terminal close (closeOwnedConnections) \u2014 at once, under any request in flight, when the client closes (stdio's stdin, an SSE stream) and at the process shutdown (forceClose); after the undo at the pool's eviction \u2014; replaced on a new credential where the credential is the request's (http, sse) \u2014 stdio's source answers the same provider for the process's life (D13) \u2014 or once SAP lost its session (D56), then ended when no call works on it any more; a failed connect() ends at once; once its instance is latched closed (the instance close, the process shutdown) nothing is built or sent (refuseIfClosed: ClosedInstanceRefusal), and one whose connect() was under way at the latch is swept with the rest and refused once the connect settles (refuseWhenClosed)",
-    "why": "the instance's own connection (role 'built'), recorded as its own before connect(); a connect that completed after its callers cancelled is kept and ends here too (D32/D56, RF1)"
+    "end": "the instance's terminal close (closeOwnedConnections) \u2014 at once, under any request in flight, when the client closes (stdio's stdin, an SSE stream) and at the process shutdown (forceClose); after the undo at the pool's eviction \u2014; replaced on a new credential where the credential is the request's (http, sse) \u2014 stdio's source answers the same provider for the process's life \u2014 or once SAP lost its session, then ended when no call works on it any more; a failed connect() ends at once; once its instance is latched closed (the instance close, the process shutdown) nothing is built or sent (refuseIfClosed: ClosedInstanceRefusal), and one whose connect() was under way at the latch is swept with the rest and refused once the connect settles (refuseWhenClosed)",
+    "why": "the instance's own connection (role 'built'), recorded as its own before connect(); a connect that completed after its callers cancelled is kept and ends here too"
   },
   {
     "file": "src/embeddable/BaseMcpServer.ts",
@@ -102,7 +102,7 @@
     "function": "records",
     "site": "WeakMap<object, ConnectionRecord>",
     "end": "none needed: keyed weakly, holds no connection",
-    "why": "how a connection was built, so a sibling can be opened like it (D20)"
+    "why": "how a connection was built, so a sibling can be opened like it"
   },
   {
     "file": "src/lib/debugger/AmdpSession.ts",
@@ -193,14 +193,14 @@
     "function": "openFreshConnection",
     "site": "createAbapConnection",
     "end": "its caller's end (each caller of openFreshConnection is listed); a connect that fails ends here (connectedOrClosed); recorded as the calling instance's, so its terminal close reaches it; once its instance is latched closed (the instance close, the process shutdown) nothing is built or sent (refuseIfClosed: ClosedInstanceRefusal), and one whose connect() was under way at the latch is swept with the rest and refused once the connect settles (refuseWhenClosed)",
-    "why": "a sibling of a connection the server built (D20)"
+    "why": "a sibling of a connection the server built"
   },
   {
     "file": "src/lib/packageSessions.ts",
     "function": "openFreshConnection",
     "site": "freshConnection",
     "end": "the same as a sibling: the caller's end, connectedOrClosed on a failed connect, the instance's terminal close; once its instance is latched closed (the instance close, the process shutdown) nothing is built or sent (refuseIfClosed: ClosedInstanceRefusal), and one whose connect() was under way at the latch is swept with the rest and refused once the connect settles (refuseWhenClosed)",
-    "why": "a consumer's freshConnection result is the server's once returned (D22)"
+    "why": "a consumer's freshConnection result is the server's once returned"
   },
   {
     "file": "src/lib/packageSessions.ts",
@@ -228,7 +228,7 @@
     "function": "hostFactories",
     "site": "WeakMap<object, FreshConnectionFactory>",
     "end": "none needed: keyed weakly, holds factories, not connections",
-    "why": "an injected connection's freshConnection factory (D20); the injected connection itself is the consumer's, never closed"
+    "why": "an injected connection's freshConnection factory; the injected connection itself is the consumer's, never closed"
   },
   {
     "file": "src/lib/utils.ts",

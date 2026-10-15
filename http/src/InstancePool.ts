@@ -29,7 +29,7 @@ export interface Poolable {
   /** The state undo: callable again, each call retrying what is left. */
   dispose(): Promise<void>;
   /**
-   * The terminal close (spec §6.4, D55): every connection the instance owns
+   * The terminal close: every connection the instance owns
    * closed with a logoff. Run when the instance leaves the pool, after its
    * undo, whatever the undo answered.
    */
@@ -274,7 +274,7 @@ export class InstancePool<T extends Poolable> {
         if (!instance.holdsState()) {
           this.drop(instance);
           this.retained.delete(instance);
-          // It left the pool: its connections end with a logoff (§3.8).
+          // It left the pool: its connections end with a logoff.
           await this.terminalClose(instance);
         } else {
           this.retained.add(instance); // still finishing: owned until it empties
@@ -316,7 +316,7 @@ export class InstancePool<T extends Poolable> {
    * finishes when its last event arrives — no timer); retry once what still
    * holds; report what is still left. Every instance it owned then leaves the
    * pool through its terminal close — its connections closed with a logoff
-   * whatever its undo answered (§3.8, §6.4).
+   * whatever its undo answered.
    */
   async shutdown(): Promise<string[]> {
     this.admitting = false;

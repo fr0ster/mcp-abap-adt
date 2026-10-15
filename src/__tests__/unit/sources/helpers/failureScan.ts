@@ -1,5 +1,5 @@
 /**
- * The failure-reading scan (D14, §9), on the TypeScript program with its type
+ * The failure-reading scan, on the TypeScript program with its type
  * checker — what a name resolves to, never what it is called.
  *
  * Rule `instanceof`: an `instanceof` whose right-hand side resolves (through

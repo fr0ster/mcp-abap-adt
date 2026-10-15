@@ -1,5 +1,5 @@
 /**
- * The one registry of live tool calls (spec §6.4, D33, D51, D55): every
+ * The one registry of live tool calls: every
  * call of every server instance registers at the wrapper's entry, is removed
  * when it ends — on success, on failure and when its request is cancelled —
  * and `settled()` waits for each without aborting any. After the latch

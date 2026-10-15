@@ -1,8 +1,8 @@
 /**
- * D53: stdio serves no token you hold. A `jwt` / `none` destination — here an
+ * Stdio serves no token you hold. A `jwt` / `none` destination — here an
  * `--env` file with `SAP_JWT_TOKEN` and both `SAP_ISSUED_*`, a record of the
  * session store's format, so nothing but the handler table decides — stops
- * the start at the startup check (D18) with `destination_refused`, its words
+ * the start at the startup check with `destination_refused`, its words
  * and the hint saying where the token goes: the `x-sap-jwt-token` header of
  * `mcp-abap-adt-http` / `mcp-abap-adt-sse`, or `mcp-auth` for stdio. No
  * broker and no provider is built, nothing reaches the system, and the

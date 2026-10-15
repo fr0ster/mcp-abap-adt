@@ -1,5 +1,5 @@
 /**
- * D14 / §9: a failure is read by structure through auth-errors — never by
+ * A failure is read by structure through auth-errors — never by
  * `instanceof` of a chain class, never through a thrown value's `message`,
  * `stack`, `cause` or `name`, and a thrown value never goes whole into a log
  * line or a string. The scan (`helpers/failureScan.ts`) runs on the
@@ -10,8 +10,8 @@
  *   sse).
  * - a thrown value's use: core, http and sse whole, and lib's auth, HTTP
  *   transport and embeddable server. lib's handlers and their libraries carry
- *   ADT errors, whose text is the tool's data (D27); how they convert a
- *   refusal is the D45 audit's (C7), with its own list.
+ *   ADT errors, whose text is the tool's data; how they convert a
+ *   refusal is the audit's, with its own list.
  *
  * The scan's own rules are load-bearing: each fixture under
  * `__fixtures__/failureScan/refused` is one way past a name-based scan and
@@ -51,7 +51,7 @@ const THROWN_SCOPE = [
 /**
  * The exact findings allowed, each with its reason. Empty: the instance
  * pool's shutdown report reads the state's own words (`failures`), else
- * `failureOf(e)?.message ?? errorClassOf(e)` (A10) — never a thrown message.
+ * `failureOf(e)?.message ?? errorClassOf(e)` — never a thrown message.
  */
 const ALLOWED: ReadonlyArray<{ where: string; text: string; why: string }> = [];
 
@@ -62,7 +62,7 @@ const isAllowed = (finding: Finding) =>
       finding.where === allowed.where && finding.text === allowed.text,
   );
 
-describe('the sources (D14, §9)', () => {
+describe('the sources', () => {
   const files = PACKAGES.flatMap((dir) => tsFiles(path.join(REPO, dir)));
   const inScope = (scope: readonly string[]) =>
     new Set(

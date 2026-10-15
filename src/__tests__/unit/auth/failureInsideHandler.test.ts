@@ -1,5 +1,5 @@
 /**
- * An auth failure inside a handler (spec §7.2, §14.2, §14.3, D56): there is
+ * An auth failure inside a handler: there is
  * no structured refusal on adt-clients' error, so the tool's result carries
  * the connection's own message — its fixed words and its hint — as it is,
  * with no secret. Over a connection the server built, and over one the

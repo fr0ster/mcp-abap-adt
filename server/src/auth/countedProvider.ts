@@ -23,7 +23,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-auth';
 
 /**
- * The closed gate's answer (D17): auth-errors' `interactive-login` `aborted`,
+ * The closed gate's answer: auth-errors' `interactive-login` `aborted`,
  * minted — the server's shutdown sentence goes beside it (`serverSentence`),
  * never into the refusal.
  */
@@ -69,7 +69,7 @@ export class ProviderGate {
   }
 
   /**
-   * Resolves when no call is in flight — no deadline, no timer (D33): a
+   * Resolves when no call is in flight — no deadline, no timer: a
    * shutdown's forced close is what ends this waiting early, and it does not
    * await it. `signal` (the shutdown's) releases this wait when it aborts.
    */

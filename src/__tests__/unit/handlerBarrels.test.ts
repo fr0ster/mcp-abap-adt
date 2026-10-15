@@ -65,7 +65,7 @@ describe("lib's read and write handler barrels", () => {
     // is why this number moves deliberately and in a commit that says so.
     // 15.1: search, where-used, table/SQL data and package contents joined, for
     // the compact facade's read half. 19.0.0: ReadTransportObjects joined, for
-    // `HandlerGet` with object_type TRANSPORT. 19.0.0 (C14): the node-structure,
+    // `HandlerGet` with object_type TRANSPORT. 19.0.0: the node-structure,
     // virtual-folder and object-structure reads joined, for `HandlerGet`'s
     // address parts, when the low set left the full binaries.
     expect(read).toHaveLength(63);
@@ -75,9 +75,9 @@ describe("lib's read and write handler barrels", () => {
     // two deprecated `…WithProfiling` runs (76 handlers). 19.0.0 added the
     // transport organizer's sort-and-compress and move-objects, for compact's
     // `HandlerTransportSortAndCompress` / `HandlerTransportMoveObjects` (78).
-    // 19.0.0 (C14): the write under the caller's lock and the package delete,
+    // 19.0.0: the write under the caller's lock and the package delete,
     // for compact's `HandlerUpdate` with lock_handle and `HandlerDelete` PACKAGE.
-    // 19.0.0 (C14 round 3): the high UpdatePackage, for `HandlerUpdate`
+    // 19.0.0: the high UpdatePackage, for `HandlerUpdate`
     // PACKAGE without lock_handle (82).
     expect(write).toHaveLength(82);
   });

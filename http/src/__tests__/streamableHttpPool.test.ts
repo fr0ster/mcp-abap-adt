@@ -19,7 +19,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { withSystemInformation } from '../../../src/__tests__/helpers/systemInformationStandIn';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
-/** Every request carries its own credentials: the server takes them from nowhere else (D39). */
+/** Every request carries its own credentials: the server takes them from nowhere else. */
 const CREDENTIALS = {
   'x-sap-url': 'https://sap.invalid',
   'x-sap-client': '100',

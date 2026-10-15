@@ -127,8 +127,8 @@ export type StartedConnection =
 
 /**
  * A connection being built, shared by every call that asks for it while it
- * is (D13, D32). A connect that completes after every caller left is still
- * the instance's (D56): kept, used by the next call.
+ * is. A connect that completes after every caller left is still
+ * the instance's: kept, used by the next call.
  */
 interface BuiltConnection {
   credential: IAuthProvider;
@@ -189,7 +189,7 @@ export abstract class BaseMcpServer extends McpServer {
   protected readonly logger: Logger;
 
   /**
-   * Connection context: the instance's one source (spec §4) — set once for
+   * Connection context: the instance's one source — set once for
    * stdio, per request for Streamable HTTP (also on a pooled instance), once
    * per SSE connection, at construction for an embedder's injected connection.
    */
@@ -197,7 +197,7 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * The connection built from the source, kept while the source answers the
-   * same credential object (D13): stdio's provider (the same one for the
+   * same credential object: stdio's provider (the same one for the
    * process's life), an SSE connection's headers. A new credential — a new
    * HTTP request's headers — builds a new connection.
    */
@@ -313,7 +313,7 @@ export abstract class BaseMcpServer extends McpServer {
       idleMinutes: options.stateIdleMinutes,
       logger: stateLoggerOf(options),
       // The idle bound's stop is a terminal disposal of what the state
-      // owns: its connections are closed whatever the undo answered (§6.4).
+      // owns: its connections are closed whatever the undo answered.
       onIdleStop: () => this.idleStopped(),
     });
     this.systemType = options.systemType;
@@ -363,14 +363,14 @@ export abstract class BaseMcpServer extends McpServer {
    * call retries what the state could not undo (the pool's retry and
    * `shutdownState()` rely on it). It closes no connection: that is the
    * terminal close (`terminalClose()`), which every terminal disposal runs
-   * after it, whatever it answered (spec §6.4, D51, D55).
+   * after it, whatever it answered.
    */
   dispose(): Promise<void> {
     return this.state.dispose();
   }
 
   /**
-   * **The terminal close** (spec §6.4): `disconnect()` — the logoff — of
+   * **The terminal close**: `disconnect()` — the logoff — of
    * every connection this instance owns (the one it built, held state's own,
    * package lock sessions, fresh connections still open), each once; a
    * failure logged in fixed words. An injected connection is the consumer's
@@ -411,7 +411,7 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Sets the instance's source (spec §4): a `ConnectionSource` to build from
+   * Sets the instance's source: a `ConnectionSource` to build from
    * (core: the destination; http and sse: the request's headers), or an
    * injected connection used as given. Nothing is read or sent here; the
    * process configuration joins the process context (the fallback after the
@@ -430,7 +430,7 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * What a thrown value is, as the client's answer (spec §7.1): lib's
+   * What a thrown value is, as the client's answer: lib's
    * `failureOf`. A server that knows more failures (core: the destination
    * layer's) reads those first, then this.
    */
@@ -446,7 +446,7 @@ export abstract class BaseMcpServer extends McpServer {
    * no `resolve`, no `connect()`, no wrap. Built: the source resolves the
    * settings and the credential with the request's `signal` (its own waits
    * race it), and the connection is built and connected once per credential
-   * object — kept while the source answers the same one (D13), replaced
+   * object — kept while the source answers the same one, replaced
    * only when SAP already lost the session or the source answers another
    * credential object (http: the request's; sse: fixed per connection). On stdio the source
    * answers the same provider for the process's life: the user is fixed, and
@@ -460,7 +460,7 @@ export abstract class BaseMcpServer extends McpServer {
    * it, and the instance's close comes after (no logoff under it). A login
    * inside it ends with the session (its party is the call's signal). A
    * success is the instance's connection, kept and used by the next call; it
-   * is closed only by the instance's terminal close (spec §6.4).
+   * is closed only by the instance's terminal close.
    *
    * Every connection it returns is a use the caller must end with exactly
    * one `connectionReleased(connection)`.
@@ -488,10 +488,10 @@ export abstract class BaseMcpServer extends McpServer {
       (held.ready !== undefined && isSpent(held.ready))
     ) {
       // A new credential (http: the request's; sse: fixed per connection), or a session SAP
-      // already lost (D56): the connection is replaced, and the replaced one
-      // ends with its logoff — once no call works on it any more (spec §6.4).
+      // already lost: the connection is replaced, and the replaced one
+      // ends with its logoff — once no call works on it any more.
       // stdio's source answers the same provider for the process's life, so
-      // only a lost session replaces its connection (D13).
+      // only a lost session replaces its connection.
       // The parameters are the destination's — the credential and the
       // target system they were made for — not the session's: a
       // replacement for the same ones has them at birth (`buildConnection`)
@@ -526,7 +526,7 @@ export abstract class BaseMcpServer extends McpServer {
    * before it has left; no timeout on the wait. A client's cancel aborts
    * nothing (`trackCall`): the call keeps its place. A call whose session
    * ended while it waits (its signal aborted) leaves the queue at once — its
-   * place passes on, and it ends without reaching its tool (D5). The process
+   * place passes on, and it ends without reaching its tool. The process
    * shutdown (stdio's client close included) interrupts every call — the
    * queued ones leave without sending — and logs the connector off at once,
    * under the running call (`logOffAtOnce`); an SSE close ends the session,
@@ -907,7 +907,7 @@ export abstract class BaseMcpServer extends McpServer {
     })();
     this.built = entry;
     // A completed connect stays the instance's whoever still waits for it
-    // (D32, D56); a failed one is not kept: the next call connects again.
+    //; a failed one is not kept: the next call connects again.
     entry.connection.catch(() => {
       if (this.built === entry) this.built = undefined;
     });
@@ -932,13 +932,13 @@ export abstract class BaseMcpServer extends McpServer {
   private async connectedLogon(
     resolved: ResolvedConnection,
   ): Promise<AbapConnection> {
-    // A closed instance logs on nowhere (§6.4): nothing is built or sent.
+    // A closed instance logs on nowhere: nothing is built or sent.
     refuseIfClosed(this);
     const connection = createAbapConnection(
       resolved.settings,
       resolved.credential,
     ) as AbapConnection;
-    // The instance's own from here on: it ends with a logoff (§6.4, D55).
+    // The instance's own from here on: it ends with a logoff.
     own(connection, { owner: this, role: 'built' });
     // Establish session (CSRF token + cookies) before first request.
     // RFC needs this for the stateful session; HTTP needs it because some
@@ -997,7 +997,7 @@ export abstract class BaseMcpServer extends McpServer {
       owner.release(claimed);
       throw error;
     }
-    // The instance's own from here on, like any built connection (§6.4). A
+    // The instance's own from here on, like any built connection. A
     // closed owner refuses it: the claimed file is given back as a leftover.
     try {
       own(connection, { owner: this, role: 'built' });
@@ -1161,7 +1161,7 @@ export abstract class BaseMcpServer extends McpServer {
               // on the instance's connection waits until the call before it
               // settled, whatever the client sends at once. Entered after the
               // connection is ready, so concurrent callers still share one
-              // connect() (D32). A background run and a listed long read work
+              // connect(). A background run and a listed long read work
               // on a connection of their own and take no place in it; so do the
               // debugger tools whose SAP work is on the debugger's own
               // connections — their sends on this one (`onMainConnection`)
@@ -1221,10 +1221,10 @@ export abstract class BaseMcpServer extends McpServer {
               // The destination's own .env enters the scope first, below the
               // request's headers; it stands only where an on-premise system
               // has no systeminformation.
-              // The whole call runs in the request signal scope (§5.2), and
+              // The whole call runs in the request signal scope, and
               // a call whose signal aborted before its tool starts — after
               // the connection is ready, after the system lookup — never
-              // reaches the tool (D5).
+              // reaches the tool.
               const holdsFlow = leaveFlow !== undefined;
               const resolved = <T>(fn: () => Promise<T>) =>
                 this.inHeldFlow(holdsFlow, context.connection, () =>
@@ -1246,7 +1246,7 @@ export abstract class BaseMcpServer extends McpServer {
               const read =
                 listed && isLongRead(entry.toolDefinition.name, args);
               if (listed && !read && readTimeout(args) !== undefined) {
-                // A listed tool's run mode takes no `timeout` (spec §5.8).
+                // A listed tool's run mode takes no `timeout`.
                 return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS)) as {
                   isError: true;
                   content: { type: 'text'; text: string }[];
@@ -1266,7 +1266,7 @@ export abstract class BaseMcpServer extends McpServer {
                   ),
                 );
               } else if (read) {
-                // A listed long tool (spec §5.8): a read on a connection of
+                // A listed long tool: a read on a connection of
                 // its own, its `timeout` cutting the read.
                 const timeoutSeconds = readTimeout(args);
                 if (timeoutSeconds === null) {
@@ -1327,8 +1327,8 @@ export abstract class BaseMcpServer extends McpServer {
 
               return { content };
             } catch (error) {
-              // The failure reader first (§7.2): a chain failure or the
-              // server's own refusal is answered as §7.3, its diagnostics on
+              // The failure reader first: a chain failure or the
+              // server's own refusal is answered as the failure answer, its diagnostics on
               // stderr only.
               // The reader may be an override or a host's: guarded, so its
               // own throw answers fixed words, never itself.
@@ -1400,7 +1400,7 @@ export abstract class BaseMcpServer extends McpServer {
       // A registry that registers its own tools: no connection is injected,
       // but every tool it registers goes through the same call tracking —
       // its request signal, the registry of live calls, the request signal
-      // scope, D5, and its turn in the main flow — as the tools above.
+      // scope, the abort check, and its turn in the main flow — as the tools above.
       handlersRegistry.registerAllTools(this.trackingRegistrations());
     }
   }
@@ -1505,7 +1505,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (strategy === undefined) {
       throw new ServerRefusal('background_runs_unavailable');
     }
-    // No connection of its own to be had: D20's refusal, before the caller
+    // No connection of its own to be had: the refusal for a missing fresh connection, before the caller
     // is asked of the system or anything is kept.
     if (!freshConnectionAvailable(context.connection)) {
       throw new ServerRefusal('fresh_connection_unavailable');
@@ -1799,11 +1799,11 @@ export abstract class BaseMcpServer extends McpServer {
    * The same entry and end are the user activity the state's idle bound
    * counts: it pauses while the call runs and counts from its end.
    *
-   * Each call has a request signal of its own (§5.1): aborted when the
+   * Each call has a request signal of its own: aborted when the
    * session ends — the instance's transport closed (`closeInstance`), unless
    * the host connects a transport per request (`transportCloseEndsSession:
    * false`, http: a dropped request ends no call) — and
-   * when the call ends whatever its outcome (D4: the broker releases the
+   * when the call ends whatever its outcome (the broker releases the
    * party it attached only then). A tool call cannot be cancelled: the
    * request's `extra.signal`, which the SDK also aborts for a client's
    * `notifications/cancelled`, is not read — the call runs to its end (the
@@ -1813,7 +1813,7 @@ export abstract class BaseMcpServer extends McpServer {
    * shutdown (`logOffAtOnce`) abort it — the call is interrupted, its
    * connections logged off at once. Once the process or this instance is latched, the
    * call is refused here — the shutdown refusal, before any connection or
-   * handler (§6.4).
+   * handler.
    *
    * The call runs as this instance's (`runAsOwner`): a connection it opens is
    * this instance's, closed by its terminal close.
@@ -1849,7 +1849,7 @@ export abstract class BaseMcpServer extends McpServer {
    * callback given to `registerTool` (or the older `tool`) is tracked like
    * the tools of a handler group — its request signal, the registry of live
    * calls, the request signal scope — and a call whose signal aborted before
-   * the tool starts ends without reaching it (D5).
+   * the tool starts ends without reaching it.
    *
    * Such a callback can reach the instance's connection: the server it is
    * handed is this instance (every member bound, `getConnection` and
@@ -1992,7 +1992,7 @@ function callHandler(
 /**
  * Whether SAP already ended `connection`'s session: ended here, or the
  * connection says it is no longer connected (connection 16: a lost session
- * spends the instance). Such a connection is replaced, never reused (D56).
+ * spends the instance). Such a connection is replaced, never reused.
  */
 function isSpent(connection: AbapConnection): boolean {
   if (isEnded(connection)) return true;

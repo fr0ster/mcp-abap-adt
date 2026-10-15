@@ -229,14 +229,14 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       }),
     });
 
-    // Used as given (spec §4.3): no credential built, no wrap, no connect().
+    // Used as given: no credential built, no wrap, no connect().
     this.setConnectionContext({
       kind: 'injected',
       connection: options.connection,
       sessionId: 'embedded',
     });
 
-    // The latest injection of this connection decides (D20).
+    // The latest injection of this connection decides.
     registerFreshConnectionFactory(options.connection, options.freshConnection);
 
     if (options.systemContext) {

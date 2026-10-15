@@ -1,5 +1,5 @@
 /**
- * The `Source` union (spec §4): an instance's connection is either built
+ * The `Source` union: an instance's connection is either built
  * from a `ConnectionSource` — `resolve(signal)` with the caller's signal,
  * then a connector over what it answered, connected — or injected by an
  * embedder and used as given: the same object, no `connect()`, no wrap, no

@@ -1,10 +1,9 @@
 /**
- * The shutdown of a program — core's, http's and sse's launchers (spec §6.4,
- * D33): installed by the launcher only, so an embedder's process is never
+ * The shutdown of a program — core's, http's and sse's launchers: installed by the launcher only, so an embedder's process is never
  * taken over.
  *
  * **What starts it.** The first trigger — `SIGTERM`, `SIGINT`, and for stdio
- * the end of stdin (`end` and `close` alike: one start, M7; the client
+ * the end of stdin (`end` and `close` alike: one start; the client
  * closed the transport) — starts one sequence. In that tick the process
  * latch is set (`latch()`), before anything else: a call arriving from here
  * on is refused before any connection. Then the program's own `begin` (stop

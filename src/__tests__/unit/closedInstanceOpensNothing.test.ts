@@ -1,5 +1,5 @@
 /**
- * A closed instance opens and owns no new connection (spec §6.4): once its
+ * A closed instance opens and owns no new connection: once its
  * latch is set — its close (`closeInstance`) or the process's shutdown
  * (`latch()`) — the terminal close has swept what it owned, so a running
  * tool's next step that would open a fresh connection is refused

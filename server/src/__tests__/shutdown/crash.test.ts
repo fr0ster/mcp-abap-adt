@@ -1,5 +1,5 @@
 /**
- * A crash outside a tool, stdio (spec §6.4): an `uncaughtException` (a
+ * A crash outside a tool, stdio: an `uncaughtException` (a
  * timer callback that throws) or an `unhandledRejection` (a promise
  * rejected with no handler) runs the forced close — the stand-in receives
  * the logoff of the instance's connection, one fixed-words stderr line names

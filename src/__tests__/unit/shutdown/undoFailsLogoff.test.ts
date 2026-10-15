@@ -1,5 +1,5 @@
 /**
- * Held state and its logoff (spec §6.4, §14.5): a held state whose undo
+ * Held state and its logoff: a held state whose undo
  * would fail every time — the stand-in refuses the debugger stop.
  *
  * - At shutdown (core, http, sse) and at an SSE close no undo is sent: the

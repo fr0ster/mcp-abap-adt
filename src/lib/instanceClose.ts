@@ -1,5 +1,5 @@
 /**
- * **The instance close** (spec §6.4, D51): how an instance ends when its
+ * **The instance close**: how an instance ends when its
  * client closed its connection — a transport close that ends the session
  * (`BaseMcpServer` wires its protocol's `onclose` here unless the host states
  * `transportCloseEndsSession: false`: stdio's transport, an SSE stream, an

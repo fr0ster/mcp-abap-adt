@@ -3,9 +3,9 @@
  * that starts it does not wait for.
  *
  * - **its own connection** — opened through the fresh-connection path
- *   (`openFreshConnection`, spec §4.3): a sibling of a connection the server
+ *   (`openFreshConnection`): a sibling of a connection the server
  *   built, or the host's `freshConnection`; on an injected connection
- *   without one the start is refused with D20's words, before anything is
+ *   without one the start is refused with its fixed words, before anything is
  *   kept. Stateless. It is the server's (role `background`), owned by the
  *   strategy, not by the instance whose call started it: the instance's
  *   terminal close (`closeOwnedConnections` — the pool's eviction, the idle
@@ -141,7 +141,7 @@ export async function startBackgroundRun(
     }
     // Its instance closed while it connected: the close cut it.
     refuseIfClosed(options.instance);
-    // Stateless (§5.7): a fresh connection is, and a host's factory's is made so.
+    // Stateless: a fresh connection is, and a host's factory's is made so.
     const typed = connection as { setSessionType?: (type: string) => void };
     if (typeof typed.setSessionType === 'function') {
       typed.setSessionType('stateless');

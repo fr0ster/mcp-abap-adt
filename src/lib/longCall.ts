@@ -1,14 +1,14 @@
 /**
- * The listed long tools (spec §5.8, D56): a tool on the user-approved list
+ * The listed long tools: a tool on the user-approved list
  * (`tools/long-handlers.json`) — a read — runs on an ABAP session of its own
  * and takes an optional `timeout` that cuts the read.
  *
  * One implementation, `runLongCall`, used by every registration path:
  *
  * - **its own connection** — opened through the fresh-connection path
- *   (`openFreshConnection`, §4.3): a sibling of a connection the server built,
+ *   (`openFreshConnection`): a sibling of a connection the server built,
  *   or the host's `freshConnection`; on an injected connection without one the
- *   call is refused with D20's words. Stateless; nothing the instance holds is
+ *   call is refused with its fixed words. Stateless; nothing the instance holds is
  *   touched. It is the server's (role `long`, the connection-ends registry);
  * - **the timeout cuts the read**: when it passes, the call's own connection
  *   is logged off at once (`disconnect()`), and the call answers in fixed
@@ -53,7 +53,7 @@ export async function runLongCall<R>(
   const { name, logger, timeoutSeconds } = options;
   const connection = await openFreshConnection(options.connection, logger);
   own(connection, { role: 'long' });
-  // Stateless (§5.7): a fresh connection is, and a host's factory's is made so.
+  // Stateless: a fresh connection is, and a host's factory's is made so.
   const typed = connection as { setSessionType?: (type: string) => void };
   if (typeof typed.setSessionType === 'function') {
     typed.setSessionType('stateless');

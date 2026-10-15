@@ -28,7 +28,7 @@ export interface ResolvedConnection {
 
 /**
  * Where an instance's connections come from, filled by the package that
- * serves it (spec §4): core a destination through the broker, http and sse
+ * serves it: core a destination through the broker, http and sse
  * the request's headers (`headerSource`).
  */
 export interface ConnectionSource {

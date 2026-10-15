@@ -1,6 +1,6 @@
 /**
  * `mcp-abap-adt-compact-http-ro` — the read-only compact tool set over
- * Streamable HTTP (C23).
+ * Streamable HTTP.
  *
  * http's `main` with `compactReadOnlyToolSetOf` over the half that changes
  * nothing, and this command's name and version. Nothing else: http's table,
@@ -9,7 +9,7 @@
  * auth broker nor the stores are installed with it.
  *
  * **Why a package of its own:** the binary fixes the tool set (the owner's
- * decision, C23), and a user installs only what they need. The modify
+ * decision), and a user installs only what they need. The modify
  * half, the debugger, background runs and the resume are `mcp-abap-adt-compact-http`'s.
  */
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';

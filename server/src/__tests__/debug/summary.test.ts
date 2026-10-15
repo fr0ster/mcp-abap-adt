@@ -1,5 +1,5 @@
 /**
- * D25: the startup summary says of a secret that it is there — `set` — and
+ * The startup summary says of a secret that it is there — `set` — and
  * not one character of it: not the password, a token, a refresh token or the
  * client secret, long or short.
  */

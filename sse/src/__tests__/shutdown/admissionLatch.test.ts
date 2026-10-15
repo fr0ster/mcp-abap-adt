@@ -1,11 +1,11 @@
 /**
- * The admission latch, sse (spec §6.4, §14.5): `POST`s admitted before the
+ * The admission latch, sse: `POST`s admitted before the
  * latch whose bodies complete after it reach no tool — no request of them
  * reaches the stand-in, no connection is built for them — while another
  * tool, its update held, is interrupted and not awaited: its session is
  * logged off at once, exit `0`, its `UNLOCK` never lands. (The answer a
  * latched call gets: `closeDuringPost.test.ts` and core's suite. Full and
- * compact: the A7 parity suite.)
+ * compact: the parity suite.)
  */
 
 import {

@@ -12,7 +12,7 @@
  * gate, disposes the logins it composed, waits for the calls already
  * running, then flushes every broker.
  *
- * The settings are read once per process (D3); the provider is asked of the
+ * The settings are read once per process; the provider is asked of the
  * broker on every call, with the caller's signal — the factory keeps no
  * provider cache, the broker does.
  */
@@ -124,7 +124,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   /** The shutdown began: no interactive login starts, `aborted` is the shutdown's. */
   private shutdownBegan = false;
   private readonly renewal: RenewalMode;
-  /** `--login-timeout` (D10): the bound every composed login runs under. */
+  /** `--login-timeout`: the bound every composed login runs under. */
   private readonly bound: LoginBound | undefined;
   /** The build of each destination, set before its first await. */
   private readonly built = new Map<string, Promise<Built>>();
@@ -169,7 +169,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   }
 
   /**
-   * The server's own sentence for a chain failure (§7.4), keyed on its
+   * The server's own sentence for a chain failure, keyed on its
    * `kind` and this factory's state: the renewal it was started with, and
    * whether the shutdown closed its gate.
    */
@@ -177,7 +177,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return serverSentence(error, this.state());
   }
 
-  /** The server's own state a sentence is keyed on (§7.4). */
+  /** The server's own state a sentence is keyed on. */
   private state(): ServerState {
     return {
       renewal: this.renewal,
@@ -312,7 +312,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     // shutdown refusal instead of a renewal that would land after the flush.
     this.gate.close();
     await this.endLogins();
-    // No deadline (D33): the shutdown's forced close is the one escape.
+    // No deadline: the shutdown's forced close is the one escape.
     await this.gate.drained(options.signal);
     const builds = await Promise.allSettled(
       [...this.built.entries()].map(async ([destination, build]) => ({
@@ -359,7 +359,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     const mode = this.modeOf(destination);
     const stores = storesFor(mode, this.config.logger);
     // The failed write under 'continue' reaches stderr whatever
-    // DEBUG_AUTH_LOG says (D12); the rest stays the gated diagnostics.
+    // DEBUG_AUTH_LOG says; the rest stays the gated diagnostics.
     const logger = brokerLogger(
       (line) => this.config.promptLogger.info(line),
       this.config.logger ?? SILENT,
@@ -372,12 +372,12 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       {
         serviceKeyStore: stores.serviceKeyStore,
         sessionStore: stores.sessionStore,
-        // D11: every token row renews this way; basic, snc and none ignore it.
+        // Every token row renews this way; basic, snc and none ignore it.
         renewal: () => renewal(),
-        // D12: the user's own --env file must see a write that did not land;
+        // The user's own --env file must see a write that did not land;
         // a named destination (in memory, or sessions/ under --unsafe) goes on.
         onWriteFailure: mode.kind === 'envFile' ? 'fail' : 'continue',
-        // D24: on from --auth-debug only, never from the environment.
+        // On from --auth-debug only, never from the environment.
         authDebug: this.config.authDebug === true,
         ...handler.brokerOptions(this.context),
       },

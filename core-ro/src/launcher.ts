@@ -1,12 +1,12 @@
 /**
- * `mcp-abap-adt-ro` — the read-only tool set over stdio (C23).
+ * `mcp-abap-adt-ro` — the read-only tool set over stdio.
  *
  * core's `main` with `fullReadOnlyToolSet`, and this command's name and
  * version. Nothing else: core's table, credentials, cancellation, failures and
  * shutdown.
  *
  * **Why a package of its own:** the binary fixes the tool set (the owner's
- * decision, C23), and a user installs only what they need. The high,
+ * decision), and a user installs only what they need. The high,
  * debugger, background-run and resume tools are `mcp-abap-adt`'s.
  */
 import {

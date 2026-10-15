@@ -295,7 +295,7 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    // The lookup is part of the connect (spec §5.7): its failure fails the
+    // The lookup is part of the connect: its failure fails the
     // call before any tool proceeds, in fixed words.
     expect(textOf(result)).toContain(SYSTEM_LOOKUP_FAILED_WORDS);
     expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);

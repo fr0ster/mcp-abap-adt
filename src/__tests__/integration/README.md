@@ -14,7 +14,7 @@ integration/
 └── helpers/     # configuration, sessions, shared objects, the testers
 ```
 
-There is no `low/` directory: the low set left the full binaries in 19.0.0 (D56), and its suites
+There is no `low/` directory: the low set left the full binaries in 19.0.0, and its suites
 and `LowTester` were removed with it. The single-step operations it served — lock, a write under
 the lock, unlock, check, validate, activate — are the compact binaries'. Their requests are tested
 against an ADT stand-in in `src/__tests__/unit/lowToCompact.test.ts` and

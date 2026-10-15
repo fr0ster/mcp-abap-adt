@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { spawnOptionsForNpx } from '../helpers/platform';
 
 /**
- * **The long tools on the approved list gain `timeout` (19.0.0, D56).** The
+ * **The long tools on the approved list gain `timeout` (19.0.0).** The
  * user approved them tool by tool (`tools/long-handlers.json`); each may
  * gain `timeout` and nothing else for it. `GetIncludesList` and
  * `GetStructuresList` already declared one (per request, in ms) — the name
@@ -81,7 +81,7 @@ describe('the MCP tool surface', () => {
 
   it('enumerates the whole surface, so the assertions below are not vacuous', () => {
     // A run that listed nothing would satisfy every comparison that follows.
-    // 19.0.0 (D56): the 112 low tools left the surface, and their rows the
+    // 19.0.0: the 112 low tools left the surface, and their rows the
     // fixture — 264 remain.
     expect(frozen.length).toBeGreaterThan(250);
     expect(current.length).toBe(frozen.length);

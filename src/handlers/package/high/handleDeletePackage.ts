@@ -95,7 +95,7 @@ export async function handleDeletePackage(
   // session and the one way around it; that choice belongs here, not inside
   // the strategy call. The connection opened here is closed here: over RFC it
   // is an ABAP session that would otherwise stay open. A fresh connection
-  // that cannot be had is the answer (D21): never a delete on the session the
+  // that cannot be had is the answer: never a delete on the session the
   // caller asked to avoid.
   let deleteConnection = connection;
   if (force_new_connection) {

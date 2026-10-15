@@ -1,5 +1,5 @@
 /**
- * The listed long tools (spec §5.8, D56): the approved list — reads only —,
+ * The listed long tools: the approved list — reads only —,
  * the `timeout` parameter every listed tool declares, and the advice its
  * description carries. A leaf module — no import of the server's — so every
  * handler's definition can read it; the call itself is `longCall.ts`.
@@ -88,7 +88,7 @@ export const TIMEOUT_NOT_FOR_RUN_WORDS =
 export const MAX_TIMEOUT_SECONDS = 2_147_483;
 
 /**
- * The advice every listed tool's description carries (spec §5.8): what the
+ * The advice every listed tool's description carries: what the
  * `timeout` does, and why to set it below the client's own limit.
  */
 export const LONG_TOOL_ADVICE =

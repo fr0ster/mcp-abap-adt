@@ -1,5 +1,5 @@
 /**
- * The server's own refusals (spec §7.3, D17): words decided by the server
+ * The server's own refusals: words decided by the server
  * before anything reaches a provider or a connection. They are not chain
  * failures — no `kind`, no `refusal` — and carry nothing read from a file, a
  * header or a server.
@@ -27,11 +27,11 @@ export type ServerRefusalCode =
   | 'system_type_required'
   | 'instance_closed';
 
-/** Inspection-only mode: stdio started without a destination (D17). */
+/** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
   'inspection-only mode: no connection parameters. To connect to an SAP system, use --mcp=<destination> or --env-path=<path>.';
 
-/** D20: an operation that needs a session of its own on a host's connection. */
+/** An operation that needs a session of its own on a host's connection. */
 export const FRESH_CONNECTION_UNAVAILABLE_WORDS =
   'This operation needs an ABAP session of its own; the connection was given by the host, which supplied no fresh-connection factory (`freshConnection`)';
 
@@ -39,7 +39,7 @@ export const FRESH_CONNECTION_UNAVAILABLE_WORDS =
 export const CREDENTIALS_REQUIRED_WORDS =
   "this server takes credentials only from the request's headers: send x-sap-url with x-sap-jwt-token, or with x-sap-login and x-sap-password";
 
-/** HTTP and SSE: a request carrying `x-mcp-destination` (D39), refused as `destination_refused`. */
+/** HTTP and SSE: a request carrying `x-mcp-destination`, refused as `destination_refused`. */
 export const DESTINATIONS_ONLY_STDIO_WORDS =
   'destinations are served only by mcp-abap-adt (stdio); send x-sap-* headers';
 

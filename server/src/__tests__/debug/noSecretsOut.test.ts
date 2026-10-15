@@ -1,5 +1,5 @@
 /**
- * D24 / §14.6: across a refused token request (a secret marker in the
+ * Across a refused token request (a secret marker in the
  * server's `error_description`) and a successful login, nothing a secret is
  * made of leaves the process by any way out — stderr, the logger, a tool
  * result, the callback listener's HTTP answers: no marker, client secret,

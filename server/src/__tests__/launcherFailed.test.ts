@@ -1,5 +1,5 @@
 /**
- * §9: the launcher's last line, when `main()` rejects, carries fixed words and
+ * The launcher's last line, when `main()` rejects, carries fixed words and
  * auth-errors' `logFields` of what the value classifies as — never its
  * message, stack or string form.
  */

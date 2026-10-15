@@ -1,13 +1,13 @@
 /**
  * `@mcp-abap-adt/lib/tool-set` — what a server serves, as an input of its
- * launcher (spec §3.4, §3.5, D37, D49).
+ * launcher.
  *
  * core's, http's and sse's `main({ toolSet, program, version })` take a
  * `ToolSet` and nothing else of the tools: everything a launcher does —
  * options, credentials, cancellation, failures, shutdown — is its transport's,
  * the same for any set.
  *
- * **The binary fixes the tool set** (C23, the owner's decision). There are
+ * **The binary fixes the tool set** (the owner's decision). There are
  * four sets, one per kind of binary, each served on stdio, Streamable HTTP
  * and SSE:
  *

@@ -1,5 +1,5 @@
 /**
- * RF8, the setup window (spec §6.4, D51): an SSE connection closes, or
+ * The setup window: an SSE connection closes, or
  * `server.connect` rejects, while it is still being set up — and a
  * host's stop arrives during setup. Each time the instance close runs once
  * (its state let go — main's failed-`connect` path did not), no session

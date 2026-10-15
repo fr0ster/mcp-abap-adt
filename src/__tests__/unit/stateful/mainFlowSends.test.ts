@@ -1,6 +1,6 @@
 /**
  * Every send on the instance's connection is inside its main flow; only work
- * on a connection of its own is outside it (spec §5.7).
+ * on a connection of its own is outside it.
  *
  * - A background run's caller and the debugger's request user are the
  *   connection's parameters, made with it: no lookup of their own.

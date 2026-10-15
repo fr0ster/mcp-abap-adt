@@ -132,14 +132,14 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
           const listed = isLongTool(toolName);
           const read = listed && isLongRead(toolName, args);
           if (listed && !read && readTimeout(args) !== undefined) {
-            // A listed tool's run mode takes no `timeout` (spec §5.8).
+            // A listed tool's run mode takes no `timeout`.
             return return_error(new Error(TIMEOUT_NOT_FOR_RUN_WORDS)) as {
               isError: true;
               content: { type: 'text'; text: string }[];
             };
           }
           if (read) {
-            // A listed long tool (spec §5.8): a read on a connection of its
+            // A listed long tool: a read on a connection of its
             // own, its `timeout` cutting the read.
             const timeoutSeconds = readTimeout(args);
             if (timeoutSeconds === null) {

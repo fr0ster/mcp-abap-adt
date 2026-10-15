@@ -21,7 +21,7 @@ export type YamlConfig = Record<string, unknown>;
 
 /**
  * `--conf` / `--config` as given on the command line, or undefined. Plain
- * code over the arguments (D26).
+ * code over the arguments.
  */
 export function parseConfigArg(
   argv: readonly string[] = process.argv,

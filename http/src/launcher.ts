@@ -1,5 +1,5 @@
 /**
- * `mcp-abap-adt-http` — the Streamable HTTP binary (D35, D39). Credentials
+ * `mcp-abap-adt-http` — the Streamable HTTP binary. Credentials
  * come only from each request's `x-sap-*` headers; no destination, no
  * broker, no store, no login. The tools are the `ToolSet` the command passes.
  */
@@ -30,7 +30,7 @@ import {
 import { StreamableHttpServer } from './StreamableHttpServer.js';
 
 /**
- * What a command passes http's launcher (spec §3.5, D37, D49): the tools it
+ * What a command passes http's launcher: the tools it
  * serves, and its own name and version — nothing else. Everything the
  * launcher does is http's, the same for any tool set:
  * `mcp-abap-adt-http` passes `fullToolSet`, `mcp-abap-adt-http-ro`

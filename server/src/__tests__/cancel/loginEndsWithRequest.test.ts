@@ -1,5 +1,5 @@
 /**
- * stdio's login ends with the session (spec §14.4.9): during a browser login
+ * stdio's login ends with the session: during a browser login
  * — auth-providers' real loopback strategy on port `0`, a fake browser that
  * does not answer — an MCP cancel aborts nothing (a tool call cannot be
  * cancelled): the login goes on, its port held. The session's end (the

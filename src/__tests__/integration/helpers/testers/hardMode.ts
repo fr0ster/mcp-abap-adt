@@ -72,7 +72,7 @@ export function getHardModeConfig(): HardModeConfig {
 /**
  * The launcher's arguments every launched server shares: the stores soft
  * mode reads, and the destination — the same file soft mode reads. The tools
- * are core's (readonly, high, debug): the binary fixes them (C23).
+ * are core's (readonly, high, debug): the binary fixes them.
  */
 function launcherArgs(hard: HardModeConfig): string[] {
   const cfg = loadTestConfig();
@@ -282,7 +282,7 @@ export function toolCandidates(
   _mode: 'high',
   handlerName: string,
 ): string[] {
-  // The full binaries serve no low set since 19.0.0 (D56): the candidates are
+  // The full binaries serve no low set since 19.0.0: the candidates are
   // the high tools only.
   const cap = step[0].toUpperCase() + step.slice(1);
   const high = `${cap}${entity}`;

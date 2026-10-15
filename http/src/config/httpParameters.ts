@@ -1,9 +1,9 @@
 /**
- * `mcp-abap-adt-http`'s parameter table (D38, spec §10.1): the Streamable HTTP
- * listener, beside lib's shared rows and the TLS rows (D50). No destination,
+ * `mcp-abap-adt-http`'s parameter table: the Streamable HTTP
+ * listener, beside lib's shared rows and the TLS rows. No destination,
  * login or SSE option is here; the CLI or YAML form of one — or any form of
  * `--transport`, which is gone — stops the start naming the binary that serves
- * it (D39). Their environment variables are not read.
+ * it. Their environment variables are not read.
  */
 
 import {
@@ -29,7 +29,7 @@ import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
 
 const HTTP = 'STREAMABLE HTTP';
 
-/** The Streamable HTTP rows: today's names (§10.1). */
+/** The Streamable HTTP rows: today's names. */
 export const HTTP_ROWS: readonly Parameter[] = [
   {
     key: 'host',
@@ -106,7 +106,7 @@ export const HTTP_ROWS: readonly Parameter[] = [
  * refuses — the set's removed `--exposition` among them, naming the http
  * binary its words asked for. `mcp-abap-adt-http-ro`, `mcp-abap-adt-compact-http`
  * and `mcp-abap-adt-compact-http-ro` are this table with their own set,
- * nothing else (spec §10.1, C23).
+ * nothing else.
  */
 export function httpParameters(
   toolSet: ToolSet,

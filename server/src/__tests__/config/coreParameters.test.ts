@@ -1,5 +1,5 @@
 /**
- * `mcp-abap-adt`'s own parameter table (D38, D39, spec §10.1, §14.1): its
+ * `mcp-abap-adt`'s own parameter table: its
  * help lists no HTTP or SSE option, every option of another binary and
  * `--transport` stop the start with their words, the shared rows are in it,
  * and its YAML template and validation come from it.
@@ -141,7 +141,7 @@ describe("core's help", () => {
   });
 });
 
-describe('--shutdown-timeout is a row of core (D33)', () => {
+describe('--shutdown-timeout is a row of core', () => {
   it('no default: absent unless given', () => {
     expect(readCoreConfig([], {}).shutdownTimeout).toBeUndefined();
   });
@@ -192,7 +192,7 @@ describe('--state-idle-minutes is a row of core', () => {
   });
 });
 
-// The binary fixes its tool set (C23): the flag and the YAML key are gone,
+// The binary fixes its tool set: the flag and the YAML key are gone,
 // each word answered with the binary of this transport that serves it.
 describe('--exposition is gone', () => {
   it('the flag stops the start, naming the binary its words ask for', () => {
@@ -219,7 +219,7 @@ describe('--exposition is gone', () => {
   });
 });
 
-describe('--transport, with any value, stops the start with the D39 sentence', () => {
+describe('--transport, with any value, stops the start with the sentence of the binary that serves it', () => {
   it.each([
     [['--transport=stdio'], {}],
     [['--transport=http'], {}],
@@ -240,7 +240,7 @@ describe('--transport, with any value, stops the start with the D39 sentence', (
   });
 });
 
-describe('every removed parameter stops core with its words (§10.1)', () => {
+describe('every removed parameter stops core with its words', () => {
   it.each([
     ['--sse-host=0.0.0.0', '--sse-host', SSE_WORDS],
     ['--sse-port=3001', '--sse-port', SSE_WORDS],

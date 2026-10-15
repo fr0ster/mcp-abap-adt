@@ -1,5 +1,5 @@
 /**
- * RF9 and the pool's eviction (spec §3.8, §6.4, §14.5, ruling 16): a tool on
+ * The pool's eviction: a tool on
  * a pooled instance (held state, `state_handle`) has its update held at the
  * stand-in when `SIGTERM` arrives — the instance's connections, its own and
  * its held state's, are logged off at once, the tool is not awaited, no

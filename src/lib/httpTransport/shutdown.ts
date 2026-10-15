@@ -1,6 +1,6 @@
 /**
  * The shutdown of an HTTP transport's program — http and sse, one sequence
- * (spec §3.7, §6.4, D50): installed by the launcher only, so an embedder's
+ *: installed by the launcher only, so an embedder's
  * process is never taken over.
  *
  * On the first `SIGTERM` / `SIGINT`: the process latch (in that tick — no

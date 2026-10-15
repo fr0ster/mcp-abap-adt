@@ -91,7 +91,7 @@ export async function runAndWait(
   const runner = testRunner(context, carrier);
   const started = await atStep('run', () =>
     runner.run(objectName.toUpperCase(), {
-      // A run SAP did not start is a failure (adt-clients MIGRATION-23 §3).
+      // A run SAP did not start is a failure (see adt-clients' migration guide to 23).
       analyse: analyseUnitTestStart,
     }),
   )();

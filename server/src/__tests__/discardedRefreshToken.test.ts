@@ -1,5 +1,5 @@
 /**
- * A discarded refresh token does not come back (spec §6.3, §14.5): the
+ * A discarded refresh token does not come back: the
  * token endpoint refuses a refresh `invalid_grant`, and the broker's
  * `refreshToken: ''` write could not land then (the file was not writable);
  * the process shuts down — its flush lands the pending write before the exit

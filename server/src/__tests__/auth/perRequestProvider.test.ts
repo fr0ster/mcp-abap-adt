@@ -1,5 +1,5 @@
 /**
- * D3 and §14.5's last bullet: every request asks the broker for the
+ * Every request asks the broker for the
  * destination's provider with its own signal — the server keeps no provider
  * cache — and the counted wrapper is memoised per inner provider; the
  * settings are read once per process, and a failed read is not kept.

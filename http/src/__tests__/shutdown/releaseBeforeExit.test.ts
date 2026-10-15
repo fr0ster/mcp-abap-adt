@@ -1,11 +1,11 @@
 /**
- * The process shutdown, http (spec §6.4, §14.5): on `SIGTERM` every
+ * The process shutdown, http: on `SIGTERM` every
  * connection the process owns is logged off at once and every running tool
  * interrupted — a tool whose update the stand-in holds is not awaited: its
  * session's logoff reaches the system while the update is still held, the
  * exit is `0`, and its `UNLOCK` never lands (the logoff released the lock).
  * Two concurrent tools on two per-request instances: both sessions logged
- * off at once. (The full and the compact tool set: the A7 parity suite.)
+ * off at once. (The full and the compact tool set: the parity suite.)
  */
 
 import {

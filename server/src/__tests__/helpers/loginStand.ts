@@ -420,7 +420,7 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
 
   let answered = 0;
   // One wrapper per provider the factory answers, so the server still sees
-  // the same credential object while the factory does (D13).
+  // the same credential object while the factory does.
   const held = new WeakMap<IAuthProvider, IAuthProvider>();
   const holding = (provider: IAuthProvider): IAuthProvider => {
     const hold = options.holdRefusedPrepare;

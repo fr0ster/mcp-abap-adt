@@ -784,7 +784,7 @@ describe('withResolvedSystemContext', () => {
     expect(String((refused as Error).message)).not.toContain('ICM down');
     expect(fn).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledTimes(1);
-    // Fixed words: a lookup's message may quote what the system answered (H4).
+    // Fixed words: a lookup's message may quote what the system answered.
     expect(String(warn.mock.calls[0][0])).not.toContain('ICM down');
     warn.mockRestore();
   });

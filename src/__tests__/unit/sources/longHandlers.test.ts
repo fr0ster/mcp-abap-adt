@@ -1,5 +1,5 @@
 /**
- * The approved list of long tools (spec §5.8, D56) is the one place a
+ * The approved list of long tools is the one place a
  * `timeout` comes from: `tools/long-handlers.json` names every tool the user
  * approved, tool by tool, with its handler and what it sends. Every tool on
  * it declares `timeout` and carries the advice in its description; no tool
@@ -76,12 +76,12 @@ function declaresTimeout(definition: ToolDefinition): boolean {
 const carriesAdvice = (definition: ToolDefinition) =>
   definition.description.includes(LONG_TOOL_ADVICE);
 
-describe('the approved list of long tools (D56)', () => {
+describe('the approved list of long tools', () => {
   const definitions = shippedDefinitions();
   const names = new Set(listed().map((l) => l.tool));
 
   it('sees every shipped tool, so the checks below are not vacuous', () => {
-    // 19.0.0 (D56): the low set's 112 tools left the surface.
+    // 19.0.0: the low set's 112 tools left the surface.
     expect(definitions.length).toBeGreaterThan(250);
   });
 

@@ -1,11 +1,11 @@
 /**
  * Errors of the authentication layer that lib keeps. They name fields and
- * vetted vocabulary only — never a value read from a file (H4). What a thrown
+ * vetted vocabulary only — never a value read from a file. What a thrown
  * value is, as an answer, is `failureOf`'s (`./failures`); the destination
  * layer's own errors live in core (`server/src/auth/destinationFailure.ts`).
  */
 
-/** Whether `text` is an identifier: a letter, `_` or `$`, then word characters. Plain code (D26). */
+/** Whether `text` is an identifier: a letter, `_` or `$`, then word characters. Plain code. */
 function isIdentifier(text: string): boolean {
   if (text.length === 0) return false;
   for (let i = 0; i < text.length; i += 1) {
@@ -20,7 +20,7 @@ function isIdentifier(text: string): boolean {
 
 /**
  * A thrown value's class, never its message: what a log line or an answer
- * may say about an error the server has no words for (H4). The class's name
+ * may say about an error the server has no words for. The class's name
  * is read from its constructor only when it is an identifier.
  */
 export function errorClassOf(error: unknown): string {

@@ -1,5 +1,5 @@
 /**
- * §10.2 row `brokerFactory.ts:217`: the shutdown's flush is
+ * The shutdown's flush is
  * `flush({ signal })`, and what was not stored is read with auth-errors'
  * `classify(entry, 'persisting-tokens')` — one line per destination,
  * `"<destination>": <reason>`, never the store's own words.

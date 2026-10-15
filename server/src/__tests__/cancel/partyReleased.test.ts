@@ -1,5 +1,5 @@
 /**
- * A finished request's party is released (D4, spec §5.1, §14.4.8): R1 logs
+ * A finished request's party is released: R1 logs
  * in and completes. Later, R2's request is refused by the system (`401`),
  * the refresh is refused, and the provider starts a login; then the session
  * ends (the client's transport closes; a cancel would abort nothing). No

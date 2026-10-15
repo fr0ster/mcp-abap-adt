@@ -6,7 +6,7 @@
  * it means to hand out, and they depend on lib. So lib cannot import them: the
  * group takes their ENTRY BUILDERS (`compactReadOnlyEntries`,
  * `compactModifyEntries`), and each compact package hands them in through
- * `compactToolSetOf` (`@mcp-abap-adt/lib/tool-set`, D49). One implementation
+ * `compactToolSetOf` (`@mcp-abap-adt/lib/tool-set`). One implementation
  * for the three compact binaries, none of which may take it from another.
  *
  * **It composes the entry builders, not group instances.** The launcher sets the

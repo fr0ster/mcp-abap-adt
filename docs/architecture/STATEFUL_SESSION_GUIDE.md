@@ -3,7 +3,7 @@
 This guide describes which ADT requests go in a **stateful** ABAP session, and
 which do not. It is about protocol behaviour, not about session files.
 
-## The window (D56)
+## The window
 
 **Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
 stateless.** Everything else — reads, searches, runs, where-used, checks — runs

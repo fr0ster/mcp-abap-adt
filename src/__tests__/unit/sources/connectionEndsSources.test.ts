@@ -1,5 +1,5 @@
 /**
- * D55's sweep, kept: every place the server creates a connection, takes
+ * The sweep, kept: every place the server creates a connection, takes
  * ownership of one, or retains connections has a listed end
  * (`tools/connection-ends.json`). The scan below finds the creation sites in
  * every package's `src` — calls of `createAbapConnection`, connection's
@@ -50,7 +50,7 @@ const CALLS = [
   'liveDebugPorts(',
   'liveAmdpPorts(',
 ];
-/** A consumer's `freshConnection`, called where it is taken (D22). */
+/** A consumer's `freshConnection`, called where it is taken. */
 const FRESH_FACTORY = 'await factory()';
 const COLLECTIONS = ['new Map<', 'new WeakMap<', 'new Set<', 'new WeakSet<'];
 
@@ -194,7 +194,7 @@ const LISTED = path.join(REPO, 'tools/connection-ends.json');
 const listed = (): ListedEnd[] =>
   JSON.parse(fs.readFileSync(LISTED, 'utf8')) as ListedEnd[];
 
-describe('every owned connection has a listed end (D55)', () => {
+describe('every owned connection has a listed end', () => {
   it("the scan's creation sites equal tools/connection-ends.json's", () => {
     const found = scanSites().map((s) => `${s.file} ${s.site}`);
     const named = listed()

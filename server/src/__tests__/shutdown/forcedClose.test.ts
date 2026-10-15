@@ -1,5 +1,5 @@
 /**
- * The forced close, core (spec §6.4, §14.5): the logoffs went out at the
+ * The forced close, core: the logoffs went out at the
  * start — a tool's update held at the stand-in for ever, interrupted, its
  * connections logged off — and the session writes are held; then a second
  * `SIGTERM` (and separately `--shutdown-timeout=1`): no further wait, every

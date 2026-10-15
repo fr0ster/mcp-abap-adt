@@ -1,6 +1,5 @@
 /**
- * Full and compact behave alike on every transport (D37, D49, spec §3.5,
- * §14.1): the tool set is the only input of a launcher that differs.
+ * Full and compact behave alike on every transport: the tool set is the only input of a launcher that differs.
  *
  * One parametrised suite runs the same scenario on stdio, Streamable HTTP and
  * SSE, each through two of the six `main`s — the full one as its bin calls
@@ -21,11 +20,11 @@
  * - and, with `debug` in the exposition (full: `readonly,debug`, compact:
  *   `ro,debug`), the debugger's tools on each.
  *
- * A8's cancellation case: a call cancelled after its connection is ready —
+ * The cancellation case: a call cancelled after its connection is ready —
  * while the system lookup an ABAP Cloud call makes first is held at the
  * stand-in — by an MCP cancel (sse) or a dropped request (http) reaches its
- * tool once the lookup is answered, the same on both sets. A10's
- * shutdown cases (D33, D55): a write whose update is held at the stand-in
+ * tool once the lookup is answered, the same on both sets. The
+ * shutdown cases: a write whose update is held at the stand-in
  * when the shutdown starts runs to its end — the `UNLOCK` lands, then the
  * session's logoff, exit `0` — and a call arriving after the latch reaches no
  * tool, the same on both sets. Every case runs
@@ -97,7 +96,7 @@ interface Launcher {
 }
 
 /**
- * The twelve launchers (C23): the full ones as their bins call them, the
+ * The twelve launchers: the full ones as their bins call them, the
  * others through their own packages.
  */
 const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
@@ -196,7 +195,7 @@ const LAUNCHERS: Record<TransportName, Record<SetName, Launcher>> = {
 /**
  * A read about one class on each set: the tool that sends it differs,
  * nothing else. Where-used, because both sets' tools for it are listed long
- * tools (spec §5.8) and so behave alike — each on a connection of its own;
+ * tools and so behave alike — each on a connection of its own;
  * compact's class read (`HandlerGet`) is listed and full's (`GetClass`) is
  * not, so those two no longer share a failure path.
  */
@@ -420,7 +419,7 @@ function outcomeOf(result: unknown): Record<string, unknown> {
   };
   if (!isError) return { ok: true };
   const text = content[0].text;
-  // A tool failure is JSON (§7.3); anything else is kept as it is, to be seen.
+  // A tool failure is JSON; anything else is kept as it is, to be seen.
   if (!text.startsWith('{')) return { ok: false, text };
   return { ok: false, ...(JSON.parse(text) as Record<string, unknown>) };
 }
@@ -428,7 +427,7 @@ function outcomeOf(result: unknown): Record<string, unknown> {
 /**
  * The `Authorization` headers the stand-in received since `from`. A logoff
  * presents the session, not the credential: compact's `HandlerGet` is a
- * listed long tool (spec §5.8) whose own connection is logged off after its
+ * listed long tool whose own connection is logged off after its
  * answer, and the full set's `GetClass` is not.
  */
 const seenSince = (from: number) => [
@@ -619,7 +618,7 @@ async function serveHttpLike(
   const started = await run(launcher, [...listen, '--system-type=onprem']);
   const basicClient = await clientWith(basicHeaders());
   const tools = await names(basicClient);
-  // http and sse write no runtime file (fix round 14): not while a request's
+  // http and sse write no runtime file: not while a request's
   // connection is held, not after.
   const runtime: Array<'absent' | string[]> = [];
   const basic = await callTwice(basicClient, set, () =>
@@ -650,7 +649,7 @@ async function serveHttpLike(
   };
   await Promise.all([clientA.close(), clientB.close()]);
 
-  // SSE: a POST is routed by its sessionId alone (ruling 14).
+  // SSE: a POST is routed by its sessionId alone.
   const sseOnly =
     transportName === 'sse' ? await ssePosts(endpoint, set) : undefined;
   const exit = await started.stop();
@@ -734,7 +733,7 @@ async function observe(transportName: TransportName, set: SetName) {
 
 /**
  * A `401` inside a handler is a failure on either set; which answer it gets
- * (§7.3's `authentication_failed`) is C6's, so only its being a failure is
+ * (the failure answer's `authentication_failed`) is pinned elsewhere, so only its being a failure is
  * pinned here — full and compact are compared whole above.
  */
 const USER_REFUSED = { ok: false };
@@ -830,11 +829,11 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       expect(full.observed.template.exits).toEqual([0]);
 
       // The tools: the object-oriented surface, and the compact facade —
-      // each binary's list is fixed by the binary (C23).
+      // each binary's list is fixed by the binary.
       expect(full.tools).toContain('GetClass');
       expect(full.tools).not.toContain('HandlerGet');
       expect(compact.tools).not.toContain('GetClass');
-      // The leftover-session tools are stdio's (fix round 14): every one on
+      // The leftover-session tools are stdio's: every one on
       // a write binary and the list and logoff on a -ro one there; none on
       // any http or sse binary, compact ones included.
       const onStdio = transportName === 'stdio';
@@ -960,7 +959,7 @@ const BINARIES_OF: Record<
 const GONE = 'is gone (19.0.0): the binary fixes its tool set, so remove it';
 
 /**
- * The binary fixes the tool set (C23): `--exposition` and the config file's
+ * The binary fixes the tool set: `--exposition` and the config file's
  * `exposition` stop each of the twelve binaries with the sentence of the
  * word, naming the binary of its own transport — through the binary, not
  * only the table.
@@ -1047,7 +1046,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
 );
 
 /**
- * A `-ro` binary keeps no background run (C23, the owner's decision): its run
+ * A `-ro` binary keeps no background run (the owner's decision): its run
  * tools (`RuntimeRunClass` is a system tool; running code changes no code)
  * offer no `background` — not in the schema a client lists, and not read:
  * a call carrying it anyway runs as any run, never refused. The write
@@ -1556,7 +1555,7 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
 }
 
 describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s: the shutdown, on both sets (D33)',
+  '%s: the shutdown, on both sets',
   (transportName) => {
     jest.setTimeout(60_000);
 

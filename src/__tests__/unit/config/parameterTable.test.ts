@@ -1,5 +1,5 @@
 /**
- * lib's parameter machinery (D38): a table read in its three forms, removed
+ * lib's parameter machinery: a table read in its three forms, removed
  * parameters refused in the form used, the template nested by dotted keys,
  * and the TLS pair.
  */

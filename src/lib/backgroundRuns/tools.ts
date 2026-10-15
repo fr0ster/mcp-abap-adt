@@ -33,7 +33,7 @@ export function isBackgroundTool(name: string): boolean {
 /**
  * A tool definition without the `background` parameter: the same name,
  * description and schema otherwise. The definition passed is not changed.
- * A read-only binary serves the run tools so (C23): it keeps no background
+ * A read-only binary serves the run tools so: it keeps no background
  * run, so the parameter does not exist there. A call carrying it anyway is
  * an ordinary run — the server's object schema drops a key it does not
  * declare before the wrapper reads anything (measured through the binary,

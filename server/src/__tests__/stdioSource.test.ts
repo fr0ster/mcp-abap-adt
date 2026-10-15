@@ -1,5 +1,5 @@
 /**
- * D13 (amended by D56) on stdio: the user is fixed for the process. The
+ * On stdio the user is fixed for the process. The
  * broker answers the same provider for the process's life — a renewed token
  * (refresh, or a new login when the refresh fails) is written back by that
  * provider — so the one instance keeps its connection while `getProvider`
@@ -114,7 +114,7 @@ afterEach(() => {
   else process.env.SAP_SYSTEM_TYPE = previousType;
 });
 
-describe("stdio: the connection is kept while getProvider answers the session's provider (D13, D56)", () => {
+describe("stdio: the connection is kept while getProvider answers the session's provider", () => {
   it('the same provider on every call: the same connection, no reopen', async () => {
     const session = provider();
     const getProvider = jest.fn(

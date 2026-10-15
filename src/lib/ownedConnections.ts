@@ -1,15 +1,15 @@
 /**
- * Every connection the server owns ends with a logoff (spec §6.4, D55): the
+ * Every connection the server owns ends with a logoff: the
  * connection-ends registry.
  *
  * A connection the server builds, or takes ownership of (a consumer's
- * `freshConnection` one once returned, D22), is recorded here at once, with
+ * `freshConnection` one once returned), is recorded here at once, with
  * the server instance it belongs to and its role. It ends through
  * `endConnection` alone: `disconnect()` — the logoff, which releases the
  * locks its SAP session holds — called **once** whoever asks (connection 16
  * rejects a second call), a second caller joining the first; a failure is
  * logged in fixed words and never thrown. On connection 16 `disconnect()`
- * resolves once the logoff is **written** to the socket, not answered (D56),
+ * resolves once the logoff is **written** to the socket, not answered,
  * so nothing here waits on SAP.
  *
  * Three ends read it:
@@ -61,7 +61,7 @@ export type ConnectionRole =
   | 'lock'
   /** Held state's own (the debugger's sessions). */
   | 'state'
-  /** A listed long tool's own, for one read (`runLongCall`, spec §5.8). */
+  /** A listed long tool's own, for one read (`runLongCall`). */
   | 'long'
   /**
    * A background run's own, until SAP answers (`startBackgroundRun`): owned
@@ -277,7 +277,7 @@ export function ownedConnections(
 }
 
 /**
- * **The terminal close** (spec §6.4, D51, D55): `disconnect()` of every
+ * **The terminal close**: `disconnect()` of every
  * connection `instance` owns — or only those of `roles` — each once; a
  * failure logged in fixed words. Never conditional on a state undo: the
  * instance close runs it with none, the pool and the idle bound after
@@ -301,7 +301,7 @@ export async function closeOwnedConnections(
 }
 
 /**
- * **The process's logoffs** (spec §6.4): the logoff of every connection the
+ * **The process's logoffs**: the logoff of every connection the
  * process owns, each `disconnect()` joined if one is already under way. It
  * awaits nothing that waits on a tool, a request, an instance close or a
  * state undo — only each logoff's write (connection 16). The process

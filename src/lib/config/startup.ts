@@ -46,14 +46,14 @@ export function readStartupConfig<T>(
 }
 
 /**
- * The process as a binary's `main` meets it (spec §3.5): the arguments, the
+ * The process as a binary's `main` meets it: the arguments, the
  * two output streams as lines, the exit, and where the shutdown listens. The
  * program passes `processEdges()`; a test passes its own.
  */
 export interface LauncherEdges extends StartupEdges {
   /** The arguments, without node's and the script's. */
   readonly argv: readonly string[];
-  /** `--version`'s one line: the only thing a launcher writes to stdout (H3). */
+  /** `--version`'s one line: the only thing a launcher writes to stdout. */
   readonly stdout: (line: string) => void;
   /** Where the shutdown listens: `process` in the program. */
   readonly processLike: EventEmitter & { stdin?: EventEmitter };

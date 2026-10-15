@@ -1,6 +1,6 @@
 /**
  * `@mcp-abap-adt/lib/http-transport` — what the Streamable HTTP and the SSE
- * transports share, so that neither imports the other's package (D50): DNS
+ * transports share, so that neither imports the other's package: DNS
  * rebinding protection, the TLS listener, and the header connection source
  * with its two `400` sentences.
  */

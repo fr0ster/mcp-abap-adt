@@ -2,7 +2,7 @@
  * A destination name becomes a file name in `keysDir` and `sessionsDir`.
  * One that is a path, hidden, empty or outside a small alphabet is refused
  * before any file is touched. The name is not quoted: it may be a path.
- * Plain code, no regular expression (D26).
+ * Plain code, no regular expression.
  */
 
 import { ServerRefusal } from './serverRefusal';

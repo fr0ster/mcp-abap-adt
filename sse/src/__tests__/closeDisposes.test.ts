@@ -1,5 +1,5 @@
 /**
- * An SSE close disposes its instance (spec §6.4, D51), beside main's
+ * An SSE close disposes its instance, beside main's
  * `sseDispose.test.ts`:
  *
  * - a connection with no tool in flight closes → the instance close ran once

@@ -1,5 +1,5 @@
 /**
- * RF6 (spec §6.4, D51): an SSE connection closes while a `POST` for it was
+ * An SSE connection closes while a `POST` for it was
  * already admitted and its body is still arriving. The late call reaches no
  * tool — no request of it reaches the stand-in — and is refused (the
  * session is already gone from the routing map: an unknown session); the

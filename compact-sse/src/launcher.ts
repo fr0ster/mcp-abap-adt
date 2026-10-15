@@ -1,5 +1,5 @@
 /**
- * `mcp-abap-adt-compact-sse` — the compact tool set over HTTP+SSE (D49).
+ * `mcp-abap-adt-compact-sse` — the compact tool set over HTTP+SSE.
  *
  * `@mcp-abap-adt/sse`'s `main` with `compactToolSet` — the two halves' entry
  * builders composed by lib's `compactToolSetOf` — and this command's name and

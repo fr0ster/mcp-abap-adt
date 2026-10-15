@@ -1,5 +1,5 @@
 /**
- * The HTTP-transport shutdown (spec §3.7, §6.4, D50): one sequence for http
+ * The HTTP-transport shutdown: one sequence for http
  * and sse — the latch and the transport's `begin` in the trigger's tick,
  * stop listening, then the logoffs at once: every connection the process
  * owns logged off and every running call interrupted, in one tick; no

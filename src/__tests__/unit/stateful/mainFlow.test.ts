@@ -10,7 +10,7 @@
  *   comes only after the first's `UNLOCK`;
  * - a background run answers while a call holds the flow; a run of the same
  *   tool that is not in the background waits;
- * - the crossing measured before the flow (F2): an `UNLOCK` whose credential
+ * - the crossing measured before the flow: an `UNLOCK` whose credential
  *   is still being asked (an `authorize` that awaits I/O) while another call's
  *   `LOCK` ends — it now goes out stateful, in the lock's context.
  * (A cancel sent to a queued call aborts nothing: `noCallCancel.test.ts`.)
@@ -191,7 +191,7 @@ describe('one main flow per instance', () => {
     }
   });
 
-  it('F2: an UNLOCK whose authorize awaits I/O while another call’s LOCK ends goes out stateful', async () => {
+  it('an UNLOCK whose authorize awaits I/O while another call’s LOCK ends goes out stateful', async () => {
     const gate: { armed: boolean; open: () => void; opened: Promise<void> } =
       (() => {
         let open!: () => void;

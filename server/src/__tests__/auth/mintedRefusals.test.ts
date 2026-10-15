@@ -1,5 +1,5 @@
 /**
- * D17: the server's refusals are minted or its own. Behind the closed gate a
+ * The server's refusals are minted or its own. Behind the closed gate a
  * provider call answers auth-errors' `interactive-login` `aborted`, never a
  * free-words refusal; inspection-only mode (stdio with no destination)
  * answers the server's own `inspection_only` refusal before any connection

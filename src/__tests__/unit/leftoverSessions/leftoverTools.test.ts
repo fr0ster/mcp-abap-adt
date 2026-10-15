@@ -1,5 +1,5 @@
 /**
- * The two leftover-session tools (session-resume spec): list and log off
+ * The two leftover-session tools: list and log off
  * the SAP sessions a killed process left, through an MCP client, against
  * the ADT stand-in. Each tool answers only for the caller's own sessions —
  * those of the destination the instance serves; another destination's file

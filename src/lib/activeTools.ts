@@ -1,6 +1,6 @@
 /**
  * The one process-wide registry of live tool calls, across every server
- * instance (spec §6.4, D33, D51, D55): each call is registered at the tool
+ * instance: each call is registered at the tool
  * wrapper's entry — before any connection is acquired or the handler runs —
  * with the server instance it runs in, and removed when the call ends.
  *
@@ -13,7 +13,7 @@
  * its close begins:
  *
  * - the process latch (`latch()`), set first by every launcher's shutdown;
- * - an instance's own latch (`latch(instance)`), set first by its close (D51).
+ * - an instance's own latch (`latch(instance)`), set first by its close.
  *
  * Once either is set, `registerActiveTool` refuses — the wrapper answers that
  * request with the shutdown refusal before any connection or handler — so

@@ -1,5 +1,5 @@
 /**
- * The second signal, sse (spec §6.4, §14.5): the shutdown waits for no
+ * The second signal, sse: the shutdown waits for no
  * tool, so with an `UNLOCK` held at the stand-in the first `SIGTERM` already
  * ends with the logoff written and exit `0`; a second signal after it, or a
  * `--shutdown-timeout=1`, changes nothing — one exit, one logoff. (The

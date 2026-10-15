@@ -1,5 +1,5 @@
 /**
- * The dependency rule (D38, spec §3.2, §14.1), separating the development
+ * The dependency rule, separating the development
  * install from the published runtime graph.
  *
  * The repository is not an npm workspace: CI installs with the root `npm ci`,
@@ -17,8 +17,8 @@
  *   and reaches them; compact reaches them only through core, declaring none;
  * - http reaches no sse and sse no http; neither reaches core;
  * - compact-http and compact-sse reach no core (nor compact), and each
- *   reaches exactly its own transport package (D49);
- * - the six read-only packages (C23) reach lib, their own transport's
+ *   reaches exactly its own transport package;
+ * - the six read-only packages reach lib, their own transport's
  *   package and — a compact one — the half that changes nothing, and never
  *   the modifying half or another transport;
  * - every package a file of a package imports is declared in that package's
@@ -93,7 +93,7 @@ const compactOver = (
 });
 
 /**
- * A read-only package (C23): lib and `transport` only — and, for a compact
+ * A read-only package: lib and `transport` only — and, for a compact
  * one, the half that changes nothing, never the modifying half — and no
  * other transport.
  */
@@ -176,7 +176,7 @@ const PACKAGES: Row[] = [
     '@mcp-abap-adt/sse',
     'forbidden',
   ),
-  // The six read-only packages (C23): each over its transport's launcher.
+  // The six read-only packages: each over its transport's launcher.
   readOnlyOver(
     '@mcp-abap-adt/core-ro',
     'core-ro',

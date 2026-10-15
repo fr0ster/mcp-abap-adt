@@ -1,9 +1,9 @@
 /**
- * The admission latch, stdio (spec §6.4, §14.5): a tool call read after
+ * The admission latch, stdio: a tool call read after
  * stdin's end gets the shutdown answer and nothing of it is sent — no
  * connection, no request — while the earlier tool, its `UNLOCK` held, is
  * interrupted and not awaited: the exit is `0`. (The full and the compact
- * tool set: the A7 parity suite.)
+ * tool set: the parity suite.)
  */
 
 import {

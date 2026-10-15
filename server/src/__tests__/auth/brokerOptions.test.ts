@@ -1,5 +1,5 @@
 /**
- * The broker options the server states (spec §4.1, §6.1 D11, §6.2 D12):
+ * The broker options the server states:
  * `renewal`, `onWriteFailure` by the destination's store, `authDebug` off,
  * and `authorization` only for a jwt / authorization_code destination.
  */
@@ -123,7 +123,7 @@ describe('authDebug and authorization', () => {
     ]);
   });
 
-  it('jwt / none: refused before any broker is built (D53)', async () => {
+  it('jwt / none: refused before any broker is built', async () => {
     const file = base.writeFile('conn.env', [
       'SAP_URL=https://system.example.test',
       'SAP_AUTH_TYPE=jwt',

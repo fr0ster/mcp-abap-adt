@@ -103,7 +103,7 @@ export interface SystemHandlersOptions {
   /**
    * Whether the run tools (`RuntimeRunClass`, `RuntimeRunProgram`) offer
    * `background`. Default: offered. A read-only binary serves them without
-   * it (C23): it keeps no background run, so the parameter does not exist
+   * it: it keeps no background run, so the parameter does not exist
    * there — not offered, not read, not refused.
    */
   background?: boolean;

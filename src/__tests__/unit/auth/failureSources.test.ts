@@ -1,8 +1,8 @@
 /**
- * Failures outside a handler (spec §14.2, the connect phase), each through a
+ * Failures outside a handler (the connect phase), each through a
  * real request: a provider's failure from a token endpoint stand-in, and
  * connection's `AuthRefusedError` from an ADT stand-in answering `401` twice.
- * The tool wrapper reads each first and answers the §7.3 JSON: `error`,
+ * The tool wrapper reads each first and answers the failure JSON: `error`,
  * `kind`, `message` and `hint` as auth-errors' `render` gives them, no
  * diagnostics; the stderr line is `logFields`.
  */

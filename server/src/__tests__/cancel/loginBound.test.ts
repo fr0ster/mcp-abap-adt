@@ -1,5 +1,5 @@
 /**
- * The login bound (D10, spec §5.6, §14.4.10): `--login-timeout=1` ends a
+ * The login bound: `--login-timeout=1` ends a
  * login with the chain's words and the server's sentence, and is not
  * retried; without it the login waits until the session ends it (a tool
  * call cannot be cancelled). A bounded login that completes leaves no timer
@@ -253,7 +253,7 @@ describe('serverLogin with a bound', () => {
   });
 });
 
-describe('the sentence names the bound as it was set (D10)', () => {
+describe('the sentence names the bound as it was set', () => {
   it.each([
     [
       '--login-timeout',

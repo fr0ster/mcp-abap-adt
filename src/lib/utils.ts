@@ -29,7 +29,7 @@ let overrideBuilt = false;
 let cachedConnection: IAbapConnection | undefined;
 
 /**
- * The end of a connection this module built (D55): its one `disconnect()` —
+ * The end of a connection this module built: its one `disconnect()` —
  * the logoff —, when it is replaced or dropped. One a caller handed in
  * (`setConnectionOverride`) is the caller's, never closed here.
  */
@@ -247,7 +247,7 @@ function isSpace(c: number): boolean {
 
 /**
  * The host after the first `ENOTFOUND` followed by whitespace, up to the
- * next whitespace; `undefined` without one. Plain code (D26).
+ * next whitespace; `undefined` without one. Plain code.
  */
 function hostAfterNotFound(text: string): string | undefined {
   const marker = 'ENOTFOUND';
@@ -286,7 +286,7 @@ function mcpErrorPrefixAt(text: string, at: number): number {
 
 /**
  * `text` without the SDK's leading `McpError: ` / `MCP error -<n>: `
- * prefixes, however many are stacked. Plain code (D26).
+ * prefixes, however many are stacked. Plain code.
  */
 function withoutMcpErrorPrefixes(text: string): string {
   let at = 0;
@@ -303,8 +303,8 @@ function withoutMcpErrorPrefixes(text: string): string {
 }
 
 export function return_error(error: any) {
-  // The failure reader first (§7.2): a chain failure or the server's own
-  // refusal is answered as §7.3 — never its message.
+  // The failure reader first: a chain failure or the server's own
+  // refusal is answered as the failure answer — never its message.
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
   // A method's error carried on a throw: answered as it is, with its step —
@@ -1200,7 +1200,7 @@ const PRESENT = 'set';
 /**
  * Format auth configuration for display at server startup
  * Shows connection details; a secret is shown by its presence only (`set`),
- * never by a character of it (D25)
+ * never by a character of it
  */
 export interface AuthDisplayConfig {
   envFile?: string;

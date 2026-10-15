@@ -22,7 +22,7 @@ describe('the debug set', () => {
     expect(names({ includeDebug: true })).toContain('DebugStartListener');
   });
 
-  // The binary fixes its set (C23): always in core, never in core-ro.
+  // The binary fixes its set: always in core, never in core-ro.
   describe('the binaries', () => {
     const groupsOf = (set: typeof fullToolSet) =>
       set

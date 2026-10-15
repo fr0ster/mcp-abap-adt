@@ -1,6 +1,6 @@
 /**
  * The sites where a started tool works on a fresh connection of its own
- * (spec §4.3, D20–D22, D56), through an embedder whose injected connection
+ *, through an embedder whose injected connection
  * names RFC and whose host gives a `freshConnection` factory:
  *
  * (a) `CreatePackage` (high) and compact's `HandlerCreate` PACKAGE over RFC,

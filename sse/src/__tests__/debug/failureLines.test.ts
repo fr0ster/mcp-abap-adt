@@ -1,5 +1,5 @@
 /**
- * D24 / §9: the lines SSE writes about a failed `POST` and a failed connect
+ * The lines SSE writes about a failed `POST` and a failed connect
  * hold fixed words and what the failure reader makes of the error — never
  * the error's `message`, which may quote a secret. Every line the process
  * writes (`console.error`, the server's logger) is scanned for the marker.

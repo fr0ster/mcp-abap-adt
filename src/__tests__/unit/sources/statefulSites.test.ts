@@ -1,5 +1,5 @@
 /**
- * The stateful sites (spec §5.7, D56): every place that turns a connection's
+ * The stateful sites: every place that turns a connection's
  * session type — the server's own in every package's `src`, and adt-clients'
  * in its installed `dist` — is a row of `tools/stateful-sites.json`, naming
  * the window it opens, where the connection returns to stateless, and whose
@@ -182,7 +182,7 @@ function rowsOf(whose: Row['whose']): string[] {
   return out.sort((a, b) => a.localeCompare(b));
 }
 
-describe('every stateful site is listed with its window (D56)', () => {
+describe('every stateful site is listed with its window', () => {
   it("the server's sites equal tools/stateful-sites.json's", () => {
     expect(scan(REPO, PACKAGES, '.ts')).toEqual(rowsOf('server'));
   });

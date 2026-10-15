@@ -1,5 +1,5 @@
 /**
- * What the MCP client sees of a failure (spec §7.3): the JSON answer, row by
+ * What the MCP client sees of a failure: the JSON answer, row by
  * row, and what never reaches it. The stderr line is `logFields`.
  */
 
@@ -60,7 +60,7 @@ const URI_WITH_STATE =
   'https://idp.example.test/callback?state=STATE-SECRET-1&code=CODE-SECRET-2';
 const URI_PLAIN = 'https://idp.example.test/other-callback';
 
-describe('the §7.3 answer, row by row', () => {
+describe('the failure answer, row by row', () => {
   it('a chain failure: authentication_failed, its kind, reason and hint', () => {
     const error = authError['credential-refused']({ credential: 'token' });
     const payload = payloadOf(read(new AuthProviderFailure(error)));
@@ -180,7 +180,7 @@ describe('the stderr line', () => {
   });
 });
 
-describe('the answer sites read the failure first (§7.2)', () => {
+describe('the answer sites read the failure first', () => {
   const error = authError['credential-refused']({ credential: 'token' });
   const expected = {
     error: 'authentication_failed',
@@ -213,7 +213,7 @@ describe('the answer sites read the failure first (§7.2)', () => {
     expect(written).toEqual([LINE]);
   });
 
-  it("return_answer: an IAdtError carrying a refusal (P6), not failurePayload's message", () => {
+  it("return_answer: an IAdtError carrying a refusal, not failurePayload's message", () => {
     const failed = {
       ok: false,
       getResult: () => {

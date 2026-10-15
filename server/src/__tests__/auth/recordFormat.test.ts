@@ -1,9 +1,9 @@
 /**
- * D54: only the chain's own session format. auth-stores 5 refuses a session
+ * Only the chain's own session format. auth-stores 5 refuses a session
  * record that is not of its store's format — `StorageError`, `reason:
  * 'record-format'` — and the broker passes it on unchanged. core answers it
- * in its own fixed words with the destination it serves (spec §7.3): the start
- * stops (D18), and a tool call answers `destination_refused` — never a new
+ * in its own fixed words with the destination it serves: the start
+ * stops, and a tool call answers `destination_refused` — never a new
  * login, never "no session", never the store's message or a value of the
  * record. The file is left byte for byte.
  *
@@ -253,7 +253,7 @@ describe.each(MODES)('a record not of the store’s format ($mode)', (mode) => {
           return true;
         });
       try {
-        // The start (D18).
+        // The start.
         const run = await start(mode.argv(file));
         expect(run.exits).toEqual([1]);
         expect(run.started).toBe(0);
@@ -302,7 +302,7 @@ describe.each(MODES)('a record not of the store’s format ($mode)', (mode) => {
   });
 });
 
-it('the hint, verbatim (spec §7.3)', () => {
+it('the hint, verbatim', () => {
   expect(RECORD_FORMAT_HINT).toBe(
     'regenerate the session with mcp-auth: `mcp-auth --destination <name> --type abap|xsuaa`, or `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (from @mcp-abap-adt/auth-broker-cli)',
   );

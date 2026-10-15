@@ -1,10 +1,10 @@
 /**
- * The program's shutdown, stdio (spec §6.4, D33). Installed by the launcher
+ * The program's shutdown, stdio. Installed by the launcher
  * only — the program, not the library — so an embedder's process is never
  * taken over.
  *
  * The first trigger — `SIGTERM`, `SIGINT`, stdin's `end` or `close` (one
- * start: the client closed the transport, M7) — starts one sequence, in
+ * start: the client closed the transport) — starts one sequence, in
  * this order:
  *
  * 1. the registry's latch, in the trigger's tick: a call read from here on
@@ -34,7 +34,7 @@
  * connection's logoff written; exit `1` naming what was pending.
  *
  * Nothing is written to stdout (H3), and no line carries an error's message:
- * fixed words, a destination and auth-errors' reason only (H4).
+ * fixed words, a destination and auth-errors' reason only.
  */
 
 import { errorClassOf } from '@mcp-abap-adt/lib/auth';

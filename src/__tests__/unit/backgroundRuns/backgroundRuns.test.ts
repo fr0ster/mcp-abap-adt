@@ -1,5 +1,5 @@
 /**
- * Background runs of the code-running tools (spec 2026-10-13): a run tool
+ * Background runs of the code-running tools: a run tool
  * called with `background: true` answers at once with a handle; the run goes
  * on to SAP's answer on a connection of its own, which is logged off only
  * after that answer; the answer is read, listed and discarded by its caller

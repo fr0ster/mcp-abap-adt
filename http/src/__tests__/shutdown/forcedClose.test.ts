@@ -1,5 +1,5 @@
 /**
- * Tools that never settle, http (spec §6.4, §14.5): a tool on a pooled
+ * Tools that never settle, http: a tool on a pooled
  * instance (held state with a connection of its own) and one on a
  * per-request instance, each with its update held for ever. On `SIGTERM`
  * (with or without `--shutdown-timeout=1`) no second signal is needed: every

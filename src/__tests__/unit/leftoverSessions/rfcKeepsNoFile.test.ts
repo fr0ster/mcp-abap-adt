@@ -1,5 +1,5 @@
 /**
- * RFC connections keep no runtime file (session-resume spec): an RFC
+ * RFC connections keep no runtime file: an RFC
  * session is its conversation and cannot be picked up by another process.
  * The connection here answers a session cookie whatever its wire, so only
  * the settings' `connectionType` decides: `http` writes a file, `rfc` none.

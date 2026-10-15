@@ -1,5 +1,5 @@
 /**
- * `mcp-abap-adt-http`'s own parameter table (D38, D39, spec §10.1, §14.1):
+ * `mcp-abap-adt-http`'s own parameter table:
  * its help lists no destination or SSE option, every option of another
  * binary and `--transport` stop the start with their words, the shared rows
  * are in it, and its YAML template and validation come from it.
@@ -141,7 +141,7 @@ describe("http's help", () => {
   });
 });
 
-describe('--shutdown-timeout is a row of http (D33)', () => {
+describe('--shutdown-timeout is a row of http', () => {
   it('no default: absent unless given', () => {
     expect(readHttpConfig([], {}).shutdownTimeout).toBeUndefined();
   });
@@ -285,7 +285,7 @@ describe('the Streamable HTTP rows', () => {
   });
 });
 
-// The binary fixes its tool set (C23): the flag and the YAML key are gone,
+// The binary fixes its tool set: the flag and the YAML key are gone,
 // each word answered with the binary of this transport that serves it.
 describe('--exposition is gone', () => {
   it('the flag stops the start, naming the binary its words ask for', () => {
@@ -312,7 +312,7 @@ describe('--exposition is gone', () => {
   });
 });
 
-describe('--transport, with any value, stops the start with the D39 sentence', () => {
+describe('--transport, with any value, stops the start with the sentence of the binary that serves it', () => {
   it.each([
     [['--transport=http'], {}],
     [['--transport=streamable-http'], {}],
@@ -333,7 +333,7 @@ describe('--transport, with any value, stops the start with the D39 sentence', (
   });
 });
 
-describe('every removed parameter stops http with its words (§10.1)', () => {
+describe('every removed parameter stops http with its words', () => {
   it.each([
     ['--mcp=TRIAL', '--mcp', DESTINATION_WORDS],
     ['--env=trial', '--env', DESTINATION_WORDS],

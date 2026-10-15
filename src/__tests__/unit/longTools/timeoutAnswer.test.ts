@@ -1,5 +1,5 @@
 /**
- * A listed long tool's `timeout` cuts its read (spec §5.8, §14.9), one case
+ * A listed long tool's `timeout` cuts its read, one case
  * per tool on the approved list, against the ADT stand-in:
  *
  * - with `timeout` and the tool's first request held at the stand-in, the

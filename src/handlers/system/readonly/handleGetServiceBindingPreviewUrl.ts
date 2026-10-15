@@ -232,7 +232,7 @@ export async function handleGetServiceBindingPreviewUrl(
                   `${bindingName}`,
                 method: 'GET',
                 // None of the server's (`0`): a deadline closes the socket
-                // under a running request, which kills it in SAP (spec §5.8);
+                // under a running request, which kills it in SAP;
                 // HandlerGet's `timeout` ends only its wait.
                 timeout: 0,
                 params: {

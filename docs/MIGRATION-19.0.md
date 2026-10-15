@@ -660,7 +660,7 @@ What changed in the public surface:
 
 **`mcp-abap-adt`, `mcp-abap-adt-http` and `mcp-abap-adt-sse` serve no low set.**
 `--exposition=…,low` — alone or beside any other word, in the CLI or the YAML form — stops the start
-(as every `--exposition` does, see above), with D56's sentence:
+(as every `--exposition` does, see above), with this sentence:
 
 > the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)
 
@@ -1286,7 +1286,7 @@ build argument `VARIANT` (the package's name without its scope), installing that
   calls `getConnection` itself calls `connectionReleased` once for it. On an instance with no
   connection source set, nothing is taken or asked: the callback runs in its turn. `sessionUtils`' `makeAdtRequestWithSession` / `makeAdtRequestStateless` (not
   exported) are gone too.
-- **`IAuthBrokerFactoryConfig.loginTimeoutStated?`** names the bound in D10's sentence (the
+- **`IAuthBrokerFactoryConfig.loginTimeoutStated?`** names the bound in the login-bound sentence (the
   launcher passes the form the user set, `` `--login-timeout=300` ``); absent, the sentence names
   `` `loginTimeoutMs: <ms>` ``, never a value the CLI would refuse.
 - **`IDestinations.getProvider(destination, { signal })`** takes the request's signal.
@@ -1374,7 +1374,7 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `@mcp-abap-adt/lib/auth`: structural (no `instanceof`, no `message`, no `name`), total, it answers
   a `ReadFailure` (`error`, `kind?`, `message`, `hint?`, …) for a chain failure
   (`AuthProviderFailure`, connection's `AuthRefusedError`) or a `ServerRefusal`, else `undefined`.
-  `answerFailure(read)` renders the §7.3 JSON, `failureLogLine(where, read)` the stderr line,
+  `answerFailure(read)` renders the failure JSON, `failureLogLine(where, read)` the stderr line,
   `answerRead(read)` both; `readGuarded(reader, thrown)` answers auth-errors' fixed `unknown`
   words when a reader you do not own throws. The
   destination layer's reader, `DestinationConfigError` first, is core's `destinationFailureOf(thrown,

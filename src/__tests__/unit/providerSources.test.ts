@@ -3,13 +3,12 @@
  * three sources — a destination (`getProvider`), the request headers
  * (`credentialFromHeaders`), or a caller's `SapConfig`
  * (`credentialFromSapConfig`) — and nothing else in the server builds one.
- * A `ConnectionSource`'s answer (`(await source.resolve(signal)).credential`,
- * spec §4) counts as a source because each source's own `credential`
+ * A `ConnectionSource`'s answer (`(await source.resolve(signal)).credential`) counts as a source because each source's own `credential`
  * binding is checked here like every other: core's `destinationSource`
  * (`getProvider`), lib's `headerSource` (`credentialFromHeaders`). A fresh
  * sibling (`openFreshConnection`) holds the credential of the factory's
  * record of the connection it is opened from — never one built from that
- * connection's configuration (D20).
+ * connection's configuration.
  *
  * Read from the source tree with the TypeScript parser: every call of
  * `createAbapConnection` outside `connectionFactory.ts` is checked for where
@@ -267,7 +266,7 @@ function judge(
   if (isSource(expr, resolvedAnswers(file))) return undefined;
 
   // A sibling of a connection the factory built: that connection's own
-  // credential, from the factory's record — and nothing else (D20: no
+  // credential, from the factory's record — and nothing else (no
   // fallback to a source read from the connection's configuration).
   if (
     ts.isPropertyAccessExpression(expr) &&

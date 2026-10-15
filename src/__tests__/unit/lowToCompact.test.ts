@@ -1,5 +1,5 @@
 /**
- * The low set left the full binaries in 19.0.0 (D56); compact is its analogue.
+ * The low set left the full binaries in 19.0.0; compact is its analogue.
  * `tools/low-to-compact.json` holds, for every tool the low set registered,
  * the compact call that replaces it and the ADT requests the low tool sent
  * for that call (`low_requests`, captured from the low handler before it was

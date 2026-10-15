@@ -1,12 +1,12 @@
 /**
- * The connect is a send on the instance's connection (D56, spec §5.3): the
+ * The connect is a send on the instance's connection: the
  * sole caller of stdio's shared `connect()` is sent a cancel while the
  * connect is held — which aborts nothing (a tool call cannot be cancelled):
  * the connect completes, the call's tool runs on it, nothing is logged off,
  * and the next call uses it without a new connect. The session's end while
  * the connect is held: the shutdown sends no logoff before the connect's
  * request was answered. The connection is closed only by the instance's
- * terminal close (spec §6.4).
+ * terminal close.
  *
  * The hold is the ADT stand-in's, on the connect's own session request: the
  * connect's requests carry no signal (connection 16 takes none), so the

@@ -1,5 +1,5 @@
 /**
- * The embeddable entry's surface of A10 (the owner's decision, M-4): of the
+ * The embeddable entry's surface (the owner's decision): of the
  * shutdown machinery it exports only what an embedder needs to close its own
  * instance — `closeInstance` and the `ClosableInstance` it takes — beside
  * `activeTools()`. The process's latch, settlement, the connection-ends

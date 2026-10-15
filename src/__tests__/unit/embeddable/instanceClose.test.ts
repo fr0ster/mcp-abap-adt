@@ -1,5 +1,5 @@
 /**
- * The instance close (spec §6.4, D51) — the client closed its connection
+ * The instance close — the client closed its connection
  * (an SSE stream, an embedder's own close): in the tick it begins, the
  * instance latch, the logoff of every connection the instance owns and the
  * interruption of every call of the instance; nothing waits for a running

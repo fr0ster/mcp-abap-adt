@@ -1,5 +1,5 @@
 /**
- * What compact gained when the low set left the full binaries (C14), beyond
+ * What compact gained when the low set left the full binaries, beyond
  * the request parity of `lowToCompact.test.ts`: the refusals that keep the new
  * arguments honest, and the function-group read-back.
  */

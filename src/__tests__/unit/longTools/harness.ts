@@ -1,5 +1,5 @@
 /**
- * The stand the listed long tools' suites run on (spec §5.8, §14.9): an
+ * The stand the listed long tools' suites run on: an
  * embedded server on a connection the server's factory built (so a fresh one
  * can be opened from it), connected to the ADT stand-in, offering ONE listed
  * tool — taken from the group that registers it in the shipped binaries —
@@ -145,7 +145,7 @@ export interface CallAnswer {
 
 /**
  * The stand for `tool`. `injected: 'bare'` serves a connection the host
- * injected with no fresh-connection factory (§4.3): a listed tool is refused.
+ * injected with no fresh-connection factory: a listed tool is refused.
  */
 export async function longStand(
   tool: string,

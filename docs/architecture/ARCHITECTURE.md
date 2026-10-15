@@ -161,7 +161,7 @@ The server calls `getProvider(destination)` and hands the provider to the connec
 | **Runtime role** | Built by the broker for a destination; the connector calls its four methods |
 | **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios`, `express`, `open` |
 
-core (stdio) supports three authentications, each served by one handler (`server/src/auth/handlers/`); `jwt` / `none` is refused (D53) — a token you hold is http's and sse's `x-sap-jwt-token` header (`TokenAuthProvider.fixed`):
+core (stdio) supports three authentications, each served by one handler (`server/src/auth/handlers/`); `jwt` / `none` is refused — a token you hold is http's and sse's `x-sap-jwt-token` header (`TokenAuthProvider.fixed`):
 
 | Authentication | `SAP_AUTH_TYPE` / `SAP_GRANT_TYPE` | Provider |
 |:---|:---|:---|
@@ -267,7 +267,7 @@ The dependency rule is a test (`src/__tests__/unit/packages/dependencyRule.test.
 lib, http and sse declare and reach no broker, stores or `interfaces-auth-broker`; http and sse
 never reach each other.
 
-#### The stateful window and the main flow (D56)
+#### The stateful window and the main flow
 
 **Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
 stateless.** Both requests are marked by adt-clients (31.1), not by the server: the
@@ -371,7 +371,7 @@ injected connection has them made by its first call (`systemBeforeTool`), inside
 
 `server/src/launcher.ts` (core), `http/src/launcher.ts` and `sse/src/launcher.ts` wire each
 binary. Each `main({ toolSet, program, version })` takes the tools as a `ToolSet`
-(`@mcp-abap-adt/lib/tool-set`) and nothing else of them, and the binary fixes it (C23): the full
+(`@mcp-abap-adt/lib/tool-set`) and nothing else of them, and the binary fixes it: the full
 bins pass `fullToolSet`, the read-only packages (`core-ro/`, `http-ro/`, `sse-ro/`)
 `fullReadOnlyToolSet`, the compact packages (`compact/`, `compact-http/`, `compact-sse/`)
 `compactToolSetOf` with the two halves' entry builders, and the read-only compact ones
@@ -387,7 +387,7 @@ main({ toolSet, program, version })
   │                                                   //   System, Search, the list and logoff; compact:
   │                                                   //   both halves, debug verbs, background runs, ...
   ├── a background-run store only if toolSet.backgroundRuns
-  ├── core only: AuthBrokerFactory                    // the destination, the startup check (D18)
+  ├── core only: AuthBrokerFactory                    // the destination, the startup check
   └── StdioServer | StreamableHttpServer | SseServer
 ```
 
@@ -404,7 +404,7 @@ Handlers are organized into groups by access level:
 
 Counts drift as tools are added; see [AVAILABLE_TOOLS.md](../user-guide/AVAILABLE_TOOLS.md) for the authoritative, up-to-date list.
 
-The binary installed decides which groups are active (C23): a `-ro` binary for read-only
+The binary installed decides which groups are active: a `-ro` binary for read-only
 deployments, a write binary for full access.
 
 **Handler registration flow:**
@@ -640,7 +640,7 @@ An embedder that has its own connection passes it as an injected source (`Embedd
 
 ### 5.3 Custom Configuration Handling
 
-Each binary reads its own parameter table (D38) through lib's machinery (`src/lib/config/authParameters.ts`):
+Each binary reads its own parameter table through lib's machinery (`src/lib/config/authParameters.ts`):
 `CORE_PARAMETERS` (`server/src/config/coreParameters.ts`: the destination, browser and login rows),
 `HTTP_PARAMETERS` (`http/src/config/httpParameters.ts`) and `SSE_PARAMETERS`
 (`sse/src/config/sseParameters.ts`), each beside lib's shared rows (`--conf`,

@@ -109,7 +109,7 @@ type SessionEntry = {
 };
 
 /**
- * The SSE server (D48): a `GET` opens a connection and builds one
+ * The SSE server: a `GET` opens a connection and builds one
  * `BaseMcpServer` for it, whose source is that `GET`'s `x-sap-*` headers
  * (lib's `headerSource`) — one per connection, shared with no other and
  * outliving none. A `POST` is routed by its `sessionId` alone: its own
@@ -128,9 +128,9 @@ export class SseServer {
   private readonly sessions = new Map<string, SessionEntry>();
   /**
    * Every connection from its `GET` until its close settled — being set up,
-   * open, or closing — with its one cleanup (the instance close, D51): a
+   * open, or closing — with its one cleanup (the instance close): a
    * shutdown runs it for the open ones and joins the ones already closing
-   * (RF7, RF8). A close that settled before the shutdown is only logged.
+   * A close that settled before the shutdown is only logged.
    */
   private readonly connections = new Map<
     BaseMcpServer,
@@ -399,8 +399,7 @@ export class SseServer {
     // process-global cache (#110).
     const requestContext = requestContextFromHeaders(req.headers);
 
-    // The close tracking comes first, before the first setup await (D51,
-    // RF8): the response's close, the stream's failure and a rejected
+    // The close tracking comes first, before the first setup await: the response's close, the stream's failure and a rejected
     // connect all reach this one cleanup — the instance close, once.
     let cleanup: Promise<void> | undefined;
     const close = (): Promise<void> => {
@@ -439,7 +438,7 @@ export class SseServer {
   }
 
   /**
-   * One connection's cleanup (D51) — the client closed its stream, as a
+   * One connection's cleanup — the client closed its stream, as a
    * stdio client closes stdin: the session leaves the routing map first
    * (main's: a later `POST` for it is an unknown session), then the instance
    * close — the instance latch, its connections logged off at once and its
@@ -510,7 +509,7 @@ export class SseServer {
         );
       }
     } catch (error) {
-      // Fixed words and what the reader makes of it — never its message (§9).
+      // Fixed words and what the reader makes of it — never its message.
       console.error(
         `[SSE POST] FAILED for session ${sessionId}: ${this.failureWords(error)}`,
       );
@@ -522,7 +521,7 @@ export class SseServer {
 
   /**
    * What a log line says of a thrown value: `logFields` of the failure the
-   * reader knows, else its class only — a message may quote a file (H4).
+   * reader knows, else its class only — a message may quote a file.
    */
   private failureWords(error: unknown): string {
     const answer = requestFailureAnswer(error);

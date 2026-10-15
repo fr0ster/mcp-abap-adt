@@ -95,7 +95,7 @@ same way.
    debugger }`, where `connection` comes from `getConnection(signal)`.
 3. **The request signal scope.** The handler runs inside `runWithRequestSignal(signal, …)`;
    `currentRequestSignal()` reads it — for the server's own waits only: a tool's sends carry no
-   request signal (D55), and nothing sent to SAP carries it. A call whose signal aborted
+   request signal, and nothing sent to SAP carries it. A call whose signal aborted
    before its tool starts never reaches the tool. The
    responsible person and master system are resolved first: what the system names
    (`systeminformation`, on ABAP Cloud and on-premise), over anything configured; the destination's
@@ -114,7 +114,7 @@ named by its handle (`stateHandle`). Held state ends after `stateIdleMinutes` wi
 (default 30). It also ends through its own stop tool, `dispose()` / `shutdownState()`, or the
 system. `idle()` resolves when every tool call of the instance has settled.
 
-### How an instance ends (D51, D55)
+### How an instance ends
 
 Of this machinery the embeddable entry exports `closeInstance` (with `ClosableInstance`) and
 `activeTools()`; the latch, the settlement, the shutdown sentence and the shutdown sequence are
@@ -178,7 +178,7 @@ process (`SIGKILL`, out of memory) cannot log off: SAP's idle timeout ends its s
 unless a later stdio process of the same destination starts on it, or the user logs them off
 (below).
 
-**One main flow per instance** (D56): the registered tool wrapper runs the calls that work on
+**One main flow per instance**: the registered tool wrapper runs the calls that work on
 the instance's connection one after another (`enterMainFlow`), whatever the client sends at once;
 a background run, a listed long read and the debugger tools that work on the debugger's own
 connections (`ownConnectionTools.ts`: every `Debug*`, `AmdpDebug*`, `HandlerDebug*` tool) take no
@@ -236,9 +236,9 @@ checks its connection again (`isStaleBuilt`): when the call ahead found the sess
 the spent connection back (`connectionReleased`) and takes the replacement (`getConnection`)
 before its tool runs, so only the call that met the loss fails; it is not replayed.
 
-**A connection is replaced only when SAP lost its session** (D56), or when a new credential
+**A connection is replaced only when SAP lost its session**, or when a new credential
 arrives where the credential is the request's (http, sse); stdio's source answers the same
-provider for the process's life (D13): `getConnection` builds a new instance for the next call, and the replaced one is logged
+provider for the process's life: `getConnection` builds a new instance for the next call, and the replaced one is logged
 off once no call works on it any more — each call's use is counted when `getConnection` hands the
 connection out, before any await, and ends with `connectionReleased(connection)` — called
 **exactly once per `getConnection`** (the tool wrapper calls it; a subclass that calls
@@ -346,7 +346,7 @@ their answers are kept is the host's: a strategy.
   one answers `background_runs_unavailable` to `background: true` (checked before any connection)
   and to the three tools.
 - **The run** (`startBackgroundRun`, `src/lib/backgroundRuns/run.ts`), from the tool wrapper:
-  refused at once without a fresh connection to be had (`freshConnectionAvailable`; D20's words);
+  refused at once without a fresh connection to be had (`freshConnectionAvailable`; its fixed words);
   the caller resolved (`backgroundCaller`: the user its destination's parameters name — made with
   the connection, no lookup of its own —, else the stated responsible, else the login
   — `SAP_USERNAME`, `x-sap-login`; an injected connection's URL from `getBaseUrl()`; none at all →
@@ -497,7 +497,7 @@ configuration.
   The registry is a `WeakMap`, so a connection the host drops is not kept. The latest injection of
   a connection object decides: a second `EmbeddableMcpServer` given the same object without
   `freshConnection` clears the earlier factory.
-- **Ownership passes to the server** (D22). Once the factory returns a connection, the server
+- **Ownership passes to the server**. Once the factory returns a connection, the server
   treats it exactly like one it built:
   - it calls `connect()` on it, and if that fails it closes it and answers the failure. The same
     holds for a fresh connection the server builds from its record;
@@ -510,7 +510,7 @@ configuration.
   to its end, and nothing in the chain takes a signal (connection 16). A package lock's connection
   and a debug session's connection outlive the request that opened them.
 - **`DeletePackage` no longer falls back** to the caller's connection when no fresh connection can
-  be had (D21). The refusal is the answer, never a delete on the session the caller asked to avoid.
+  be had. The refusal is the answer, never a delete on the session the caller asked to avoid.
 
 ## Tools: handlers, groups and tool sets
 
@@ -540,7 +540,7 @@ export async function handleCreatePackage(context: HandlerContext, args: CreateP
   `ReadOnlyHandlersGroup`, `HighLevelHandlersGroup`, `SystemHandlersGroup`,
   `SearchHandlersGroup` and `DebugHandlersGroup` (`LowLevelHandlersGroup` is gone since 19.0.0).
 - **Tool sets.** A binary's tools are its `ToolSet` (`@mcp-abap-adt/lib/tool-set`), fixed by the
-  binary (C23; there is no `--exposition`): its groups, the TOOLS section of its help, its removed
+  binary (there is no `--exposition`): its groups, the TOOLS section of its help, its removed
   `--exposition` and whether it serves background runs. `fullToolSet` covers readonly, high, debug,
   search, background runs and, on stdio, the leftover sessions; `fullReadOnlyToolSet` readonly,
   search and, on stdio, the leftover-session list and logoff; `compactToolSetOf({ readOnly, modify })`

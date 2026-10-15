@@ -1,5 +1,5 @@
 /**
- * The stateful window (spec §5.7, §14.9, D56): a tool's session is stateful
+ * The stateful window: a tool's session is stateful
  * only for the lock and the unlock — and nothing else of a tool's goes
  * stateful. Against the stand-in, which records each request's
  * `x-sap-adt-sessiontype` and `Cookie`, on one shared connection:

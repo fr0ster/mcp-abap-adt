@@ -42,7 +42,7 @@ list and logoff, on stdio); compact-ro 18 / 16 (16, + the leftover-session list 
    - Transport operations
 
 3. **low** - gone from `mcp-abap-adt`, `-http` and `-sse` in 19.0.0. `--exposition=…,low`
-   stops the start, as every `--exposition` does, with D56's sentence: *"the low set is gone from mcp-abap-adt / -http / -sse; use
+   stops the start, as every `--exposition` does, with this sentence: *"the low set is gone from mcp-abap-adt / -http / -sse; use
    mcp-abap-adt-compact (or -compact-http / -compact-sse)"*. Its single-step operations —
    lock, a write under the lock you hold, unlock, check, validate, activate, the node and
    object structure reads — are compact's: see [MIGRATION-19.0](../MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries)
@@ -170,7 +170,7 @@ what the word asked for (here as stdio names them; `-http` / `-sse` name their o
 | `ro` | `…; the compact tools that change nothing are served by` `` `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) `` |
 | `rw` | `…; all compact tools are served by` `` `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) `` |
 | `compact` | `…; the compact tools are served by` `` `mcp-abap-adt-compact` (…) ``, `those that change nothing by` `` `mcp-abap-adt-compact-ro` (…) `` |
-| `low` (core family) | `the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)` (D56, verbatim) |
+| `low` (core family) | `the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)` (verbatim) |
 | `low` (compact family) | `…; the low set is gone from mcp-abap-adt / -http / -sse, and this binary serves its analogue, the compact tools` |
 | anything else, or none | `…;` `` `mcp-abap-adt` (…) `` `serves readonly, high and debug,` `` `mcp-abap-adt-ro` (…) `` `the readonly tools alone` (compact: the compact pair) |
 

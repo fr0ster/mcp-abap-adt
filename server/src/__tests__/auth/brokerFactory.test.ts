@@ -331,7 +331,7 @@ describe('AuthBrokerFactory', () => {
       expect(await config.sessionStore.loadSession('dest')).toBeNull();
     });
 
-    it('3. jwt / none (D53): a token you hold is refused at the handler table, with the hint where it went', async () => {
+    it('3. jwt / none: a token you hold is refused at the handler table, with the hint where it went', async () => {
       const file = path.join(root, 'conn.env');
       fs.writeFileSync(
         file,
@@ -603,7 +603,7 @@ describe('AuthBrokerFactory', () => {
   });
 
   describe('getProvider', () => {
-    it('a named jwt / none destination: refused as unsupported, with the hint where it went, no token in the words (D53)', async () => {
+    it('a named jwt / none destination: refused as unsupported, with the hint where it went, no token in the words', async () => {
       writeSession('dest', [
         `SAP_URL=${SYSTEM_URL}`,
         'SAP_AUTH_TYPE=jwt',
@@ -693,7 +693,7 @@ describe('AuthBrokerFactory', () => {
       expect(other.flush).toHaveBeenCalledTimes(1);
     });
 
-    it('has no deadline: a held call keeps settle() waiting until it answers (D33)', async () => {
+    it('has no deadline: a held call keeps settle() waiting until it answers', async () => {
       jest.useFakeTimers();
       try {
         basic('dest');

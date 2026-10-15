@@ -76,7 +76,7 @@ afterEach(() => {
 });
 
 describe('the table', () => {
-  it('has the destination rows, then the system type it shares (§10.1)', () => {
+  it('has the destination rows, then the system type it shares', () => {
     expect(AUTH_PARAMETERS.map((p) => p.cli)).toEqual([
       '--mcp',
       '--env',

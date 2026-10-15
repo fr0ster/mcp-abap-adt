@@ -1,12 +1,12 @@
 /**
- * The admission latch, http (spec §6.4, §14.5): one tool's update held at
+ * The admission latch, http: one tool's update held at
  * the stand-in; a `POST` accepted before `SIGTERM` whose body is still
  * arriving completes after it — no request of it reaches the stand-in (no
  * mutation, no connection acquired), it is answered with the shutdown
  * refusal (the pool's `503`, in the latch's tick); the earlier tool is
  * interrupted and not awaited — its connection is logged off at once, exit
  * `0`, and its `UNLOCK` never lands. (The full and the compact tool set: the
- * A7 parity suite.)
+ * parity suite.)
  */
 
 import {

@@ -132,7 +132,7 @@ const rows = Object.entries(groups).flatMap(([group, instance]) =>
 
 console.log(JSON.stringify(rows, null, 2));
 
-// What each kind of binary lists (C23: the binary fixes the tool set; there
+// What each kind of binary lists (the binary fixes the tool set; there
 // is no exposition). The four sets of `@mcp-abap-adt/lib/tool-set`, each tool
 // with the group that registers it, in registration order. Collected and
 // dumped as JSON to stderr at the end (stdout carries only the rows JSON

@@ -1,5 +1,5 @@
 /**
- * D26: no regular expression over untrusted input in the touched files —
+ * No regular expression over untrusted input in the touched files —
  * `errorClassOf` (errors.ts), `return_error` (utils.ts), the destination name
  * (destinationName.ts) and the parameter parsers (authParameters.ts, the
  * config file reader, and each binary's table) are
@@ -65,7 +65,7 @@ function regexesIn(root: ts.Node, source: ts.SourceFile): string[] {
   return found;
 }
 
-describe('no regular expression over input in the touched files (D26)', () => {
+describe('no regular expression over input in the touched files', () => {
   it.each(SCANNED.map(([file, fns]) => [file, fns] as const))(
     '%s',
     (file, functions) => {

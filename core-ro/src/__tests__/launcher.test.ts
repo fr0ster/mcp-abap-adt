@@ -1,6 +1,6 @@
 /**
  * `mcp-abap-adt-ro`: the read-only tool set over stdio (core's launcher), and
- * this package's own name and version — nothing else (C23): the readonly tools (with system and search) and the leftover-session list and logoff.
+ * this package's own name and version — nothing else: the readonly tools (with system and search) and the leftover-session list and logoff.
  * The behaviour beside the write binary is
  * `src/__tests__/parity/toolSetParity.test.ts`'s.
  */

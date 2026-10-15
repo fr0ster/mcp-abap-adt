@@ -1,5 +1,5 @@
 /**
- * The runtime files (session-resume spec): one per owned HTTP connection
+ * The runtime files: one per owned HTTP connection
  * holding a session — the instance's own (`built`) and each debugger
  * connection — in a `0700` directory, `0600` each (POSIX; on Windows Node's
  * `chmod` sets only the read-only flag, so the directory's ACL applies and

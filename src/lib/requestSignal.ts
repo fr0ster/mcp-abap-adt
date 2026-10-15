@@ -1,21 +1,21 @@
 /**
- * The request signal scope (spec §5.2): the signal of the MCP request a tool
+ * The request signal scope: the signal of the MCP request a tool
  * call serves, readable anywhere inside that call.
  *
  * Its own `AsyncLocalStorage` — not the system-context request scope
  * (`requestContext.ts`), which stdio does not enter and whose presence
  * changes what `getStatedSystemContext` answers. The tool wrapper runs
  * the handler inside `runWithRequestSignal(signal, …)`. It is for the
- * server's own waits (D32) and D5's check only: a tool's sends carry no
+ * server's own waits and its abort check only: a tool's sends carry no
  * request signal — nothing sent to SAP carries it, and no `freshConnection`
- * factory receives it (D55, D56). Nothing reads it to abort a request on
+ * factory receives it. Nothing reads it to abort a request on
  * the wire: a client's close and the process shutdown end a running tool by
  * the logoff of its connections, sent at once (`closeInstance`,
  * `logOffAtOnce`), and abort this signal beside it, so its waits end.
  *
  * Also here: what a request whose signal aborted ends with, and the race a
  * server's own wait that sends nothing runs against the request's signal
- * (D32). The signal aborts at the end of the call's session, at the
+ *. The signal aborts at the end of the call's session, at the
  * instance close and at the process shutdown — never at a client's cancel:
  * a tool call cannot be cancelled (`BaseMcpServer`).
  */
@@ -37,7 +37,7 @@ export function currentRequestSignal(): AbortSignal | undefined {
 /**
  * What a request whose signal aborted (its session ended) ends with: the
  * server's own error, in fixed words.
- * It carries nothing else — no code, no reason, no cause. (D56: there is no
+ * It carries nothing else — no code, no reason, no cause. (There is no
  * `request_aborted` answer; connection 16 has no aborted-request code.)
  */
 export class RequestAbortedError extends Error {
@@ -47,13 +47,13 @@ export class RequestAbortedError extends Error {
   }
 }
 
-/** Throws `RequestAbortedError` when `signal` has aborted (D5). */
+/** Throws `RequestAbortedError` when `signal` has aborted. */
 export function throwIfRequestAborted(signal: AbortSignal): void {
   if (signal.aborted) throw new RequestAbortedError();
 }
 
 /**
- * `work`, raced against `signal` (D32): the caller settles with
+ * `work`, raced against `signal`: the caller settles with
  * `RequestAbortedError` the moment its signal aborts, while the work itself
  * runs on for whoever else waits for it. A rejection of the work that comes
  * after the caller left is handled here, never left unhandled.

@@ -1,5 +1,5 @@
 /**
- * The forced close, core (spec §6.4): a `SIGTERM` / `SIGINT` after the start
+ * The forced close, core: a `SIGTERM` / `SIGINT` after the start
  * — while the session writes are held — exits at once naming what was
  * pending; `--shutdown-timeout=1` ends a held flush the same way. Exit
  * codes, and one stderr line per fact.

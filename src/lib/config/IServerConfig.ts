@@ -1,9 +1,9 @@
 /**
  * What every binary's configuration holds: the values of lib's shared rows
  * (`--system-type`, `--conf`, `--state-idle-minutes`). The tools are not
- * among them: the binary fixes its tool set (C23).
+ * among them: the binary fixes its tool set.
  *
- * The transport, HTTP, SSE and destination fields are not here (D38): each
+ * The transport, HTTP, SSE and destination fields are not here: each
  * belongs to the package that reads it — core's `CoreConfig` (the
  * destination, the browser, the login), http's `HttpConfig` (the Streamable
  * HTTP listener), sse's `SseConfig` (the SSE listener).
@@ -22,7 +22,7 @@ export interface TlsConfig {
 /**
  * The object-oriented handler sets an embedder may combine
  * (`registryForExposition`, `expositionGroups`). The binaries take no set: each
- * fixes its own (C23). `compact` is not served by these groups: the facade is
+ * fixes its own. `compact` is not served by these groups: the facade is
  * the compact binaries'.
  */
 export type HandlerSet = 'readonly' | 'high' | 'compact' | 'debug';

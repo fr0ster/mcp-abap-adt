@@ -1,5 +1,5 @@
 /**
- * A crash outside a tool, http (spec §6.4): `uncaughtException` and
+ * A crash outside a tool, http: `uncaughtException` and
  * `unhandledRejection` run the forced close — the stand-in receives the
  * logoff of the held instance's connections, one fixed-words line, exit `1`.
  * (A crash during a running shutdown: core's suite and lib's sequence — the

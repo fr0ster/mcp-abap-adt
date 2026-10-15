@@ -43,7 +43,7 @@ function required(
 
 /**
  * The credential a caller's `SapConfig` describes: `basic`, `jwt`, `saml`,
- * `certificate`. Nothing is guessed (D19): any other `authType` is refused
+ * `certificate`. Nothing is guessed: any other `authType` is refused
  * naming the field — `snc` is served through a destination of mcp-abap-adt
  * (stdio), `kerberos` has no provider — and so is a missing user, password,
  * token or cookies. A refusal names the field, never a value.

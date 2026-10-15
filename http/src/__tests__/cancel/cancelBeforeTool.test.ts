@@ -2,7 +2,7 @@
  * A cancel before the tool, http: a client's dropped request ends no admitted
  * call, wherever it waits — here in its connection's credential, before its
  * tool started. R1 and R2 are two requests, each building its connection from
- * its own headers (D39); each connect waits in the credential: in
+ * its own headers; each connect waits in the credential: in
  * `rejected()` (the system refused the logon with `401`, the renewal is held)
  * and, separately, in `authorize()` (the credential for the logon is held).
  * R1 is dropped while both wait: once the credential answers, R1's tool runs

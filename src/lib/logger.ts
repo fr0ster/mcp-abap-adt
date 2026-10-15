@@ -85,7 +85,7 @@ function safeStringify(obj: any): string {
 function createLogFn(level: string) {
   return (message: string, data?: any) => {
     // Never log in stdio mode (MCP protocol requires clean JSON only)
-    // `--transport` is gone (D39): only the explicit `--stdio` mark is left.
+    // `--transport` is gone: only the explicit `--stdio` mark is left.
     const isStdio = process.argv.includes('--stdio');
     if (isStdio) {
       return; // Suppress all logging in stdio mode
@@ -206,7 +206,7 @@ export const logger = {
   // Special handler for TLS config
   tlsConfig: (rejectUnauthorized: boolean) => {
     // Never log in stdio mode
-    // `--transport` is gone (D39): only the explicit `--stdio` mark is left.
+    // `--transport` is gone: only the explicit `--stdio` mark is left.
     const isStdio = process.argv.includes('--stdio');
     if (isStdio) {
       return; // Suppress all logging in stdio mode
@@ -235,7 +235,7 @@ export const logger = {
     data?: any,
   ) => {
     // Never log in stdio mode
-    // `--transport` is gone (D39): only the explicit `--stdio` mark is left.
+    // `--transport` is gone: only the explicit `--stdio` mark is left.
     const isStdio = process.argv.includes('--stdio');
     if (isStdio) {
       return; // Suppress all logging in stdio mode
@@ -262,7 +262,7 @@ export const logger = {
 function createHandlerLogFn(level: string) {
   return (handlerName: string, step: string, message: string, data?: any) => {
     // Never log in stdio mode
-    // `--transport` is gone (D39): only the explicit `--stdio` mark is left.
+    // `--transport` is gone: only the explicit `--stdio` mark is left.
     const isStdio = process.argv.includes('--stdio');
     if (isStdio) {
       return; // Suppress all logging in stdio mode
@@ -318,7 +318,7 @@ export const handlerLogger = {
 function createConnectionManagerLogFn(level: string) {
   return (message: string, data?: any) => {
     // Never log in stdio mode
-    // `--transport` is gone (D39): only the explicit `--stdio` mark is left.
+    // `--transport` is gone: only the explicit `--stdio` mark is left.
     const isStdio = process.argv.includes('--stdio');
     if (isStdio) {
       return; // Suppress all logging in stdio mode

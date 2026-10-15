@@ -1,5 +1,5 @@
 /**
- * `serverLogin` (spec §5.5, D8): the request goes on with its signal and the
+ * `serverLogin`: the request goes on with its signal and the
  * prompt logger, `dispose()` is forwarded, the wrapper is recorded for the
  * factory's disposal at shutdown — and, on a real loopback strategy, the
  * login settles only after its listener is closed, so the callback port is

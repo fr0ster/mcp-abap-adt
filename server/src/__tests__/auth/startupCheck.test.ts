@@ -1,5 +1,5 @@
 /**
- * D18: the start reads the destination's settings and builds its provider —
+ * The start reads the destination's settings and builds its provider —
  * `getProvider(destination, { signal: startup })` — so a destination the
  * broker refuses stops the start before any transport; the startup signal is
  * aborted once the check ends, so nothing of the check outlives it. Building
@@ -126,9 +126,9 @@ describe('the startup check', () => {
     expect(signals[0].aborted).toBe(true);
   });
 
-  describe('a platform with no browser (§8): only a destination that logs in is refused', () => {
+  describe('a platform with no browser: only a destination that logs in is refused', () => {
     // basic stands for every destination that never logs in (jwt / none is
-    // not served over stdio, D53).
+    // not served over stdio).
     it('basic starts on freebsd with the default --browser', async () => {
       const file = base.writeFile('conn.env', basicLines());
       const { exits, stderr } = await run([`--env-path=${file}`], 'freebsd');

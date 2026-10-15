@@ -1,5 +1,5 @@
 /**
- * The program's shutdown, stdio (spec §6.4, D33): every trigger — a signal,
+ * The program's shutdown, stdio: every trigger — a signal,
  * or stdin's end (the client closed the transport) — runs one sequence: the
  * latch, the logoffs at once with every running tool interrupted (none
  * awaited), the MCP server's close, then the factory's settle (gate,

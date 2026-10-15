@@ -1,14 +1,14 @@
 /**
- * The destination layer's failures, as the client's answer (spec §7.1, §7.3).
+ * The destination layer's failures, as the client's answer.
  *
  * core reads first what only core knows — a `DestinationConfigError`
  * (auth-broker's `isDestinationConfigError`, structural): its destination,
  * the fields it names and the error it carries; then a session record the
  * store refused as not of its format (auth-stores 5's `StorageError`,
- * `reason: 'record-format'`, read by its own `code` and `reason`, D54) —
+ * `reason: 'record-format'`, read by its own `code` and `reason`) —
  * then lib's `failureOf`.
  * Built from field names, vetted vocabulary and auth-errors' words only,
- * never a message or a stored value (H4).
+ * never a message or a stored value.
  */
 
 import { isDestinationConfigError } from '@mcp-abap-adt/auth-broker';
@@ -37,15 +37,14 @@ export class DestinationRefusal extends ServerRefusal {
 }
 
 /**
- * Where a token you hold went (D53, spec §7.3): the hint of a `jwt` / `none`
+ * Where a token you hold went: the hint of a `jwt` / `none`
  * destination's refusal.
  */
 export const JWT_NONE_HINT =
   'a token you hold is sent in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the session with mcp-auth';
 
 /**
- * The hint of a session record the store refused as not of its format (D54,
- * spec §7.3).
+ * The hint of a session record the store refused as not of its format.
  */
 export const RECORD_FORMAT_HINT =
   'regenerate the session with mcp-auth: `mcp-auth --destination <name> --type abap|xsuaa`, or `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (from @mcp-abap-adt/auth-broker-cli)';
@@ -102,7 +101,7 @@ export interface DestinationFailureOptions {
   readonly destination?: string;
   /** The platform a browser login found no browser on (default `process.platform`). */
   readonly platform?: string;
-  /** The server's own sentence beside a chain failure (§7.4). */
+  /** The server's own sentence beside a chain failure. */
   readonly sentenceFor?: (error: IAuthProviderError) => string | undefined;
 }
 
@@ -152,7 +151,7 @@ function destinationConfigFailure(
 }
 
 /**
- * A session record the store refused as not of its format (D54): the
+ * A session record the store refused as not of its format: the
  * server's own fixed words with the destination it serves — never the
  * store's message, never a value of the record. Read by structure: an own
  * `code` `STORAGE_ERROR` and an own `reason` `'record-format'`.
@@ -215,7 +214,7 @@ export function destinationFailureOf(
 /**
  * The words a failure is reported in on stderr at the start: the answer's
  * message, then its hint and the server's sentence, each on its own line;
- * else the destination and the error's class — never its message (H4).
+ * else the destination and the error's class — never its message.
  */
 export function destinationFailureWords(
   thrown: unknown,

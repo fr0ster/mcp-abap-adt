@@ -1,5 +1,5 @@
 /**
- * The client closes its SSE stream (owner's ruling: SSE closes as stdio
+ * The client closes its SSE stream (SSE closes as stdio
  * does): the logoff of every connection the instance owns — its connector,
  * held state's, a long read's own — is written at once, while a tool's
  * request is still held at the stand-in; a call queued behind it never

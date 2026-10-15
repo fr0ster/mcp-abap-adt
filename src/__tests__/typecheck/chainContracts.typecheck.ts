@@ -1,5 +1,5 @@
 /**
- * The removal chain's contracts, checked by the compiler (spec §3.3, D56):
+ * The removal chain's contracts, checked by the compiler:
  * `npm run test:check` compiles this file, and each `@ts-expect-error` below
  * fails the check the moment its field exists again. interfaces-adt-connection
  * 3.0.0 has no `IAbapRequestOptions.signal`; interfaces-adt 16.0.0 has no

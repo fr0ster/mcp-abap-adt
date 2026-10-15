@@ -29,7 +29,7 @@ done
 # responsible-rules depend on lib, and core, http and sse depend on both;
 # compact depends on core, compact-http on
 # http and compact-sse on sse. core, http and sse do not depend on one another.
-# The six read-only packages (C23) come last: core-ro and compact-ro depend on
+# The six read-only packages come last: core-ro and compact-ro depend on
 # core, http-ro and compact-http-ro on http, sse-ro and compact-sse-ro on sse,
 # and the compact ones on compact-readonly-entries.
 PACKAGES=(

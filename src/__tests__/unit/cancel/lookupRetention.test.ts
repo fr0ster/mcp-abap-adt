@@ -1,5 +1,5 @@
 /**
- * RF5: the system parameters are kept per resolver and connection, and the
+ * The system parameters are kept per resolver and connection, and the
  * keeping must not hold a connection. An HTTP server makes a connection and
  * a credential for every request; 200 of them, one after the other, go
  * through the path that keeps the parameters (`withResolvedSystemContext`,

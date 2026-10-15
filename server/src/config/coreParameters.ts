@@ -1,9 +1,9 @@
 /**
- * `mcp-abap-adt`'s parameter table (D38, spec §10.1): the destination, the
+ * `mcp-abap-adt`'s parameter table: the destination, the
  * browser and the login, beside lib's shared rows. Nothing of the HTTP or SSE
  * binaries is here; the CLI or YAML form of one of their options — or any
  * form of `--transport`, which is gone — stops the start naming the binary
- * that serves it (D39). Their environment variables are not read.
+ * that serves it. Their environment variables are not read.
  */
 
 import {
@@ -126,7 +126,7 @@ export const CORE_ROWS: readonly Parameter[] = [
 /** The longest login bound: a day. */
 export const MAX_LOGIN_TIMEOUT_SECONDS = 86_400;
 
-/** Whether `text` is one or more ASCII digits. Plain code (D26). */
+/** Whether `text` is one or more ASCII digits. Plain code. */
 function isDigits(text: string): boolean {
   if (text.length === 0) return false;
   for (let i = 0; i < text.length; i += 1) {
@@ -161,7 +161,7 @@ export function parseLoginTimeout(raw: unknown, name: string): number {
 }
 
 /**
- * `--login-timeout` / `MCP_LOGIN_TIMEOUT` / `login-timeout` (D10): the bound
+ * `--login-timeout` / `MCP_LOGIN_TIMEOUT` / `login-timeout`: the bound
  * on each login, opt-in. No default: without it a login ends on its result,
  * the user's refusal or its request's end.
  */
@@ -178,7 +178,7 @@ export const LOGIN_TIMEOUT_ROW: Parameter = {
 };
 
 /**
- * `--auth-debug` / `auth-debug` (D24): the token providers' debug line names
+ * `--auth-debug` / `auth-debug`: the token providers' debug line names
  * a refused request's secrets by their first and last four characters. The
  * command line and the configuration file only — no environment variable
  * turns it on.
@@ -193,7 +193,7 @@ export const AUTH_DEBUG_ROW: Parameter = {
 };
 
 /**
- * The login bound as the user set it, for D10's sentence: the form it came
+ * The login bound as the user set it, for the login-bound sentence: the form it came
  * from (`parameterSource`) with its value — `` `--login-timeout=300` ``,
  * `` `MCP_LOGIN_TIMEOUT=300` ``, or `` `login-timeout: 300` in the
  * configuration file ``.
@@ -230,7 +230,7 @@ const AUTH_BROKER_REMOVED = {
  * refuses — the set's removed `--exposition` among them, naming the stdio
  * binary its words asked for. `mcp-abap-adt-ro`, `mcp-abap-adt-compact` and
  * `mcp-abap-adt-compact-ro` are this table with their own set, nothing else
- * (spec §10.1, C23).
+ *.
  */
 export function coreParameters(
   toolSet: ToolSet,
@@ -296,14 +296,14 @@ export interface CoreConfig extends IServerConfig {
   renewal?: 'refresh-then-login' | 'refresh-only';
   /** Port for the login's callback (`--browser-auth-port`) */
   browserAuthPort?: number;
-  /** `--login-timeout` in seconds (D10): the bound on each login; absent: none. */
+  /** `--login-timeout` in seconds: the bound on each login; absent: none. */
   loginTimeout?: number;
   /**
    * The form `loginTimeout` came from: `--login-timeout`,
    * `MCP_LOGIN_TIMEOUT`, or `login-timeout (config file)`.
    */
   loginTimeoutSource?: string;
-  /** `--auth-debug` (D24): the providers' debug lines on stderr, secrets in their prepared form. */
+  /** `--auth-debug`: the providers' debug lines on stderr, secrets in their prepared form. */
   authDebug?: boolean;
   /** SAP connection type: http (default) or rfc */
   connectionType?: 'http' | 'rfc';

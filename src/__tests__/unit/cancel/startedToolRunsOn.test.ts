@@ -1,5 +1,5 @@
 /**
- * A started tool runs to its end (D56): a tool call cannot be cancelled. A
+ * A started tool runs to its end: a tool call cannot be cancelled. A
  * client's MCP cancel sent while the tool's first request is on the wire
  * aborts nothing — the handler runs once, every request of the tool is sent,
  * and its answer is produced (nobody reads it).

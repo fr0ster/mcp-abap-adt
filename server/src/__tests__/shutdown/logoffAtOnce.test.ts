@@ -1,5 +1,5 @@
 /**
- * stdio, the client's close and the process shutdown (spec §6.4): on stdin's
+ * stdio, the client's close and the process shutdown: on stdin's
  * `end` (the client closed the transport) and on `SIGTERM`, the logoff of
  * every connection the instance owns — its connector, held state's, a long
  * read's own — is written at once, while a tool's request is still held at

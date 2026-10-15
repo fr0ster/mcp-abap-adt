@@ -1,5 +1,5 @@
 /**
- * A session lost while calls wait in the main flow (C15 round 6): a queued
+ * A session lost while calls wait in the main flow: a queued
  * call took its connection before it waited, so the call ahead can spend it
  * under it. After the flow is entered the connection is checked again; a
  * spent one is given back and the replacement taken, before the tool runs.

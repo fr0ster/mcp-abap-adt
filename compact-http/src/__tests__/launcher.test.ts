@@ -1,6 +1,6 @@
 /**
  * `mcp-abap-adt-compact-http`: the compact tool set over Streamable HTTP (http's launcher), and this package's own name and
- * version — nothing else (D49). The behaviour beside the full binary is
+ * version — nothing else. The behaviour beside the full binary is
  * `src/__tests__/parity/toolSetParity.test.ts`'s.
  */
 

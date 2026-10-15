@@ -1,6 +1,5 @@
 /**
- * A fresh connection on a host's connection comes from the host (spec §4.3,
- * D20–D22, §14.3).
+ * A fresh connection on a host's connection comes from the host.
  *
  * `CreatePackage` (high, and compact's `HandlerCreate` PACKAGE) and compact's
  * `HandlerLock` PACKAGE over RFC, and compact's `HandlerDelete` PACKAGE with
@@ -8,7 +7,7 @@
  * set's package tools left the full binaries; compact took their cases). On an injected connection — here one whose configuration names RFC and
  * holds no usable credential, so nothing could be built from it — that session
  * is the host's `freshConnection` factory's: it is called with no argument —
- * no signal (D56: a fresh connection is made inside a started tool, which
+ * no signal (a fresh connection is made inside a started tool, which
  * runs to its end) —, the operation runs on what it returns, and the server
  * disconnects it when the operation (or the lock) ends. No credential provider and no
  * connection is built by the server. Without the factory the operation is

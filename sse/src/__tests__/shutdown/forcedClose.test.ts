@@ -1,5 +1,5 @@
 /**
- * Tools that never settle, sse (spec §6.4, §14.5): one connection's tool
+ * Tools that never settle, sse: one connection's tool
  * holds its request at the stand-in for ever, and another connection
  * already closed (its session logged off by its close). On `SIGTERM` (with
  * or without `--shutdown-timeout=1`) no second signal is needed: every owned

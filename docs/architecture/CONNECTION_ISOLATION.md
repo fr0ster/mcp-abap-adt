@@ -18,7 +18,7 @@ In previous versions, the server used a global connection cache that could be ov
 
 A connection belongs to the `BaseMcpServer` instance that built it, and that instance belongs to one session or one request:
 
-- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built at the process's start, before the MCP transport opens (the destination's one leftover session taken up, or a logon; a failure ends the process), and kept for the instance's life (D13 as amended by D56): only a session SAP already lost replaces it. On stdio the user is fixed for the process: the session is renewed (refresh token, or a new login when the refresh fails) and written back by the same provider — the same user — so the leftover-session tools' caller is the destination the instance serves (matched from the process's own settings and credential, with no request to SAP), and the background-run tools' caller is the user of the session the instance keeps — every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
+- **stdio** (`@mcp-abap-adt/core`): one instance for the life of the process, serving its one destination; its connection is built at the process's start, before the MCP transport opens (the destination's one leftover session taken up, or a logon; a failure ends the process), and kept for the instance's life: only a session SAP already lost replaces it. On stdio the user is fixed for the process: the session is renewed (refresh token, or a new login when the refresh fails) and written back by the same provider — the same user — so the leftover-session tools' caller is the destination the instance serves (matched from the process's own settings and credential, with no request to SAP), and the background-run tools' caller is the user of the session the instance keeps — every tool runs in SAP as that user. HTTP and SSE never keep a connection across credentials.
 - **SSE** (`@mcp-abap-adt/sse`): one instance per SSE connection, its credential from the `GET` that opened it.
 - **HTTP (streamable)** (`@mcp-abap-adt/http`): one instance per request, or the pooled one its `state_handle` names; either way the request's own headers give its credential, so a request never sees another request's.
 
@@ -57,7 +57,7 @@ Values that belong to one request, such as the master language of created object
 ### The stateful window and the main flow
 
 **Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
-stateless** (D56). adt-clients (31.1) marks the two requests, each a request of its
+stateless**. adt-clients (31.1) marks the two requests, each a request of its
 own, and sets the connection back to stateless in a `finally` whatever the request
 answered. The server sets no tool's session stateful (`tools/stateful-sites.json`).
 

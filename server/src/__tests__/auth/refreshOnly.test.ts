@@ -1,5 +1,5 @@
 /**
- * D11: under `--renewal=refresh-only` a destination that needs a login does
+ * Under `--renewal=refresh-only` a destination that needs a login does
  * not log in: its provider answers `renewal-declined`, and the server's
  * sentence for it is "Logins are off (`--renewal=refresh-only`): log in with
  * `mcp-auth`, or start without it." Real broker, real provider; the login

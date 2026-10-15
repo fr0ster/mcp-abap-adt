@@ -1,5 +1,5 @@
 /**
- * The client's disconnect, http (owner's ruling): a dropped request closes
+ * The client's disconnect, http: a dropped request closes
  * nothing. The tool it started runs to its end — its `UNLOCK` lands — and no
  * logoff is sent while it runs. Then the pool's lifecycle as before: an
  * instance that holds no state is disposed after its work, its connection

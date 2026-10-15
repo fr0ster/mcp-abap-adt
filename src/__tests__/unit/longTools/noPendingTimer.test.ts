@@ -1,6 +1,5 @@
 /**
- * RF11 — no timer is left pending after a listed long call (spec §5.8,
- * §14.9), one case per tool on the approved list: the call's `timeout` is a
+ * No timer is left pending after a listed long call, one case per tool on the approved list: the call's `timeout` is a
  * timer of the call's own, cleared when the call settles. Its delay (37 s
  * here) marks it among every other timer the process sets; after a call
  * that finished in time each such timer was cleared, and after a call whose

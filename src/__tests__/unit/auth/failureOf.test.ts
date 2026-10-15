@@ -1,5 +1,5 @@
 /**
- * `failureOf` (spec §7.1, D14): one structural reader. Each source it knows,
+ * `failureOf`: one structural reader. Each source it knows,
  * and that it answers `undefined` for anything else.
  */
 
@@ -47,7 +47,7 @@ describe('failureOf', () => {
     expect(logFields(read?.authError as never).kind).toBe('connection');
   });
 
-  it("no step 3 (D56): an own code 'ADT_REQUEST_ABORTED' is not a failure it knows", () => {
+  it("no step 3: an own code 'ADT_REQUEST_ABORTED' is not a failure it knows", () => {
     const thrown = Object.assign(new Error('socket hang up at x'), {
       code: 'ADT_REQUEST_ABORTED',
     });
@@ -69,7 +69,7 @@ describe('failureOf', () => {
     expect(read?.message).toBe(error.reason);
   });
 
-  it("no step 3b (D56): a refusal that only carries the connection's AuthRefusedError is not read", () => {
+  it("no step 3b: a refusal that only carries the connection's AuthRefusedError is not read", () => {
     const refusal = refusedAgain('logon');
     const adtError = {
       origin: 'refusal',
@@ -78,7 +78,7 @@ describe('failureOf', () => {
     expect(failureOf(adtError)).toBeUndefined();
   });
 
-  it('no step 3b (D56): a refusal that is an AuthProviderFailure is not read', () => {
+  it('no step 3b: a refusal that is an AuthProviderFailure is not read', () => {
     const error = authError['renewal-declined']({ trigger: 'expired' });
     expect(
       failureOf({ refusal: new AuthProviderFailure(error) }),

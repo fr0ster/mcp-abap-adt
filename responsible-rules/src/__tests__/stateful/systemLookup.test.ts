@@ -1,7 +1,7 @@
 /**
  * The ABAP Cloud system-context lookup (`systeminformation`) is asked once
  * per connection, before the first tool on it runs, inside the main flow
- * (spec §5.7) — never after a tool, so no tool runs twice. The tool wrapper
+ * — never after a tool, so no tool runs twice. The tool wrapper
  * reads its answer and sends nothing. (A stdio process asks it at its start:
  * `startBirth.test.ts`.)
  *

@@ -74,7 +74,7 @@ describe('handlerFor', () => {
   });
 });
 
-describe('jwt / none (D53)', () => {
+describe('jwt / none', () => {
   it('is refused like any authentication not in the table: three handlers', () => {
     expect(HANDLERS.map((h) => `${h.authType}/${h.grantType ?? ''}`)).toEqual([
       'basic/',
@@ -141,7 +141,7 @@ describe('brokerOptions', () => {
   });
 });
 
-describe('jwt / authorization_code checkSettings: the browser (D18, §8)', () => {
+describe('jwt / authorization_code checkSettings: the browser', () => {
   const login = handlerFor('d', {
     authType: 'jwt',
     grantType: 'authorization_code',

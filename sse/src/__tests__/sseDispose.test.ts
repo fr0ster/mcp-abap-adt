@@ -10,7 +10,7 @@ import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { SseServer } from '../SseServer.js';
 
-/** The opening GET carries the connection's credentials (D48). */
+/** The opening GET carries the connection's credentials. */
 const CREDENTIALS = {
   'x-sap-url': 'https://sap.invalid',
   'x-sap-jwt-token': 'header.payload.signature',

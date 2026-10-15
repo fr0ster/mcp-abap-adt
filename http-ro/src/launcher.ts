@@ -1,5 +1,5 @@
 /**
- * `mcp-abap-adt-http-ro` — the read-only tool set over Streamable HTTP (C23).
+ * `mcp-abap-adt-http-ro` — the read-only tool set over Streamable HTTP.
  *
  * http's `main` with `fullReadOnlyToolSet`, and this command's name and
  * version. Nothing else: http's table, credentials, cancellation, failures and
@@ -7,7 +7,7 @@
  * neither the auth broker nor the stores are installed with it.
  *
  * **Why a package of its own:** the binary fixes the tool set (the owner's
- * decision, C23), and a user installs only what they need. The high,
+ * decision), and a user installs only what they need. The high,
  * debugger, background-run and resume tools are `mcp-abap-adt-http`'s.
  */
 import { main as httpMain } from '@mcp-abap-adt/http/launcher';

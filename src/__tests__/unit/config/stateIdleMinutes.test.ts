@@ -9,7 +9,7 @@ import {
   validateYamlConfig as validateTable,
 } from '../../../lib/config/yamlConfig';
 
-/** lib's shared row alone: every binary's table holds it (§3.8). */
+/** lib's shared row alone: every binary's table holds it. */
 const IDLE: ParameterTable = {
   program: 'any-binary',
   rows: [STATE_IDLE_ROW],

@@ -1,8 +1,8 @@
 # Configuration
 
 How a binary reads its parameters: CLI, then environment, then YAML — each binary from its
-**own table** (19.0.0, D38). An option of another binary is in none of its forms; its CLI and YAML
-forms stop the start, naming the binary that serves it (D39). Its environment variable is not read
+**own table** (19.0.0). An option of another binary is in none of its forms; its CLI and YAML
+forms stop the start, naming the binary that serves it. Its environment variable is not read
 (an environment is inherited); `MCP_TRANSPORT` is the one environment variable refused.
 
 ## Components
@@ -32,13 +32,13 @@ In every binary's table: `CONF_ROW` (`--conf` / `--config`), `STATE_IDLE_ROW`
 (`--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, the idle bound on held
 state), and `SYSTEM_TYPE_ROW` (`--system-type` / `SAP_SYSTEM_TYPE`, required), which is
 `@mcp-abap-adt/responsible-rules`' with the rules that read it. In http's and sse's: `tlsRows('http' | 'sse')` (`--tls-cert` / `--tls-key` / `--tls-ca`,
-`MCP_TLS_*`, D50), read with `tlsConfigOf(values)`.
+`MCP_TLS_*`), read with `tlsConfigOf(values)`.
 
 The shared removed parameters: `transportRemoved('stdio' | 'http' | 'sse')` (`--transport`,
-`MCP_TRANSPORT`, YAML `transport`, with the D39 sentence of `TRANSPORT_GONE`),
+`MCP_TRANSPORT`, YAML `transport`, with the sentence of the binary that serves it of `TRANSPORT_GONE`),
 `SSE_OPTIONS_REMOVED`, `HTTP_OPTIONS_REMOVED`, `TLS_OPTIONS_REMOVED`,
 `DESTINATION_OPTIONS_REMOVED`, and the tool set's `expositionRemoved(transport)`: the binary
-fixes its tool set (`binaries.ts`, C23), so `--exposition` and YAML `exposition` stop the start
+fixes its tool set (`binaries.ts`), so `--exposition` and YAML `exposition` stop the start
 with `expositionGoneWords`, one sentence per word, naming the binary of the same transport that
 serves what the words asked for. A removed parameter's `words(form, value)` receives the value the
 form carried.

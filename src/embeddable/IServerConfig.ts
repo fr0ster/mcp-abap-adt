@@ -1,7 +1,7 @@
 /**
  * The shared server configuration, re-exported from lib/config. The
  * transport, HTTP, SSE and destination fields are each in the package that
- * reads them (D38).
+ * reads them.
  */
 
 export type {

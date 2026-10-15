@@ -1,5 +1,5 @@
 /**
- * Two live processes on one leftover file (owner's decision on C21): before
+ * Two live processes on one leftover file (the owner's decision): before
  * a resume (at a stdio start) or a logoff, a process claims the file by renaming it to a name
  * carrying itself; of two claims, one wins and the other finds nothing — it
  * answers "not available". A file claimed by a process that then died is

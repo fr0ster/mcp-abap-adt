@@ -1,5 +1,5 @@
 /**
- * The header connection source (spec §4.2, D39, D50): what the Streamable
+ * The header connection source: what the Streamable
  * HTTP and the SSE transports take credentials from — only the `x-sap-*`
  * headers of a request (http: each request; sse: the `GET` that opens a
  * connection) — and how a request they refuse is answered. One
@@ -32,7 +32,7 @@ function header(headers: RequestHeaders, name: string): string | undefined {
 }
 
 /**
- * `x-mcp-destination` is refused, never ignored (H1): destinations are
+ * `x-mcp-destination` is refused, never ignored: destinations are
  * served only by core's stdio binary. Any value, an empty one included.
  */
 export function refuseDestinationHeader(headers: RequestHeaders): void {
@@ -121,7 +121,7 @@ export interface RequestFailureAnswer {
 
 /**
  * A refused request is the client's (`400`, the refusal's fixed words); a
- * failure lib's reader knows is answered in its §7.3 words, with `logLine`
+ * failure lib's reader knows is answered in the failure answer's words, with `logLine`
  * for stderr (`logFields`); anything else as `Internal Server Error`,
  * without its message.
  */

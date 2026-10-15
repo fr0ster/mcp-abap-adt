@@ -1,6 +1,6 @@
 /**
  * The browser of a login (`--browser`, `--browser-program`), mapped by the
- * platform to one of auth-providers' six shipped browsers (spec §8, D9).
+ * platform to one of auth-providers' six shipped browsers.
  *
  * `browserFor` is a pure function: it answers which factory and which
  * argument, and constructs nothing — so the table is tested cell by cell
@@ -8,7 +8,7 @@
  * the table, or `--browser-program` beside `--browser`, is refused at start on
  * every platform. A browser on a platform with none is *unavailable*: only a
  * destination that logs in (`jwt` / `authorization_code`) is refused for it,
- * at the startup check (D18).
+ * at the startup check.
  */
 
 import {

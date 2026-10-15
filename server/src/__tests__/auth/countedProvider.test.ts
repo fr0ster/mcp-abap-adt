@@ -165,7 +165,7 @@ describe('ProviderGate.drained', () => {
     await expect(new ProviderGate().drained()).resolves.toBeUndefined();
   });
 
-  it('resolves when the count reaches zero — no deadline, no timer (D33)', async () => {
+  it('resolves when the count reaches zero — no deadline, no timer', async () => {
     const held = deferred<AuthOutcome>();
     const { inner } = fakeInner(() => held.promise);
     const gate = new ProviderGate();

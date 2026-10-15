@@ -113,7 +113,7 @@ describe('an embedder', () => {
     }
   });
 
-  it('without freshConnection on an injected connection, the start is refused in D20’s words and nothing is kept', async () => {
+  it('without freshConnection on an injected connection, the start is refused in its fixed words and nothing is kept', async () => {
     const standIn = await adtStandIn();
     const built = createAbapConnection(
       { url: standIn.url, client: '100', authType: 'basic' },
@@ -226,7 +226,7 @@ describe('where the background-run tools are served: beside the run tools', () =
     for (const name of FULL) expect(tools.includes(name)).toBe(served);
   });
 
-  // The binary fixes its set (C23): the four kinds of binary.
+  // The binary fixes its set: the four kinds of binary.
   it.each<[string, ToolSet, boolean]>([
     ['core', fullToolSet, true],
     ['core-ro', fullReadOnlyToolSet, false],

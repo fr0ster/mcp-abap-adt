@@ -1,5 +1,5 @@
 /**
- * The browser table of spec §8 (D9), cell by cell, as a pure function: no
+ * The browser table, cell by cell, as a pure function: no
  * browser is constructed and nothing is launched.
  */
 
@@ -15,7 +15,7 @@ import { BrowserChoiceError, browserFor } from '../../auth/browser';
 
 const NONE = {};
 
-describe('browserFor: the §8 table', () => {
+describe('browserFor: the browser table', () => {
   const rows: Array<[string, string, unknown]> = [
     ['system', 'linux', { factory: linuxDefaultBrowser }],
     ['system', 'darwin', { factory: macDefaultBrowser }],

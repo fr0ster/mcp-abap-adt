@@ -1,6 +1,6 @@
 /**
- * A debugger tool outside the main flow (`DEBUGGER_OWN_CONNECTION_TOOLS`,
- * spec §5.7) works only on the debugger's own connections: its handler — and
+ * A debugger tool outside the main flow (`DEBUGGER_OWN_CONNECTION_TOOLS`)
+ * works only on the debugger's own connections: its handler — and
  * the local helpers it imports from its own directory — never reads the
  * call's `connection`. A tool that does (the memory-snapshot tools) stays in
  * the flow. Plain code over the sources: comments and imports skipped.

@@ -13,7 +13,7 @@
  * The master system is not guarded: when none is known it is left out of the
  * request (adt-clients omits the attribute), and the system applies itself.
  *
- * The words are fixed and name only keys: no value reaches them (H4). The
+ * The words are fixed and name only keys: no value reaches them. The
  * responsible is what the call states — the connection's parameters, where
  * a host's rules made them, included — else the login the request scope
  * states. A call whose parameters could not be

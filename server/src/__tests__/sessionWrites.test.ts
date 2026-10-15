@@ -1,5 +1,5 @@
 /**
- * What a failed session write means (spec §6.2, D12, §7.4), by store:
+ * What a failed session write means, by store:
  *
  * - the `--env` / `--env-path` file, `'fail'`: a store whose write throws
  *   (`EACCES`) fails the request `unknown` `persisting-tokens` with the

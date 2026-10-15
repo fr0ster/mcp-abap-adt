@@ -1,5 +1,5 @@
 /**
- * Leftover sessions on stdio (session-resume spec): core's server takes the
+ * Leftover sessions on stdio: core's server takes the
  * launcher's owner. The destination's connection keeps a runtime file
  * while it holds the session, deleted once its logoff is written at the
  * instance's close; the leftover-session tools answer for the destination —

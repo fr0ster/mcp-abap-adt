@@ -1,5 +1,5 @@
 /**
- * core's failure reader (spec §7.1, §7.3): a `DestinationConfigError` is read
+ * core's failure reader: a `DestinationConfigError` is read
  * first — `destination_refused`, `Destination "<name>" cannot be used:
  * <fields>`, the carried error's hint then one fixed hint per known field,
  * `cause_kind` — then lib's `failureOf`. Through a real `--env` file too.
@@ -186,7 +186,7 @@ describe('through a real --env file (broker 5.0.1)', () => {
   });
   afterEach(() => base.remove());
 
-  it('jwt / none (D53): refused as unsupported, with the hint where a token you hold goes', async () => {
+  it('jwt / none: refused as unsupported, with the hint where a token you hold goes', async () => {
     const file = base.writeFile('conn.env', [
       `SAP_URL=${SYSTEM_URL}`,
       'SAP_AUTH_TYPE=jwt',
@@ -217,9 +217,9 @@ describe('through a real --env file (broker 5.0.1)', () => {
 
   it("jwt / authorization_code whose SAP_ISSUED_* name another destination's means: not refused — the broker does not use the stored session (measured)", async () => {
     // Broker 5.0.1 refuses naming issuedFor / issuedBy only for a
-    // handed-over credential, which no handler of stdio serves any more
-    // (D53), so the server holds no hint for them. For a grant the provider obtains, broker 5.0.1 discards a
-    // session bound elsewhere and the provider obtains a new one.
+    // handed-over credential, which no handler of stdio serves any more, so
+    // the server holds no hint for them. For a grant the provider obtains,
+    // broker 5.0.1 discards a session bound elsewhere and the provider obtains a new one.
     const warnings: string[] = [];
     const file = base.writeFile('conn.env', [
       ...authorizationCodeLines(),
@@ -255,7 +255,7 @@ describe('a tool call on core (StdioServer): the server sentence beside the chai
   });
   afterEach(() => base.remove());
 
-  it('--renewal=refresh-only with no session: authentication_failed, renewal-declined, server: the D11 sentence', async () => {
+  it('--renewal=refresh-only with no session: authentication_failed, renewal-declined, server: the refresh-only sentence', async () => {
     const file = base.writeFile('conn.env', authorizationCodeLines());
     const factory = new AuthBrokerFactory(
       factoryConfig(base, recordingLogins(), {

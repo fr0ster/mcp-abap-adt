@@ -1,6 +1,6 @@
 /**
  * Streamable HTTP takes credentials only from each request's `x-sap-*`
- * headers (D39, spec §4.2), through lib's `headerSource`, on a new instance
+ * headers, through lib's `headerSource`, on a new instance
  * or the pooled one its `state_handle` names. Every case goes over real HTTP
  * to a real connection against an ADT stand-in, which records the
  * `Authorization` each call put on the wire.

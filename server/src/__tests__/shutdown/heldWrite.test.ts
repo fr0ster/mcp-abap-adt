@@ -1,5 +1,5 @@
 /**
- * No shutdown deadline (spec §6.3, §6.4, D33): a session write the store
+ * No shutdown deadline: a session write the store
  * holds lands before the exit however long it takes, and without
  * `--shutdown-timeout` no timer is pending — the server keeps no clock of
  * its own over a shutdown (fake time).

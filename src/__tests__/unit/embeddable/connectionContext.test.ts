@@ -1,9 +1,9 @@
 /**
- * A server's connection context is its source (spec §4): a destination's
+ * A server's connection context is its source: a destination's
  * settings and `getProvider` (core), or the request headers through
  * `headerSource` (http, sse). No token is read, no refresher is looked up,
  * and the settings carry no secret. A connection is kept while the source
- * answers the same credential object and built anew for a new one (D13).
+ * answers the same credential object and built anew for a new one.
  */
 
 import type { SapConfig } from '@mcp-abap-adt/connection';

@@ -23,13 +23,11 @@
  *   releases it and closes it. The handle belongs to the session that took
  *   it, so the whole lock → update → unlock chain has to share that session.
  *
- * Where a fresh connection comes from is `openFreshConnection` (spec §4.3,
- * D20): the factory's record of a connection the server built, or the host's
+ * Where a fresh connection comes from is `openFreshConnection`: the factory's record of a connection the server built, or the host's
  * `freshConnection` for one it injected — never the connection's own
  * configuration. Without either the operation is refused.
  *
- * Every fresh connection is the server's from the moment it exists (D22,
- * D55): recorded in the connection-ends registry (`ownedConnections.ts`) as
+ * Every fresh connection is the server's from the moment it exists: recorded in the connection-ends registry (`ownedConnections.ts`) as
  * the calling instance's, and ended with its one `disconnect()` — the logoff —
  * when its operation ends, on every path, or by the instance's terminal close.
  */
@@ -52,10 +50,10 @@ import {
 type Logger = HandlerContext['logger'];
 
 /**
- * The host's factory of fresh connections (spec §4.3, D20): a connection of
+ * The host's factory of fresh connections: a connection of
  * its own, built by the host with its credential. It receives no signal
- * (D56): a fresh connection is made inside a started tool, which runs to its
- * end. Once returned it is the server's (D22): held for the operation or
+ *: a fresh connection is made inside a started tool, which runs to its
+ * end. Once returned it is the server's: held for the operation or
  * under a package lock's handle, then closed with `disconnect()`.
  */
 export type FreshConnectionFactory = () => Promise<IAbapConnection>;
@@ -81,13 +79,13 @@ export function registerFreshConnectionFactory(
 /**
  * A connection of its own, ready for requests, decided from a registry keyed
  * by the connection object — never from the connection's configuration
- * (spec §4.3, D20):
+ *:
  *
  * - built by the server (`createAbapConnection`) → the factory's record: the
  *   same settings and the same credential object, connected here (closed if
  *   that fails);
  * - injected with the host's `freshConnection` → that factory, called with
- *   no argument (D56); what it returns is the server's (D22), connected here
+ *   no argument; what it returns is the server's, connected here
  *   like the server's own;
  * - anything else → refused `fresh_connection_unavailable`, nothing sent.
  *
@@ -126,7 +124,7 @@ export async function openFreshConnection(
   }
   const factory = hostFactories.get(connection);
   if (!factory) throw new ServerRefusal('fresh_connection_unavailable');
-  // Once handed over it is the server's (D22), treated exactly like a
+  // Once handed over it is the server's, treated exactly like a
   // connection the server built.
   const given = await factory();
   own(given, { role: 'fresh' });
@@ -193,8 +191,8 @@ async function connectedOrClosed(
 
 /**
  * Closes a connection this process holds as its own — its one
- * `disconnect()`, joined if another end already asked for it (D55); a failure
- * to close is only logged, in fixed words (D22).
+ * `disconnect()`, joined if another end already asked for it; a failure
+ * to close is only logged, in fixed words.
  */
 export async function closeQuietly(
   opened: IAbapConnection,
@@ -257,7 +255,7 @@ export async function connectionForPackageLock(
     keep: (lockHandle) => {
       lockSessions.set(lockHandle, fresh);
       // Held under its handle until the unlock — or the instance's terminal
-      // close, which logs it off and forgets it here (§6.4).
+      // close, which logs it off and forgets it here.
       own(fresh, { role: 'lock' });
       whenEnded(fresh, () => {
         if (lockSessions.get(lockHandle) === fresh) {

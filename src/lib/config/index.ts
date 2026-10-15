@@ -1,5 +1,5 @@
 /**
- * The parameter machinery and the rows every binary shares (D38). Each
+ * The parameter machinery and the rows every binary shares. Each
  * binary's own table lives in its package: core's destination rows, http's
  * Streamable HTTP rows, sse's SSE rows.
  */

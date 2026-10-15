@@ -9,7 +9,7 @@
  * handlers and the embeddable server under Apache-2.0, and no transport.
  */
 
-// core's parameter table and the destination's env file (D38, §3.4)
+// core's parameter table and the destination's env file
 export * from './config/coreParameters.js';
 export * from './config/envFileContext.js';
 export * from './config/envResolver.js';

@@ -1,5 +1,5 @@
 /**
- * D24: `authDebug` comes from `--auth-debug` or the YAML key `auth-debug`
+ * `authDebug` comes from `--auth-debug` or the YAML key `auth-debug`
  * and from nothing else — no `DEBUG_*` variable, no `MCP_AUTH_DEBUG`. The
  * broker is built with it exactly as stated.
  */

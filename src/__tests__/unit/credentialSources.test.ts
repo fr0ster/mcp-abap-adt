@@ -65,7 +65,7 @@ describe('credentialFromHeaders', () => {
 });
 
 /**
- * A caller's SapConfig names its credential, or is refused (D19): nothing is
+ * A caller's SapConfig names its credential, or is refused: nothing is
  * guessed, and a refusal names the field — never a value.
  */
 describe('credentialFromSapConfig', () => {

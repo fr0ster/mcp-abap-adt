@@ -1,5 +1,5 @@
 /**
- * The tool-set contract (spec §3.4, §3.5, D37, D49, C23): a launcher serves
+ * The tool-set contract: a launcher serves
  * the groups its `ToolSet` builds, and the binary fixes the set — no flag
  * chooses it.
  *
@@ -212,7 +212,7 @@ describe('the four tool sets', () => {
 });
 
 /**
- * The leftover-session tools are stdio's only (the owner, fix round 14): the
+ * The leftover-session tools are stdio's only (the owner): the
  * runtime files exist for stdio, where the process serves one user. An http
  * or sse server holds many sessions of different users, so none of its
  * binaries — compact ones included — lists a leftover-session tool, and its
@@ -377,7 +377,7 @@ describe('a -ro set holds no write, debugger or background-run tool; a write set
 });
 
 /**
- * The run tools in a -ro set (C23, the owner's decision: running code changes
+ * The run tools in a -ro set (the owner's decision: running code changes
  * no code, as in SAP): served, but without `background` — a -ro set keeps no
  * background run, so the parameter, and its pointer to GetBackgroundRun, do
  * not exist there. The write set's run tools keep it; the shared
@@ -416,7 +416,7 @@ describe('the run tools of a -ro set offer no background', () => {
 });
 
 /**
- * The binaries duplicate no tool (the owner, C14): the full sets carry no
+ * The binaries duplicate no tool (the owner): the full sets carry no
  * low tool — the fixed list of every tool the low set registered, the three
  * System `*Low` reads included — and no compact tool; the compact sets carry
  * none of the full set's high or low tools. Readonly alone may be in both.
@@ -476,7 +476,7 @@ const TRANSPORTS: readonly ServedTransport[] = ['stdio', 'http', 'sse'];
 
 /**
  * The removed `--exposition`: one sentence per word, naming the binary of the
- * binary's own transport (C23). Asserted verbatim for every transport.
+ * binary's own transport. Asserted verbatim for every transport.
  */
 describe('--exposition is gone: each word stops the start with its sentence', () => {
   const expected = (

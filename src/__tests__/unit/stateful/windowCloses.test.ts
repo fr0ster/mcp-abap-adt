@@ -1,5 +1,5 @@
 /**
- * RF12: a connection left stateful after its window. A read that follows a
+ * A connection left stateful after its window. A read that follows a
  * tool's window on the same connection — stdio's kept one, a pooled HTTP
  * instance's — must run stateless and outside the lock's stateful context;
  * left stateful, it would run inside the old session, holding it open and

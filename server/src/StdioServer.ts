@@ -29,7 +29,7 @@ export interface StdioServerOptions {
   stateIdleMinutes?: number;
   /** Where the state's lifecycle lines go; default stderr, always on. */
   stateLogger?: StateLogger;
-  /** The server's own sentence beside a chain failure (§7.4): the factory's `sentenceFor`. */
+  /** The server's own sentence beside a chain failure: the factory's `sentenceFor`. */
   sentenceFor?: (error: IAuthProviderError) => string | undefined;
   /**
    * The owner of the process's runtime session files (the launcher's): the
@@ -54,7 +54,7 @@ export interface StdioServerOptions {
  * logon, and the system information with it.
  * Without destinations the server is in inspection-only mode: the tools are
  * listed, and a tool call answers the server's own `inspection_only` refusal
- * before any connection is built (D17).
+ * before any connection is built.
  */
 export class StdioServer extends BaseMcpServer {
   private readonly sentenceFor:
@@ -88,7 +88,7 @@ export class StdioServer extends BaseMcpServer {
     this.sentenceFor = opts?.sentenceFor;
   }
 
-  /** The destination layer's failures first, then lib's reader (§7.1). */
+  /** The destination layer's failures first, then lib's reader. */
   protected override readFailure(thrown: unknown): ReadFailure | undefined {
     return destinationFailureOf(thrown, {
       sentenceFor: this.sentenceFor,
@@ -141,7 +141,7 @@ export class StdioServer extends BaseMcpServer {
       // The user is fixed for the process: getProvider answers the same
       // provider while the session is renewed (refresh, or a new login when
       // the refresh fails) and written back, so the connection is replaced
-      // only when SAP lost its session (D13, D56).
+      // only when SAP lost its session.
       source: destinationSource(destination, this.destinations),
       sessionId: destination,
       // Who calls, for the leftover sessions: on stdio the destination —

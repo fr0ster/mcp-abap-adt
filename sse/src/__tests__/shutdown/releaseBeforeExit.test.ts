@@ -1,10 +1,10 @@
 /**
- * The process shutdown, sse (spec §6.4, §14.5): on `SIGTERM` every
+ * The process shutdown, sse: on `SIGTERM` every
  * connection the process owns is logged off at once and every running tool
  * interrupted — a tool whose update the stand-in holds is not awaited: its
  * session is logged off under the held update, exit `0`, its `UNLOCK`
  * never lands; an idle connection's session is logged off too, and every
- * stream is ended. (Full and compact: the A7 parity suite.)
+ * stream is ended. (Full and compact: the parity suite.)
  */
 
 import {

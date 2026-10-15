@@ -1,5 +1,5 @@
 /**
- * `mcp-abap-adt-compact` — the compact tool set over stdio (D37, D49).
+ * `mcp-abap-adt-compact` — the compact tool set over stdio.
  *
  * The same server as `mcp-abap-adt`, a different decomposition of its tool
  * list: core's `main` with `compactToolSet` — the two halves' entry builders
@@ -9,7 +9,7 @@
  *
  * **Why a command at all**, rather than a flag on the first one: the host this is
  * for cannot build a retrieval pipeline and must be handed a tool list short by
- * construction. A binary fixes its tool set (C23): `mcp-abap-adt-compact-ro` serves
+ * construction. A binary fixes its tool set: `mcp-abap-adt-compact-ro` serves
  * the half that changes nothing.
  */
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';

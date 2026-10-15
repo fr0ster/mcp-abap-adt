@@ -1,6 +1,6 @@
 /**
  * `mcp-abap-adt-http-ro`: the read-only tool set over Streamable HTTP (http's launcher), and
- * this package's own name and version — nothing else (C23): the readonly tools (with system and search) — no leftover-session tool, which is stdio's.
+ * this package's own name and version — nothing else: the readonly tools (with system and search) — no leftover-session tool, which is stdio's.
  * The behaviour beside the write binary is
  * `src/__tests__/parity/toolSetParity.test.ts`'s.
  */
@@ -72,7 +72,7 @@ describe('mcp-abap-adt-http-ro', () => {
     expect(shape(readOnlyToolSet)).toEqual(shape(fullReadOnlyToolSet));
     expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(66);
     expect(readOnlyToolSet.backgroundRuns).toBe(false);
-    // The leftover-session tools are stdio's (fix round 14).
+    // The leftover-session tools are stdio's.
     expect(
       shape(readOnlyToolSet)
         .flatMap((g) => g.tools)

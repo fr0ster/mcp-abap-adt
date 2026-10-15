@@ -183,7 +183,7 @@ describe('descriptions carry no incidental literals', () => {
   });
 
   it('sees every tool group', () => {
-    // 19.0.0 (D56): the low set's tools left; compact's are read here too.
+    // 19.0.0: the low set's tools left; compact's are read here too.
     expect(tools.length).toBeGreaterThan(250);
   });
 

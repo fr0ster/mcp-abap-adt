@@ -1,6 +1,5 @@
 /**
- * A session holding a lock is closed with a logoff (spec §14.4 item 4,
- * §6.4, D55): a lock tool's session, and an update whose `UNLOCK` the
+ * A session holding a lock is closed with a logoff: a lock tool's session, and an update whose `UNLOCK` the
  * stand-in refuses, end their tool with the lock held. At shutdown (core,
  * http per-request and pooled, sse), at an SSE close and at the pool's
  * eviction, the stand-in's log holds that session's logoff after the `LOCK`

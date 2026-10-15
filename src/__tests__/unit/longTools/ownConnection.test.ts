@@ -1,11 +1,10 @@
 /**
- * RF10 — a listed long tool runs on a connection of its own (spec §5.8,
- * §14.9), one case per tool on the approved list, against the ADT stand-in:
+ * A listed long tool runs on a connection of its own, one case per tool on the approved list, against the ADT stand-in:
  * every request the tool sends runs in an ABAP session that is not the
  * instance's, stateless; when the call ends normally that session is logged
  * off once, after its last request, and the instance's session is not. On a
  * connection the host injected without a `freshConnection` the tool is
- * refused with D20's words, and nothing is sent.
+ * refused with its fixed words, and nothing is sent.
  *
  */
 
@@ -62,7 +61,7 @@ describe.each(LONG_TOOLS)('%s', (tool) => {
     }
   });
 
-  it('on an injected connection without freshConnection, is refused with D20’s words and sends nothing', async () => {
+  it('on an injected connection without freshConnection, is refused with its fixed words and sends nothing', async () => {
     const stand = await longStand(tool, { injected: 'bare' });
     try {
       const answer = await stand.call(tool, args);

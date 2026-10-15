@@ -1,6 +1,5 @@
 /**
- * `BaseMcpServer.dispose()` and the terminal close beside it (spec §6.4,
- * D51, D55):
+ * `BaseMcpServer.dispose()` and the terminal close beside it:
  *
  * - `dispose()` is the state undo only: it closes no connection, and a second
  *   call after a failed undo retries it (main's contract, which the pool's

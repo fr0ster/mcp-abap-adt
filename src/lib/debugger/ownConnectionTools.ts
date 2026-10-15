@@ -2,7 +2,7 @@
  * The debugger tools whose SAP work runs on the debugger's own connections
  * (`openStateful`: the listener, the debuggee, the AMDP events and commands),
  * never on the instance's: they take no place in the instance's main flow,
- * as a background run does not (spec §5.7). Each was audited (C15 round 3):
+ * as a background run does not. Each was audited:
  * its handler reads no `context.connection` — it reaches the debugger through
  * `requireDebugger` / the compact `branchByKind` — and the debugger touches
  * the instance's connection only to open its own (`openFreshConnection`,

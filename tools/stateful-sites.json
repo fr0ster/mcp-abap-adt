@@ -4,7 +4,7 @@
     "function": "startBackgroundRun",
     "site": "setSessionType('stateless')",
     "count": 1,
-    "window": "none: a background run's own fresh connection, made stateless before the run (§5.7)",
+    "window": "none: a background run's own fresh connection, made stateless before the run",
     "stateless": "stateless throughout; the connection ends with its logoff when the run ends",
     "whose": "server"
   },
@@ -13,7 +13,7 @@
     "function": "openStateful",
     "site": "setSessionType('stateful')",
     "count": 1,
-    "window": "the debuggee session: the debugger's own connection, opened fresh for a debug or AMDP debug session (held state), stateful for that session's life — the debugger's session, not a tool's (spec §5.7, §16)",
+    "window": "the debuggee session: the debugger's own connection, opened fresh for a debug or AMDP debug session (held state), stateful for that session's life — the debugger's session, not a tool's",
     "stateless": "never: the connection is not reused; it ends with its logoff at the session's stop, the idle bound's stop, the host's stop or the instance's terminal close",
     "whose": "server"
   },
@@ -22,7 +22,7 @@
     "function": "runLongCall",
     "site": "setSessionType('stateless')",
     "count": 1,
-    "window": "none: a listed long call's own fresh connection, made stateless before the call (§5.7, §5.8)",
+    "window": "none: a listed long call's own fresh connection, made stateless before the call",
     "stateless": "stateless throughout; the connection ends with its logoff when the call ends or its timeout fires",
     "whose": "server"
   },

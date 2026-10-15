@@ -3,7 +3,7 @@ import { serverLogin } from '../serverLogin';
 import type { AuthenticationHandler } from './types.js';
 
 /**
- * A browser login (D8): each strategy the broker asks for is auth-providers'
+ * A browser login: each strategy the broker asks for is auth-providers'
  * composed callback strategy inside `serverLogin`. One destination per
  * process, so its provider serializes its own logins; no lock is needed.
  */
@@ -23,8 +23,8 @@ export const jwtAuthorizationCodeHandler: AuthenticationHandler = {
       ),
   }),
   /**
-   * A browser login needs a browser this platform has (§8): an unavailable
-   * one refuses the destination at the startup check (D18), naming `browser`.
+   * A browser login needs a browser this platform has: an unavailable
+   * one refuses the destination at the startup check, naming `browser`.
    */
   checkSettings(_settings, context) {
     if (context.browserUnavailable !== undefined) {

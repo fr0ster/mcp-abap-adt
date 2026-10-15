@@ -23,7 +23,7 @@ broker's `renewal` says.
    `authorization_code` (browser login). Anything else is refused with `Destination "X" uses
    <type> / <grant>, which this server does not support` — `jwt` / `none` (a token you hold)
    included, with the hint that the token goes in the `x-sap-jwt-token` header of
-   `mcp-abap-adt-http` / `mcp-abap-adt-sse`, or that `mcp-auth` creates the session (D53).
+   `mcp-abap-adt-http` / `mcp-abap-adt-sse`, or that `mcp-auth` creates the session.
 5. **A destination's settings are read once per process.** Nothing watches the files; a `.env`
    change from outside takes effect on restart. Editing a destination's files while the server
    runs is not supported and may combine old and new values until the next start.
@@ -81,7 +81,7 @@ the source (`--mcp`, `destination`) and never quotes the name.
 | `sncHandler` | `snc` | `SAP_SNC_PARTNERNAME` | refuses settings whose `connection-type` is not `rfc` |
 | `jwtAuthorizationCodeHandler` | `jwt` / `authorization_code` | a service key or `SAP_UAA_*` | the browser login (`authorization`): `serverLogin(browserCallbackStrategy({ browser, port }), …)`, on the callback port (default `61001`) |
 
-`jwt` / `none` (a token you hold) has no handler (D53): it is refused like any authentication not in
+`jwt` / `none` (a token you hold) has no handler: it is refused like any authentication not in
 the table, with the hint that a token you hold goes in the `x-sap-jwt-token` header of
 `mcp-abap-adt-http` / `mcp-abap-adt-sse`, or that `mcp-auth` creates the session for stdio.
 

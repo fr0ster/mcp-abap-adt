@@ -1,5 +1,5 @@
 /**
- * `--login-timeout=<seconds>` (D10, spec §5.6): `MCP_LOGIN_TIMEOUT`, YAML
+ * `--login-timeout=<seconds>`: `MCP_LOGIN_TIMEOUT`, YAML
  * `login-timeout`; a whole number from 1 to 86 400, read by plain code; no
  * default. The factory gets it in milliseconds.
  */

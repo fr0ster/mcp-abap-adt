@@ -436,7 +436,7 @@ const DETAIL_WIRING_EXCEPTIONS: ReadonlyArray<{
   line: number;
   reason: string;
 }> = [
-  // 19.0.0 (D56): the one entry — handleActivateObject's group-activation
+  // 19.0.0: the one entry — handleActivateObject's group-activation
   // path — left with ActivateObjectLow, the tool that registered it; the
   // handler now serves compact's HandlerActivate, which is not in this audit.
 ];

@@ -370,7 +370,7 @@ export async function withResolvedSystemContext<T>(
 /**
  * Run `fn` with the responsible person and master system the request lacks
  * filled from parameters already made — the server's, with its connection
- * (spec §5.7: no send outside the connection's main flow). Sends nothing.
+ * (no send outside the connection's main flow). Sends nothing.
  * `undefined`: nothing was made (no resolver), and `fn` runs as it is.
  */
 export async function withKnownSystemContext<T>(

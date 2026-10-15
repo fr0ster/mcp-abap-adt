@@ -179,7 +179,7 @@ export async function handleGetIncludesList(
       );
     }
 
-    // No deadline of the server's on a request (spec §5.8): the call's own
+    // No deadline of the server's on a request: the call's own
     // `timeout`, when given, ends only the wait — a request abandoned here
     // would run on in SAP while its session is logged off under it.
     logger?.info(

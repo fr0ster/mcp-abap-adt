@@ -44,7 +44,7 @@ async function openStateful(context: HandlerContext): Promise<IAbapConnection> {
     connection as { setSessionType?: (t: 'stateful' | 'stateless') => void }
   ).setSessionType?.('stateful');
   // Held state's own: closed at its stop, the idle bound's stop, the host's
-  // stop and the instance's terminal close, whichever comes first (§6.4).
+  // stop and the instance's terminal close, whichever comes first.
   own(connection, { role: 'state' });
   // Its session is kept in a runtime file (role debugger) until its logoff
   // is written, for the identity the call's connection was built for.

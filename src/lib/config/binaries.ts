@@ -1,5 +1,5 @@
 /**
- * The twelve binaries and the tool set each fixes (C23, the owner's
+ * The twelve binaries and the tool set each fixes (the owner's
  * decision): four kinds — core, core-ro, compact, compact-ro — each on
  * stdio, Streamable HTTP and SSE, and each `-ro` binary a package of its
  * own. A binary is chosen by what is installed, never by a flag:
@@ -7,12 +7,12 @@
  * stops the start with a sentence naming the binary that serves what the
  * words asked for, of the binary's own transport.
  *
- * Plain code over the words, no regular expression (D26).
+ * Plain code over the words, no regular expression.
  */
 
 import type { RemovedParameter } from './authParameters.js';
 
-/** The transport a binary serves: one binary per transport and tool set (D35, D49). */
+/** The transport a binary serves: one binary per transport and tool set. */
 export type ServedTransport = 'stdio' | 'http' | 'sse';
 
 /** The four tool sets, one per kind of binary. */
@@ -66,7 +66,7 @@ export const BINARIES: Readonly<
 /** "`mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`)" */
 const named = ({ bin, pkg }: Binary): string => `\`${bin}\` (\`${pkg}\`)`;
 
-/** D56: the words that refuse `low`, verbatim. */
+/** The words that refuse `low`, verbatim. */
 export const LOW_SET_GONE =
   'the low set is gone from mcp-abap-adt / -http / -sse; use mcp-abap-adt-compact (or -compact-http / -compact-sse)';
 
@@ -110,8 +110,8 @@ export function decidingWord(value: unknown): DecidingWord | undefined {
 /**
  * The sentence that refuses a removed `--exposition` in a binary of
  * `family` serving `transport`, given the form used and its value — one
- * sentence per word (C23). It names the binary serving what the words
- * asked for, of the same transport; `low` keeps D56's sentence verbatim in
+ * sentence per word. It names the binary serving what the words
+ * asked for, of the same transport; `low` keeps that sentence verbatim in
  * the full binaries, and says to drop the flag in the compact ones.
  */
 export function expositionGoneWords(
@@ -125,7 +125,7 @@ export function expositionGoneWords(
   const word = decidingWord(value);
   switch (word) {
     case 'low':
-      // D56's sentence in the full binaries; a compact one already serves
+      // The refusal sentence in the full binaries; a compact one already serves
       // the low set's analogue, so it says to drop the flag.
       return family === 'core'
         ? LOW_SET_GONE

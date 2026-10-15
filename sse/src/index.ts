@@ -7,6 +7,6 @@
  * handlers and the embeddable server under Apache-2.0, and no transport.
  */
 
-// sse's parameter table (D38)
+// sse's parameter table
 export * from './config/sseParameters.js';
 export * from './SseServer.js';

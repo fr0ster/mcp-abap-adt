@@ -1,5 +1,5 @@
 /**
- * What the MCP client sees of a read failure (spec §7.3), and what stderr
+ * What the MCP client sees of a read failure, and what stderr
  * gets of it.
  *
  * The answer is an `isError` result whose text is JSON in the shape of the
@@ -18,7 +18,7 @@ export interface FailureAnswer {
   content: Array<{ type: 'text'; text: string }>;
 }
 
-/** The §7.3 payload, field by field. */
+/** The failure payload, field by field. */
 export function failurePayload(read: ReadFailure): Record<string, string> {
   const payload: Record<string, string> = {
     error: read.error,

@@ -89,7 +89,7 @@ export interface InstanceStateOptions {
   idleMinutes?: number;
   /**
    * Run after the idle bound's stop, whatever its undo answered: the host's
-   * terminal close of what the state owns (spec §6.4). A failure is reported
+   * terminal close of what the state owns. A failure is reported
    * on the state logger, never thrown.
    */
   onIdleStop?: () => Promise<void>;
@@ -244,7 +244,7 @@ export class InstanceState {
       failed = messageOf(error);
     }
     // The terminal close of what the state owns, whatever the undo answered:
-    // a failed undo never keeps a session, or a lock, open (§6.4, D55).
+    // a failed undo never keeps a session, or a lock, open.
     if (this.onIdleStop) {
       try {
         await this.onIdleStop();

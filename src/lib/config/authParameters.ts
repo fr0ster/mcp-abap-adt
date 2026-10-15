@@ -1,7 +1,7 @@
 /**
  * The parameter machinery, and the rows every binary shares.
  *
- * Each binary has a table of its own (D38): `mcp-abap-adt` (core) the
+ * Each binary has a table of its own: `mcp-abap-adt` (core) the
  * destination, browser and login rows; `mcp-abap-adt-http` the Streamable HTTP
  * rows; `mcp-abap-adt-sse` the SSE rows. Each row names a parameter in its
  * forms — CLI, environment variable and YAML key. The reader, the YAML
@@ -11,13 +11,13 @@
  *
  * A parameter of another binary, or one that is gone, is a removed parameter
  * of the table: its CLI and YAML forms stop the start, naming where it went
- * (D39). Its environment variable is not read (an environment is inherited);
+ *. Its environment variable is not read (an environment is inherited);
  * only `MCP_TRANSPORT`, which stated the transport, is refused there.
  *
  * A refusal names the parameter in the form the user used. It may quote the
  * user's own value (a port, an enum word): those are not secrets.
  *
- * Plain code over the arguments, no regular expression (D26).
+ * Plain code over the arguments, no regular expression.
  */
 
 import {
@@ -38,7 +38,7 @@ export class ParameterRefusal extends Error {
   }
 }
 
-/** Whether `text` is one or more ASCII digits. Plain code (D26). */
+/** Whether `text` is one or more ASCII digits. Plain code. */
 function isDigits(text: string): boolean {
   if (text.length === 0) return false;
   for (let i = 0; i < text.length; i += 1) {
@@ -98,7 +98,7 @@ export interface RemovedParameter {
   /**
    * Environment names of a parameter that is gone (`MCP_TRANSPORT`). Another
    * binary's environment variables are not listed: an environment is
-   * inherited, so they are not read at all (§10.1, the user's ruling).
+   * inherited, so they are not read at all (the user's ruling).
    */
   readonly env?: readonly string[];
   /** Top-level YAML keys. */
@@ -628,7 +628,7 @@ ${renderNode(root, 0)}`;
 }
 
 // ============================================================================
-// The shared rows (D38, D50; spec §10.1)
+// The shared rows
 // ============================================================================
 
 /** `--conf` / `--config`: the YAML file. Read before the others; no env or YAML form. */
@@ -650,7 +650,7 @@ export const STATE_IDLE_YAML = 'state-idle-minutes';
  * `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`:
  * the idle bound on held state, the owner's one exception to "no timeouts",
  * as main reads it (a whole number, 30 to 35 791, default 30), in every
- * binary's table (§3.8).
+ * binary's table.
  */
 export const STATE_IDLE_ROW: Parameter = {
   key: 'stateIdleMinutes',
@@ -708,7 +708,7 @@ export function parseShutdownTimeout(raw: unknown, name: string): number {
 }
 
 /**
- * `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` / `shutdown-timeout` (D33),
+ * `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` / `shutdown-timeout`,
  * in every binary's table: the forced close after this many seconds of a
  * shutdown. **No default**: without it a shutdown waits for every running
  * tool, every state undo and every session write, as long as they take; a
@@ -727,7 +727,7 @@ export const SHUTDOWN_TIMEOUT_ROW: Parameter = {
 };
 
 /**
- * The TLS rows (D50), read by `mcp-abap-adt-http` and `mcp-abap-adt-sse`:
+ * The TLS rows, read by `mcp-abap-adt-http` and `mcp-abap-adt-sse`:
  * `--tls-cert` / `--tls-key` / `--tls-ca`, `MCP_TLS_*`, YAML
  * `<transport>.tls.*` as before.
  */
@@ -785,10 +785,10 @@ export function tlsConfigOf(
 }
 
 // ============================================================================
-// The removed parameters the binaries share (D39, §10.1)
+// The removed parameters the binaries share
 // ============================================================================
 
-/** The D39 sentences, per binary family (verbatim, §10.1). */
+/** The removed-parameter sentences, per binary family (verbatim). */
 export const TRANSPORT_GONE = {
   stdio:
     '`--transport` is gone: `mcp-abap-adt` serves stdio; for Streamable HTTP run `mcp-abap-adt-http`, for SSE `mcp-abap-adt-sse` (compact: `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse`)',
@@ -847,7 +847,7 @@ export const TLS_OPTIONS_REMOVED: RemovedParameter = {
 
 /**
  * The destination and login options, in the HTTP and SSE binaries: their
- * credentials come only from the `x-sap-*` headers (D39, D48).
+ * credentials come only from the `x-sap-*` headers.
  */
 export const DESTINATION_OPTIONS_REMOVED: RemovedParameter = {
   cli: [

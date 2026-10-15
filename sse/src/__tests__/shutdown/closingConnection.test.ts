@@ -1,5 +1,5 @@
 /**
- * RF7 (spec §6.4, D51): a process shutdown meets an SSE connection that is
+ * A process shutdown meets an SSE connection that is
  * already closing — its tool's update held at the stand-in. The connection's
  * close logged its session off at once; the shutdown joins that logoff
  * (never a second one), lets the instance go once, and exits `0` without

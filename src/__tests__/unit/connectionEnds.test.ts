@@ -1,5 +1,5 @@
 /**
- * Every owned connection ends with `disconnect()` (spec §6.4, D55's sweep):
+ * Every owned connection ends with `disconnect()` (the sweep):
  * one case per end in `tools/connection-ends.json`, on recording
  * connections, asserting `disconnect()` was called exactly once — on
  * success and on failure for the fresh connections — and never for an
@@ -10,7 +10,7 @@
  * disposal, an SSE close, shutdown — run against the ADT stand-in in
  * `unit/shutdown/lockHeldLogoff.test.ts`, `undoFailsLogoff.test.ts` and the
  * http, sse and server shutdown suites; the stdio connection kept after its
- * caller cancelled (RF1) in `server/src/__tests__/cancel/lateConnect.test.ts`.
+ * caller cancelled in `server/src/__tests__/cancel/lateConnect.test.ts`.
  */
 
 import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
@@ -272,7 +272,7 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     expect(handedToA.disconnects).toBe(1);
   });
 
-  it('a session SAP lost (D56): a new connection instance for the next call; the spent one ends once, after the call on it', async () => {
+  it('a session SAP lost: a new connection instance for the next call; the spent one ends once, after the call on it', async () => {
     const credential = provider();
     const server = serve([credential]);
     const first = (await server.connection()) as unknown as Closable;
@@ -305,7 +305,7 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
   });
 });
 
-describe('the fresh connections (D20, D22)', () => {
+describe('the fresh connections', () => {
   it('openFreshConnection, a sibling: its caller ends it once; a failed connect ends it once', async () => {
     const base = closable();
     records.set(base, { settings: SETTINGS });

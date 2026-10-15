@@ -1,5 +1,5 @@
 /**
- * The server's login wrapper (spec §5.5, D8).
+ * The server's login wrapper.
  *
  * With one destination per process, one provider serializes its own logins
  * (its shared attempt), so no cross-destination lock is left. What the server
@@ -10,7 +10,7 @@
  *   whatever `DEBUG_AUTH_LOG` says — never stdout;
  * - `dispose()` is forwarded;
  * - the wrapper is recorded, so the factory disposes it at shutdown;
- * - under `--login-timeout` (D10), each login is bounded: the request's
+ * - under `--login-timeout`, each login is bounded: the request's
  *   signal combined with the bound's, the bound cleared when it settles.
  *
  * It settles exactly when the composed strategy does: auth-providers'
@@ -32,12 +32,12 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 /**
- * `--login-timeout` (D10): the bound on each login, how it was stated, and
+ * `--login-timeout`: the bound on each login, how it was stated, and
  * which logins it ended — the server's own state its sentence is keyed on.
  * A login's end is recorded on the failure that login ended with, never as
  * "the last login": another login starting before that failure is read
  * cannot take the sentence away, nor make the failure look like another
- * caller's abort (D7).
+ * caller's abort.
  */
 export interface LoginBound {
   /** The bound, in milliseconds. */
@@ -79,7 +79,7 @@ export interface ServerLoginContext {
   /**
    * Whether the shutdown began: from then on no interactive login starts —
    * it is refused `interactive-login` `aborted`, answered with the shutdown
-   * sentence (§6.4, §7.4). Absent: never.
+   * sentence. Absent: never.
    */
   readonly shuttingDown?: (() => boolean) | undefined;
 }
@@ -103,7 +103,7 @@ export function promptLogger(
 
 /**
  * How the chain logs a session write that did not land under
- * `onWriteFailure: 'continue'` (a named destination, D12): auth-broker's
+ * `onWriteFailure: 'continue'` (a named destination): auth-broker's
  * writer (`[AuthBroker] Session write for <destination> failed; …`) and
  * auth-providers' `refreshStatePersistence`. That line is a report the user
  * must see. Read by its fixed opening words — the chain gives it no code.
@@ -178,7 +178,7 @@ export function serverLogin(
 }
 
 /**
- * One login under `--login-timeout` (D10): the strategy gets the request's
+ * One login under `--login-timeout`: the strategy gets the request's
  * signal combined with the bound's, so either ends the login. The bound is
  * the login's, not the request's: its timer starts with the login and is
  * cleared when the login settles, so no timer outlives it. A login the bound

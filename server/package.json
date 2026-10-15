@@ -71,7 +71,7 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npx tsc -p tsconfig.json",
-    "test": "jest --passWithNoTests",
+    "test": "npm --prefix .. test -- --roots server/src",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "lint:check": "npx biome check src",
     "prepublishOnly": "npm run build"
@@ -91,41 +91,6 @@
     "@mcp-abap-adt/responsible-rules": "^19.0.0",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "dotenv": "^18.0.5"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "roots": [
-      "<rootDir>/src"
-    ],
-    "testMatch": [
-      "**/__tests__/**/*.test.ts"
-    ],
-    "transform": {
-      "^.+\\.ts$": [
-        "ts-jest",
-        {
-          "tsconfig": "tsconfig.test.json"
-        }
-      ]
-    },
-    "moduleNameMapper": {
-      "^@mcp-abap-adt/background-runs-memory$": "<rootDir>/../background-runs-memory/src/index.ts",
-      "^@mcp-abap-adt/responsible-rules$": "<rootDir>/../responsible-rules/src/index.ts",
-      "^@mcp-abap-adt/lib$": "<rootDir>/../src/index.ts",
-      "^@mcp-abap-adt/lib/handlers$": "<rootDir>/../src/lib/handlers/index.ts",
-      "^@mcp-abap-adt/lib/http-transport$": "<rootDir>/../src/lib/httpTransport/index.ts",
-      "^@mcp-abap-adt/lib/utils$": "<rootDir>/../src/lib/utils.ts",
-      "^@mcp-abap-adt/lib/embeddable$": "<rootDir>/../src/embeddable/index.ts",
-      "^@mcp-abap-adt/lib/config$": "<rootDir>/../src/lib/config/index.ts",
-      "^@mcp-abap-adt/lib/auth$": "<rootDir>/../src/lib/auth/index.ts",
-      "^@mcp-abap-adt/lib/logger$": "<rootDir>/../src/lib/handlerLogger.ts",
-      "^@mcp-abap-adt/lib/request-context$": "<rootDir>/../src/lib/requestContext.ts",
-      "^@mcp-abap-adt/lib/debugger$": "<rootDir>/../src/lib/debugger/index.ts",
-      "^@mcp-abap-adt/lib/state$": "<rootDir>/../src/lib/state/index.ts",
-      "^@mcp-abap-adt/lib/tool-set$": "<rootDir>/../src/lib/toolSet.ts",
-      "^(\\.{1,2}/.*)\\.js$": "$1"
-    }
   },
   "devDependencies": {
     "@types/jest": "*",

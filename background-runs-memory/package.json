@@ -41,35 +41,13 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npx tsc -p tsconfig.json",
-    "test": "jest --passWithNoTests",
+    "test": "npm --prefix .. test -- --roots background-runs-memory/src",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "lint:check": "npx biome check src",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
     "@mcp-abap-adt/lib": "^19.0.0"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "roots": [
-      "<rootDir>/src"
-    ],
-    "testMatch": [
-      "**/__tests__/**/*.test.ts"
-    ],
-    "transform": {
-      "^.+\\.ts$": [
-        "ts-jest",
-        {
-          "tsconfig": "tsconfig.test.json"
-        }
-      ]
-    },
-    "moduleNameMapper": {
-      "^@mcp-abap-adt/lib/embeddable$": "<rootDir>/../src/embeddable/index.ts",
-      "^(\\.{1,2}/.*)\\.js$": "$1"
-    }
   },
   "devDependencies": {
     "@types/jest": "*",

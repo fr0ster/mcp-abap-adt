@@ -53,7 +53,7 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npx tsc -p tsconfig.json",
-    "test": "jest --passWithNoTests",
+    "test": "npm --prefix .. test -- --roots compact-sse-ro/src",
     "lint:check": "npx biome check src",
     "prepublishOnly": "npm run build",
     "start": "node ./bin/mcp-abap-adt-compact-sse-ro.js"

@@ -253,6 +253,11 @@
     "testEnvironment": "node",
     "roots": [
       "<rootDir>/src",
+      "<rootDir>/background-runs-memory/src",
+      "<rootDir>/responsible-rules/src",
+      "<rootDir>/server/src",
+      "<rootDir>/http/src",
+      "<rootDir>/sse/src",
       "<rootDir>/compact-readonly-entries/src",
       "<rootDir>/compact-modify/src",
       "<rootDir>/compact/src",

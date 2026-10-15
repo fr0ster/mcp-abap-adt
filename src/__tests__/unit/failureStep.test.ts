@@ -854,3 +854,165 @@ describe('an activation run whose reading was refused', () => {
     );
   });
 });
+
+describe('GetEnhancements: a probe that SAP refused is not replaced by words', () => {
+  const run = (args: Record<string, unknown>) =>
+    handleGetEnhancements(
+      {
+        connection: {
+          makeAdtRequest: async () => {
+            throw new Error('no request expected');
+          },
+        },
+        logger: undefined,
+      } as any,
+      args,
+    ) as Promise<any>;
+  const refused = (status: number, message: string) =>
+    refusedResponse(message, {
+      adtType: 'ExceptionResourceNoAuthorization',
+      response: { status, data: DOCUMENT },
+    } as Partial<IAdtError>);
+
+  it('an include SAP refused (403): the method error as it is, with its step', async () => {
+    fakeClient = fakeClientOf({
+      readMetadata: async () => refused(403, 'No authorization'),
+    });
+    const result = await run({ object_name: 'ZINC', object_type: 'include' });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toEqual({
+      failures: [expectedPayload('read include metadata')],
+    });
+    expect(result.content[0].text).not.toContain('could not be read');
+  });
+
+  it('an include SAP refused (401): the call ends as it came', async () => {
+    fakeClient = fakeClientOf({
+      readMetadata: async () => refused(401, 'Unauthorized'),
+    });
+    const result = await run({ object_name: 'ZINC', object_type: 'include' });
+    expect(result.isError).toBe(true);
+    const body = payloadOf(result);
+    expect(body.status).toBe(401);
+    expect(body.message).toBe('Unauthorized');
+    expect(body.step).toBe('read include metadata');
+    expect(body.failures).toBeUndefined();
+  });
+
+  it('an unknown type: every refused probe is listed, each with its step', async () => {
+    fakeClient = fakeClientOf({
+      readMetadata: async () => forbidden(),
+    });
+    const result = await run({ object_name: 'ZX', object_type: 'unknown' });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toEqual({
+      failures: [
+        expectedPayload('read class metadata'),
+        expectedPayload('read program metadata'),
+        expectedPayload('read include metadata'),
+      ],
+    });
+    expect(result.content[0].text).not.toContain('Could not determine');
+  });
+
+  it('an unknown type: a credential failure at the first probe ends the call, no further probe', async () => {
+    const probed: unknown[] = [];
+    const failure = new AuthProviderFailure(
+      authError['credential-refused']({ credential: 'token' }),
+    );
+    fakeClient = fakeClientOf({
+      readMetadata: async (config: unknown) => {
+        probed.push(config);
+        throw failure;
+      },
+    });
+    const result = await run({ object_name: 'ZX', object_type: 'unknown' });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result).error).toBe('authentication_failed');
+    expect(probed.length).toBe(1);
+  });
+
+  it('an unknown type that is absent (404 on every probe) keeps its words', async () => {
+    fakeClient = fakeClientOf({ readMetadata: async () => notThere() });
+    const result = await run({ object_name: 'ZX', object_type: 'unknown' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      'Could not determine object type for: ZX',
+    );
+  });
+
+  it('an include that is absent (404) keeps its words', async () => {
+    fakeClient = fakeClientOf({ readMetadata: async () => notThere() });
+    const result = await run({ object_name: 'ZINC', object_type: 'include' });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('Include ZINC could not be read.');
+  });
+});
+
+describe('GetStructuresList: a credential failure ends the whole call', () => {
+  const unauthorized = () =>
+    refusedResponse('Unauthorized', {
+      response: { status: 401, data: '' },
+    } as Partial<IAdtError>);
+  const root = okResponse(
+    'define structure zs {\n  include zinc1;\n  include zinc2;\n}',
+  );
+
+  it('a 401 on the first embedded structure: one call ends as it came, nothing further is read', async () => {
+    const read: string[] = [];
+    fakeClient = fakeClientOf({
+      read: async (config: any) => {
+        read.push(config?.structureName ?? config?.tableName);
+        return config?.structureName === 'ZS' ? root : unauthorized();
+      },
+    });
+    const result: any = await handleGetStructuresList(context as any, {
+      structure_name: 'ZS',
+      include_extensions: false,
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({
+      status: 401,
+      message: 'Unauthorized',
+      step: 'read structure',
+    });
+    expect(read).toEqual(['ZS', 'ZINC1']);
+  });
+
+  it('a thrown credential failure on an embedded structure ends it too', async () => {
+    const read: string[] = [];
+    const failure = new AuthProviderFailure(
+      authError['credential-refused']({ credential: 'token' }),
+    );
+    fakeClient = fakeClientOf({
+      read: async (config: any) => {
+        read.push(config?.structureName ?? config?.tableName);
+        if (config?.structureName === 'ZS') return root;
+        throw failure;
+      },
+    });
+    const result: any = await handleGetStructuresList(context as any, {
+      structure_name: 'ZS',
+      include_extensions: false,
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result).error).toBe('authentication_failed');
+    expect(read).toEqual(['ZS', 'ZINC1']);
+  });
+
+  it('a 403 on an embedded structure stays that node, the walk goes on', async () => {
+    const read: string[] = [];
+    fakeClient = fakeClientOf({
+      read: async (config: any) => {
+        read.push(config?.structureName ?? config?.tableName);
+        return config?.structureName === 'ZS' ? root : forbidden();
+      },
+    });
+    const result: any = await handleGetStructuresList(context as any, {
+      structure_name: 'ZS',
+      include_extensions: false,
+    });
+    expect(result.isError).toBe(false);
+    expect(read).toEqual(['ZS', 'ZINC1', 'ZINC1', 'ZINC2', 'ZINC2']);
+  });
+});

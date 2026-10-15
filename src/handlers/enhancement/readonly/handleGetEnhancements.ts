@@ -11,13 +11,19 @@ import {
   failureEntry,
   failurePayload,
   isCredentialFailure,
+  isCredentialPayload,
   thrownEntry,
 } from '../../../lib/answer';
 import { failureOf } from '../../../lib/auth/failures';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { carryingFailure, methodFailureOf } from '../../../lib/strategies/step';
+import {
+  carryingFailure,
+  carryingPayload,
+  methodFailureOf,
+  payloadCarriedBy,
+} from '../../../lib/strategies/step';
 import {
   type AxiosResponse,
   encodeSapObjectName,
@@ -268,13 +274,29 @@ async function determineObjectTypeAndPath(
       const answer = await read();
       if (answer.ok) return String(answer.getResult().value ?? '');
       const error = answer.getError();
+      // The credentials are the same for every probe: the call ends, as it came.
+      if (isCredentialPayload(failureEntry(error, step)))
+        throw carryingFailure(new Error(error.message), error, step);
       if (error?.response?.status !== 404)
         unreadable.push(failureEntry(error, step));
       return undefined;
     } catch (error) {
+      if (isCredentialPayload(thrownEntry(error, step))) throw error;
       unreadable.push(thrownEntry(error, step));
       return undefined;
     }
+  };
+
+  /**
+   * The object's kind could not be resolved. When probes were refused, the
+   * answer is those refusals as they are, each with its step — not words that
+   * replace them; when every probe found nothing (404), the words.
+   */
+  const unresolved = (message: string): never => {
+    const words = new EnhancementInputError(message);
+    throw unreadable.length > 0
+      ? carryingPayload(words, { failures: unreadable })
+      : words;
   };
 
   const asInclude = async () => {
@@ -322,7 +344,7 @@ async function determineObjectTypeAndPath(
   if (kind === 'INCLUDE' || kind === 'PROG/I') {
     const include = await asInclude();
     if (include) return withReport(include);
-    throw new EnhancementInputError(`Include ${objectName} could not be read.`);
+    return unresolved(`Include ${objectName} could not be read.`);
   }
 
   // No usable type: find out, one independent probe at a time.
@@ -347,7 +369,7 @@ async function determineObjectTypeAndPath(
   }
   const include = await asInclude();
   if (include) return withReport(include);
-  throw new EnhancementInputError(
+  return unresolved(
     `Could not determine object type for: ${objectName}. Object is neither a valid class, program, include, nor a function group's main program.`,
   );
 }
@@ -766,7 +788,9 @@ export async function handleGetEnhancements(
           includesUnread.push({
             include: includeName,
             step: 'read enhancements',
-            failures: [thrownEntry(error, 'read enhancements')],
+            failures: (payloadCarriedBy(error)?.failures as
+              | FailureEntry[]
+              | undefined) ?? [thrownEntry(error, 'read enhancements')],
           });
           // Continue with the other includes
         }

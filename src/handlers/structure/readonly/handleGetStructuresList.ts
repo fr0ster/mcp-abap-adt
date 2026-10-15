@@ -3,12 +3,14 @@ import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import {
   type FailureEntry,
   failureEntry,
+  isCredentialPayload,
   thrownEntry,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { carryingFailure } from '../../../lib/strategies/step';
 import { fetchWhereUsedReferences } from '../../../lib/strategies/whereUsedList';
 import {
   type AxiosResponse,
@@ -231,11 +233,16 @@ export async function handleGetStructuresList(
           };
           if (failed?.ok === false && typeof failed.getError === 'function') {
             const error = failed.getError();
+            // The credentials are the same for every node: the whole call
+            // ends, as it came.
+            if (isCredentialPayload(failureEntry(error, step)))
+              throw carryingFailure(new Error(error.message), error, step);
             failures.push(failureEntry(error, step));
             if (error?.response?.status !== 404) return null;
           }
           answered++;
         } catch (thrown) {
+          if (isCredentialPayload(thrownEntry(thrown, step))) throw thrown;
           failures.push(thrownEntry(thrown, step));
         }
         return null;

@@ -127,6 +127,37 @@ describe('GetStructuresList append handling (#128)', () => {
     expect(data.appends_unavailable).toBe(true);
   });
 
+  it('a 401 in the where-used lookup ends the call as it came, no second object_type', async () => {
+    mockGetWhereUsedScope.mockResolvedValue(
+      refusedResponse('Unauthorized', {
+        response: { status: 401, data: '' },
+      } as any),
+    );
+
+    const result = await handleGetStructuresList(ctx, { structure_name: 'ZS' });
+
+    expect(result.isError).toBe(true);
+    expect(payload(result)).toMatchObject({
+      status: 401,
+      message: 'Unauthorized',
+    });
+    expect(mockGetWhereUsedScope).toHaveBeenCalledTimes(1);
+  });
+
+  it('a 403 in the where-used lookup stays appends_unavailable', async () => {
+    mockGetWhereUsedScope.mockResolvedValue(
+      refusedResponse('No authorization', {
+        response: { status: 403, data: '' },
+      } as any),
+    );
+
+    const result = await handleGetStructuresList(ctx, { structure_name: 'ZS' });
+
+    expect(result.isError).toBe(false);
+    expect(payload(result).appends_unavailable).toBe(true);
+    expect(mockGetWhereUsedScope).toHaveBeenCalledTimes(2);
+  });
+
   it('does not run where-used (or flag) when include_extensions is false', async () => {
     const result = await handleGetStructuresList(ctx, {
       structure_name: 'ZS',

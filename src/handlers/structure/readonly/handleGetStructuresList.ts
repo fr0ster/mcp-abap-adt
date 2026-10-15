@@ -297,6 +297,13 @@ export async function handleGetStructuresList(
             enableOnlyTypes: ['TABL/DS'],
           });
           if (!wu.ok) {
+            // The credentials are the same for every request: the call ends.
+            if (isCredentialPayload(failureEntry(wu.getError(), 'where-used')))
+              throw carryingFailure(
+                new Error(wu.getError().message),
+                wu.getError(),
+                'where-used',
+              );
             lastErr = new Error(wu.getError().message);
             continue;
           }
@@ -304,6 +311,7 @@ export async function handleGetStructuresList(
           resolved = true;
           break;
         } catch (e) {
+          if (isCredentialPayload(thrownEntry(e, 'where-used'))) throw e;
           lastErr = e;
         }
       }

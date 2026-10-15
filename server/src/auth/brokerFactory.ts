@@ -370,8 +370,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
         // D12: the user's own --env file must see a write that did not land;
         // a named destination (in memory, or sessions/ under --unsafe) goes on.
         onWriteFailure: mode.kind === 'envFile' ? 'fail' : 'continue',
-        // D24 (A11) turns this on from --auth-debug only.
-        authDebug: false,
+        // D24: on from --auth-debug only, never from the environment.
+        authDebug: this.config.authDebug === true,
         ...handler.brokerOptions(this.context),
       },
       logger,

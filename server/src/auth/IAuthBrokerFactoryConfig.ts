@@ -64,6 +64,12 @@ export interface IAuthBrokerFactoryConfig {
    */
   loginTimeoutStated?: string;
   /**
+   * `--auth-debug` (D24): the brokers are built with `authDebug: true`, so a
+   * refused token request's debug line names its secrets' first and last four
+   * characters. Absent: off. The caller routes `logger` to stderr with it.
+   */
+  authDebug?: boolean;
+  /**
    * Builds the login strategy of the `authorization_code` handler. The
    * launcher passes auth-providers' `browserCallbackStrategy`; there is no
    * default here. The factory wraps it in `serverLogin`.

@@ -98,6 +98,7 @@ that serves it. See [YAML Configuration](../configuration/YAML_CONFIG.md).
 | `--renewal=<mode>` | `MCP_RENEWAL` | `renewal` | `refresh-then-login`, `refresh-only` | How an expired session is renewed (default `refresh-then-login`); `refresh-only` never logs in |
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
 | `--login-timeout=<seconds>` | `MCP_LOGIN_TIMEOUT` | `login-timeout` | 1-86400 | Ends a browser login not finished after this many seconds (default: none) |
+| `--auth-debug` | — | `auth-debug` | flag | Auth debugging: the token providers' debug lines go to stderr, and a refused token request's line names the first and last four characters of each secret it sent (default: off). **No environment variable** |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
 
 The environment forms `MCP_DESTINATION` and `MCP_ENV` do **not** exist; use `--mcp` and `--env`
@@ -262,6 +263,23 @@ other request waits for it. A tool call cannot be cancelled: a cancel ends no lo
 ```bash
 mcp-abap-adt --mcp=TRIAL --login-timeout=300
 ```
+
+### --auth-debug
+
+Off by default. With it, `mcp-abap-adt` builds every broker with `authDebug: true`, routes the
+broker's and the token providers' log lines to **stderr** (never stdout), and prints one warning
+line at start: a refused token request's debug line then names the first and last four characters
+of each secret the request carried (a secret shorter than sixteen characters is shown by its
+length only). It is read from the command line or the configuration file (`auth-debug: true`) and
+**from no environment variable** — neither `DEBUG_*` nor `MCP_AUTH_DEBUG` turns it on. Without it a
+secret reaches no line at all. The authorization server's `error_description` is read by nothing,
+with or without it.
+
+```bash
+mcp-abap-adt --mcp=TRIAL --auth-debug
+```
+
+The startup summary shows a secret by its presence only (`Password: set`), whatever the flag says.
 
 See [Authentication & Destinations](AUTHENTICATION.md) for the supported authentications.
 

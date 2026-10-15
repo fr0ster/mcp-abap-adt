@@ -71,6 +71,10 @@ const silentLogger: ILogger = {
 const loggerForTransport =
   process.env.DEBUG_AUTH_LOG === 'true' ? stderrLogger : silentLogger;
 
+/** The one line `--auth-debug` prints at the start (D24). */
+export const AUTH_DEBUG_WARNING =
+  "[MCP] --auth-debug is on: a refused token request's debug line on stderr names the first and last four characters of each secret it sent";
+
 /**
  * The state's lifecycle lines — the idle bound's end of a state, a cleanup
  * that failed — on stderr whatever DEBUG_AUTH_LOG says: they are what an
@@ -439,6 +443,7 @@ export function factoryConfigFrom(
     }),
     ...(config.connectionType && { connectionType: config.connectionType }),
     ...(config.renewal && { renewal: config.renewal }),
+    ...(config.authDebug === true && { authDebug: true }),
     ...(config.loginTimeout !== undefined && {
       loginTimeoutMs: config.loginTimeout * 1000,
       loginTimeoutStated: statedLoginTimeout(
@@ -654,6 +659,10 @@ export async function launch(
     return;
   }
 
+  if (config.authDebug === true) {
+    deps.stderr(AUTH_DEBUG_WARNING);
+  }
+
   const factory = new AuthBrokerFactory(
     factoryConfigFrom(config, {
       browserStrategy: deps.browserStrategy,
@@ -662,7 +671,8 @@ export async function launch(
       // A login prompts on stderr whatever DEBUG_AUTH_LOG says; the broker's
       // diagnostics stay gated (§9).
       promptLogger: promptLogger(deps.stderr, loggerForTransport),
-      logger: loggerForTransport,
+      // --auth-debug routes the providers' debug lines to stderr (D24).
+      logger: config.authDebug === true ? stderrLogger : loggerForTransport,
     }),
   );
 

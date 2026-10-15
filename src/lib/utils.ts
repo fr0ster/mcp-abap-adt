@@ -1194,40 +1194,13 @@ export function getConfig(): SapConfig {
   return config;
 }
 
-/**
- * Mask sensitive values (tokens, secrets) for safe logging
- *
- * Rules:
- * - Long values (>20 chars): show first 4 and last 4 chars with *** in between
- * - Short values (<=20 chars): fully mask with asterisks
- * - Empty/undefined: return placeholder
- *
- * @param value - The sensitive value to mask
- * @param placeholder - Placeholder for empty values (default: '(not set)')
- * @returns Masked string safe for logging
- */
-export function maskSensitiveValue(
-  value: string | undefined | null,
-  placeholder = '(not set)',
-): string {
-  if (!value || value.trim() === '') {
-    return placeholder;
-  }
-
-  const trimmed = value.trim();
-
-  // Long values: show first 4 and last 4 chars
-  if (trimmed.length > 20) {
-    return `${trimmed.substring(0, 4)}***${trimmed.substring(trimmed.length - 4)}`;
-  }
-
-  // Short values: fully mask
-  return '*'.repeat(trimmed.length);
-}
+/** What the summary says of a value it holds: that it is there. */
+const PRESENT = 'set';
 
 /**
  * Format auth configuration for display at server startup
- * Shows connection details with masked sensitive values
+ * Shows connection details; a secret is shown by its presence only (`set`),
+ * never by a character of it (D25)
  */
 export interface AuthDisplayConfig {
   envFile?: string;
@@ -1290,22 +1263,16 @@ export function formatAuthConfigForDisplay(
       lines.push(`║  Username:      ${config.username.padEnd(45)}║`);
     }
     if (config.password) {
-      lines.push(
-        `║  Password:      ${maskSensitiveValue(config.password).padEnd(45)}║`,
-      );
+      lines.push(`║  Password:      ${PRESENT.padEnd(45)}║`);
     }
   }
 
   if (config.authType === 'jwt') {
     if (config.jwtToken) {
-      lines.push(
-        `║  JWT Token:     ${maskSensitiveValue(config.jwtToken).padEnd(45)}║`,
-      );
+      lines.push(`║  JWT Token:     ${PRESENT.padEnd(45)}║`);
     }
     if (config.refreshToken) {
-      lines.push(
-        `║  Refresh Token: ${maskSensitiveValue(config.refreshToken).padEnd(45)}║`,
-      );
+      lines.push(`║  Refresh Token: ${PRESENT.padEnd(45)}║`);
     }
     if (config.uaaUrl) {
       const uaaUrl =
@@ -1315,14 +1282,10 @@ export function formatAuthConfigForDisplay(
       lines.push(`║  UAA URL:       ${uaaUrl.padEnd(45)}║`);
     }
     if (config.uaaClientId) {
-      lines.push(
-        `║  UAA Client ID: ${maskSensitiveValue(config.uaaClientId).padEnd(45)}║`,
-      );
+      lines.push(`║  UAA Client ID: ${PRESENT.padEnd(45)}║`);
     }
     if (config.uaaClientSecret) {
-      lines.push(
-        `║  UAA Secret:    ${maskSensitiveValue(config.uaaClientSecret).padEnd(45)}║`,
-      );
+      lines.push(`║  UAA Secret:    ${PRESENT.padEnd(45)}║`);
     }
   }
 

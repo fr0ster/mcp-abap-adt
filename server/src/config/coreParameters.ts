@@ -178,6 +178,21 @@ export const LOGIN_TIMEOUT_ROW: Parameter = {
 };
 
 /**
+ * `--auth-debug` / `auth-debug` (D24): the token providers' debug line names
+ * a refused request's secrets by their first and last four characters. The
+ * command line and the configuration file only — no environment variable
+ * turns it on.
+ */
+export const AUTH_DEBUG_ROW: Parameter = {
+  key: 'authDebug',
+  cli: '--auth-debug',
+  yaml: 'auth-debug',
+  kind: 'flag',
+  section: DESTINATION,
+  help: "Auth debugging: the token providers' debug lines go to stderr, and a refused token request's line names the first and last four characters of each secret it sent. No environment variable. Off by default",
+};
+
+/**
  * The login bound as the user set it, for D10's sentence: the form it came
  * from (`parameterSource`) with its value — `` `--login-timeout=300` ``,
  * `` `MCP_LOGIN_TIMEOUT=300` ``, or `` `login-timeout: 300` in the
@@ -228,6 +243,7 @@ export function coreParameters(
       SYSTEM_TYPE_ROW,
       ...CORE_ROWS,
       LOGIN_TIMEOUT_ROW,
+      AUTH_DEBUG_ROW,
       STATE_IDLE_ROW,
       SHUTDOWN_TIMEOUT_ROW,
     ],
@@ -287,6 +303,8 @@ export interface CoreConfig extends IServerConfig {
    * `MCP_LOGIN_TIMEOUT`, or `login-timeout (config file)`.
    */
   loginTimeoutSource?: string;
+  /** `--auth-debug` (D24): the providers' debug lines on stderr, secrets in their prepared form. */
+  authDebug?: boolean;
   /** SAP connection type: http (default) or rfc */
   connectionType?: 'http' | 'rfc';
   /**
@@ -357,6 +375,7 @@ export function readCoreConfig(
     renewal: values.renewal as CoreConfig['renewal'],
     browserAuthPort: values.browserAuthPort as number | undefined,
     loginTimeout: values.loginTimeout as number | undefined,
+    authDebug: values.authDebug === true,
     loginTimeoutSource:
       values.loginTimeout === undefined ? undefined : source('loginTimeout'),
     connectionType: values.connectionType as CoreConfig['connectionType'],

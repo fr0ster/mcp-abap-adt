@@ -24,6 +24,16 @@ DEBUG_TESTS=true npm test -- integration/domain
 }
 ```
 
+### --auth-debug
+
+Not an environment variable: `mcp-abap-adt --mcp=TRIAL --auth-debug`, or `auth-debug: true` in the
+configuration file. It routes the broker's and the token providers' log lines to stderr and, on a
+refused token request, names each secret the request carried by its first and last four characters
+(shorter than sixteen: its length only). One warning line says so at start. No `DEBUG_*` variable
+and no `MCP_AUTH_DEBUG` turns it on; `DEBUG_AUTH_LOG` only routes the broker's own lines. Use it on
+your own machine: its stderr holds fragments of real secrets. Without it no line holds a secret,
+and the startup summary shows one by presence only (`Password: set`).
+
 ### DEBUG_HANDLERS=true
 
 Enables detailed logging in handler functions. Shows:

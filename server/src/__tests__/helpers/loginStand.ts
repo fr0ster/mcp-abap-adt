@@ -24,6 +24,7 @@ import type {
   IAuthProvider,
   IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -110,6 +111,10 @@ export interface TokenEndpoint {
   holdCodes(on: boolean): void;
   releaseCodes(): void;
   refuseRefresh(on: boolean): void;
+  /** Answers every `authorization_code` request `400 invalid_grant` with this `error_description`. */
+  refuseCodes(description: string | undefined): void;
+  /** Every token the endpoint issued, access and refresh. */
+  issued: string[];
   close(): Promise<void>;
 }
 
@@ -119,7 +124,9 @@ export async function tokenEndpoint(): Promise<TokenEndpoint> {
   let gate = deferred();
   let arrived = deferred();
   let refusing = false;
+  let refusedCodeWith: string | undefined;
   let issued = 0;
+  const issuedTokens: string[] = [];
   const server = http.createServer((req, res) => {
     let body = '';
     req.on('data', (c) => {
@@ -132,6 +139,16 @@ export async function tokenEndpoint(): Promise<TokenEndpoint> {
         arrived.resolve();
         arrived = deferred();
         if (holding) await gate.promise;
+        if (refusedCodeWith !== undefined) {
+          res.writeHead(400, { 'content-type': 'application/json' });
+          res.end(
+            JSON.stringify({
+              error: 'invalid_grant',
+              error_description: refusedCodeWith,
+            }),
+          );
+          return;
+        }
       }
       if (grant === 'refresh_token' && refusing) {
         res.writeHead(400, { 'content-type': 'application/json' });
@@ -139,11 +156,14 @@ export async function tokenEndpoint(): Promise<TokenEndpoint> {
         return;
       }
       issued += 1;
+      const access = jwt(`placeholder-access-${issued}`);
+      const refresh = `placeholder-refresh-${issued}`;
+      issuedTokens.push(access, refresh);
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(
         JSON.stringify({
-          access_token: jwt(`placeholder-access-${issued}`),
-          refresh_token: `placeholder-refresh-${issued}`,
+          access_token: access,
+          refresh_token: refresh,
           expires_in: 3600,
           token_type: 'bearer',
         }),
@@ -165,6 +185,10 @@ export async function tokenEndpoint(): Promise<TokenEndpoint> {
     refuseRefresh: (on) => {
       refusing = on;
     },
+    refuseCodes: (description) => {
+      refusedCodeWith = description;
+    },
+    issued: issuedTokens,
     close: () =>
       new Promise<void>((resolve) => {
         gate.resolve();
@@ -183,6 +207,10 @@ export interface FakeBrowser {
   browser: IBrowser;
   /** The callback ports of the logins opened so far, in order. */
   ports: number[];
+  /** The authorization URLs opened so far, in order. */
+  urls: string[];
+  /** What the callback listener answered the browser, in order. */
+  answers: string[];
   answering(on: boolean): void;
   /** Resolves when the `n`-th open (1-based) has happened. */
   opened(n: number): Promise<void>;
@@ -190,6 +218,8 @@ export interface FakeBrowser {
 
 export function fakeBrowser(): FakeBrowser {
   const ports: number[] = [];
+  const urls: string[] = [];
+  const answers: string[] = [];
   let answer = true;
   const waiters: Array<{ n: number; resolve(): void }> = [];
   const browser: IBrowser = {
@@ -197,6 +227,7 @@ export function fakeBrowser(): FakeBrowser {
       const parsed = new URL(url);
       const redirect = parsed.searchParams.get('redirect_uri') ?? '';
       const state = parsed.searchParams.get('state') ?? '';
+      urls.push(url);
       ports.push(Number(new URL(redirect).port));
       for (const waiter of waiters.filter((w) => w.n <= ports.length)) {
         waiter.resolve();
@@ -204,13 +235,19 @@ export function fakeBrowser(): FakeBrowser {
       if (answer) {
         void fetch(
           `${redirect}?code=the-code&state=${encodeURIComponent(state)}`,
-        ).catch(() => undefined);
+        )
+          .then(async (response) => {
+            answers.push(await response.text());
+          })
+          .catch(() => undefined);
       }
     },
   };
   return {
     browser,
     ports,
+    urls,
+    answers,
     answering: (on) => {
       answer = on;
     },
@@ -249,6 +286,12 @@ export interface StandOptions {
    * `--shutdown-timeout` in milliseconds, if any.
    */
   shutdown?: { timeoutMs?: number };
+  /** The client secret of a `jwt` destination (default `client-secret`). */
+  clientSecret?: string;
+  /** The factory's `authDebug`. */
+  authDebug?: boolean;
+  /** The factory's `logger` (silent by default). */
+  logger?: ILogger;
   /** Where the factory's prompt logger writes (`info`: stderr in the program). */
   promptLines?: string[];
 }
@@ -313,7 +356,7 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
               'SAP_GRANT_TYPE=authorization_code',
               `SAP_UAA_URL=${tokens.url}`,
               'SAP_UAA_CLIENT_ID=client-id',
-              'SAP_UAA_CLIENT_SECRET=client-secret',
+              `SAP_UAA_CLIENT_SECRET=${options.clientSecret ?? 'client-secret'}`,
             ]
           : [
               'SAP_AUTH_TYPE=basic',
@@ -363,7 +406,8 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
               options.promptLines?.push(line);
             },
           },
-    logger: silentLogger,
+    logger: options.logger ?? silentLogger,
+    ...(options.authDebug === true && { authDebug: true }),
     ...(options.renewal !== undefined && { renewal: options.renewal }),
     ...(options.loginTimeoutStated !== undefined && {
       loginTimeoutStated: options.loginTimeoutStated,

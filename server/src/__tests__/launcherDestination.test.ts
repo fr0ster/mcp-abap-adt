@@ -1,7 +1,7 @@
 /**
  * The launcher's destination: what the parameters build (one factory, one
  * destination, the browser reaching the login strategy), what stops a start
- * before any transport, and the startup summary's mask, unchanged.
+ * before any transport, and the startup summary's presence-only secrets.
  */
 
 import { EventEmitter } from 'node:events';
@@ -46,7 +46,7 @@ import { readConfigFile } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { AuthBrokerFactory, type LoginStrategyOptions } from '../auth';
 import { CORE_PARAMETERS, readCoreConfig } from '../config/coreParameters';
-import { factoryConfigFrom, launch } from '../launcher.js';
+import { AUTH_DEBUG_WARNING, factoryConfigFrom, launch } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
 
 /** The launcher's options as `mcp-abap-adt` passes them. */
@@ -520,7 +520,7 @@ describe('a destination that cannot be served stops the start', () => {
 });
 
 describe('the startup summary', () => {
-  it('a basic destination: the password masked exactly as before', async () => {
+  it('a basic destination: the password by its presence only', async () => {
     writeSession('dest', basicLines());
     const { stderr } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
     const summary = stderr.join('\n');
@@ -533,9 +533,40 @@ describe('the startup summary', () => {
     expect(summary).toContain(
       `║  Username:      ${'placeholder-user'.padEnd(45)}║`,
     );
-    // Over 20 characters: the first four and the last four, as before.
-    expect(summary).toContain(`║  Password:      ${'plac***long'.padEnd(45)}║`);
+    expect(summary).toContain(`║  Password:      ${'set'.padEnd(45)}║`);
     expect(summary).not.toContain(PASSWORD);
+  });
+});
+
+describe('--auth-debug', () => {
+  it('prints one start warning line and hands the factory authDebug', async () => {
+    writeSession('dest', basicLines());
+    // The debug lines go through console.error: stderr in the program.
+    const lines = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { stderr } = await run([
+      '--mcp=dest',
+      `--auth-broker-path=${root}`,
+      '--auth-debug',
+    ]);
+    expect(lines).toHaveBeenCalled();
+    lines.mockRestore();
+    expect(stderr.filter((line) => line.includes('--auth-debug'))).toEqual([
+      AUTH_DEBUG_WARNING,
+    ]);
+    expect(
+      factoryConfigFrom(readCoreConfig(['--auth-debug'], {}), {
+        browserStrategy: () => {
+          throw new Error('not built');
+        },
+        promptLogger: { info() {}, warn() {}, error() {}, debug() {} },
+      }).authDebug,
+    ).toBe(true);
+  });
+
+  it('says nothing without it', async () => {
+    writeSession('dest', basicLines());
+    const { stderr } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
+    expect(stderr.join('\n')).not.toContain('--auth-debug');
   });
 });
 

@@ -68,6 +68,7 @@ browser: system                # system | auto | chrome | edge | firefox | none 
 renewal: refresh-then-login    # refresh-then-login | refresh-only
 browser-auth-port: 61001
 # login-timeout: 300           # seconds, 1-86400; no default (a login has no bound)
+# auth-debug: true             # providers' debug lines on stderr, secrets' first and last four characters; no environment form
 state-idle-minutes: 30
 # shutdown-timeout: 25         # seconds, 1-86400; no default (a shutdown waits)
 ```
@@ -85,6 +86,7 @@ state-idle-minutes: 30
 | `renewal` | string | `refresh-then-login` | `refresh-then-login` or `refresh-only` (never a login) |
 | `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |
 | `login-timeout` | number | — | Seconds after which a browser login is ended, 1-86400; no default (no bound) |
+| `auth-debug` | boolean | `false` | The token providers' debug lines on stderr; a refused token request's line names the first and last four characters of each secret it sent. YAML and `--auth-debug` only: no environment variable |
 
 `state-idle-minutes` here bounds the stdio instance's held state.
 

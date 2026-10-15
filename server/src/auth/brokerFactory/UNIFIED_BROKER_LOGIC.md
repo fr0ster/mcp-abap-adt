@@ -30,7 +30,7 @@ broker's `renewal` says.
 6. **The options the server states for every broker**: `renewal` — `refreshThenLogin()`, or
    `refreshOnly()` under `--renewal=refresh-only`; `onWriteFailure` by the store — `'fail'` for the
    `--env` / `--env-path` file, `'continue'` for a named destination (in memory, or `sessions/`
-   under `--unsafe`); `authDebug: false`. The handler adds its own (`authorization` for
+   under `--unsafe`); `authDebug` — `false` unless `--auth-debug` (never an environment variable). The handler adds its own (`authorization` for
    `jwt` / `authorization_code`).
 
 ## The default destination

@@ -1023,6 +1023,13 @@ transport's options only:
   from 1 to 86400, no default): a login still waiting then ends `aborted`, answered with "The
   login was ended by the server's login timeout (`--login-timeout=<n>`)." (the bound named in the
   form you set it).
+- **`--auth-debug`** (YAML `auth-debug`; **no environment form**) is new, in `mcp-abap-adt` only: it
+  builds the brokers with `authDebug: true`, routes the broker's and the token providers' lines to
+  stderr, and a refused token request's line then names each secret's first and last four
+  characters; one warning line at start says so. No `DEBUG_*` variable or `MCP_AUTH_DEBUG` turns
+  it on. **The startup summary shows a secret by its presence only** (`Password: set`, `JWT Token:
+  set`): the first-and-last-four masks of 18.x are gone, so a script that read a fragment from the
+  summary reads nothing now. `maskSensitiveValue` left `@mcp-abap-adt/lib/utils`.
 - **A tool call cannot be cancelled**, on every transport: it ends with its result or with the
   session. A client's cancel (`notifications/cancelled`) aborts nothing: the call keeps its place
   in the queue, its connect, login and system lookup run on, its tool runs, and the MCP SDK sends
@@ -1081,7 +1088,8 @@ transport's options only:
   place of `browser: string`, a `browserStrategy` taking `{ browser?: IBrowser; port?: number }`
   (auth-providers 6's `browserCallbackStrategy` fits), a required `promptLogger`
   (`promptLogger(stderr, diagnostics)`), `renewal?: 'refresh-then-login' | 'refresh-only'`, and
-  `loginTimeoutMs?` (`--login-timeout` in milliseconds; absent: no bound).
+  `loginTimeoutMs?` (`--login-timeout` in milliseconds; absent: no bound), and `authDebug?`
+  (`--auth-debug`; absent: off — route `logger` to stderr with it).
 - **Each tool call has a request signal** (`BaseMcpServer`): aborted when the session ends — the
   instance's transport closed, which is the instance's close (`closeInstance`, below); a host
   that connects a transport per request (as Streamable HTTP does) passes

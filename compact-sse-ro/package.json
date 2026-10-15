@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/compact-sse-ro",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-compact-sse-ro",
-  "version": "18.1.0",
+  "version": "19.0.0",
   "description": "The read-only compact MCP server for SAP ABAP ADT over HTTP+SSE: the 16 compact tools that change nothing, with credentials only from the x-sap-* headers of the request that opens each SSE connection. No auth broker, no stores.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -59,9 +59,9 @@
     "start": "node ./bin/mcp-abap-adt-compact-sse-ro.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/compact-readonly-entries": "^18.1.0",
-    "@mcp-abap-adt/lib": "^18.1.0",
-    "@mcp-abap-adt/sse": "^17.1.0"
+    "@mcp-abap-adt/compact-readonly-entries": "^19.0.0",
+    "@mcp-abap-adt/lib": "^19.0.0",
+    "@mcp-abap-adt/sse": "^19.0.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

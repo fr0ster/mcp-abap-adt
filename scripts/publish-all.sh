@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publish the sixteen packages of this repository to npm, in dependency order.
+# Publish the seventeen packages of this repository to npm, in dependency order.
 #
 # Usage: npm run release:publish            (add --dry-run to rehearse)
 #

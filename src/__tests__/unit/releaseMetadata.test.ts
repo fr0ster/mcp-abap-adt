@@ -17,7 +17,11 @@ const json = (file: string) => JSON.parse(read(file));
 const manifests = {
   lib: json('package.json'),
   core: json('server/package.json'),
+  http: json('http/package.json'),
+  sse: json('sse/package.json'),
   compact: json('compact/package.json'),
+  'compact-http': json('compact-http/package.json'),
+  'compact-sse': json('compact-sse/package.json'),
   'background-runs-memory': json('background-runs-memory/package.json'),
   'responsible-rules': json('responsible-rules/package.json'),
   'compact-readonly-entries': json('compact-readonly-entries/package.json'),
@@ -33,7 +37,7 @@ const version: string = manifests.lib.version;
 const major = version.split('.')[0];
 
 describe('release metadata names the version npm will carry', () => {
-  it('the thirteen packages are released together', () => {
+  it('the seventeen packages are released together', () => {
     for (const [name, manifest] of Object.entries(manifests)) {
       expect(`${name} ${manifest.version}`).toBe(`${name} ${version}`);
     }
@@ -69,12 +73,6 @@ describe('release metadata names the version npm will carry', () => {
   // a different server. The entry names the package's transport: stdio for
   // the four destination servers, Streamable HTTP and SSE for the eight
   // listeners, which take their credentials from x-sap-* headers.
-  const listeners = {
-    http: json('http/package.json'),
-    sse: json('sse/package.json'),
-    'compact-http': json('compact-http/package.json'),
-    'compact-sse': json('compact-sse/package.json'),
-  };
   const entries: Array<
     [
       string,
@@ -91,16 +89,16 @@ describe('release metadata names the version npm will carry', () => {
     ['server-compact.json', manifests.compact, 'stdio'],
     ['server-ro.json', manifests['core-ro'], 'stdio'],
     ['server-compact-ro.json', manifests['compact-ro'], 'stdio'],
-    ['server-http.json', listeners.http, 'streamable-http'],
-    ['server-compact-http.json', listeners['compact-http'], 'streamable-http'],
+    ['server-http.json', manifests.http, 'streamable-http'],
+    ['server-compact-http.json', manifests['compact-http'], 'streamable-http'],
     ['server-http-ro.json', manifests['http-ro'], 'streamable-http'],
     [
       'server-compact-http-ro.json',
       manifests['compact-http-ro'],
       'streamable-http',
     ],
-    ['server-sse.json', listeners.sse, 'sse'],
-    ['server-compact-sse.json', listeners['compact-sse'], 'sse'],
+    ['server-sse.json', manifests.sse, 'sse'],
+    ['server-compact-sse.json', manifests['compact-sse'], 'sse'],
     ['server-sse-ro.json', manifests['sse-ro'], 'sse'],
     ['server-compact-sse-ro.json', manifests['compact-sse-ro'], 'sse'],
   ];

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [19.0.0]
+## [19.0.0] - 2026-10-15
 
 The server split by transport and tool set into packages of their own — seventeen packages, twelve binaries — on the 6.0 auth chain (`auth-broker` 5, `auth-providers` 6, `auth-stores` 5) and the removal chain (`connection` 17.1, `interfaces-adt-connection` 3, `interfaces-adt` 16, `adt-clients` 31.1): the system type required, the low set gone, a logoff at every session end, no cancellation of a started tool. Migration: [`docs/MIGRATION-19.0.md`](docs/MIGRATION-19.0.md).
 

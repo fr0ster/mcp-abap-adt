@@ -9,8 +9,7 @@
  * and their honesty about what they could and couldn't find.
  *
  * Step 1's answer: the repository owner ruled for "find the trace on this
- * side" (option 1) — see `.superpowers/sdd/2026-09-12-consumer-side-migration/
- * task-24-report.md`. `trace_lookup_uris` is accepted and ignored (adt-clients
+ * side" (option 1). `trace_lookup_uris` is accepted and ignored (adt-clients
  * 19's `IProfilerListOptions` is `{ user?: string }` — no URI to put it in).
  * `run_status`/`trace_requests_status` are gone in every option: `run` and
  * `runWithProfiler` answer `IAdtResponse<string>` and `ClassExecutor` takes no

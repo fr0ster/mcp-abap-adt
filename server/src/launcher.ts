@@ -71,7 +71,7 @@ const silentLogger: ILogger = {
 const loggerForTransport =
   process.env.DEBUG_AUTH_LOG === 'true' ? stderrLogger : silentLogger;
 
-/** The one line `--auth-debug` prints at the start (D24). */
+/** The one line `--auth-debug` prints at the start. */
 export const AUTH_DEBUG_WARNING =
   "[MCP] --auth-debug is on: a refused token request's debug line on stderr names the first and last four characters of each secret it sent";
 
@@ -214,7 +214,7 @@ EXAMPLES:
   # (or SAP_CONNECTION_TYPE=rfc in the .env file)
   ${program} --env-path=my-system.env --connection-type=rfc
 
-  # Explicit system type (tools default to cloud; the connector to cloud for a jwt, else onprem)
+  # Explicit system type (required: onprem, cloud or legacy)
   ${program} --env-path=<system>.env --system-type=onprem
 
   # A YAML config file (a template is written when it does not exist)
@@ -243,7 +243,7 @@ export function coreHelp(
 }
 
 /**
- * What a command passes core's launcher (spec §3.5, D37, D49): the tools it
+ * What a command passes core's launcher: the tools it
  * serves, and its own name and version — nothing else. Everything the
  * launcher does — options, the destination, credentials, cancellation,
  * failures, shutdown — is stdio's, the same for any tool set:
@@ -459,9 +459,9 @@ export function factoryConfigFrom(
 
 /**
  * The words a startup failure is reported in: what the failure reader makes
- * of it (`destinationFailureWords`: the §7.3 message, its hint, the server's
+ * of it (`destinationFailureWords`: the failure message, its hint, the server's
  * sentence), else the destination and the error's class — never its
- * message, which may quote a file it could not parse (H4).
+ * message, which may quote a file it could not parse.
  */
 function startupWords(
   error: unknown,
@@ -543,7 +543,7 @@ export function startConnectionWords(
 }
 
 /**
- * The startup check (D18), then the summary. The destination's settings are
+ * The startup check, then the summary. The destination's settings are
  * read and its provider is built — `getProvider(destination, { signal })`
  * with the start's own signal, aborted once the check ends — so a
  * destination the broker refuses stops the start; building sends nothing.
@@ -636,7 +636,7 @@ export async function launch(
   // The command's tool set: fixed by the command, never by a flag.
   const handlersRegistry = registryOf(options.toolSet, 'stdio');
 
-  // The browser of a login, mapped by the platform (D9); a choice that
+  // The browser of a login, mapped by the platform; a choice that
   // cannot be served stops the start before anything is read.
   let browser: IBrowser | undefined;
   let browserUnavailable: string | undefined;
@@ -646,7 +646,7 @@ export async function launch(
       deps.platform ?? process.platform,
     );
     // No browser on this platform refuses only a destination that logs in,
-    // at the startup check (D18); the others start.
+    // at the startup check; the others start.
     if (mapping.unavailable !== undefined) {
       browserUnavailable = mapping.unavailable;
     } else {
@@ -669,14 +669,14 @@ export async function launch(
       browser,
       browserUnavailable,
       // A login prompts on stderr whatever DEBUG_AUTH_LOG says; the broker's
-      // diagnostics stay gated (§9).
+      // diagnostics stay gated.
       promptLogger: promptLogger(deps.stderr, loggerForTransport),
-      // --auth-debug routes the providers' debug lines to stderr (D24).
+      // --auth-debug routes the providers' debug lines to stderr.
       logger: config.authDebug === true ? stderrLogger : loggerForTransport,
     }),
   );
 
-  // The start is tracked, and the shutdown (D33) installed, before anything
+  // The start is tracked, and the shutdown installed, before anything
   // is read: a signal or the client closing stdin during the startup check
   // is latched like one later — latch, every owned connection logged off at
   // once and the running tools interrupted, the MCP server closed (none yet
@@ -792,7 +792,7 @@ export async function launch(
 
 /**
  * The launcher's last line when `main()` rejects: fixed words and auth-errors'
- * `logFields` of what the value classifies as — never its message (§9).
+ * `logFields` of what the value classifies as — never its message.
  */
 export function launcherFailedLine(thrown: unknown): string {
   return `[MCP] launcher failed: ${JSON.stringify(logFields(classify(thrown, 'unfamiliar-error')))}`;

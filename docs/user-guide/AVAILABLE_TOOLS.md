@@ -18,11 +18,10 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `high` -> [High-Level Group](#high-level-group): `mcp-abap-adt`, `-http`, `-sse`
 - `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
 - every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
-- compact -> [High-Level / Compact](#high-level-compact): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
+- compact -> [the compact package](../../compact/README.md): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
 
 ## Navigation
 
-- [Compact Set](#high-level-compact)
 - [Read-Only Group](#read-only-group)
   - [Background Run](#read-only-background-run)
     - [DiscardBackgroundRun](#discardbackgroundrun-read-only-background-run)

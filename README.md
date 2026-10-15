@@ -251,7 +251,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader (dumps — filtered by user, runtime error, exception, object, package or component, and read past SAP's 100 entries per request — system messages, gateway errors), SM02 system messages, Gateway error log
 - **🐞 Debugger** (in `mcp-abap-adt`, `-http`, `-sse` and the compact write binaries; in no `-ro` binary): ABAP and AMDP — breakpoints (line, exception, statement, message; a line breakpoint may carry a condition), a background run of a class or report caught at them, another user's requests and terminal mode, stack, variables, watchpoints, steps, leaving a debuggee running, the debugger settings, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. In user mode a breakpoint catches every request of the request user (the connected SAP user unless another is named): where that must not be possible, install a `-ro` binary. See [Debugger](docs/user-guide/DEBUGGER.md)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
-- **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
+- **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destinations))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
 
 > ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.
@@ -315,7 +315,7 @@ After installing globally with `npm install -g`, you can run from any directory:
 # Show help
 mcp-abap-adt --help
 
-# Default stdio mode (for MCP clients; requires .env file or --mcp parameter)
+# Default stdio mode (for MCP clients; the destination comes from --mcp, or from a .env file named with --env or --env-path: a .env in the working directory is read only when named)
 mcp-abap-adt --system-type=<onprem|cloud>
 
 # Streamable HTTP on a custom port (@mcp-abap-adt/http; credentials from x-sap-* headers)

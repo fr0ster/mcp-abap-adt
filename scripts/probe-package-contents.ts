@@ -2,7 +2,7 @@
  * Measure the traversal cost of the three walking tools, so the safety bound the
  * result/error-strategies design leaves to stage 1 is a measurement rather than a guess.
  *
- * The design (docs/superpowers/specs/2026-09-08-result-error-strategies-design.md) makes
+ * The result/error-strategies design makes
  * `GetPackageTree`, `GetPackageContents` and `GetObjectsList` bounded traversals that say so
  * in their answer. It deliberately does not fix the bound: "it is a number, not a principle,
  * and belongs with the inventory that shows how large real packages are."
@@ -307,8 +307,7 @@ async function main(): Promise<void> {
       '    not to its neighbours.\n' +
       '  - Round trips are counted at getAxiosInstance(), so CSRF fetches and 403 retries are\n' +
       '    included; the initial connect() handshake is not.\n' +
-      '\nRecord these numbers in docs/superpowers/specs/2026-09-09-tool-inventory.md,\n' +
-      'section "The traversal bound", together with the system and package they came from.',
+      '\nRecord these numbers together with the system and package they came from.',
   );
 }
 

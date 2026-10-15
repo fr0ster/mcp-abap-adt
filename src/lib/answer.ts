@@ -5,8 +5,6 @@
  * injected strategies. Turning either half into an MCP result is this file's job, and
  * only this file's: a handler that did it itself would repeat four lines per tool and
  * throw away everything the error contract carries.
- *
- * See docs/superpowers/specs/2026-09-08-result-error-strategies-design.md.
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
@@ -186,8 +184,8 @@ export function answerFailure(
   ctx?: AnswerContext,
 ): McpResult {
   const error = failed as IAdtError & MessageCarrier;
-  // A failure that carries a refusal (§7.2, P6): answered as the chain
-  // made it (§7.3), never rebuilt from the error's message.
+  // A failure that carries a refusal: answered as the chain
+  // made it, never rebuilt from the error's message.
   const read = failureOf(error);
   if (read !== undefined) return answerRead(read);
   // Refused here, before any request: not a claim about the server.
@@ -200,7 +198,7 @@ export function answerFailure(
 /**
  * One failure as an entry of a list — several failures in one answer (a
  * batch's items, a cleanup's steps): the payload the consumer gets for that
- * failure alone, with its step. A chain failure is its own payload (§7.3),
+ * failure alone, with its step. A chain failure is its own payload,
  * never the method's message.
  */
 export type FailureEntry = Record<string, unknown>;
@@ -361,7 +359,7 @@ function messageOf(thrown: unknown): string {
  * `answer()` and a handler that works by throws share.
  */
 export function answerThrown(thrown: unknown, ctx: AnswerContext): McpResult {
-  // The failure reader first (§7.2): a thrown refusal is the chain's.
+  // The failure reader first: a thrown refusal is the chain's.
   const read = failureOf(thrown);
   if (read !== undefined) return answerRead(read);
   // Refused here, before any request: not a claim about the server.

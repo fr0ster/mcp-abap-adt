@@ -28,7 +28,7 @@ const OUTPUT_PATHS = {
   high: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_HIGH.md'),
   legacy: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LEGACY.md'),
 };
-// `low` left in 19.0.0 (D56): the low set is not served by the full binaries,
+// `low` left in 19.0.0: the low set is not served by the full binaries,
 // and the low handler files that remain serve compact and high only.
 const LEVELS = ['readonly', 'high', 'debug', 'session'];
 
@@ -759,7 +759,7 @@ function readOnlyCopies(tools) {
  * `-sse-ro`), taken from the set the binary uses — `fullReadOnlyToolSet` of
  * the build — never from a group or a folder: the readonly folders also hold
  * the background-run tools, which core-ro does not serve, and the run tools
- * are served there without `background` (C23). Each tool keeps its source
+ * are served there without `background`. Each tool keeps its source
  * file and object; its parameters are the set's: a parameter the set's
  * definition does not declare is dropped. Throws when the set serves a tool
  * the file walk did not find, so the page cannot silently miss one.
@@ -879,10 +879,9 @@ function generateMarkdown(tools) {
   md += `- \`high\` -> [High-Level Group](#high-level-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`\n`;
   md += `- \`debug\` -> [Debug Group](#debug-group): \`mcp-abap-adt\`, \`-http\`, \`-sse\`; no \`-ro\` binary\n`;
   md += `- every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file\n`;
-  md += `- compact -> [High-Level / Compact](#high-level-compact): \`mcp-abap-adt-compact\` and \`mcp-abap-adt-compact-ro\` (and \`-compact-http\`, \`-compact-sse\`, each with its \`-ro\`)\n\n`;
+  md += `- compact -> [the compact package](../../compact/README.md): \`mcp-abap-adt-compact\` and \`mcp-abap-adt-compact-ro\` (and \`-compact-http\`, \`-compact-sse\`, each with its \`-ro\`)\n\n`;
 
   md += `## Navigation\n\n`;
-  md += `- [Compact Set](#high-level-compact)\n`;
   for (const level of LEVELS) {
     const objects = Object.values(grouped[level]).sort((a, b) =>
       a.objectTitle.localeCompare(b.objectTitle),

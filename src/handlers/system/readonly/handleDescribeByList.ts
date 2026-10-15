@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
 
 // DescribeByList: Batch description for a list of ABAP objects
 
-import { failedPayloadOf } from '../../../lib/answer';
+import { failedPayloadOf, isCredentialPayload } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
@@ -105,6 +105,9 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
               res as { isError?: boolean; content?: unknown },
               'search',
             ) ?? { message: textOf(res), step: 'search' };
+            // A credential failure is every object's: the call ends with it
+            // as it came.
+            if (isCredentialPayload(failure)) return res;
             results.push({
               type: 'text',
               text: JSON.stringify({ name: obj.name, error: failure }),

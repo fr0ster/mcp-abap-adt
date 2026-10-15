@@ -190,6 +190,15 @@ export async function handleGetStructuresList(
     // object_type, so the response can flag that appends could not be
     // determined (≠ "no appends"). #128
     let appendsUnavailable = false;
+    // Append candidates where-used named but SAP refused to read: each with
+    // its refusal as it is, the step `read append candidate` and its name —
+    // listed, not skipped as "not an append". A candidate both endpoints
+    // answer 404 for is absent and stays skipped.
+    const unreadCandidates: Array<{
+      candidate: string;
+      step: 'read append candidate';
+      failures: FailureEntry[];
+    }> = [];
     if (!structure_name)
       return return_error(new Error('structure_name is required'));
 
@@ -319,6 +328,13 @@ export async function handleGetStructuresList(
       const refs: EmbeddedRef[] = [];
       for (const cand of candidates) {
         const read = await readDdl(cand);
+        if ('failures' in read) {
+          unreadCandidates.push({
+            candidate: cand,
+            step: 'read append candidate',
+            failures: read.failures,
+          });
+        }
         const csrc = 'source' in read ? read.source : null;
         if (csrc && extendRe.test(csrc)) {
           refs.push({ name: cand, attribute: null, kind: 'append' });
@@ -402,6 +418,9 @@ export async function handleGetStructuresList(
           // determined and the tree may be missing them (≠ "no appends"). #128
           ...(includeExtensions && appendsUnavailable
             ? { appends_unavailable: true }
+            : {}),
+          ...(unreadCandidates.length > 0
+            ? { append_candidates_unread: unreadCandidates }
             : {}),
           tree,
         },

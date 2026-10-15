@@ -1,4 +1,4 @@
-import { type FailureEntry, thrownEntry } from '../answer';
+import { type FailureEntry, isCredentialFailure, thrownEntry } from '../answer';
 import { failureOf } from '../auth/failures';
 import type { HandlerContext } from '../handlers/interfaces';
 import { methodFailureOf } from '../strategies/step';
@@ -202,9 +202,11 @@ export async function runSearchSource(
           // A read that failed — SAP's refusal, a chain failure — is this
           // object's answer, with its step; the others are scanned on. The
           // hits read before it stay.
+          // A credential failure is every item's: it ends the call as it came.
           if (
-            methodFailureOf(error) === undefined &&
-            failureOf(error) === undefined
+            isCredentialFailure(error) ||
+            (methodFailureOf(error) === undefined &&
+              failureOf(error) === undefined)
           )
             throw error;
           failures.push({

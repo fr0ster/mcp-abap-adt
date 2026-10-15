@@ -129,7 +129,14 @@ export type DebugState =
   | { state: 'idle' }
   | { state: 'listening' }
   | { state: 'stopped'; stop: StopView }
-  | { state: 'ended'; reason: EndReason; run?: RunOutcome; message?: string };
+  | {
+      state: 'ended';
+      reason: EndReason;
+      run?: RunOutcome;
+      message?: string;
+      /** A refused attach: the method's error as it is, with its step. */
+      failure?: DebugFailure;
+    };
 export interface DebugView<T> {
   value: T;
   raw: string;
@@ -246,6 +253,13 @@ const bodyOf = (a: IAdtResponse<unknown>): string =>
 const messageOf = (a: IAdtResponse<unknown>): string =>
   a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
+/**
+ * A listener failure that was a throw (a connection, a collaborator): it
+ * carries its entry — the carried method's error as it is, a credential
+ * failure as it came, else the throw as ours (`client_threw`) — with the step.
+ */
+const listenerThrown = (e: unknown, step: string): DebugListenerError =>
+  carryingPayload(new DebugListenerError(thrown(e)), thrownFailure(e, step));
 /** A debug error that carries the method's error as it is, with its step. */
 const failedAt = <E extends Error>(
   error: E,
@@ -306,6 +320,11 @@ function listenerError(
   answer: IAdtResponse<unknown>,
   step: string,
 ): DebugListenerError {
+  if (!answer.ok && isFromThrow(answer.getError()))
+    return carryingPayload(
+      new DebugListenerError(messageOf(answer)),
+      failedEntry(answer, step),
+    );
   const held = answer.ok ? undefined : readListenerConflict(answer.getError());
   return failedAt(
     held
@@ -851,7 +870,10 @@ export class DebugSession<O = unknown> {
       // (stopped, dropped or superseded) changes nothing. A listener this loop dropped itself
       // already has its failure set.
       if (this.owns(listener, generation)) {
-        this.failure ??= thrown(error);
+        if (this.failure === undefined) {
+          this.failure = thrown(error);
+          this.failedListen = listenerThrown(error, 'listen');
+        }
         await this.dropListener(); // a close that throws is kept and recorded
       }
       this.notify();
@@ -911,7 +933,7 @@ export class DebugSession<O = unknown> {
         this.notices.push({
           state: 'ended',
           reason: 'attach_refused',
-          message: messageOf(attached),
+          failure: failedEntry(attached, 'attach'),
         });
         await this.closeOrRecord(connection, "the debuggee's connection");
         return false;
@@ -962,6 +984,7 @@ export class DebugSession<O = unknown> {
       // The failure and the drop below happen whatever the close does; a close that throws is kept.
       await this.closeOrRecord(connection, "the debuggee's connection");
       this.failure = thrown(error);
+      this.failedListen = listenerThrown(error, 'attach');
       await this.dropListener();
       return false;
     }

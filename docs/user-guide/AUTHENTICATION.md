@@ -395,11 +395,15 @@ folded into one text:
   — does not end the call at the first refusal: each item that failed carries its failure
   (`failures[]` with the object for `SearchSource`, `{ name, error }` for `DescribeByList`,
   `error` on the symbol for `GetAbapSystemSymbols`) beside the other items' results, and the
-  rest are read on;
+  rest are read on — except a credential failure (an authentication failure, a `401`): the
+  credentials are the same for every item, so it ends the whole call, as it came;
 - a tool that tries two endpoints — `GetStructuresList` reads a name as a structure, then as a
   table — answers both failures in one array (`read structure`, `read table`) when neither
-  has it; a `404` from both stays absence;
-- a probe that was refused rather than finding nothing (`GetEnhancements`' `unreadable`), a
+  has it; a `404` from both stays absence; an append candidate that where-used named and SAP
+  refused to read is listed in `append_candidates_unread` (`{ candidate, step: 'read append
+  candidate', failures }`), not skipped as "not an append";
+- a probe that was refused rather than finding nothing (`GetEnhancements`' `unreadable`; its
+  enhancements request itself is read the same way, step `read enhancements`), a
   refused typing of a new transport task (`CreateTransportTask`'s `task_type_error`), and
   what a debugger stop could not undo (see [DEBUGGER.md](DEBUGGER.md#what-ends-a-session)).
 

@@ -1,4 +1,9 @@
-import { type FailureEntry, failedPayloadOf } from '../../../lib/answer';
+import {
+  type FailureEntry,
+  failedPayloadOf,
+  isCredentialPayload,
+  type McpResult,
+} from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { return_error } from '../../../lib/utils';
@@ -468,14 +473,26 @@ function refusalOf(
   const payload = failedPayloadOf(result, step);
   if (payload === undefined) return;
   if (payload.adt_type === 'ExceptionResourceNotFound') return;
+  // A credential failure is every symbol's: the call ends with the answer as
+  // it came (`resolveSymbols` finds it by the entry).
+  if (isCredentialPayload(payload) && result !== undefined)
+    credentialAnswers.set(payload, result);
   return payload;
 }
+
+/** The delegated answers that were credential failures, by their entry. */
+const credentialAnswers = new WeakMap<object, unknown>();
 
 class AbapSystemSymbolResolver {
   public async resolveSymbols(
     context: HandlerContext,
     symbols: AbapSymbolInfo[],
-  ): Promise<{ resolvedSymbols: AbapSymbolInfo[]; stats: any }> {
+  ): Promise<{
+    resolvedSymbols: AbapSymbolInfo[];
+    stats: any;
+    /** A credential failure's answer, as it came: the call ends with it. */
+    ended?: unknown;
+  }> {
     const resolvedSymbols: AbapSymbolInfo[] = [];
     let resolvedCount = 0;
     let failedCount = 0;
@@ -483,6 +500,11 @@ class AbapSystemSymbolResolver {
     for (const symbol of symbols) {
       try {
         const resolved = await this.resolveSymbol(context, symbol);
+        const ended = resolved.error
+          ? credentialAnswers.get(resolved.error)
+          : undefined;
+        if (ended !== undefined)
+          return { resolvedSymbols, stats: undefined, ended };
         resolvedSymbols.push(resolved);
         if (resolved.systemInfo?.exists) {
           resolvedCount++;
@@ -777,10 +799,11 @@ export async function handleGetAbapSystemSymbols(
 
     // Then, resolve symbols with SAP system information
     const resolver = new AbapSystemSymbolResolver();
-    const { resolvedSymbols, stats } = await resolver.resolveSymbols(
+    const { resolvedSymbols, stats, ended } = await resolver.resolveSymbols(
       context,
       semanticResult.symbols,
     );
+    if (ended !== undefined) return ended as McpResult;
     logger?.info(
       `Resolved ${stats.resolvedSymbols}/${stats.totalSymbols} symbols from system`,
     );

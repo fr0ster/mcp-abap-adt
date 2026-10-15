@@ -226,6 +226,24 @@ export function thrownEntry(thrown: unknown, step: string): FailureEntry {
 }
 
 /**
+ * Whether a failure is a credential failure — the credentials are the same
+ * for every item of a batch, so it ends the call instead of being one item's
+ * answer: a chain failure (`authentication_failed`), or a `401` SAP answered.
+ */
+export function isCredentialFailure(thrown: unknown): boolean {
+  if (failureOf(thrown)?.error === 'authentication_failed') return true;
+  const carried = methodFailureOf(thrown);
+  return (
+    (carried?.response as { status?: unknown } | undefined)?.status === 401
+  );
+}
+
+/** A failed payload (a delegated handler's answer) that is a credential failure. */
+export function isCredentialPayload(payload: FailureEntry): boolean {
+  return payload.error === 'authentication_failed' || payload.status === 401;
+}
+
+/**
  * A delegated handler's failed answer as an entry: its payload as it is,
  * with the step added unless it names one. `undefined` for a success or an
  * answer whose text is not a JSON object.

@@ -7,6 +7,10 @@ import {
   FIRST_POLL_HOLD_SECONDS,
   LISTEN_HOLD_SECONDS,
 } from '../../../lib/debugger/DebugSession';
+import {
+  methodFailureOf,
+  payloadCarriedBy,
+} from '../../../lib/strategies/step';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   CONFLICT,
@@ -199,7 +203,12 @@ describe('DebugSession', () => {
     expect(await session.wait(0)).toMatchObject({
       state: 'ended',
       reason: 'attach_refused',
-      message: 'Debuggee already attached',
+      // The method's error as it is, with the step; no text of ours.
+      failure: {
+        message: 'Debuggee already attached',
+        origin: 'refusal',
+        step: 'attach',
+      },
     });
     expect(world.closed).toHaveLength(1); // the attach connection
   });
@@ -249,7 +258,48 @@ describe('DebugSession', () => {
     const { session } = await listening(world);
     world.polls[1].resolve(LISTEN_CATCH());
     await until(() => world.closed.length === 2);
-    await expect(session.wait(0)).rejects.toThrow(/socket hang up/);
+    const failed = await session.wait(0).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(failed).toBeInstanceOf(DebugListenerError);
+    // A throw is ours, never dressed as SAP's answer, with the step.
+    expect(payloadCarriedBy(failed)).toEqual({
+      error: 'client_threw',
+      message: 'socket hang up',
+      step: 'attach',
+    });
+  });
+
+  it('a listen that throws is a listener failure with the step listen', async () => {
+    const { session, world } = await listening();
+    world.polls[1].reject(new Error('socket hang up'));
+    await until(() => world.closed.length === 1);
+    const failed = await session.wait(0).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(failed).toBeInstanceOf(DebugListenerError);
+    expect(payloadCarriedBy(failed)).toEqual({
+      error: 'client_threw',
+      message: 'socket hang up',
+      step: 'listen',
+    });
+  });
+
+  it('a refused listen carries the method error as it is, with the step listen', async () => {
+    const { session, world } = await listening();
+    world.polls[1].resolve(refusedResponse('Listener is gone'));
+    await until(() => world.closed.length === 1);
+    const failed = await session.wait(0).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(methodFailureOf(failed)).toMatchObject({
+      message: 'Listener is gone',
+      origin: 'refusal',
+      step: 'listen',
+    });
   });
 
   it('a step that stays rereads the stack; a refused step keeps the stop', async () => {

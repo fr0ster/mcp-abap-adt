@@ -166,7 +166,10 @@ meanwhile is not caught.
 A background run reports its outcome — its output, or its failure — as the end of
 the session state: `DebugWait` answers `ended` with reason `run_finished`. Other
 reasons are `debuggee_ended`, `terminated`, `attach_refused` and
-`attach_impossible`; none of them is an error.
+`attach_impossible`; none of them is an error. An `attach_refused` carries `failure`: SAP's
+refusal as it is, with the step `attach`. A listener or an attach that fails by a throw of
+ours (not an answer of SAP) fails the next wait as `client_threw` with the step `listen` or
+`attach`.
 
 Answers take `detail`: `terse` (default — what is needed to act), `full` (every
 field, the whole stack) or `raw` (the system's document as it came).

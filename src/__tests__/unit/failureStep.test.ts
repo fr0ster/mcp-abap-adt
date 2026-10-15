@@ -6,6 +6,7 @@
  * A source or level that is not there (`404`) stays what it was.
  */
 
+import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
@@ -343,6 +344,240 @@ describe('GetStructuresList: both endpoints failed', () => {
       failureEntryOf('read structure', 'No authorization'),
       failureEntryOf('read table', 'No authorization for the table'),
     ]);
+  });
+});
+
+describe('GetEnhancements: the elements request is read like every other answer', () => {
+  const run = (makeAdtRequest: () => Promise<unknown>) =>
+    handleGetEnhancements(
+      { connection: { makeAdtRequest }, logger: undefined } as any,
+      { object_name: 'ZCL_X', object_type: 'class' },
+    ) as Promise<any>;
+
+  it('a 403 SAP answered is the method error as it is, with step read enhancements', async () => {
+    const result = await run(async () => {
+      const error: any = new Error('Request failed with status code 403');
+      error.response = { status: 403, data: DOCUMENT };
+      throw error;
+    });
+    expect(result.isError).toBe(true);
+    // The strategy's reading: the transport's sentence, SAP's document read
+    // into `messages`, the document itself as `raw_body`.
+    expect(payloadOf(result)).toEqual({
+      message: 'Request failed with status code 403',
+      messages: [{ type: 'E', text: 'No authorization' }],
+      origin: 'refusal',
+      step: 'read enhancements',
+      status: 403,
+      raw_body: DOCUMENT,
+      request: {
+        method: 'GET',
+        url: '/sap/bc/adt/oo/classes/ZCL_X/source/main/enhancements/elements',
+      },
+    });
+  });
+
+  it('a 200 whose document is an exception is a refusal too', async () => {
+    const result = await run(async () => ({ status: 200, data: DOCUMENT }));
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({
+      origin: 'refusal',
+      step: 'read enhancements',
+      message: 'No authorization',
+    });
+  });
+
+  it('a failure with no answer behind it keeps its words and carries no SAP status', async () => {
+    const result = await run(async () => {
+      throw new Error('socket hang up');
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain('socket hang up');
+    expect(result.content[0].text).not.toContain('"status"');
+  });
+});
+
+describe('a credential failure inside a batch tool ends the whole call, as it came', () => {
+  const credential = () =>
+    new AuthProviderFailure(
+      authError['credential-refused']({ credential: 'token' }),
+    );
+  const target = (name: string) => ({
+    name,
+    type: 'PROG/P',
+    packageName: 'ZPKG',
+    isPackage: false,
+  });
+
+  it('SearchSource: the failure is thrown, no further object is read', async () => {
+    const read: string[] = [];
+    const failure = credential();
+    const run = runSearchSource(
+      {
+        fetchPackageContents: async () =>
+          [target('ZA'), target('ZB'), target('ZC')] as never,
+        sourceReader: {
+          async readProgram(name) {
+            read.push(name);
+            if (name === 'ZB') throw failure;
+            return 'marker';
+          },
+          readInclude: async () => null,
+          readClassMain: async () => null,
+          fetchFugrStructure: async () => [],
+          readFugrFm: async () => null,
+        },
+        resolvePackages: async (entries) => entries,
+      },
+      {
+        query: 'marker',
+        packages: ['ZPKG'],
+        object_types: ['PROG'],
+        concurrency: 1,
+      },
+    );
+    await expect(run).rejects.toBe(failure);
+    expect(read).toEqual(['ZA', 'ZB']);
+  });
+
+  it('SearchSource: a 401 SAP answered ends it too', async () => {
+    const unauthorized = carryingFailure(
+      new Error('Unauthorized'),
+      {
+        message: 'Unauthorized',
+        origin: 'refusal',
+        response: { status: 401, data: '' },
+      } as IAdtError,
+      'read program',
+    );
+    const run = runSearchSource(
+      {
+        fetchPackageContents: async () => [target('ZA')] as never,
+        sourceReader: {
+          readProgram: async () => {
+            throw unauthorized;
+          },
+          readInclude: async () => null,
+          readClassMain: async () => null,
+          fetchFugrStructure: async () => [],
+          readFugrFm: async () => null,
+        },
+        resolvePackages: async (entries) => entries,
+      },
+      { query: 'marker', packages: ['ZPKG'], object_types: ['PROG'] },
+    );
+    await expect(run).rejects.toBe(unauthorized);
+  });
+
+  it('DescribeByList: the answer is the failure as it came, no object after it is searched', async () => {
+    const searched: string[] = [];
+    fakeClient = fakeClientOf({
+      search: async (criteria: any) => {
+        searched.push(criteria?.query);
+        throw credential();
+      },
+    });
+    const result: any = await handleDescribeByList(context as any, {
+      objects: [
+        { name: 'ZCL_X', type: 'CLAS/OC' },
+        { name: 'ZCL_Y', type: 'CLAS/OC' },
+      ],
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({ error: 'authentication_failed' });
+    expect(payloadOf(result).step).toBeUndefined();
+    expect(new Set(searched)).toEqual(new Set(['ZCL_X']));
+  });
+
+  it('GetAbapSystemSymbols: the answer is the failure as it came, no symbol after it is read', async () => {
+    const reads: string[] = [];
+    fakeClient = fakeClientOf({
+      read: async (config: any) => {
+        reads.push(config?.className);
+        throw credential();
+      },
+    });
+    const result: any = await handleGetAbapSystemSymbols(context as any, {
+      code: 'CLASS zcl_x DEFINITION.\nENDCLASS.\nCLASS zcl_y DEFINITION.\nENDCLASS.',
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({ error: 'authentication_failed' });
+    expect(payloadOf(result).step).toBeUndefined();
+    expect(reads).toHaveLength(1);
+  });
+
+  it("a 403 in the same batch stays that item's answer", async () => {
+    fakeClient = fakeClientOf({ read: async () => forbidden() });
+    const result: any = await handleGetAbapSystemSymbols(context as any, {
+      code: 'CLASS zcl_x DEFINITION.\nENDCLASS.\nCLASS zcl_y DEFINITION.\nENDCLASS.',
+    });
+    expect(result.isError).toBe(false);
+  });
+});
+
+describe('GetStructuresList: an append candidate SAP refused to read is listed', () => {
+  const whereUsedNaming = (...names: string[]) =>
+    okResponse(
+      reading({
+        'usagereferences:usageReferenceResult': {
+          'usagereferences:referencedObjects': {
+            'usagereferences:referencedObject': names.map((name) => ({
+              'usagereferences:adtObject': {
+                '@': { 'adtcore:name': name, 'adtcore:type': 'TABL/DS' },
+              },
+            })),
+          },
+        },
+      }),
+    );
+
+  const clientWith = (candidates: Record<string, () => unknown>) =>
+    fakeClientOf({
+      read: async (config: any) => {
+        const name = config?.structureName ?? config?.tableName;
+        return name === 'ZS'
+          ? okResponse('define structure zs {\n}')
+          : (candidates[name] ?? (() => notThere()))();
+      },
+      getWhereUsedScope: async () => okResponse(reading({ raw: '<scope/>' })),
+      modifyWhereUsedScope: () => '<scope/>',
+      getWhereUsed: async (params: any) =>
+        params?.object_name === 'ZS'
+          ? whereUsedNaming('ZREFUSED', 'ZABSENT', 'ZAPP')
+          : whereUsedNaming(),
+    });
+
+  it('lists the refused candidate: its refusals as they are, the step and its name; absent ones stay skipped', async () => {
+    fakeClient = clientWith({
+      ZREFUSED: () => forbidden(),
+      ZAPP: () => okResponse('extend type zs with zapp { }'),
+    });
+    const result: any = await handleGetStructuresList(context as any, {
+      structure_name: 'ZS',
+    });
+    expect(result.isError).toBe(false);
+    const answer = JSON.parse(result.content[0].text);
+    expect(answer.append_candidates_unread).toEqual([
+      {
+        candidate: 'ZREFUSED',
+        step: 'read append candidate',
+        failures: [
+          failureEntryOf('read structure', 'No authorization'),
+          failureEntryOf('read table', 'No authorization'),
+        ],
+      },
+    ]);
+    expect(answer.tree.children.map((c: any) => c.structure)).toEqual(['ZAPP']);
+  });
+
+  it('lists nothing when every candidate is absent', async () => {
+    fakeClient = clientWith({});
+    const result: any = await handleGetStructuresList(context as any, {
+      structure_name: 'ZS',
+    });
+    expect(
+      JSON.parse(result.content[0].text).append_candidates_unread,
+    ).toBeUndefined();
   });
 });
 

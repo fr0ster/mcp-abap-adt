@@ -1,17 +1,24 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  ADT_NO_FAILURE,
+  type IAdtError,
+  type IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type FailureEntry,
   failureEntry,
   failurePayload,
   thrownEntry,
 } from '../../../lib/answer';
+import { failureOf } from '../../../lib/auth/failures';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure, methodFailureOf } from '../../../lib/strategies/step';
 import {
+  type AxiosResponse,
   encodeSapObjectName,
   logger,
   makeAdtRequest,
@@ -500,17 +507,57 @@ async function getEnhancementsForSingleObject(
 
   // Name the object in a failure: with the type taken from the caller there
   // is no probe in front of this request to have said which object it was.
-  const response = await makeAdtRequest(
-    connection,
-    url,
-    'GET',
-    // No deadline of the server's: the request waits for SAP's answer.
-    0,
-  ).catch((error: unknown) => {
-    throw new EnhancementInputError(
-      `Failed to retrieve enhancements for ${objectName}: ${error instanceof Error ? error.message : String(error)}`,
+  // adt-clients 31.1 has no member for the elements request (open issue
+  // fr0ster/mcp-abap-adt-clients#227), so it is made directly and its answer
+  // is read with the strategy every other read uses.
+  const request = { method: 'GET', url };
+  const refused = (answer: unknown, message: string, verdict?: IAdtError) => {
+    const judged = analyseException(
+      verdict ?? ADT_NO_FAILURE,
+      answer as IAdtWireResponse,
     );
-  });
+    if (judged === ADT_NO_FAILURE) return undefined;
+    return carryingFailure(
+      new EnhancementInputError(message),
+      judged,
+      'read enhancements',
+    );
+  };
+  let response: AxiosResponse;
+  try {
+    response = await makeAdtRequest(
+      connection,
+      url,
+      'GET',
+      // No deadline of the server's: the request waits for SAP's answer.
+      0,
+    );
+  } catch (thrown) {
+    // A credential failure or an error already carrying its answer: as it is.
+    if (
+      failureOf(thrown) !== undefined ||
+      methodFailureOf(thrown) !== undefined
+    )
+      throw thrown;
+    const answer = (thrown as { response?: { status?: unknown } } | undefined)
+      ?.response;
+    const message = thrown instanceof Error ? thrown.message : String(thrown);
+    if (answer !== null && typeof answer === 'object') {
+      const failure = refused(answer, message, {
+        origin: 'refusal',
+        message,
+        response: answer as IAdtWireResponse,
+        request,
+      });
+      if (failure !== undefined) throw failure;
+    }
+    throw new EnhancementInputError(
+      `Failed to retrieve enhancements for ${objectName}: ${message}`,
+    );
+  }
+  // A 200 whose document is an exception is a refusal too.
+  const refusal = refused(response, 'SAP refused the enhancements request');
+  if (refusal !== undefined) throw refusal;
 
   if (response.status === 200 && response.data) {
     // Parse the XML to extract enhancement implementations

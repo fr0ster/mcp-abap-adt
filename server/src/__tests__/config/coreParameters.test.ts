@@ -358,6 +358,7 @@ describe('the YAML template and validation come from the table', () => {
     expect(Object.keys(parsed).sort()).toEqual(
       [
         'auth-broker-path',
+        'auth-debug',
         'browser',
         'browser-auth-port',
         'browser-program',

@@ -580,9 +580,13 @@ describe('DebugSession', () => {
         reason: 'attach_refused',
       });
       expect((await session.wait(0)).state).toBe('listening');
-      expect(session.failures().join()).toMatch(
-        /the debuggee's connection was not closed: close failed/,
-      );
+      expect(session.failures()).toEqual([
+        {
+          error: 'client_threw',
+          message: 'close failed',
+          step: "close the debuggee's connection",
+        },
+      ]);
       refuse = false;
       await session.stop();
       expect(session.holdsState()).toBe(false);
@@ -610,7 +614,7 @@ describe('DebugSession', () => {
       expect(error).toBeInstanceOf(DebugListenerError);
       expect((error as Error).message).toMatch(/SY 530/);
       expect((error as Error).message).toMatch(
-        /not undone: listener: listener busy; breakpoint .*: Breakpoint is locked/,
+        /not undone: stop listener: listener busy; delete breakpoint .*: Breakpoint is locked/,
       );
       expect(session.listBreakpoints()).toHaveLength(1);
     });

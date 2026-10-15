@@ -118,26 +118,88 @@ export function carryingFailure<E extends Error>(
 }
 
 /**
+ * What a handler left behind: a note in words, and — where the leftovers are
+ * failures of their own — each as an entry in the shape of every other
+ * failure (`failures`), with notes that are no debt (`notes`).
+ */
+export interface LeftBehind {
+  message?: string;
+  failures?: readonly unknown[];
+  notes?: readonly unknown[];
+}
+
+/** What was left behind before, with what is added now. */
+export function mergedLeftBehind(
+  prior: unknown,
+  added: LeftBehind,
+): LeftBehind {
+  const before = (prior ?? {}) as LeftBehind;
+  const message = [before.message, added.message]
+    .filter((m): m is string => typeof m === 'string' && m !== '')
+    .join('; ');
+  const failures = [...(before.failures ?? []), ...(added.failures ?? [])];
+  const notes = [...(before.notes ?? []), ...(added.notes ?? [])];
+  return {
+    ...(message ? { message } : {}),
+    ...(failures.length ? { failures } : {}),
+    ...(notes.length ? { notes } : {}),
+  };
+}
+
+/**
  * What a handler left behind after the method failed — cleanup it could not
  * do, state it keeps — added beside the method's error as `cleanup`, the
  * field the `answer()` path already renders for a lock left held. The
  * method's error itself is untouched. Nothing when the throw carries none.
  */
-export function noteLeftBehind(thrown: unknown, note: string): void {
+export function noteLeftBehind(
+  thrown: unknown,
+  note: string | LeftBehind,
+): void {
   const carried = methodFailureOf(thrown);
   if (carried === undefined) return;
-  const prior = (carried as { cleanup?: { message?: unknown } }).cleanup
-    ?.message;
   Object.defineProperty(thrown, METHOD_FAILURE, {
     value: {
       ...carried,
-      cleanup: {
-        message: typeof prior === 'string' ? `${prior}; ${note}` : note,
-      },
+      cleanup: mergedLeftBehind(
+        (carried as { cleanup?: unknown }).cleanup,
+        typeof note === 'string' ? { message: note } : note,
+      ),
     },
     enumerable: false,
     configurable: true,
   });
+}
+
+const CARRIED_PAYLOAD = Symbol('carriedPayload');
+
+/**
+ * A throw that carries its whole answer: a failure that is several failures
+ * (a cleanup's), or an error of ours with what it left behind — each part in
+ * the shape of every other failure. `return_error` answers the payload as it
+ * is.
+ */
+export function carryingPayload<E extends object>(
+  thrown: E,
+  payload: Record<string, unknown>,
+): E {
+  Object.defineProperty(thrown, CARRIED_PAYLOAD, {
+    value: payload,
+    enumerable: false,
+    configurable: true,
+  });
+  return thrown;
+}
+
+/** The payload a throw carries, or `undefined`. */
+export function payloadCarriedBy(
+  thrown: unknown,
+): Record<string, unknown> | undefined {
+  if (thrown === null || typeof thrown !== 'object') return undefined;
+  const carried = (thrown as { [CARRIED_PAYLOAD]?: unknown })[CARRIED_PAYLOAD];
+  return carried === undefined
+    ? undefined
+    : (carried as Record<string, unknown>);
 }
 
 /** A method failure carried on a throw, or `undefined`. */

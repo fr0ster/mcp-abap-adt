@@ -60,5 +60,12 @@ export function safeCleanup(
   const request = safeRequest(carrier.request);
   if (request !== undefined) out.request = request;
 
+  // What was left behind as failures of their own: entries already built in
+  // the shape of every other failure (`failureEntry`, `thrownEntry`).
+  if (Array.isArray(carrier.failures) && carrier.failures.length > 0)
+    out.failures = carrier.failures;
+  if (Array.isArray(carrier.notes) && carrier.notes.length > 0)
+    out.notes = carrier.notes;
+
   return Object.keys(out).length > 0 ? out : undefined;
 }

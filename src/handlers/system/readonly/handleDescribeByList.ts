@@ -34,10 +34,17 @@ export const TOOL_DEFINITION = {
 
 // DescribeByList: Batch description for a list of ABAP objects
 
-import { failedAtStep } from '../../../lib/answer';
+import { failedPayloadOf } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
+
+/** The text of a failed answer that is not a JSON payload, as it is. */
+function textOf(result: unknown): string {
+  const first = (result as { content?: Array<{ text?: unknown }> })
+    ?.content?.[0]?.text;
+  return typeof first === 'string' ? first : '';
+}
 
 /**
  * DescribeByListArray handler.
@@ -90,10 +97,19 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
 
         if (tryWithoutType) {
           res = await handleSearchObject(context, { object_name: obj.name });
-          // A refusal is the search's error as it is, with the step — not an
-          // object skipped as if nothing were found.
+          // A refusal is the search's error as it is, with the step — this
+          // object's answer beside the others', not an object skipped as if
+          // nothing were found, and not the end of the call.
           if ((res as { isError?: boolean })?.isError === true) {
-            return failedAtStep(res, `search ${obj.name}`);
+            const failure = failedPayloadOf(
+              res as { isError?: boolean; content?: unknown },
+              'search',
+            ) ?? { message: textOf(res), step: 'search' };
+            results.push({
+              type: 'text',
+              text: JSON.stringify({ name: obj.name, error: failure }),
+            });
+            continue;
           }
           parsed = typeof res === 'string' ? JSON.parse(res) : res;
           // If it comes back empty, skip this object

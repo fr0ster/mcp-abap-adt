@@ -322,7 +322,9 @@ describe('AmdpSession', () => {
     await expect(stopping).rejects.toThrow(/release debuggee D1: busy/);
     expect(refusedDeletes).toBe(1);
     expect(w.session.pending()).toBe(false);
-    expect(w.session.failures()).toEqual(['release debuggee D1: busy']);
+    expect(w.session.failures()).toEqual([
+      { message: 'busy', origin: 'refusal', step: 'release debuggee D1' },
+    ]);
     expect(w.closed).toHaveLength(0);
     w.dbg.deleteDebuggee = realDelete;
     await w.session.stop();
@@ -357,7 +359,11 @@ describe('AmdpSession', () => {
       /release debuggee D1: release failed/,
     );
     expect(w.session.failures()).toEqual([
-      'release debuggee D1: release failed',
+      {
+        message: 'release failed',
+        origin: 'refusal',
+        step: 'release debuggee D1',
+      },
     ]);
     expect(w.session.holdsState()).toBe(true);
   });
@@ -372,7 +378,9 @@ describe('AmdpSession', () => {
     w.dbg.deleteDebuggee = async () => refusedResponse('busy');
     w.reads[1].resolve(okResponse(BREAK));
     await expect(first).rejects.toThrow(/release debuggee D1: busy/);
-    expect(w.session.failures()).toEqual(['release debuggee D1: busy']);
+    expect(w.session.failures()).toEqual([
+      { message: 'busy', origin: 'refusal', step: 'release debuggee D1' },
+    ]);
     expect(w.session.holdsState()).toBe(true);
   });
 
@@ -426,7 +434,7 @@ describe('AmdpSession', () => {
     await expect(
       w.session.start({ stopExisting: true, breakpoints: [] }),
     ).rejects.toThrow(
-      /socket hang up; not undone: the events' connection was not closed: logoff failed/,
+      /socket hang up; not undone: close the events' connection: logoff failed/,
     );
     expect(w.session.holdsState()).toBe(true);
     refuse = false;
@@ -496,8 +504,16 @@ describe('AmdpSession', () => {
     await expect(w.session.stop()).rejects.toThrow(/logoff failed/);
     expect(w.session.pending()).toBe(false);
     expect(w.session.failures()).toEqual([
-      "the events' connection was not closed: logoff failed",
-      "the commands' connection was not closed: logoff failed",
+      {
+        error: 'client_threw',
+        message: 'logoff failed',
+        step: "close the events' connection",
+      },
+      {
+        error: 'client_threw',
+        message: 'logoff failed',
+        step: "close the commands' connection",
+      },
     ]);
     expect(w.session.holdsState()).toBe(true);
     refuse = false;
@@ -586,7 +602,9 @@ describe('AmdpSession', () => {
     await expect(w.session.wait(0)).rejects.toThrow(
       /session gone; not undone: stop: not stopped/,
     );
-    expect(w.session.failures()).toEqual(['stop: not stopped']);
+    expect(w.session.failures()).toEqual([
+      { message: 'not stopped', origin: 'refusal', step: 'stop' },
+    ]);
   });
 
   it('observers hear of changes the read loop makes', async () => {

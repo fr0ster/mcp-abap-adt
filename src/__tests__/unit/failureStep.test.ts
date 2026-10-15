@@ -8,15 +8,23 @@
 
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
+import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
+import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
 import { handleGetAbapSystemSymbols } from '../../handlers/system/readonly/handleGetAbapSystemSymbols';
+import { runSearchSource } from '../../lib/search-source/orchestrator';
 import {
   createSourceReaderDeps,
+  type ReadSourceUnitsDeps,
   readSourceUnits,
 } from '../../lib/search-source/sourceReader';
-import { methodFailureOf } from '../../lib/strategies/step';
+import {
+  type ActivationRunSource,
+  awaitActivationRun,
+} from '../../lib/strategies/activationRun';
+import { carryingFailure, methodFailureOf } from '../../lib/strategies/step';
 import {
   fakeClientOf,
   okResponse,
@@ -56,6 +64,16 @@ const expectedPayload = (step: string, message = 'No authorization') => ({
 });
 
 const payloadOf = (result: any) => JSON.parse(result.content[0].text);
+
+/** An entry: the method's error as `answer()` renders it, with its step. */
+const failureEntryOf = (step: string, message: string) => ({
+  message,
+  origin: 'refusal',
+  step,
+  status: 403,
+  adt_type: 'ExceptionResourceNoAuthorization',
+  raw_body: DOCUMENT,
+});
 
 describe('a multi-step handler adds the step that failed', () => {
   it('UpdateClass refused at the lock answers the lock error with step lock, and nothing is written', async () => {
@@ -181,22 +199,57 @@ describe('a refusal is not swallowed', () => {
     expect((await units.next()).done).toBe(true);
   });
 
-  it('DescribeByList: a refused search is its error with the step, not an object skipped', async () => {
-    fakeClient = fakeClientOf({ search: async () => forbidden() });
-    const result: any = await handleDescribeByList(context as any, {
-      objects: [{ name: 'ZCL_X', type: 'CLAS/OC' }],
+  it("DescribeByList: a refused search is that object's error with the step, and the others are described", async () => {
+    fakeClient = fakeClientOf({
+      search: async (criteria: any) =>
+        criteria?.query === 'ZCL_X'
+          ? forbidden()
+          : okResponse(
+              reading({
+                'adtcore:objectReferences': {
+                  'adtcore:objectReference': {
+                    '@': { 'adtcore:name': 'ZCL_Y', 'adtcore:type': 'CLAS/OC' },
+                  },
+                },
+              } as never),
+            ),
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual(expectedPayload('search ZCL_X'));
+    const result: any = await handleDescribeByList(context as any, {
+      objects: [
+        { name: 'ZCL_X', type: 'CLAS/OC' },
+        { name: 'ZCL_Y', type: 'CLAS/OC' },
+      ],
+    });
+    expect(result.isError).toBe(false);
+    const items = result.content.map((c: any) => JSON.parse(c.text));
+    expect(items[0]).toEqual({
+      name: 'ZCL_X',
+      error: expectedPayload('search'),
+    });
+    expect(items).toHaveLength(2);
+    expect(items[1].name).toBe('ZCL_Y');
+    expect(items[1].error).toBeUndefined();
   });
 
-  it('GetAbapSystemSymbols: a refused class read is its error with the step, not "not found"', async () => {
-    fakeClient = fakeClientOf({ read: async () => forbidden() });
-    const result: any = await handleGetAbapSystemSymbols(context as any, {
-      code: 'CLASS zcl_x DEFINITION.\nENDCLASS.',
+  it('GetAbapSystemSymbols: a refused class read is that symbol\'s error with the step, not "not found", and the call goes on', async () => {
+    const reads: string[] = [];
+    fakeClient = fakeClientOf({
+      read: async (config: any) => {
+        reads.push(config?.className ?? config?.interfaceName ?? '?');
+        return forbidden();
+      },
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual(expectedPayload('read class ZCL_X'));
+    const result: any = await handleGetAbapSystemSymbols(context as any, {
+      code: 'CLASS zcl_x DEFINITION.\nENDCLASS.\nCLASS zcl_y DEFINITION.\nENDCLASS.',
+    });
+    expect(result.isError).toBe(false);
+    const symbols = result.content[0].json.symbols;
+    const zclX = symbols.find((s: any) => s.name.toUpperCase() === 'ZCL_X');
+    const zclY = symbols.find((s: any) => s.name.toUpperCase() === 'ZCL_Y');
+    expect(zclX.error).toEqual(expectedPayload('read class'));
+    expect(zclX.systemInfo).toBeUndefined();
+    // Not the end of the call: the next symbol was read too.
+    expect(zclY.error).toEqual(expectedPayload('read class'));
   });
 
   it('GetAbapSystemSymbols: a class that is not there stays "not found"', async () => {
@@ -211,5 +264,280 @@ describe('a refusal is not swallowed', () => {
       exists: false,
       error: 'Class not found in SAP system',
     });
+  });
+});
+
+describe('GetStructuresList: both endpoints failed', () => {
+  const tableRefused = () =>
+    refusedResponse('No authorization for the table', {
+      adtType: 'ExceptionResourceNoAuthorization',
+      response: { status: 403, data: DOCUMENT },
+    } as Partial<IAdtError>);
+
+  it("answers both endpoints' failures, each as it is with its step, in one array", async () => {
+    let call = 0;
+    fakeClient = fakeClientOf({
+      read: async () => (call++ === 0 ? forbidden() : tableRefused()),
+    });
+    const result: any = await handleGetStructuresList(context as any, {
+      structure_name: 'ZS',
+      include_extensions: false,
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toEqual([
+      failureEntryOf('read structure', 'No authorization'),
+      failureEntryOf('read table', 'No authorization for the table'),
+    ]);
+  });
+
+  it('a 404 from one endpoint and a refusal from the other: both, as they are', async () => {
+    let call = 0;
+    fakeClient = fakeClientOf({
+      read: async () => (call++ === 0 ? notThere() : tableRefused()),
+    });
+    const result: any = await handleGetStructuresList(context as any, {
+      structure_name: 'ZS',
+      include_extensions: false,
+    });
+    expect(result.isError).toBe(true);
+    const [structure, table] = payloadOf(result);
+    expect(structure).toMatchObject({
+      step: 'read structure',
+      status: 404,
+      adt_type: 'ExceptionResourceNotFound',
+    });
+    expect(table).toEqual(
+      failureEntryOf('read table', 'No authorization for the table'),
+    );
+  });
+
+  it('a 404 from both stays absence, as today', async () => {
+    fakeClient = fakeClientOf({ read: async () => notThere() });
+    const result: any = await handleGetStructuresList(context as any, {
+      structure_name: 'ZS',
+      include_extensions: false,
+    });
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain(
+      'Could not read source for structure/table ZS',
+    );
+  });
+
+  it("an embedded structure that could not be read names both endpoints' failures on its node", async () => {
+    fakeClient = fakeClientOf({
+      read: async (config: any) =>
+        config?.structureName === 'ZS'
+          ? okResponse('define structure zs {\n  include zinc;\n}')
+          : config?.structureName === 'ZINC'
+            ? forbidden()
+            : tableRefused(),
+    });
+    const result: any = await handleGetStructuresList(context as any, {
+      structure_name: 'ZS',
+      include_extensions: false,
+    });
+    expect(result.isError).toBe(false);
+    const [child] = JSON.parse(result.content[0].text).tree.children;
+    expect(child.structure).toBe('ZINC');
+    expect(child.error).toEqual([
+      failureEntryOf('read structure', 'No authorization'),
+      failureEntryOf('read table', 'No authorization for the table'),
+    ]);
+  });
+});
+
+describe('SearchSource: a refused object is its own answer, the scan goes on', () => {
+  const target = (name: string) => ({
+    name,
+    type: 'PROG/P',
+    packageName: 'ZPKG',
+    isPackage: false,
+  });
+  const refusedRead = (step: string) =>
+    carryingFailure(
+      new Error('No authorization'),
+      {
+        message: 'No authorization',
+        origin: 'refusal',
+        adtType: 'ExceptionResourceNoAuthorization',
+        response: { status: 403, data: DOCUMENT },
+      } as IAdtError,
+      step,
+    );
+
+  it('collects the refusal with its object beside the others, and the pool keeps going', async () => {
+    const read: string[] = [];
+    const sourceReader: ReadSourceUnitsDeps = {
+      async readProgram(name) {
+        read.push(name);
+        if (name === 'ZB') throw refusedRead('read program');
+        return 'REPORT x.\n* marker';
+      },
+      async readInclude() {
+        return null;
+      },
+      async readClassMain() {
+        return null;
+      },
+      async fetchFugrStructure() {
+        return [];
+      },
+      async readFugrFm() {
+        return null;
+      },
+    };
+    const result = await runSearchSource(
+      {
+        fetchPackageContents: async () =>
+          [target('ZA'), target('ZB'), target('ZC')] as never,
+        sourceReader,
+        resolvePackages: async (entries) => entries,
+      },
+      {
+        query: 'marker',
+        packages: ['ZPKG'],
+        object_types: ['PROG'],
+        concurrency: 1,
+      },
+    );
+    // One pump: ZC was read after ZB's refusal.
+    expect(read).toEqual(['ZA', 'ZB', 'ZC']);
+    expect(result.results.map((h) => h.object_name)).toEqual(['ZA', 'ZC']);
+    expect(result.failures).toEqual([
+      {
+        devclass: 'ZPKG',
+        object_type: 'PROG',
+        object_name: 'ZB',
+        error: expectedPayload('read program'),
+      },
+    ]);
+  });
+
+  it('answers no failures field when nothing failed', async () => {
+    const result = await runSearchSource(
+      {
+        fetchPackageContents: async () => [target('ZA')] as never,
+        sourceReader: {
+          readProgram: async () => 'marker',
+          readInclude: async () => null,
+          readClassMain: async () => null,
+          fetchFugrStructure: async () => [],
+          readFugrFm: async () => null,
+        },
+        resolvePackages: async (entries) => entries,
+      },
+      { query: 'marker', packages: ['ZPKG'], object_types: ['PROG'] },
+    );
+    expect(result.failures).toBeUndefined();
+  });
+
+  it('a function group include and module are read through adt-clients, a refusal carried with its step', async () => {
+    const calls: Array<{ config: unknown; version: unknown }> = [];
+    fakeClient = fakeClientOf({
+      read: async (config: unknown, version: unknown) => {
+        calls.push({ config, version });
+        return forbidden();
+      },
+    });
+    const deps = createSourceReaderDeps(context as any);
+    const include = await deps.readInclude('LZFGU01').then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(methodFailureOf(include)).toMatchObject({
+      message: 'No authorization',
+      step: 'read include',
+    });
+    const module = await deps.readFugrFm('ZFG', 'Z_FM').then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(methodFailureOf(module)).toMatchObject({
+      message: 'No authorization',
+      step: 'read function module',
+    });
+    expect(calls).toEqual([
+      { config: { includeName: 'LZFGU01' }, version: undefined },
+      {
+        config: { functionGroupName: 'ZFG', functionModuleName: 'Z_FM' },
+        version: undefined,
+      },
+    ]);
+  });
+
+  it('a function module that is not there is skipped, as before', async () => {
+    fakeClient = fakeClientOf({ read: async () => notThere() });
+    const deps = createSourceReaderDeps(context as any);
+    await expect(deps.readFugrFm('ZFG', 'Z_FM')).resolves.toBeNull();
+  });
+});
+
+describe('an activation run whose reading was refused', () => {
+  const source = (
+    run: () => Promise<unknown>,
+    results: () => Promise<unknown> = async () => okResponse(reading('')),
+  ) =>
+    ({
+      getActivationRun: run,
+      getActivationResults: results,
+    }) as unknown as ActivationRunSource;
+
+  it("is the method's error as it is, with its step — not a message folded into the run's", async () => {
+    const outcome = await awaitActivationRun(
+      source(async () => forbidden()),
+      'RUN-1',
+      undefined,
+      6,
+      0,
+    );
+    expect(outcome.messages).toEqual([]);
+    expect(outcome.settled).toBe(false);
+    expect(outcome.failure).toEqual({
+      message: 'No authorization',
+      origin: 'refusal',
+      adtType: 'ExceptionResourceNoAuthorization',
+      response: { status: 403, data: DOCUMENT },
+      step: 'read activation run',
+    });
+  });
+
+  it("ActivateObjectLow's group path answers it as the method's error with its step", async () => {
+    fakeClient = fakeClientOf({
+      activateObjectsGroup: async () => okResponse('RUN-1'),
+      getActivationRun: async () => forbidden(),
+    });
+    const result: any = await handleActivateObject(
+      context as any,
+      {
+        objects: [
+          { name: 'ZA', type: 'PROG/P' },
+          { name: 'ZB', type: 'PROG/P' },
+        ],
+      } as any,
+    );
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toEqual(expectedPayload('read activation run'));
+  });
+
+  it('a refused results read names its own step', async () => {
+    const outcome = await awaitActivationRun(
+      source(
+        async () =>
+          okResponse(
+            reading(
+              '<runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>',
+            ),
+          ),
+        async () => forbidden(),
+      ),
+      'RUN-1',
+      undefined,
+      6,
+      0,
+    );
+    expect(outcome.messages).toEqual([]);
+    expect((outcome.failure as { step?: string }).step).toBe(
+      'read activation results',
+    );
   });
 });

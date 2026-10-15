@@ -9,11 +9,14 @@
  * See docs/superpowers/specs/2026-09-08-result-error-strategies-design.md.
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answerRead } from './auth/answerFailure';
+import {
+  answerRead,
+  failurePayload as chainFailurePayload,
+} from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
-import { stepOf } from './strategies/step';
+import { methodFailureOf, stepOf, withStep } from './strategies/step';
 import {
   isSystemContextRefusal,
   SystemContextMissingError,
@@ -192,6 +195,59 @@ export function answerFailure(
     return local('system_context_missing', ctx, error.message);
   }
   return json(failurePayload(error), true);
+}
+
+/**
+ * One failure as an entry of a list — several failures in one answer (a
+ * batch's items, a cleanup's steps): the payload the consumer gets for that
+ * failure alone, with its step. A chain failure is its own payload (§7.3),
+ * never the method's message.
+ */
+export type FailureEntry = Record<string, unknown>;
+
+/** A method's failed answer as an entry: its error as it is, with the step. */
+export function failureEntry(failed: IAdtError, step: string): FailureEntry {
+  const read = failureOf(failed);
+  if (read !== undefined) return { ...chainFailurePayload(read), step };
+  return failurePayload(withStep(failed, step) as IAdtError & MessageCarrier);
+}
+
+/**
+ * A throw as an entry: a carried method error as it is, a chain failure as
+ * its own payload, anything else the method's own failure — `client_threw`,
+ * never dressed as SAP's answer.
+ */
+export function thrownEntry(thrown: unknown, step: string): FailureEntry {
+  const read = failureOf(thrown);
+  if (read !== undefined) return { ...chainFailurePayload(read), step };
+  const carried = methodFailureOf(thrown);
+  if (carried !== undefined) return failureEntry(carried, step);
+  return { error: 'client_threw', message: messageOf(thrown), step };
+}
+
+/**
+ * A delegated handler's failed answer as an entry: its payload as it is,
+ * with the step added unless it names one. `undefined` for a success or an
+ * answer whose text is not a JSON object.
+ */
+export function failedPayloadOf(
+  result: { isError?: boolean; content?: unknown } | undefined,
+  step: string,
+): FailureEntry | undefined {
+  if (result?.isError !== true || !Array.isArray(result.content)) return;
+  const text = (result.content[0] as { text?: unknown } | undefined)?.text;
+  if (typeof text !== 'string') return;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return;
+  }
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
+    return;
+  return 'step' in payload
+    ? (payload as FailureEntry)
+    : { ...(payload as FailureEntry), step };
 }
 
 /**

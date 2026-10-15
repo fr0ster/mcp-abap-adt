@@ -152,10 +152,16 @@ describe('DebugSession lifecycle', () => {
       return okResponse(undefined);
     };
     await expect(session.stop()).rejects.toThrow(
-      /a debuggee caught during the stop .* was not attached: .*debuggee gone/,
+      /attach a debuggee caught during the stop .*: debuggee gone/,
     );
     expect(session.failures()).toEqual([
-      expect.stringMatching(/was not attached/),
+      {
+        message: 'debuggee gone',
+        origin: 'refusal',
+        step: expect.stringMatching(
+          /^attach a debuggee caught during the stop \(/,
+        ),
+      },
     ]);
     expect(session.holdsState()).toBe(true);
     expect((await session.wait(0)).state).toBe('idle'); // not a notice: the failure is the stop's
@@ -170,7 +176,7 @@ describe('DebugSession lifecycle', () => {
       return okResponse(undefined);
     };
     await expect(session.stop()).rejects.toThrow(
-      /a debuggee caught during the stop .*: the debuggee was not released: .*release refused/,
+      /release a debuggee caught during the stop .*: release refused/,
     );
     expect(world.calls.some((c) => c.startsWith('attach:'))).toBe(true);
     expect(session.holdsState()).toBe(true);
@@ -210,7 +216,7 @@ describe('DebugSession lifecycle', () => {
     };
     await expect(session.stop()).rejects.toThrow(/release refused/);
     await expect(session.stop()).rejects.toThrow(
-      /a debuggee caught during the stop .*: the debuggee was not released: .*release refused/,
+      /release a debuggee caught during the stop .*: release refused/,
     );
     expect(session.holdsState()).toBe(true);
     delete world.override.step;
@@ -373,7 +379,9 @@ describe('DebugSession lifecycle', () => {
       await expect(failed).rejects.toThrow(DebugCleanupError);
       await expect(failed).rejects.toThrow(/close refused/);
       expect(session.holdsState()).toBe(true);
-      expect(session.failures().join()).toMatch(/close refused/);
+      expect(session.failures()).toContainEqual(
+        expect.objectContaining({ message: 'close refused' }),
+      );
       await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
       expect(new Set(world.closed)).toEqual(new Set(world.opened));
@@ -462,9 +470,11 @@ describe('DebugSession lifecycle', () => {
           state: 'ended',
           reason: 'run_finished',
         });
-        expect(session.failures().join()).toMatch(
-          /the run's connection was not closed: close refused/,
-        );
+        expect(session.failures()).toContainEqual({
+          error: 'client_threw',
+          message: 'close refused',
+          step: "close the run's connection",
+        });
         expect(session.holdsState()).toBe(true);
         gate.refuse = false;
         await expect(session.stop()).resolves.toEqual([]);
@@ -482,9 +492,11 @@ describe('DebugSession lifecycle', () => {
       world.polls[1].resolve(refusedResponse('session gone'));
       await jest.advanceTimersByTimeAsync(0);
       await expect(session.wait(0)).rejects.toThrow(/session gone/);
-      expect(session.failures().join()).toMatch(
-        /the listener's connection was not closed: close refused/,
-      );
+      expect(session.failures()).toContainEqual({
+        error: 'client_threw',
+        message: 'close refused',
+        step: "close the listener's connection",
+      });
       expect(session.holdsState()).toBe(true);
       gate.refuse = false;
       await expect(session.stop()).resolves.toEqual([]);
@@ -503,9 +515,11 @@ describe('DebugSession lifecycle', () => {
       await until(() => world.calls.some((c) => c.startsWith('attach:')));
       await jest.advanceTimersByTimeAsync(0);
       await expect(session.wait(0)).rejects.toThrow(/attach broke/);
-      expect(session.failures().join()).toMatch(
-        /the debuggee's connection was not closed: close refused/,
-      );
+      expect(session.failures()).toContainEqual({
+        error: 'client_threw',
+        message: 'close refused',
+        step: "close the debuggee's connection",
+      });
       gate.refuse = false;
       await expect(session.stop()).resolves.toEqual([]);
       expect(session.holdsState()).toBe(false);
@@ -524,8 +538,11 @@ describe('DebugSession lifecycle', () => {
       attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
       await jest.advanceTimersByTimeAsync(0);
       await jest.advanceTimersByTimeAsync(0);
-      expect(session.failures().join()).toMatch(
-        /the debuggee was not released: work process busy/,
+      expect(session.failures()).toContainEqual(
+        expect.objectContaining({
+          message: 'work process busy',
+          step: 'release the debuggee',
+        }),
       );
       expect(session.holdsState()).toBe(true);
       const attaching = world.opened[world.opened.length - 1];
@@ -596,11 +613,9 @@ describe('DebugSession lifecycle', () => {
       world.polls[1].resolve(refusedResponse('poll broke'));
       return okResponse(undefined);
     };
-    await expect(session.stop()).rejects.toThrow(
-      /the listener's last poll: .*poll broke/,
-    );
+    await expect(session.stop()).rejects.toThrow(/listen: .*poll broke/);
     expect(session.failures()).toEqual([
-      expect.stringMatching(/the listener's last poll/),
+      { message: 'poll broke', origin: 'refusal', step: 'listen' },
     ]);
     expect(session.holdsState()).toBe(true);
     delete world.override.stopListener;

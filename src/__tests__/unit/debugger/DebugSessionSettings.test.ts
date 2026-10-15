@@ -138,15 +138,34 @@ describe('the debugger settings', () => {
     });
   });
 
+  it('a stack read refused at an attach keeps the stop and names the failure as the method error, with its step', async () => {
+    const world = fakeWorld();
+    world.override.getStack = async () => {
+      world.calls.push('getStack');
+      return refusedResponse('Stack not readable');
+    };
+    const { session } = await caught(undefined, world);
+    const state = await session.wait(0);
+    expect(state.state).toBe('stopped');
+    expect(state.state === 'stopped' && state.stop.stackError).toEqual({
+      message: 'Stack not readable',
+      origin: 'refusal',
+      step: 'read stack',
+    });
+    delete world.override.getStack;
+  });
+
   it('a settings failure at an attach keeps the stop and names the failure', async () => {
     const world = fakeWorld();
     world.settingsAnswers.push(() => refusedResponse('Settings not allowed'));
     const { session } = await caught({ systemDebugging: true }, world);
     const state = await session.wait(0);
     expect(state.state).toBe('stopped');
-    expect(state.state === 'stopped' && state.stop.settingsError).toBe(
-      'Settings not allowed',
-    );
+    expect(state.state === 'stopped' && state.stop.settingsError).toEqual({
+      message: 'Settings not allowed',
+      origin: 'refusal',
+      step: 'set settings',
+    });
   });
 
   it('a failed first call after an attach does not count: a later system_debugging false is still sent twice', async () => {
@@ -174,8 +193,10 @@ describe('the debugger settings', () => {
     expect(state.state).toBe('stopped');
     expect(session.settingsInForce()).toBeUndefined();
     expect(state.state === 'stopped' && state.stop.settings).toBeUndefined();
-    expect(state.state === 'stopped' && state.stop.settingsError).toBe(
-      'Settings not allowed',
-    );
+    expect(state.state === 'stopped' && state.stop.settingsError).toEqual({
+      message: 'Settings not allowed',
+      origin: 'refusal',
+      step: 'set settings',
+    });
   });
 });

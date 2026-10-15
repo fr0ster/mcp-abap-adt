@@ -379,10 +379,29 @@ it arose. A tool never rewrites it:
 - **The method failed** — a throw in the client, a reading or the tool itself (a document it
   could not parse, a defect): `error: "client_threw"` and the thrown message, with no `origin`
   — it is not presented as SAP's answer.
+- **Our own wait ran out** — a tool that waits a bounded number of polls for SAP (a unit-test
+  include's activation run: 6) and gives up says so in plain words, as the method's failure
+  (`client_threw`), never as SAP's refusal.
 - `step` — where it arose, in the tool's own words (`lock`, `update`, `update metadata`,
   `check`, `activate`, `read`, `delete check`, `delete`, …). A single-call tool adds none. What
   a failed step left behind (a lock not released, cleanup not done) rides beside it as
-  `cleanup`.
+  `cleanup` — and when that is itself a failure, as an entry of `cleanup.failures` in the same
+  shape.
+
+**Several failures in one answer.** Each is an entry in the shape above, with its step — never
+folded into one text:
+
+- a tool that reads a list of items — `SearchSource`, `DescribeByList`, `GetAbapSystemSymbols`
+  — does not end the call at the first refusal: each item that failed carries its failure
+  (`failures[]` with the object for `SearchSource`, `{ name, error }` for `DescribeByList`,
+  `error` on the symbol for `GetAbapSystemSymbols`) beside the other items' results, and the
+  rest are read on;
+- a tool that tries two endpoints — `GetStructuresList` reads a name as a structure, then as a
+  table — answers both failures in one array (`read structure`, `read table`) when neither
+  has it; a `404` from both stays absence;
+- a probe that was refused rather than finding nothing (`GetEnhancements`' `unreadable`), a
+  refused typing of a new transport task (`CreateTransportTask`'s `task_type_error`), and
+  what a debugger stop could not undo (see [DEBUGGER.md](DEBUGGER.md#what-ends-a-session)).
 
 **An ADT authorization error is not a credential refusal.** A user who logged on but may not
 work with an object gets a `403` with SAP's exception document: it is answered as above, its

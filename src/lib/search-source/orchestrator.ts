@@ -1,4 +1,7 @@
+import { type FailureEntry, thrownEntry } from '../answer';
+import { failureOf } from '../auth/failures';
 import type { HandlerContext } from '../handlers/interfaces';
+import { methodFailureOf } from '../strategies/step';
 import { scanLines } from './lineScanner';
 import {
   createPackageContentsFetcher,
@@ -52,9 +55,19 @@ export interface NoHitEntry {
   object_name: string;
 }
 
+/** An object whose read failed: the failure as it is, with its step. */
+export interface FailedObject {
+  devclass: string;
+  object_type: ScanObjectType;
+  object_name: string;
+  error: FailureEntry;
+}
+
 export interface OrchestratorResult {
   results: SearchHit[];
   no_hits?: NoHitEntry[];
+  /** Objects whose read failed, beside the others' hits; present only when any did. */
+  failures?: FailedObject[];
   scanned: { packages: number; objects: number; sources: number };
   truncated: {
     by_object_cap: boolean;
@@ -91,9 +104,10 @@ async function runWithLimit<T>(
   shouldStop?: () => boolean,
 ): Promise<void> {
   let next = 0;
-  // The first failure ends the run: no pump takes another item, and the
-  // failure is answered once every pump has stopped — nothing runs on after
-  // the call has answered.
+  // A failure the worker does not answer as its item's (a defect, not a
+  // read) ends the run: no pump takes another item, and the failure is
+  // answered once every pump has stopped — nothing runs on after the call has
+  // answered.
   let failed: { error: unknown } | undefined;
   async function pump(): Promise<void> {
     while (true) {
@@ -166,6 +180,7 @@ export async function runSearchSource(
 
   const allHits: SearchHit[] = [];
   const noHits: NoHitEntry[] = [];
+  const failures: FailedObject[] = [];
   let sourcesScanned = 0;
   let truncatedByObjectCap = false;
   let timedOut = false;
@@ -178,11 +193,31 @@ export async function runSearchSource(
       let capHitForTarget = false;
       const targetHits: SearchHit[] = [];
 
-      for await (const unit of readSourceUnits(
-        deps.sourceReader,
-        target,
-        version,
-      )) {
+      const units = readSourceUnits(deps.sourceReader, target, version);
+      for (;;) {
+        let next: IteratorResult<{ include: string; lines: string[] }>;
+        try {
+          next = await units.next();
+        } catch (error) {
+          // A read that failed — SAP's refusal, a chain failure — is this
+          // object's answer, with its step; the others are scanned on. The
+          // hits read before it stay.
+          if (
+            methodFailureOf(error) === undefined &&
+            failureOf(error) === undefined
+          )
+            throw error;
+          failures.push({
+            devclass: target.devclass,
+            object_type: target.object_type,
+            object_name: target.object_name,
+            error: thrownEntry(error, 'read source'),
+          });
+          allHits.push(...targetHits);
+          return;
+        }
+        if (next.done) break;
+        const unit = next.value;
         if (deadlinePassed()) {
           timedOut = true;
           break;
@@ -276,6 +311,13 @@ export async function runSearchSource(
     },
   };
   if (emitNoHits) result.no_hits = noHits;
+  if (failures.length > 0) {
+    failures.sort((a, b) => {
+      if (a.devclass !== b.devclass) return a.devclass < b.devclass ? -1 : 1;
+      return a.object_name < b.object_name ? -1 : 1;
+    });
+    result.failures = failures;
+  }
   return result;
 }
 

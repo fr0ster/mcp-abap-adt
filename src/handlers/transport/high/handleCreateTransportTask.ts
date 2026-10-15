@@ -31,7 +31,7 @@
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import { answer } from '../../../lib/answer';
+import { answer, type FailureEntry, failureEntry } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -119,7 +119,7 @@ export async function handleCreateTransportTask(
   // What typing the task came to: the type it carries now, and the refusal
   // when there was one. The task exists either way, so a refused typing does
   // not fail the creation — it is said in the answer instead.
-  let typed: { type: TaskType; error?: string } = { type: 'X' };
+  let typed: { type: TaskType; error?: FailureEntry } = { type: 'X' };
 
   const terseTask: Terse<unknown> = (value) => {
     const number = taskNumberOf(value);
@@ -165,9 +165,13 @@ export async function handleCreateTransportTask(
         const changed = await request.changeTaskType(number, taskType, {
           analyse: analyseException,
         });
+        // A refusal is the method's error as it is, with its step.
         typed = changed.ok
           ? { type: taskType }
-          : { type: 'X', error: changed.getError().message };
+          : {
+              type: 'X',
+              error: failureEntry(changed.getError(), 'change task type'),
+            };
         if (!changed.ok) {
           // **The refusal has to survive `detail`, and in the terse fields it
           // did not.** `project()` calls the terse projection for `terse` only:
@@ -186,8 +190,8 @@ export async function handleCreateTransportTask(
             getResult: () => result,
             getError: () => failure,
             cleanup: {
-              message: `the task was created but changetasktype to ${taskType} was refused, so it is still Unclassified and AddTransportObject onto it will be refused (TK127): ${failure.message}`,
-              origin: failure.origin,
+              message: `the task was created but changetasktype to ${taskType} was refused, so it is still Unclassified and AddTransportObject onto it will be refused (TK127)`,
+              failures: [failureEntry(failure, 'change task type')],
             },
           } as unknown as typeof created;
         }

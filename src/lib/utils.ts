@@ -17,7 +17,7 @@ import { credentialFromSapConfig } from './credentialSources.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
 import { endConnection } from './ownedConnections.js';
-import { methodFailureOf } from './strategies/step';
+import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
 
 // Initialize connection variables before exports to avoid circular dependency issues
@@ -311,6 +311,14 @@ export function return_error(error: any) {
   // the same payload the `answer()` path gives.
   const carried = methodFailureOf(error);
   if (carried !== undefined) return answerFailure(carried);
+  // A throw that carries its whole answer (several failures, each as it is).
+  const payload = payloadCarriedBy(error);
+  if (payload !== undefined) {
+    return {
+      isError: true,
+      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+    };
+  }
 
   // Safely extract error message to avoid circular reference issues
   // Always extract only safe properties, never serialize the entire error object

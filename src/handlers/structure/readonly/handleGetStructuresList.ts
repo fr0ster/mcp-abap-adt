@@ -1,4 +1,10 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import {
+  type FailureEntry,
+  failureEntry,
+  thrownEntry,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
@@ -49,8 +55,19 @@ interface StructureNode {
   kind: 'root' | 'include' | 'append'; // how THIS node is embedded into its parent
   children: StructureNode[]; // embedded structures of this one
   cyclic?: boolean;
-  error?: string; // if this node's source could not be read
+  // This node's source could not be read: words when neither endpoint has
+  // it (404), else what each endpoint answered, with its step.
+  error?: string | FailureEntry[];
 }
+
+/**
+ * What reading a name's DDL came to: its source; absence — both endpoints
+ * answered 404; or each endpoint's failure as it is, with its step.
+ */
+type DdlRead =
+  | { source: string }
+  | { absent: true }
+  | { failures: FailureEntry[] };
 
 interface EmbeddedRef {
   name: string; // embedded structure name
@@ -184,30 +201,51 @@ export async function handleGetStructuresList(
     /**
      * Read the DDL source of a structure OR table (the embed/extend syntax is
      * identical, and an extension's base is often a table). Try the structure
-     * endpoint first, fall back to the table endpoint.
+     * endpoint first, fall back to the table endpoint. When neither has it,
+     * a 404 from both is absence; anything else is each endpoint's failure
+     * as it is, with its step (`read structure`, `read table`).
      */
-    const readDdl = async (name: string): Promise<string | null> => {
-      try {
-        const sr = await obj.read(
-          { structureName: name },
-          version as 'active' | 'inactive',
-          { analyse: analyseException },
-        );
-        const s = extractSource(sr);
-        if (s != null) return s;
-      } catch {
-        // fall through to table
-      }
-      try {
-        const tr = await client
+    const readDdl = async (name: string): Promise<DdlRead> => {
+      const failures: FailureEntry[] = [];
+      let answered = 0; // endpoints that answered 404 (or nothing to read)
+      const attempt = async (
+        step: 'read structure' | 'read table',
+        read: () => Promise<unknown>,
+      ): Promise<string | null> => {
+        try {
+          const answer = await read();
+          const source = extractSource(answer);
+          if (source != null) return source;
+          const failed = answer as {
+            ok?: unknown;
+            getError?: () => IAdtError;
+          };
+          if (failed?.ok === false && typeof failed.getError === 'function') {
+            const error = failed.getError();
+            failures.push(failureEntry(error, step));
+            if (error?.response?.status !== 404) return null;
+          }
+          answered++;
+        } catch (thrown) {
+          failures.push(thrownEntry(thrown, step));
+        }
+        return null;
+      };
+      const structure = await attempt('read structure', () =>
+        obj.read({ structureName: name }, version as 'active' | 'inactive', {
+          analyse: analyseException,
+        }),
+      );
+      if (structure != null) return { source: structure };
+      const table = await attempt('read table', () =>
+        client
           .getTable()
           .read({ tableName: name }, version as 'active' | 'inactive', {
             analyse: analyseException,
-          });
-        return extractSource(tr);
-      } catch {
-        return null;
-      }
+          }),
+      );
+      if (table != null) return { source: table };
+      return answered === 2 ? { absent: true } : { failures };
     };
 
     /**
@@ -280,7 +318,8 @@ export async function handleGetStructuresList(
       );
       const refs: EmbeddedRef[] = [];
       for (const cand of candidates) {
-        const csrc = await readDdl(cand);
+        const read = await readDdl(cand);
+        const csrc = 'source' in read ? read.source : null;
         if (csrc && extendRe.test(csrc)) {
           refs.push({ name: cand, attribute: null, kind: 'append' });
         }
@@ -289,12 +328,22 @@ export async function handleGetStructuresList(
     };
 
     // Read root source first (structure or table); failure here is fatal.
-    const rootSource = await readDdl(rootName);
-    if (rootSource == null) {
+    const root = await readDdl(rootName);
+    if ('failures' in root) {
+      // Both endpoints failed: each failure as it is, with its step.
+      return {
+        isError: true,
+        content: [
+          { type: 'text', text: JSON.stringify(root.failures, null, 2) },
+        ],
+      };
+    }
+    if ('absent' in root) {
       return return_error(
         new Error(`Could not read source for structure/table ${rootName}`),
       );
     }
+    const rootSource = root.source;
 
     const visited = new Set<string>([rootName]);
 
@@ -323,11 +372,13 @@ export async function handleGetStructuresList(
         }
         visited.add(ref.name);
 
-        const childSource = await readDdl(ref.name);
-        if (childSource == null) {
+        const child = await readDdl(ref.name);
+        if ('failures' in child) {
+          node.error = child.failures;
+        } else if ('absent' in child) {
           node.error = `Could not read source for ${ref.name}`;
         } else {
-          node.children = await buildChildren(ref.name, childSource);
+          node.children = await buildChildren(ref.name, child.source);
         }
 
         children.push(node);

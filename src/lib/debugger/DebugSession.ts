@@ -31,7 +31,11 @@ import type {
   IDebuggerStepToLineMethod,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { carryingFailure, noteLeftBehind } from '../strategies/step';
+import {
+  carryingFailure,
+  carryingPayload,
+  noteLeftBehind,
+} from '../strategies/step';
 import {
   type BreakpointNotPlaced,
   mergeDefinitions,
@@ -40,6 +44,15 @@ import {
   type UnexpectedRow,
   wireOf,
 } from './arming';
+import {
+  asFailure,
+  type DebugFailure,
+  describeFailures,
+  failedEntry,
+  isFromThrow,
+  leaveBehind,
+  thrownFailure,
+} from './failures';
 import type { BreakpointConflict, DebuggerIds } from './ids';
 import {
   type AttachReading,
@@ -98,11 +111,12 @@ export interface StopView {
   debuggee: DebuggeeReading;
   attach: AttachReading;
   stack: StackReading;
-  stackError?: string;
+  /** Reading the stack failed: the method's error as it is, with its step; the stop stands. */
+  stackError?: DebugFailure;
   /** The settings in force after this attach applied the preferences. */
   settings?: SettingsReading;
-  /** Why applying them failed; the stop stands. */
-  settingsError?: string;
+  /** Why applying them failed — the method's error as it is, with its step; the stop stands. */
+  settingsError?: DebugFailure;
   raw: { debuggee: string; attach: string; stack: string };
 }
 export type EndReason =
@@ -156,16 +170,27 @@ export class DebugListenerError extends Error {}
 export class DebugStateError extends Error {}
 export class DebugRequestError extends Error {}
 /**
- * What a stop could not undo, named in the message. `notes`: what the stop
+ * What a stop could not undo: each failure in the shape of every other
+ * failure — the method's error as it is, with its step. `notes`: what the stop
  * answered beside the failure and that is no debt (SAP's final refusal, the
- * breakpoints it leaves on the system) — also in the message, since a later stop
- * has nothing left to answer them again.
+ * breakpoints it leaves on the system), entries too — answered with it, since
+ * a later stop has nothing left to answer them again. The consumer gets
+ * `{ failures, notes? }`; the message describes them for an in-process reader.
  */
 export class DebugCleanupError extends Error {
-  readonly notes: readonly string[];
-  constructor(message: string, notes: readonly string[] = []) {
-    super(message);
+  readonly failures: readonly DebugFailure[];
+  readonly notes: readonly DebugFailure[];
+  constructor(
+    failures: readonly DebugFailure[],
+    notes: readonly DebugFailure[] = [],
+  ) {
+    super(describeFailures([...failures, ...notes]));
+    this.failures = failures;
     this.notes = notes;
+    carryingPayload(this, {
+      failures: [...failures],
+      ...(notes.length ? { notes: [...notes] } : {}),
+    });
   }
 }
 /**
@@ -227,23 +252,9 @@ const failedAt = <E extends Error>(
   a: IAdtResponse<unknown>,
   step: string,
 ): E =>
-  a.ok || fromThrow.has(a.getError())
+  a.ok || isFromThrow(a.getError())
     ? error
     : carryingFailure(error, a.getError(), step);
-/**
- * A throw read as a failed answer, so the loops can handle both alike. No
- * SAP answer is behind it: it is never carried as the method's error to the
- * consumer as if SAP had answered (`failedAt` skips it).
- */
-const fromThrow = new WeakSet<object>();
-const asFailure = (e: unknown) => {
-  const error = { origin: 'connection', message: thrown(e) };
-  fromThrow.add(error);
-  return {
-    ok: false as const,
-    getError: () => error,
-  } as unknown as IAdtResponse<string>;
-};
 
 /** A condition on a breakpoint other than a line is refused before the wire, naming it. */
 export function refuseConditionOffLine(
@@ -438,7 +449,7 @@ export class DebugSession<O = unknown> {
     }
   }
   /** Closes the control connection; a close that throws is kept for the next stop and named. */
-  private async closeControl(): Promise<string[]> {
+  private async closeControl(): Promise<DebugFailure[]> {
     const control = this.control;
     this.control = undefined;
     const kept = await this.closeOrRecord(
@@ -621,15 +632,14 @@ export class DebugSession<O = unknown> {
   private async retireListener(
     listener: Listener | undefined,
     open: Promise<IAdtResponse<string>> | undefined,
-    failures: string[],
+    failures: DebugFailure[],
   ): Promise<void> {
     this.listener = undefined;
     if (!listener) return;
     if (open) {
       const last = await open;
       listener.open = undefined;
-      if (!last.ok)
-        failures.push(`the listener's last poll: ${messageOf(last)}`);
+      if (!last.ok) failures.push(failedEntry(last, 'listen'));
       else {
         // A catch in it — during the stop, or just before and not yet handled.
         const caught = readDebuggee(bodyOf(last));
@@ -771,13 +781,14 @@ export class DebugSession<O = unknown> {
           ];
           this.settle(failures);
           if (failures.length === 0) throw error;
-          const notClosed = `not closed: ${failures.join('; ')}`;
-          noteLeftBehind(error, notClosed);
-          if (error instanceof Error) {
-            error.message = `${error.message}; ${notClosed}`;
-            throw error;
-          }
-          throw new DebugListenerError(`${thrown(error)}; ${notClosed}`);
+          const notClosed = `not closed: ${describeFailures(failures)}`;
+          const failed =
+            error instanceof Error
+              ? error
+              : new DebugListenerError(thrown(error));
+          leaveBehind(failed, { message: 'not closed', failures });
+          failed.message = `${failed.message}; ${notClosed}`;
+          throw failed;
         }
         // A start that failed after a change runs the stop's cleanup. It no longer
         // deletes the ids "placed here": after a replacement they do not say what this
@@ -788,17 +799,23 @@ export class DebugSession<O = unknown> {
         this.failure = undefined;
         this.notices.length = 0;
         this.settle(failures);
+        if (notes.length === 0 && failures.length === 0) throw error;
         const told = [
-          ...notes,
-          ...(failures.length ? [`not undone: ${failures.join('; ')}`] : []),
-        ];
-        if (told.length === 0) throw error;
-        noteLeftBehind(error, told.join('; '));
-        if (error instanceof Error) {
-          error.message = `${error.message}; ${told.join('; ')}`;
-          throw error;
-        }
-        throw new DebugListenerError(`${thrown(error)}; ${told.join('; ')}`);
+          ...(notes.length ? [describeFailures(notes)] : []),
+          ...(failures.length
+            ? [`not undone: ${describeFailures(failures)}`]
+            : []),
+        ].join('; ');
+        const failed =
+          error instanceof Error
+            ? error
+            : new DebugListenerError(thrown(error));
+        leaveBehind(failed, {
+          ...(failures.length ? { message: 'not undone', failures } : {}),
+          ...(notes.length ? { notes } : {}),
+        });
+        failed.message = `${failed.message}; ${told}`;
+        throw failed;
       }
     });
   }
@@ -902,7 +919,7 @@ export class DebugSession<O = unknown> {
       if (generation !== this.generation) {
         // Overtaken while attaching: released at once. A release that fails is recorded,
         // and the debuggee is kept with its connection for the next stop to release.
-        const notReleased = await this.release(dbg);
+        const notReleased = await this.release(dbg, 'the debuggee');
         if (notReleased) {
           this.cleanupFailures.push(notReleased);
           this.owed.add({ connection, debugger: dbg, what: 'the debuggee' });
@@ -920,7 +937,7 @@ export class DebugSession<O = unknown> {
           stack: stack.ok
             ? readStack(bodyOf(stack))
             : { cursor: 0, frames: [] },
-          ...(stack.ok ? {} : { stackError: messageOf(stack) }),
+          ...(stack.ok ? {} : { stackError: failedEntry(stack, 'read stack') }),
           raw: {
             debuggee: rawDebuggee,
             attach: bodyOf(attached),
@@ -934,7 +951,10 @@ export class DebugSession<O = unknown> {
       if (Object.keys(this.preferences).length > 0) {
         const stop = this.current;
         await this.applySettings(stop).catch((e: unknown) => {
-          stop.view = { ...stop.view, settingsError: thrown(e) };
+          stop.view = {
+            ...stop.view,
+            settingsError: thrownFailure(e, 'set settings'),
+          };
         });
       }
       return true;
@@ -948,13 +968,14 @@ export class DebugSession<O = unknown> {
   }
 
   /** Lets an attached debuggee run on. Never throws: answers why it was not released. */
-  private async release(dbg: Debugger): Promise<string | undefined> {
+  private async release(
+    dbg: Debugger,
+    what: string,
+  ): Promise<DebugFailure | undefined> {
     const released = await dbg
       .step('stepContinue', { analyse: analyseDebuggeeEnd })
       .catch(asFailure);
-    return released.ok
-      ? undefined
-      : `the debuggee was not released: ${messageOf(released)}`;
+    return released.ok ? undefined : failedEntry(released, `release ${what}`);
   }
 
   /**
@@ -966,7 +987,7 @@ export class DebugSession<O = unknown> {
    */
   private async releaseCaught(
     debuggee: DebuggeeReading,
-    failures: string[],
+    failures: DebugFailure[],
   ): Promise<void> {
     if (debuggee.attachImpossible) return; // the system decided: it runs on by itself
     const what = `a debuggee caught during the stop (${debuggee.debuggeeId})`;
@@ -982,25 +1003,24 @@ export class DebugSession<O = unknown> {
           debuggee.instance ? { server: debuggee.instance } : {},
         )
         .catch(asFailure);
-      if (!attached.ok)
-        failures.push(`${what} was not attached: ${messageOf(attached)}`);
+      if (!attached.ok) failures.push(failedEntry(attached, `attach ${what}`));
       else {
-        const notReleased = await this.release(dbg);
+        const notReleased = await this.release(dbg, what);
         if (notReleased) {
           // Kept with the session that attached it: the next stop retries the release there.
-          failures.push(`${what}: ${notReleased}`);
+          failures.push(notReleased);
           this.owed.add({ connection, debugger: dbg, what });
           return;
         }
       }
     } catch (error) {
-      failures.push(`${what} was not released: ${thrown(error)}`);
+      failures.push(thrownFailure(error, `release ${what}`));
     }
     await this.closeOrKeep(connection, `${what}'s connection`, failures);
   }
 
   /** Never throws: a close that throws is kept for the next stop, recorded, and answered. */
-  protected async dropListener(): Promise<string[]> {
+  protected async dropListener(): Promise<DebugFailure[]> {
     const listener = this.listener;
     this.listener = undefined;
     this.generation++;
@@ -1097,7 +1117,7 @@ export class DebugSession<O = unknown> {
       stack: stack.ok ? readStack(bodyOf(stack)) : stop.view.stack,
       ...(stack.ok
         ? { stackError: undefined }
-        : { stackError: messageOf(stack) }),
+        : { stackError: failedEntry(stack, 'read stack') }),
       raw: { ...stop.view.raw, stack: bodyOf(stack) },
     };
     return { state: 'stopped', stop: stop.view };
@@ -1317,9 +1337,9 @@ export class DebugSession<O = unknown> {
   // --- lifecycle -------------------------------------------------------------
   private run?: { generation: number; connection?: IAbapConnection };
   private reconciled = false;
-  private cleanupFailures: string[] = [];
+  private cleanupFailures: DebugFailure[] = [];
   /** What the current cleanup has to tell that is no debt: SAP's final refusal of the stopListener. */
-  private cleanupNotes: string[] = [];
+  private cleanupNotes: DebugFailure[] = [];
   /** Connections whose work is done but whose close threw: the next stop closes them. */
   private readonly unclosed = new Set<IAbapConnection>();
   /** Attached debuggees whose release failed, each with its connection: the next stop retries. */
@@ -1329,7 +1349,7 @@ export class DebugSession<O = unknown> {
   private async closeOrKeep(
     connection: IAbapConnection | undefined,
     what: string,
-    failures: string[],
+    failures: DebugFailure[],
   ): Promise<void> {
     if (!connection) return;
     try {
@@ -1337,7 +1357,7 @@ export class DebugSession<O = unknown> {
       this.unclosed.delete(connection);
     } catch (e) {
       this.unclosed.add(connection);
-      failures.push(`${what} was not closed: ${thrown(e)}`);
+      failures.push(thrownFailure(e, `close ${what}`));
     }
   }
 
@@ -1348,8 +1368,8 @@ export class DebugSession<O = unknown> {
   private async closeOrRecord(
     connection: IAbapConnection | undefined,
     what: string,
-  ): Promise<string | undefined> {
-    const failures: string[] = [];
+  ): Promise<DebugFailure | undefined> {
+    const failures: DebugFailure[] = [];
     await this.closeOrKeep(connection, what, failures);
     this.cleanupFailures.push(...failures);
     return failures[0];
@@ -1484,16 +1504,16 @@ export class DebugSession<O = unknown> {
    * It needs the connected user's debug authorisation (`S_DEVELOP` DEBUG) as
    * the start does; SAP's refusal reaches the model as SAP says it.
    */
-  private async cleanupLocked(): Promise<string[]> {
+  private async cleanupLocked(): Promise<DebugFailure[]> {
     this.generation++;
-    const failures: string[] = [];
+    const failures: DebugFailure[] = [];
     try {
       for (const connection of [...this.unclosed])
         await this.closeOrKeep(connection, 'a connection', failures);
       for (const owed of [...this.owed]) {
-        const notReleased = await this.release(owed.debugger);
+        const notReleased = await this.release(owed.debugger, owed.what);
         if (notReleased) {
-          failures.push(`${owed.what}: ${notReleased}`); // kept: a later stop retries
+          failures.push(notReleased); // kept: a later stop retries
           continue;
         }
         // Released: only its connection may be left, and a retry must not release twice.
@@ -1519,7 +1539,7 @@ export class DebugSession<O = unknown> {
             failures,
           );
         } else {
-          failures.push(`release the debuggee: ${messageOf(released)}`); // kept: a later stop retries
+          failures.push(failedEntry(released, 'release the debuggee')); // kept: a later stop retries
         }
       }
       // 2. The listener is stopped, and the key's breakpoints with it.
@@ -1562,10 +1582,16 @@ export class DebugSession<O = unknown> {
           // SAP's answer still reaches the model, as a note that is no debt, naming
           // the breakpoints that stay on the system.
           const placed = this.listBreakpoints();
+          const refused = failedEntry(stopped, 'stop listener');
           this.cleanupNotes.push(
             placed.length
-              ? `listener: ${messageOf(stopped)}; the breakpoints placed stay on the system: ${placed.map(describePlaced).join(', ')}`
-              : `listener: ${messageOf(stopped)}`,
+              ? {
+                  ...refused,
+                  cleanup: {
+                    message: `the breakpoints placed stay on the system: ${placed.map(describePlaced).join(', ')}`,
+                  },
+                }
+              : refused,
           );
           this.forgetAll();
           // Final: no later stop retries it.
@@ -1576,13 +1602,13 @@ export class DebugSession<O = unknown> {
           await this.retireListener(listener, open, failures);
         } else {
           // 4. Deleted by id, as before; what fails stays for the next stop.
-          failures.push(`listener: ${messageOf(stopped)}`);
+          failures.push(failedEntry(stopped, 'stop listener'));
           for (const id of [...this.armed.keys()]) {
             const deleted = await control
               .deleteBreakpoint(identity, id)
               .catch(asFailure);
             if (deleted.ok) this.forget(id);
-            else failures.push(`breakpoint ${id}: ${messageOf(deleted)}`);
+            else failures.push(failedEntry(deleted, `delete breakpoint ${id}`));
           }
         }
       } else if (this.listener) {
@@ -1605,7 +1631,7 @@ export class DebugSession<O = unknown> {
         );
       }
     } catch (error) {
-      failures.push(thrown(error));
+      failures.push(thrownFailure(error, 'stop'));
     } finally {
       const run = this.run;
       this.run = undefined;
@@ -1621,7 +1647,7 @@ export class DebugSession<O = unknown> {
    * owed stopListener goes as soon as the listener's stop succeeded or was refused
    * for the user (cleanupLocked), never sent twice.
    */
-  private settle(failures: string[]): void {
+  private settle(failures: DebugFailure[]): void {
     this.cleanupFailures = failures;
     if (failures.length > 0) return;
     this.fixed = undefined;
@@ -1650,7 +1676,7 @@ export class DebugSession<O = unknown> {
    * Never throws anything but DebugCleanupError, and whatever failed stays for the next stop.
    * Answers the notes that are no debt: SAP's final refusal of the stopListener.
    */
-  stop(): Promise<string[]> {
+  stop(): Promise<DebugFailure[]> {
     return this.mutate(async () => {
       this.cleanupNotes = [];
       const failures = await this.cleanupLocked();
@@ -1659,8 +1685,7 @@ export class DebugSession<O = unknown> {
       this.notices.length = 0;
       this.settle(failures);
       this.notify(); // also tells the instance state (observe) that this part may hold nothing now
-      if (failures.length)
-        throw new DebugCleanupError([...failures, ...notes].join('; '), notes);
+      if (failures.length) throw new DebugCleanupError(failures, notes);
       return notes;
     });
   }
@@ -1682,8 +1707,8 @@ export class DebugSession<O = unknown> {
     );
   }
 
-  /** What the last stop could not undo. */
-  failures(): string[] {
+  /** What the last stop could not undo, each in the shape of every other failure. */
+  failures(): DebugFailure[] {
     return [...this.cleanupFailures];
   }
 }

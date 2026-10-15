@@ -325,7 +325,13 @@ describe('debugger handlers', () => {
         return this;
       },
       stop: async () => {
-        throw new DebugCleanupError('amdp: release refused');
+        throw new DebugCleanupError([
+          {
+            message: 'amdp: release refused',
+            origin: 'refusal',
+            step: 'release debuggee D1',
+          },
+        ]);
       },
     };
     const dbg = new DebuggerInstance({
@@ -349,9 +355,19 @@ describe('debugger handlers', () => {
     world.polls[1].resolve(LISTEN_NOTHING());
     const r: any = await stopping;
     expect(r.isError).toBe(true);
-    const text = r.content.map((c: any) => c.text).join('\n');
-    expect(text).toContain('amdp: release refused');
-    expect(text).toMatch(/User SAPUSER03 does not exist/);
+    // Each failure and each note an entry: the method's error as it is, with
+    // its step.
+    const answered = JSON.parse(r.content[0].text);
+    expect(answered.failures).toEqual([
+      {
+        message: 'amdp: release refused',
+        origin: 'refusal',
+        step: 'release debuggee D1',
+      },
+    ]);
+    expect(answered.notes).toHaveLength(1);
+    expect(answered.notes[0].step).toBe('stop listener');
+    expect(answered.notes[0].raw_body).toMatch(/User SAPUSER03 does not exist/);
   });
 
   it('a refused start that left nothing answers no handle', async () => {

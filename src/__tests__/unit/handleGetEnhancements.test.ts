@@ -72,10 +72,10 @@ describe('GetEnhancements', () => {
     ]);
   });
 
-  it('when it must probe, sends Accept as a header, never as the body', async () => {
+  it("when it must probe, reads each kind's metadata through adt-clients, Accept as a header", async () => {
     const connection = connectionAnswering(
       (u) =>
-        u === '/sap/bc/adt/programs/programs/ZPROG' ||
+        u === '/sap/bc/adt/programs/programs/zprog' ||
         u.startsWith(
           '/sap/bc/adt/programs/programs/ZPROG/source/main/enhancements',
         ),
@@ -90,11 +90,60 @@ describe('GetEnhancements', () => {
     for (const call of connection.calls) {
       expect(call.data).toBeUndefined();
     }
+    expect(connection.calls.map((c) => c.url)).toEqual([
+      '/sap/bc/adt/oo/classes/zprog',
+      '/sap/bc/adt/programs/programs/zprog',
+      '/sap/bc/adt/programs/programs/ZPROG/source/main/enhancements/elements',
+    ]);
     expect(
       connection.calls.find(
-        (c) => c.url === '/sap/bc/adt/programs/programs/ZPROG',
+        (c) => c.url === '/sap/bc/adt/programs/programs/zprog',
       )?.headers?.Accept,
-    ).toBe('application/vnd.sap.adt.programs.v3+xml');
+    ).toContain('application/vnd.sap.adt.programs.programs');
+    expect(JSON.parse(result.content[0].text).unreadable).toBeUndefined();
+  });
+
+  it('a refused probe is the method error as it is, with its step, beside the enhancements', async () => {
+    const DOCUMENT =
+      '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><type id="ExceptionResourceNoAccess"/><message>No access</message></exc:exception>';
+    const calls: Call[] = [];
+    const connection = {
+      calls,
+      async makeAdtRequest(req: Call) {
+        calls.push(req);
+        if (
+          req.url === '/sap/bc/adt/programs/programs/zprog' ||
+          req.url.startsWith(
+            '/sap/bc/adt/programs/programs/ZPROG/source/main/enhancements',
+          )
+        ) {
+          return {
+            status: 200,
+            data: '<enh:enhancements xmlns:enh="http://www.sap.com/adt/enhancements"/>',
+          };
+        }
+        const error: any = new Error('Request failed with status code 403');
+        error.response = {
+          status: 403,
+          data: DOCUMENT,
+          headers: { 'content-type': 'application/xml' },
+        };
+        throw error;
+      },
+    };
+
+    const result: any = await run(connection, {
+      object_name: 'ZPROG',
+      object_type: 'unknown-kind',
+    });
+
+    expect(result.isError).toBe(false);
+    const [refused, ...rest] = JSON.parse(result.content[0].text).unreadable;
+    expect(rest).toEqual([]);
+    expect(refused.step).toBe('read class metadata');
+    expect(refused.status).toBe(403);
+    expect(refused.raw_body).toBe(DOCUMENT);
+    expect(refused.message).toBe('Request failed with status code 403');
   });
 });
 

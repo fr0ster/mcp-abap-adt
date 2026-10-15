@@ -1,6 +1,12 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
-import { failurePayload } from '../../../lib/answer';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  type FailureEntry,
+  failureEntry,
+  failurePayload,
+  thrownEntry,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -66,7 +72,7 @@ export interface EnhancementResponse {
    * a list nobody was allowed to read are different answers, and they used to
    * look the same.
    */
-  unreadable?: { url: string; message: string }[];
+  unreadable?: FailureEntry[];
 }
 
 /**
@@ -191,8 +197,10 @@ export function parseEnhancementsFromXml(
  * main program `SAPL<fg>` is none of those addressable things — on premise
  * (2026-09-25) all three URIs answered 404 — so the tool failed outright.
  * Its enhancements are the group's, at `/functions/groups/<fg>/source/main`,
- * which answers 200. Each probe that remains is its own try, and its Accept
- * header goes where headers go (the seventh argument), not into the body.
+ * which answers 200. Each probe that remains is its own metadata read
+ * through adt-clients (`getClass()`, `getProgram()`, `getInclude()`) with
+ * `analyseException`, so a refusal arrives in the shape every other failure
+ * has.
  */
 async function determineObjectTypeAndPath(
   connection: AbapConnection,
@@ -204,7 +212,7 @@ async function determineObjectTypeAndPath(
   basePath: string;
   context?: string;
   /** Probes that were refused rather than answering "not this kind". */
-  unreadable?: { url: string; message: string }[];
+  unreadable?: FailureEntry[];
 }> {
   const name = objectName.toUpperCase();
   const enc = encodeSapObjectName(name);
@@ -233,58 +241,46 @@ async function determineObjectTypeAndPath(
    *
    * So a `404` — the object is not of that kind, or not there — keeps the probe
    * going and says nothing, and anything else is collected and travels in the
-   * answer beside the enhancements that were found. `ExceptionResourceNoAccess`
-   * is the case that mattered: an object this user may not read answered "no
-   * enhancements", which is a different statement from "could not look".
+   * answer beside the enhancements that were found: the method's error as it
+   * is, with the probe's step. `ExceptionResourceNoAccess` is the case that
+   * mattered: an object this user may not read answered "no enhancements",
+   * which is a different statement from "could not look".
    */
-  const unreadable: { url: string; message: string }[] = [];
+  const unreadable: FailureEntry[] = [];
   /** Carry the refusals out with whichever path was resolved. */
   const withReport = <T extends { basePath: string }>(path: T) =>
     unreadable.length > 0 ? { ...path, unreadable } : path;
-  const probe = async (url: string, accept: string) => {
+  const client = createAdtClient(connection, logger);
+  /** A metadata read: its document when found, `undefined` otherwise. */
+  const probe = async (
+    step: string,
+    read: () => Promise<IAdtResponse<unknown, IAdtError>>,
+  ): Promise<string | undefined> => {
     try {
-      const response = await makeAdtRequest(
-        connection,
-        url,
-        'GET',
-        // No deadline of the server's: the request waits for SAP's answer.
-        0,
-        undefined,
-        undefined,
-        { Accept: accept },
-      );
-      if (response.status === 200) return response;
-      if (response.status !== 404) {
-        unreadable.push({ url, message: `answered ${response.status}` });
-      }
+      const answer = await read();
+      if (answer.ok) return String(answer.getResult().value ?? '');
+      const error = answer.getError();
+      if (error?.response?.status !== 404)
+        unreadable.push(failureEntry(error, step));
       return undefined;
-    } catch (error: any) {
-      const status = error?.response?.status;
-      if (status !== 404) {
-        unreadable.push({
-          url,
-          message: String(
-            error?.response?.data?.toString?.().slice(0, 200) ??
-              error?.message ??
-              error,
-          ),
-        });
-      }
+    } catch (error) {
+      unreadable.push(thrownEntry(error, step));
       return undefined;
     }
   };
 
   const asInclude = async () => {
-    const response = await probe(
-      `/sap/bc/adt/programs/includes/${enc}`,
-      'application/vnd.sap.adt.programs.includes.v2+xml',
+    const metadata = await probe('read include metadata', () =>
+      client
+        .getInclude()
+        .readMetadata({ includeName: name }, { analyse: analyseException }),
     );
-    if (!response) return undefined;
+    if (metadata === undefined) return undefined;
     let context: string | undefined;
     if (manualProgramContext) {
       context = `/sap/bc/adt/programs/programs/${manualProgramContext}`;
     } else {
-      context = String(response.data ?? '').match(
+      context = metadata.match(
         /include:contextRef[^>]+adtcore:uri="([^"]+)"/,
       )?.[1];
     }
@@ -324,18 +320,20 @@ async function determineObjectTypeAndPath(
   // No usable type: find out, one independent probe at a time.
   if (saplGroup) return withReport(groupPath(saplGroup));
   if (
-    await probe(
-      `/sap/bc/adt/oo/classes/${enc}`,
-      'application/vnd.sap.adt.oo.classes.v4+xml',
-    )
+    (await probe('read class metadata', () =>
+      client
+        .getClass()
+        .readMetadata({ className: name }, { analyse: analyseException }),
+    )) !== undefined
   ) {
     return withReport(classPath);
   }
   if (
-    await probe(
-      `/sap/bc/adt/programs/programs/${enc}`,
-      'application/vnd.sap.adt.programs.v3+xml',
-    )
+    (await probe('read program metadata', () =>
+      client
+        .getProgram()
+        .readMetadata({ programName: name }, { analyse: analyseException }),
+    )) !== undefined
   ) {
     return withReport(programPath);
   }

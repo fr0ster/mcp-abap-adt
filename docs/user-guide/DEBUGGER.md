@@ -323,7 +323,8 @@ program where it stands.
 attach; a field left out keeps its value. `DebugSetSettings` changes them at the
 current stop, merges them into those kept and answers the settings in force; a
 stop answers them under `settings` (and a failure to apply them under
-`settings_error`, the stop standing). The first change after an attach ignores
+`settings_error`, the stop standing; a stack that could not be read under `stack_error` —
+each the method's error as it is, with its step: `set settings`, `read stack`). The first change after an attach ignores
 `system_debugging: false` (server source, BASIS 816, read 2026-10-11) and its
 answer cannot show it, so the server sends a `false` there twice. The display of
 data aging is not offered: left out, it stays off, the system's default.
@@ -399,7 +400,13 @@ ends by:
   in our runs answered it at once; when even that one arrives first, the stop
   waits for the poll's hold. The race is the system's and is documented, not
   closed (measured on premise, 2026-10-12). A part that could not be undone is
-  reported, kept, and retried by the next stop; the handle stays valid, the
+  reported, kept, and retried by the next stop — the answer is `{ failures, notes? }`, each
+  entry the method's error as it is with its step (`release the debuggee`, `stop listener`,
+  `delete breakpoint <id>`, `close the listener's connection`, `clear breakpoints`, `stop`,
+  …), and SAP's final refusal of the listener's stop is a note in the same shape, the
+  breakpoints it leaves on the system named under its `cleanup`; a start that failed and could
+  not undo everything answers what it could not undo the same way, under `cleanup.failures`;
+  the handle stays valid, the
   identity (mode, request user) and the settings stay, and a new start is
   refused, until nothing is held. A debuggee the listener caught as the stop
   began is attached and released by the stop; measured on premise (2026-10-11), an attach after

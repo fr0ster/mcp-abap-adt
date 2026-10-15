@@ -161,8 +161,10 @@ describe('no built-in deadline on the server reads', () => {
     const reads = scans.flatMap((s) =>
       s.calls.filter((c) => c.callee === 'makeAdtRequest'),
     );
-    // 12 calls today; the floor keeps the scan from passing on an empty set.
-    expect(reads.length).toBeGreaterThanOrEqual(12);
+    // 9 calls today (SearchSource's include and function-module reads and
+    // GetEnhancements' probes now go through adt-clients); the floor keeps
+    // the scan from passing on an empty set.
+    expect(reads.length).toBeGreaterThanOrEqual(9);
   });
 
   it('every makeAdtRequest call passes no deadline (0)', () => {

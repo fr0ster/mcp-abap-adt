@@ -1,4 +1,4 @@
-import { failedAtStep } from '../../../lib/answer';
+import { type FailureEntry, failedPayloadOf } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { return_error } from '../../../lib/utils';
@@ -47,6 +47,8 @@ interface AbapSymbolInfo {
   dataType?: string;
   parameters?: AbapParameterInfo[];
   systemInfo?: AbapSystemInfo;
+  /** The symbol's read failed: its error as it is, with the step. */
+  error?: FailureEntry;
 }
 
 interface AbapParameterInfo {
@@ -455,35 +457,18 @@ class SimpleAbapSemanticAnalyzer {
 }
 
 /**
- * A delegated read that SAP refused: the read's error as it is, with the
- * step, ends the call. A symbol that is not there (`ExceptionResourceNotFound`)
- * or a failure that is not a method's error stays what it was: not found.
+ * A delegated read that failed: the read's error as it is, with the step —
+ * this symbol's answer, beside the others'. A symbol that is not there
+ * (`ExceptionResourceNotFound`) stays what it was: not found.
  */
-class SymbolReadRefused extends Error {
-  constructor(readonly result: ReturnType<typeof failedAtStep>) {
-    super('a symbol read was refused');
-  }
-}
-
 function refusalOf(
   result: { isError?: boolean; content?: unknown } | undefined,
   step: string,
-): SymbolReadRefused | undefined {
-  if (result?.isError !== true || !Array.isArray(result.content)) return;
-  const text = (result.content[0] as { text?: unknown } | undefined)?.text;
-  if (typeof text !== 'string') return;
-  let payload: unknown;
-  try {
-    payload = JSON.parse(text);
-  } catch {
-    return;
-  }
-  if (payload === null || typeof payload !== 'object') return;
-  if (
-    (payload as { adt_type?: unknown }).adt_type === 'ExceptionResourceNotFound'
-  )
-    return;
-  return new SymbolReadRefused(failedAtStep(result, step));
+): FailureEntry | undefined {
+  const payload = failedPayloadOf(result, step);
+  if (payload === undefined) return;
+  if (payload.adt_type === 'ExceptionResourceNotFound') return;
+  return payload;
 }
 
 class AbapSystemSymbolResolver {
@@ -505,7 +490,6 @@ class AbapSystemSymbolResolver {
           failedCount++;
         }
       } catch (error) {
-        if (error instanceof SymbolReadRefused) throw error;
         // If resolution fails, add original symbol with error info
         resolvedSymbols.push({
           ...symbol,
@@ -544,7 +528,6 @@ class AbapSystemSymbolResolver {
           return await this.resolveGenericSymbol(context, symbol);
       }
     } catch (error) {
-      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -564,8 +547,8 @@ class AbapSystemSymbolResolver {
       const classInfo = await handleGetClass(context, {
         class_name: symbol.name,
       });
-      const refused = refusalOf(classInfo, `read class ${symbol.name}`);
-      if (refused) throw refused;
+      const refused = refusalOf(classInfo, 'read class');
+      if (refused) return { ...symbol, error: refused };
       if (
         !classInfo ||
         classInfo.isError ||
@@ -612,7 +595,6 @@ class AbapSystemSymbolResolver {
         },
       };
     } catch (error) {
-      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -632,11 +614,8 @@ class AbapSystemSymbolResolver {
         function_module_name: symbol.name,
         function_group_name: '',
       });
-      const refused = refusalOf(
-        functionInfo,
-        `read function module ${symbol.name}`,
-      );
-      if (refused) throw refused;
+      const refused = refusalOf(functionInfo, 'read function module');
+      if (refused) return { ...symbol, error: refused };
       if (
         !functionInfo ||
         functionInfo.isError ||
@@ -674,7 +653,6 @@ class AbapSystemSymbolResolver {
         } as AbapSystemInfo,
       };
     } catch (error) {
-      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -694,8 +672,8 @@ class AbapSystemSymbolResolver {
         interface_name: symbol.name,
       });
 
-      const refused = refusalOf(interfaceInfo, `read interface ${symbol.name}`);
-      if (refused) throw refused;
+      const refused = refusalOf(interfaceInfo, 'read interface');
+      if (refused) return { ...symbol, error: refused };
       if (
         !interfaceInfo ||
         interfaceInfo.isError ||
@@ -743,7 +721,6 @@ class AbapSystemSymbolResolver {
         } as AbapSystemInfo,
       };
     } catch (error) {
-      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -772,7 +749,6 @@ class AbapSystemSymbolResolver {
         } as AbapSystemInfo,
       };
     } catch (error) {
-      if (error instanceof SymbolReadRefused) throw error;
       return {
         ...symbol,
         systemInfo: {
@@ -829,7 +805,6 @@ export async function handleGetAbapSystemSymbols(
 
     return response;
   } catch (error) {
-    if (error instanceof SymbolReadRefused) return error.result;
     logger?.error('Failed to resolve ABAP system symbols', error as any);
     return {
       isError: true,

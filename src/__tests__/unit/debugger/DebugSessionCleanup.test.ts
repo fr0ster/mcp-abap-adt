@@ -3,6 +3,7 @@ import {
   DebugSession,
   DebugStateError,
 } from '../../../lib/debugger/DebugSession';
+import { return_error } from '../../../lib/utils';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   CONFLICT,
@@ -60,7 +61,7 @@ describe('the cleanup', () => {
     world.override.deleteBreakpoint = async () =>
       refusedResponse('Breakpoint is locked');
     await expect(session.stop()).rejects.toThrow(
-      /listener: listener busy; breakpoint L10: Breakpoint is locked; breakpoint E1: Breakpoint is locked/,
+      /stop listener: listener busy; delete breakpoint L10: Breakpoint is locked; delete breakpoint E1: Breakpoint is locked/,
     );
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
@@ -87,9 +88,15 @@ describe('the cleanup', () => {
     await expect(session.stop()).rejects.toThrow(DebugCleanupError);
     expect(session.listBreakpoints().map((r) => r.id)).toEqual(['E1']);
     expect(session.requestedBreakpoints()).toEqual([EXC]);
+    // Each in the shape of every other failure: the method's error as it
+    // is, with its step — not one text.
     expect(session.failures()).toEqual([
-      'listener: listener busy',
-      'breakpoint E1: Breakpoint is locked',
+      { message: 'listener busy', origin: 'refusal', step: 'stop listener' },
+      {
+        message: 'Breakpoint is locked',
+        origin: 'refusal',
+        step: 'delete breakpoint E1',
+      },
     ]);
     expect(session.holdsState()).toBe(true);
   });
@@ -312,6 +319,50 @@ describe('the cleanup', () => {
     expect(session.holdsState()).toBe(false);
   });
 
+  it('a start that failed with no SAP answer behind it answers its own words, with what it could not undo as entries', async () => {
+    const world = fakeWorld();
+    world.breakpointAnswers.push(ROWS);
+    world.override.stopListener = async () => refusedResponse('listener busy');
+    world.override.deleteBreakpoint = async () =>
+      refusedResponse('Breakpoint is locked');
+    const session = new DebugSession(world.ports, IDS).bind('origin');
+    const started = session
+      .start('refuse', { breakpoints: [A] })
+      .catch((e: unknown) => e);
+    await until(() => world.polls.length === 1);
+    world.polls[0].reject(new Error('socket hang up'));
+    const error = await started;
+    const answered = JSON.parse(
+      (return_error(error) as { content: Array<{ text: string }> }).content[0]
+        .text,
+    );
+    expect(answered).toEqual({
+      message: 'socket hang up',
+      cleanup: {
+        message: 'not undone',
+        failures: [
+          {
+            message: 'listener busy',
+            origin: 'refusal',
+            step: 'stop listener',
+          },
+          {
+            message: 'Breakpoint is locked',
+            origin: 'refusal',
+            step: 'delete breakpoint L10',
+          },
+          {
+            message: 'Breakpoint is locked',
+            origin: 'refusal',
+            step: 'delete breakpoint E1',
+          },
+        ],
+      },
+    });
+    delete world.override.stopListener;
+    delete world.override.deleteBreakpoint;
+  });
+
   it("another user without authorisation: SAP's 403 reaches the caller as it said it, and the state stays held for DebugStop", async () => {
     const world = fakeWorld();
     const NO_AUTH = 'No authorization to debug the requests of SAPUSER02';
@@ -322,8 +373,21 @@ describe('the cleanup', () => {
       .start('refuse', { ...START, requestUser: 'SAPUSER02', breakpoints: [A] })
       .catch((e: unknown) => e);
     expect((error as Error).message).toBe(
-      `${NO_AUTH}; not undone: listener: ${NO_AUTH}`,
+      `${NO_AUTH}; not undone: stop listener: ${NO_AUTH}`,
     );
+    // The consumer's answer: the arming's refusal as it is, with what could
+    // not be undone beside it — each an entry with its step.
+    const answered = JSON.parse(
+      (return_error(error) as { content: Array<{ text: string }> }).content[0]
+        .text,
+    );
+    expect(answered.message).toBe(NO_AUTH);
+    expect(answered.cleanup).toEqual({
+      message: 'not undone',
+      failures: [
+        { message: NO_AUTH, origin: 'refusal', step: 'stop listener' },
+      ],
+    });
     expect(session.holdsState()).toBe(true);
     expect(session.currentIdentity()).toMatchObject({
       requestUser: 'SAPUSER02',

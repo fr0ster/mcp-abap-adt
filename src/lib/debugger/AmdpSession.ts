@@ -40,6 +40,15 @@ import {
   type RunTarget,
   WAIT_MAX_SECONDS,
 } from './DebugSession';
+import {
+  asFailure,
+  type DebugFailure,
+  describeFailures,
+  failedEntry,
+  isFromThrow,
+  leaveBehind,
+  thrownFailure,
+} from './failures';
 import { lineUriOf } from './objectUri';
 import { failureText } from './readings';
 import { Serial } from './serial';
@@ -76,7 +85,7 @@ interface Open {
   stopped: boolean; // the stop request was answered ok
   readDone: boolean; // the read loop's last batch arrived (its cleanup may still run)
   /** What the last batch could not undo, set once its cleanup finished and was recorded. */
-  lastBatchFailures?: string[];
+  lastBatchFailures?: DebugFailure[];
   readFailed?: string; // the event read failed: a sync waiting for confirmation hears it at once
   readFailedWith?: IAdtError; // the method's error behind `readFailed`, when the read answered one
   failureReported: boolean; // that failure was already thrown by a sync
@@ -93,23 +102,9 @@ const failedAt = <E extends Error>(
   a: IAdtResponse<unknown>,
   step: string,
 ): E =>
-  a.ok || fromThrow.has(a.getError())
+  a.ok || isFromThrow(a.getError())
     ? error
     : carryingFailure(error, a.getError(), step);
-/**
- * A throw read as a failed answer, so the loops can handle both alike. No
- * SAP answer is behind it: it is never carried as the method's error to the
- * consumer as if SAP had answered (`failedAt` skips it).
- */
-const fromThrow = new WeakSet<object>();
-const asFailure = (e: unknown) => {
-  const error = { origin: 'connection', message: thrown(e) };
-  fromThrow.add(error);
-  return {
-    ok: false as const,
-    getError: () => error,
-  } as unknown as IAdtResponse<never>;
-};
 type Wire = { headers?: Record<string, unknown>; data?: unknown };
 const wireOf = (a: IAdtResponse<unknown>): Wire =>
   (a.ok ? (a.getResult().value ?? {}) : {}) as Wire;
@@ -127,8 +122,8 @@ export class AmdpSession<O = unknown> {
   private notices: AmdpState[] = [];
   private failure?: string;
   /** The failed event read behind `failure`: the method's error, and what was not undone. */
-  private failedRead?: { error: IAdtError; failures: string[] };
-  private cleanupFailures: string[] = [];
+  private failedRead?: { error: IAdtError; failures: DebugFailure[] };
+  private cleanupFailures: DebugFailure[] = [];
   /** Runs in flight, each its own token: stop() forgets them all, so a late end changes nothing. */
   private readonly runs = new Set<{ connection?: IAbapConnection }>();
   private readonly waiters = new Set<() => void>();
@@ -186,7 +181,7 @@ export class AmdpSession<O = unknown> {
   private async closeOrKeep(
     c: IAbapConnection | undefined,
     what: string,
-    failures: string[],
+    failures: DebugFailure[],
   ): Promise<void> {
     if (!c) return;
     try {
@@ -194,7 +189,7 @@ export class AmdpSession<O = unknown> {
       this.unclosed.delete(c);
     } catch (e) {
       this.unclosed.add(c);
-      failures.push(`${what} was not closed: ${thrown(e)}`);
+      failures.push(thrownFailure(e, `close ${what}`));
     }
   }
   /** Inside the serial: the session is no longer the running one; its cleanup is owed. */
@@ -261,7 +256,7 @@ export class AmdpSession<O = unknown> {
           failureReported: false,
         };
       } catch (error) {
-        const failures: string[] = [];
+        const failures: DebugFailure[] = [];
         await this.closeOrKeep(events, "the events' connection", failures);
         await this.closeOrKeep(commands, "the commands' connection", failures);
         throw withNotUndone(error, failures);
@@ -392,7 +387,7 @@ export class AmdpSession<O = unknown> {
         }
         if (current && failed !== undefined) {
           open.readFailed = failed;
-          if (!answer.ok && !fromThrow.has(answer.getError()))
+          if (!answer.ok && !isFromThrow(answer.getError()))
             open.readFailedWith = answer.getError();
           this.notify(); // a sync waiting in the serial hears it now, not after its bound
         }
@@ -433,7 +428,7 @@ export class AmdpSession<O = unknown> {
       if (owed) this.cleanupFailures = failures;
       if (failedHere && !open.failureReported) {
         this.failure = `${open.readFailed ?? 'the event read failed'}${
-          failures.length ? `; not undone: ${failures.join('; ')}` : ''
+          failures.length ? `; not undone: ${describeFailures(failures)}` : ''
         }`;
         this.failedRead =
           open.readFailedWith !== undefined
@@ -456,18 +451,18 @@ export class AmdpSession<O = unknown> {
   private async finishClosing(
     open: Open,
     lastBatch: AmdpEvent[],
-  ): Promise<string[]> {
+  ): Promise<DebugFailure[]> {
     if (this.closing !== open) return [];
     for (const e of lastBatch)
       if (e.kind === 'ON_BREAK' && !open.released.has(e.debuggeeId))
         open.unreleased.add(e.debuggeeId);
-    const failures: string[] = [];
+    const failures: DebugFailure[] = [];
     if (!open.cleared) {
       const cleared = await open.onCommands
         .syncBreakpoints(open.mainId, [])
         .catch(asFailure);
       if (cleared.ok) open.cleared = true;
-      else failures.push(`clear breakpoints: ${messageOf(cleared)}`);
+      else failures.push(failedEntry(cleared, 'clear breakpoints'));
     }
     for (const id of [...open.unreleased]) {
       const released = await open.onCommands
@@ -476,12 +471,12 @@ export class AmdpSession<O = unknown> {
       if (released.ok) {
         open.unreleased.delete(id);
         open.released.add(id);
-      } else failures.push(`release debuggee ${id}: ${messageOf(released)}`);
+      } else failures.push(failedEntry(released, `release debuggee ${id}`));
     }
     if (!open.stopped) {
       const stopped = await open.onCommands.stop(open.mainId).catch(asFailure);
       if (stopped.ok) open.stopped = true;
-      else failures.push(`stop: ${messageOf(stopped)}`);
+      else failures.push(failedEntry(stopped, 'stop'));
     }
     if (failures.length || !open.readDone) return failures; // kept: retried by stop(), or finished by the read loop
     // Done with the session; a connection whose close throws stays in `unclosed` for the next stop.
@@ -532,7 +527,10 @@ export class AmdpSession<O = unknown> {
       if (read === undefined) throw failed;
       carryingFailure(failed, read.error, 'read events');
       if (read.failures.length > 0) {
-        noteLeftBehind(failed, `not undone: ${read.failures.join('; ')}`);
+        noteLeftBehind(failed, {
+          message: 'not undone',
+          failures: read.failures,
+        });
       }
       throw failed;
     }
@@ -626,7 +624,7 @@ export class AmdpSession<O = unknown> {
   async stop(): Promise<void> {
     let ending: Open | undefined;
     await this.mutate(async () => {
-      const failures: string[] = [];
+      const failures: DebugFailure[] = [];
       try {
         for (const c of [...this.unclosed])
           await this.closeOrKeep(c, 'a connection', failures);
@@ -642,7 +640,7 @@ export class AmdpSession<O = unknown> {
           if (!stoppedBefore && open.stopped && !open.readDone) ending = open;
         }
       } catch (error) {
-        failures.push(thrown(error));
+        failures.push(thrownFailure(error, 'stop'));
       } finally {
         const runs = [...this.runs];
         this.runs.clear();
@@ -659,13 +657,13 @@ export class AmdpSession<O = unknown> {
         this.abandoned.clear();
         this.cleanupFailures = failures;
       }
-      if (failures.length) throw new DebugCleanupError(failures.join('; '));
+      if (failures.length) throw new DebugCleanupError(failures);
     });
     // Outside the serial: the read's last batch, and what it could not undo is this
     // stop's failure too — its own, not whatever a later call left in cleanupFailures.
     if (ending) {
       const failures = await this.lastBatchHandled(ending);
-      if (failures.length) throw new DebugCleanupError(failures.join('; '));
+      if (failures.length) throw new DebugCleanupError(failures);
     }
   }
 
@@ -674,7 +672,7 @@ export class AmdpSession<O = unknown> {
    * finished and been recorded. Anything else that wakes the waiters meanwhile (a
    * run ending, a wait) changes nothing.
    */
-  private lastBatchHandled(open: Open): Promise<string[]> {
+  private lastBatchHandled(open: Open): Promise<DebugFailure[]> {
     return new Promise((resolve) => {
       const check = () => {
         const failures = open.lastBatchFailures;
@@ -738,20 +736,18 @@ export class AmdpSession<O = unknown> {
     return !!this.closing && this.closing.lastBatchFailures === undefined;
   }
 
-  /** What the last cleanup could not undo. */
-  failures(): string[] {
+  /** What the last cleanup could not undo, each in the shape of every other failure. */
+  failures(): DebugFailure[] {
     return [...this.cleanupFailures];
   }
 }
 
-/** The original error, with what could not be undone appended. */
-function withNotUndone(error: unknown, failures: string[]): unknown {
+/** The original error, with what could not be undone beside it, each as an entry. */
+function withNotUndone(error: unknown, failures: DebugFailure[]): unknown {
   if (failures.length === 0) return error;
-  const notUndone = `not undone: ${failures.join('; ')}`;
-  noteLeftBehind(error, notUndone);
-  if (error instanceof Error) {
-    error.message = `${error.message}; ${notUndone}`;
-    return error;
-  }
-  return new DebugListenerError(`${thrown(error)}; ${notUndone}`);
+  const failed =
+    error instanceof Error ? error : new DebugListenerError(thrown(error));
+  leaveBehind(failed, { message: 'not undone', failures });
+  failed.message = `${failed.message}; not undone: ${describeFailures(failures)}`;
+  return failed;
 }

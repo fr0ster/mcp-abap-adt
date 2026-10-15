@@ -343,8 +343,13 @@ describe('CreateTransportTask', () => {
       }),
     );
     expect(terse.task_type).toBe('X');
-    expect(terse.task_type_error).toContain('workbench requests');
+    expect(terse.task_type_error).toEqual({
+      message: 'You can only change the type of tasks in workbench requests',
+      origin: 'refusal',
+      step: 'change task type',
+    });
     expect(terse.cleanup.message).toContain('TK127');
+    expect(terse.cleanup.failures).toEqual([terse.task_type_error]);
 
     fakeClient = refused();
     const full = body(
@@ -355,7 +360,16 @@ describe('CreateTransportTask', () => {
       }),
     );
     expect(full.cleanup.message).toContain('still Unclassified');
-    expect(full.cleanup.message).toContain('workbench requests');
+    // SAP's refusal rides as the method's error, with its step — not folded
+    // into the note's words.
+    expect(full.cleanup.message).not.toContain('workbench requests');
+    expect(full.cleanup.failures).toEqual([
+      {
+        message: 'You can only change the type of tasks in workbench requests',
+        origin: 'refusal',
+        step: 'change task type',
+      },
+    ]);
 
     fakeClient = refused();
     const raw = body(
@@ -423,7 +437,8 @@ describe('CreateTransportTask', () => {
     expect(result.isError).toBe(false);
     expect(answered.task_number).toBe('SIDK907073');
     expect(answered.task_type).toBe('X');
-    expect(answered.task_type_error).toMatch(/unknown/);
+    expect(answered.task_type_error.message).toMatch(/unknown/);
+    expect(answered.task_type_error.step).toBe('change task type');
     expect(answered.note).toMatch(/AddTransportObject/);
   });
 

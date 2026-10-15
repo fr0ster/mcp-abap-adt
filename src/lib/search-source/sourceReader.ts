@@ -1,10 +1,10 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { failureOf } from '../auth/failures';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import { carryingFailure, methodFailureOf } from '../strategies/step';
-import { encodeSapObjectName, makeAdtRequest } from '../utils';
 import type { EnumeratedObject, ScanObjectType } from './packageEnumerator';
 
 export type SourceVersion = 'active' | 'inactive';
@@ -46,9 +46,10 @@ async function safe<T>(
   try {
     return await op();
   } catch (e: any) {
-    // SAP refused a read: the method's error as it is, with its step — the
-    // scan answers it, it is not skipped as if the source were empty.
-    if (methodFailureOf(e) !== undefined) throw e;
+    // SAP refused a read, or the chain failed it: the failure as it is, with
+    // its step — the scan answers it, it is not skipped as if the source were
+    // empty.
+    if (methodFailureOf(e) !== undefined || failureOf(e) !== undefined) throw e;
     logger?.debug?.(`[search-source] ${desc} failed: ${e?.message ?? e}`);
     return null;
   }
@@ -195,15 +196,11 @@ export function createSourceReaderDeps(
       return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read program');
     },
     async readInclude(includeName) {
-      const r = await makeAdtRequest(
-        ctx.connection,
-        `/sap/bc/adt/programs/includes/${encodeSapObjectName(includeName)}/source/main`,
-        'GET',
-        // No deadline of the server's (spec §5.8): a request cut here runs
-        // on in SAP while SearchSource's own session is logged off under it.
-        0,
-      );
-      return typeof r?.data === 'string' ? r.data : null;
+      // The include endpoint has no version selector: none is sent, as before.
+      const r = await client
+        .getInclude()
+        .read({ includeName }, undefined, { analyse: analyseException });
+      return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read include');
     },
     async readClassMain(className, version) {
       const r = await client
@@ -220,15 +217,16 @@ export function createSourceReaderDeps(
       return [];
     },
     async readFugrFm(fugrName, fmName) {
-      const r = await makeAdtRequest(
-        ctx.connection,
-        `/sap/bc/adt/functions/groups/${encodeSapObjectName(fugrName.toLowerCase())}/fmodules/${encodeSapObjectName(fmName.toLowerCase())}/source/main`,
-        'GET',
-        // No deadline of the server's (spec §5.8): a request cut here runs
-        // on in SAP while SearchSource's own session is logged off under it.
-        0,
-      );
-      return typeof r?.data === 'string' ? r.data : null;
+      const r = await client
+        .getFunctionModule()
+        .read(
+          { functionGroupName: fugrName, functionModuleName: fmName },
+          undefined,
+          { analyse: analyseException },
+        );
+      return r.ok
+        ? r.getResult().value
+        : refusedOrAbsent(r, 'read function module');
     },
     logger: ctx.logger,
   };

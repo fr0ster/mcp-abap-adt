@@ -89,7 +89,7 @@ import {
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
-import { succeededWith } from '../../../lib/strategies/sequence';
+import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -348,6 +348,9 @@ export async function handleActivateObject(
         runId,
         analyseException,
       );
+      // Reading the run failed: the method's error as it is, with its step.
+      if (outcome.failure !== undefined)
+        return failedWith<ActivationRunOutcome>(outcome.failure);
       return succeededWith(outcome);
     },
     (outcome: ActivationRunOutcome) => {

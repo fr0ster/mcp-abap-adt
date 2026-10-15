@@ -51,7 +51,7 @@ describe('an atomic write whose unlock is refused (a client double)', () => {
       adtType: 'ExceptionResourceNoAuthorization',
       response: { status: 403, data: DOCUMENT },
       messages: UNLOCK_ENTRY.messages,
-    } as Partial<IAdtError>);
+    } as unknown as Partial<IAdtError>);
 
   it('after a successful write: the success stands, cleanup carries the whole unlock error with step unlock', async () => {
     fakeClient = fakeClientOf({

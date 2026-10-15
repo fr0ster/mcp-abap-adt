@@ -126,6 +126,13 @@ describe('withLock', () => {
     expect((result.getError() as { cleanup?: unknown }).cleanup).toEqual({
       error: 'client_threw',
       message: 'unlock called with no handle',
+      failures: [
+        {
+          error: 'client_threw',
+          message: 'unlock called with no handle',
+          step: 'unlock',
+        },
+      ],
     });
   });
 
@@ -201,6 +208,13 @@ describe('withLock', () => {
     expect((result as { cleanup?: unknown }).cleanup).toEqual({
       error: 'client_threw',
       message: 'unlock called with no handle',
+      failures: [
+        {
+          error: 'client_threw',
+          message: 'unlock called with no handle',
+          step: 'unlock',
+        },
+      ],
     });
   });
 

@@ -1061,6 +1061,43 @@ transport's options only:
   (18.x: `lacks: <fields>`); a browser login on a platform with no known browser reads
   `Destination "X" logs in through a browser, and none is known on this platform (<platform>)`.
 
+## Docker users: one image per binary
+
+18.x had one image: it installed `core` and `compact` and ran `mcp-abap-adt
+--allow-destination-header` over HTTP (`MCP_TRANSPORT=http`), with `service-keys/` and `sessions/`
+under `AUTH_BROKER_PATH=/app`. That command no longer starts — `MCP_TRANSPORT` is refused by every
+binary and `--allow-destination-header` is gone (see above) — and the image is gone with it.
+[`docker/Dockerfile`](../docker/Dockerfile) now builds **one image per binary**, chosen with the
+build argument `VARIANT` (the package's name without its scope), installing that package alone:
+
+- **Build with the context `docker/`**, not the repository root:
+  `docker build --build-arg VARIANT=http -t mcp-abap-adt-http docker`. The image's entrypoint is the
+  variant's binary, so arguments follow the image name (`docker run … mcp-abap-adt-http --port=…`).
+  `MCP_ABAP_ADT_VERSION` is now the version of that one package (default `latest`).
+- **HTTP in a container is `VARIANT=http`** (`compact-http`, `http-ro`, `compact-http-ro` for the
+  other tool sets): `0.0.0.0:3000`, `HEALTHCHECK` on `/mcp/health`, credentials only from each
+  request's `x-sap-*` headers (see "HTTP users"). Drop the `service-keys` / `sessions` mounts,
+  `AUTH_BROKER_PATH`, `MCP_TRANSPORT` and `--allow-destination-header`; a client that sent
+  `x-mcp-destination` sends `x-sap-url` with its credential instead.
+- **SSE in a container is `VARIANT=sse`** (`compact-sse`, `sse-ro`, `compact-sse-ro`):
+  `0.0.0.0:3001` — the SSE binary's own port, no longer 3000 — and `/sse`.
+- **Destinations (service keys, sessions, logins) are served by a stdio image** (`VARIANT=core`,
+  `compact`, `core-ro`, `compact-ro`): the MCP client starts `docker run -i --rm` with
+  `service-keys/` and `sessions/` mounted under `/app` (`AUTH_BROKER_PATH=/app`) and `--mcp=<name>`.
+  A server several clients reach over the network holding destinations is no longer offered.
+- **Every image needs the system type**: `-e SAP_SYSTEM_TYPE=onprem|cloud|legacy` (or
+  `--system-type`); no image sets one (see "the system type is required" above).
+- **Compose:** `docker/docker-compose.yml` has one service per variant, each in a profile of its own
+  name — `docker compose -f docker/docker-compose.yml up -d http`; a bare `up` starts nothing.
+  `docker-compose.headerless.yml` and the `docker:*:headerless` scripts are gone: the `http` service
+  is what it ran. `npm run docker:build` / `docker:up` / `docker:logs` take the service after `--`.
+- The images are still not published anywhere: build the one you need. See
+  [DOCKER.md](deployment/DOCKER.md).
+- **The MCP Registry** lists every binary: eight new entries for the Streamable HTTP and SSE
+  packages (`io.github.fr0ster/mcp-abap-adt-http`, `…-compact-http`, `…-http-ro`,
+  `…-compact-http-ro`, `…-sse`, `…-compact-sse`, `…-sse-ro`, `…-compact-sse-ro`) beside the four
+  stdio ones; `@mcp-abap-adt/http`, `sse`, `http-ro` and `sse-ro` now carry an `mcpName`.
+
 ## Embedders
 
 - **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **17.1**,

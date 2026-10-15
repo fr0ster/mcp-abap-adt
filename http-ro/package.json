@@ -1,5 +1,6 @@
 {
   "name": "@mcp-abap-adt/http-ro",
+  "mcpName": "io.github.fr0ster/mcp-abap-adt-http-ro",
   "version": "18.1.0",
   "description": "The read-only MCP server for SAP ABAP ADT over Streamable HTTP: the readonly tools (with system and search), no high, debugger, background-run or leftover-session tool; credentials only from each request's x-sap-* headers. No auth broker, no stores.",
   "license": "AGPL-3.0-only",

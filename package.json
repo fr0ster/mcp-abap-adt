@@ -162,10 +162,7 @@
     "docker:build": "docker compose -f docker/docker-compose.yml build",
     "docker:up": "docker compose -f docker/docker-compose.yml up -d",
     "docker:down": "docker compose -f docker/docker-compose.yml down",
-    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f",
-    "docker:build:headerless": "docker compose -f docker/docker-compose.headerless.yml build",
-    "docker:up:headerless": "docker compose -f docker/docker-compose.headerless.yml up -d",
-    "docker:down:headerless": "docker compose -f docker/docker-compose.headerless.yml down"
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f"
   },
   "keywords": [
     "abap",

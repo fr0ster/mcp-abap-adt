@@ -256,13 +256,32 @@ jobs:
             ./node_modules/.bin/$bin --help
           done
 
-      # The image installs the published packages from npm (nothing of this
-      # checkout goes into it); this keeps the Dockerfile itself working — it
-      # stopped starting once and nothing noticed, because nothing built it.
-      - name: Build the Docker image
+      # **Every image, from this run's tarballs.** One Dockerfile builds the
+      # twelve variants (`VARIANT`); with `PACKAGE_SOURCE=tarballs` it installs
+      # the checkout's packages, so the images are this run's code and not
+      # whatever npm holds — a release raising the major could not be built
+      # from the registry before it is published. Each image is checked:
+      # `--version`, a `tools/list`; HTTP and SSE also the health endpoint,
+      # the image's HEALTHCHECK and a `tools/call` whose x-sap-* credential
+      # reaches an ADT stand-in; a `-ro` image lists no write tool.
+      - name: Build and check the Docker images
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
-          docker build -f docker/Dockerfile -t mcp-abap-adt:ci .
-          docker run --rm mcp-abap-adt:ci mcp-abap-adt --version
-          docker run --rm mcp-abap-adt:ci mcp-abap-adt-compact --version
+          mkdir -p "$RUNNER_TEMP/tarballs"
+          cp mcp-abap-adt-*.tgz "$RUNNER_TEMP/tarballs/"
+          node scripts/ci/check-images.mjs --tarballs "$RUNNER_TEMP/tarballs" --tag ci
 
+      # The Glama reference image installs `core` from npm at its pinned
+      # version, which is on npm only once the release is published: it is
+      # built when it can be, and the run says so when it cannot.
+      - name: Build the Glama reference image
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
+        run: |
+          version=$(sed -n 's/^ARG CORE_VERSION=//p' docker/Dockerfile.inspect)
+          if [ -z "$(npm view "@mcp-abap-adt/core@$version" version 2>/dev/null)" ]; then
+            echo "@mcp-abap-adt/core@$version is not on npm yet: Dockerfile.inspect not built"
+            exit 0
+          fi
+          docker build -f docker/Dockerfile.inspect -t mcp-abap-adt-test/inspect:ci docker
+          docker run --rm mcp-abap-adt-test/inspect:ci mcp-abap-adt --version
+          docker image rm mcp-abap-adt-test/inspect:ci

@@ -1,0 +1,86 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.fr0ster/mcp-abap-adt-compact-sse",
+  "description": "Compact MCP server for SAP ABAP ADT over HTTP+SSE: x-sap-* header credentials",
+  "repository": {
+    "url": "https://github.com/fr0ster/mcp-abap-adt",
+    "source": "github"
+  },
+  "version": "17.1.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@mcp-abap-adt/compact-sse",
+      "version": "17.1.0",
+      "transport": {
+        "type": "sse",
+        "url": "http://localhost:{MCP_SSE_PORT}/sse",
+        "headers": [
+          {
+            "name": "x-sap-url",
+            "description": "The SAP system's URL, e.g. https://my-system.example.com.",
+            "isRequired": true,
+            "format": "string"
+          },
+          {
+            "name": "x-sap-client",
+            "description": "The SAP client (optional), e.g. 100.",
+            "format": "string"
+          },
+          {
+            "name": "x-sap-login",
+            "description": "The user of a basic logon, with x-sap-password.",
+            "format": "string"
+          },
+          {
+            "name": "x-sap-password",
+            "description": "The password of a basic logon, with x-sap-login.",
+            "isSecret": true,
+            "format": "string"
+          },
+          {
+            "name": "x-sap-jwt-token",
+            "description": "A token you hold, sent as a Bearer token (used as it is; the server cannot renew it). Instead of x-sap-login and x-sap-password.",
+            "isSecret": true,
+            "format": "string"
+          }
+        ]
+      },
+      "environmentVariables": [
+        {
+          "name": "SAP_SYSTEM_TYPE",
+          "description": "System type, required (here or as --system-type; no default, never guessed, no request header states it): the tools offered, the connector, and how the system's answers are read. Without it the server does not start.",
+          "format": "string",
+          "isRequired": true,
+          "choices": [
+            "cloud",
+            "onprem",
+            "legacy"
+          ]
+        },
+        {
+          "name": "MCP_SSE_HOST",
+          "description": "Host to listen on: 127.0.0.1 (this machine only) or 0.0.0.0 (every interface).",
+          "format": "string",
+          "default": "127.0.0.1"
+        },
+        {
+          "name": "MCP_SSE_PORT",
+          "description": "Port to listen on, 1-65535.",
+          "format": "number",
+          "default": "3001"
+        },
+        {
+          "name": "SAP_MASTER_SYSTEM",
+          "description": "System context for on-prem create/update operations (system id), when no x-sap-master-system header states it.",
+          "format": "string"
+        },
+        {
+          "name": "SAP_RESPONSIBLE",
+          "description": "Responsible user for on-prem create/update operations, when no x-sap-responsible header (or x-sap-login) states it.",
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

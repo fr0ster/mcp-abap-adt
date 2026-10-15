@@ -64,19 +64,60 @@ describe('release metadata names the version npm will carry', () => {
     }
   });
 
-  // The MCP Registry: one entry per stdio server package, published
-  // separately (`mcp-publisher publish server.json`, `… server-compact.json`,
-  // `… server-ro.json`, `… server-compact-ro.json`) — a different tool list is
-  // a different server.
-  describe.each([
-    ['server.json', manifests.core],
-    ['server-compact.json', manifests.compact],
-    ['server-ro.json', manifests['core-ro']],
-    ['server-compact-ro.json', manifests['compact-ro']],
-  ])('%s', (file, manifest) => {
+  // The MCP Registry: one entry per server package, published separately
+  // (`mcp-publisher publish <file>`) — a different tool list or transport is
+  // a different server. The entry names the package's transport: stdio for
+  // the four destination servers, Streamable HTTP and SSE for the eight
+  // listeners, which take their credentials from x-sap-* headers.
+  const listeners = {
+    http: json('http/package.json'),
+    sse: json('sse/package.json'),
+    'compact-http': json('compact-http/package.json'),
+    'compact-sse': json('compact-sse/package.json'),
+  };
+  const entries: Array<
+    [
+      string,
+      {
+        name: string;
+        version: string;
+        mcpName?: string;
+        bin: Record<string, string>;
+      },
+      string,
+    ]
+  > = [
+    ['server.json', manifests.core, 'stdio'],
+    ['server-compact.json', manifests.compact, 'stdio'],
+    ['server-ro.json', manifests['core-ro'], 'stdio'],
+    ['server-compact-ro.json', manifests['compact-ro'], 'stdio'],
+    ['server-http.json', listeners.http, 'streamable-http'],
+    ['server-compact-http.json', listeners['compact-http'], 'streamable-http'],
+    ['server-http-ro.json', manifests['http-ro'], 'streamable-http'],
+    [
+      'server-compact-http-ro.json',
+      manifests['compact-http-ro'],
+      'streamable-http',
+    ],
+    ['server-sse.json', listeners.sse, 'sse'],
+    ['server-compact-sse.json', listeners['compact-sse'], 'sse'],
+    ['server-sse-ro.json', manifests['sse-ro'], 'sse'],
+    ['server-compact-sse-ro.json', manifests['compact-sse-ro'], 'sse'],
+  ];
+
+  it('every server package has its entry, and no other entry exists', () => {
+    const files = fs
+      .readdirSync(root)
+      .filter((file) => file.startsWith('server') && file.endsWith('.json'))
+      .sort();
+    expect(files).toEqual(entries.map(([file]) => file).sort());
+  });
+
+  describe.each(entries)('%s', (file, manifest, transport) => {
     const entry = json(file);
 
     it('is the package it publishes, at its version', () => {
+      expect(manifest.mcpName).toBeDefined();
       expect(entry.name).toBe(manifest.mcpName);
       expect(entry.version).toBe(manifest.version);
       expect(entry.packages).toHaveLength(1);
@@ -84,9 +125,59 @@ describe('release metadata names the version npm will carry', () => {
       expect(entry.packages[0].version).toBe(manifest.version);
     });
 
+    it("is named after the package's binary", () => {
+      expect(Object.keys(manifest.bin)).toHaveLength(1);
+      expect(entry.name).toBe(
+        `io.github.fr0ster/${Object.keys(manifest.bin)[0]}`,
+      );
+    });
+
+    it(`names the ${transport} transport, where the binary serves it`, () => {
+      const served = entry.packages[0].transport;
+      expect(served.type).toBe(transport);
+      // The listener's own defaults: its port variable and its endpoint path.
+      const url = {
+        stdio: undefined,
+        'streamable-http': 'http://localhost:{MCP_HTTP_PORT}/mcp/stream/http',
+        sse: 'http://localhost:{MCP_SSE_PORT}/sse',
+      }[transport];
+      expect(served.url).toBe(url);
+      const variables = (entry.packages[0].environmentVariables ?? []).map(
+        (variable: { name: string }) => variable.name,
+      );
+      if (transport === 'stdio') {
+        expect(served.headers).toBeUndefined();
+      } else {
+        expect(variables).toContain(
+          transport === 'sse' ? 'MCP_SSE_PORT' : 'MCP_HTTP_PORT',
+        );
+        expect(
+          served.headers.find((h: { name: string }) => h.name === 'x-sap-url')
+            ?.isRequired,
+        ).toBe(true);
+      }
+      // The system type is required everywhere: never a default.
+      const systemType = entry.packages[0].environmentVariables.find(
+        (variable: { name: string }) => variable.name === 'SAP_SYSTEM_TYPE',
+      );
+      expect(systemType?.isRequired).toBe(true);
+      expect(systemType?.default).toBeUndefined();
+    });
+
     it('has a description the registry accepts (at most 100 characters)', () => {
       expect(entry.description.length).toBeLessThanOrEqual(100);
     });
+  });
+
+  // One Dockerfile builds every variant: a stage per package, named by its
+  // directory, that runs the package's own binary.
+  it('docker/Dockerfile has a stage for each server package, running its binary', () => {
+    const dockerfile = read('docker/Dockerfile');
+    for (const [, manifest] of entries) {
+      const variant = manifest.name.replace('@mcp-abap-adt/', '');
+      const bin = Object.keys(manifest.bin)[0];
+      expect(dockerfile).toContain(`AS ${variant}\nENTRYPOINT ["${bin}"]\n`);
+    }
   });
 
   // Glama builds from npm; the reference image pins the release, so a rebuild

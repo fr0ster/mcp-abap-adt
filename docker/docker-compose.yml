@@ -1,73 +1,126 @@
-# MCP ABAP ADT Server with destination-based authentication
+# One service per server variant, each the image docker/Dockerfile builds for
+# it from npm (nothing of the checkout goes in). Every service has a profile of
+# its own name, so a bare `up` starts nothing: name the variant.
 #
-# Architecture:
-# - A destination is a service key (and optionally a session file)
-# - Service keys stored in volume (./service-keys)
-# - HTTP transport on port 3000
+#   Streamable HTTP and SSE — credentials only from x-sap-* headers:
+#     docker compose -f docker/docker-compose.yml up -d http
+#     curl http://localhost:3000/mcp/health        (SSE variants: port 3001)
+#
+#   stdio — a named destination from ./service-keys and ./sessions:
+#     docker compose -f docker/docker-compose.yml run --rm -T core --mcp=<name>
+#
+# The system type is required and never guessed: set SAP_SYSTEM_TYPE (onprem,
+# cloud or legacy) in the shell or in docker/.env; it is passed to every
+# service as it is.
+
+x-build: &build
+  context: .
+  dockerfile: Dockerfile
+
+x-logging: &logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# stdio: run on demand with stdin open; the service keys read-only, the
+# sessions writable (written only with --unsafe).
+x-stdio: &stdio
+  stdin_open: true
+  environment:
+    - SAP_SYSTEM_TYPE
+  volumes:
+    - ./service-keys:/app/service-keys:ro
+    - ./sessions:/app/sessions
+  logging: *logging
+
+# Streamable HTTP on 3000; the image listens on 0.0.0.0 and checks its health.
+x-http: &http
+  restart: unless-stopped
+  ports:
+    - "3000:3000"
+  environment:
+    - SAP_SYSTEM_TYPE
+  logging: *logging
+
+# HTTP+SSE on 3001, the SSE binary's own port.
+x-sse: &sse
+  restart: unless-stopped
+  ports:
+    - "3001:3001"
+  environment:
+    - SAP_SYSTEM_TYPE
+  logging: *logging
 
 services:
-  mcp-abap-adt:
-    # Installs the published packages from npm; nothing of the checkout goes in.
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        MCP_ABAP_ADT_VERSION: ${MCP_ABAP_ADT_VERSION:-latest}
-    container_name: mcp-abap-adt-server
-    restart: unless-stopped
+  core:
+    <<: *stdio
+    profiles: ["core"]
+    build: { <<: *build, args: { VARIANT: core, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/core
 
-    # HTTP transport for client connections
-    ports:
-      - "3000:3000"
+  compact:
+    <<: *stdio
+    profiles: ["compact"]
+    build: { <<: *build, args: { VARIANT: compact, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/compact
 
-    # Environment configuration
-    environment:
-      - NODE_ENV=production
-      - MCP_HTTP_PORT=3000
-      - MCP_HTTP_HOST=0.0.0.0
+  core-ro:
+    <<: *stdio
+    profiles: ["core-ro"]
+    build: { <<: *build, args: { VARIANT: core-ro, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/core-ro
 
-      # Base directory of service-keys/ and sessions/ inside the container.
-      # One directory (a list is not split): set it, or the server reads the home directory's.
-      - AUTH_BROKER_PATH=/app
-    # The destination is chosen by the command, not by an environment variable:
-    #   --mcp=<name>                an own default destination (service-keys/<name>.json)
-    #   --allow-destination-header  a client names it per request with x-mcp-destination
-    #   --mcp=<destination>         a default destination: service-keys/<destination>.json
-    command: ["mcp-abap-adt", "--allow-destination-header"]
+  compact-ro:
+    <<: *stdio
+    profiles: ["compact-ro"]
+    build: { <<: *build, args: { VARIANT: compact-ro, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/compact-ro
 
-    # Volumes for AuthBroker data
-    volumes:
-      # Service keys directory - put your {destination}.json files here
-      # Example: ./service-keys/trial.json, ./service-keys/dev.json
-      - ./service-keys:/app/service-keys:ro
+  http:
+    <<: *http
+    profiles: ["http"]
+    build: { <<: *build, args: { VARIANT: http, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/http
 
-      # Sessions: written only with --unsafe (otherwise the session is kept in memory)
-      # - ./sessions:/app/sessions
+  compact-http:
+    <<: *http
+    profiles: ["compact-http"]
+    build: { <<: *build, args: { VARIANT: compact-http, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/compact-http
 
-      # Optional: Cache directory
-      # - ./cache:/app/cache
+  http-ro:
+    <<: *http
+    profiles: ["http-ro"]
+    build: { <<: *build, args: { VARIANT: http-ro, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/http-ro
 
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-          memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
+  compact-http-ro:
+    <<: *http
+    profiles: ["compact-http-ro"]
+    build: { <<: *build, args: { VARIANT: compact-http-ro, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/compact-http-ro
 
-    # Healthcheck
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/mcp/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
+  sse:
+    <<: *sse
+    profiles: ["sse"]
+    build: { <<: *build, args: { VARIANT: sse, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/sse
 
-    # Logging
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
+  compact-sse:
+    <<: *sse
+    profiles: ["compact-sse"]
+    build: { <<: *build, args: { VARIANT: compact-sse, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/compact-sse
+
+  sse-ro:
+    <<: *sse
+    profiles: ["sse-ro"]
+    build: { <<: *build, args: { VARIANT: sse-ro, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/sse-ro
+
+  compact-sse-ro:
+    <<: *sse
+    profiles: ["compact-sse-ro"]
+    build: { <<: *build, args: { VARIANT: compact-sse-ro, MCP_ABAP_ADT_VERSION: "${MCP_ABAP_ADT_VERSION:-latest}" } }
+    image: mcp-abap-adt/compact-sse-ro

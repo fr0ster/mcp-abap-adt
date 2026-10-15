@@ -49,14 +49,19 @@ so that no package goes out on top of a dependency that is missing.
    Every range must be a semver range that resolves on the registry (no `file:`, `link:` or
    `workspace:`).
 2. **Bump the registry and Glama metadata** — part of the release, in the same PR:
-   - `server.json`, `server-compact.json`, `server-ro.json` and `server-compact-ro.json`: both
-     version fields each, and a description of at most 100 characters (see
+   - the twelve registry entries — `server.json`, `server-compact.json`, `server-ro.json`,
+     `server-compact-ro.json`, `server-http.json`, `server-compact-http.json`, `server-http-ro.json`,
+     `server-compact-http-ro.json`, `server-sse.json`, `server-compact-sse.json`,
+     `server-sse-ro.json`, `server-compact-sse-ro.json`: both version fields each, at the version of
+     the package the entry names, and a description of at most 100 characters (see
      [MCP_REGISTRY.md](./MCP_REGISTRY.md));
    - `docker/Dockerfile.inspect`: `ARG CORE_VERSION=<version>` — the image Glama builds, pinned so a
      rebuild cannot put a newer package under an older release number;
    - `glama.json`: the description, when what the server does changed.
 
-   `src/__tests__/unit/releaseMetadata.test.ts` fails until the versions agree with the manifests.
+   `src/__tests__/unit/releaseMetadata.test.ts` fails until the versions agree with the manifests,
+   and also when a server package has no entry, an entry names another package or transport, or
+   `docker/Dockerfile` has no stage for a variant.
    Glama picks the release up by itself from npm and the repository; nothing is set there by hand.
 3. **Update `CHANGELOG.md` and the documentation** the change touches; for a breaking release, a
    migration note (`docs/MIGRATION-<major>.0.md`). If tools changed, regenerate the tool lists with
@@ -72,6 +77,10 @@ so that no package goes out on top of a dependency that is missing.
    npm --prefix sse run test:check && npm --prefix sse test
    npm --prefix background-runs-memory run test:check && npm --prefix background-runs-memory test
    npm --prefix responsible-rules run test:check && npm --prefix responsible-rules test
+   ```
+   With Docker, the images as CI builds them — every package packed into one directory, then:
+   ```bash
+   node scripts/ci/check-images.mjs --tarballs <directory>
    ```
 5. **Rehearse the publish**:
    ```bash
@@ -89,14 +98,15 @@ so that no package goes out on top of a dependency that is missing.
    ```
    On the first package a browser window may open for 2FA. If a publish fails (often a dropped
    login: `npm whoami`, `npm login`), re-run: packages already on npm are skipped.
-8. **Publish the registry entries** — four commands, one per stdio server package
+8. **Publish the registry entries** — twelve commands, one per server package
    (`mcp-publisher publish` alone takes `./server.json` only):
    ```bash
    mcp-publisher login github      # once per session
-   mcp-publisher publish server.json
-   mcp-publisher publish server-compact.json
-   mcp-publisher publish server-ro.json
-   mcp-publisher publish server-compact-ro.json
+   for entry in server.json server-compact.json server-ro.json server-compact-ro.json \
+     server-http.json server-compact-http.json server-http-ro.json server-compact-http-ro.json \
+     server-sse.json server-compact-sse.json server-sse-ro.json server-compact-sse-ro.json; do
+     mcp-publisher publish "$entry"
+   done
    ```
    See [MCP_REGISTRY.md](./MCP_REGISTRY.md). npm may answer the new version only a few minutes after
    the publish; install with `--prefer-online` if it still says `ETARGET`.
@@ -111,10 +121,15 @@ so that no package goes out on top of a dependency that is missing.
 - `ci.yml` (push and pull request to `main` / `develop`): Ubuntu, macOS and Windows × Node 22 and
   24 — Biome lint (root and each package's `lint:check`), build, test type-check, tests, the
   server, http, sse, background-runs-memory and responsible-rules tests; on Ubuntu / Node 22 also
-  `npm audit --omit=dev --audit-level=high`, `npm pack` of all seventeen packages, and an install of
-  the tarballs that runs each of the twelve bins' `--version` and `--help`.
-- `release.yml` (tag `v*.*.*`): the same lint, build and tests on Ubuntu × Node 22 and 24, then a
-  GitHub Release (`softprops/action-gh-release`, generated notes).
+  `npm audit --omit=dev --audit-level=high`, `npm pack` of all seventeen packages, an install of
+  the tarballs that runs each of the twelve bins' `--version` and `--help`, and the twelve Docker
+  images built from those tarballs and checked (`scripts/ci/check-images.mjs`).
+- `release.yml` (tag `v*.*.*`): the same lint, build and tests on Ubuntu × Node 22 and 24 — on
+  Node 22 also the packing, the install, the bins and the twelve images —, then a GitHub Release
+  (`softprops/action-gh-release`, generated notes).
+
+No workflow publishes an image: the images are built by whoever runs them, from
+[`docker/Dockerfile`](../../docker/Dockerfile) (see [DOCKER.md](./DOCKER.md)).
 
 See [GITHUB_ACTIONS.md](./GITHUB_ACTIONS.md).
 

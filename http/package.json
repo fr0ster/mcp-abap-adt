@@ -1,5 +1,6 @@
 {
   "name": "@mcp-abap-adt/http",
+  "mcpName": "io.github.fr0ster/mcp-abap-adt-http",
   "version": "17.1.0",
   "description": "The Streamable HTTP transport of the MCP ABAP ADT server: an Express app serving the ADT tools of @mcp-abap-adt/lib over MCP Streamable HTTP, with DNS rebinding protection and TLS.",
   "license": "AGPL-3.0-only",

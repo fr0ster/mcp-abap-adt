@@ -1,4 +1,5 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { failureEntry, thrownEntry } from '../answer';
 import { type Cleanup, safeRequest } from './safeFields';
 import { atStep, stepOf } from './step';
 
@@ -40,6 +41,9 @@ async function runRelease<H>(
       carrier: {
         error: 'client_threw',
         message: error instanceof Error ? error.message : String(error),
+        // The throw as an entry, with its step: a credential failure as it
+        // came, a carried method error as it is.
+        failures: [thrownEntry(error, 'unlock')],
       },
     };
   }
@@ -55,6 +59,9 @@ async function runRelease<H>(
       message: error.message,
       origin: error.origin,
       request: safeRequest(error.request),
+      // The method's error as it is — status, code, adt_type, T100 messages,
+      // raw body — with the step it arose at; a credential failure as it came.
+      failures: [failureEntry(error, 'unlock')],
     },
   };
 }
@@ -140,9 +147,7 @@ export async function withLock<H, T>(
   if (released.kind === 'refused') {
     return succeededWithCleanup(value, { cleanup: released.carrier });
   }
-  return succeededWithCleanup(value, {
-    cleanup: { error: 'client_threw', message: messageOf(released.thrown) },
-  });
+  return succeededWithCleanup(value, { cleanup: released.carrier });
 }
 
 /**
@@ -166,10 +171,6 @@ function succeededWithCleanup<T>(
     },
     cleanup: carrier.cleanup,
   } as unknown as IAdtResponse<T, IAdtError>;
-}
-
-function messageOf(thrown: unknown): string {
-  return thrown instanceof Error ? thrown.message : String(thrown);
 }
 
 /**

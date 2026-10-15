@@ -14,8 +14,17 @@
  * Something in this process threw: `client_threw`, and deliberately no origin.
  */
 export type Cleanup =
-  | { message: string; origin?: string; request?: unknown }
-  | { error: 'client_threw'; message: string };
+  | {
+      message: string;
+      origin?: string;
+      request?: unknown;
+      failures?: readonly unknown[];
+    }
+  | {
+      error: 'client_threw';
+      message: string;
+      failures?: readonly unknown[];
+    };
 
 /**
  * Two fields, copied by name.

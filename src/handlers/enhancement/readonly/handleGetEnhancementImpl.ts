@@ -1,23 +1,25 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { failureEntry, isCredentialPayload } from '../../../lib/answer';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  logger,
-  makeAdtRequest,
-  return_error,
-} from '../../../lib/utils';
+import { carryingFailure } from '../../../lib/strategies/step';
+import { logger, return_error } from '../../../lib/utils';
 import { enhancementTypeOf, notThroughAdt } from './enhancementAvailability';
 
 /**
  * Collections whose objects have no `/source/main`, so asking for one is
  * answered before any request. A class enhancement is not exposed by ADT at
- * all; a BAdI implementation has metadata (`enhoxhb/{name}`) but no source —
- * `enhoxhh`, the source code plugin, is the one collection with source.
+ * all; a BAdI implementation (`enhoxhb`) and a BAdI spot (`enhsxsb`) have
+ * metadata but no source — `enhoxhh`, the source code plugin, is the one
+ * subtype with source (adt-clients' `EnhancementType`).
  */
 const NO_SOURCE: Record<string, string> = {
   enhoxh:
     'A class enhancement (ENHO/XH) is not available through ADT — Eclipse opens it in SAP GUI.',
   enhoxhb:
     'A BAdI implementation (ENHO/XHB) has no source: only a source code plugin (enhancement_spot "enhoxhh") does.',
+  enhsxsb:
+    'A BAdI enhancement spot (ENHS/XSB) has no source: read it with GetEnhancementSpot.',
 };
 
 /**
@@ -117,16 +119,16 @@ function parseEnhancementSourceFromXml(xmlData: string): string {
 /**
  * Handler to retrieve a specific enhancement implementation by name in an ABAP system.
  * This function is intended for retrieving the source code of a specific enhancement implementation (requires both spot and implementation name).
- * This function uses the SAP ADT API endpoint to fetch the source code of a specific enhancement
- * implementation within a given enhancement spot. If the implementation is not found, it falls back
- * to retrieving metadata about the enhancement spot itself to provide context about the failure.
+ * The source of a source code plugin (ENHO/XHH) is read through adt-clients'
+ * `getEnhancement().read`; ADT answers a missing object with 200 and no body,
+ * which is answered `not_found`.
  *
  * @param args - Tool arguments containing:
- *   - enhancement_spot: Name of the enhancement spot (e.g., 'enhoxhh'). This is a required parameter.
+ *   - enhancement_spot: The enhancement collection — 'enhoxhh' for a source code plugin. This is a required parameter.
  *   - enhancement_name: Name of the specific enhancement implementation (e.g., 'zpartner_update_pai'). This is a required parameter.
  * @returns Response object containing:
- *   - If successful: enhancement_spot, enhancement_name, source_code, and raw_xml of the enhancement implementation.
- *   - If implementation not found: enhancement_spot, enhancement_name, status as 'not_found', a message, spot_metadata, and raw_xml of the spot.
+ *   - If successful: enhancement_spot, enhancement_name, source_code.
+ *   - If SAP answered no source: enhancement_spot, enhancement_name, status as 'not_found' and a message.
  *   - In case of error: an error object with details about the failure.
  */
 export async function handleGetEnhancementImpl(
@@ -155,72 +157,37 @@ export async function handleGetEnhancementImpl(
       `Getting enhancement: ${enhancementName} from spot: ${enhancementSpot}`,
     );
 
-    // Build the ADT URL for the specific enhancement
-    // Format: /sap/bc/adt/enhancements/{enhancement_spot}/{enhancement_name}/source/main
-    const url = `/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}/${encodeSapObjectName(enhancementName)}/source/main`;
+    const collection = String(enhancementSpot).toLowerCase();
+    const name = String(enhancementName);
+    /** What the name's type says about this read, after the search. */
+    const explained = async () => {
+      const type = await enhancementTypeOf(connection, name, 'ENHO');
+      return type ? explainByType(name, type, collection) : undefined;
+    };
 
-    logger?.info(`Enhancement URL: ${url}`);
-
-    const response = await makeAdtRequest(
-      connection,
-      url,
-      'GET',
-      // No deadline of the server's: the request waits for SAP's answer.
-      0,
-    );
-
-    if (response.status === 200 && response.data) {
-      // Parse the XML to extract source code
-      const sourceCode = parseEnhancementSourceFromXml(response.data);
-
-      const enhancementResponse: EnhancementByNameResponse = {
-        enhancement_spot: enhancementSpot,
-        enhancement_name: enhancementName,
-        source_code: sourceCode,
-      };
-
-      const result = {
-        isError: false,
-        content: [
-          {
-            type: 'json',
-            json: enhancementResponse,
-          },
-        ],
-      };
-      return result;
-    } else {
-      logger?.warn(
-        `Enhancement ${enhancementName} not found in spot ${enhancementSpot}. Status: ${response.status}. Attempting to retrieve spot metadata as fallback.`,
+    // Only a source code plugin has source; any other collection name is no
+    // ADT enhancement collection at all — say what the name is, if known.
+    if (collection !== 'enhoxhh') {
+      const why = await explained();
+      return return_error(
+        why ??
+          `"${enhancementSpot}" is not an enhancement collection with source: a source code plugin (ENHO/XHH) is read with enhancement_spot "enhoxhh".`,
       );
-      // Fallback to retrieve metadata about the enhancement spot
-      const spotUrl = `/sap/bc/adt/enhancements/${encodeSapObjectName(enhancementSpot)}`;
-      logger?.info(`Fallback enhancement spot URL: ${spotUrl}`);
+    }
 
-      const spotResponse = await makeAdtRequest(
-        connection,
-        spotUrl,
-        'GET',
-        // No deadline of the server's: the request waits for SAP's answer.
-        0,
-        undefined,
-        undefined,
-        {
-          Accept: 'application/vnd.sap.adt.enhancements.v1+xml',
-        },
-      );
+    // adt-clients' source code plugin read, with the strategy every other
+    // read uses.
+    const step = 'read enhancement source';
+    const answer = await createAdtClient(connection, logger)
+      .getEnhancement()
+      .read({ enhancementName: name, enhancementType: 'enhoxhh' }, 'active', {
+        analyse: analyseException,
+      });
 
-      if (spotResponse.status === 200 && spotResponse.data) {
-        // Parse metadata if possible
-        const metadata: { description?: string } = {};
-        const descriptionMatch = spotResponse.data.match(
-          /<adtcore:description>([^<]*)<\/adtcore:description>/,
-        );
-        if (descriptionMatch?.[1]) {
-          metadata.description = descriptionMatch[1];
-        }
-
-        const fallbackResult = {
+    if (answer.ok) {
+      const body = String(answer.getResult().value ?? '');
+      if (!body) {
+        return {
           isError: false,
           content: [
             {
@@ -230,29 +197,43 @@ export async function handleGetEnhancementImpl(
                 enhancement_name: enhancementName,
                 status: 'not_found',
                 message: `Enhancement implementation ${enhancementName} not found in spot ${enhancementSpot}.`,
-                spot_metadata: metadata,
               },
             },
           ],
         };
-        return fallbackResult;
-      } else {
-        return return_error(
-          `Failed to retrieve enhancement ${enhancementName} from spot ${enhancementSpot}. Status: ${response.status}. Fallback to retrieve spot metadata also failed. Status: ${spotResponse.status}`,
-        );
       }
+      // Parse the answer to extract source code
+      const sourceCode = parseEnhancementSourceFromXml(body);
+
+      const enhancementResponse: EnhancementByNameResponse = {
+        enhancement_spot: enhancementSpot,
+        enhancement_name: enhancementName,
+        source_code: sourceCode,
+      };
+
+      return {
+        isError: false,
+        content: [
+          {
+            type: 'json',
+            json: enhancementResponse,
+          },
+        ],
+      };
     }
-  } catch (error) {
+
     // The read failed: if the name says what it is, say why — a type ADT does
-    // not expose, a BAdI implementation with no source, a source code plugin
-    // asked under a spot name. Anything else is reported as it came.
-    if (args?.enhancement_name) {
-      const name = String(args.enhancement_name);
-      const type = await enhancementTypeOf(connection, name, 'ENHO');
-      const collection = String(args.enhancement_spot ?? '').toLowerCase();
-      const why = type ? explainByType(name, type, collection) : undefined;
+    // not expose, a BAdI implementation with no source. A credential failure
+    // ends the call as it came; anything else is the method's error as it is,
+    // with the step.
+    const error = answer.getError();
+    if (!isCredentialPayload(failureEntry(error, step))) {
+      const why = await explained();
       if (why) return return_error(why);
     }
+    return return_error(carryingFailure(new Error(error.message), error, step));
+  } catch (error) {
+    // A throw — no answer of the method's to read: as it came.
     return return_error(error);
   }
 }

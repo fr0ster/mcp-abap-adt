@@ -1,10 +1,9 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { failureEntry, isCredentialPayload } from '../../../lib/answer';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  logger,
-  makeAdtRequest,
-  return_error,
-} from '../../../lib/utils';
+import { carryingFailure } from '../../../lib/strategies/step';
+import { logger, return_error } from '../../../lib/utils';
 import { enhancementTypeOf, notThroughAdt } from './enhancementAvailability';
 
 export const TOOL_DEFINITION = {
@@ -110,13 +109,13 @@ function parseEnhancementSpotMetadata(xmlData: string): any {
 }
 
 /**
- * Handler to retrieve metadata for a specific enhancement spot in an ABAP system.
- * This function uses the SAP ADT API endpoint to fetch details about an enhancement spot,
- * regardless of whether it has any implementations. It is designed to provide information
- * about the spot's existence, description, type, and status.
+ * Handler to retrieve metadata for a specific BAdI enhancement spot (ENHS/XSB)
+ * in an ABAP system, through adt-clients' `getEnhancement().readMetadata`,
+ * regardless of whether it has any implementations. It is designed to provide
+ * information about the spot's existence, description, type, and status.
  *
  * @param args - Tool arguments containing:
- *   - enhancement_spot: Name of the enhancement spot (e.g., 'enhoxhh'). This is a required parameter.
+ *   - enhancement_spot: Name of the enhancement spot (e.g., 'SADT_REST_RFC_APPLICATION'). This is a required parameter.
  * @returns Response object containing:
  *   - enhancement_spot: The name of the queried enhancement spot.
  *   - metadata: An object with properties like description, type, and status of the enhancement spot.
@@ -139,34 +138,32 @@ export async function handleGetEnhancementSpot(
 
     logger?.info(`Getting metadata for enhancement spot: ${enhancementSpot}`);
 
-    // Build the ADT URL for the specific enhancement spot (Eclipse uses /sap/bc/adt/enhancements/enhsxsb/{spot_name})
-    const url = `/sap/bc/adt/enhancements/enhsxsb/${encodeSapObjectName(enhancementSpot)}`;
+    // adt-clients' BAdI spot (`enhsxsb`), with its own media type, read with
+    // the strategy every other read uses.
+    const step = 'read enhancement spot';
+    const answer = await createAdtClient(connection, logger)
+      .getEnhancement()
+      .readMetadata(
+        { enhancementName: enhancementSpot, enhancementType: 'enhsxsb' },
+        { analyse: analyseException },
+      );
 
-    logger?.info(`Enhancement spot URL: ${url}`);
-
-    const response = await makeAdtRequest(
-      connection,
-      url,
-      'GET',
-      // No deadline of the server's: the request waits for SAP's answer.
-      0,
-      undefined,
-      undefined,
-      {
-        Accept: 'application/vnd.sap.adt.enhancements.v1+xml',
-      },
-    );
-
-    if (response.status === 200 && response.data) {
+    if (answer.ok) {
+      const document = String(answer.getResult().value ?? '');
+      if (!document) {
+        return return_error(
+          `Failed to retrieve metadata for enhancement spot ${enhancementSpot}: SAP answered no document.`,
+        );
+      }
       // Parse the XML to extract metadata
-      const metadata = parseEnhancementSpotMetadata(response.data);
+      const metadata = parseEnhancementSpotMetadata(document);
 
       const enhancementSpotResponse: EnhancementSpotResponse = {
         enhancement_spot: enhancementSpot,
         metadata: metadata,
       };
 
-      const result = {
+      return {
         isError: false,
         content: [
           {
@@ -175,27 +172,27 @@ export async function handleGetEnhancementSpot(
           },
         ],
       };
-      return result;
-    } else {
-      return return_error(
-        `Failed to retrieve metadata for enhancement spot ${enhancementSpot}. Status: ${response.status}`,
-      );
     }
-  } catch (error) {
-    // `enhsxsb` serves BAdI spots. A plain spot is not served at all — its own
-    // collection answers `500 I::000` too — so say what it is rather than pass
-    // that on; any other failure is reported as it came.
-    if (args?.enhancement_spot) {
+
+    const error = answer.getError();
+    // A credential failure ends the call as it came; anything else may be a
+    // plain spot, which `enhsxsb` does not serve — its own collection answers
+    // `500 I::000` too — so say what it is rather than pass that on. Any other
+    // failure is the method's error as it is, with the step.
+    if (!isCredentialPayload(failureEntry(error, step))) {
       const type = await enhancementTypeOf(
         connection,
-        String(args.enhancement_spot),
+        String(enhancementSpot),
         'ENHS',
       );
       const why = type
-        ? notThroughAdt(String(args.enhancement_spot), type)
+        ? notThroughAdt(String(enhancementSpot), type)
         : undefined;
       if (why) return return_error(why);
     }
+    return return_error(carryingFailure(new Error(error.message), error, step));
+  } catch (error) {
+    // A throw — no answer of the method's to read: as it came.
     return return_error(error);
   }
 }

@@ -347,91 +347,69 @@ describe('GetStructuresList: both endpoints failed', () => {
   });
 });
 
-describe('GetEnhancements: the elements request is read like every other answer', () => {
-  const run = (makeAdtRequest: () => Promise<unknown>) =>
-    handleGetEnhancements(
-      { connection: { makeAdtRequest }, logger: undefined } as any,
-      { object_name: 'ZCL_X', object_type: 'class' },
-    ) as Promise<any>;
+describe('GetEnhancements: a refused elements read is the method error as it is, with step read enhancements', () => {
+  const run = () =>
+    handleGetEnhancements({ connection: {}, logger: undefined } as any, {
+      object_name: 'ZCL_X',
+      object_type: 'class',
+    }) as Promise<any>;
 
-  it('a 403 SAP answered is the method error as it is, with step read enhancements', async () => {
-    const result = await run(async () => {
-      const error: any = new Error('Request failed with status code 403');
-      error.response = { status: 403, data: DOCUMENT };
-      throw error;
+  it('a 403 SAP answered', async () => {
+    fakeClient = fakeClientOf({
+      readEnhancementElements: async () => forbidden(),
     });
+    const result = await run();
     expect(result.isError).toBe(true);
-    // The strategy's reading: the transport's sentence, SAP's document read
-    // into `messages`, the document itself as `raw_body`.
-    expect(payloadOf(result)).toEqual({
-      message: 'Request failed with status code 403',
-      messages: [{ type: 'E', text: 'No authorization' }],
-      origin: 'refusal',
-      step: 'read enhancements',
-      status: 403,
-      raw_body: DOCUMENT,
-      request: {
-        method: 'GET',
-        url: '/sap/bc/adt/oo/classes/ZCL_X/source/main/enhancements/elements',
-      },
-    });
+    expect(payloadOf(result)).toEqual(expectedPayload('read enhancements'));
   });
 
-  it('a 200 whose document is an exception is a refusal too', async () => {
-    const result = await run(async () => ({ status: 200, data: DOCUMENT }));
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      origin: 'refusal',
-      step: 'read enhancements',
-      message: 'No authorization',
+  it('a 401: the call ends as it came, with the step', async () => {
+    fakeClient = fakeClientOf({
+      readEnhancementElements: async () =>
+        refusedResponse('Unauthorized', {
+          response: { status: 401, data: '' },
+        } as Partial<IAdtError>),
     });
-  });
-
-  it('a failure with no answer behind it keeps its words and carries no SAP status', async () => {
-    const result = await run(async () => {
-      throw new Error('socket hang up');
-    });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('socket hang up');
-    expect(result.content[0].text).not.toContain('"status"');
+    const body = payloadOf(await run());
+    expect(body.status).toBe(401);
+    expect(body.message).toBe('Unauthorized');
+    expect(body.step).toBe('read enhancements');
   });
 });
 
 describe('GetEnhancements include_nested lists an include SAP refused', () => {
   const EMPTY =
     '<enh:enhancements xmlns:enh="http://www.sap.com/adt/enhancements"/>';
-  const walk = () =>
+  /** The includes walk, and each include's elements by its name. */
+  const walk = (refusedInclude?: { name: string; status: number }) =>
     fakeClientOf({
       fetchNodeStructure: async (...args: unknown[]) =>
         (args[2] as { nodeId: string }).nodeId === '000000'
           ? okResponse({ childNodes: [{ type: 'PROG/I', nodeId: 'N1' }] })
           : okResponse({ objects: [{ name: 'ZINC1' }, { name: 'ZINC2' }] }),
+      readEnhancementElements: async (...args: unknown[]) =>
+        refusedInclude !== undefined &&
+        (args[0] as { includeName?: string }).includeName ===
+          refusedInclude.name
+          ? refusedResponse(
+              `Request failed with status code ${refusedInclude.status}`,
+              {
+                response: { status: refusedInclude.status, data: DOCUMENT },
+              } as Partial<IAdtError>,
+            )
+          : okResponse(EMPTY),
     });
-  const run = (
-    makeAdtRequest: (request: { url: string }) => Promise<unknown>,
-  ) =>
-    handleGetEnhancements(
-      { connection: { makeAdtRequest }, logger: undefined } as any,
-      {
-        object_name: 'ZPROG',
-        object_type: 'program',
-        program: 'ZPROG',
-        include_nested: true,
-      },
-    ) as Promise<any>;
-  const refuse = (status: number) => {
-    const error: any = new Error(`Request failed with status code ${status}`);
-    error.response = { status, data: DOCUMENT };
-    return error;
-  };
+  const run = () =>
+    handleGetEnhancements({ connection: {}, logger: undefined } as any, {
+      object_name: 'ZPROG',
+      object_type: 'program',
+      program: 'ZPROG',
+      include_nested: true,
+    }) as Promise<any>;
 
   it('the refused include is listed with its name, the method error and the step, beside the others', async () => {
-    fakeClient = walk();
-    const result = await run(async ({ url }) => {
-      if (/ZINC2/i.test(url)) throw refuse(403);
-      return { status: 200, data: EMPTY };
-    });
-    const body = payloadOf(result);
+    fakeClient = walk({ name: 'ZINC2', status: 403 });
+    const body = payloadOf(await run());
     expect(body.objects.length).toBe(0); // the others answered (none holds an enhancement)
     expect(body.total_objects_analyzed).toBe(2); // the main object and ZINC1
     expect(body.includes_unread).toEqual([
@@ -441,7 +419,6 @@ describe('GetEnhancements include_nested lists an include SAP refused', () => {
         failures: [
           expect.objectContaining({
             message: 'Request failed with status code 403',
-            messages: [{ type: 'E', text: 'No authorization' }],
             origin: 'refusal',
             step: 'read enhancements',
             status: 403,
@@ -454,19 +431,14 @@ describe('GetEnhancements include_nested lists an include SAP refused', () => {
 
   it('no include refused: no includes_unread', async () => {
     fakeClient = walk();
-    const body = payloadOf(
-      await run(async () => ({ status: 200, data: EMPTY })),
-    );
+    const body = payloadOf(await run());
     expect(body.includes_unread).toBeUndefined();
     expect(body.total_objects_analyzed).toBe(3);
   });
 
   it('a 401 on an include ends the call as it came', async () => {
-    fakeClient = walk();
-    const result = await run(async ({ url }) => {
-      if (/ZINC1/i.test(url)) throw refuse(401);
-      return { status: 200, data: EMPTY };
-    });
+    fakeClient = walk({ name: 'ZINC1', status: 401 });
+    const result = await run();
     expect(result.isError).toBe(true);
     const body = payloadOf(result);
     expect(body.status).toBe(401);

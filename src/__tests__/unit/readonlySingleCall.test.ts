@@ -14,10 +14,9 @@
  * Two of the fifteen do not fit the shared `it.each` below and are tested on
  * their own, with the reason given at each:
  *
- *  - `handleGetEnhancements` — its required-args path never reaches
- *    `createAdtClient` at all (see its own file: everything but the
- *    `include_nested` sub-flow calls `connection.makeAdtRequest` directly,
- *    unrelated to the adt-clients v19 migration).
+ *  - `handleGetEnhancements` — one call per host kind, each on its own
+ *    factory (`getClass`, `getProgram`, `getFunctionGroup`, `getInclude`),
+ *    and the include's after a metadata read; asserted per kind below.
  *  - `resolveVersionedObject` — a synchronous resolver, not a handler; it
  *    makes no call of its own.
  */
@@ -347,25 +346,80 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
 
 describe('GetEnhancements', () => {
   /**
-   * Not `refusingClient`: the required-args path (`object_name`,
-   * `object_type`, no `include_nested`) never builds an adt-clients object at
-   * all — it goes through `makeAdtRequest`, which calls
-   * `connection.makeAdtRequest` on the raw connection. A `connection` with no
-   * such method is this family's equivalent of a refusal: the resulting
-   * message reaches the caller, but as plain text (this handler's own
-   * catch/wrap chain, not `answer()`'s JSON failure payload) — verified by
-   * running it, not assumed.
+   * The elements are read by the host's adt-clients member
+   * (`readEnhancementElements`), with `analyseException` — not a request of
+   * the handler's own.
    */
-  it('surfaces a connection failure as isError, in its own (non-JSON) shape', async () => {
+  it.each([
+    ['class', 'ZCL_X', 'getClass', [{ className: 'ZCL_X' }]],
+    ['program', 'ZPROG', 'getProgram', [{ programName: 'ZPROG' }]],
+    [
+      'function_group',
+      'ZFG',
+      'getFunctionGroup',
+      [{ functionGroupName: 'ZFG' }],
+    ],
+    ['program', 'SAPLZFG', 'getFunctionGroup', [{ functionGroupName: 'ZFG' }]],
+  ])(
+    'a %s (%s) reads its elements through %s().readEnhancementElements',
+    async (object_type, object_name, factory, args) => {
+      const seen = recordAnalyse();
+      fakeClient = seen.client;
+      const result: any = await handleGetEnhancements(context as any, {
+        object_name,
+        object_type,
+      });
+      expect(result.isError).toBe(false);
+      expect(seen.calls).toEqual([
+        {
+          member: 'readEnhancementElements',
+          factory,
+          analyse: analyseException,
+          carriedAnalyse: true,
+          args,
+        },
+      ]);
+    },
+  );
+
+  it('an include reads its elements through getInclude(), naming its main program', async () => {
+    const seen = recordAnalyse({
+      readMetadata: () =>
+        '<include:abapInclude><include:contextRef adtcore:uri="/sap/bc/adt/functions/groups/svim" adtcore:type="FUGR/F" adtcore:name="SVIM"/></include:abapInclude>',
+    });
+    fakeClient = seen.client;
+    const result: any = await handleGetEnhancements(context as any, {
+      object_name: 'LSVIMTOP',
+      object_type: 'include',
+    });
+    expect(result.isError).toBe(false);
+    expect(seen.calls.map((c) => [c.factory, c.member])).toEqual([
+      ['getInclude', 'readMetadata'],
+      ['getInclude', 'readEnhancementElements'],
+    ]);
+    const elements = seen.calls[1];
+    expect(elements?.analyse).toBe(analyseException);
+    expect(elements?.args).toEqual([
+      { includeName: 'LSVIMTOP' },
+      { context: 'SAPLSVIM' },
+    ]);
+    expect(JSON.parse(result.content[0].text).context).toBe(
+      '/sap/bc/adt/functions/groups/svim',
+    );
+  });
+
+  it('a refusal is the JSON failure payload, with step read enhancements', async () => {
+    fakeClient = refusingClient('No authorization', {
+      response: { status: 403, data: '' },
+    } as any);
     const result: any = await handleGetEnhancements(context as any, {
       object_name: 'ZFOO',
       object_type: 'program',
     });
-
     expect(result.isError).toBe(true);
-    expect(typeof result.content[0].text).toBe('string');
-    expect(() => JSON.parse(result.content[0].text)).toThrow();
-    expect(result.content[0].text).toContain('ZFOO');
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.message).toBe('No authorization');
+    expect(payload.step).toBe('read enhancements');
   });
 });
 

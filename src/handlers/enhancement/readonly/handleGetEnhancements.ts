@@ -1,11 +1,6 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
-import {
-  ADT_NO_FAILURE,
-  type IAdtError,
-  type IAdtResponse,
-} from '@mcp-abap-adt/interfaces-adt';
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   type FailureEntry,
   failureEntry,
@@ -24,13 +19,7 @@ import {
   methodFailureOf,
   payloadCarriedBy,
 } from '../../../lib/strategies/step';
-import {
-  type AxiosResponse,
-  encodeSapObjectName,
-  logger,
-  makeAdtRequest,
-  return_error,
-} from '../../../lib/utils';
+import { logger, return_error } from '../../../lib/utils';
 
 /**
  * Raised deliberately by the enhancement helpers. Distinguishes "I decided this
@@ -204,17 +193,21 @@ export function parseEnhancementsFromXml(
 }
 
 /**
- * Where the enhancements of an object live, and what kind of object it is.
+ * Whose enhancements to read, and what kind of object it is.
  *
  * **The caller's `object_type` decides; guessing is the fallback.** This
  * used to ignore it and probe class → program → include. A function group's
  * main program `SAPL<fg>` is none of those addressable things — on premise
  * (2026-09-25) all three URIs answered 404 — so the tool failed outright.
- * Its enhancements are the group's, at `/functions/groups/<fg>/source/main`,
- * which answers 200. Each probe that remains is its own metadata read
- * through adt-clients (`getClass()`, `getProgram()`, `getInclude()`) with
- * `analyseException`, so a refusal arrives in the shape every other failure
- * has.
+ * Its enhancements are the group's, which answer 200. Each probe that remains
+ * is its own metadata read through adt-clients (`getClass()`, `getProgram()`,
+ * `getInclude()`) with `analyseException`, so a refusal arrives in the shape
+ * every other failure has.
+ *
+ * The elements themselves are read by the host's own adt-clients member,
+ * `readEnhancementElements` (`IAdtEnhancementHost`, and
+ * `IAdtIncludeEnhancementHost` for an include, whose read names its main
+ * program).
  */
 async function determineObjectTypeAndPath(
   connection: AbapConnection,
@@ -223,26 +216,35 @@ async function determineObjectTypeAndPath(
   requestedType?: string,
 ): Promise<{
   type: 'program' | 'include' | 'class' | 'function_group';
-  basePath: string;
+  /** The host's enhancement elements, read with `analyseException`. */
+  readElements: () => Promise<IAdtResponse<unknown, IAdtError>>;
   context?: string;
   /** Probes that were refused rather than answering "not this kind". */
   unreadable?: FailureEntry[];
 }> {
   const name = objectName.toUpperCase();
-  const enc = encodeSapObjectName(name);
   const kind = (requestedType ?? '').trim().toUpperCase();
 
+  const client = createAdtClient(connection, logger);
+  const analyse = { analyse: analyseException };
   const classPath = {
     type: 'class' as const,
-    basePath: `/sap/bc/adt/oo/classes/${enc}/source/main/enhancements/elements`,
+    readElements: () =>
+      client.getClass().readEnhancementElements({ className: name }, analyse),
   };
   const programPath = {
     type: 'program' as const,
-    basePath: `/sap/bc/adt/programs/programs/${enc}/source/main/enhancements/elements`,
+    readElements: () =>
+      client
+        .getProgram()
+        .readEnhancementElements({ programName: name }, analyse),
   };
   const groupPath = (group: string) => ({
     type: 'function_group' as const,
-    basePath: `/sap/bc/adt/functions/groups/${encodeSapObjectName(group.toLowerCase())}/source/main/enhancements/elements`,
+    readElements: () =>
+      client
+        .getFunctionGroup()
+        .readEnhancementElements({ functionGroupName: group }, analyse),
   });
   // `SAPL<fg>` is the group's main program: address the group.
   const saplGroup =
@@ -262,9 +264,8 @@ async function determineObjectTypeAndPath(
    */
   const unreadable: FailureEntry[] = [];
   /** Carry the refusals out with whichever path was resolved. */
-  const withReport = <T extends { basePath: string }>(path: T) =>
+  const withReport = <T extends { type: string }>(path: T) =>
     unreadable.length > 0 ? { ...path, unreadable } : path;
-  const client = createAdtClient(connection, logger);
   /** A metadata read: its document when found, `undefined` otherwise. */
   const probe = async (
     step: string,
@@ -307,21 +308,32 @@ async function determineObjectTypeAndPath(
     );
     if (metadata === undefined) return undefined;
     let context: string | undefined;
+    let mainProgram: string | undefined;
     if (manualProgramContext) {
       context = `/sap/bc/adt/programs/programs/${manualProgramContext}`;
+      mainProgram = manualProgramContext;
     } else {
       context = metadata.match(
         /include:contextRef[^>]+adtcore:uri="([^"]+)"/,
       )?.[1];
+      mainProgram = context ? mainProgramOf(context) : undefined;
     }
-    if (!context) {
+    if (!context || !mainProgram) {
       throw new EnhancementInputError(
         `Could not determine parent program context for include: ${objectName}. No contextRef found in metadata. Consider providing the 'program' parameter manually.`,
       );
     }
+    // adt-clients takes the main program's name and builds its URI.
+    const program = mainProgram;
     return {
       type: 'include' as const,
-      basePath: `/sap/bc/adt/programs/includes/${enc}/source/main/enhancements/elements`,
+      readElements: () =>
+        client
+          .getInclude()
+          .readEnhancementElements(
+            { includeName: name },
+            { context: program, analyse: analyseException },
+          ),
       context,
     };
   };
@@ -372,6 +384,22 @@ async function determineObjectTypeAndPath(
   return unresolved(
     `Could not determine object type for: ${objectName}. Object is neither a valid class, program, include, nor a function group's main program.`,
   );
+}
+
+/**
+ * The main program an include's `contextRef` URI names: a program's own name,
+ * or `SAPL<group>` for a function group. `undefined` for any other URI.
+ */
+function mainProgramOf(uri: string): string | undefined {
+  const last = (prefix: string) => {
+    if (!uri.toLowerCase().startsWith(prefix)) return undefined;
+    const segment = uri.slice(prefix.length).split(/[/?#]/)[0];
+    return segment ? decodeURIComponent(segment).toUpperCase() : undefined;
+  };
+  const program = last('/sap/bc/adt/programs/programs/');
+  if (program) return program;
+  const group = last('/sap/bc/adt/functions/groups/');
+  return group ? `SAPL${group}` : undefined;
 }
 
 /**
@@ -517,44 +545,16 @@ async function getEnhancementsForSingleObject(
     requestedType,
   );
 
-  // Build URL based on object type
-  let url = objectInfo.basePath;
-
-  // Add context parameter only for includes
   if (objectInfo.type === 'include' && objectInfo.context) {
-    url += `?context=${encodeURIComponent(objectInfo.context)}`;
     logger?.info(`Using context for include: ${objectInfo.context}`);
   }
 
-  logger?.info(`Final enhancement URL: ${url}`);
-
-  // Name the object in a failure: with the type taken from the caller there
-  // is no probe in front of this request to have said which object it was.
-  // adt-clients 31.1 has no member for the elements request (open issue
-  // fr0ster/mcp-abap-adt-clients#227), so it is made directly and its answer
-  // is read with the strategy every other read uses.
-  const request = { method: 'GET', url };
-  const refused = (answer: unknown, message: string, verdict?: IAdtError) => {
-    const judged = analyseException(
-      verdict ?? ADT_NO_FAILURE,
-      answer as IAdtWireResponse,
-    );
-    if (judged === ADT_NO_FAILURE) return undefined;
-    return carryingFailure(
-      new EnhancementInputError(message),
-      judged,
-      'read enhancements',
-    );
-  };
-  let response: AxiosResponse;
+  // The host's own adt-clients member, read with the strategy every other
+  // read uses: SAP's refusal is the method's error as it is, with the step.
+  const step = 'read enhancements';
+  let answer: IAdtResponse<unknown, IAdtError>;
   try {
-    response = await makeAdtRequest(
-      connection,
-      url,
-      'GET',
-      // No deadline of the server's: the request waits for SAP's answer.
-      0,
-    );
+    answer = await objectInfo.readElements();
   } catch (thrown) {
     // A credential failure or an error already carrying its answer: as it is.
     if (
@@ -562,44 +562,43 @@ async function getEnhancementsForSingleObject(
       methodFailureOf(thrown) !== undefined
     )
       throw thrown;
-    const answer = (thrown as { response?: { status?: unknown } } | undefined)
-      ?.response;
     const message = thrown instanceof Error ? thrown.message : String(thrown);
-    if (answer !== null && typeof answer === 'object') {
-      const failure = refused(answer, message, {
-        origin: 'refusal',
-        message,
-        response: answer as IAdtWireResponse,
-        request,
-      });
-      if (failure !== undefined) throw failure;
-    }
     throw new EnhancementInputError(
       `Failed to retrieve enhancements for ${objectName}: ${message}`,
     );
   }
-  // A 200 whose document is an exception is a refusal too.
-  const refusal = refused(response, 'SAP refused the enhancements request');
-  if (refusal !== undefined) throw refusal;
-
-  if (response.status === 200 && response.data) {
-    // Parse the XML to extract enhancement implementations
-    const enhancements = parseEnhancementsFromXml(response.data);
-
-    const enhancementResponse: EnhancementResponse = {
-      object_name: objectName,
-      object_type: objectInfo.type,
-      context: objectInfo.context,
-      enhancements: enhancements,
-      ...(objectInfo.unreadable ? { unreadable: objectInfo.unreadable } : {}),
-    };
-
-    return enhancementResponse;
-  } else {
-    throw new EnhancementInputError(
-      `Failed to retrieve enhancements for ${objectName}. Status: ${response.status}`,
+  if (!answer.ok) {
+    const error = answer.getError();
+    throw carryingFailure(
+      new EnhancementInputError(error.message),
+      error,
+      step,
     );
   }
+
+  // Parse the XML to extract enhancement implementations
+  const enhancements = parseEnhancementsFromXml(
+    String(answer.getResult().value ?? ''),
+  );
+
+  return {
+    object_name: objectName,
+    object_type: objectInfo.type,
+    context: objectInfo.context,
+    enhancements: enhancements,
+    ...(objectInfo.unreadable ? { unreadable: objectInfo.unreadable } : {}),
+  };
+}
+
+/**
+ * A credential failure, however it travels: a chain failure or a `401` on the
+ * throw itself, or carried as the method's error of a read.
+ */
+function credentialFailure(thrown: unknown): boolean {
+  return (
+    isCredentialFailure(thrown) ||
+    isCredentialPayload(thrownEntry(thrown, 'read enhancements'))
+  );
 }
 
 /**
@@ -784,7 +783,7 @@ export async function handleGetEnhancements(
           allEnhancementResponses.push(includeEnhancements);
         } catch (error) {
           // The credentials are the same for every include: the call ends.
-          if (isCredentialFailure(error)) throw error;
+          if (credentialFailure(error)) throw error;
           includesUnread.push({
             include: includeName,
             step: 'read enhancements',
@@ -807,7 +806,7 @@ export async function handleGetEnhancements(
       ({ allEnhancementResponses, includesUnread } =
         await processNestedIncludes());
     } catch (error) {
-      if (isCredentialFailure(error)) throw error; // as it came
+      if (credentialFailure(error)) throw error; // as it came
       logger?.error('Nested enhancement processing failed:', error);
       // Return partial results with just the main object
       const fallbackResult = {

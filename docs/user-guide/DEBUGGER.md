@@ -502,6 +502,9 @@ class (`class_name`, `line`).
 - `AmdpDebugStep` steps `over` or `continue`s;
   `AmdpDebugGetTable` reads a table variable's rows (at most 100; an optional
   SELECT over it); `AmdpDebugCancel` cancels the execution.
+- **A failed event read** fails the next wait (or a start waiting for its sync). SAP's refusal is
+  carried as it is with the step `read events`; a read that threw on our side (not an answer of
+  SAP) is carried as `client_threw` with the same step.
 - **Stop releases a suspended debuggee first.** A stop alone never releases it
   (measured), so `AmdpDebugStop` — and `DebugStop` — delete it first, then stop the
   session, and return once the system has answered the event read it ended.

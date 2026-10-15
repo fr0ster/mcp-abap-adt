@@ -21,7 +21,11 @@ import type {
 } from '@mcp-abap-adt/adt-clients';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { carryingFailure, noteLeftBehind } from '../strategies/step';
+import {
+  carryingFailure,
+  carryingPayload,
+  noteLeftBehind,
+} from '../strategies/step';
 import {
   type AmdpBreakpointState,
   type AmdpEvent,
@@ -88,6 +92,7 @@ interface Open {
   lastBatchFailures?: DebugFailure[];
   readFailed?: string; // the event read failed: a sync waiting for confirmation hears it at once
   readFailedWith?: IAdtError; // the method's error behind `readFailed`, when the read answered one
+  readThrown?: DebugFailure; // the entry of the throw behind `readFailed`, when the read threw (step `read events`)
   failureReported: boolean; // that failure was already thrown by a sync
 }
 
@@ -122,7 +127,11 @@ export class AmdpSession<O = unknown> {
   private notices: AmdpState[] = [];
   private failure?: string;
   /** The failed event read behind `failure`: the method's error, and what was not undone. */
-  private failedRead?: { error: IAdtError; failures: DebugFailure[] };
+  private failedRead?: {
+    error?: IAdtError;
+    thrown?: DebugFailure;
+    failures: DebugFailure[];
+  };
   private cleanupFailures: DebugFailure[] = [];
   /** Runs in flight, each its own token: stop() forgets them all, so a late end changes nothing. */
   private readonly runs = new Set<{ connection?: IAbapConnection }>();
@@ -334,9 +343,11 @@ export class AmdpSession<O = unknown> {
     if (open.readFailed !== undefined) {
       open.failureReported = true;
       const failed = new DebugListenerError(open.readFailed);
-      throw open.readFailedWith !== undefined
-        ? carryingFailure(failed, open.readFailedWith, 'read events')
-        : failed;
+      if (open.readFailedWith !== undefined)
+        throw carryingFailure(failed, open.readFailedWith, 'read events');
+      if (open.readThrown !== undefined)
+        throw carryingPayload(failed, open.readThrown);
+      throw failed;
     }
     this.abandoned.add(requestId); // a late confirmation is dropped, not kept
     throw new DebugRequestError(
@@ -389,6 +400,8 @@ export class AmdpSession<O = unknown> {
           open.readFailed = failed;
           if (!answer.ok && !isFromThrow(answer.getError()))
             open.readFailedWith = answer.getError();
+          else if (!answer.ok)
+            open.readThrown = failedEntry(answer, 'read events');
           this.notify(); // a sync waiting in the serial hears it now, not after its bound
         }
         await this.lastBatch(open, events);
@@ -398,7 +411,11 @@ export class AmdpSession<O = unknown> {
       // Thrown outside an answer (the ask itself, an observer): the same end as a failed read.
       // A stale loop changes nothing.
       const message = `the event read failed: ${thrown(error)}`;
-      if (!open.stopping && this.open === open) open.readFailed ??= message;
+      if (!open.stopping && this.open === open) {
+        if (open.readFailed === undefined)
+          open.readThrown = thrownFailure(error, 'read events');
+        open.readFailed ??= message;
+      }
       try {
         await this.lastBatch(open, []);
       } catch {
@@ -433,7 +450,9 @@ export class AmdpSession<O = unknown> {
         this.failedRead =
           open.readFailedWith !== undefined
             ? { error: open.readFailedWith, failures }
-            : undefined;
+            : open.readThrown !== undefined
+              ? { thrown: open.readThrown, failures }
+              : undefined;
       }
       // Last: a stop waiting for this batch returns only now, with what it could not undo.
       open.lastBatchFailures = failures;
@@ -525,7 +544,9 @@ export class AmdpSession<O = unknown> {
       this.changed?.(); // consuming it may leave nothing held
       const failed = new DebugListenerError(message);
       if (read === undefined) throw failed;
-      carryingFailure(failed, read.error, 'read events');
+      if (read.error !== undefined)
+        carryingFailure(failed, read.error, 'read events');
+      else if (read.thrown !== undefined) carryingPayload(failed, read.thrown);
       if (read.failures.length > 0) {
         noteLeftBehind(failed, {
           message: 'not undone',

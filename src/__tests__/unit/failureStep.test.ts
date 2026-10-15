@@ -397,6 +397,84 @@ describe('GetEnhancements: the elements request is read like every other answer'
   });
 });
 
+describe('GetEnhancements include_nested lists an include SAP refused', () => {
+  const EMPTY =
+    '<enh:enhancements xmlns:enh="http://www.sap.com/adt/enhancements"/>';
+  const walk = () =>
+    fakeClientOf({
+      fetchNodeStructure: async (...args: unknown[]) =>
+        (args[2] as { nodeId: string }).nodeId === '000000'
+          ? okResponse({ childNodes: [{ type: 'PROG/I', nodeId: 'N1' }] })
+          : okResponse({ objects: [{ name: 'ZINC1' }, { name: 'ZINC2' }] }),
+    });
+  const run = (
+    makeAdtRequest: (request: { url: string }) => Promise<unknown>,
+  ) =>
+    handleGetEnhancements(
+      { connection: { makeAdtRequest }, logger: undefined } as any,
+      {
+        object_name: 'ZPROG',
+        object_type: 'program',
+        program: 'ZPROG',
+        include_nested: true,
+      },
+    ) as Promise<any>;
+  const refuse = (status: number) => {
+    const error: any = new Error(`Request failed with status code ${status}`);
+    error.response = { status, data: DOCUMENT };
+    return error;
+  };
+
+  it('the refused include is listed with its name, the method error and the step, beside the others', async () => {
+    fakeClient = walk();
+    const result = await run(async ({ url }) => {
+      if (/ZINC2/i.test(url)) throw refuse(403);
+      return { status: 200, data: EMPTY };
+    });
+    const body = payloadOf(result);
+    expect(body.objects.length).toBe(0); // the others answered (none holds an enhancement)
+    expect(body.total_objects_analyzed).toBe(2); // the main object and ZINC1
+    expect(body.includes_unread).toEqual([
+      {
+        include: 'ZINC2',
+        step: 'read enhancements',
+        failures: [
+          expect.objectContaining({
+            message: 'Request failed with status code 403',
+            messages: [{ type: 'E', text: 'No authorization' }],
+            origin: 'refusal',
+            step: 'read enhancements',
+            status: 403,
+            raw_body: DOCUMENT,
+          }),
+        ],
+      },
+    ]);
+  });
+
+  it('no include refused: no includes_unread', async () => {
+    fakeClient = walk();
+    const body = payloadOf(
+      await run(async () => ({ status: 200, data: EMPTY })),
+    );
+    expect(body.includes_unread).toBeUndefined();
+    expect(body.total_objects_analyzed).toBe(3);
+  });
+
+  it('a 401 on an include ends the call as it came', async () => {
+    fakeClient = walk();
+    const result = await run(async ({ url }) => {
+      if (/ZINC1/i.test(url)) throw refuse(401);
+      return { status: 200, data: EMPTY };
+    });
+    expect(result.isError).toBe(true);
+    const body = payloadOf(result);
+    expect(body.status).toBe(401);
+    expect(body.includes_unread).toBeUndefined();
+    expect(body.partial_result).toBeUndefined();
+  });
+});
+
 describe('a credential failure inside a batch tool ends the whole call, as it came', () => {
   const credential = () =>
     new AuthProviderFailure(

@@ -1,6 +1,7 @@
 import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
+import { payloadCarriedBy } from '../../../lib/strategies/step';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   AMDP_BREAK_LINE,
@@ -555,6 +556,39 @@ describe('AmdpSession', () => {
     await expect(w.session.wait(0)).rejects.toThrow(/socket closed/);
     expect((await w.session.wait(0)).state).toBe('idle');
     expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('an event read that throws outside its answer carries the throw as an entry with the step read events', async () => {
+    const w = await started();
+    w.dbg.getEvents = () => {
+      throw new Error('socket closed');
+    };
+    w.reads[1].resolve(okResponse(''));
+    await until(() => w.closed.length === 2);
+    const thrown = await w.session.wait(0).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(payloadCarriedBy(thrown)).toEqual({
+      error: 'client_threw',
+      message: 'socket closed',
+      step: 'read events',
+    });
+  });
+
+  it('an event read that rejects carries the throw as an entry with the step read events', async () => {
+    const w = await started();
+    w.reads[1].reject(new Error('socket reset'));
+    await until(() => w.closed.length === 2);
+    const thrown = await w.session.wait(0).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(payloadCarriedBy(thrown)).toEqual({
+      error: 'client_threw',
+      message: 'socket reset',
+      step: 'read events',
+    });
   });
 
   it('two runs are fenced each by its own token: both outcomes arrive, and stop closes the one in flight', async () => {

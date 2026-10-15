@@ -402,6 +402,9 @@ folded into one text:
   has it; a `404` from both stays absence; an append candidate that where-used named and SAP
   refused to read is listed in `append_candidates_unread` (`{ candidate, step: 'read append
   candidate', failures }`), not skipped as "not an append";
+- `GetEnhancements` with `include_nested`: a nested include whose enhancements request SAP refused
+  is listed in `includes_unread` (`{ include, step: 'read enhancements', failures }`), beside the
+  other includes' results, not swallowed; a credential failure ends the call, as it came;
 - a probe that was refused rather than finding nothing (`GetEnhancements`' `unreadable`; its
   enhancements request itself is read the same way, step `read enhancements`), a
   refused typing of a new transport task (`CreateTransportTask`'s `task_type_error`), and

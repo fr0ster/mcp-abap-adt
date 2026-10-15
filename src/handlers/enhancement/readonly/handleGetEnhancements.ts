@@ -10,6 +10,7 @@ import {
   type FailureEntry,
   failureEntry,
   failurePayload,
+  isCredentialFailure,
   thrownEntry,
 } from '../../../lib/answer';
 import { failureOf } from '../../../lib/auth/failures';
@@ -732,6 +733,14 @@ export async function handleGetEnhancements(
         includesList = includesList.slice(0, maxIncludes);
       }
 
+      // An include whose request SAP refused is listed, the method's error as
+      // it is with the step and the include's name, beside the others' results.
+      const includesUnread: Array<{
+        include: string;
+        step: 'read enhancements';
+        failures: FailureEntry[];
+      }> = [];
+
       // Collect all enhancement responses
       const allEnhancementResponses: EnhancementResponse[] = [
         mainEnhancementResponse,
@@ -752,21 +761,29 @@ export async function handleGetEnhancements(
 
           allEnhancementResponses.push(includeEnhancements);
         } catch (error) {
-          logger?.warn(
-            `Failed to get enhancements for include ${includeName}:`,
-            error,
-          );
-          // Continue with other includes even if one fails
+          // The credentials are the same for every include: the call ends.
+          if (isCredentialFailure(error)) throw error;
+          includesUnread.push({
+            include: includeName,
+            step: 'read enhancements',
+            failures: [thrownEntry(error, 'read enhancements')],
+          });
+          // Continue with the other includes
         }
       }
 
-      return allEnhancementResponses;
+      return { allEnhancementResponses, includesUnread };
     };
 
     let allEnhancementResponses: EnhancementResponse[];
+    let includesUnread: Awaited<
+      ReturnType<typeof processNestedIncludes>
+    >['includesUnread'];
     try {
-      allEnhancementResponses = await processNestedIncludes();
+      ({ allEnhancementResponses, includesUnread } =
+        await processNestedIncludes());
     } catch (error) {
+      if (isCredentialFailure(error)) throw error; // as it came
       logger?.error('Nested enhancement processing failed:', error);
       // Return partial results with just the main object
       const fallbackResult = {
@@ -814,6 +831,7 @@ export async function handleGetEnhancements(
         0,
       ),
       objects: allEnhancementResponses,
+      ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
 
     // Apply filtering if not detailed

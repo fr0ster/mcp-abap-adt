@@ -71,6 +71,21 @@ npm test -- --testPathPatterns=class
 npm test -- --testPathPatterns="class|unitTest|cds"
 ```
 
+### One Jest configuration for every package
+
+The root `package.json` holds the repository's only Jest configuration: its `roots` name the root `src` and every
+package's `src` (`server`, `http`, `sse`, `background-runs-memory`, `responsible-rules`, the compact packages and
+the six `-ro` packages), and its `moduleNameMapper` resolves every sibling package to its sources. The root
+`npm test` runs every package's suites once. A package's own `npm test` runs that same configuration for its folder
+only (`npm --prefix .. test -- --roots <package>/src`), so it works from inside the package:
+
+```bash
+cd server && npm test        # the server package's suites alone
+npm --prefix http test       # the same for http, from the repository root
+```
+
+A package's `test:check` still type-checks its tests against its own `tsconfig.test.json`.
+
 ## Test Modes
 
 - **Soft mode** (default, `integration_hard_mode.enabled: false`): calls handlers directly, no MCP subprocess. Use for mass regression testing.

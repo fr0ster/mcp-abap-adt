@@ -88,41 +88,23 @@ jobs:
       - name: Run tests
         run: npm test
 
-      # The server package's own tests: the root Jest's roots are `src` and
-      # `compact*`, so `server/src/__tests__` never ran in CI before.
+      # These five packages' tests run in the root `npm test` above (one shared
+      # Jest configuration, its roots name every package); only their types are
+      # checked here, each against its own tsconfig.test.json.
       - name: Type-check server tests
         run: npm --prefix server run test:check
 
-      - name: Run server tests
-        run: npm --prefix server test
-
-      # The HTTP package's own tests, beside core's.
       - name: Type-check http tests
         run: npm --prefix http run test:check
 
-      - name: Run http tests
-        run: npm --prefix http test
-
-      # The SSE package's own tests, beside http's.
       - name: Type-check sse tests
         run: npm --prefix sse run test:check
 
-      - name: Run sse tests
-        run: npm --prefix sse test
-
-      # The in-memory background-run store's own tests.
       - name: Type-check background-runs-memory tests
         run: npm --prefix background-runs-memory run test:check
 
-      - name: Run background-runs-memory tests
-        run: npm --prefix background-runs-memory test
-
-      # The responsible rules' own tests.
       - name: Type-check responsible-rules tests
         run: npm --prefix responsible-rules run test:check
-
-      - name: Run responsible-rules tests
-        run: npm --prefix responsible-rules test
 
       # What ci.yml checks of the release as a user gets it, on the tag too:
       # every package packed, the tarballs installed together, the twelve

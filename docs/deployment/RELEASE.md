@@ -71,12 +71,12 @@ so that no package goes out on top of a dependency that is missing.
    npm ci
    npm run build          # all seventeen packages
    npm run test:check
-   npm test               # includes binSmoke: packs all seventeen, installs them, runs the twelve bins
-   npm --prefix server run test:check && npm --prefix server test
-   npm --prefix http run test:check && npm --prefix http test
-   npm --prefix sse run test:check && npm --prefix sse test
-   npm --prefix background-runs-memory run test:check && npm --prefix background-runs-memory test
-   npm --prefix responsible-rules run test:check && npm --prefix responsible-rules test
+   npm test               # every package's suites, once; includes binSmoke: packs all seventeen, installs them, runs the twelve bins
+   npm --prefix server run test:check
+   npm --prefix http run test:check
+   npm --prefix sse run test:check
+   npm --prefix background-runs-memory run test:check
+   npm --prefix responsible-rules run test:check
    ```
    With Docker, the images as CI builds them — every package packed into one directory, then:
    ```bash

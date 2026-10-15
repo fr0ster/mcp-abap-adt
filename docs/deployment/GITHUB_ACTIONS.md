@@ -16,9 +16,9 @@ the MCP Registry, and neither needs a secret beyond the built-in `GITHUB_TOKEN`.
    `-ro` packages)
 3. `npm run build`
 4. Test type-check: `npm run test:check`
-5. `npm test` (its Jest roots hold the compact and `-ro` packages' suites)
-6. The server, http, sse, background-runs-memory and responsible-rules tests: `npm --prefix <dir> run test:check`,
-   `npm --prefix <dir> test`
+5. `npm test` — every package's suites, once: the root `package.json` holds the one Jest configuration, and its roots
+   name the root `src` and every package's `src`
+6. The server, http, sse, background-runs-memory and responsible-rules test type-check: `npm --prefix <dir> run test:check`
 
 Every step gates the run; none is `continue-on-error`.
 
@@ -50,8 +50,8 @@ Every step gates the run; none is `continue-on-error`.
 
 **Jobs:**
 1. `test` — Ubuntu × Node 22 and 24: `npm ci`, Biome lint (root and each package's
-   `lint:check`), build, test type-check, tests, the server, http, sse, background-runs-memory and
-   responsible-rules tests; on Node 22 also what CI runs on Ubuntu / Node 22 alone: `npm pack` of the
+   `lint:check`), build, test type-check, tests (every package's, in the one root `npm test`), the
+   server, http, sse, background-runs-memory and responsible-rules test type-check; on Node 22 also what CI runs on Ubuntu / Node 22 alone: `npm pack` of the
    seventeen packages, the install of the tarballs and the twelve bins, the twelve Docker images
    built from the tarballs and checked, and the Glama reference image when its version is on npm.
 2. `release` — after `test` passes: creates a GitHub Release for the tag with

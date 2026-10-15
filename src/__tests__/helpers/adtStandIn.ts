@@ -46,9 +46,14 @@ export interface AdtStandIn {
   hold(match: (request: StandInRequest) => boolean): StandInHold;
   /**
    * From now on every request `match` accepts is answered `status` (a
-   * refused `UNLOCK`, a refused debugger stop); the others as ever.
+   * refused `UNLOCK`, a refused debugger stop); the others as ever. `text`:
+   * an ADT exception document it answers with.
    */
-  answer(match: (request: StandInRequest) => boolean, status: number): void;
+  answer(
+    match: (request: StandInRequest) => boolean,
+    status: number,
+    text?: string,
+  ): void;
   /** The next request `match` accepts is answered `status`, once. */
   answerOnce(match: (request: StandInRequest) => boolean, status: number): void;
   /**
@@ -117,6 +122,8 @@ export async function adtStandIn(): Promise<AdtStandIn> {
   const answers: Array<{
     match: (request: StandInRequest) => boolean;
     status: number;
+    /** An ADT exception document, answered as `application/xml`. */
+    text?: string;
     once?: boolean;
     used?: boolean;
   }> = [];
@@ -187,8 +194,11 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       const given = answers.find((a) => !a.used && a.match(request));
       if (given) {
         if (given.once) given.used = true;
-        res.writeHead(given.status, { 'content-type': 'text/plain' });
-        res.end('');
+        res.writeHead(given.status, {
+          'content-type':
+            given.text !== undefined ? 'application/xml' : 'text/plain',
+        });
+        res.end(given.text ?? '');
         return;
       }
       // A valid ABAP system's systeminformation names the session's user:
@@ -243,8 +253,8 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       holds.push({ match, taken: false, arrive, released, release });
       return { arrived, release };
     },
-    answer: (match, status) => {
-      answers.push({ match, status });
+    answer: (match, status, text) => {
+      answers.push({ match, status, ...(text !== undefined && { text }) });
     },
     answerOnce: (match, status) => {
       answers.push({ match, status, once: true });

@@ -143,16 +143,16 @@ Install the package whose binary serves the tools you want; the binary takes no 
 ```bash
 # readonly, high, debug, background runs (and the leftover sessions on stdio)
 npm install -g @mcp-abap-adt/core
-mcp-abap-adt --env-path=.env
+mcp-abap-adt --env-path=.env --system-type=<onprem|cloud>
 
 # the readonly tools alone (with system and search)
 npm install -g @mcp-abap-adt/core-ro
-mcp-abap-adt-ro --env-path=.env
+mcp-abap-adt-ro --env-path=.env --system-type=<onprem|cloud>
 
 # the compact tools; and those that change nothing
 npm install -g @mcp-abap-adt/compact @mcp-abap-adt/compact-ro
-mcp-abap-adt-compact --env-path=.env
-mcp-abap-adt-compact-ro --env-path=.env
+mcp-abap-adt-compact --env-path=.env --system-type=<onprem|cloud>
+mcp-abap-adt-compact-ro --env-path=.env --system-type=<onprem|cloud>
 ```
 
 #### `--exposition` is gone

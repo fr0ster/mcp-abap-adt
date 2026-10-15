@@ -192,7 +192,7 @@ login that fails ends the process with exit `1`. The token is then renewed as `-
   destination the broker refuses stops the start, exit `1`, with the error's own words.
 
 ```bash
-mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
+mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005 --system-type=cloud
 ```
 
 ## Generate a `.env`

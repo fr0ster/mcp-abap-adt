@@ -58,7 +58,7 @@ With a `.env` file:
     "mcp-abap-adt": {
       "type": "stdio",
       "command": "mcp-abap-adt",
-      "args": ["--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "timeout": 60,
       "disabled": false
     }
@@ -66,10 +66,10 @@ With a `.env` file:
 }
 ```
 
-With a named destination: `"args": ["--mcp=<destination>"]`. Add `--unsafe` to keep
+With a named destination: `"args": ["--mcp=<destination>", "--system-type=<onprem|cloud>"]`. Add `--unsafe` to keep
 its session on disk across restarts.
 
-Without installing: `"command": "npx"`, `"args": ["-y", "@mcp-abap-adt/core", "--env-path=/path/to/<destination>.env"]`.
+Without installing: `"command": "npx"`, `"args": ["-y", "@mcp-abap-adt/core", "--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"]`.
 
 ### Compact server
 
@@ -82,7 +82,7 @@ The same arguments, the command `mcp-abap-adt-compact` (through npx:
     "mcp-abap-adt-compact": {
       "type": "stdio",
       "command": "mcp-abap-adt-compact",
-      "args": ["--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "timeout": 60,
       "disabled": false
     }
@@ -102,7 +102,7 @@ server runs:
     "mcp-abap-adt": {
       "type": "stdio",
       "command": "mcp-abap-adt",
-      "args": ["--env-path=C:/path/to/<destination>.env"],
+      "args": ["--env-path=C:/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "env": {
         "PATH": "C:\\nwrfcsdk\\nwrfcsdk\\lib;<the rest of your PATH>"
       },
@@ -141,7 +141,7 @@ trusts that CA. The setting belongs to the process, so it goes in `env`:
     "mcp-abap-adt": {
       "type": "stdio",
       "command": "mcp-abap-adt",
-      "args": ["--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "env": {
         "NODE_EXTRA_CA_CERTS": "/path/to/company-ca.pem"
       },
@@ -162,7 +162,7 @@ See [HTTPS certificates](INSTALLATION.md#https-certificates).
 
 ```bash
 npm install -g @mcp-abap-adt/http
-mcp-abap-adt-http --port=3000
+mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
 ```
 
 `npx -y @mcp-abap-adt/http` takes the same arguments. It takes no destination and no `.env`: each
@@ -199,7 +199,7 @@ served only by `mcp-abap-adt` (stdio, Option 1). The headers:
 
 ```bash
 npm install -g @mcp-abap-adt/sse
-mcp-abap-adt-sse --sse-port=3001
+mcp-abap-adt-sse --sse-port=3001 --system-type=<onprem|cloud>
 ```
 
 The `GET` that opens the SSE connection carries the credential:
@@ -257,7 +257,7 @@ Write paths with forward slashes (`C:/path/to/<destination>.env`) or escaped bac
 3. For RFC: `npm ls -g @mcp-abap-adt/sap-rfc-lite` must show a version — see [RFC Setup](RFC_SETUP.md#troubleshooting).
 4. Test stdio by hand:
    ```bash
-   echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | mcp-abap-adt --env-path=/path/to/<destination>.env
+   echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | mcp-abap-adt --env-path=/path/to/<destination>.env --system-type=<onprem|cloud>
    ```
 
 ### Windows-specific issues
@@ -274,12 +274,12 @@ One entry per system, each with its own destination:
   "mcpServers": {
     "mcp-abap-dev": {
       "command": "mcp-abap-adt",
-      "args": ["--env-path=/path/to/dev.env"],
+      "args": ["--env-path=/path/to/dev.env", "--system-type=<onprem|cloud>"],
       "disabled": false
     },
     "mcp-abap-prod": {
       "command": "mcp-abap-adt",
-      "args": ["--env-path=/path/to/prod.env"],
+      "args": ["--env-path=/path/to/prod.env", "--system-type=<onprem|cloud>"],
       "disabled": false
     }
   }
@@ -322,7 +322,7 @@ Every option with its environment and YAML forms: [CLI_OPTIONS.md](../user-guide
 2. **Use JWT authentication** for production environments.
 3. **Enable DNS-rebinding protection** for HTTP/SSE servers exposed to network — use `--http-enable-dns-protection` with `--http-allowed-hosts` to restrict which Host headers are accepted. Example:
    ```bash
-   mcp-abap-adt-http --http-enable-dns-protection --http-allowed-hosts=localhost:3000
+   mcp-abap-adt-http --http-enable-dns-protection --http-allowed-hosts=localhost:3000 --system-type=<onprem|cloud>
    ```
    This is Host/Origin allowlist validation, NOT browser CORS — no `Access-Control-Allow-Origin` headers are emitted. A non-allowlisted Host gets HTTP 403. The `--http-allowed-hosts` value must include the port (e.g. `localhost:3000`, not `localhost`).
 4. **Use HTTPS** in production (configure reverse proxy).

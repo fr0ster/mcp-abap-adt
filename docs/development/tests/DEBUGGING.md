@@ -26,7 +26,7 @@ DEBUG_TESTS=true npm test -- integration/domain
 
 ### --auth-debug
 
-Not an environment variable: `mcp-abap-adt --mcp=TRIAL --auth-debug`, or `auth-debug: true` in the
+Not an environment variable: `mcp-abap-adt --mcp=TRIAL --system-type=cloud --auth-debug`, or `auth-debug: true` in the
 configuration file. It routes the broker's and the token providers' log lines to stderr and, on a
 refused token request, names each secret the request carried by its first and last four characters
 (shorter than sixteen: its length only). One warning line says so at start. No `DEBUG_*` variable
@@ -209,7 +209,7 @@ Enables logging of all incoming HTTP requests and MCP JSON-RPC calls. Shows:
 
 **Usage:**
 ```bash
-DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL
+DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 **Example output:**
@@ -259,7 +259,7 @@ Enables all connection-level debugging, including:
 
 **Usage:**
 ```bash
-DEBUG_CONNECTORS=true mcp-abap-adt --mcp=TRIAL
+DEBUG_CONNECTORS=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 **Note:** `DEBUG_CONNECTORS=true` automatically enables `DEBUG_HTTP_REQUESTS=true`.
@@ -275,10 +275,10 @@ Enables debug logging for `auth-broker` package. Shows:
 **Usage:**
 ```bash
 # Using DEBUG_AUTH_LOG (original)
-DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL
+DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Using DEBUG_AUTH_BROKER (alias, recommended)
-DEBUG_AUTH_BROKER=true mcp-abap-adt --mcp=TRIAL
+DEBUG_AUTH_BROKER=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 **Note:** `DEBUG_AUTH_BROKER=true` automatically sets `DEBUG_AUTH_LOG=true` for the auth-broker package.
@@ -293,7 +293,7 @@ Enables detailed logging in MCP handler functions. Shows:
 
 **Usage:**
 ```bash
-DEBUG_HANDLERS=true mcp-abap-adt --mcp=TRIAL
+DEBUG_HANDLERS=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 ### DEBUG_CONNECTION_MANAGER=true
@@ -306,7 +306,7 @@ Enables logging for connection manager (`getManagedConnection`). Shows:
 
 **Usage:**
 ```bash
-DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL
+DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 ## Combined Debugging
@@ -314,28 +314,28 @@ DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL
 Enable all debug flags for maximum visibility:
 
 ```bash
-DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_LOG=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL
+DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_LOG=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 **Common combinations:**
 
 ```bash
 # HTTP requests and MCP calls only
-DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL
+DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Connection-level debugging (HTTP, sessions, connection management)
-DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL
+DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Authentication debugging
-DEBUG_AUTH_BROKER=true mcp-abap-adt --mcp=TRIAL
+DEBUG_AUTH_BROKER=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 # or
-DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL
+DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Handler debugging
-DEBUG_HANDLERS=true mcp-abap-adt --mcp=TRIAL
+DEBUG_HANDLERS=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Full visibility (everything)
-DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_BROKER=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL
+DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_BROKER=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 ## Security Note
@@ -353,16 +353,16 @@ All debug logs are written to `stderr` in JSON format to avoid interfering with 
 
 1. **View logs in terminal:**
    ```bash
-   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL 2>&1 | jq
+   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL --system-type=cloud 2>&1 | jq
    ```
 
 2. **Save logs to file:**
    ```bash
-   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL 2>debug.log
+   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL --system-type=cloud 2>debug.log
    ```
 
 3. **Filter specific log types:**
    ```bash
-   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL 2>&1 | grep "HTTP_REQUEST"
+   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL --system-type=cloud 2>&1 | grep "HTTP_REQUEST"
    ```
 

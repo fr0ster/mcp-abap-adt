@@ -66,7 +66,7 @@ See [docs/user-guide/TERMINOLOGY.md](docs/user-guide/TERMINOLOGY.md) for the ful
 Destination-based auth is the default. Drop service keys into the standard platform folder and use the filename as your destination:
 
 ```bash
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 Standard service key paths:
@@ -135,14 +135,14 @@ tools: [Handler sets](docs/user-guide/HANDLERS_MANAGEMENT.md).
 ### 1. Standalone MCP Server (Default)
 Run as a standalone MCP server; a binary is its transport (there is no `--transport` option):
 ```bash
-mcp-abap-adt --mcp=TRIAL               # stdio (@mcp-abap-adt/core): one destination
-mcp-abap-adt-http                      # Streamable HTTP (@mcp-abap-adt/http): x-sap-* headers per request
-mcp-abap-adt-sse                       # SSE (@mcp-abap-adt/sse): x-sap-* headers per SSE connection
-mcp-abap-adt-compact --mcp=TRIAL       # the compact tool set over stdio (@mcp-abap-adt/compact)
-mcp-abap-adt-compact-http              # ... over Streamable HTTP (@mcp-abap-adt/compact-http)
-mcp-abap-adt-compact-sse               # ... over SSE (@mcp-abap-adt/compact-sse)
-mcp-abap-adt-ro --mcp=TRIAL            # the readonly tools alone over stdio (@mcp-abap-adt/core-ro)
-mcp-abap-adt-compact-ro --mcp=TRIAL    # the compact tools that change nothing (@mcp-abap-adt/compact-ro)
+mcp-abap-adt --mcp=TRIAL --system-type=cloud # stdio (@mcp-abap-adt/core): one destination
+mcp-abap-adt-http --system-type=<onprem|cloud> # Streamable HTTP (@mcp-abap-adt/http): x-sap-* headers per request
+mcp-abap-adt-sse --system-type=<onprem|cloud> # SSE (@mcp-abap-adt/sse): x-sap-* headers per SSE connection
+mcp-abap-adt-compact --mcp=TRIAL --system-type=cloud # the compact tool set over stdio (@mcp-abap-adt/compact)
+mcp-abap-adt-compact-http --system-type=<onprem|cloud> # ... over Streamable HTTP (@mcp-abap-adt/compact-http)
+mcp-abap-adt-compact-sse --system-type=<onprem|cloud> # ... over SSE (@mcp-abap-adt/compact-sse)
+mcp-abap-adt-ro --mcp=TRIAL --system-type=cloud # the readonly tools alone over stdio (@mcp-abap-adt/core-ro)
+mcp-abap-adt-compact-ro --mcp=TRIAL --system-type=cloud # the compact tools that change nothing (@mcp-abap-adt/compact-ro)
                                        # (and -http-ro, -sse-ro, -compact-http-ro, -compact-sse-ro)
 ```
 
@@ -316,31 +316,31 @@ After installing globally with `npm install -g`, you can run from any directory:
 mcp-abap-adt --help
 
 # Default stdio mode (for MCP clients; requires .env file or --mcp parameter)
-mcp-abap-adt
+mcp-abap-adt --system-type=<onprem|cloud>
 
 # Streamable HTTP on a custom port (@mcp-abap-adt/http; credentials from x-sap-* headers)
-mcp-abap-adt-http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 
 # Use stdio mode with auth-broker (--mcp parameter)
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Use env destination from platform sessions store
-mcp-abap-adt --env=trial
+mcp-abap-adt --env=trial --system-type=cloud
 
 # Use explicit .env file path
-mcp-abap-adt --env-path=/path/to/my.env
+mcp-abap-adt --env-path=/path/to/my.env --system-type=<onprem|cloud>
 
 # SSE (@mcp-abap-adt/sse; credentials from the opening GET's x-sap-* headers)
-mcp-abap-adt-sse --sse-port=3001
+mcp-abap-adt-sse --sse-port=3001 --system-type=<onprem|cloud>
 
 # The compact servers take their full counterpart's options; the binary fixes the tools
-mcp-abap-adt-compact --env-path=/path/to/my.env       # npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact-http --port=8080                 # npm install -g @mcp-abap-adt/compact-http
-mcp-abap-adt-compact-sse --sse-port=3001              # npm install -g @mcp-abap-adt/compact-sse
+mcp-abap-adt-compact --env-path=/path/to/my.env --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/compact
+mcp-abap-adt-compact-http --port=8080 --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/compact-http
+mcp-abap-adt-compact-sse --sse-port=3001 --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/compact-sse
 
 # The read-only servers: the same options, the tools that change nothing
-mcp-abap-adt-ro --env-path=/path/to/my.env            # npm install -g @mcp-abap-adt/core-ro
-mcp-abap-adt-compact-http-ro --port=8080              # npm install -g @mcp-abap-adt/compact-http-ro
+mcp-abap-adt-ro --env-path=/path/to/my.env --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/core-ro
+mcp-abap-adt-compact-http-ro --port=8080 --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/compact-http-ro
 ```
 
 ### Development Mode
@@ -442,16 +442,16 @@ When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` 
 **Examples:**
 ```bash
 # Named destination, session kept in memory (default)
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Named destination, session persisted to sessions/TRIAL.env
-mcp-abap-adt --mcp=TRIAL --unsafe
+mcp-abap-adt --mcp=TRIAL --unsafe --system-type=cloud
 
 # Custom base directory for service-keys/ and sessions/
-mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/ --unsafe
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/ --unsafe --system-type=cloud
 
 # Browser login on another callback port
-mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
+mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005 --system-type=cloud
 ```
 
 See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.

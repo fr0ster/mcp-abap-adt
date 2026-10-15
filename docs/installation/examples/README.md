@@ -39,7 +39,7 @@ With one `.env` file:
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "disabled": false
     }
   }
@@ -76,14 +76,14 @@ The same arguments and `.env`, the command `mcp-abap-adt-compact`:
   "mcpServers": {
     "mcp-abap-adt-compact": {
       "command": "mcp-abap-adt-compact",
-      "args": ["--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "disabled": false
     }
   }
 }
 ```
 
-Through npx: `"command": "npx"`, `"args": ["-y", "-p", "@mcp-abap-adt/compact", "mcp-abap-adt-compact", "--env-path=…"]`.
+Through npx: `"command": "npx"`, `"args": ["-y", "-p", "@mcp-abap-adt/compact", "mcp-abap-adt-compact", "--env-path=…", "--system-type=<onprem|cloud>"]`.
 
 ## 3. RFC and SNC
 
@@ -95,7 +95,7 @@ them from the `.env`. On Windows the SDK's `lib` directory must be on `PATH` whe
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--env-path=C:/path/to/<destination>.env"],
+      "args": ["--env-path=C:/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "env": {
         "PATH": "C:\\nwrfcsdk\\nwrfcsdk\\lib;<the rest of your PATH>"
       },
@@ -134,7 +134,7 @@ trusts that CA. Name the PEM file in the client's `env` block:
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--env-path=/path/to/<destination>.env"],
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"],
       "env": {
         "NODE_EXTRA_CA_CERTS": "/path/to/company-ca.pem"
       },
@@ -167,7 +167,7 @@ connection, carries its credential in `x-sap-*` headers. Then use `cline-http-co
 `cline-sse-config.json`. A request carrying `x-mcp-destination` is answered `400`: destinations, service
 keys and the browser login are served only by `mcp-abap-adt` (stdio).
 
-**First-time authentication** of a service-key destination (`mcp-abap-adt --mcp=<destination>`, stdio): the browser opens for the login at the
+**First-time authentication** of a service-key destination (`mcp-abap-adt --mcp=<destination> --system-type=cloud`, stdio): the browser opens for the login at the
 server's start, before the client sees its tools (callback port `61001`). The token is kept in memory, or saved to `sessions/<destination>.env` with `--unsafe`.
 
 ## More Info

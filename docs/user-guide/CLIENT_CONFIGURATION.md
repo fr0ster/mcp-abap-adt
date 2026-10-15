@@ -126,10 +126,10 @@ Otherwise there is no default destination. Nothing is looked up in the working d
 
 ```bash
 # stdio: a named destination
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # stdio: one env file
-mcp-abap-adt --env-path=/path/to/.env
+mcp-abap-adt --env-path=/path/to/.env --system-type=<onprem|cloud>
 ```
 
 Destinations are served only by `mcp-abap-adt` (stdio); `mcp-abap-adt-http` and `mcp-abap-adt-sse` refuse
@@ -173,7 +173,7 @@ By default a named destination's session (JWT and refresh token) is kept **in me
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--mcp=TRIAL"]
+      "args": ["--mcp=TRIAL", "--system-type=cloud"]
     }
   }
 }
@@ -185,9 +185,9 @@ By default a named destination's session (JWT and refresh token) is kept **in me
 
 ```bash
 # Unix/Linux/macOS
-mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/ --system-type=cloud
 # Windows
-mcp-abap-adt --mcp=TRIAL --auth-broker-path=C:\prj\tmp\
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=C:\prj\tmp\ --system-type=cloud
 ```
 
 The server uses `service-keys` and `sessions` subdirectories of that path (`~/prj/tmp/service-keys/`, `~/prj/tmp/sessions/`).
@@ -210,9 +210,9 @@ These are `mcp-abap-adt`'s (stdio). Every parameter of each binary, with its env
 The Streamable HTTP server is its own package:
 
 ```bash
-mcp-abap-adt-http --port=3000
+mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
 # or without installing
-npx -y @mcp-abap-adt/http --port=3000
+npx -y @mcp-abap-adt/http --port=3000 --system-type=<onprem|cloud>
 ```
 
 It takes no destination and no `.env`: each request carries its credential in `x-sap-*` headers.
@@ -384,7 +384,7 @@ In Claude Code (`claude_desktop_config.json` or `mcp.json`), name that file — 
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--env-path=/path/to/<destination>.env"]
+      "args": ["--env-path=/path/to/<destination>.env", "--system-type=<onprem|cloud>"]
     }
   }
 }

@@ -107,16 +107,16 @@ the same configuration. See [Installation variants](../INSTALLATION.md#installat
 **Usage examples:**
 ```bash
 # HTTP server on default port (3000)
-mcp-abap-adt-http
+mcp-abap-adt-http --system-type=<onprem|cloud>
 
 # HTTP server on custom port
-mcp-abap-adt-http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 
 # SSE server accessible from network
-mcp-abap-adt-sse --sse-host=0.0.0.0 --sse-port=3001
+mcp-abap-adt-sse --sse-host=0.0.0.0 --sse-port=3001 --system-type=<onprem|cloud>
 
 # stdio with a custom .env file
-mcp-abap-adt --env-path=/path/to/custom/.env
+mcp-abap-adt --env-path=/path/to/custom/.env --system-type=<onprem|cloud>
 ```
 
 **Troubleshooting:**
@@ -176,7 +176,7 @@ SAP_PASSWORD=your_password
 ```
 
 ```bash
-mcp-abap-adt --env-path=/path/to/your/your-system.env
+mcp-abap-adt --env-path=/path/to/your/your-system.env --system-type=<onprem|cloud>
 ```
 
 > **No request deadline to set.** From 19.0.0 nothing reads `SAP_TIMEOUT_DEFAULT`,
@@ -216,7 +216,8 @@ Uses **stdio** mode (`mcp-abap-adt`; a binary is its transport, there is no `--t
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
       "args": [
-        "--env=/path/to/your/your-system.env"
+        "--env=/path/to/your/your-system.env",
+        "--system-type=<onprem|cloud>"
       ]
     }
   }
@@ -237,7 +238,8 @@ Uses **stdio** mode (`mcp-abap-adt`; a binary is its transport, there is no `--t
       "command": "node",
       "args": [
         "/usr/local/lib/node_modules/@mcp-abap-adt/core/bin/mcp-abap-adt.js",
-        "--env=/path/to/your/your-system.env"
+        "--env=/path/to/your/your-system.env",
+        "--system-type=<onprem|cloud>"
       ]
     }
   }
@@ -258,7 +260,8 @@ Add to Cursor settings (`~/.cursor/config.json`):
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
       "args": [
-        "--env=/path/to/your/your-system.env"
+        "--env=/path/to/your/your-system.env",
+        "--system-type=<onprem|cloud>"
       ]
     }
   }
@@ -275,10 +278,10 @@ Add to Cursor settings (`~/.cursor/config.json`):
 
 ```bash
 # Start the Streamable HTTP server
-mcp-abap-adt-http
+mcp-abap-adt-http --system-type=<onprem|cloud>
 
 # Or with custom port
-mcp-abap-adt-http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 ```
 
 **HTTP Server Options:**
@@ -291,7 +294,7 @@ mcp-abap-adt-http --port=8080
 
 **Example with custom port:**
 ```bash
-mcp-abap-adt-http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 ```
 
 Server will be available at: `http://localhost:8080/mcp/stream/http`
@@ -325,10 +328,10 @@ Server will be available at: `http://localhost:8080/mcp/stream/http`
 
 ```bash
 # Start the SSE server
-mcp-abap-adt-sse
+mcp-abap-adt-sse --system-type=<onprem|cloud>
 
 # Or with custom port
-mcp-abap-adt-sse --sse-port=3001
+mcp-abap-adt-sse --sse-port=3001 --system-type=<onprem|cloud>
 ```
 
 **SSE Server Options:**
@@ -342,7 +345,7 @@ mcp-abap-adt-sse --sse-port=3001
 
 **Example with custom port and host:**
 ```bash
-mcp-abap-adt-sse --sse-port=4100 --sse-host=127.0.0.1
+mcp-abap-adt-sse --sse-port=4100 --sse-host=127.0.0.1 --system-type=<onprem|cloud>
 ```
 
 Server will be available at: `http://127.0.0.1:4100/sse`

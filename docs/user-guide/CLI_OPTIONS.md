@@ -74,9 +74,9 @@ its sentence:
 ### YAML configuration file
 
 ```bash
-mcp-abap-adt --conf=config.yaml          # a template of mcp-abap-adt's table when missing
-mcp-abap-adt-http --conf=http.yaml       # a template of mcp-abap-adt-http's table
-mcp-abap-adt --conf=config.yaml --mcp=TRIAL   # the CLI overrides the file
+mcp-abap-adt --conf=config.yaml --system-type=<onprem|cloud> # a template of mcp-abap-adt's table when missing
+mcp-abap-adt-http --conf=http.yaml --system-type=<onprem|cloud> # a template of mcp-abap-adt-http's table
+mcp-abap-adt --conf=config.yaml --mcp=TRIAL --system-type=cloud # the CLI overrides the file
 ```
 
 Each binary writes and validates its own file: a key of another binary is refused naming the binary
@@ -124,9 +124,9 @@ The environment forms `MCP_DESTINATION` and `MCP_ENV` do **not** exist; use `--m
 explicit `.env` file path (or relative file name).
 
 ```bash
-mcp-abap-adt --env=trial                          # sessions/trial.env
-mcp-abap-adt --env-path=/opt/config/sap-prod.env  # explicit path
-mcp-abap-adt --env-path=../configs/dev.env        # relative to the current directory
+mcp-abap-adt --env=trial --system-type=cloud # sessions/trial.env
+mcp-abap-adt --env-path=/opt/config/sap-prod.env --system-type=<onprem|cloud> # explicit path
+mcp-abap-adt --env-path=../configs/dev.env --system-type=<onprem|cloud> # relative to the current directory
 ```
 
 The server resolves the env file in this order:
@@ -149,7 +149,7 @@ It is read once per process: a change made from outside takes effect on restart.
 The destination the process serves.
 
 ```bash
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 - An XSUAA service key needs `XSUAA_MCP_URL` in `sessions/<name>.env` (the key carries the UAA,
@@ -162,7 +162,7 @@ How the server communicates with the SAP system: `http` (default, HTTP/HTTPS) or
 SAP NW RFC SDK, any system it supports).
 
 ```bash
-mcp-abap-adt --connection-type=rfc --env-path=my-system.env
+mcp-abap-adt --connection-type=rfc --env-path=my-system.env --system-type=<onprem|cloud>
 ```
 
 RFC requires the SAP NW RFC SDK installed and configured. See
@@ -190,9 +190,9 @@ Linux, an application on macOS, a program on Windows; elsewhere run as on Linux)
 `--browser`.
 
 ```bash
-mcp-abap-adt --mcp=TRIAL --browser=firefox
-mcp-abap-adt --mcp=TRIAL --browser-program=/opt/browsers/my-browser
-mcp-abap-adt --mcp=TRIAL --browser=none        # open the URL from stderr yourself
+mcp-abap-adt --mcp=TRIAL --browser=firefox --system-type=cloud
+mcp-abap-adt --mcp=TRIAL --browser-program=/opt/browsers/my-browser --system-type=cloud
+mcp-abap-adt --mcp=TRIAL --browser=none --system-type=cloud # open the URL from stderr yourself
 ```
 
 ### --renewal=\<mode\>
@@ -209,7 +209,7 @@ Callback port of the browser login (JWT / `authorization_code`). The default is 
 is registered elsewhere.
 
 ```bash
-mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
+mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005 --system-type=cloud
 ```
 
 ### Shutdown
@@ -246,7 +246,7 @@ choose: [Leftover SAP sessions](README.md#leftover-sap-sessions-of-a-killed-proc
 An http or sse server records none: one such server holds the sessions of many users.
 
 ```bash
-mcp-abap-adt-http --shutdown-timeout=25
+mcp-abap-adt-http --shutdown-timeout=25 --system-type=<onprem|cloud>
 ```
 
 ### --login-timeout=\<seconds\>
@@ -262,7 +262,7 @@ that waits for it ends — a client that closes its connection ends the login it
 other request waits for it. A tool call cannot be cancelled: a cancel ends no login.
 
 ```bash
-mcp-abap-adt --mcp=TRIAL --login-timeout=300
+mcp-abap-adt --mcp=TRIAL --login-timeout=300 --system-type=cloud
 ```
 
 ### --auth-debug
@@ -277,7 +277,7 @@ secret reaches no line at all. The authorization server's `error_description` is
 with or without it.
 
 ```bash
-mcp-abap-adt --mcp=TRIAL --auth-debug
+mcp-abap-adt --mcp=TRIAL --auth-debug --system-type=cloud
 ```
 
 The startup summary shows a secret by its presence only (`Password: set`), whatever the flag says.
@@ -354,7 +354,7 @@ Only effective when `--http-enable-dns-protection` is set AND at least one allow
 A non-allowlisted Host/Origin gets HTTP 403.
 
 ```bash
-mcp-abap-adt-http \
+mcp-abap-adt-http --system-type=<onprem|cloud> \
   --http-enable-dns-protection \
   --http-allowed-hosts=localhost:3000 \
   --http-allowed-origins=https://app.example.com
@@ -363,8 +363,8 @@ mcp-abap-adt-http \
 ### Example
 
 ```bash
-mcp-abap-adt-http --host=0.0.0.0 --port=8080
-mcp-abap-adt-http-ro --host=0.0.0.0 --port=8080     # the readonly tools alone
+mcp-abap-adt-http --host=0.0.0.0 --port=8080 --system-type=<onprem|cloud>
+mcp-abap-adt-http-ro --host=0.0.0.0 --port=8080 --system-type=<onprem|cloud> # the readonly tools alone
 ```
 
 ## `mcp-abap-adt-sse` (HTTP + SSE)
@@ -412,8 +412,8 @@ until the connection closes; see [Held State](#held-state).
 ### Example
 
 ```bash
-mcp-abap-adt-sse --sse-host=0.0.0.0 --sse-port=3001 --sse-path=/sse --post-path=/messages
-mcp-abap-adt-sse \
+mcp-abap-adt-sse --sse-host=0.0.0.0 --sse-port=3001 --sse-path=/sse --post-path=/messages --system-type=<onprem|cloud>
+mcp-abap-adt-sse --system-type=<onprem|cloud> \
   --sse-enable-dns-protection \
   --sse-allowed-hosts=localhost:3001 \
   --sse-allowed-origins=https://app.example.com
@@ -471,8 +471,8 @@ itself, so SAP's own session timeout never ends an abandoned debug session.
 - `mcp-abap-adt-sse`: each SSE connection's instance, until the connection closes.
 
 ```bash
-mcp-abap-adt --mcp=TRIAL --state-idle-minutes=60
-mcp-abap-adt-http --state-idle-minutes=60
+mcp-abap-adt --mcp=TRIAL --state-idle-minutes=60 --system-type=cloud
+mcp-abap-adt-http --state-idle-minutes=60 --system-type=<onprem|cloud>
 ```
 
 ## Environment Variables
@@ -554,7 +554,7 @@ When the same option is specified multiple ways, this is the priority order (hig
 ```bash
 # Port 9000 wins (command line)
 export MCP_HTTP_PORT=8080
-mcp-abap-adt-http --port=9000
+mcp-abap-adt-http --port=9000 --system-type=<onprem|cloud>
 ```
 
 ## Common Usage Patterns
@@ -573,7 +573,7 @@ SAP_PASSWORD=dev-password
 EOF
 
 # A .env in the current directory is read only when named
-mcp-abap-adt --env-path=./.env
+mcp-abap-adt --env-path=./.env --system-type=<onprem|cloud>
 ```
 
 ### RFC Connection Setup
@@ -588,16 +588,16 @@ SAP_USERNAME=developer
 SAP_PASSWORD=dev-password
 EOF
 
-mcp-abap-adt --connection-type=rfc --env-path=rfc-system.env
+mcp-abap-adt --connection-type=rfc --env-path=rfc-system.env --system-type=<onprem|cloud>
 # Or from the process environment
-SAP_CONNECTION_TYPE=rfc mcp-abap-adt --env-path=rfc-system.env
+SAP_CONNECTION_TYPE=rfc mcp-abap-adt --env-path=rfc-system.env --system-type=<onprem|cloud>
 ```
 
 ### A shared HTTP server
 
 ```bash
 # Every client sends its own x-sap-* headers; the server holds no credential
-mcp-abap-adt-http --host=0.0.0.0 --port=8080 \
+mcp-abap-adt-http --host=0.0.0.0 --port=8080 --system-type=<onprem|cloud> \
   --tls-cert=/etc/mcp/server.crt --tls-key=/etc/mcp/server.key
 ```
 
@@ -610,8 +610,8 @@ mcp-abap-adt-http --host=0.0.0.0 --port=8080 \
 ├── test.env
 └── prod.env
 
-alias mcp-dev='mcp-abap-adt --env-path=~/sap-configs/dev.env'
-alias mcp-test='mcp-abap-adt --env-path=~/sap-configs/test.env'
+alias mcp-dev='mcp-abap-adt --env-path=~/sap-configs/dev.env --system-type=<onprem|cloud>'
+alias mcp-test='mcp-abap-adt --env-path=~/sap-configs/test.env --system-type=<onprem|cloud>'
 ```
 
 ## Troubleshooting
@@ -629,7 +629,7 @@ ls -la ~/configs/sap.env
 
 ```bash
 lsof -i :3000
-mcp-abap-adt-http --port=3002
+mcp-abap-adt-http --port=3002 --system-type=<onprem|cloud>
 ```
 
 ### No Destination, or the Wrong One

@@ -2,7 +2,7 @@
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--env-path=C:/path/to/<destination>.env"],
+      "args": ["--env-path=C:/path/to/<destination>.env", "--system-type=onprem"],
       "env": {
         "PATH": "C:\\nwrfcsdk\\nwrfcsdk\\lib;<the rest of your PATH>"
       },

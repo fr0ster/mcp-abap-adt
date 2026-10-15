@@ -165,17 +165,17 @@ environment. See [RFC Setup](RFC_SETUP.md).
 **Run the server:**
 ```bash
 # stdio (for MCP clients): name the destination with --mcp, --env or --env-path
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Or specify env destination from sessions store
-mcp-abap-adt --env=trial
+mcp-abap-adt --env=trial --system-type=cloud
 
 # Or explicit .env location
-mcp-abap-adt --env-path=/path/to/my.env
-mcp-abap-adt --env-path ~/configs/sap-dev.env
+mcp-abap-adt --env-path=/path/to/my.env --system-type=<onprem|cloud>
+mcp-abap-adt --env-path ~/configs/sap-dev.env --system-type=<onprem|cloud>
 
 # Streamable HTTP server on a custom port (credentials from each request's x-sap-* headers)
-mcp-abap-adt-http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 ```
 
 **Environment File Priority:**
@@ -217,7 +217,7 @@ Install in your project directory:
 ```bash
 cd /path/to/your/project
 npm install @mcp-abap-adt/core
-npx mcp-abap-adt --mcp=TRIAL
+npx mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 #### Configuration
@@ -248,7 +248,7 @@ EOF
 
 # Run the server with the destination; the browser login opens at the start
 # (callback port 61001 unless --browser-auth-port says otherwise)
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 An XSUAA service key carries the UAA, not the system: state the system's URL as `XSUAA_MCP_URL` in `~/.config/mcp-abap-adt/sessions/TRIAL.env`.
@@ -283,29 +283,29 @@ A `.env` is read once per process: a change to it takes effect on restart.
 Or use a custom environment file:
 
 ```bash
-mcp-abap-adt --env-path /path/to/custom/.env
+mcp-abap-adt --env-path /path/to/custom/.env --system-type=<onprem|cloud>
 ```
 
 #### Usage Examples
 
 **Example 1: stdio with a named destination**
 ```bash
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 **Example 2: Streamable HTTP server on a custom port** (`@mcp-abap-adt/http`)
 ```bash
-mcp-abap-adt-http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 ```
 
 **Example 3: Streamable HTTP server accessible from network**
 ```bash
-mcp-abap-adt-http --host=0.0.0.0 --port=3000
+mcp-abap-adt-http --host=0.0.0.0 --port=3000 --system-type=<onprem|cloud>
 ```
 
 **Example 4: SSE server** (`@mcp-abap-adt/sse`)
 ```bash
-mcp-abap-adt-sse --sse-port=3001
+mcp-abap-adt-sse --sse-port=3001 --system-type=<onprem|cloud>
 ```
 
 #### Command Line Options
@@ -405,18 +405,18 @@ For complete list see [CLI Options](../user-guide/CLI_OPTIONS.md#environment-var
 mcp-abap-adt --help
 
 # Use custom .env from different location
-mcp-abap-adt --env-path=~/configs/sap-production.env
+mcp-abap-adt --env-path=~/configs/sap-production.env --system-type=<onprem|cloud>
 
 # Start a Streamable HTTP server
-mcp-abap-adt-http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 
 # Start an SSE server
-mcp-abap-adt-sse --sse-port=3001
+mcp-abap-adt-sse --sse-port=3001 --system-type=<onprem|cloud>
 ```
 
 **Example 6: Use stdio transport (for MCP clients)**
 ```bash
-mcp-abap-adt
+mcp-abap-adt --system-type=<onprem|cloud>
 ```
 
 #### Updating the Package

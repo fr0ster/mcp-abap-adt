@@ -35,10 +35,10 @@ EOF
 # A token you hold is not served over stdio: send it in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse, or create the session with mcp-auth.
 
 # stdio (for MCP clients)
-mcp-abap-adt --env-path=/path/to/<destination>.env
+mcp-abap-adt --env-path=/path/to/<destination>.env --system-type=<onprem|cloud>
 
 # Streamable HTTP server (@mcp-abap-adt/http): no destination, each request sends x-sap-* headers
-mcp-abap-adt-http --port=3000
+mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
 ```
 
 ---
@@ -161,20 +161,20 @@ start, naming the binary that serves it. Another binary's environment variables 
 
 ### `mcp-abap-adt` - stdio (`@mcp-abap-adt/core`)
 ```bash
-mcp-abap-adt [--mcp <destination>] [--env <destination>] [--env-path /path/to/.env]
+mcp-abap-adt [--mcp <destination>] [--env <destination>] [--env-path /path/to/.env] --system-type=<onprem|cloud>
 ```
 Use with MCP clients like Claude Desktop, VSCode extensions. `mcp-abap-adt-compact` takes the same
 options with the compact tool set.
 
 ### `mcp-abap-adt-http` - Streamable HTTP (`@mcp-abap-adt/http`)
 ```bash
-mcp-abap-adt-http [--port 3000] [--host 127.0.0.1]
+mcp-abap-adt-http [--port 3000] [--host 127.0.0.1] --system-type=<onprem|cloud>
 ```
 Credentials come only from each request's `x-sap-*` headers.
 
 ### `mcp-abap-adt-sse` - HTTP+SSE (`@mcp-abap-adt/sse`)
 ```bash
-mcp-abap-adt-sse [--sse-port 3001] [--sse-host 127.0.0.1]
+mcp-abap-adt-sse [--sse-port 3001] [--sse-host 127.0.0.1] --system-type=<onprem|cloud>
 ```
 Credentials come only from the `x-sap-*` headers of the `GET` that opens each SSE connection.
 
@@ -182,15 +182,15 @@ Credentials come only from the `x-sap-*` headers of the `GET` that opens each SS
 
 ### Example 1: Streamable HTTP Server on Port 8080
 ```bash
-mcp-abap-adt-http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 ```
 
 ### Example 2: SSE Server Accessible from Network
 ```bash
-mcp-abap-adt-sse --sse-host=0.0.0.0 --sse-port=3001
+mcp-abap-adt-sse --sse-host=0.0.0.0 --sse-port=3001 --system-type=<onprem|cloud>
 ```
 
 ### Example 3: Custom Environment File (stdio)
 ```bash
-mcp-abap-adt --env-path /opt/config/.env.production
+mcp-abap-adt --env-path /opt/config/.env.production --system-type=<onprem|cloud>
 ```

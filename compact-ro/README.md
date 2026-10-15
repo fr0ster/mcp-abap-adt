@@ -25,7 +25,7 @@ background-run tools — those are `mcp-abap-adt-compact`'s ([`@mcp-abap-adt/com
 
 ```bash
 npm install -g @mcp-abap-adt/compact-ro
-mcp-abap-adt-compact-ro --env-path=./mcp.env        # a .env written by mcp-auth (or --mcp=<destination>)
+mcp-abap-adt-compact-ro --env-path=./mcp.env --system-type=<onprem|cloud> # a .env written by mcp-auth (or --mcp=<destination>)
 mcp-abap-adt-compact-ro --help        # every option, from this binary's table
 mcp-abap-adt-compact-ro --version
 ```

@@ -48,7 +48,7 @@ With an installed server (a checkout is not runnable by itself — see
 [Installation — from source](../../installation/INSTALLATION.md#from-source-development)):
 
 ```bash
-npx @modelcontextprotocol/inspector mcp-abap-adt --mcp=TRIAL   # stdio, in the MCP Inspector
+npx @modelcontextprotocol/inspector mcp-abap-adt --mcp=TRIAL --system-type=cloud   # stdio, in the MCP Inspector
 ```
 
 Destinations, service keys and the browser login are served only by `mcp-abap-adt` (stdio);
@@ -88,7 +88,7 @@ To keep the stores elsewhere, name the base directory (it holds `service-keys/` 
 ```bash
 mkdir -p ~/prj/tmp/service-keys
 # put TRIAL.json in ~/prj/tmp/service-keys/
-mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/ --system-type=cloud
 ```
 
 ## Debug Mode:
@@ -96,7 +96,7 @@ mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
 To enable debug logs for auth-broker:
 
 ```bash
-DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL
+DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 ## Test Logging Switches

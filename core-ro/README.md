@@ -30,7 +30,7 @@ and waits for its answer.
 
 ```bash
 npm install -g @mcp-abap-adt/core-ro
-mcp-abap-adt-ro --env-path=./mcp.env        # a .env written by mcp-auth (or --mcp=<destination>)
+mcp-abap-adt-ro --env-path=./mcp.env --system-type=<onprem|cloud> # a .env written by mcp-auth (or --mcp=<destination>)
 mcp-abap-adt-ro --help        # every option, from this binary's table
 mcp-abap-adt-ro --version
 ```

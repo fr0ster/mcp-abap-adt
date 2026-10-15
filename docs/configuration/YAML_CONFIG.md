@@ -10,9 +10,9 @@ it (19.0.0). A binary never reads another binary's environment variables.
 
 1. **Generate a template** — the binary you will run writes its own:
    ```bash
-   mcp-abap-adt --conf=config.yaml         # stdio: the destination and login keys
-   mcp-abap-adt-http --conf=http.yaml      # Streamable HTTP: the http: keys
-   mcp-abap-adt-sse --conf=sse.yaml        # SSE: the sse: keys
+   mcp-abap-adt --conf=config.yaml --system-type=<onprem|cloud> # stdio: the destination and login keys
+   mcp-abap-adt-http --conf=http.yaml --system-type=<onprem|cloud> # Streamable HTTP: the http: keys
+   mcp-abap-adt-sse --conf=sse.yaml --system-type=<onprem|cloud> # SSE: the sse: keys
    ```
    If the file doesn't exist, the template is written there and the start ends.
 
@@ -20,7 +20,7 @@ it (19.0.0). A binary never reads another binary's environment variables.
 
 3. **Run with config:**
    ```bash
-   mcp-abap-adt --conf=config.yaml
+   mcp-abap-adt --conf=config.yaml --system-type=<onprem|cloud>
    ```
 
 ## Command-Line Override
@@ -30,7 +30,7 @@ YAML). Keep **configuration** in YAML. **Secrets and the session do not belong t
 [Configuration only](#configuration-only-no-secrets).
 
 ```bash
-mcp-abap-adt-http --conf=http.yaml --port=8080
+mcp-abap-adt-http --conf=http.yaml --port=8080 --system-type=<onprem|cloud>
 ```
 
 ## Keys of every binary

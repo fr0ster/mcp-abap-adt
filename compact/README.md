@@ -39,11 +39,11 @@ smaller install, and it is not a sandbox — code that deliberately reaches into
 
 ```bash
 npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact                    # stdio: all 27, the debugger verbs, leftover sessions, background runs
+mcp-abap-adt-compact --system-type=<onprem|cloud> # stdio: all 27, the debugger verbs, leftover sessions, background runs
 mcp-abap-adt-compact --version
 
 npm install -g @mcp-abap-adt/compact-ro
-mcp-abap-adt-compact-ro                 # the 16 that change nothing, the leftover-session list and logoff
+mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 16 that change nothing, the leftover-session list and logoff
 ```
 
 **The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 27 tools (every access, which

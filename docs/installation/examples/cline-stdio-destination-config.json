@@ -2,7 +2,7 @@
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--mcp=<destination>"],
+      "args": ["--mcp=<destination>", "--system-type=cloud"],
       "disabled": false
     }
   }

@@ -25,7 +25,7 @@ otherwise SAP ends it on its own timeout, which releases its locks: [MIGRATION-1
 
 ```bash
 npm install -g @mcp-abap-adt/sse
-mcp-abap-adt-sse --sse-port=3001
+mcp-abap-adt-sse --sse-port=3001 --system-type=onprem
 ```
 
 ## Credentials: the headers of the opening request
@@ -62,6 +62,13 @@ Beside the credential, the opening `GET` may state `x-sap-responsible`, `x-sap-m
 `x-sap-language` and the debugger's `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` (then the
 environment's `SAP_*`).
 
+The system is asked first, when the stream's connection is created (`systeminformation`, once per
+stream, by `@mcp-abap-adt/responsible-rules`): its user and system id win over
+these headers. They count only where an on-premise system gives no information — the responsible
+if stated, else the login, else the call is refused `system_user_unknown`; on ABAP Cloud no
+information is an error (`cloud_without_systeminformation` for a `404`, else
+`system_lookup_failed`). See [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#every-transport-only-lock-and-unlock-are-sent-stateful-and-an-instances-calls-run-one-at-a-time).
+
 ## Options
 
 As before 19.0.0, under the same names: `--sse-host` / `MCP_SSE_HOST`, `--sse-port` /
@@ -82,8 +89,9 @@ tool holds — and its running tools are interrupted: **nothing waits for a runn
 call never starts, and no state undo is sent (the logoff ends the held state). A running tool
 whose next step would open an ADT session of its own (a debugger start, a package lock over RFC)
 is refused before it logs on: a closed connection's instance opens no new session. Then its MCP
-server and stream are closed. Another connection's tools and instance are not touched, and a
-background run it started runs on (the process's end logs it off).
+server and stream are closed. A background run the connection started is cut with it — its
+session logged off at once with the others; it ends in the store once its request settled. Another
+connection's tools, instance and background runs are not touched.
 
 ## Shutdown
 

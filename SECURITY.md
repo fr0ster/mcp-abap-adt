@@ -119,6 +119,13 @@ logged by class where a message could quote a file. Logs still carry object
 names, URLs and state handles: treat them as internal, and do not enable the
 wire trace on a shared machine.
 
+Without `--auth-debug` no line holds a secret, and the startup summary shows one
+by its presence only (`Password: set`). `--auth-debug` (the stdio binaries, the
+command line or YAML only — no environment variable turns it on) routes the auth
+chain's lines to stderr and names each secret a refused token request carried by
+its first and last four characters: use it on your own machine only, and keep
+that stderr out of shared logs.
+
 ## Deployment checklist
 
 - **stdio:** protect the machine and the destination's files.
@@ -127,7 +134,8 @@ wire trace on a shared machine.
   - HTTPS (`--tls-cert`/`--tls-key`);
   - DNS-rebinding protection with allowlists;
   - access restricted by a firewall or an authenticating proxy;
-  - only the destinations those callers are entitled to.
+  - each caller sends its own credential in the `x-sap-*` headers: the server
+    holds no destination to share.
 - **Isolation:** a container, a dedicated OS user, and read-only key mounts are
   the deployer's choice and responsibility.
 - **Runtime files (stdio):** keep `<config dir>/runtime/` owner-only and off

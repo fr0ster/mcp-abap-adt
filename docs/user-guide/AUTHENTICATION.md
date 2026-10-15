@@ -260,9 +260,10 @@ is the login only of an `x-sap-url` basic connection, which logs on with it; a t
 no login. The process environment (`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_USERNAME`) is read
 once: a change made to it while the server runs is not picked up.
 
-A create (or a transport without an `owner`) that finds no responsible person — on an on-premise
-system without `systeminformation`, over SNC or with a token you hold, with no `SAP_RESPONSIBLE`
-anywhere — is refused by the server before any request
+In the servers a call never reaches its tool without a responsible person: an on-premise system
+without `systeminformation`, over SNC or with a token you hold, with no `SAP_RESPONSIBLE` anywhere,
+is `system_user_unknown` above. An embedder that passes no rules has no such step: there a create
+(or a transport without an `owner`) that finds no responsible person is refused before any request
 is made: the answer is `"error": "system_context_missing"` with words naming `SAP_RESPONSIBLE`, the
 `x-sap-responsible` header and the login. The servers ask the system for its user before a
 tool runs: on ABAP Cloud, when the system gives no information, the call answers `"error":
@@ -440,8 +441,8 @@ from a file), when:
 
 **Ending the waiting early.** A second `SIGTERM` / `SIGINT`, or `--shutdown-timeout=<seconds>`
 (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; no default), is the forced close: nothing more
-is waited for — not a logoff still being written, not a write —, every ADT session is still
-logged off, and the exit is `1` with `Still running at the forced close: <tool>` per tool and `Not
+is waited for — not a session write, not a flush — but each ADT session's logoff, which is still
+written (one whose write never completes keeps the process until it is killed), and the exit is `1` with `Still running at the forced close: <tool>` per tool and `Not
 finished at the forced close: <step>`. What it costs: a session write lost (a discarded refresh
 token can come back on the next start).
 

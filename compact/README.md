@@ -47,8 +47,8 @@ mcp-abap-adt-compact-ro                 # the 16 that change nothing, the leftov
 ```
 
 **The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 27 tools (every access, which
-is what a local server gives), the four debugger verbs, the leftover-session tools and the
-background-run tools — 37. `mcp-abap-adt-compact-ro` serves the 16 tools that change nothing (no
+is what a local server gives), the four debugger verbs, the leftover-session list and logoff and the
+background-run tools — 36. `mcp-abap-adt-compact-ro` serves the 16 tools that change nothing (no
 create, update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool list at
 all, so a client cannot call one) and the leftover-session list and logoff — 18. `--exposition`
 (`ro`, `rw`, `debug`, any word) and a config file's `exposition` stop the start with a sentence

@@ -239,7 +239,7 @@ Each step accumulates results in `TState`, providing full audit trail of the ope
 |:---|:---|
 | **Responsibility** | MCP protocol adapter -- translates MCP tool calls into ADT client operations |
 | **Runtime role** | Primary application entry point; one composition root per binary |
-| **Packages** | `@mcp-abap-adt/core` (`server/`, `mcp-abap-adt`: stdio), `@mcp-abap-adt/http` (`http/`, `mcp-abap-adt-http`: Streamable HTTP), `@mcp-abap-adt/sse` (`sse/`, `mcp-abap-adt-sse`: HTTP+SSE), each on `@mcp-abap-adt/lib` |
+| **Packages** | `@mcp-abap-adt/core` (`server/`, `mcp-abap-adt`: stdio), `@mcp-abap-adt/http` (`http/`, `mcp-abap-adt-http`: Streamable HTTP), `@mcp-abap-adt/sse` (`sse/`, `mcp-abap-adt-sse`: HTTP+SSE), each on `@mcp-abap-adt/lib`, `@mcp-abap-adt/background-runs-memory` and `@mcp-abap-adt/responsible-rules`; the compact and `-ro` packages are one call each of their transport's `main` with another tool set (Composition Roots below) — twelve binaries in all |
 | **Dependencies** | All packages above + `@modelcontextprotocol/sdk`, `zod`; only core depends on `@mcp-abap-adt/auth-broker` and `@mcp-abap-adt/auth-stores` |
 
 #### The three packages and their connection sources
@@ -592,7 +592,7 @@ The system has three distinct IoC boundaries:
 1. Reads configuration (CLI, YAML, env)
 2. Chooses the stores of a destination (`server/src/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
 3. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
-4. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`, on first use
+4. Assembles one `AuthBroker` for the destination via `AuthBrokerFactory`; the startup check builds the credential, and the connection is born at the start — the destination's one leftover session taken up, else a logon, and the system information asked — before the MCP transport opens; any failure exits `1`
 5. Assembles the registry of the tool set it is given (`registryOf(toolSet)`)
 6. Starts `StdioServer` with `destinationSource`
 

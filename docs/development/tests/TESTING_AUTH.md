@@ -57,7 +57,7 @@ request carrying `x-mcp-destination` with `400`.
 
 ### 3. Test via MCP Inspector or client:
 
-Call any tool: the first call connects, opening the browser login when there is no valid session.
+The server connects at its start, before the MCP transport opens: with no valid session the browser login opens then, and the Inspector lists the tools once it is done. Call any tool.
 
 ### 4. Verify that .env file was created:
 

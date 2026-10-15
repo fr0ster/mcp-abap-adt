@@ -8,8 +8,8 @@ broker's `renewal` says.
 
 ## Principles
 
-1. **One broker per destination**, built on first use and cached (a failed build is dropped, so the
-   next request tries again). Two requests to the same new destination at once build one broker.
+1. **One broker per destination**, built when it is first asked for — at the start, by the startup
+   check — and cached (a failed build is dropped, so the next request tries again). Two requests to the same new destination at once build one broker.
 2. **The provider is asked of the broker on every call** — `getProvider(destination, { signal })`,
    the caller's signal releasing that caller alone — and handed out *counted*, one wrapper per
    inner provider (a `WeakMap`): the broker answers its cached provider while the destination is
@@ -60,7 +60,9 @@ the source (`--mcp`, `destination`) and never quotes the name.
   start's own signal, aborted once the check ends; building sends nothing — so a destination
   the broker refuses stops the start, exit 1, with the error's own vetted words.
 - One server instance for the process; its source is the destination (`destinationSource`). Its
-  connection is built on the first tool call and kept for the session; the user and the
+  connection is born at the start, before the MCP transport opens (`StdioServer.connectAtStart`:
+  the destination's one leftover session taken up, else a logon, and the system information
+  asked), any failure ending the process with exit `1`, and kept for the session; the user and the
   credentials are fixed for the process, and the session is only renewed (refresh token, or a
   new login when the refresh fails) and written back — the same user.
 - With no default destination the server starts in inspection-only mode: the tool list answers, and
@@ -94,9 +96,10 @@ closed, so the callback port is free when a login ends.
 
 ## Shutdown
 
-`factory.settle(30_000, { signal })`: closes the provider gate (a call that arrives later gets the
+`factory.settle({ signal })`: closes the provider gate (a call that arrives later gets the
 shutdown refusal — auth-errors' `interactive-login` `aborted`, minted), disposes every login
-strategy it composed, waits for the calls in flight up to the deadline, then
+strategy it composed, waits for the calls in flight with no deadline (the shutdown's forced close —
+a second signal or `--shutdown-timeout` — aborts `signal`), then
 `flush({ signal })`es every broker built. A secret that could not be stored is reported as
 `"<destination>": <reason>`, the reason `classify(entry, 'persisting-tokens').reason`; the program
 then exits `1` with one stderr line, never the secret.
@@ -105,7 +108,7 @@ then exits `1` with one stderr line, never the secret.
 
 ### stdio with `--mcp=trial`
 - Default destination `trial`: `service-keys/trial.json` and `sessions/trial.env`, field by field.
-- First tool call: connect, browser login if there is no valid session.
+- At the start: connect, browser login if there is no valid session; then the MCP transport opens.
 
 ### stdio with `--env-path=./my.env`
 - Default destination `default`, read from and written back to `./my.env`.

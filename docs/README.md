@@ -18,7 +18,7 @@ Complete installation instructions for different platforms and environments.
 Documentation for end users: configuration, usage, and available tools.
 
 - `CLIENT_CONFIGURATION.md` - How to configure MCP clients to connect to the server
-- `AUTHENTICATION.md` - The four supported authentications, destinations, service key locations, and header-based auth
+- `AUTHENTICATION.md` - The three stdio authentications, destinations, service key locations, the HTTP/SSE headers, and what a client sees when a call fails
 - Configurator (auto-config): `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
@@ -60,6 +60,7 @@ Documentation for developers: testing, development guides, and internal document
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Authentication**: [Destinations & Auth](user-guide/AUTHENTICATION.md)
 - **Installation variants** (full or compact; HTTP, RFC or SNC): [Installation Guide](installation/INSTALLATION.md#installation-variants) | [RFC Setup](installation/RFC_SETUP.md)
+- **Upgrading from 18.x**: [Migration to 19.0](MIGRATION-19.0.md)
 - **Upgrading from 17.x**: [Migration to 18.0](MIGRATION-18.0.md)
 - **Upgrading from 16.x**: [Migration to 17.0](MIGRATION-17.0.md)
 - **Upgrading from 15.x**: [Migration to 16.0](MIGRATION-16.0.md)

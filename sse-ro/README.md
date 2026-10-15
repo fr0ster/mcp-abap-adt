@@ -33,7 +33,7 @@ otherwise SAP ends it on its own timeout, which releases its locks: [MIGRATION-1
 
 ```bash
 npm install -g @mcp-abap-adt/sse-ro
-mcp-abap-adt-sse-ro --sse-host=127.0.0.1 --sse-port=3001
+mcp-abap-adt-sse-ro --sse-host=127.0.0.1 --sse-port=3001 --system-type=onprem
 mcp-abap-adt-sse-ro --help        # every option, from this binary's table
 mcp-abap-adt-sse-ro --version
 ```

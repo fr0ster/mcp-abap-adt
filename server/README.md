@@ -6,9 +6,16 @@ browser login — and the launcher.
 
 ```bash
 npm install -g @mcp-abap-adt/core
-mcp-abap-adt --mcp=TRIAL                 # a destination from the service-keys folder
-mcp-abap-adt --env-path=./mcp.env        # a .env written by mcp-auth
+mcp-abap-adt --mcp=TRIAL --system-type=cloud   # a destination from the service-keys folder
+mcp-abap-adt --env-path=./mcp.env              # a .env written by mcp-auth, SAP_SYSTEM_TYPE in it
 ```
+
+**The system type is required (19.0.0)** — `--system-type`, `SAP_SYSTEM_TYPE` (the environment or
+the `--env` file) or YAML `system-type`: `onprem`, `cloud` or `legacy`; a destination does not
+start without it. **The server connects at its start**, before the MCP transport opens — the
+browser login included, and the destination's one leftover session of a killed process taken
+up —; any failure ends it with exit `1`. Coming from 18.x:
+[MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md).
 
 Streamable HTTP and HTTP+SSE are packages of their own, serving credentials from each request's
 `x-sap-*` headers: [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)

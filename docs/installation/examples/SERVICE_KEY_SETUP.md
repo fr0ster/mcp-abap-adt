@@ -42,14 +42,19 @@ Service keys, sessions and the browser login are served only over stdio: `mcp-ab
 
 ```bash
 # Installed (npm install -g @mcp-abap-adt/core; the compact server: mcp-abap-adt-compact)
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Or without installing
-npx -y @mcp-abap-adt/core --mcp=TRIAL
+npx -y @mcp-abap-adt/core --mcp=TRIAL --system-type=cloud
 
 # With custom path for service keys and sessions
-mcp-abap-adt --mcp=TRIAL --auth-broker-path=/path/to/dir/
+mcp-abap-adt --mcp=TRIAL --system-type=cloud --auth-broker-path=/path/to/dir/
 ```
+
+**The system type is required** (19.0.0): `--system-type=cloud` for an ABAP Cloud system,
+`onprem` for an on-premise one (an XSUAA key may point at either), or `SAP_SYSTEM_TYPE` in the
+environment, or YAML `system-type`. A named destination's files are not read for it; without it
+the server does not start.
 
 **What `--mcp=TRIAL` does:**
 - The destination is read field by field from `sessions/TRIAL.env` (wins) and `service-keys/TRIAL.json`
@@ -70,7 +75,7 @@ A stdio client starts the server itself — no separate server, no URL:
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--mcp=TRIAL"],
+      "args": ["--mcp=TRIAL", "--system-type=cloud"],
       "disabled": false
     }
   }
@@ -80,17 +85,20 @@ A stdio client starts the server itself — no separate server, no URL:
 The destination name must **exactly** match the service key filename without `.json` (**case-sensitive**) and may use only letters, digits, `_`, `.` and `-`.
 
 **Examples:**
-- File: `sk.json` → Header: `"sk"` (lowercase)
-- File: `SK.json` → Header: `"SK"` (uppercase)
-- File: `TRIAL.json` → Header: `"TRIAL"`
+- File: `sk.json` → `--mcp=sk` (lowercase)
+- File: `SK.json` → `--mcp=SK` (uppercase)
+- File: `TRIAL.json` → `--mcp=TRIAL`
 
 ### Step 4: First-Time Authentication
 
-When you make the first request:
+The server connects at its start, before the client sees its tools:
 1. The server reads the destination
 2. The browser opens for the login; the server waits for the redirect on port `61001` (`--browser-auth-port` changes it)
 3. The token is stored: in memory, or in `~/.config/mcp-abap-adt/sessions/TRIAL.env` with `--unsafe`
-4. Subsequent requests use the stored token, and the server renews it
+4. Tool calls use the stored token, and the server renews it
+
+A failure at the start — the login refused, the system unreachable — ends the process (exit `1`,
+the words on stderr): start it again.
 
 ## Troubleshooting
 
@@ -105,7 +113,7 @@ When you make the first request:
 
 ### Error: `Destination "TRIAL" uses <type> / <grant>, which this server does not support`
 
-**Cause**: The destination states an authentication outside the four the server supports (basic, SNC, `jwt` / `authorization_code`, `jwt` / `none`).
+**Cause**: The destination states an authentication outside the three `mcp-abap-adt` (stdio) supports (basic, SNC, `jwt` / `authorization_code`). A token you hold (`jwt` / `none`) is refused with the hint to send it in the `x-sap-jwt-token` header to `mcp-abap-adt-http` / `mcp-abap-adt-sse`, or to create the session with `mcp-auth`.
 
 ### Error: the key is not found
 
@@ -139,12 +147,12 @@ Run one server per destination, each started by the client:
   "mcpServers": {
     "mcp-abap-dev": {
       "command": "mcp-abap-adt",
-      "args": ["--mcp=DEV"],
+      "args": ["--mcp=DEV", "--system-type=cloud"],
       "disabled": false
     },
     "mcp-abap-prod": {
       "command": "mcp-abap-adt",
-      "args": ["--mcp=PROD"],
+      "args": ["--mcp=PROD", "--system-type=cloud"],
       "disabled": false
     }
   }

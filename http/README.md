@@ -7,7 +7,7 @@ Express app, with DNS rebinding protection and optional TLS. Licensed AGPL-3.0-o
 
 ```bash
 npm install -g @mcp-abap-adt/http
-mcp-abap-adt-http --port=3000
+mcp-abap-adt-http --port=3000 --system-type=onprem
 ```
 
 **The binary fixes the tool set (19.0.0).** `mcp-abap-adt-http` serves readonly (with system and search),
@@ -56,6 +56,13 @@ Per request, beside the credential: `x-sap-responsible`, `x-sap-master-system`, 
 and the debugger's `x-sap-debug-terminal-id` / `x-sap-debug-ide-id` (then `SAP_RESPONSIBLE`,
 `SAP_MASTER_SYSTEM`, `SAP_DEBUG_TERMINAL_ID`, `SAP_DEBUG_IDE_ID` of the environment). With
 `x-sap-login`, the login is the responsible when none is stated.
+
+The system is asked first, when the instance's connection is created (`systeminformation`, by
+`@mcp-abap-adt/responsible-rules`; each request's credential is its own destination): its user and system id win over
+these headers. They count only where an on-premise system gives no information — the responsible
+if stated, else the login, else the call is refused `system_user_unknown`; on ABAP Cloud no
+information is an error (`cloud_without_systeminformation` for a `404`, else
+`system_lookup_failed`). See [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#every-transport-only-lock-and-unlock-are-sent-stateful-and-an-instances-calls-run-one-at-a-time).
 
 ## Options
 

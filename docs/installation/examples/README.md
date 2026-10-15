@@ -47,7 +47,9 @@ With one `.env` file:
 ```
 
 With a named destination (`service-keys/<destination>.json` and `sessions/<destination>.env`, see
-[SERVICE_KEY_SETUP.md](SERVICE_KEY_SETUP.md)): replace the `--env-path` argument with `--mcp=<destination>`.
+[SERVICE_KEY_SETUP.md](SERVICE_KEY_SETUP.md)): replace the `--env-path` argument with `--mcp=<destination>`
+and state the system type beside it, `--system-type=<onprem|cloud>` — required since 19.0.0, and a
+named destination's session `.env` is not read for it (`cline-stdio-destination-config.json`).
 Without a global install, use `"command": "npx"` and put `"-y", "@mcp-abap-adt/core"` before the
 other arguments.
 
@@ -116,6 +118,7 @@ SAP_CONNECTION_TYPE=rfc
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME=p:CN=<system>, O=<org>, C=<country>
 SAP_RESPONSIBLE=<your ABAP user>
+SAP_SYSTEM_TYPE=onprem
 ```
 
 For RFC with a user and password, use `SAP_AUTH_TYPE=basic` with `SAP_USERNAME` and `SAP_PASSWORD`
@@ -150,19 +153,22 @@ such as `NODE_EXTRA_CA_CERTS` belong in that terminal's environment):
 
 ```bash
 # Streamable HTTP (@mcp-abap-adt/http): http://localhost:3000/mcp/stream/http
-mcp-abap-adt-http --port=3000
+mcp-abap-adt-http --port=3000 --system-type=onprem
 
 # SSE (@mcp-abap-adt/sse): http://localhost:3001/sse
-mcp-abap-adt-sse --sse-port=3001
+mcp-abap-adt-sse --sse-port=3001 --system-type=onprem
 ```
+
+The system type (`onprem`, `cloud` or `legacy`) is the process's parameter — `--system-type`,
+`SAP_SYSTEM_TYPE` or YAML `system-type`; no header states it, and without it neither binary starts.
 
 Neither takes a destination: each request (Streamable HTTP), or the `GET` that opens each SSE
 connection, carries its credential in `x-sap-*` headers. Then use `cline-http-config.json` or
 `cline-sse-config.json`. A request carrying `x-mcp-destination` is answered `400`: destinations, service
 keys and the browser login are served only by `mcp-abap-adt` (stdio).
 
-**First-time authentication** of a service-key destination (`mcp-abap-adt --mcp=<destination>`, stdio): the browser opens for the login (callback
-port `61001`). The token is kept in memory, or saved to `sessions/<destination>.env` with `--unsafe`.
+**First-time authentication** of a service-key destination (`mcp-abap-adt --mcp=<destination>`, stdio): the browser opens for the login at the
+server's start, before the client sees its tools (callback port `61001`). The token is kept in memory, or saved to `sessions/<destination>.env` with `--unsafe`.
 
 ## More Info
 

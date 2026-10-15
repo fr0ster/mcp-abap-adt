@@ -50,9 +50,9 @@ Values that belong to one request, such as the master language of created object
 
 1. **Session Creation**: stdio starts, a client opens an SSE connection, or an HTTP request arrives: a server instance is created (or, for HTTP, the pooled one a `state_handle` names is taken)
 2. **Source**: the destination (stdio) or the headers (http, sse) become the instance's `ConnectionSource`
-3. **Connection Creation**: stdio's launcher builds and connects the connector at the start, before the transport opens (`connectAtStart`); http, sse and an embedder's instance at the first tool call, which resolves the source and builds and connects it
+3. **Connection Creation**: stdio's launcher builds and connects the connector at the start, before the transport opens (`connectAtStart`), any failure ending the process with exit `1`; http, sse and an embedder's instance at the first tool call, which resolves the source and builds and connects it. With the connection the server makes its parameters — the responsible, the user, the system — by `@mcp-abap-adt/responsible-rules` (the servers; an embedder only when it passes the rules), once per destination
 4. **Renewal**: a `401` is put to the credential (`rejected`); a renewed token gets the request one more attempt. A header credential is fixed: nothing renews it
-5. **Shutdown**: on `SIGTERM`/`SIGINT` the transport stops accepting; core's factory waits for provider calls in flight and flushes its broker
+5. **The end**: on `SIGTERM`/`SIGINT` — and on stdio's stdin closing or an SSE stream closing, for that instance — every ADT session is logged off at once and the running tools interrupted, with no wait for a tool; core's factory then waits for provider calls in flight and flushes its broker. Over Streamable HTTP a dropped request closes nothing: the instance ends after its work, or at its state's stop or the idle bound
 
 ### The stateful window and the main flow
 
@@ -65,7 +65,8 @@ answered. The server sets no tool's session stateful (`tools/stateful-sites.json
 work on its connection run strictly one after another, whatever the client sends at
 once — the server enforces it. The shared connections are stdio's kept one and an SSE
 connection's; Streamable HTTP builds one per request. Every send on the instance's
-connection is inside the order (identity lookups included); a background run, a listed
+connection is inside the order; the system lookup (`systeminformation`, once per destination)
+comes with the connection, when it is created, before any tool can use it; a background run, a listed
 long read and the debugger tools that work on the debugger's own connections are
 outside it. A long call on the main connection holds the flow; `background: true` or a
 tool on its own connection does not. Once in the flow, a queued call checks its

@@ -116,8 +116,9 @@ npm run docker:down
 docker compose -f docker/docker-compose.yml run --rm -T core --mcp=<destination>
 ```
 
-The Streamable HTTP services publish `3000`, the SSE services `3001`, so one of each can run at a
-time on those ports.
+The Streamable HTTP services publish `3000`, the SSE services `3001`, on the host's loopback only
+(`127.0.0.1:3000`, `127.0.0.1:3001`), so one of each can run at a time on those ports. To reach one
+from another machine, put TLS in front of it or change the mapping in your own compose file.
 
 **A version:** `MCP_ABAP_ADT_VERSION=<version>` in `docker/.env` (see `docker/.env.example`), or
 `docker build --build-arg MCP_ABAP_ADT_VERSION=<version> …`. It is the version of the variant's own

@@ -227,8 +227,9 @@ sessions; over Streamable HTTP a client that drops its request closes nothing.
 
 `--shutdown-timeout=<seconds>` (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`; a whole number
 from 1 to 86400, **no default**) ends the waiting after that long, and so does a second `SIGTERM`
-/ `SIGINT`: the forced close. Nothing more is waited for — not a logoff still being written, not
-a session write —, every ADT session is still logged off, and the exit is `1`, naming each tool
+/ `SIGINT`: the forced close. Nothing more is waited for — not a session write, not a flush —
+but each ADT session's logoff, which is still written (a logoff whose write never completes, a
+system that never takes the bytes, keeps the process until it is killed), and the exit is `1`, naming each tool
 still running (`Still running at the forced close: <tool>`) and the step cut short.
 **What it costs**: a session write lost — a refresh token the token endpoint refused can come back
 on the next start. Set it against the time your supervisor waits before it kills the process (a

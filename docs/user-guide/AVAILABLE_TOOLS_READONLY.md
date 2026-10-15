@@ -1086,4 +1086,4 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 ---
 
-*Last updated: 2026-10-14*
+*Last updated: 2026-10-15*

@@ -27,7 +27,7 @@ otherwise SAP ends it on its own timeout, which releases its locks: [MIGRATION-1
 
 ```bash
 npm install -g @mcp-abap-adt/compact-http-ro
-mcp-abap-adt-compact-http-ro --host=127.0.0.1 --port=3000
+mcp-abap-adt-compact-http-ro --host=127.0.0.1 --port=3000 --system-type=onprem
 mcp-abap-adt-compact-http-ro --help        # every option, from this binary's table
 mcp-abap-adt-compact-http-ro --version
 ```

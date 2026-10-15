@@ -90,16 +90,15 @@ export const TOOL_DEFINITION = {
 
 **How filtering works:**
 
-At server startup, `BaseMcpServer.registerHandlers()` determines the current environment and skips tools that don't match:
+At registration, `BaseMcpServer.registerHandlers()` reads the stated system type and skips tools that don't match:
 
 ```typescript
-const currentEnv = systemCtx.isLegacy
-  ? 'legacy'
-  : authType === 'jwt' ? 'cloud' : 'onprem';
+// The kind is stated, never guessed: the server's `systemType` option, else SAP_SYSTEM_TYPE.
+const currentEnv = statedEnvironment(this.systemType ?? process.env.SAP_SYSTEM_TYPE);
 
 // For each tool:
 const availableIn = entry.toolDefinition.available_in;
-if (availableIn?.length > 0 && !availableIn.includes(currentEnv)) {
+if (availableIn?.length > 0 && currentEnv !== undefined && !availableIn.includes(currentEnv)) {
   // Tool is not registered — hidden from the client
   continue;
 }
@@ -108,7 +107,7 @@ if (availableIn?.length > 0 && !availableIn.includes(currentEnv)) {
 **Rules:**
 - If `available_in` is omitted or empty, the tool is registered everywhere (backward compatibility)
 - Tools are filtered at registration time — clients never see unsupported tools
-- Environment detection: `isLegacy` flag → `'legacy'`, JWT auth → `'cloud'`, otherwise → `'onprem'`
+- The environment is the stated system type (`--system-type`, `SAP_SYSTEM_TYPE`, YAML `system-type`, or an embedder's `systemType`): `onprem`, `cloud` or `legacy`. It is never guessed from the credential or the URL (19.0.0: a `jwt` destination is no longer taken for `cloud`). With none stated — stdio's inspection-only mode, an embedder that states none — nothing is filtered; every binary that connects requires it at start
 
 **Common patterns:**
 

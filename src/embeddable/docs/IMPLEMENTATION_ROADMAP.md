@@ -1,5 +1,11 @@
 # MCP Server v2 Implementation Roadmap
 
+> **Historical.** This roadmap records how the v2 server was planned; it is not maintained and does
+> not describe the code. Since 19.0.0 there is no `--transport` (each binary is its transport —
+> `mcp-abap-adt`, `-http`, `-sse` and their compact and `-ro` siblings), no `ArgumentsParser` (each
+> binary reads its own parameter table) and no `--exposition`. What is built: [ARCHITECTURE.md](ARCHITECTURE.md)
+> and [MIGRATION-19.0](../../../docs/MIGRATION-19.0.md).
+
 ## Overview
 
 This roadmap outlines the step-by-step implementation plan for the new MCP server architecture with Dependency Injection, modular design, and support for both LOCAL and REMOTE modes.

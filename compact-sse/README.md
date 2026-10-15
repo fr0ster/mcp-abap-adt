@@ -17,7 +17,7 @@ transport `@mcp-abap-adt/compact-http`. It does not depend on
 
 ```bash
 npm install -g @mcp-abap-adt/compact-sse
-mcp-abap-adt-compact-sse --sse-host=127.0.0.1 --sse-port=3001    # all 27, the debugger verbs, background runs
+mcp-abap-adt-compact-sse --sse-host=127.0.0.1 --sse-port=3001 --system-type=onprem # all 27, the debugger verbs, background runs
 mcp-abap-adt-compact-sse --help                     # every option, from this binary's table
 ```
 

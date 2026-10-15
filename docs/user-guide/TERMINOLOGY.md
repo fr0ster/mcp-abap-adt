@@ -17,7 +17,7 @@ A JSON file downloaded from SAP BTP. The file name becomes the destination name.
 
 ## Auth Broker
 
-The component (`@mcp-abap-adt/auth-broker` 4) that builds the credential a destination states, keeps its token current and stores it. The server creates one per destination, on first use.
+The component (`@mcp-abap-adt/auth-broker` 5) that builds the credential a destination states, keeps its token current and stores it. `mcp-abap-adt` (stdio) creates one for its destination at the start, and connects then, before the MCP transport opens. The HTTP and SSE binaries have none: the credential is the request's headers.
 
 ## Session
 
@@ -29,11 +29,11 @@ Secure Network Communications: passwordless logon over RFC with the credential o
 
 ## Transport
 
-The protocol used between MCP client and server:
+The protocol used between MCP client and server. Each binary is its transport (there is no `--transport` option):
 
-- `stdio` — local process stdio
-- `http` / `streamableHttp` — HTTP POST JSON endpoint
-- `sse` — server-sent events + POST messages
+- stdio — local process stdio: `mcp-abap-adt`, `mcp-abap-adt-ro`, `mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`
+- Streamable HTTP — HTTP POST JSON endpoint: `mcp-abap-adt-http` and its `-ro` and compact siblings
+- SSE — server-sent events + POST messages: `mcp-abap-adt-sse` and its `-ro` and compact siblings
 
 ## Headers vs .env
 

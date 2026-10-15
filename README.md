@@ -85,16 +85,21 @@ Standard service key paths:
 A `jwt` `.env` must state `SAP_GRANT_TYPE`. The `mcp-auth` command that writes such a `.env` comes from
 `@mcp-abap-adt/auth-broker-cli`. The browser login listens on port `61001` unless `--browser-auth-port` says otherwise.
 
-A created object always carries its responsible person: the first stated of the tool's own argument,
-the `x-sap-responsible` header, `SAP_RESPONSIBLE` in the destination's own `.env`, then in the process
-environment — else the login: on-premise the destination's `SAP_USERNAME`, the `x-sap-login` of an
-`x-sap-url` connection, the process `SAP_USERNAME`; on a cloud system only the system's user. A create
-that finds none (SNC, a token you hold) is refused naming `SAP_RESPONSIBLE`; nothing is sent — a message class included, from 17.0.0. The master system
-comes from `x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, then process) — no tool
-takes it as an argument — else from a cloud system itself; otherwise it is left out and the system
-applies itself — never refused. Reads are unaffected. The process environment is read once: a change
-made to it while the server runs is not picked up. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, and a debugger start needs at least one breakpoint. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
+A created object always carries its responsible person and, where known, its master system. The
+servers name them once per destination — its credentials and its ABAP system — when its connection
+is created, by the rules of `@mcp-abap-adt/responsible-rules`: the system's `systeminformation`
+answer (its user, its system id) wins, on-premise and on ABAP Cloud alike; a tool argument that
+names the value (a transport's `owner`, say) still states it for that call. When the system gives
+no information, ABAP Cloud is an error (`cloud_without_systeminformation` for a `404`, else
+`system_lookup_failed`); on-premise the responsible is `SAP_RESPONSIBLE` / `x-sap-responsible` if
+stated, else the login (`SAP_USERNAME`, `x-sap-login`), and the master system
+`SAP_MASTER_SYSTEM` / `x-sap-master-system` when stated; with no user at all the call is refused
+`system_user_unknown`, and a stdio start ends with exit `1`. A `401` is answered as it came. The
+library applies no rules unless an embedder passes them. See
+[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
+Coming from 18.x? See the [19.0 migration note](docs/MIGRATION-19.0.md) — the server split into a
+package per transport and tool set, the system type required, the low set gone, the auth chain on
+6.0. Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, and a debugger start needs at least one breakpoint. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
@@ -119,7 +124,7 @@ the obligations of a server that service never runs.
 | [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 16 compact tools that change nothing and, on stdio, the leftover-session list and logoff. |
 | [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes (`compact-readonly-entries` was `compact-readonly` before 19.0.0). |
 
-Sixteen packages, twelve binaries: four kinds of binary — core, core-ro, compact, compact-ro — on
+Seventeen packages, twelve binaries: four kinds of binary — core, core-ro, compact, compact-ro — on
 each transport. **The binary fixes the tool set** (19.0.0; there is no `--exposition`): install the
 one for your transport and the tools you want to run a server — `@mcp-abap-adt/core`, `http` or
 `sse` (readonly, high, the debugger), their `-ro` packages (the readonly tools alone), `compact`,
@@ -276,6 +281,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-19.0.md](docs/MIGRATION-19.0.md)** - A package per transport and tool set (seventeen packages, twelve binaries), the system type required, the low set gone, the auth chain on 6.0, logoff at every session end
 - **[docs/MIGRATION-18.0.md](docs/MIGRATION-18.0.md)** - The debugger on adt-clients 29: what an embedder of lib/debugger changes; a start needs a breakpoint
 - **[docs/MIGRATION-17.0.md](docs/MIGRATION-17.0.md)** - The HTTPS certificate is verified; a message class needs a responsible
 - **[docs/MIGRATION-16.0.md](docs/MIGRATION-16.0.md)** - Authentication on auth-broker 4: four authentications, destinations

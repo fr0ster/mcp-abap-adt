@@ -50,7 +50,7 @@ the create/update prompt), `--auth-broker-path=<dir>`, `--browser-auth-port=<por
 ## MCP CRUD Smoke Runner
 
 **`mcp-crud-smoke.js`** — a real MCP client that runs `CreateProgram -> GetProgram -> UpdateProgram
--> GetProgram -> DeleteProgramLow` against a running server, from the YAML cases in
+-> GetProgram -> DeleteProgram` against a running server, from the YAML cases in
 `tests/test-config.yaml` (`create_program.test_cases`).
 
 ```bash

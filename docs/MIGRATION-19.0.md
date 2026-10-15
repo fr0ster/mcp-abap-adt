@@ -560,6 +560,39 @@ design. Send a long run to the background where the tool offers it.
 - Every site that turns a session type is listed in `tools/stateful-sites.json`.
 
 
+## Every transport: a tool's failure is the method's error as it is, plus the step
+
+A tool that fails answers the error its ADT method returned **as it is** — the words the method's
+reading gave it, its `origin`, SAP's `status`, `adt_type`, the T100 `messages`, SAP's document in
+`raw_body` and the `request` — plus **`step`**: where a tool of several steps was when it arose
+(`lock`, `update`, `update metadata`, `check`, `activate`, `read`, `delete check`, `delete`, …; a
+single-call tool adds none). What a failed step left behind rides beside it as `cleanup`. 18.x
+rebuilt the error from its message in several tools (the debugger's, the version tool,
+`GetIncludesList`, `GetWhereUsed`, `GetPackageTree`, …); none does now. A client that parsed those
+texts reads the fields instead. See
+[A tool failure](user-guide/AUTHENTICATION.md#a-tool-failure-the-methods-error-as-it-is-plus-the-step).
+
+- **SAP's refusal and a method's own failure are told apart.** A throw in the client, a reading or
+  the tool itself (a document it could not parse, a defect) answers `error: "client_threw"` with
+  the thrown message and the step, and no `origin`: it is never presented as SAP's answer. A tool
+  that waits a bounded number of polls for SAP (a unit-test include's activation run: 6) and gives
+  up says so as its own failure.
+- **A refusal is no longer turned into nothing.** `GetPackageContents`' walk, `GetEnhancements`,
+  `SearchSource`, `DescribeByList` and `GetAbapSystemSymbols` answered a SAP refusal as an empty
+  result, `null` or "not found"; they answer the refusal now. Only a `404` where a tool defines what
+  absence answers (a source or a package level that is not there) stays absence.
+- **Several failures in one answer, each with its step.** A tool reading a list of items
+  (`SearchSource`, `DescribeByList`, `GetAbapSystemSymbols`) carries each item's failure beside the
+  other items' results and reads on; `GetStructuresList` answers both endpoints' failures
+  (`read structure`, `read table`) when neither has the name, and lists the append candidates SAP
+  refused to read (`append_candidates_unread`); `GetEnhancements` with `include_nested` lists the
+  includes whose request SAP refused (`includes_unread`); a debugger stop's cleanup failures are
+  entries in the same shape, not text.
+- **A credential failure ends the call, as it came.** A `401` inside a tool — in a batch too — ends
+  the whole call with the connection's own words and hint, never replaced and never collected per
+  item: the credential is the same for every item. A `403` with SAP's exception document is an ADT
+  error, never `authentication_failed`.
+
 ## BREAKING — embedders: no rules by default
 
 The rules that name a call's responsible, user and system (above) are the servers', not the
@@ -614,6 +647,7 @@ What changed in the public surface:
   `HandlerContext` has `systemContextResolver?` and `systemContextRules?`.
 - `SYSTEM_TYPE_ROW` and `listenerSystemTypeRequiredWords` left `@mcp-abap-adt/lib/config` for
   `@mcp-abap-adt/responsible-rules`.
+
 ## The low set leaves the full binaries
 
 **`mcp-abap-adt`, `mcp-abap-adt-http` and `mcp-abap-adt-sse` serve no low set.**
@@ -866,8 +900,9 @@ first; a function module, service definition or service binding activates throug
   connection, the debugger's, a long read's own — is logged off **at once**, without waiting for a
   tool and without a state undo (the logoff ends the held state); then the instance is disposed and
   its stream closed. A `POST` for a closing connection reaches no tool. A connection that closes, or
-  fails, while it is being set up is disposed too (18.x left it). A background run is not the
-  connection's: it runs on, and the process's end logs it off.
+  fails, while it is being set up is disposed too (18.x left it). A background run the stream
+  started is cut with it — its session logged off at once with the others (see "background runs"
+  above); a run another stream started is untouched.
 - **Shutdown logs off at once**, as for HTTP: every open connection's sessions logged off, its
   tools interrupted, exit `0`; `--shutdown-timeout` and a second signal matter only while a logoff
   is still being written.
@@ -894,7 +929,7 @@ transport's options only:
   write binary. The sections above apply to each as to its counterpart; only the tool list differs.
 - **The binary fixes the tool list** (see "`--exposition` is gone" above): `mcp-abap-adt-compact`
   serves the 27 tools, the four debugger verbs (`HandlerDebugStart`, `…Wait`, `…View`, `…Step`),
-  the three background-run tools and the three leftover-session tools — 37 (`-compact-http` and
+  the three background-run tools and the two leftover-session tools (list, logoff) — 36 (`-compact-http` and
   `-compact-sse` the same without the leftover-session tools — 34); `mcp-abap-adt-compact-ro` the 16
   that change nothing and the leftover-session list and logoff — 18 (`-compact-http-ro` and
   `-compact-sse-ro` the 16 alone). `--exposition`, with `ro`, `rw`, `debug` or any word,
@@ -1023,7 +1058,8 @@ transport's options only:
   from 1 to 86400, no default): a login still waiting then ends `aborted`, answered with "The
   login was ended by the server's login timeout (`--login-timeout=<n>`)." (the bound named in the
   form you set it).
-- **`--auth-debug`** (YAML `auth-debug`; **no environment form**) is new, in `mcp-abap-adt` only: it
+- **`--auth-debug`** (YAML `auth-debug`; **no environment form**) is new, in the stdio binaries only
+  (`mcp-abap-adt`, and the compact and `-ro` stdio binaries, which take its options): it
   builds the brokers with `authDebug: true`, routes the broker's and the token providers' lines to
   stderr, and a refused token request's line then names each secret's first and last four
   characters; one warning line at start says so. No `DEBUG_*` variable or `MCP_AUTH_DEBUG` turns
@@ -1088,15 +1124,18 @@ build argument `VARIANT` (the package's name without its scope), installing that
 - **Every image needs the system type**: `-e SAP_SYSTEM_TYPE=onprem|cloud|legacy` (or
   `--system-type`); no image sets one (see "the system type is required" above).
 - **Compose:** `docker/docker-compose.yml` has one service per variant, each in a profile of its own
-  name — `docker compose -f docker/docker-compose.yml up -d http`; a bare `up` starts nothing.
+  name — `docker compose -f docker/docker-compose.yml up -d http`; a bare `up` starts nothing. The
+  listener services publish their port on the host's loopback only (`127.0.0.1:3000`,
+  `127.0.0.1:3001`; 18.x published `3000` on every interface).
   `docker-compose.headerless.yml` and the `docker:*:headerless` scripts are gone: the `http` service
   is what it ran. `npm run docker:build` / `docker:up` / `docker:logs` take the service after `--`.
 - The images are still not published anywhere: build the one you need. See
   [DOCKER.md](deployment/DOCKER.md).
-- **The MCP Registry** lists every binary: eight new entries for the Streamable HTTP and SSE
-  packages (`io.github.fr0ster/mcp-abap-adt-http`, `…-compact-http`, `…-http-ro`,
-  `…-compact-http-ro`, `…-sse`, `…-compact-sse`, `…-sse-ro`, `…-compact-sse-ro`) beside the four
-  stdio ones; `@mcp-abap-adt/http`, `sse`, `http-ro` and `sse-ro` now carry an `mcpName`.
+- **The MCP Registry** lists every binary — twelve entries, one per server package: beside the two
+  of 18.x (`io.github.fr0ster/mcp-abap-adt`, `…-compact`), ten new ones — the stdio `…-ro` and
+  `…-compact-ro`, and the Streamable HTTP and SSE packages (`…-http`, `…-compact-http`,
+  `…-http-ro`, `…-compact-http-ro`, `…-sse`, `…-compact-sse`, `…-sse-ro`, `…-compact-sse-ro`);
+  each new package carries its `mcpName`.
 
 ## Embedders
 
@@ -1113,6 +1152,25 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `createConnection({ system, transport, … })`. Neither library sets a deadline of its own any
   more (see connection's `docs/MIGRATION-17.0.md`): a request carries the `timeout` you pass and
   nothing else, and inside a critical section none at all.
+- **`AbapConnection` answers `unknown` by default.** The connection you pass
+  (`EmbeddableMcpServer`'s `connection`, typed as `@mcp-abap-adt/connection`'s `AbapConnection`) is on
+  interfaces-adt-connection 3, whose `makeAdtRequest<T = unknown, D = unknown>` no longer answers
+  `any`: reading a field off an answer whose type you did not name stops compiling. Name the type
+  (`makeAdtRequest<string>(…)`, `IAdtWireResponse<T>`) or narrow `unknown` before reading it; a
+  stub of `makeAdtRequest` is declared generic (connection's `docs/MIGRATION-15.0.md`).
+- **The chain's own migrations.** From 18.x the chain moved several majors at once; each package's
+  note says what a consumer of it changes:
+  - `@mcp-abap-adt/connection` 11 → 17.1: `docs/MIGRATION-12.0.md` (the authentication error
+    contract), `-13.0` (interfaces-auth 7, auth-errors 2, auth-providers 6), `-14.0` (the bundled
+    `sap-abap-auth` command gone), `-15.0` (the `unknown` default above), `-16.0` (one instance is
+    one SAP session; `disconnect()` resolves once the logoff is written; `createConnection`),
+    `-17.0` (no deadline but the caller's; an instance built on an existing session);
+  - `@mcp-abap-adt/auth-providers` 5 → 6, `@mcp-abap-adt/auth-broker` 4 → 5,
+    `@mcp-abap-adt/auth-stores` 3 → 5, `@mcp-abap-adt/interfaces-auth` 3 → 7 and
+    `@mcp-abap-adt/auth-errors` 2 (new): every failure of the chain is an `AuthProviderFailure`
+    carrying a minted `IAuthProviderError` — read it with `failureOf` (below) or auth-errors'
+    `readFailure`, never by `instanceof` or its message; the session store reads only its own
+    record format (see "stdio users"). Their CHANGELOGs list the rest.
 - **`makeAdtRequestWithTimeout`, `getTimeout` and `getTimeoutConfig` are gone from
   `@mcp-abap-adt/lib/utils`.** The last two were connection's, re-exported, and connection 17 no
   longer has them; `makeAdtRequestWithTimeout` turned a name (`'default'`, `'csrf'`, `'long'`) into
@@ -1229,7 +1287,7 @@ build argument `VARIANT` (the package's name without its scope), installing that
   takes `leftoverSessions?: LeftoverSessions` (`@mcp-abap-adt/lib/embeddable`): one per process,
   created by you — `new LeftoverSessions({ directory: runtimeDirectory() })` — and handed to every
   instance; no module global. With it, each HTTP connection an instance builds and holds a session
-  on keeps a runtime file until its logoff is written, and the three leftover-session tools work —
+  on keeps a runtime file until its logoff is written, and the two leftover-session tools work —
   when the instance also serves a destination: `ConnectionContext.destination` (new, optional), who
   its leftover sessions belong to; `StdioServer` sets it to the destination it serves. Without the
   owner or the destination they answer `leftover_sessions_unavailable` and no file is kept, as on an

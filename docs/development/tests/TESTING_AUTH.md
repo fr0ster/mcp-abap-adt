@@ -105,3 +105,23 @@ DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL --system-type=cloud
 - `TEST_LOG_FILE=/tmp/adt-tests.log` — optional file sink for test logs (best-effort).
 - `TEST_LOG_SILENT=true` — disable test logging pipeline entirely.
 - `TEST_LOG_COLOR=true` — enable colored/prefixed tags in stdout.
+
+## Live measurements of 19.0.0 (2026-10-15)
+
+Run against an on-premise system (BASIS 816) and an SAP BTP ABAP trial system, with the release's own packages packed
+from the branch and installed outside the repository. Linux, Node.js 26.7.0, unless stated; SNC on Windows.
+
+| What | How | Result |
+|---|---|---|
+| stdio, trial, a session file | `--env=<name>` (resolves `sessions/<name>.env`), `--system-type=cloud`, `--browser=none` | Started without a login; a read answered; a second start reused the session file unchanged. |
+| stdio, trial, a browser login | `--mcp=<name>`, `--system-type=cloud`, `--browser=system` | Logged in (the browser's SSO session answered at once); 236 tools; a read answered; port 61001 free after exit. |
+| Renewal | a copy of the session file with the access token's signature broken | The system refused, the provider renewed with the refresh token, the read answered, the new token and expiry written back (the refresh token unchanged). A copy whose `SAP_EXPIRES_AT` lay in the past with a still valid token was not renewed: the expiry is the token's own. |
+| stdio, on premise, basic over HTTP | `--env-path=<file>`, `--system-type=onprem` | The connector was born at the start; a read answered; with `SAP_RESPONSIBLE` / `SAP_MASTER_SYSTEM` removed from the file, `systeminformation` filled both. |
+| stdio, on premise, basic over RFC | `SAP_CONNECTION_TYPE=rfc`, the gateway port forwarded | 251 tools; `GetClass` answered. |
+| stdio, on premise, SNC over RFC (Windows) | Secure Login Client, no password and no `SAP_RESPONSIBLE` in the `.env` | 251 tools; `GetClass` answered. |
+| `mcp-abap-adt-http`, `mcp-abap-adt-compact-http` | `x-sap-*` headers: basic on premise, a token on the trial | A read answered on both. |
+| `mcp-abap-adt-sse`, `mcp-abap-adt-compact-sse` | the same headers on the opening `GET` | A read answered on both. |
+| A logoff releases the locks | compact `HandlerLock`, then a stdio shutdown (SIGTERM) and, separately, an SSE stream close | Before: another session's lock refused `403`. After: a fresh connection took the lock about 0.8–0.9 s later (the logoff is written at once; the system releases the lock when it has processed it). |
+| A long read's `timeout` | `HandlerWhereUsed`, `timeout=1`, a lock held across it | Answered `timed_out` after 1.14 s; the instance answered the next read and the held lock unlocked with its handle. |
+| The stdio start takes up its leftover session | a lock taken, the process killed with SIGKILL, a new start | The one leftover file was taken up; the old lock handle unlocked. With the leftover logged off first, the start logged on anew. |
+| A shutdown during the start's browser login | SIGTERM while the login waited | Found hanging (the login held the connection's `connect()` the logoff queued behind) and fixed: `the authorization was aborted`, the start failed, exit `1`, port 61001 free. |

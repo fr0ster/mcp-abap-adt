@@ -50,6 +50,10 @@ The server split by transport and tool set into packages of their own — sevent
 - `DeletePackage` with `force_new_connection` no longer falls back to the current session.
 - Every ADT session the server opens ends with a logoff — a request's instance, a pooled one at its state's end, a debugger's, a long read's, a background run's, a lock session's.
 
+### Measured
+
+- Live measurements of 19.0.0 (2026-10-15; on premise BASIS 816 and an SAP BTP ABAP trial; Linux, Node.js 26.7.0; SNC on Windows): every transport and binary kind answered with basic, a token and SNC; a token refused by the system was renewed with the refresh token and written back; a logoff released the locks on a shutdown and on an SSE stream close; a long read's `timeout` left the instance's session and its lock in place; the stdio start took up its leftover session. A shutdown during the start's browser login hung and is fixed (exit `1`, the callback port freed). Details: [`docs/development/tests/TESTING_AUTH.md`](docs/development/tests/TESTING_AUTH.md#live-measurements-of-1900-2026-10-15).
+
 ## [18.1.0] - 2026-10-12
 
 Two transport organizer actions on `@mcp-abap-adt/adt-clients` 30.

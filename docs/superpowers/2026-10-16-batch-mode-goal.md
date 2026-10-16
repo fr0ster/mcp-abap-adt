@@ -29,7 +29,16 @@ activates the group afterwards.
   which the LLM drives each phase as its own batch.
 - **`BatchEnd`** executes the recorded batch, switches the instance back to its
   plain connection, and answers a short summary: how many calls were recorded
-  and which numbers failed.
+  and which numbers failed. It ends batch mode whatever happened, and nothing
+  recorded is ever sent again: a batch cannot be repeated.
+- **Every recorded call gets its answer**, in every package. SAP answers every
+  part of an envelope — a status and headers, a body when there is one (an
+  empty line when there is none) — and that is the call's answer, as it came.
+  A call whose part was never sent, because an earlier envelope of the same
+  batch failed, gets that as its answer.
+- **The credentials are the ones at execution.** The whole batch goes with the
+  credentials in force when `BatchEnd` executes it, not those of the calls that
+  recorded it.
 - **Answers by number.** The calls made in batch mode are numbered in the order
   they were made, from 1. The instance keeps the answers of its last executed
   batch, and a tool returns the answers of the numbers asked for: one number or a
@@ -46,6 +55,8 @@ activates the group afterwards.
   description tell the LLM that in batch mode a call returns nothing, that calls
   are numbered in the order made, and that the answers are read by number once
   `BatchEnd` has run.
+- **A long read is one call**, and in batch mode it is recorded like any other
+  single-request tool instead of running on a connection of its own.
 - **Every package has batch mode.** The full, read-only and compact sets all
   serve `BatchBegin`, `BatchEnd` and the answer tool; what a set can do in batch
   mode is whatever of its tools send one request — reads everywhere, and in

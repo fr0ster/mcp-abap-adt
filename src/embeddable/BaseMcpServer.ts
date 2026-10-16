@@ -15,7 +15,11 @@ import {
   type ReadFailure,
   readGuarded,
 } from '../lib/auth/failures.js';
-import { ServerRefusal } from '../lib/auth/serverRefusal.js';
+import {
+  batchNotRecordableWords,
+  batchNotServedWords,
+  ServerRefusal,
+} from '../lib/auth/serverRefusal.js';
 import { answerBackgroundStarted } from '../lib/backgroundRuns/answers.js';
 import type {
   BackgroundRunAnswer,
@@ -31,11 +35,15 @@ import {
   readBackground,
   withoutBackground,
 } from '../lib/backgroundRuns/tools.js';
-import type { InstanceBatch } from '../lib/batch/InstanceBatch.js';
+import { isBatchTool } from '../lib/batch/batchTools.js';
+import { eligible } from '../lib/batch/eligibility.js';
+import type { BatchAnswer, InstanceBatch } from '../lib/batch/InstanceBatch.js';
+import { createRecorder, untilSent } from '../lib/batch/recorder.js';
 import {
   createAbapConnection,
   systemKindOf,
 } from '../lib/connectionFactory.js';
+import { isRfcConnection } from '../lib/connectionKind.js';
 import {
   createDebuggerInstance,
   type DebuggerInstance,
@@ -1156,6 +1164,16 @@ export abstract class BaseMcpServer extends McpServer {
             // A tool that works on no connection (the leftover-session
             // tools): called without one being built or connected first.
             if (entry.connectionless === true) {
+              // While a batch is open such a tool is not served: it is
+              // neither a batch tool nor recordable.
+              if (this.batchOpenFor(entry.toolDefinition.name)) {
+                return this.refusalAnswer(
+                  new ServerRefusal(
+                    'batch_not_recordable',
+                    batchNotServedWords(entry.toolDefinition.name),
+                  ),
+                );
+              }
               return this.runConnectionless(entry.handler, group, args, signal);
             }
             let inUse: AbapConnection | undefined;
@@ -1183,11 +1201,17 @@ export abstract class BaseMcpServer extends McpServer {
               // debugger tools whose SAP work is on the debugger's own
               // connections — their sends on this one (`onMainConnection`)
               // still take their turn.
-              const ownConnection = worksOnOwnConnection(
-                entry.toolDefinition.name,
-                args,
-                runsInBackground,
-              );
+              // While a batch is open every call but a batch tool's takes its
+              // turn: a recorded call is recorded in call order, a refused one
+              // is refused there — a long read in batch mode gets no
+              // connection of its own.
+              const ownConnection =
+                !this.batchOpenFor(entry.toolDefinition.name) &&
+                worksOnOwnConnection(
+                  entry.toolDefinition.name,
+                  args,
+                  runsInBackground,
+                );
               if (!ownConnection) {
                 leaveFlow = await this.enterMainFlow(signal);
                 // The connection this call took before it waited may be one
@@ -1258,6 +1282,21 @@ export abstract class BaseMcpServer extends McpServer {
                     ),
                   ),
                 );
+              // Batch mode (read inside the call's turn): an eligible call is
+              // recorded, every other refused — before any handler is chosen.
+              if (this.batchOpenFor(entry.toolDefinition.name)) {
+                return await this.recordCall({
+                  tool: entry.toolDefinition.name,
+                  handler: entry.handler,
+                  group,
+                  context,
+                  args: handlerArgs,
+                  holdsFlow,
+                  runsInBackground,
+                  system,
+                  signal,
+                });
+              }
               let handlerPromise: Promise<unknown>;
               const listed = isLongTool(entry.toolDefinition.name);
               const read =
@@ -1421,6 +1460,196 @@ export abstract class BaseMcpServer extends McpServer {
       handlersRegistry.registerAllTools(this.trackingRegistrations());
     }
   }
+  /**
+   * Whether a call of `tool` meets an open batch: a batch is open and `tool`
+   * is not one of the batch tools.
+   */
+  private batchOpenFor(tool: string): boolean {
+    return (
+      this.batch !== undefined &&
+      this.batch.mode() !== 'off' &&
+      !isBatchTool(tool)
+    );
+  }
+
+  /** A failure answered as a tool's: through the failure reader, else `return_error`. */
+  private refusalAnswer(error: unknown): {
+    content: { type: 'text'; text: string }[];
+    isError: true;
+  } {
+    const read = readGuarded((t) => this.readFailure(t), error);
+    if (read !== undefined) {
+      return answerRead(read) as {
+        content: { type: 'text'; text: string }[];
+        isError: true;
+      };
+    }
+    return return_error(error) as {
+      content: { type: 'text'; text: string }[];
+      isError: true;
+    };
+  }
+
+  /**
+   * A call in its turn while a batch is open (spec §4.1). Refused — thrown
+   * as the server's refusal, answered by the caller — unless the open
+   * batch is a communication batch that admits it: a tool that works on a
+   * connection of its own (a debugger tool, a background run) or a call
+   * that holds no turn is not served; a listed long read given `timeout` is
+   * refused `batch_no_timeout`; a call no entry of the eligibility table
+   * admits — read on the arguments the handler receives, over the kind of
+   * the instance's connection — is refused `batch_not_recordable`. A refusal
+   * takes no number.
+   *
+   * Admitted, the handler runs on a recorder over the batch connection, in
+   * the call's scopes but under the batch's signal, and the call waits until
+   * it has recorded everything it sends before an answer, or settled. It
+   * answers nothing (`{ content: [] }`) once it recorded; the handler goes on
+   * and builds its answer when `BatchEnd` settles its parts — the answer of
+   * its number. A handler that settled without recording answers its own
+   * answer, with no number. The late-bound target points at the call's
+   * connection for its turn.
+   */
+  private async recordCall(call: {
+    tool: string;
+    handler: unknown;
+    group: unknown;
+    context: HandlerContext;
+    args: unknown;
+    holdsFlow: boolean;
+    runsInBackground: boolean;
+    system: ResolvedSystemContext | undefined;
+    signal: AbortSignal;
+  }): Promise<{
+    content: { type: 'text'; text: string }[];
+    isError?: true;
+  }> {
+    const owner = this.batch;
+    const open = owner?.opened();
+    const notServed = () =>
+      new ServerRefusal('batch_not_recordable', batchNotServedWords(call.tool));
+    // The debugger batch serves its own tools alone (§7).
+    if (
+      owner === undefined ||
+      open === undefined ||
+      owner.mode() !== 'communication'
+    ) {
+      throw notServed();
+    }
+    if (
+      !call.holdsFlow ||
+      call.runsInBackground ||
+      isDebuggerOwnConnectionTool(call.tool)
+    ) {
+      throw notServed();
+    }
+    if (isLongTool(call.tool) && readTimeout(call.args) !== undefined) {
+      throw new ServerRefusal('batch_no_timeout');
+    }
+    const connection = call.context.connection;
+    const kind = isRfcConnection(connection) ? 'rfc' : 'http';
+    if (!eligible(call.tool, call.args, kind).ok) {
+      throw new ServerRefusal(
+        'batch_not_recordable',
+        batchNotRecordableWords(call.tool),
+      );
+    }
+    throwIfRequestAborted(call.signal);
+
+    // The handler's promise, known only once it is started; its number is
+    // taken at its first request, possibly before.
+    let started!: (handler: Promise<unknown>) => void;
+    const handlerStarted = new Promise<Promise<unknown>>((resolve) => {
+      started = resolve;
+    });
+    const recorder = createRecorder(open.connection, owner, (number) => {
+      open.recorded.push({
+        number,
+        answer: handlerStarted.then((handler) =>
+          this.recordedAnswer(number, handler, owner, () =>
+            recorder.rawParts(),
+          ),
+        ),
+      });
+    });
+    const recordedContext: HandlerContext = {
+      ...call.context,
+      connection: recorder as unknown as AbapConnection,
+    };
+    open.target.point(connection);
+    try {
+      let handler: Promise<unknown>;
+      try {
+        handler = Promise.resolve(
+          this.inHeldFlow(true, connection, () =>
+            runWithRequestSignal(owner.signal(), () =>
+              withDestinationSystemContext(
+                this.systemContexts.get(connection),
+                () =>
+                  withKnownSystemContext(call.system, () =>
+                    callHandler(
+                      call.handler,
+                      call.group,
+                      recordedContext,
+                      call.args,
+                    ),
+                  ),
+              ),
+            ),
+          ),
+        );
+      } catch (error) {
+        handler = Promise.reject(error);
+      }
+      // It never rejects unhandled: its answer is read by its number, or
+      // below when it recorded nothing.
+      handler.catch(() => undefined);
+      started(handler);
+      await untilSent(handler, recorder);
+      if (recorder.number() !== undefined) return { content: [] };
+      // Settled without recording: nothing went into an envelope.
+      const result = await handler;
+      const content = normalizeToolContent(result) as {
+        type: 'text';
+        text: string;
+      }[];
+      return (result as ToolResultLike | undefined)?.isError
+        ? { content, isError: true }
+        : { content };
+    } finally {
+      open.target.point(undefined);
+    }
+  }
+
+  /**
+   * A recorded call's answer under its number: the tool's answer its
+   * handler built from all its parts, as this wrapper answers a tool — its
+   * content, `isError` when it failed; a throw read by the failure reader,
+   * else `return_error`. Never rejects.
+   */
+  private async recordedAnswer(
+    number: number,
+    handler: Promise<unknown>,
+    owner: InstanceBatch,
+    rawParts: () => BatchAnswer['raw'],
+  ): Promise<BatchAnswer> {
+    let answer: Pick<BatchAnswer, 'content' | 'isError'>;
+    try {
+      const result = await handler;
+      const content = normalizeToolContent(result) as BatchAnswer['content'];
+      answer = (result as ToolResultLike | undefined)?.isError
+        ? { content, isError: true }
+        : { content };
+    } catch (error) {
+      answer = this.refusalAnswer(error);
+    }
+    return {
+      number,
+      ...answer,
+      ...(owner.keepRawParts ? { raw: rawParts() } : {}),
+    };
+  }
+
   /**
    * A tool that works on no connection of the instance (`connectionless`):
    * the call's context has none, and the leftover-session port when the host
@@ -1905,6 +2134,14 @@ export abstract class BaseMcpServer extends McpServer {
             // callback can reach the instance's connection, and nothing in
             // its name proves it works on a connection of its own.
             leaveFlow = await this.enterMainFlow(signal);
+            // A registry's own tool is not served while a batch is open: it
+            // is no batch tool, and nothing proves it records.
+            if (this.batchOpenFor(name)) {
+              throw new ServerRefusal(
+                'batch_not_recordable',
+                batchNotServedWords(name),
+              );
+            }
             const run = () =>
               runWithRequestSignal(signal, async () => {
                 // Its turn came after the session ended: it never runs.

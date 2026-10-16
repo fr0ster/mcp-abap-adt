@@ -19,6 +19,7 @@ import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ServerRefusal } from '../auth/serverRefusal';
 import type { StatePart } from '../state/InstanceState';
+import type { LateBoundConnection } from './lateBound';
 
 /** Which batch is open: none, the communication batch, or the debugger batch. */
 export type BatchMode = 'off' | 'communication' | 'debugger';
@@ -26,7 +27,7 @@ export type BatchMode = 'off' | 'communication' | 'debugger';
 /** The kind of a batch that can be begun. */
 export type BatchKind = Exclude<BatchMode, 'off'>;
 
-/** A part of the envelope's answer as it came, kept when `keepRawParts`. */
+/** A part of the envelope's answer as it came, kept when `keepRawParts`: one per request of a call, in the order sent. */
 export type RawPart = {
   status: number;
   status_text: string;
@@ -39,19 +40,27 @@ export type BatchAnswer = {
   number: number;
   content: CallToolResult['content'];
   isError?: true;
-  raw?: RawPart;
+  /** SAP's raw parts of the call's requests, in the order sent — only when `keepRawParts`. */
+  raw?: RawPart[];
 };
 
-/** One recorded call: its number and the answer its handler builds once the batch is sent. */
+/**
+ * One recorded call: its number and the answer its handler builds once the
+ * batch is sent — from all of the call's parts. It never rejects.
+ */
 export interface RecordedCall {
   number: number;
   answer: Promise<BatchAnswer>;
-  raw?: RawPart;
 }
 
-/** What a begin hands the owner: the batch connection and the record of its calls. */
+/**
+ * What a begin hands the owner: the batch connection, the late-bound target
+ * it wraps (pointed by the dispatch and `BatchEnd`), and the record of its
+ * calls, in number order.
+ */
 export interface OpenBatch {
   connection: AdtBatchConnection;
+  target: LateBoundConnection;
   recorded: RecordedCall[];
 }
 

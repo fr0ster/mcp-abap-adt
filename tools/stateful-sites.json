@@ -9,6 +9,33 @@
     "whose": "server"
   },
   {
+    "file": "src/lib/batch/lateBound.ts",
+    "function": "LateBoundConnection.setSessionType",
+    "site": "setSessionType(type: Session)",
+    "count": 1,
+    "window": "none of its own: the declaration of the late-bound target's member, which the batch connection's execute() calls to set each envelope's session type (stateful only for LOCK/UNLOCK envelopes, as adt-clients sends them)",
+    "stateless": "execute()'s finally restores the session type the target's connection had before the batch, through the same member",
+    "whose": "server"
+  },
+  {
+    "file": "src/lib/batch/lateBound.ts",
+    "function": "LateBoundConnection.setSessionType",
+    "site": "setSessionType(type)",
+    "count": 1,
+    "window": "none of its own: forwards the batch connection's envelope session type to the connection the target points at now (BatchEnd's)",
+    "stateless": "execute()'s finally restores the previous session type through this member",
+    "whose": "server"
+  },
+  {
+    "file": "src/lib/batch/recorder.ts",
+    "function": "createRecorder",
+    "site": "setSessionType(type)",
+    "count": 1,
+    "window": "none on the wire: forwards a recorded call's member's mode to the batch connection, which marks the next recorded request (LOCK/UNLOCK) stateful in the batch; no connection is touched",
+    "stateless": "the batch connection's recorded mode falls back to its default after that one request is recorded",
+    "whose": "server"
+  },
+  {
     "file": "src/lib/debugger/ports.ts",
     "function": "openStateful",
     "site": "setSessionType('stateful')",
@@ -31,7 +58,7 @@
     "function": "execute",
     "site": "setSessionType(active[0].stateful ? 'stateful' : 'stateless')",
     "count": 1,
-    "window": "one batch envelope: the wrapped connection is stateful while an envelope of LOCK, UNLOCK or other stateful parts is sent, stateless for a stateless one. The server builds no AdtBatchConnection.",
+    "window": "one batch envelope: the wrapped connection is stateful while an envelope of LOCK, UNLOCK or other stateful parts is sent, stateless for a stateless one. The server's batch mode wraps one around its late-bound target (src/lib/batch/lateBound.ts), which forwards these to the instance's connection in force.",
     "stateless": "in the same call: execute's finally sets the wrapped connection back to the session type it had before the batch, on every path",
     "whose": "adt-clients"
   },
@@ -40,7 +67,7 @@
     "function": "execute",
     "site": "setSessionType(previous)",
     "count": 1,
-    "window": "none: it ends the batch envelopes' window, restoring the session type the wrapped connection had before execute. The server builds no AdtBatchConnection.",
+    "window": "none: it ends the batch envelopes' window, restoring the session type the wrapped connection had before execute. The server's batch mode wraps one around its late-bound target (src/lib/batch/lateBound.ts), which forwards these to the instance's connection in force.",
     "stateless": "execute's finally, on every path",
     "whose": "adt-clients"
   },
@@ -49,7 +76,7 @@
     "function": "setSessionType",
     "site": "setSessionType(type)",
     "count": 1,
-    "window": "none on the wire: the batch wrapper records the mode a member asks for, for the one request it records next; the wrapped connection is not touched. The server builds no AdtBatchConnection.",
+    "window": "none on the wire: the batch wrapper records the mode a member asks for, for the one request it records next; the wrapped connection is not touched. The server's batch mode wraps one around its late-bound target (src/lib/batch/lateBound.ts), which forwards these to the instance's connection in force.",
     "stateless": "the recorded mode falls back to the wrapper's default after that one request is recorded",
     "whose": "adt-clients"
   },
@@ -58,7 +85,7 @@
     "function": "makeAdtRequest",
     "site": "x-sap-adt-sessiontype",
     "count": 2,
-    "window": "none on the wire: a recorded request whose member asked for stateful (its mode or its own header) is marked stateful in the batch, and its envelope is sent stateful by execute. The server builds no AdtBatchConnection.",
+    "window": "none on the wire: a recorded request whose member asked for stateful (its mode or its own header) is marked stateful in the batch, and its envelope is sent stateful by execute. The server's batch mode wraps one around its late-bound target (src/lib/batch/lateBound.ts), which forwards these to the instance's connection in force.",
     "stateless": "execute's finally restores the wrapped connection's session type",
     "whose": "adt-clients"
   },

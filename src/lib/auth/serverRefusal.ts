@@ -174,9 +174,12 @@ export const BATCH_NO_TIMEOUT_WORDS =
 export const DEBUG_BATCH_AMDP_UNMEASURED_WORDS =
   'AMDP debugging is not offered in a debugger batch: not yet confirmed against a system';
 
-/** A tool that sends more than one request, called in batch mode. */
+/**
+ * A call no entry of `tools/batch-handlers.json` admits, in a communication
+ * batch: a request of it depends on another's answer (or it sends none).
+ */
 export function batchNotRecordableWords(tool: string): string {
-  return `${tool} sends more than one request and cannot be recorded in batch mode; record its steps with the single-request tools — compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet — each phase its own batch`;
+  return `${tool} builds a request from another's answer and cannot be recorded in batch mode; record its steps with the low-level tools — compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet — each phase its own batch`;
 }
 
 /**

@@ -6,13 +6,17 @@ import {
   InstanceBatch,
   type OpenBatch,
 } from '../../../lib/batch/InstanceBatch';
+import { LateBoundConnection } from '../../../lib/batch/lateBound';
 import { InstanceState } from '../../../lib/state/InstanceState';
 
 /** A batch connection that only counts what would be sent: the owner sends nothing. */
 function fakeBatch(): { open: OpenBatch; execute: jest.Mock } {
   const execute = jest.fn(async () => undefined);
   const connection = { execute } as unknown as AdtBatchConnection;
-  return { open: { connection, recorded: [] }, execute };
+  return {
+    open: { connection, target: new LateBoundConnection(), recorded: [] },
+    execute,
+  };
 }
 
 const answerOf = (n: number): BatchAnswer => ({

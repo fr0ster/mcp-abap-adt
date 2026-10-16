@@ -11,6 +11,7 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import { handleGetClass } from '../../handlers/class/high/handleGetClass';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclude';
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
@@ -435,5 +436,42 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
       { parent_type: 'PROG/P', parent_name: 'ZPROG', maxDepth: 1 },
     );
     expect(result.isError).toBe(false);
+  });
+});
+
+describe('GetTransport / GetIncludesList: a missing argument', () => {
+  /** How a compliant read answers its missing argument. */
+  const compliant = () =>
+    handleGetClass(
+      { connection: {} as any, logger: undefined } as any,
+      {
+        class_name: '',
+      } as any,
+    );
+
+  it('is answered in the shape a compliant read answers its own, before any request', async () => {
+    const shape = (result: any) => ({
+      isError: result.isError,
+      types: result.content.map((c: any) => c.type),
+    });
+    const sent: string[] = [];
+    const transport: any = await handleGetTransport(
+      { connection: refusingWith(403, sent), logger: undefined } as any,
+      {} as any,
+    );
+    fakeClient = fakeClientOf({});
+    const includes: any = await handleGetIncludesList(
+      { connection: {} as any, logger: undefined } as any,
+      { object_type: 'PROG/P' },
+    );
+    const reference = shape(await compliant());
+    expect(reference).toEqual({ isError: true, types: ['text'] });
+    expect(shape(transport)).toEqual(reference);
+    expect(shape(includes)).toEqual(reference);
+    expect(transport.content[0].text).toBe('Transport number is required');
+    expect(includes.content[0].text).toBe(
+      'Parameter "object_name" (string) is required and cannot be empty.',
+    );
+    expect(sent).toEqual([]);
   });
 });

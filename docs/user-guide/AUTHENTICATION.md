@@ -426,7 +426,7 @@ folded into one text:
   that failed as a whole is `error` beside the partial result, step `list includes`), the
   system lookup `GetServiceBindingPreviewUrl` makes for the client and the language
   (`system_information_failure`, step `read system information`, beside the URL; a `401` there
-  ends the call), a
+  ends the call, as does a `401` on its service URL lookup, step `read service URL`), a
   refused typing of a new transport task (`CreateTransportTask`'s `task_type_error`), and
   what a debugger stop could not undo (see [DEBUGGER.md](DEBUGGER.md#what-ends-a-session)).
   A credential failure is none of these. A `401` on `CreateTransportTask`'s task type change is

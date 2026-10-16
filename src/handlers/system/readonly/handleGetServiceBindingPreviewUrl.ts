@@ -43,8 +43,8 @@ import {
   answer,
   answerRequestThrown,
   type FailureEntry,
-  isCredentialFailure,
   isCredentialPayload,
+  requestFailureOf,
   requestThrownEntry,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -59,14 +59,18 @@ import {
 } from '../../../lib/strategies/feapDescriptor';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { sequence, succeededWith } from '../../../lib/strategies/sequence';
+import {
+  failedWith,
+  sequence,
+  succeededWith,
+} from '../../../lib/strategies/sequence';
 import {
   associationsOf,
   categoryServiceUrlsOf,
   exposedEntitiesOf,
   serviceBindingFactsOf,
 } from '../../../lib/strategies/serviceBindingFacts';
-import { atStep } from '../../../lib/strategies/step';
+import { atStep, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 /** The resource `getSystemInformation` reads. */
@@ -249,11 +253,13 @@ export async function handleGetServiceBindingPreviewUrl(
           // composed URL remains the answer when it says nothing.
           let category: ReturnType<typeof categoryServiceUrlsOf> = {};
           if (facts.protocol !== undefined && facts.service !== undefined) {
+            const sent = {
+              method: 'GET',
+              url: `/sap/bc/adt/businessservices/${facts.protocol}/${bindingName}`,
+            };
             try {
               const answered = await connection.makeAdtRequest({
-                url:
-                  `/sap/bc/adt/businessservices/${facts.protocol}/` +
-                  `${bindingName}`,
+                url: sent.url,
                 method: 'GET',
                 // None of the server's (`0`): a deadline closes the socket
                 // under a running request, which kills it in SAP;
@@ -266,9 +272,16 @@ export async function handleGetServiceBindingPreviewUrl(
               });
               category = categoryServiceUrlsOf(String(answered.data ?? ''));
             } catch (error) {
-              // A credential failure ends the call as it came; absent, refused
-              // or shaped otherwise: the composed URL answers.
-              if (isCredentialFailure(error)) throw error;
+              // A credential failure ends the call as it came — a thrown
+              // refusal rethrown, a `401` SAP answered as the lookup's error
+              // with its step; absent, refused or shaped otherwise: the
+              // composed URL answers.
+              const step = 'read service URL';
+              if (isCredentialPayload(requestThrownEntry(error, sent, step))) {
+                const failed = requestFailureOf(error, sent);
+                if (failed === undefined) throw error;
+                return failedWith<Found>(withStep(failed, step));
+              }
             }
           }
 

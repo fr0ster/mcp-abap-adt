@@ -163,7 +163,7 @@ executed batch, communication or debugger.
   one request is recorded instead of sent, and returns nothing. Every recorded call is numbered,
   in the order made, from 1. A tool that sends more than one request is refused in batch mode; use
   the single-request tools (compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with
-  lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. BatchEnd sends the
+  lock_handle, HandlerUnlock) and run each phase as its own batch. BatchEnd sends the
   recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle
   this answers in the request header on every call of the batch."
 - `BatchEnd`: "Sends every call recorded since BatchBegin, in parallel envelopes, with the
@@ -200,8 +200,7 @@ context exactly as any call), and before the handler is chosen:
    tools. For a communication batch the call is looked up in the eligibility table (§4.2) by tool
    name, arguments and connection. Not eligible → answered at once with the server's refusal
    `batch_not_recordable` (§8); the handler never runs; nothing goes into an envelope, so the call
-   has **no number**. The background-run branch, the long-read branch (`runLongCall`) and the
-   `timeout` handling are not taken in batch mode (§4.4).
+   has **no number**. A listed long read is refused the same way (§4.4).
 3. Eligible → recorded (below).
 
 Recording an eligible call:
@@ -242,8 +241,7 @@ may be recorded, with:
 - `when` (optional): the arguments under which the call sends one request — an equality, a
   membership or a presence on named arguments (as `longTools.ts`' `NOT_A_READ` reads
   `object_type`), e.g. `HandlerUpdate` only with `lock_handle`, and for DOMAIN, DATA_ELEMENT and
-  PACKAGE only with `document` (§4.6); `HandlerCreate` only with `create_only: true`; `HandlerGet`
-  only for the parts that send one GET (not `contents`, not `UNIT_TEST`/`CDS_UNIT_TEST`);
+  PACKAGE only with `document` (§4.6); `HandlerCreate` only with `create_only: true`;
 - `connection` (optional): `http` when the one request holds only over HTTP — `HandlerLock` /
   `HandlerUnlock` of `PACKAGE`: over RFC the package lock opens an ABAP session of its own
   (`connectionForPackageLock`), outside the batch, so over RFC that entry is not eligible.
@@ -258,14 +256,13 @@ What the code settles about the first entries (each still proven by its test):
   `handleUnlockObject`). `HandlerUpdate` with `lock_handle` for the source-written types (CLASS,
   PROGRAM, INTERFACE, DDL, TABLE, STRUCTURE, FUNCTION_MODULE, BEHAVIOR_DEFINITION,
   METADATA_EXTENSION — each proven), and for DOMAIN, DATA_ELEMENT, PACKAGE with `document`
-  (§4.6). Single-GET reads of the full and compact sets, `HandlerGet` per part.
+  (§4.6). Single-GET reads of the full and compact sets that are not listed long reads (§4.4).
 - **Not eligible:** `HandlerUpdate` with `lock_handle` and `properties` for DOMAIN, DATA_ELEMENT,
   PACKAGE — it reads the metadata, then writes it patched (`handleUpdateDomain`'s `sequence(read,
   update)`): two requests, the second needing the first's answer. `HandlerCreate` without
   `create_only` and every high tool (validate → create → lock → write → unlock → check → activate,
-  `handleCreateDomain`). Multi-request long reads (`GetWhereUsed` with a filter, `SearchSource`,
-  `GetPackageContents`, `GetObjectsList`, …, per `tools/long-handlers.json`' `sends`). Debugger
-  tools, background runs, the leftover-session tools.
+  `handleCreateDomain`). Every listed long read (§4.4). Debugger tools, background runs, the leftover-session
+  tools.
 
 ### 4.3 The recorded handler's signal and lifetime
 
@@ -278,18 +275,12 @@ tools (`registerActiveTool`): the shutdown's `logOffAtOnce` interrupts `BatchEnd
 
 ### 4.4 Long reads
 
-A listed long read (`isLongTool && isLongRead`) is one call. In batch mode it is not given a
-connection of its own: `runLongCall` / `openFreshConnection` are not called, and the call is
-recorded on the batch connection like any eligible call — when its entry is in
-`tools/batch-handlers.json` (single-request long reads: `SearchObject`, `GetSqlQuery`,
-`GetTableContents`, `GetATCFindings`, `HandlerSearch`, `HandlerGetData`, the profiler trace views,
-`HandlerGet` per part).
-
-**In batch mode there is no timeout**: a long read in batch mode takes none. A call that gives
-`timeout` in batch mode is **refused before anything is recorded** (`batch_no_timeout`: "in batch
-mode a read takes no timeout: the batch is sent at BatchEnd, with no deadline"), and takes no number
-— *this design's recommendation, marked as such:* refusing rather than ignoring, because a parameter
-silently dropped hides the caller's mistake.
+**Long reads are not part of a batch.** A listed long read (`isLongTool(tool) && isLongRead(tool,
+args)`, `tools/long-handlers.json`) is refused in batch mode like a multi-request tool —
+`batch_not_recordable`, in the words for a long read: "<tool> is a long read and is not part of a
+batch; run it as a normal call outside batch mode" — before anything is recorded; it takes no
+number and runs nothing. The consumer decides when to run it. `tools/batch-handlers.json` lists no
+long-read tool (its source test refuses one).
 
 ### 4.5 What a recorded call touches outside the batch
 
@@ -383,6 +374,12 @@ work. A refusal after that reaches `execute()` as the connection's `AuthRefusedE
 1. A communication batch must be open, else `batch_mode_off` (or, while the debugger batch is
    open, `batch_mode_other`).
 2. Take the connection (§5.1), point the target at it.
+
+   **`BatchEnd` ends batch mode whatever fails, before `execute()` included.** When its call fails
+   before `execute()` — taking the connection, or the system lookup the dispatch runs before the
+   tool (`systemBeforeTool`) — as it would fail for any call, the dispatch ends batch mode (step 4)
+   and every recorded call's answer is that failure, as it came (as the call itself answers it).
+   Nothing is sent. No other mechanism is added for this.
 3. `execute()` — awaited to its end; no timeout. Every part settles inside it, follow-up envelopes
    included (§1). Then every recorded handler is awaited until it has built its answer (no timeout;
    a handler only reads its settled part then).
@@ -483,21 +480,21 @@ its own request only; the stack is in the batch when the model recorded `stack`.
   no `state_handle` argument.
 - **The session's serial.** Every session change runs through `DebugSession.mutate` → `Serial`. A
   recorded operation must not await its answer inside the serial — the second recorded call would
-  wait behind the first, which waits for `DebugBatchEnd`: a deadlock. So `DebugBatchBegin` takes the
-  serial once and holds it until the batch ends; recorded operations go through a batch path of the
-  session (`recordStep`, `recordStack`, …) that checks the stop and records on the batch debugger
-  without entering the serial. Nothing else changes the session while the batch is open.
+  wait behind the first, which waits for `DebugBatchEnd`: a deadlock. So a recorded operation does
+  not enter the serial: it goes through a batch path of the session (`recordStep`, `recordStack`, …)
+  that checks there is a stop and records on the batch debugger. Nothing more is done with the
+  serial; while the batch is open no other tool is served (§4.1).
 - **Recording** is as §4.1: a per-call recorder (a fresh `AbapDebugger` over a per-call recorder of
   the batch connection, so each request takes its number), `{ content: [] }` once recorded.
   Debugger tools take no turn in the main flow today (`worksOnOwnConnection`); numbers follow the
   record order.
-- **`DebugBatchEnd`**: `execute()` on the debuggee connection (the debugger batch goes with that
-  connection's credential; the attached session lives there and cannot be swapped). In `finally`:
-  mode `off`, the serial released. Then the session applies, in number order and with the readers
-  it uses today (`readDebuggeeEnd`, `readAttach`, `readStack`), what the answers say about the stop
-  — a move answering the debuggee's end releases the stop (`releaseStop`) **after** `execute()`
-  settled, never under its envelopes; the last move's attach and the last stack read update the
-  view. No request is sent for this. Answers and `DebugBatchEnd`'s answer as §5.3–5.4.
+- **`DebugBatchEnd`** executes the envelope on the debuggee connection (it goes with that
+  connection's credential; the attached session lives there), keeps the answers by number and
+  switches the mode off — whatever fails. It does **not** reconcile the debug session's state from
+  the answers and calls no `releaseStop`: the debugger batch is several debugger commands in one
+  envelope without the overhead (step, then check the variables). If a step ended the program, its
+  answer shows it, and the next ordinary debugger call learns it from SAP as today. Answers and
+  `DebugBatchEnd`'s answer as §5.3–5.4.
 - **AMDP**: `AmdpSession` is not offered in the debugger batch until a test against a system
   confirms it (§9.3). Until then `DebugBatchBegin` on an AMDP stop is refused
   `debug_batch_amdp_unmeasured` ("AMDP debugging is not offered in a debugger batch: not yet
@@ -516,8 +513,8 @@ its own request only; the stack is in the batch when the model recorded `stack`.
   `batch_mode_other`, `batch_mode_off`, `batch_not_recordable` ("<tool> sends more than one request
   and cannot be recorded in batch mode; record its steps with the single-request tools —
   compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle,
-  HandlerUnlock, HandlerGet — each phase its own batch"; for a tool refused only because a batch is
-  open: "<tool> is not served while a batch is open"), `batch_no_timeout`,
+  HandlerUnlock — each phase its own batch"; for a long read: §4.4's words; for a tool refused only
+  because a batch is open: "<tool> is not served while a batch is open"),
   `debug_batch_amdp_unmeasured`. SAP's answers and errors reach the model as they came: a number's
   answer is the tool's answer built from what came (§5.3), a method's error the C6 shape (the
   method's error as it is plus `step`), a credential refusal the chain's answer.
@@ -526,8 +523,7 @@ its own request only; the stack is in the batch when the model recorded `stack`.
   `cutBackgroundRuns` (the close lets go of state without `dispose()`), which aborts the batch's
   signal and discards the `AdtBatchConnection` and the answers. Recorded part promises never settle
   (adt-clients has no discard **[code]**); they and their handlers are released with the object.
-  A debugger batch's hold on the serial is released first, so the debugger's own cleanup
-  (`DebuggerInstance.stop()` through `mutate`) is not blocked. A `BatchEnd` running at the close is
+  A `BatchEnd` running at the close is
   interrupted like any running tool (`logOffAtOnce`): the logoff goes out under its envelopes.
 - **HTTP disconnect.** HTTP instances are built with `transportCloseEndsSession: false`: a dropped
   request ends no call. A dropped recording call has already recorded or still records; a dropped
@@ -595,9 +591,12 @@ watch the test go red, revert (the *Break* line).
   no `response`) thrown by the target: `BatchEnd` answers it as `answerRead` does, every number's
   answer is it, mode off; the answered variant (`cause.response.status === 401`). *Break:* wrap
   the refusal in a "not sent" or summary-only answer.
-- **Long read recorded, no timeout** — a listed single-request long read in batch mode:
-  `openFreshConnection` and `runLongCall` not called, the read is in the envelope; with `timeout`
-  it is refused `batch_no_timeout`, nothing recorded. *Break:* keep the long-read branch first.
+- **Long reads refused** — a listed long read in batch mode is refused with the long-read words,
+  nothing recorded, no number, `runLongCall` not called; the source test refuses a long-read tool
+  in `tools/batch-handlers.json`. *Break:* look up eligibility before the long-read check.
+- **`BatchEnd` failing before `execute()`** — a source whose `resolve` fails at `BatchEnd`: the call
+  answers that failure, batch mode is off, every recorded call's answer is that failure as it came,
+  nothing is sent. *Break:* end batch mode only around `execute()`.
 - **Surface** — the full and read-only sets serve the three batch tools and the compact sets
   `HandlerBatch` alone; `DebugBatch*` only in full, `HandlerDebugBatch` only in `compact`; each
   `HandlerBatch` action behaves as its full-set tool, `begin`/`answers` build no connection, `number`
@@ -605,10 +604,11 @@ watch the test go red, revert (the *Break* line).
   batch tool has a `state_handle` property, every tool's description carries its sentence;
   `compact/tests/fixtures/surface.json` updated (the new `create_only` and `document`).
 - **Close / dispose** — `closeInstance` with a batch open: zero envelopes, no unhandled rejection
-  (plain-node recorder), the debugger's stop not blocked by a held serial. *Break:* omit `dropBatch`.
-- **Debugger batch** — begin needs a stop; the serial is held (a breakpoint change waits); step +
-  stack + variables recorded into one debugger envelope on the stop's connection; a step answering
-  the debuggee's end releases the stop only after `execute`; AMDP refused; begin of either batch
+  (plain-node recorder). *Break:* omit `dropBatch`.
+- **Debugger batch** — begin needs a stop; step + stack + variables recorded into one debugger
+  envelope on the stop's connection; `DebugBatchEnd` keeps the answers by number, switches the mode
+  off and leaves the session's stop as it was (no `releaseStop`, no view change), also when a step's
+  answer says the program ended; AMDP refused; begin of either batch
   refused while the other is open; breakpoint/listener tools refused. *Break:* record inside `mutate` — the
   second call is then never recorded, and the test asserts both records once the second call returned.
 
@@ -635,7 +635,7 @@ Gated by `tests/test-config.yaml`, as the existing integration suites, with a te
   RFC case measures the batch over RFC; a failure there is reported with what came, since it may be
   the RFC transport's rather than the batch's.
 - **Debugger batch, on-premise** and **ABAP Cloud** — at a live stop: step + stack + variables in one
-  `DebugBatchEnd`; the session's view matches.
+  `DebugBatchEnd`; the answers by number.
 - **AMDP debugger batch** — on a system that runs AMDP debugging (on-premise on HANA); the gate for
   offering it: until it has passed there, §7's AMDP refusal stays. Its result goes to the docs with
   the date.

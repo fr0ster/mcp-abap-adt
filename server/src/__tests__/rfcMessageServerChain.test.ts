@@ -113,6 +113,27 @@ function envFile(extra: string[] = []): string {
 async function handedToCreateConnection(
   argv: string[],
 ): Promise<Record<string, unknown>> {
+  const { stderr, exits } = await start(argv);
+  const calls = (createConnection as unknown as jest.Mock).mock.calls;
+  if (calls.length !== 1) {
+    throw new Error(
+      `createConnection called ${calls.length} times; stderr: ${stderr.join(' | ')}`,
+    );
+  }
+  // The recorded build stopped the start, as any failed connection does.
+  expect(exits).toEqual([1]);
+  const spec = calls[0][0] as {
+    config: Record<string, unknown>;
+    transport: string;
+  };
+  expect(spec.transport).toBe('rfc');
+  return spec.config;
+}
+
+/** Parses `argv` as the program does and launches with stand-in edges. */
+async function start(
+  argv: string[],
+): Promise<{ stderr: string[]; exits: number[] }> {
   process.argv = ['node', 'mcp-abap-adt', ...argv];
   const args = process.argv.slice(2);
   const file = readConfigFile(CORE_PARAMETERS, args);
@@ -136,20 +157,7 @@ async function handedToCreateConnection(
       platform: 'linux',
     },
   );
-  const calls = (createConnection as unknown as jest.Mock).mock.calls;
-  if (calls.length !== 1) {
-    throw new Error(
-      `createConnection called ${calls.length} times; stderr: ${stderr.join(' | ')}`,
-    );
-  }
-  // The recorded build stopped the start, as any failed connection does.
-  expect(exits).toEqual([1]);
-  const spec = calls[0][0] as {
-    config: Record<string, unknown>;
-    transport: string;
-  };
-  expect(spec.transport).toBe('rfc');
-  return spec.config;
+  return { stderr, exits };
 }
 
 function expectAll(config: Record<string, unknown>, given = GIVEN): void {
@@ -235,5 +243,44 @@ describe('an absent field stays absent (no key, not undefined-as-default)', () =
   it('none given: no key of them', async () => {
     const config = await handedToCreateConnection([`--env-path=${envFile()}`]);
     for (const f of fields) expect(Object.hasOwn(config, f)).toBe(false);
+  });
+});
+
+describe("mshost without msserv and sysid: connection's refusal reaches the start's caller as it came", () => {
+  it('the start stops with connection’s own words, naming msserv and sysid', async () => {
+    const actual = jest.requireActual('@mcp-abap-adt/connection');
+    // connection's own words for this config, read from connection itself.
+    let words = '';
+    try {
+      actual.rfcParamsFrom({ url: SYSTEM_URL, mshost: GIVEN.mshost });
+    } catch (error) {
+      words = (error as Error).message;
+    }
+    expect(words).toContain('msserv');
+    expect(words).toContain('sysid');
+
+    // This start's build is connection's real one.
+    (createConnection as unknown as jest.Mock).mockImplementationOnce(
+      (spec: unknown) => actual.createConnection(spec),
+    );
+    const file = envFile([`SAP_MSHOST=${GIVEN.mshost}`, 'SAP_GROUP=SPACE']);
+    const { stderr, exits } = await start([`--env-path=${file}`]);
+
+    expect(createConnection).toHaveBeenCalledTimes(1);
+    expect(exits).toEqual([1]);
+    expect(stderr.join('\n')).toContain(words);
+  });
+
+  it('any other failure of the build is still named by its class only, never its message', async () => {
+    (createConnection as unknown as jest.Mock).mockImplementationOnce(() => {
+      throw new Error('placeholder words that must not be shown');
+    });
+    const file = envFile([`SAP_MSHOST=${GIVEN.mshost}`, 'SAP_SYSID=XYZ']);
+    const { stderr, exits } = await start([`--env-path=${file}`]);
+    expect(exits).toEqual([1]);
+    expect(stderr.join('\n')).toContain(
+      'could not be connected at start: Error',
+    );
+    expect(stderr.join('\n')).not.toContain('placeholder words');
   });
 });

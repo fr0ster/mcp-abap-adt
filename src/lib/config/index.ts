@@ -54,6 +54,7 @@ export {
   MESSAGE_SERVER_ENV,
   MESSAGE_SERVER_FIELDS,
   type MessageServerField,
+  rfcAddressRefusalOf,
 } from './messageServer.js';
 export {
   answerVersionOrHelp,

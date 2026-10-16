@@ -365,7 +365,8 @@ the instance that holds it.
 | `--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, YAML `sse` | ``<form>: SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)`` |
 
 `MCP_SSE_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`,
-`AUTH_BROKER_PATH` and `SAP_CONNECTION_TYPE` are not read by `mcp-abap-adt-http`.
+`AUTH_BROKER_PATH`, `SAP_CONNECTION_TYPE`, `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP` and
+`SAP_SAPROUTER` are not read by `mcp-abap-adt-http`.
 
 TLS needs `--tls-cert` and `--tls-key` together; one without the other (or `--tls-ca` alone) is
 refused at start.
@@ -432,7 +433,8 @@ until the connection closes; see [Held State](#held-state).
 | `--host`, `--port`, `--path`, `--http-*`, YAML `http` | ``<form>: Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)`` |
 
 `MCP_HTTP_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`,
-`AUTH_BROKER_PATH` and `SAP_CONNECTION_TYPE` are not read by `mcp-abap-adt-sse`.
+`AUTH_BROKER_PATH`, `SAP_CONNECTION_TYPE`, `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP` and
+`SAP_SAPROUTER` are not read by `mcp-abap-adt-sse`.
 
 `--host` and `--port` are Streamable HTTP's: the SSE binary listens on `--sse-host` /
 `--sse-port`.

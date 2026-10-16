@@ -15,6 +15,7 @@ import {
   MESSAGE_SERVER_FIELDS,
   type MessageServerField,
   processEdges,
+  rfcAddressRefusalOf,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
 import {
@@ -597,6 +598,12 @@ export function startConnectionWords(
   }
   if (read !== undefined) {
     return destinationFailureWords(error, destination, options);
+  }
+  // connection's refusal of an RFC address it cannot dial (a message server
+  // with neither msserv nor sysid): its own fixed words, as it came.
+  const address = rfcAddressRefusalOf(error);
+  if (address !== undefined) {
+    return `Destination "${destination}" could not be connected at start: ${address}`;
   }
   const sap = sapAnswerOf(error);
   return `Destination "${destination}" could not be connected at start: ${errorClassOf(error)}${sap === undefined ? '' : `, SAP answered ${sap.status}`}`;

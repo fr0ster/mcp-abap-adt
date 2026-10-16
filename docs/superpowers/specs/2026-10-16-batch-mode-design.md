@@ -2,8 +2,7 @@
 
 Implements `docs/superpowers/2026-10-16-batch-mode-goal.md` (the goal). The goal is binding; this
 document says how, against the code as it is on `feat/auth-chain-6`, with the owner's answers to the
-questions earlier drafts raised folded in. Where the text carries *[controller's recommendation,
-pending owner confirmation]*, the owner confirms it at review.
+questions earlier drafts raised folded in.
 
 Sources read: `src/embeddable/BaseMcpServer.ts`, `src/handlers/interfaces.ts`, `src/lib/clients.ts`,
 `src/lib/longCall.ts`, `src/lib/longTools.ts`, `tools/long-handlers.json`,
@@ -29,7 +28,8 @@ source), **[doc]** (stated in its BATCH.md or CHANGELOG, not traced in code) or 
   per envelope and restores it in `finally` **[code]**; resolves a part's promise with its inner
   response for 2xx, rejects with an `Error` carrying `response` otherwise **[code]**; after each
   envelope yields one turn and sends what members recorded meanwhile as follow-up envelopes,
-  up to 100 **[code]** — among them the members' `406`/`415` corrected retry **[doc]**; an empty
+  up to 100 **[code]** — among them a member's `406`/`415` corrected retry, which batch mode
+  switches off (§4.7); an empty
   queue answers a synthetic `204` without sending **[code]**; concurrent `execute()` is refused
   **[code]**.
 - On an envelope failure: parts of that envelope reject with the error, every later part (and
@@ -97,7 +97,7 @@ and the answers.
   instance's; the instance has one destination, so there is no other case. No batch tool takes a
   `state_handle` parameter.
   - **The header.** The handle travels as the optional request header `x-mcp-state-handle`.
-    *[controller's recommendation, pending owner confirmation]* `StreamableHttpServer`'s request
+    `StreamableHttpServer`'s request
     handler, where it reads the request's other headers (`headerContext(req.headers)`), reads
     `x-mcp-state-handle` first, then — when the header is absent — the `tools/call` argument as
     today (`handleOf(req.body)`; the debugger tools keep their `state_handle` argument in this PR),
@@ -208,7 +208,7 @@ Recording an eligible call:
 - The handler gets `{ ...context, connection: recorder }` — a **per-call recorder**, an
   `IAbapConnection` over the open `AdtBatchConnection` that forwards every call; at the call's
   first `makeAdtRequest` it takes the batch's next number for the call, and it keeps the raw part
-  of each of the call's requests when `batch.keepRawParts` is on (§5.3). Nothing else of the
+  of the call's request when `batch.keepRawParts` is on (§5.3). Nothing else of the
   context changes.
 - The handler is started inside the same scopes as today (`inHeldFlow`, `withDestinationSystemContext`,
   `withKnownSystemContext`), but its request-signal scope is the **batch's** signal, not the call's
@@ -228,10 +228,8 @@ Recording an eligible call:
 
 **Numbering.** Every call that put a request into an envelope has its own number, from 1, in the
 order made — and only those: a refused call, or a handler that refused before sending, takes none.
-A request a member records **while settling** — the `406`/`415` corrected retry **[doc]**, adt-clients'
-own accept negotiation, not a call of the model — *[controller's recommendation, pending owner
-confirmation]* takes no number of its own: it belongs to the call whose request it retries, and that
-call's answer is the answer after the retry, under the call's number.
+In batch mode there are no retries (§4.7): a part answered `406` or `415` is that call's answer,
+as any other failure, and the model reads it and decides.
 
 ### 4.2 Eligibility: declared, reviewed, proven
 
@@ -303,7 +301,7 @@ that call holds.
 
 ### 4.6 The two new single-request modes in compact
 
-*[controller's recommendation, pending owner confirmation]* Compact is its own library with its own
+Compact is its own library with its own
 servers: both are added in the compact library — its modify half (`compact-modify`) — as parameters
 of its existing `HandlerCreate` and `HandlerUpdate`, `create_only: boolean` and `document: string`.
 They are served by the `compact` binaries (not `compact-ro`) and are eligible in batch mode. They work outside batch mode too, as one request each.
@@ -326,6 +324,46 @@ They are served by the `compact` binaries (not `compact-ro`) and are eligible in
   `document` beside `properties` or the flat fields `properties` covers, is refused before anything
   is sent. With `properties` (no `document`) the existing read-patch-write stays, and stays
   ineligible. The source-written types already send one `PUT` under a lock and take no `document`.
+
+### 4.7 No retries in batch mode
+
+The batch is the model's: nothing recorded is corrected and sent again. adt-clients' accept
+negotiation retries a request answered `406` (with a corrected `Accept`) or `415` (with a corrected
+`Content-Type`) **[code]**, `src/utils/acceptNegotiation.ts` at `v33.0.0`, from line 194
+(`makeAdtRequestWithAcceptNegotiation`). In a batch that retry would be recorded while settling and
+sent in a follow-up envelope; batch mode switches it off.
+
+What adt-clients offers, at `v33.0.0` **[code]**:
+
+- The switch and the learned media types live **per connection object**, under a symbol on the
+  object itself (`acceptNegotiation.ts:25–45`, `stateOf`); `withRequestTrace` keeps the object's
+  identity (`requestTrace.ts:78–85`), and `withCallTimeout` forwards symbol reads to it (the file's
+  own header, `acceptNegotiation.ts:10–24`).
+- `makeAdtRequestWithAcceptNegotiation` reads the switch of the connection it is handed
+  (`acceptNegotiation.ts:202–203`: `options?.enableAcceptCorrection ??
+  getAcceptCorrectionEnabled(connection)`); the switch, when set, wins over the
+  `ADT_ACCEPT_CORRECTION` environment default (`acceptNegotiation.ts:73–79`).
+- `AdtClient`'s constructor option `enableAcceptCorrection` (`IAdtClientOptions`, interfaces-adt)
+  sets that switch on the connection the client is built with and, when `false`, does not wrap it
+  (`AdtClient.ts:1089–1104`). `setAcceptCorrectionEnabled` itself (`acceptNegotiation.ts:65–70`) is
+  not exported from the package's index **[code]**, so the constructor option is the way in.
+
+How the server uses it: a recorded call's clients are built over its per-call recorder —
+`createAdtClient(recorder, …)` — with `enableAcceptCorrection: false` (`GuardedAdtClient` passes its
+options through to `AdtClient`). The switch lands on the recorder, a different object from the
+instance's connection, so the members recorded through it never correct and retry, and the
+instance's plain connection keeps its own switch, untouched. The debugger batch's requests are sent
+by `src/runtime/debugger/abap.ts` with a plain `connection.makeAdtRequest` (e.g. lines 208, 262,
+277, 349, 372) **[code]** — no negotiation on that path.
+
+**Gap — the envelope itself.** The envelope `POST` goes through the late-bound target to the
+instance's connection's `makeAdtRequest`. When an `AdtClient` built over that connection with
+correction on (the default, or `ADT_ACCEPT_CORRECTION` unset) has wrapped it,
+`wrapConnectionAcceptNegotiation` has replaced that method (`acceptNegotiation.ts:171–192`), so a
+`406`/`415` answered to the **envelope** would be corrected and the envelope sent again. adt-clients
+offers no way to send one request with correction off on a connection whose switch is on, short of
+switching the whole connection: this is an adt-clients change (for example `AdtBatchConnection`
+sending its envelope past the negotiation), not something the server works around.
 
 ## 5. Execution at `BatchEnd`
 
@@ -390,7 +428,7 @@ strategies read; nothing else is put in its place. By how the part settled:
 
 **Raw parts, by configuration.** With `batch.keepRawParts` on (default **off**) — a server
 configuration value the launcher reads and hands to each `InstanceBatch` it creates — each answer
-also carries, beside the tool's answer, SAP's raw part of each of the call's requests as it came:
+also carries, beside the tool's answer, SAP's raw part of the call's request as it came:
 `{ status, status_text, headers, body }` — the inner status, its text, the inner headers as
 adt-clients parsed them (names lower-cased **[code]**), the body as text, `""` when the part had
 none (goal: "an empty line when there is none"); a request not sent has none. Off, no raw part is
@@ -533,10 +571,13 @@ watch the test go red, revert (the *Break* line).
 - **Queue order is call order** — two handlers with an artificial pre-record delay; the envelope
   holds them in call order. *Break:* return before the record.
 - **Numbers only for what went into an envelope** — a refused call and a handler that refuses its
-  arguments before sending take no number and answer at once; the next recorded request takes the
-  next number. A follow-up request recorded while settling (a fake member's corrected retry) takes
-  no number: the call's answer is the one after the retry, under the call's number.
-  *Break:* number at call entry; number every request.
+  arguments before sending take no number and answer at once; the next recorded call takes the
+  next number. *Break:* number at call entry.
+- **No retry in batch mode** — a recorded read and a recorded write whose parts answer `406` (with a
+  supported `Accept` in the answer) and `415`: each is that call's answer, built by its handler as
+  any failure; the fake saw each request once and no follow-up envelope; the instance's plain
+  connection still corrects outside the batch. *Break:* build the recorded call's client without
+  `enableAcceptCorrection: false`.
 - **Only batch tools and eligible tools while a batch is open** — a high tool, `HandlerUpdate`
   DOMAIN with `properties`, a debugger tool during a communication batch, a leftover-session tool:
   refused, handler not called, nothing recorded or sent. *Break:* default eligibility to true.
@@ -564,8 +605,8 @@ watch the test go red, revert (the *Break* line).
   envelope with no answer; the not-sent ones; the summary's `failed`; the strategies are not run
   before `execute()`. *Break:* answer the raw part instead of the handler's answer.
 - **`batch.keepRawParts`** — off (default): no raw part in any answer; on: each answer carries the
-  raw part(s) as they came (status, text, headers, body, `""` for a bodyless `200`), the retry's
-  part beside the first. *Break:* default it on.
+  raw part as it came (status, text, headers, body, `""` for a bodyless `200`).
+  *Break:* default it on.
 - **Credential refusal** — a refusal-shaped object (own `refusal.kind`, `refusal.reason`, `at`,
   no `response`) thrown by the target: `BatchEnd` answers it as `answerRead` does, every number's
   answer is it, mode off; the answered variant (`cause.response.status === 401`). *Break:* wrap
@@ -646,10 +687,11 @@ No unit test talks to SAP; no live test runs in CI.
 
 ## Contradictions with the owner's answers
 
-- **Round 1's Q3 said the header's value is passed into the instance constructor as an attribute and
-  used on the call.** Round 2 drops the rule that used it ("act only when the header equals the
-  instance's handle"), and routing by the pool is all that remains — so this design passes no
-  attribute to the constructor: nothing would read it.
+- **"No retries" and the connection's `401` renewal.** On a `401` the connection asks its credential
+  to renew and sends that one request again (§5.1) — for an envelope too. SAP refused it before
+  running it, so nothing executed is repeated, but it is a second send of the envelope. This design
+  keeps the connection's behaviour as it is for every request; the owner confirms that "no retries"
+  covers the accept negotiation only.
 
 ## Open questions for the owner
 

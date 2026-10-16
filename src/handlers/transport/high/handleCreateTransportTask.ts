@@ -31,13 +31,18 @@
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import { answer, type FailureEntry, failureEntry } from '../../../lib/answer';
+import {
+  answer,
+  type FailureEntry,
+  failureEntry,
+  isCredentialPayload,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { atStep } from '../../../lib/strategies/step';
+import { atStep, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
@@ -184,6 +189,18 @@ export async function handleCreateTransportTask(
           // already uses for a release that failed after a write that landed:
           // the call succeeded, and something the caller must act on did not.
           const failure = changed.getError();
+          // A credential failure (a `401`) is the call's failure, as it came
+          // with its step — not a cleanup note beside a creation.
+          if (isCredentialPayload(failureEntry(failure, 'change task type'))) {
+            const stepped = withStep(failure, 'change task type');
+            return {
+              ok: false,
+              getResult: () => {
+                throw new Error('asked for the result of a failure');
+              },
+              getError: () => stepped,
+            } as unknown as typeof created;
+          }
           const result = created.ok ? created.getResult() : undefined;
           return {
             ok: created.ok,

@@ -46,6 +46,7 @@ import {
 } from './DebugSession';
 import {
   asFailure,
+  credentialRefusalIn,
   type DebugFailure,
   describeFailures,
   failedEntry,
@@ -90,6 +91,8 @@ interface Open {
   readDone: boolean; // the read loop's last batch arrived (its cleanup may still run)
   /** What the last batch could not undo, set once its cleanup finished and was recorded. */
   lastBatchFailures?: DebugFailure[];
+  /** The steps the last cleanup did not attempt once the credential was refused. */
+  notAttempted?: string[];
   readFailed?: string; // the event read failed: a sync waiting for confirmation hears it at once
   readFailedWith?: IAdtError; // the method's error behind `readFailed`, when the read answered one
   readThrown?: DebugFailure; // the entry of the throw behind `readFailed`, when the read threw (step `read events`)
@@ -476,6 +479,16 @@ export class AmdpSession<O = unknown> {
       if (e.kind === 'ON_BREAK' && !open.released.has(e.debuggeeId))
         open.unreleased.add(e.debuggeeId);
     const failures: DebugFailure[] = [];
+    // A credential failure stops it: no request after it is sent — each would
+    // ask the credential again — and each step left is named, kept for the
+    // next stop.
+    const notAttempted: string[] = [];
+    open.notAttempted = notAttempted;
+    const skipped = (step: string): boolean => {
+      if (credentialRefusalIn(failures) === undefined) return false;
+      notAttempted.push(step);
+      return true;
+    };
     if (!open.cleared) {
       const cleared = await open.onCommands
         .syncBreakpoints(open.mainId, [])
@@ -484,6 +497,7 @@ export class AmdpSession<O = unknown> {
       else failures.push(failedEntry(cleared, 'clear breakpoints'));
     }
     for (const id of [...open.unreleased]) {
+      if (skipped(`release debuggee ${id}`)) continue;
       const released = await open.onCommands
         .deleteDebuggee(open.mainId, id)
         .catch(asFailure);
@@ -492,7 +506,7 @@ export class AmdpSession<O = unknown> {
         open.released.add(id);
       } else failures.push(failedEntry(released, `release debuggee ${id}`));
     }
-    if (!open.stopped) {
+    if (!open.stopped && !skipped('stop')) {
       const stopped = await open.onCommands.stop(open.mainId).catch(asFailure);
       if (stopped.ok) open.stopped = true;
       else failures.push(failedEntry(stopped, 'stop'));
@@ -644,6 +658,7 @@ export class AmdpSession<O = unknown> {
    */
   async stop(): Promise<void> {
     let ending: Open | undefined;
+    let notAttempted: readonly string[] = [];
     await this.mutate(async () => {
       const failures: DebugFailure[] = [];
       try {
@@ -654,6 +669,7 @@ export class AmdpSession<O = unknown> {
           const open = this.closing;
           const stoppedBefore = open.stopped;
           failures.push(...(await this.finishClosing(open, [])));
+          notAttempted = open.notAttempted ?? [];
           // Accepted in this call: the system answers the open read now, and the read loop
           // handles that answer as the last batch. This call waits for it outside the serial,
           // so a read that never answers holds this call only — never another call, a
@@ -678,13 +694,15 @@ export class AmdpSession<O = unknown> {
         this.abandoned.clear();
         this.cleanupFailures = failures;
       }
-      if (failures.length) throw new DebugCleanupError(failures);
+      if (failures.length)
+        throw new DebugCleanupError(failures, [], notAttempted);
     });
     // Outside the serial: the read's last batch, and what it could not undo is this
     // stop's failure too — its own, not whatever a later call left in cleanupFailures.
     if (ending) {
       const failures = await this.lastBatchHandled(ending);
-      if (failures.length) throw new DebugCleanupError(failures);
+      if (failures.length)
+        throw new DebugCleanupError(failures, [], ending.notAttempted ?? []);
     }
   }
 

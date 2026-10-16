@@ -5,7 +5,12 @@
  * not undo several things answers each as such an entry, not one text.
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { type FailureEntry, failureEntry, thrownEntry } from '../answer';
+import {
+  type FailureEntry,
+  failureEntry,
+  isCredentialPayload,
+  thrownEntry,
+} from '../answer';
 import { failureOf } from '../auth/failures';
 import {
   carryingPayload,
@@ -98,4 +103,46 @@ export function leaveBehind(error: unknown, left: LeftBehind): void {
     message: messageOf(error),
     cleanup: mergedLeftBehind(payloadCarriedBy(error)?.cleanup, left),
   });
+}
+
+/** The fixed words beside the steps a cleanup did not attempt. */
+export const NOT_ATTEMPTED_WORDS =
+  'Not attempted: the credential was refused, and every further request would be refused again. They stay for the next stop.';
+
+/** The credential failure among a cleanup's entries, if any. */
+export function credentialRefusalIn(
+  list: readonly DebugFailure[],
+): DebugFailure | undefined {
+  return list.find(isCredentialPayload);
+}
+
+/**
+ * What a cleanup answers: its entries, or — once the credential was refused —
+ * that refusal as it came (its entry, with its step), the other entries
+ * beside it, and the steps not attempted after it, in fixed words.
+ */
+export function cleanupPayload(
+  failures: readonly DebugFailure[],
+  notes: readonly DebugFailure[] = [],
+  notAttempted: readonly string[] = [],
+): Record<string, unknown> {
+  const refused = credentialRefusalIn(failures);
+  const others = failures.filter((entry) => entry !== refused);
+  const skipped = notAttempted.length
+    ? {
+        not_attempted: {
+          message: NOT_ATTEMPTED_WORDS,
+          steps: [...notAttempted],
+        },
+      }
+    : {};
+  const noted = notes.length ? { notes: [...notes] } : {};
+  if (refused === undefined)
+    return { failures: [...failures], ...skipped, ...noted };
+  return {
+    ...refused,
+    ...(others.length ? { failures: others } : {}),
+    ...skipped,
+    ...noted,
+  };
 }

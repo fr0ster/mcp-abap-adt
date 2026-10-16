@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { isCredentialFailure } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
@@ -48,6 +49,8 @@ export async function handleGetInclude(context: HandlerContext, args: any) {
       ],
     };
   } catch (error) {
+    // A credential failure is the chain's answer, as it came: never reworded.
+    if (isCredentialFailure(error)) return return_error(error);
     logger?.error(
       `Error getting include ${args?.include_name ?? ''}: ${error instanceof Error ? error.message : String(error)}`,
     );

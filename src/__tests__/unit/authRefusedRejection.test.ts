@@ -11,8 +11,13 @@ import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { handleUpdateBehaviorDefinition } from '../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
+import { handleGetEnhancementImpl } from '../../handlers/enhancement/readonly/handleGetEnhancementImpl';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
+import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclude';
+import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
+import { handleCreateTransportTask } from '../../handlers/transport/high/handleCreateTransportTask';
+import { objectsListCache } from '../../lib/getObjectsListCache';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
 import { createSourceReaderDeps } from '../../lib/search-source/sourceReader';
 import {
@@ -259,5 +264,94 @@ describe('GetServiceBindingPreviewUrl: the system lookup rejects with AuthRefuse
     );
     expectCredentialAnswer(result);
     expect(calls).toEqual([]);
+  });
+});
+
+describe('a direct request the credential refused ends the call as the credential failure', () => {
+  /** A connection whose every request is refused before SAP is asked. */
+  const refusing = () =>
+    ({
+      getBaseUrl: async () => 'https://example.invalid',
+      makeAdtRequest: async () => {
+        throw refused();
+      },
+    }) as any;
+
+  it('GetInclude: the chain answer, not its message as text', async () => {
+    const result = await handleGetInclude(
+      { connection: refusing(), logger: undefined } as any,
+      { include_name: 'ZINC' },
+    );
+    expectCredentialAnswer(result);
+  });
+
+  it('GetObjectNodeFromCache: the chain answer, not a note in the node', async () => {
+    objectsListCache.setCache({
+      objects: [
+        {
+          OBJECT_TYPE: 'PROG/P',
+          OBJECT_NAME: 'ZPROG',
+          TECH_NAME: 'ZPROG',
+          OBJECT_URI: '/sap/bc/adt/programs/programs/zprog',
+        },
+      ],
+    });
+    const result = await handleGetObjectNodeFromCache(
+      { connection: refusing(), logger: undefined } as any,
+      { object_type: 'PROG/P', object_name: 'ZPROG', tech_name: 'ZPROG' },
+    );
+    expectCredentialAnswer(result);
+  });
+
+  it("GetEnhancementImpl: the type search's refusal is the answer, not the words of an unknown collection", async () => {
+    const result = await handleGetEnhancementImpl(
+      { connection: refusing(), logger: undefined } as any,
+      { enhancement_spot: 'zspot', enhancement_name: 'ZENH' },
+    );
+    expectCredentialAnswer(result);
+  });
+});
+
+describe("a 401 SAP answered to a cleanup step is the call's credential failure", () => {
+  const unauthorized = () =>
+    refusedResponse('Unauthorized', {
+      response: { status: 401, data: '' },
+    } as any);
+
+  it("withLock: the unlock answered 401 after a successful write: the unlock's error with its step, no cleanup entry, nothing activated", async () => {
+    const calls: string[] = [];
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      check: async () => okResponse(reading(undefined, '', 200)),
+      update: async () => okResponse(reading(undefined, '', 200)),
+      unlock: async () => (calls.push('unlock'), unauthorized()),
+      activate: async () => (calls.push('activate'), okResponse(undefined)),
+    });
+    const result: any = await handleUpdateClass(context as any, {
+      class_name: 'ZCL_X',
+      source_code: 'x',
+      activate: true,
+    });
+    expect(result.isError).toBe(true);
+    const payload = payloadOf(result);
+    expect(payload).toMatchObject({ status: 401, step: 'unlock' });
+    expect(payload.cleanup).toBeUndefined();
+    expect(calls).toEqual(['unlock']);
+  });
+
+  it('CreateTransportTask: the task type change answered 401: its error with its step, not a cleanup note', async () => {
+    fakeClient = fakeClientOf({
+      createTask: async () =>
+        okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
+      changeTaskType: async () => unauthorized(),
+    });
+    const result: any = await handleCreateTransportTask(context as any, {
+      transport_number: 'SIDK907072',
+      target_user: 'DEVELOPER',
+    });
+    expect(result.isError).toBe(true);
+    const payload = payloadOf(result);
+    expect(payload).toMatchObject({ status: 401, step: 'change task type' });
+    expect(payload.cleanup).toBeUndefined();
   });
 });

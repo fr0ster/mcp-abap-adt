@@ -32,9 +32,16 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
+  type FailureEntry,
+  isCredentialFailure,
+  isCredentialPayload,
+  unlessCredentialFailure,
+} from '../answer';
+import {
   carryingFailure,
   carryingPayload,
   noteLeftBehind,
+  payloadCarriedBy,
 } from '../strategies/step';
 import {
   type BreakpointNotPlaced,
@@ -46,6 +53,8 @@ import {
 } from './arming';
 import {
   asFailure,
+  cleanupPayload,
+  credentialRefusalIn,
   type DebugFailure,
   describeFailures,
   failedEntry,
@@ -187,17 +196,20 @@ export class DebugRequestError extends Error {}
 export class DebugCleanupError extends Error {
   readonly failures: readonly DebugFailure[];
   readonly notes: readonly DebugFailure[];
+  /** The steps not attempted once the credential was refused. */
+  readonly notAttempted: readonly string[];
   constructor(
     failures: readonly DebugFailure[],
     notes: readonly DebugFailure[] = [],
+    notAttempted: readonly string[] = [],
   ) {
     super(describeFailures([...failures, ...notes]));
     this.failures = failures;
     this.notes = notes;
-    carryingPayload(this, {
-      failures: [...failures],
-      ...(notes.length ? { notes: [...notes] } : {}),
-    });
+    this.notAttempted = notAttempted;
+    // A credential refusal is the answer as it came, with its step; the
+    // steps after it were not attempted (`cleanupPayload`).
+    carryingPayload(this, cleanupPayload(failures, notes, notAttempted));
   }
 }
 /**
@@ -313,6 +325,19 @@ function describePlaced(b: BreakpointReading): string {
     b.statement ??
     ([b.msgId, b.msgNo].filter(Boolean).join(' ') || undefined);
   return `${b.id ?? '?'} (${b.kind}${on ? ` ${on}` : ''})`;
+}
+
+/**
+ * The credential failure a start's throw is or carries, as its entry with its
+ * step: a chain failure or a `401` thrown, or a listener's throw carrying one
+ * (`listenerThrown`, `listenerError`). `undefined` for any other failure.
+ */
+function credentialEntryOf(error: unknown): DebugFailure | undefined {
+  if (isCredentialFailure(error)) return thrownFailure(error, 'start');
+  const carried = payloadCarriedBy(error) as FailureEntry | undefined;
+  return carried !== undefined && isCredentialPayload(carried)
+    ? carried
+    : undefined;
 }
 
 /** A failed listener answer: the holder named when it is the system's conflict. */
@@ -652,6 +677,7 @@ export class DebugSession<O = unknown> {
     listener: Listener | undefined,
     open: Promise<IAdtResponse<string>> | undefined,
     failures: DebugFailure[],
+    skipped: (step: string) => boolean,
   ): Promise<void> {
     this.listener = undefined;
     if (!listener) return;
@@ -662,7 +688,13 @@ export class DebugSession<O = unknown> {
       else {
         // A catch in it — during the stop, or just before and not yet handled.
         const caught = readDebuggee(bodyOf(last));
-        if (caught) await this.releaseCaught(caught, failures);
+        if (
+          caught &&
+          !skipped(
+            `release a debuggee caught during the stop (${caught.debuggeeId})`,
+          )
+        )
+          await this.releaseCaught(caught, failures);
       }
     }
     await this.closeOrKeep(
@@ -813,11 +845,20 @@ export class DebugSession<O = unknown> {
         // deletes the ids "placed here": after a replacement they do not say what this
         // start added.
         this.cleanupNotes = [];
-        const failures = await this.cleanupLocked();
+        // A start the credential refused: its cleanup sends nothing — every
+        // request would be refused again — and names what it did not attempt.
+        const refusedStart = credentialEntryOf(error);
+        const failures = await this.cleanupLocked(refusedStart);
         const notes = this.cleanupNotes.splice(0);
         this.failure = undefined;
         this.notices.length = 0;
-        this.settle(failures);
+        this.settle(failures, this.cleanupNotAttempted);
+        if (refusedStart)
+          throw new DebugCleanupError(
+            [refusedStart, ...failures],
+            notes,
+            this.cleanupNotAttempted,
+          );
         if (notes.length === 0 && failures.length === 0) throw error;
         const told = [
           ...(notes.length ? [describeFailures(notes)] : []),
@@ -1363,6 +1404,8 @@ export class DebugSession<O = unknown> {
   private cleanupFailures: DebugFailure[] = [];
   /** What the current cleanup has to tell that is no debt: SAP's final refusal of the stopListener. */
   private cleanupNotes: DebugFailure[] = [];
+  /** The steps the last cleanup did not attempt once the credential was refused. */
+  private cleanupNotAttempted: string[] = [];
   /** Connections whose work is done but whose close threw: the next stop closes them. */
   private readonly unclosed = new Set<IAbapConnection>();
   /** Attached debuggees whose release failed, each with its connection: the next stop retries. */
@@ -1415,7 +1458,8 @@ export class DebugSession<O = unknown> {
     // A connection that cannot be opened sends nothing: that start failed before any change.
     const control = await this.controlDebugger();
     this.changed = true;
-    await control.stopListener(identity).catch(() => undefined);
+    // A credential failure ends the start as it came; any other is no failure.
+    await control.stopListener(identity).catch(unlessCredentialFailure);
     this.reconciled = true;
   }
 
@@ -1526,14 +1570,35 @@ export class DebugSession<O = unknown> {
    * throws; answers what it could not undo, which stays for the next stop.
    * It needs the connected user's debug authorisation (`S_DEVELOP` DEBUG) as
    * the start does; SAP's refusal reaches the model as SAP says it.
+   *
+   * A credential failure (the chain's refusal, or a `401`) stops it: no
+   * request after it is sent — each would ask the credential again — and each
+   * step left is named in `cleanupNotAttempted`, kept for the next stop. Only
+   * the closes still run: a logoff carries the session's cookies, nothing
+   * asked of the credential provider.
    */
-  private async cleanupLocked(): Promise<DebugFailure[]> {
+  private async cleanupLocked(
+    refusedBefore?: DebugFailure,
+  ): Promise<DebugFailure[]> {
     this.generation++;
     const failures: DebugFailure[] = [];
+    const notAttempted: string[] = [];
+    this.cleanupNotAttempted = notAttempted;
+    /** Whether `step` is not sent: the credential was refused before it. */
+    const skipped = (step: string): boolean => {
+      if (
+        refusedBefore === undefined &&
+        credentialRefusalIn(failures) === undefined
+      )
+        return false;
+      notAttempted.push(step);
+      return true;
+    };
     try {
       for (const connection of [...this.unclosed])
         await this.closeOrKeep(connection, 'a connection', failures);
       for (const owed of [...this.owed]) {
+        if (skipped(`release ${owed.what}`)) continue;
         const notReleased = await this.release(owed.debugger, owed.what);
         if (notReleased) {
           failures.push(notReleased); // kept: a later stop retries
@@ -1549,7 +1614,7 @@ export class DebugSession<O = unknown> {
       }
       // 1. A held stop is released.
       const stop = this.current;
-      if (stop) {
+      if (stop && !skipped('release the debuggee')) {
         const released = await stop.debugger
           .step('stepContinue', { analyse: analyseDebuggeeEnd })
           .catch(asFailure);
@@ -1566,7 +1631,7 @@ export class DebugSession<O = unknown> {
         }
       }
       // 2. The listener is stopped, and the key's breakpoints with it.
-      if (this.changed) {
+      if (this.changed && !skipped('stop listener')) {
         const identity = this.requireIdentity();
         const control = await this.controlDebugger();
         const listener = this.listener;
@@ -1593,7 +1658,7 @@ export class DebugSession<O = unknown> {
           // handled further (DEBUGGER.md, What ends a session).
           if (open && !settledPolls.has(open))
             await control.stopListener(identity).catch(() => undefined);
-          await this.retireListener(listener, open, failures);
+          await this.retireListener(listener, open, failures, skipped);
         } else if (refusesUser(stopped)) {
           // Our choice on an explicit reading (refusesUser), a safety net: 404
           // invalidUser (measured for a request user that does not exist) or 403
@@ -1622,11 +1687,12 @@ export class DebugSession<O = unknown> {
           // Unlike after a stopListener that succeeded, the system's listener was not
           // stopped, so nothing wakes an open poll: the wait for its answer can last
           // the poll's full hold — the system's clock, not ours.
-          await this.retireListener(listener, open, failures);
+          await this.retireListener(listener, open, failures, skipped);
         } else {
           // 4. Deleted by id, as before; what fails stays for the next stop.
           failures.push(failedEntry(stopped, 'stop listener'));
           for (const id of [...this.armed.keys()]) {
+            if (skipped(`delete breakpoint ${id}`)) continue;
             const deleted = await control
               .deleteBreakpoint(identity, id)
               .catch(asFailure);
@@ -1634,7 +1700,7 @@ export class DebugSession<O = unknown> {
             else failures.push(failedEntry(deleted, `delete breakpoint ${id}`));
           }
         }
-      } else if (this.listener) {
+      } else if (this.listener && !this.changed) {
         // Nothing was sent that changes the system: a listener here only closes.
         const listener = this.listener;
         this.listener = undefined;
@@ -1670,9 +1736,13 @@ export class DebugSession<O = unknown> {
    * owed stopListener goes as soon as the listener's stop succeeded or was refused
    * for the user (cleanupLocked), never sent twice.
    */
-  private settle(failures: DebugFailure[]): void {
+  private settle(
+    failures: DebugFailure[],
+    notAttempted: readonly string[] = [],
+  ): void {
     this.cleanupFailures = failures;
-    if (failures.length > 0) return;
+    // A step not attempted is kept like a failure: the next stop sends it.
+    if (failures.length > 0 || notAttempted.length > 0) return;
     this.fixed = undefined;
     this.changed = false;
     this.preferences = {};
@@ -1706,9 +1776,10 @@ export class DebugSession<O = unknown> {
       const notes = this.cleanupNotes.splice(0);
       this.failure = undefined;
       this.notices.length = 0;
-      this.settle(failures);
+      this.settle(failures, this.cleanupNotAttempted);
       this.notify(); // also tells the instance state (observe) that this part may hold nothing now
-      if (failures.length) throw new DebugCleanupError(failures, notes);
+      if (failures.length)
+        throw new DebugCleanupError(failures, notes, this.cleanupNotAttempted);
       return notes;
     });
   }

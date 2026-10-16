@@ -16,9 +16,10 @@ export const TOOL_DEFINITION = {
 
 // handleGetObjectNodeFromCache returns a cached node by OBJECT_TYPE, OBJECT_NAME, and TECH_NAME, expanding OBJECT_URI when available
 
+import { isCredentialFailure } from '../../../lib/answer';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { makeAdtRequest } from '../../../lib/utils';
+import { makeAdtRequest, return_error } from '../../../lib/utils';
 
 /**
  * @param args { object_type, object_name, tech_name }
@@ -93,6 +94,9 @@ export async function handleGetObjectNodeFromCache(
         objectsListCache.setCache(cache);
       }
     } catch (e) {
+      // A credential failure is the call's answer, as it came: not a note in
+      // the node.
+      if (isCredentialFailure(e)) return return_error(e);
       logger?.error('Failed to expand OBJECT_URI from cache', e as any);
       node.object_uri_response = `ERROR: ${e instanceof Error ? e.message : String(e)}`;
     }

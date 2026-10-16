@@ -1,7 +1,12 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { failureEntry, isCredentialFailure, thrownEntry } from '../answer';
+import {
+  failureEntry,
+  isCredentialFailure,
+  isCredentialPayload,
+  thrownEntry,
+} from '../answer';
 import { type Cleanup, safeRequest } from './safeFields';
-import { atStep, stepOf } from './step';
+import { atStep, stepOf, withStep } from './step';
 
 export interface CleanupCarrier {
   cleanup?: Cleanup;
@@ -122,6 +127,13 @@ export async function withLock<H, T>(
   if (threw && isCredentialFailure(thrown)) throw thrown;
   if (released.kind === 'threw' && isCredentialFailure(released.thrown))
     throw released.thrown;
+  // A `401` SAP answered to the unlock is the same: the call's failure, the
+  // unlock's error as it is with its step — not a cleanup entry.
+  if (
+    released.kind === 'refused' &&
+    isCredentialPayload(failureEntry(released.error, 'unlock'))
+  )
+    return failure<T>(withStep(released.error, 'unlock'));
 
   if (threw) {
     if (released.kind === 'ok') throw thrown;

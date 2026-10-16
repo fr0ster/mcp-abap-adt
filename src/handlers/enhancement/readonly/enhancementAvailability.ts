@@ -1,4 +1,5 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { isCredentialFailure } from '../../../lib/answer';
 import { makeAdtRequest } from '../../../lib/utils';
 
 /**
@@ -54,9 +55,11 @@ export async function enhancementTypeOf(
         continue;
       return /adtcore:type="([^"]+)"/.exec(attrs)?.[1];
     }
-  } catch {
-    // A search that fails says nothing about the type; the caller keeps the
-    // failure it already has.
+  } catch (error) {
+    // A credential failure ends the call as it came. Any other search that
+    // fails says nothing about the type; the caller keeps the failure it
+    // already has.
+    if (isCredentialFailure(error)) throw error;
   }
   return undefined;
 }

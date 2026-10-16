@@ -1,7 +1,10 @@
+import { authError } from '@mcp-abap-adt/auth-errors';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
 import { payloadCarriedBy } from '../../../lib/strategies/step';
+import { return_error } from '../../../lib/utils';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   AMDP_BREAK_LINE,
@@ -648,5 +651,34 @@ describe('AmdpSession', () => {
     w.reads[1].resolve(okResponse(BREAK));
     await until(() => heard.mock.calls.length > 0);
     expect(await w.session.wait(0)).toMatchObject({ state: 'event' });
+  });
+
+  it('a breakpoint clear the credential refused (AuthRefusedError): the stop is not sent, the refusal is the answer with its step, the stop named not attempted', async () => {
+    const w = await started();
+    const realSync = w.dbg.syncBreakpoints;
+    w.dbg.syncBreakpoints = async (m: string, b: any[]) => {
+      if (b.length) return realSync(m, b);
+      throw new AuthRefusedError(
+        authError.connection({
+          problem: 'refused-after-renewal',
+          at: 'request',
+        }),
+        'request',
+      );
+    };
+    w.calls.length = 0;
+    const error = await w.session.stop().then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(DebugCleanupError);
+    expect(w.calls).not.toContain('stop');
+    const payload = JSON.parse((return_error(error) as any).content[0].text);
+    expect(payload).toMatchObject({
+      error: 'authentication_failed',
+      step: 'clear breakpoints',
+      not_attempted: { steps: ['stop'] },
+    });
+    expect(w.session.holdsState()).toBe(true);
   });
 });

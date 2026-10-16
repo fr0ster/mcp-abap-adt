@@ -77,7 +77,17 @@ export class DebuggerInstance implements StatePart {
           ? [...r.reason.notes]
           : [],
       );
-      throw new DebugCleanupError(failures, [...failedNotes, ...notes]);
+      // The steps either side did not attempt once the credential was refused.
+      const notAttempted = results.flatMap((r) =>
+        r.status === 'rejected' && r.reason instanceof DebugCleanupError
+          ? [...r.reason.notAttempted]
+          : [],
+      );
+      throw new DebugCleanupError(
+        failures,
+        [...failedNotes, ...notes],
+        notAttempted,
+      );
     }
     return notes;
   }

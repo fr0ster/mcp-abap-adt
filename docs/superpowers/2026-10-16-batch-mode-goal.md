@@ -32,7 +32,8 @@ activates the group afterwards.
   and which numbers failed.
 - **Answers by number.** The calls made in batch mode are numbered in the order
   they were made, from 1. The instance keeps the answers of its last executed
-  batch, and a tool returns the answer of a given number. A number exists until
+  batch, and a tool returns the answers of the numbers asked for: one number or a
+  list of them, as the caller chooses. A number exists until
   the next batch replaces the answers, or the instance ends; no timeout. A
   number the last batch does not have, or no batch yet, is one answer: no
   answer with that number.

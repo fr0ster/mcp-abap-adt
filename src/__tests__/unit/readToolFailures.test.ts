@@ -475,3 +475,23 @@ describe('GetTransport / GetIncludesList: a missing argument', () => {
     expect(sent).toEqual([]);
   });
 });
+
+describe('GetIncludesList: a throw that carries nothing', () => {
+  it("is the method's own failure, client_threw, not the bare message", async () => {
+    fakeClient = fakeClientOf({
+      readObjectSource: async () => {
+        throw new TypeError('boom');
+      },
+    });
+    const result: any = await handleGetIncludesList(
+      { connection: {} as any, logger: undefined } as any,
+      { object_name: 'ZPROG', object_type: 'PROG/P' },
+    );
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({
+      error: 'client_threw',
+      tool: 'GetIncludesList',
+      message: 'boom',
+    });
+  });
+});

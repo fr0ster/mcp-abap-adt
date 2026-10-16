@@ -1,5 +1,6 @@
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import {
+  answerCaught,
   failureEntry,
   failurePayload,
   isCredentialPayload,
@@ -343,8 +344,8 @@ export async function handleGetIncludesList(
     logger?.error(
       `Error getting includes list: ${error instanceof Error ? error.message : String(error)}`,
     );
-    return return_error(
-      error instanceof Error ? error : new Error(String(error)),
-    );
+    // A carried method error as it is, a chain failure as it came, a throw
+    // of our own `client_threw` — never the bare message.
+    return answerCaught(error, { tool: 'GetIncludesList', detail: 'terse' });
   }
 }

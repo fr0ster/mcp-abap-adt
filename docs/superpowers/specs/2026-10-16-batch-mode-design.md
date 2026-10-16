@@ -699,7 +699,7 @@ same as the sequential version's.
 **The rule for every phase: all requests in one envelope are independent of each other.** A request
 that needs another's answer goes in a later phase. Each level is read once, in one envelope, and
 then the answers are assembled. A sequence of envelopes lets one call get the information for
-**several** objects at once (§11's schema proposals).
+**several** objects at once (§11's schema changes).
 
 **Only the batched version stays.** The sequential version remains only for systems where the
 communication batch does not exist (below); there it is the same code path the handler has today.
@@ -719,7 +719,7 @@ kind:
   from discovery means nothing.
 - **RFC offers nothing else to read**: an ADT request over RFC is the same request; the same rule
   applies.
-- *[Proposal, pending owner confirmation]* **The system's own answer to the batch endpoint.** The
+- **The system's own answer to the batch endpoint** (owner-approved). The
   first internal batch on a destination sends its first envelope; when the outer answer is not a
   multipart batch answer (adt-clients' `parseBatchResponse` refuses it: "missing multipart boundary"
   **[code]**) and its status says the endpoint is not served (`404`), the destination is remembered
@@ -781,9 +781,9 @@ kind:
 Each row is to be confirmed against its handler when it is reimplemented; a dependency the table
 does not show splits a phase, never joins two.
 
-### Schema proposals: several objects per call
+### Schema changes: several objects per call
 
-*[Proposal, pending owner confirmation]* By the owner's principle, a tool that today takes one root
+(Owner-approved.) By the owner's principle, a tool that today takes one root
 object takes several, so one call reads them all in the same envelopes: an optional list beside the
 existing single argument (exactly one of them given; the single one keeps today's answer shape, the
 list answers one entry per object, in the order asked):
@@ -819,4 +819,4 @@ with the date.
 
 ## Open questions for the owner
 
-None beyond the passages marked *[Proposal, pending owner confirmation]*.
+None.

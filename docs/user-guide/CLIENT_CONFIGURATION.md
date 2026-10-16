@@ -82,6 +82,7 @@ When using HTTP transport, a request can carry its own connection. The headers s
 | `x-sap-debug-terminal-id` | No | The debugger's terminal id; wins over the environment (`SAP_DEBUG_TERMINAL_ID`). Random per instance when none is stated | `<terminal id>` |
 | `x-sap-debug-ide-id` | No | The debugger's IDE id; same order. The system keys its listener conflict by it: a shared IDE id means shared catches and no conflict ([Debugger](DEBUGGER.md#the-sap-ids-and-when-to-share-one)) | `<IDE id>` |
 | `x-sap-debug-breakpoint-conflict` | No | `replace` or `refuse-if-held` ([Debugger](DEBUGGER.md#the-breakpoint-set-and-its-key)); wins over the destination's `.env` and the environment | `refuse-if-held` |
+| `x-mcp-state-handle` | No (Streamable HTTP) | The `state_handle` of the instance that holds state: send the one `BatchBegin` answers on every call of the batch, `BatchEnd` and `BatchAnswers` included ([Batch Mode](BATCH_MODE.md#over-streamable-http)). It comes first; without it a `tools/call`'s `state_handle` argument routes, as the debugger tools send it. A bearer secret | `<state_handle>` |
 
 \* A request (SSE: the opening `GET`) must carry `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password`; without them it is answered `400`. `x-mcp-destination` is answered `400`.
 

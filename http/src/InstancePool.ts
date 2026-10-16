@@ -5,7 +5,9 @@
  * and state lives in an instance (measured for the debugger: a continuous
  * poll, an attach within seconds, the attaching ABAP session; over RFC nothing
  * carries that session to another connection). So per request the host takes
- * an instance once: the one the request's `state_handle` names, or a new one.
+ * an instance once: the one the request's handle names (the
+ * `x-mcp-state-handle` header, else the `tools/call`'s `state_handle`), or a
+ * new one.
  * The handle identifies an LLM session's state and is a bearer secret:
  * whoever holds it reaches the instance, like a session cookie; keeping it
  * safe is the deployer's. There is no owner and no limit of ours: two
@@ -19,6 +21,7 @@
  *
  * The pool knows `InstanceState` and nothing of what the state is.
  */
+import type { IncomingHttpHeaders } from 'node:http';
 import { errorClassOf, failureOf } from '@mcp-abap-adt/lib/auth';
 import type { InstanceState } from '@mcp-abap-adt/lib/state';
 
@@ -77,6 +80,25 @@ export function handleOf(body: unknown): string | undefined {
     return undefined;
   }
   return one(body);
+}
+
+/** The request header that carries the handle on Streamable HTTP. */
+export const STATE_HANDLE_HEADER = 'x-mcp-state-handle';
+
+/**
+ * The handle a request routes by: the `x-mcp-state-handle` header first, else
+ * the `state_handle` of a single `tools/call` (`handleOf`; the debugger tools
+ * keep their argument). A JSON-RPC batch carrying `state_handle` is refused
+ * whether or not the header is there. A header that is not one non-empty
+ * value is absent.
+ */
+export function handleFrom(
+  headers: IncomingHttpHeaders,
+  body: unknown,
+): string | undefined {
+  const argument = handleOf(body);
+  const header = headers[STATE_HANDLE_HEADER];
+  return typeof header === 'string' && header !== '' ? header : argument;
 }
 
 interface Held<T> {

@@ -84,6 +84,19 @@ served in batch mode (a tool that sends no request, a debugger, background-run o
 tool, a registry's own tool: run it outside batch mode). The sentence is there where the server
 instance has a batch owner.
 
+## Over Streamable HTTP
+
+Every HTTP request is an MCP session of its own, served by a pooled server instance. Send the
+`state_handle` `BatchBegin` answers in the `x-mcp-state-handle` request header on every call of
+the batch, `BatchEnd` and `BatchAnswers` included: the pool routes the call to the instance that
+holds the batch, one request at a time, in the order they arrive. A call without the header (or
+with a handle the pool does not know) reaches an instance where no batch is open. The header comes
+first; without it the pool routes by a `tools/call`'s `state_handle` argument, which only the
+debugger tools take — no batch tool takes one. The handle is a bearer secret: whoever holds it
+reaches the batch. A client that leaves during `BatchEnd` does not stop it: the answers are kept
+for the next `BatchAnswers` with the header. On stdio and SSE nothing is needed: the batch is the
+process's (stdio) or the connection's (SSE).
+
 ## Credentials and failures
 
 `BatchEnd` sends on the instance's connection as it is at that moment, with the credential in

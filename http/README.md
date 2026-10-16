@@ -77,11 +77,21 @@ new in 19.0.0, `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` (see [Shutdown](#sh
 
 ## Held state (the debugger)
 
-Every request is an MCP session of its own. A tool that holds state (a debug session) answers a `state_handle`; a `tools/call` carrying it is routed to the
-instance that holds the state, one request at a time, and its own headers give its credential. The
-handle is a bearer secret: whoever holds it reaches the state. Held state ends by its stop tool,
-the idle bound (`--state-idle-minutes`, 30–35 791, default 30), or the server's stop. See
+Every request is an MCP session of its own. A tool that holds state (a debug session, a batch)
+answers a `state_handle`; a request carrying it is routed to the instance that holds the state,
+one request at a time, and its own headers give its credential. The handle travels in the
+optional `x-mcp-state-handle` request header; without the header the pool reads a `tools/call`'s
+`state_handle` argument, as the debugger tools send it. A handle the pool does not know reaches a
+new instance. The handle is a bearer secret: whoever holds it reaches the state. Held state ends
+by its stop tool, the idle bound (`--state-idle-minutes`, 30–35 791, default 30), or the server's
+stop. See
 [the debugger guide](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
+
+**Batch mode.** `BatchBegin` (compact: `HandlerBatch` with `action: 'begin'`) holds state and
+answers the instance's `state_handle`: send it in `x-mcp-state-handle` on every call of the batch,
+`BatchEnd` and `BatchAnswers` included. A call without it reaches an instance where no batch is
+open. See
+[Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md#over-streamable-http).
 
 ## Every ADT session ends with a logoff
 

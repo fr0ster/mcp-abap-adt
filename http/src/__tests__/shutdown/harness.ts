@@ -9,7 +9,10 @@ import { EventEmitter } from 'node:events';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import * as net from 'node:net';
-import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import {
+  CompositeHandlersRegistry,
+  type IHandlerGroup,
+} from '@mcp-abap-adt/lib/handlers';
 import { installTransportShutdown } from '@mcp-abap-adt/lib/http-transport';
 import {
   type AdtStandIn,
@@ -18,7 +21,10 @@ import {
 } from '../../../../src/__tests__/helpers/adtStandIn';
 import { shutdownTools } from '../../../../src/__tests__/helpers/shutdownTools';
 import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
-import { StreamableHttpServer } from '../../StreamableHttpServer.js';
+import {
+  StreamableHttpServer,
+  type StreamableHttpServerOptions,
+} from '../../StreamableHttpServer.js';
 
 export const turns = async (n = 10) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
@@ -66,14 +72,23 @@ export const basicHeaders = (url: string) => ({
 });
 
 export async function httpStand(
-  options: { shutdownTimeoutMs?: number; stateIdleMinutes?: number } = {},
+  options: {
+    shutdownTimeoutMs?: number;
+    stateIdleMinutes?: number;
+    server?: Partial<StreamableHttpServerOptions>;
+    /** Groups served beside the probe and shutdown tools. */
+    groups?: IHandlerGroup[];
+  } = {},
 ): Promise<HttpStand> {
   resetProcessLatchForTests();
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   const standIn = await adtStandIn();
   const stateErrors: string[] = [];
   const mcp = new StreamableHttpServer(
-    new CompositeHandlersRegistry([probeGroup(shutdownTools())]),
+    new CompositeHandlersRegistry([
+      probeGroup(shutdownTools()),
+      ...(options.groups ?? []),
+    ]),
     {
       host: '127.0.0.1',
       port: 0,
@@ -84,6 +99,7 @@ export async function httpStand(
       ...(options.stateIdleMinutes !== undefined && {
         stateIdleMinutes: options.stateIdleMinutes,
       }),
+      ...options.server,
     },
   );
   await mcp.start();

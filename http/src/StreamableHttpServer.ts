@@ -36,7 +36,7 @@ import { HTTP_VERSION } from './httpVersion.js';
 import {
   BATCH_WITH_HANDLE_WORDS,
   BatchWithHandleError,
-  handleOf,
+  handleFrom,
   InstancePool,
   POOL_CLOSED_WORDS,
   type Poolable,
@@ -223,9 +223,11 @@ export class StreamableHttpServer extends BaseMcpServer {
         // is a protocol-level check and answers without them.
         const context = isPing ? undefined : headerContext(req.headers);
 
+        // The handle: the `x-mcp-state-handle` header first, else the
+        // `tools/call` argument. A bearer value: never logged.
         let handle: string | undefined;
         try {
-          handle = handleOf(req.body);
+          handle = handleFrom(req.headers, req.body);
         } catch (err) {
           if (err instanceof BatchWithHandleError) {
             res.status(400).send(BATCH_WITH_HANDLE_WORDS);

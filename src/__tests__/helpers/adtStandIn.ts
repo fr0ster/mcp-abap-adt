@@ -30,6 +30,17 @@ export interface StandInRequest {
   sessionType: string | undefined;
   /** Its `Cookie` header, if any. */
   cookie: string | undefined;
+  /** Its `Content-Type` header, if any. */
+  contentType: string | undefined;
+  /** Its body, once it has arrived in full; `''` before. */
+  body: string;
+}
+
+/** What `respond` answers a request with. */
+export interface StandInResponse {
+  status: number;
+  headers?: Record<string, string>;
+  text?: string;
 }
 
 export interface AdtStandIn {
@@ -53,6 +64,15 @@ export interface AdtStandIn {
     match: (request: StandInRequest) => boolean,
     status: number,
     text?: string,
+  ): void;
+  /**
+   * From now on every request `match` accepts is answered by `respond`,
+   * which reads the whole request, its body included (an envelope's parts);
+   * ahead of `answer` and `body`. The session cookie goes beside its headers.
+   */
+  respond(
+    match: (request: StandInRequest) => boolean,
+    respond: (request: StandInRequest) => StandInResponse,
   ): void;
   /** The next request `match` accepts is answered `status`, once. */
   answerOnce(match: (request: StandInRequest) => boolean, status: number): void;
@@ -134,6 +154,10 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     released: Promise<void>;
     release: () => void;
   }> = [];
+  const responders: Array<{
+    match: (request: StandInRequest) => boolean;
+    respond: (request: StandInRequest) => StandInResponse;
+  }> = [];
   const bodies: Array<{
     match: (request: StandInRequest) => boolean;
     text: string;
@@ -146,6 +170,7 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     const carried = sessionOf(req.headers.cookie);
     const session = carried ?? `session-${++sessions}`;
     const sessionType = req.headers['x-sap-adt-sessiontype'];
+    const contentType = req.headers['content-type'];
     const request: StandInRequest = {
       method: req.method ?? '',
       url: req.url ?? '',
@@ -153,6 +178,8 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       session,
       sessionType: Array.isArray(sessionType) ? sessionType[0] : sessionType,
       cookie: req.headers.cookie,
+      contentType,
+      body: '',
     };
     requests.push(request);
     const hold = holds.find((h) => !h.taken && h.match(request));
@@ -160,12 +187,25 @@ export async function adtStandIn(): Promise<AdtStandIn> {
       hold.taken = true;
       hold.arrive();
     }
-    req.resume();
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk: Buffer) => chunks.push(chunk));
     req.on('end', async () => {
+      request.body = Buffer.concat(chunks).toString('utf8');
       if (hold) await hold.released;
       if (refusing) {
         res.writeHead(401, { 'content-type': 'text/plain' });
         res.end('');
+        return;
+      }
+      const responder = responders.find((r) => r.match(request));
+      if (responder) {
+        const answered = responder.respond(request);
+        res.writeHead(answered.status, {
+          'content-type': 'text/plain',
+          ...answered.headers,
+          'set-cookie': [`${SESSION_COOKIE}=${session}; path=/`],
+        });
+        res.end(answered.text ?? '');
         return;
       }
       if (
@@ -255,6 +295,9 @@ export async function adtStandIn(): Promise<AdtStandIn> {
     },
     answer: (match, status, text) => {
       answers.push({ match, status, ...(text !== undefined && { text }) });
+    },
+    respond: (match, respond) => {
+      responders.push({ match, respond });
     },
     answerOnce: (match, status) => {
       answers.push({ match, status, once: true });

@@ -5,6 +5,7 @@
 import { InstanceState } from '@mcp-abap-adt/lib/state';
 import {
   BatchWithHandleError,
+  handleFrom,
   handleOf,
   InstancePool,
   PoolClosedError,
@@ -108,6 +109,38 @@ describe('handleOf', () => {
       ]),
     ).toThrow(BatchWithHandleError);
     expect(handleOf([{ method: 'tools/list' }])).toBeUndefined();
+  });
+});
+
+describe('handleFrom', () => {
+  const call = (handle?: string) => ({
+    method: 'tools/call',
+    params: { arguments: handle === undefined ? {} : { state_handle: handle } },
+  });
+
+  it('reads the x-mcp-state-handle header first, else the tools/call argument', () => {
+    expect(handleFrom({ 'x-mcp-state-handle': 'H' }, call('A'))).toBe('H');
+    expect(handleFrom({ 'x-mcp-state-handle': 'H' }, call())).toBe('H');
+    expect(handleFrom({ 'x-mcp-state-handle': 'H' }, { method: 'ping' })).toBe(
+      'H',
+    );
+    expect(handleFrom({}, call('A'))).toBe('A');
+    expect(handleFrom({}, call())).toBeUndefined();
+  });
+
+  it('an empty header is absent', () => {
+    expect(handleFrom({ 'x-mcp-state-handle': '' }, call('A'))).toBe('A');
+    expect(handleFrom({ 'x-mcp-state-handle': '' }, call())).toBeUndefined();
+  });
+
+  it('a JSON-RPC batch carrying state_handle is refused, with the header too', () => {
+    const batch = [call('A')];
+    expect(() => handleFrom({}, batch)).toThrow(BatchWithHandleError);
+    expect(() => handleFrom({ 'x-mcp-state-handle': 'H' }, batch)).toThrow(
+      BatchWithHandleError,
+    );
+    // A batch without the argument routes by the header.
+    expect(handleFrom({ 'x-mcp-state-handle': 'H' }, [call()])).toBe('H');
   });
 });
 

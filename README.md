@@ -236,7 +236,9 @@ create or update, a fallback after a `404`, a poll. Run such work as phases, eac
 with the single-step tools: lock (`HandlerLock`; the handles read with `BatchAnswers`), write
 (`HandlerUpdate` with `lock_handle`), unlock (`HandlerUnlock`). Every tool's description ends with
 one sentence saying whether it is recorded, for which arguments, refused, or not served in batch
-mode. See [Batch Mode](docs/user-guide/BATCH_MODE.md), with the list of every recordable call.
+mode. Over Streamable HTTP, send the `state_handle` `BatchBegin` answers in the
+`x-mcp-state-handle` request header on every call of the batch. See
+[Batch Mode](docs/user-guide/BATCH_MODE.md), with the list of every recordable call.
 
 ## Registries
 

@@ -28,6 +28,7 @@ import {
   handleCreateFunctionModule,
   handleCreateInterface,
   handleCreateMetadataExtension,
+  handleCreateOnly,
   handleCreatePackage,
   handleCreateProgram,
   handleCreateServiceBinding,
@@ -206,4 +207,20 @@ export async function routeCompactWrite(
   args: { object_type: CompactObjectType } & Record<string, unknown>,
 ): Promise<unknown> {
   return dispatchCompact(context, compactWriteRouterMap, operation, args);
+}
+
+/**
+ * Route a compact create with `create_only: true`: the create request alone
+ * (`handleCreateOnly`). A type with no create answers as the create route
+ * does; a type whose create sends more than one request refuses, before
+ * anything is sent.
+ */
+export async function routeCompactCreateOnly(
+  context: Parameters<typeof dispatchCompact>[0],
+  args: { object_type: CompactObjectType } & Record<string, unknown>,
+): Promise<unknown> {
+  if (!args?.object_type || !compactWriteRouterMap[args.object_type]?.create) {
+    return dispatchCompact(context, compactWriteRouterMap, 'create', args);
+  }
+  return handleCreateOnly(context, args);
 }

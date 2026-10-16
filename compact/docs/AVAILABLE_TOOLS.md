@@ -316,6 +316,7 @@ per request.
 - `description` — Human-readable object description.
 - `transport_request` — Transport request id (if required by system).
 - `activate` — Activate object after create.
+- `create_only` — send the create request alone: no validation, lock, write, check or activation; the object is created inactive with what the create carries
 - `master_language` — Original language of the created object; the session language when absent.
 - `super_package` — Super package (PACKAGE create).
 - `package_type` — Package type (PACKAGE create).

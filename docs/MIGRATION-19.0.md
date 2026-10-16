@@ -717,6 +717,9 @@ was removed (`tools/low-to-compact.json`). Three differences are accepted and na
 create through `HandlerCreate` of a domain, data element, structure, behavior definition or metadata
 extension also validates, locks and checks; a delete through `HandlerDelete` asks the deletion check
 first; a function module, service definition or service binding activates through the activation run.
+For a low create tool's create request alone, `HandlerCreate` takes `create_only: true`: only the
+create is sent — no validation, lock, write, check or activation — for every type of the create
+route but `UNIT_TEST` and `CDS_UNIT_TEST`, which refuse it.
 
 <!-- low-to-compact table: rendered from tools/low-to-compact.json -->
 | Low tool | Compact call | Difference / note |

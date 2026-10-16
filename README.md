@@ -233,8 +233,9 @@ transport.
 
 A tool that builds a request from an earlier answer is refused in batch mode — a high-level
 create or update, a fallback after a `404`, a poll. Run such work as phases, each its own batch,
-with the single-step tools: lock (`HandlerLock`; the handles read with `BatchAnswers`), write
-(`HandlerUpdate` with `lock_handle`), unlock (`HandlerUnlock`). Every tool's description ends with
+with the single-step tools: create (`HandlerCreate` with `create_only`), lock (`HandlerLock`;
+the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`), unlock
+(`HandlerUnlock`). Every tool's description ends with
 one sentence saying whether it is recorded, for which arguments, refused, or not served in batch
 mode. Over Streamable HTTP, send the `state_handle` `BatchBegin` answers in the
 `x-mcp-state-handle` request header on every call of the batch. See

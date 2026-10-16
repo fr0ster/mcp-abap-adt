@@ -44,6 +44,12 @@ export const compactCreateSchema = {
       description: 'Transport request id (if required by system).',
     },
     activate: { type: 'boolean', description: 'Activate object after create.' },
+    create_only: {
+      type: 'boolean',
+      default: false,
+      description:
+        'send the create request alone: no validation, lock, write, check or activation; the object is created inactive with what the create carries',
+    },
     master_language: {
       type: 'string',
       description:

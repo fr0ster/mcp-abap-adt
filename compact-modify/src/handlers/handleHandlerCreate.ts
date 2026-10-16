@@ -1,7 +1,10 @@
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import { compactCreateSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { routeCompactWrite } from './compactWriteRoutes';
+import {
+  routeCompactCreateOnly,
+  routeCompactWrite,
+} from './compactWriteRoutes';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCreate',
@@ -20,5 +23,8 @@ export async function handleHandlerCreate(
   context: HandlerContext,
   args: HandlerCreateArgs,
 ) {
+  if (args.create_only === true) {
+    return routeCompactCreateOnly(context, args);
+  }
   return routeCompactWrite(context, 'create', args);
 }

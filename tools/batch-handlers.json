@@ -575,6 +575,62 @@
     "sends": "GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true"
   },
   {
+    "tool": "HandlerCreate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerCreate.ts#handleHandlerCreate",
+    "sends": "POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate",
+    "when": [
+      {
+        "argument": "create_only",
+        "equals": [
+          "true"
+        ]
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "TRANSPORT",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING",
+          "CLASS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerCreate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerCreate.ts#handleHandlerCreate",
+    "sends": "POST /sap/bc/adt/packages[?corrNr=…], the package create alone; over RFC a package is created in an ABAP session of its own, outside the batch",
+    "when": [
+      {
+        "argument": "create_only",
+        "equals": [
+          "true"
+        ]
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE"
+        ]
+      }
+    ],
+    "connection": "http"
+  },
+  {
     "tool": "HandlerLock",
     "set": "compact",
     "handler": "compact-modify/src/handlers/handleHandlerLock.ts#handleHandlerLock",

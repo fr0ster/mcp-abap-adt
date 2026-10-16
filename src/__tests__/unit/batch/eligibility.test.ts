@@ -73,15 +73,36 @@ describe('eligible', () => {
   });
 
   it('HandlerCreate needs create_only true', () => {
-    // Not listed until Task 10 adds its entries; the rule they take is
-    // `create_only` equal to true, the boolean read as its word.
+    const domain = { object_type: 'DOMAIN', domain_name: 'DOM_A' };
+    expect(
+      eligible('HandlerCreate', { ...domain, create_only: true }, 'http'),
+    ).toEqual({ ok: true });
+    expect(
+      eligible('HandlerCreate', { ...domain, create_only: true }, 'rfc'),
+    ).toEqual({ ok: true });
+    expect(
+      eligible('HandlerCreate', { ...domain, create_only: false }, 'http'),
+    ).toEqual({ ok: false, reason: 'arguments' });
+    expect(eligible('HandlerCreate', domain, 'http')).toEqual({
+      ok: false,
+      reason: 'arguments',
+    });
+    // A type whose create sends more than one request is not listed for it.
     expect(
       eligible(
         'HandlerCreate',
-        { object_type: 'DOMAIN', create_only: true },
+        { object_type: 'UNIT_TEST', create_only: true },
         'http',
       ),
-    ).toEqual({ ok: false, reason: 'not-listed' });
+    ).toEqual({ ok: false, reason: 'arguments' });
+    // A package over RFC is created in an ABAP session of its own.
+    const pkg = { object_type: 'PACKAGE', create_only: true };
+    expect(eligible('HandlerCreate', pkg, 'http')).toEqual({ ok: true });
+    expect(eligible('HandlerCreate', pkg, 'rfc')).toEqual({
+      ok: false,
+      reason: 'connection',
+    });
+    // `create_only` equal to true, the boolean read as its word.
     const createOnly = [{ argument: 'create_only', equals: ['true'] }];
     expect(whenHolds('HandlerCreate', createOnly, { create_only: true })).toBe(
       true,

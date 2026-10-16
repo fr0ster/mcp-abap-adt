@@ -20,7 +20,7 @@ context, no tool-RAG, no way to select tools per request — and must still driv
 through MCP reliably. A consumer that does select per request (cloud-llm-hub, for
 one) has no use for it and should take `@mcp-abap-adt/lib` instead.
 
-**The low set's analogue.** The low set left the full binaries in 19.0.0; its single-step operations are compact's: `HandlerLock`, `HandlerUpdate` with the `lock_handle` it answered (the write alone, under your lock), `HandlerUnlock`, `HandlerCheckRun`, `HandlerValidate`, `HandlerActivate`, and `HandlerGet` `part` `object_structure` / `node_structure` / `virtual_folders`. **Keeping a lock from `HandlerLock` short is your job:** the server releases nothing on its own clock — unlock as soon as the write is done. The tool-by-tool table: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+**The low set's analogue.** The low set left the full binaries in 19.0.0; its single-step operations are compact's: `HandlerCreate` with `create_only: true` (the create request alone — no validation, lock, write, check or activation; the object is created inactive with what the create carries), `HandlerLock`, `HandlerUpdate` with the `lock_handle` it answered (the write alone, under your lock), `HandlerUnlock`, `HandlerCheckRun`, `HandlerValidate`, `HandlerActivate`, and `HandlerGet` `part` `object_structure` / `node_structure` / `virtual_folders`. **Keeping a lock from `HandlerLock` short is your job:** the server releases nothing on its own clock — unlock as soon as the write is done. The tool-by-tool table: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
 
 **Batch mode: `HandlerBatch`.** Every compact binary, `-ro` ones included, on every transport,
 serves batch mode as one tool: `action: 'begin'` switches the server into batch mode, every call
@@ -28,8 +28,8 @@ none of whose requests depends on another's answer is then recorded (it answers 
 the next number, from 1), `action: 'end'` sends them all in ADT batch envelopes and leaves batch
 mode whatever happens, and `action: 'answers'` with `number` or `numbers` reads each call's answer
 by its number. A tool that builds a request from an earlier answer is refused; run such work as
-phases, each its own batch — lock (`HandlerLock`), write (`HandlerUpdate` with `lock_handle`),
-unlock (`HandlerUnlock`). Every tool's description ends with one sentence saying whether it is
+phases, each its own batch — create (`HandlerCreate` with `create_only`), lock (`HandlerLock`),
+write (`HandlerUpdate` with `lock_handle`), unlock (`HandlerUnlock`). Every tool's description ends with one sentence saying whether it is
 recorded, for which arguments, refused, or not served in batch mode. Over Streamable HTTP send the
 `state_handle` `action: 'begin'` answers in the `x-mcp-state-handle` header on every call of the
 batch. See

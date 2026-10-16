@@ -375,6 +375,76 @@ const COMPACT: BatchEntryCase[] = [
   })),
 ];
 
+/** `HandlerCreate` with `create_only`: the create request alone, per type but PACKAGE. */
+const CREATES_ONLY: Array<[string, Record<string, unknown>]> = [
+  ['DOMAIN', { domain_name: 'DOM_A', package_name: 'PKG_A' }],
+  ['DATA_ELEMENT', { data_element_name: 'DTEL_A', package_name: 'PKG_A' }],
+  ['TRANSPORT', { description: 'text' }],
+  ['TABLE', { table_name: 'TAB_A', package_name: 'PKG_A' }],
+  ['STRUCTURE', { structure_name: 'STRU_A', package_name: 'PKG_A' }],
+  ['DDL', { ddl_name: 'DDL_A', package_name: 'PKG_A' }],
+  [
+    'SERVICE_DEFINITION',
+    { service_definition_name: 'SRVD_A', package_name: 'PKG_A' },
+  ],
+  [
+    'SERVICE_BINDING',
+    {
+      service_binding_name: 'SRVB_A',
+      service_definition_name: 'SRVD_A',
+      package_name: 'PKG_A',
+    },
+  ],
+  ['CLASS', { class_name: 'CLAS_A', package_name: 'PKG_A' }],
+  ['PROGRAM', { program_name: 'PROG_A', package_name: 'PKG_A' }],
+  ['INTERFACE', { interface_name: 'INTF_A', package_name: 'PKG_A' }],
+  ['FUNCTION_GROUP', { function_group_name: 'FUGR_A', package_name: 'PKG_A' }],
+  [
+    'FUNCTION_MODULE',
+    {
+      function_module_name: 'FM_A',
+      function_group_name: 'FUGR_A',
+      package_name: 'PKG_A',
+    },
+  ],
+  [
+    'BEHAVIOR_DEFINITION',
+    {
+      name: 'BDEF_A',
+      package_name: 'PKG_A',
+      root_entity: 'BDEF_A',
+      implementation_type: 'Managed',
+    },
+  ],
+  [
+    'BEHAVIOR_IMPLEMENTATION',
+    {
+      class_name: 'BP_A',
+      behavior_definition: 'BDEF_A',
+      package_name: 'PKG_A',
+    },
+  ],
+  ['METADATA_EXTENSION', { name: 'DDLX_A', package_name: 'PKG_A' }],
+];
+
+const CREATE_ONLY: BatchEntryCase[] = [
+  ...CREATES_ONLY.map(([object_type, fields]) => ({
+    tool: 'HandlerCreate',
+    args: { object_type, ...fields, create_only: true },
+    ...(object_type === 'TRANSPORT' ? { body: TRANSPORT_DOCUMENT } : {}),
+  })),
+  {
+    tool: 'HandlerCreate',
+    args: {
+      object_type: 'PACKAGE',
+      package_name: 'PKG_A',
+      super_package: 'PKG_SUPER',
+      create_only: true,
+    },
+    connection: 'http',
+  },
+];
+
 /** The tools that change something or run code, one request each. */
 const ACTIVATIONS: Array<[string, Record<string, unknown>]> = [
   ['ActivateDomain', { domain_name: 'DOM_A' }],
@@ -782,6 +852,7 @@ const TOGETHER: BatchEntryCase[] = [
 export const BATCH_ENTRY_CASES: readonly BatchEntryCase[] = [
   ...FULL,
   ...COMPACT,
+  ...CREATE_ONLY,
   ...WRITES,
   ...TOGETHER,
 ];

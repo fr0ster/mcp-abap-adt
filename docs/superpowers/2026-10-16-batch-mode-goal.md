@@ -55,8 +55,9 @@ activates the group afterwards.
   description tell the LLM that in batch mode a call returns nothing, that calls
   are numbered in the order made, and that the answers are read by number once
   `BatchEnd` has run.
-- **A long read is one call**, and in batch mode it is recorded like any other
-  single-request tool instead of running on a connection of its own.
+- **Long reads are not part of a batch.** In batch mode a long read is refused,
+  like a multi-endpoint handler; the consumer runs it as a normal call outside
+  batch mode.
 - **Every package has batch mode.** The full, read-only and compact sets all
   serve `BatchBegin`, `BatchEnd` and the answer tool; what a set can do in batch
   mode is whatever of its tools send one request — reads everywhere, and in

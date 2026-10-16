@@ -23,7 +23,7 @@ the high group's `Get<X>` of the same object, see the dedup below).
 Batch mode is in every binary, on every transport: the full binaries, `-ro` ones included, serve
 `BatchBegin`, `BatchEnd` and `BatchAnswers`; the compact ones serve it as one tool, `HandlerBatch`
 (`action: 'begin' | 'end' | 'answers'`). Every other tool's description ends with one sentence
-saying whether a call of it is recorded in batch mode, for which arguments, or refused — see
+saying whether a call of it is recorded in batch mode, for which arguments, refused, or not served — see
 [Batch Mode](BATCH_MODE.md).
 
 Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 / 252; core-ro

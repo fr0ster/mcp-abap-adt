@@ -50,11 +50,10 @@ A tool that builds a request from an earlier answer cannot be recorded — a hig
 writes it back patched, a `404` fallback, a poll. Run such work as phases, each its own batch,
 with the single-step tools:
 
-1. create — `HandlerCreate` with `create_only` (compact);
-2. lock — `HandlerLock`; read the lock handles with `BatchAnswers`;
-3. write — `HandlerUpdate` with `lock_handle`;
-4. unlock — `HandlerUnlock`;
-5. read back, check — `HandlerGet`, `HandlerCheckRun`.
+1. lock — `HandlerLock`; read the lock handles with `BatchAnswers`;
+2. write — `HandlerUpdate` with `lock_handle`;
+3. unlock — `HandlerUnlock`;
+4. read back, check — `HandlerGet`, `HandlerCheckRun`.
 
 Only LOCK and UNLOCK go stateful, in their own envelopes, as adt-clients sends them; everything
 else is stateless.
@@ -74,7 +73,10 @@ Every other call is answered at once with the server's refusal and takes no numb
 | `batch_mode_unavailable` | the host gave this server instance no batch owner (an embedder's `EmbeddableMcpServer` without `batch`) |
 
 Every tool's description says which applies to it: it ends with one sentence — recorded, recorded
-only for some arguments (which ones), or refused in batch mode.
+only for some arguments (which ones), refused (a request of it depends on another's answer), or not
+served in batch mode (a tool that sends no request, a debugger, background-run or leftover-session
+tool, a registry's own tool: run it outside batch mode). The sentence is there where the server
+instance has a batch owner.
 
 ## Credentials and failures
 
@@ -86,15 +88,6 @@ recorded call's answer is that failure.
 
 A part SAP answered `401`, `406` or `415` is that call's answer, as any other failure: in batch
 mode nothing recorded is corrected and sent again.
-
-## Over Streamable HTTP
-
-Every HTTP request is an MCP session of its own, served by a pooled server instance. Send the
-`state_handle` `BatchBegin` answers in the `x-mcp-state-handle` request header on every call of
-the batch, `BatchEnd` and `BatchAnswers` included: the pool routes the call to the instance that
-holds the batch. A call without the header reaches an instance where no batch is open. No batch
-tool takes a `state_handle` argument. On stdio and SSE nothing is needed: the batch is the
-process's (stdio) or the connection's (SSE).
 
 ## Raw parts
 

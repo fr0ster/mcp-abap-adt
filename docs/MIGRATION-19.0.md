@@ -1373,11 +1373,11 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `BatchAnswers`; `@mcp-abap-adt/lib/handlers`) is in every full tool set, `-ro` included, and the
   compact sets serve `HandlerBatch` (`CompactBatchHandlersGroup`). `EmbeddableMcpServer`'s default
   registry does not add it: a registry of your own that should offer batch mode adds
-  `new BatchHandlersGroup(context)`. The handlers reach the owner as `HandlerContext.batch`. Once a
-  registry serves a batch tool, every other tool's description is registered with one sentence
-  appended — recorded in batch mode, recorded only for some arguments, or refused; where the
-  instance has an owner, a registry that registers its own tools gets the refused sentence on each.
-  A client that compares tool descriptions sees them change.
+  `new BatchHandlersGroup(context)`. The handlers reach the owner as `HandlerContext.batch`. Where
+  the instance has an owner (`batch`), every tool's description but a batch tool's is registered
+  with one sentence appended — recorded in batch mode, recorded only for some arguments, refused,
+  or not served (a registry that registers its own tools gets "not served" on each); without an
+  owner no description changes. A client that compares tool descriptions sees them change.
 - **`HandlerEntry.connectionless?: true | ((args) => boolean)`** marks a tool that works on no
   connection of the instance: the server calls it without building or connecting one, its
   context's `connection` absent. The leftover-session tools are such tools (a list or a logoff

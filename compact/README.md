@@ -30,8 +30,7 @@ mode whatever happens, and `action: 'answers'` with `number` or `numbers` reads 
 by its number. A tool that builds a request from an earlier answer is refused; run such work as
 phases, each its own batch — lock (`HandlerLock`), write (`HandlerUpdate` with `lock_handle`),
 unlock (`HandlerUnlock`). Every tool's description ends with one sentence saying whether it is
-recorded, for which arguments, or refused. Over Streamable HTTP send the `state_handle`
-`action: 'begin'` answers in the `x-mcp-state-handle` header on every call of the batch. See
+recorded, for which arguments, refused, or not served in batch mode. See
 [Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md).
 
 ## Why two library packages

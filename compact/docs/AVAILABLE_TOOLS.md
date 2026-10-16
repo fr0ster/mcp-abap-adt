@@ -9,7 +9,7 @@ definitions a client receives.
 - Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
 - Leftover-session tools: `@mcp-abap-adt/lib`, on stdio only (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`): the list and the logoff in both; no `-compact-http` or `-compact-sse` binary serves them
 - Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)
-- Batch mode: `HandlerBatch` of `@mcp-abap-adt/lib`, in every compact binary, on every transport. Every other tool's description, as the server lists it, ends with one sentence saying whether a call of it is recorded in batch mode, for which arguments, or refused; the descriptions on this page are the tools' own, without it ([Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md))
+- Batch mode: `HandlerBatch` of `@mcp-abap-adt/lib`, in every compact binary, on every transport. Every other tool's description, as the server lists it, ends with one sentence saying whether a call of it is recorded in batch mode, for which arguments, refused, or not served; the descriptions on this page are the tools' own, without it ([Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md))
 - Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`, the same without the leftover-session tools)
 
 ## How it works

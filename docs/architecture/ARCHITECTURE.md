@@ -452,9 +452,9 @@ where the host gave one, the instance's batch owner (`batch`, an `InstanceBatch`
 (`tools/batch-handlers.json`) admits — its handler runs on a per-call recorder over adt-clients'
 `AdtBatchConnection`, numbered in the order made — and refuses every other call. `BatchEnd` takes the
 instance's connection in its turn, holds it for the whole `execute()`, and every recorded handler then
-builds its answer from what SAP answered; batch mode ends whatever fails. Every tool's description,
-as registered, ends with one sentence (`src/lib/batch/sentence.ts`) saying whether it is recorded, for
-which arguments, or refused. See [Batch Mode](../user-guide/BATCH_MODE.md).
+builds its answer from what SAP answered; batch mode ends whatever fails. Where the instance has a
+batch owner, every tool's description, as registered, ends with one sentence (`src/lib/batch/sentence.ts`)
+saying whether it is recorded, for which arguments, refused, or not served in batch mode. See [Batch Mode](../user-guide/BATCH_MODE.md).
 
 #### Transport Servers
 

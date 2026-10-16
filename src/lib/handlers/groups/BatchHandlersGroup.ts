@@ -3,8 +3,7 @@
  * transport): `BatchBegin`, `BatchEnd`, `BatchAnswers`. `BatchBegin` and
  * `BatchAnswers` work on no connection of the instance (`connectionless`);
  * `BatchEnd` takes the instance's connection in its turn and sends the
- * recorded calls on it. No batch tool takes a `state_handle`: over HTTP the
- * handle travels in the request header.
+ * recorded calls on it. No batch tool takes a `state_handle`.
  */
 import {
   TOOL_DEFINITION as BatchAnswers_Tool,

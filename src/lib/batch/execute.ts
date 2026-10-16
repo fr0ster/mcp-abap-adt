@@ -18,7 +18,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type McpResult, requestThrownEntry } from '../answer';
 import { failureOf } from '../auth/failures';
 import { ServerRefusal } from '../auth/serverRefusal';
-import type { BatchAnswer, InstanceBatch } from './InstanceBatch';
+import type { BatchAnswer, InstanceBatch, OpenBatch } from './InstanceBatch';
 import type { LateBoundConnection } from './lateBound';
 
 /**
@@ -37,6 +37,19 @@ export type BatchSummary = {
 /** The step a failure of the envelopes is named at. */
 export const EXECUTE_STEP = 'execute';
 
+/** The open communication batch, or why there is none to end. */
+function communicationState(
+  owner: InstanceBatch | undefined,
+): OpenBatch | ServerRefusal {
+  if (owner === undefined) return new ServerRefusal('batch_mode_unavailable');
+  if (owner.mode() === 'debugger') return new ServerRefusal('batch_mode_other');
+  const open = owner.opened();
+  if (owner.mode() !== 'communication' || open === undefined) {
+    return new ServerRefusal('batch_mode_off');
+  }
+  return open;
+}
+
 /**
  * Why a `BatchEnd` now has nothing to end: no owner (`batch_mode_unavailable`),
  * the debugger batch open (`batch_mode_other`), no batch open
@@ -46,22 +59,15 @@ export const EXECUTE_STEP = 'execute';
 export function communicationBatchRefusal(
   owner: InstanceBatch | undefined,
 ): ServerRefusal | undefined {
-  if (owner === undefined) return new ServerRefusal('batch_mode_unavailable');
-  const mode = owner.mode();
-  if (mode === 'debugger') return new ServerRefusal('batch_mode_other');
-  if (mode !== 'communication' || owner.opened() === undefined) {
-    return new ServerRefusal('batch_mode_off');
-  }
-  return undefined;
+  const state = communicationState(owner);
+  return state instanceof ServerRefusal ? state : undefined;
 }
 
-/** The open communication batch; refused `batch_mode_off`, or `batch_mode_other` while the debugger batch is open. */
-function openCommunication(owner: InstanceBatch) {
-  const refusal = communicationBatchRefusal(owner);
-  const open = owner.opened();
-  if (refusal !== undefined) throw refusal;
-  if (open === undefined) throw new ServerRefusal('batch_mode_off');
-  return open;
+/** The open communication batch; throws `communicationBatchRefusal`'s refusal when there is none. */
+export function openCommunication(owner: InstanceBatch | undefined): OpenBatch {
+  const state = communicationState(owner);
+  if (state instanceof ServerRefusal) throw state;
+  return state;
 }
 
 /**

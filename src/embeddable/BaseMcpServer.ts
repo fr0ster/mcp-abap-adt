@@ -47,7 +47,7 @@ import {
 import type { BatchAnswer, InstanceBatch } from '../lib/batch/InstanceBatch.js';
 import { createRecorder, untilSent } from '../lib/batch/recorder.js';
 import {
-  ineligibleSentence,
+  NOT_SERVED_SENTENCE,
   withBatchSentence,
 } from '../lib/batch/sentence.js';
 import type { ToolSetKind } from '../lib/config/binaries.js';
@@ -1168,10 +1168,13 @@ export abstract class BaseMcpServer extends McpServer {
     // Get handler groups from registry
     if (handlersRegistry instanceof CompositeHandlersRegistry) {
       const groups = handlersRegistry.getHandlerGroups();
-      // The set's batch tools name the words every other tool's description
-      // ends with (spec §3); a registry serving none gets no sentence.
-      const words = batchWordsOf(groups);
-      if (words !== undefined) this.batchWords = words;
+      // Where the instance has a batch owner, every tool's description but
+      // a batch tool's ends with its batch sentence (spec §3), in the words
+      // of the batch tools the registry serves (the full sets' by default).
+      const found = batchWordsOf(groups);
+      if (found !== undefined) this.batchWords = found;
+      const words =
+        this.batch !== undefined ? (this.batchWords ?? 'core') : undefined;
 
       for (const group of groups) {
         const handlers = group.getHandlers();
@@ -1506,6 +1509,7 @@ export abstract class BaseMcpServer extends McpServer {
                       entry.toolDefinition.description,
                       entry.toolDefinition.name,
                       words,
+                      { connectionless: entry.connectionless === true },
                     )
                   : entry.toolDefinition.description,
               inputSchema: zodSchema,
@@ -2259,13 +2263,14 @@ export abstract class BaseMcpServer extends McpServer {
           ]
         : registerArgs;
     };
-    // A registry's own tool is refused in batch mode: where the instance
-    // has a batch owner, its description says so (spec §3).
+    // A registry's own tool is not served in batch mode: where the instance
+    // has a batch owner, its description says so (spec §3) — the same rule
+    // as a handler group's tools.
     const described = (registerArgs: unknown[]): unknown[] => {
       if (this.batch === undefined) return registerArgs;
       const name = registerArgs[0];
       if (typeof name !== 'string' || isBatchTool(name)) return registerArgs;
-      const sentence = ineligibleSentence(this.batchWords ?? 'core');
+      const sentence = NOT_SERVED_SENTENCE;
       const second = registerArgs[1];
       const appended = (description: string) =>
         description.trimEnd().length === 0

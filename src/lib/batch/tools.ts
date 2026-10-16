@@ -5,8 +5,7 @@
  * without one answers `batch_mode_unavailable`.
  *
  * - begin: opens a communication batch over a late-bound target (nothing
- *   is sent, no connection taken) and answers the instance's state handle,
- *   which the client sends in the `x-mcp-state-handle` header over HTTP.
+ *   is sent, no connection taken) and answers the instance's state handle.
  * - end: executes the open batch on the connection the call took; the
  *   dispatch holds that use until the call settles, so the envelopes go on
  *   it for the whole `execute()`. A failure it knows is thrown, never
@@ -18,11 +17,7 @@ import type { HandlerContext } from '../../handlers/interfaces';
 import type { McpResult } from '../answer';
 import { ServerRefusal } from '../auth/serverRefusal';
 import { type AnswersAsk, batchAnswersAnswer, readAnswers } from './answers';
-import {
-  batchEndAnswer,
-  communicationBatchRefusal,
-  executeBatch,
-} from './execute';
+import { batchEndAnswer, executeBatch, openCommunication } from './execute';
 import type { InstanceBatch } from './InstanceBatch';
 import { LateBoundConnection } from './lateBound';
 
@@ -53,10 +48,7 @@ export async function beginBatch(context: HandlerContext): Promise<McpResult> {
 /** `BatchEnd`: the open communication batch executed on the call's connection. */
 export async function endBatch(context: HandlerContext): Promise<McpResult> {
   const owner = ownerOf(context);
-  const refusal = communicationBatchRefusal(owner);
-  const open = owner.opened();
-  if (refusal !== undefined) throw refusal;
-  if (open === undefined) throw new ServerRefusal('batch_mode_off');
+  const open = openCommunication(owner);
   return batchEndAnswer(
     await executeBatch(owner, open.target, context.connection),
   );

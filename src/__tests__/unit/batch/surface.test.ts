@@ -17,11 +17,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { ConnectionSource } from '../../../embeddable/ConnectionContext';
 import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
-import {
-  batchSentence,
-  eligibleSentence,
-  ineligibleSentence,
-} from '../../../lib/batch/sentence';
+import { batchSentence, eligibleSentence } from '../../../lib/batch/sentence';
 import type { ToolSetKind } from '../../../lib/config/binaries';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import type { IHandlersRegistry } from '../../../lib/handlers/interfaces';
@@ -65,6 +61,9 @@ const ELIGIBLE_WORDS =
   'In batch mode (BatchBegin) a call is recorded and returns nothing; calls are numbered in the order made, and their answers are read by number with BatchAnswers once BatchEnd has run.';
 const INELIGIBLE_WORDS =
   "In batch mode (BatchBegin) this tool is refused: a request of it depends on another's answer.";
+// The controller's wording (for the owner to confirm), copied here.
+const NOT_SERVED_WORDS =
+  'In batch mode this tool is not served: run it outside batch mode.';
 
 class SurfaceServer extends BaseMcpServer {
   constructor(
@@ -153,13 +152,22 @@ describe('the batch tools on the surface', () => {
       });
       const { tools } = await client.listTools();
       expect(tools.length).toBeGreaterThan(10);
+      const connectionless = new Set(
+        set
+          .groups({ connection: undefined as never }, 'stdio')
+          .flatMap((group) => group.getHandlers())
+          .filter((entry) => entry.connectionless === true)
+          .map((entry) => entry.toolDefinition.name),
+      );
       for (const tool of tools) {
         const description = tool.description ?? '';
         if (FULL_BATCH.includes(tool.name) || tool.name === 'HandlerBatch') {
           expect(description).not.toContain('In batch mode (');
           continue;
         }
-        const sentence = batchSentence(tool.name, kind);
+        const sentence = batchSentence(tool.name, kind, {
+          connectionless: connectionless.has(tool.name),
+        });
         expect({
           tool: tool.name,
           ends: description.endsWith(` ${sentence}`),
@@ -167,6 +175,7 @@ describe('the batch tools on the surface', () => {
           tool: tool.name,
           ends: true,
         });
+        if (sentence === NOT_SERVED_WORDS) continue;
         if (isCompact(kind)) {
           expect(description).toContain("(HandlerBatch action 'begin')");
           expect(description).not.toContain('BatchBegin');
@@ -186,6 +195,19 @@ describe('the batch tools on the surface', () => {
         expect(
           byName.get('UpdateClass')?.endsWith(` ${INELIGIBLE_WORDS}`),
         ).toBe(true);
+        // Not served, for a reason other than a dependency: no request, the
+        // debugger's own connection, a background run, a leftover session.
+        for (const name of [
+          'GetAbapAST',
+          'DebugStep',
+          'GetBackgroundRun',
+          'ListLeftoverSessions',
+        ]) {
+          expect({
+            name,
+            ends: byName.get(name)?.endsWith(` ${NOT_SERVED_WORDS}`),
+          }).toEqual({ name, ends: true });
+        }
       }
       if (kind === 'compact') {
         expect(byName.get('HandlerLock')).toContain(
@@ -197,6 +219,16 @@ describe('the batch tools on the surface', () => {
         expect(byName.get('HandlerGet')).toContain(
           'part is source (absent reads as source)',
         );
+        for (const name of [
+          'HandlerDebugStep',
+          'HandlerBackgroundRunGet',
+          'HandlerLeftoverSessionList',
+        ]) {
+          expect({
+            name,
+            ends: byName.get(name)?.endsWith(` ${NOT_SERVED_WORDS}`),
+          }).toEqual({ name, ends: true });
+        }
       }
     },
   );
@@ -212,7 +244,19 @@ describe('the batch tools on the surface', () => {
     expect(byName.get('BatchAnswers')).toBe(ANSWERS_WORDS);
   });
 
-  it("a registry's own tool gets the ineligible sentence where the instance has a batch owner", async () => {
+  it('without a batch owner no description gets a sentence', async () => {
+    for (const [, set] of SETS) {
+      const { client } = await served(registryOf(set, 'stdio'));
+      const { tools } = await client.listTools();
+      expect(
+        tools
+          .filter((t) => (t.description ?? '').includes('In batch mode'))
+          .map((t) => t.name),
+      ).toEqual([]);
+    }
+  });
+
+  it("a registry's own tool gets the not-served sentence where the instance has a batch owner", async () => {
     const own = (): IHandlersRegistry =>
       ({
         registerAllTools: (server: {
@@ -232,7 +276,7 @@ describe('the batch tools on the surface', () => {
     });
     const listed = (await withOwner.client.listTools()).tools;
     expect(listed.find((t) => t.name === 'OwnTool')?.description).toBe(
-      `Does its own thing. ${ineligibleSentence('core')}`,
+      `Does its own thing. ${NOT_SERVED_WORDS}`,
     );
     const withoutOwner = await served(own());
     expect(

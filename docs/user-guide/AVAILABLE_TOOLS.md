@@ -19,7 +19,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `high` -> [High-Level Group](#high-level-group): `mcp-abap-adt`, `-http`, `-sse`
 - `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
 - every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
-- every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, `HandlerBatch`. Every other tool's description, as the server lists it, ends with one sentence saying whether a call of it is recorded in batch mode, for which arguments, or refused; the descriptions on this page are the handlers' own, without it
+- every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, `HandlerBatch`. Every other tool's description, as the server lists it, ends with one sentence saying whether a call of it is recorded in batch mode, for which arguments, refused, or not served; the descriptions on this page are the handlers' own, without it
 - compact -> [the compact package](../../compact/README.md): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
 
 ## Navigation

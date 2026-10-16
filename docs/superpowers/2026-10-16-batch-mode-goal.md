@@ -2,12 +2,16 @@
 
 ## What it is for
 
-An LLM working through mcp-abap-adt often needs many independent ADT requests:
-reading a list of objects, or creating, locking, writing and unlocking many of
-them. Each request is a round trip. ADT accepts many requests in one multipart
+An LLM working through mcp-abap-adt often needs many independent ADT requests of
+one kind: reading a list of objects, or creating, locking, writing and
+unlocking many of them. Each request is a round trip. ADT accepts many requests in one multipart
 envelope (`/sap/bc/adt/communication/batch`, `/sap/bc/adt/debugger/batch`), and
 `@mcp-abap-adt/adt-clients` records and sends them (`AdtBatchConnection`).
-Batch mode lets the LLM use that through the tools it already has.
+Batch mode lets the LLM run such requests in parallel through the tools it
+already has. The LLM drives the phases: to create 100 domains it records 100
+creates and executes them, then 100 locks (a stateful envelope), then 100
+updates under those locks, then 100 unlocks, each phase its own batch, and
+activates the group afterwards.
 
 ## The behaviour
 
@@ -15,16 +19,23 @@ Batch mode lets the LLM use that through the tools it already has.
   instance's handlers work on a batch connection (`AdtBatchConnection`, endpoint
   `communication`) wrapping the instance's own connection, instead of the
   connection itself.
-- **Every tool can be called in batch mode.** A tool called in batch mode
-  records its requests and returns nothing. Its answer exists only after
-  `BatchEnd`.
-- **`BatchEnd`** executes the recorded batch and switches the instance back to
-  its plain connection.
+- **A tool that sends one request can be called in batch mode.** It records
+  that request and returns nothing; its answer exists only after `BatchEnd`.
+- **A tool whose handler calls several endpoints is refused in batch mode**
+  (create → lock → write → unlock, validate → create → check, a read that
+  follows one answer with another request): its later requests need the earlier
+  answers, which do not exist until the batch runs. The refusal says so and
+  points to the single-request (low-level) tools of the compact set, through
+  which the LLM drives each phase as its own batch.
+- **`BatchEnd`** executes the recorded batch, switches the instance back to its
+  plain connection, and answers a short summary: how many calls were recorded
+  and which numbers failed.
 - **Answers by number.** The calls made in batch mode are numbered in the order
   they were made, from 1. The instance keeps the answers of its last executed
-  batch, and a tool returns the answer of a given number. The last batch's
-  answers stay until the next `BatchEnd` replaces them or the instance ends; no
-  timeout.
+  batch, and a tool returns the answer of a given number. A number exists until
+  the next batch replaces the answers, or the instance ends; no timeout. A
+  number the last batch does not have, or no batch yet, is one answer: no
+  answer with that number.
 - **The instance is the scope.** On stdio and SSE the MCP session has one
   instance, and batch mode is that instance's. On HTTP the instance is the one
   taken from the pool by `state_handle`, exactly as for any other call;

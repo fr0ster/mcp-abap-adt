@@ -387,7 +387,8 @@ it arose. A tool never rewrites it:
   `check`, `activate`, `read`, `delete check`, `delete`, …). A single-call tool adds none. What
   a failed step left behind (a lock not released, cleanup not done) rides beside it as
   `cleanup` — and when that is itself a failure, as an entry of `cleanup.failures` in the same
-  shape.
+  shape. A credential failure is never such an entry: on a write, its unlock or its activation it
+  is the answer itself, after the unlock was tried.
 
 **Several failures in one answer.** Each is an entry in the shape above, with its step — never
 folded into one text:

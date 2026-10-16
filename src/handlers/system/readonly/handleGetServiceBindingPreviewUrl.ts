@@ -39,7 +39,7 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, isCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -147,6 +147,9 @@ export async function handleGetServiceBindingPreviewUrl(
       systemClient = info?.client;
       systemLanguage = info?.language;
     } catch (error) {
+      // A credential failure is not a lookup's: the call ends with it, as it
+      // came — the binding's read would only be refused again.
+      if (isCredentialFailure(error)) return return_error(error);
       systemLookupFailed =
         error instanceof Error ? error.message : String(error);
     }
@@ -241,8 +244,10 @@ export async function handleGetServiceBindingPreviewUrl(
                 },
               });
               category = categoryServiceUrlsOf(String(answered.data ?? ''));
-            } catch {
-              // Absent, refused or shaped otherwise: the composed URL answers.
+            } catch (error) {
+              // A credential failure ends the call as it came; absent, refused
+              // or shaped otherwise: the composed URL answers.
+              if (isCredentialFailure(error)) throw error;
             }
           }
 

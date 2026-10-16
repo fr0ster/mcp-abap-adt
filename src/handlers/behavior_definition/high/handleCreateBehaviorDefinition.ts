@@ -24,7 +24,7 @@ import type {
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -159,13 +159,13 @@ export async function handleCreateBehaviorDefinition(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      // Best-effort: wait for the write to be visible before activating.
+      // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.
       await obj
         .read({ name }, 'inactive', {
           withLongPolling: true,
           analyse: analyseException,
         })
-        .catch(() => undefined);
+        .catch(unlessCredentialFailure);
 
       if (!shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;

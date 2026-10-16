@@ -2,7 +2,8 @@
  * An atomic write whose unlock is refused: the lock is still held, and the
  * consumer gets the unlock's error as the method returned it — status, code,
  * `adt_type`, T100 messages, raw body — with the step `unlock`, in `cleanup`.
- * A credential failure on the unlock reaches the consumer as it came.
+ * A credential failure on the unlock ends the call: it is the answer, as it
+ * came (adt-clients 33 rejects with it; nothing after it is sent).
  */
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
@@ -103,11 +104,9 @@ describe('an atomic write whose unlock is refused (a client double)', () => {
       class_name: 'ZCL_X',
       source_code: 'x',
     });
+    expect(result.isError).toBe(true);
     const payload = payloadOf(result);
-    expect(payload.cleanup.failures).toHaveLength(1);
-    expect(payload.cleanup.failures[0]).toMatchObject({
-      error: 'authentication_failed',
-      step: 'unlock',
-    });
+    expect(payload.error).toBe('authentication_failed');
+    expect(payload.cleanup).toBeUndefined();
   });
 });

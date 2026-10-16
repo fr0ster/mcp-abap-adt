@@ -33,7 +33,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -262,7 +262,7 @@ export async function handleCreateDomain(
                 analyse: analyseException,
               }),
           ),
-        // Best-effort: wait for the write to be visible, right before the
+        // Best-effort (a credential failure ends the call): wait for the write to be visible, right before the
         // first call that reads it back — this is the call most likely to
         // meet a not-yet-ready object (see `xmlPatch.ts`), so the wait sits
         // immediately ahead of it, exactly where the pre-migration handler
@@ -273,7 +273,7 @@ export async function handleCreateDomain(
               { domainName },
               { withLongPolling: true, analyse: analyseException },
             )
-            .catch(() => undefined);
+            .catch(unlessCredentialFailure);
           return obj.check({ domainName }, undefined, {
             analyse: analyseException,
           });

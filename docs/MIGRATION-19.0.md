@@ -229,7 +229,7 @@ section but one): it cannot be cut, so it gets no `timeout`.
   11 minutes), and none of the libraries' either: inside a lock window the connection applies no
   deadline at all (its 10-minute ceiling is gone, see below).
 - **No request carries a deadline of the libraries' either, and `SAP_TIMEOUT_*` are not read.**
-  With `@mcp-abap-adt/connection` 17 and `@mcp-abap-adt/adt-clients` 32, nothing reads
+  With `@mcp-abap-adt/connection` 17 and `@mcp-abap-adt/adt-clients` 33, nothing reads
   `SAP_TIMEOUT_DEFAULT`, `SAP_TIMEOUT_CSRF`, `SAP_TIMEOUT_LONG` or `SAP_TIMEOUT_CRITICAL`: the CSRF
   fetch and the cloud session preflight carry no 15 s bound, adt-clients' 120 s default for slow
   operations is gone, and inside a lock → write → unlock window a request carries no deadline at
@@ -598,8 +598,10 @@ texts reads the fields instead. See
   what the object is when it can; SAP answering no source is `status: "not_found"`.
 - **A credential failure ends the call, as it came.** A `401` inside a tool — in a batch too — ends
   the whole call with the connection's own words and hint, never replaced and never collected per
-  item: the credential is the same for every item. A `403` with SAP's exception document is an ADT
-  error, never `authentication_failed`.
+  item: the credential is the same for every item. A refusal before SAP was asked ends it the same
+  way (adt-clients 33 rejects with it), and so does one on a write's unlock or activation: the
+  unlock is still tried, and the credential failure is the answer, not a `cleanup` entry. A `403`
+  with SAP's exception document is an ADT error, never `authentication_failed`.
 
 ## BREAKING — embedders: no rules by default
 
@@ -1149,7 +1151,7 @@ build argument `VARIANT` (the package's name without its scope), installing that
 
 - **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **17.1**,
   `@mcp-abap-adt/interfaces-adt-connection` **3**, `@mcp-abap-adt/interfaces-adt` **18**,
-  `@mcp-abap-adt/adt-clients` **32** (and `@mcp-abap-adt/adt-strategies` 0.12). None of them takes a
+  `@mcp-abap-adt/adt-clients` **33** (and `@mcp-abap-adt/adt-strategies` 0.12). None of them takes a
   signal: `IAbapRequestOptions.signal` and `IAdtClientOptions.signal` are gone, there is no
   `ADT_REQUEST_ERROR` / `ADT_REQUEST_ABORTED`, and `IAdtError` has no `refusal` — an
   authentication failure inside a tool reaches the model with the connection's own words. A
@@ -1168,8 +1170,11 @@ build argument `VARIANT` (the package's name without its scope), installing that
   stub of `makeAdtRequest` is declared generic (connection's `docs/MIGRATION-15.0.md`).
 - **The chain's own migrations.** From 18.x the chain moved several majors at once; each package's
   note says what a consumer of it changes:
-  - `@mcp-abap-adt/adt-clients` 30 → 32 and `@mcp-abap-adt/interfaces-adt` 15 → 18: adt-clients'
-    `docs/usage/MIGRATION-31.md` and `MIGRATION-32.md`. From 32, `EnhancementType` is `enhoxhb |
+  - `@mcp-abap-adt/adt-clients` 30 → 33 and `@mcp-abap-adt/interfaces-adt` 15 → 18: adt-clients'
+    `docs/usage/MIGRATION-31.md`, `MIGRATION-32.md` and `MIGRATION-33.md`. From 33, a credential the
+    provider refused before SAP was asked (connection's `AuthRefusedError`) rejects from every member
+    — `unlockAll()` and `await using` included — where it answered `ok: false`: catch it where you
+    call members and stop. From 32, `EnhancementType` is `enhoxhb |
     enhoxhh | enhsxsb` (`enhoxh` and `enhsxs` are gone; the codes are SAP's `ENHO/XHB`, `ENHO/XHH`,
     `ENHS/XSB`), and a custom result set for a class, program, function group or include needs
     `enhancementElements` and `enhancementOptions` — lib's `resultsFor` reads both `verbatim`;

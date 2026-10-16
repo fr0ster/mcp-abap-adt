@@ -1,5 +1,5 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { failureEntry, thrownEntry } from '../answer';
+import { failureEntry, isCredentialFailure, thrownEntry } from '../answer';
 import { type Cleanup, safeRequest } from './safeFields';
 import { atStep, stepOf } from './step';
 
@@ -115,6 +115,13 @@ export async function withLock<H, T>(
   }
 
   const released = await runRelease(release, handle);
+
+  // A credential failure ends the call as it came, once the release was
+  // tried: the body's, else the release's — adt-clients rejects with it, and
+  // every further request (an activation, say) would only be refused again.
+  if (threw && isCredentialFailure(thrown)) throw thrown;
+  if (released.kind === 'threw' && isCredentialFailure(released.thrown))
+    throw released.thrown;
 
   if (threw) {
     if (released.kind === 'ok') throw thrown;
@@ -234,7 +241,8 @@ export async function carryCleanup<T, U>(
   try {
     answered = await next();
   } catch (error) {
-    if (cleanup === undefined) throw error;
+    // A credential failure as it came: wrapped, its reader would not know it.
+    if (cleanup === undefined || isCredentialFailure(error)) throw error;
     throw new LockNotReleased(error, { cleanup });
   }
   return attachCleanup(from, answered);

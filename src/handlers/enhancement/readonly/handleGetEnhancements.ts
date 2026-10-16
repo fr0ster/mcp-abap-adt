@@ -509,7 +509,10 @@ async function getIncludesListInternal(
     );
     return includeNames;
   } catch (error) {
-    if (methodFailureOf(error) !== undefined) throw error;
+    // SAP's refusal carried with its step, or a credential failure as it
+    // came (adt-clients rejects with it): never an empty list of includes.
+    if (methodFailureOf(error) !== undefined || failureOf(error) !== undefined)
+      throw error;
     logger?.error(
       `Failed to get includes list for ${objectType} '${objectName}':`,
       error,

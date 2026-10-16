@@ -236,6 +236,16 @@ export function isCredentialFailure(thrown: unknown): boolean {
   );
 }
 
+/**
+ * The catch of a best-effort call (a wait for a write to be visible): a
+ * credential failure is rethrown as it came — every further request would be
+ * refused again, so the tool's call ends with it; anything else is dropped.
+ */
+export function unlessCredentialFailure(thrown: unknown): undefined {
+  if (isCredentialFailure(thrown)) throw thrown;
+  return undefined;
+}
+
 /** A failed payload (a delegated handler's answer) that is a credential failure. */
 export function isCredentialPayload(payload: FailureEntry): boolean {
   return payload.error === 'authentication_failed' || payload.status === 401;

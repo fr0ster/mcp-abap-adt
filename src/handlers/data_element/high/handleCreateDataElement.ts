@@ -34,7 +34,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { patchDataElementXml } from '../../../lib/strategies/dataElementPatch';
@@ -285,7 +285,7 @@ export async function handleCreateDataElement(
                 analyse: analyseException,
               }),
           ),
-        // Best-effort: wait for the write to be visible, right before the
+        // Best-effort (a credential failure ends the call): wait for the write to be visible, right before the
         // first call that reads it back — see `handleCreateDomain.ts` for
         // why the wait sits here rather than after `check`.
         atStep('check', async () => {
@@ -294,7 +294,7 @@ export async function handleCreateDataElement(
               { dataElementName },
               { withLongPolling: true, analyse: analyseException },
             )
-            .catch(() => undefined);
+            .catch(unlessCredentialFailure);
           return obj.check({ dataElementName }, undefined, {
             analyse: analyseException,
           });

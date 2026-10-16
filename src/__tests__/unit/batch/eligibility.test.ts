@@ -106,11 +106,24 @@ describe('eligible', () => {
         eligible('HandlerGet', { object_type, run_id: 'RUN_A' }, 'http'),
       ).toEqual({ ok: false, reason: 'arguments' });
     }
-    // A metadata part that reads source and metadata — two requests.
+    // Source and metadata sent together: eligible. A function module's source
+    // read is built from its metadata's group: not.
     expect(
       eligible(
         'HandlerGet',
         { object_type: 'CLASS', part: 'metadata', class_name: 'CLAS_A' },
+        'http',
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      eligible(
+        'HandlerGet',
+        {
+          object_type: 'FUNCTION_MODULE',
+          part: 'metadata',
+          function_module_name: 'FM_A',
+          function_group_name: 'FUGR_A',
+        },
         'http',
       ),
     ).toEqual({ ok: false, reason: 'arguments' });
@@ -183,12 +196,125 @@ describe('eligible', () => {
   });
 
   it('an unlisted tool is not eligible', () => {
-    for (const tool of ['SearchSource', 'GetWhereUsed', 'DebugStep', 'Nope']) {
+    for (const tool of ['SearchSource', 'RunATC', 'DebugStep', 'Nope']) {
       expect(eligible(tool, {}, 'http')).toEqual({
         ok: false,
         reason: 'not-listed',
       });
     }
+  });
+
+  it('the writes and runs are eligible only under the arguments whose requests do not chain', () => {
+    const no = { ok: false, reason: 'arguments' };
+    expect(eligible('ActivateClass', { class_name: 'C' }, 'rfc')).toEqual({
+      ok: true,
+    });
+    expect(
+      eligible(
+        'HandlerActivate',
+        { object_type: 'CLASS', object_name: 'C' },
+        'http',
+      ),
+    ).toEqual({ ok: true });
+    // An activation run polls its result; objects[] and object_adt_type take one.
+    expect(
+      eligible(
+        'HandlerActivate',
+        { objects: [{ name: 'C', type: 'CLAS/OC' }] },
+        'http',
+      ),
+    ).toEqual(no);
+    expect(
+      eligible(
+        'HandlerActivate',
+        { object_type: 'CLASS', object_name: 'C', object_adt_type: 'CLAS/OC' },
+        'http',
+      ),
+    ).toEqual(no);
+    expect(
+      eligible(
+        'HandlerActivate',
+        { object_type: 'PACKAGE', object_name: 'P' },
+        'http',
+      ),
+    ).toEqual(no);
+    expect(eligible('RuntimeRunClass', { class_name: 'C' }, 'http')).toEqual({
+      ok: true,
+    });
+    expect(
+      eligible('RuntimeRunClass', { class_name: 'C', profile: true }, 'http'),
+    ).toEqual(no);
+    expect(
+      eligible(
+        'HandlerProfileRun',
+        { target_type: 'CLASS', class_name: 'C', profiling: false },
+        'http',
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      eligible(
+        'HandlerProfileRun',
+        { target_type: 'CLASS', class_name: 'C' },
+        'http',
+      ),
+    ).toEqual(no);
+    expect(
+      eligible(
+        'CreateFunctionGroup',
+        { function_group_name: 'F', package_name: 'P' },
+        'http',
+      ),
+    ).toEqual(no);
+    expect(
+      eligible(
+        'CreateServiceDefinition',
+        {
+          service_definition_name: 'S',
+          package_name: 'P',
+          activate: false,
+          source_code: 'x',
+        },
+        'http',
+      ),
+    ).toEqual(no);
+    expect(eligible('RuntimeListFeeds', {}, 'http')).toEqual({ ok: true });
+    expect(
+      eligible('RuntimeListFeeds', { feed_type: 'dumps' }, 'http'),
+    ).toEqual(no);
+    expect(
+      eligible(
+        'GetWhereUsed',
+        { object_name: 'C', object_type: 'class' },
+        'http',
+      ),
+    ).toEqual({ ok: true });
+    for (const filter of [
+      { enable_all_types: true },
+      { enable_only_types: ['CLAS/OC'] },
+      { disable_types: ['PROG/P'] },
+    ]) {
+      expect(
+        eligible(
+          'GetWhereUsed',
+          { object_name: 'C', object_type: 'class', ...filter },
+          'http',
+        ),
+      ).toEqual(no);
+    }
+    expect(
+      eligible(
+        'CreatePackage',
+        { package_name: 'P', super_package: 'S' },
+        'rfc',
+      ),
+    ).toEqual({ ok: false, reason: 'connection' });
+    expect(
+      eligible(
+        'HandlerGet',
+        { part: 'node_structure', object_name: 'C' },
+        'http',
+      ),
+    ).toEqual(no);
   });
 
   it('reads arguments that are not an object as absent', () => {

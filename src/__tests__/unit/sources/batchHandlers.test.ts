@@ -1,10 +1,10 @@
 /**
  * `tools/batch-handlers.json` is the one place batch eligibility comes from
  * (spec §4.2): every entry names a tool its set serves, a handler that exists,
- * and the one request it sends; no entry lists a long read whose
- * `tools/long-handlers.json` `sends` names several requests; and every entry
- * is proven by sample calls in `batchEntryCases.ts`, which
- * `oneRequestPerEntry.test.ts` runs against a counting connection.
+ * and the requests it sends — none of which needs another's answer (the
+ * owner, 2026-10-16); no entry lists a long read whose requests chain; and
+ * every entry is proven by sample calls in `batchEntryCases.ts`, which
+ * `oneRequestPerEntry.test.ts` runs held open and answered.
  */
 
 import * as fs from 'node:fs';
@@ -57,76 +57,81 @@ function servedBySet(): Record<'full' | 'compact', Set<string>> {
   return { full: new Set(full), compact: new Set(compact) };
 }
 
-const METHOD = /\b(GET|POST|PUT|DELETE)\b/g;
-/** Words a `sends` uses for more than one request. */
-const SEVERAL_WORDS = [
-  ' per ',
-  ' each ',
-  'GETs',
-  'POSTs',
-  'walk',
-  'recurs',
-  'paged',
-  'up to',
-];
-
-/** Whether a `sends` names exactly one request: one HTTP method, no word for several. */
-function namesOneRequest(sends: string): boolean {
-  return (
-    (sends.match(METHOD) ?? []).length === 1 &&
-    !SEVERAL_WORDS.some((w) => sends.includes(w))
-  );
-}
-
-/** A long tool's `sends`, "as X or Y" read as X's and Y's. */
-function longSends(tool: string): string[] {
-  const all = longListed();
-  const own = all.find((l) => l.tool === tool)?.sends ?? '';
-  if (!own.startsWith('as ')) return [own];
-  return own
-    .slice('as '.length)
-    .split(' or ')
-    .map((name) => all.find((l) => l.tool === name.trim())?.sends ?? '');
-}
+/** An HTTP method, as a `sends` names a request. */
+const METHODS = ['GET ', 'POST ', 'PUT ', 'DELETE '];
 
 /**
- * Every long tool by what one call sends: one request, several, or several
- * unless its arguments pick a single-request mode (listed only under `when`).
- * Checked against each tool's `sends` both ways below.
+ * Every long tool by whether a request of one call needs an earlier answer:
+ * `independent` (none does), `chained` (a walk, a page, a fallback, a scope
+ * read first), or `by-arguments` (chained unless the arguments pick a mode
+ * that is not — listed only under `when`). Measured by the probe this table
+ * was written from; the entries themselves are proven by
+ * `oneRequestPerEntry.test.ts`.
  */
 const LONG_BY_REQUESTS: Readonly<
-  Record<string, 'one' | 'several' | 'by-arguments'>
+  Record<string, 'independent' | 'chained' | 'by-arguments'>
 > = {
-  SearchObject: 'one',
-  GetSqlQuery: 'one',
-  GetTableContents: 'one',
-  GetATCFindings: 'one',
-  RuntimeGetProfilerTraceData: 'one',
-  RuntimeAnalyzeProfilerTrace: 'one',
-  HandlerSearch: 'one',
-  HandlerGetData: 'one',
-  HandlerProfileView: 'one',
+  SearchObject: 'independent',
+  GetSqlQuery: 'independent',
+  GetTableContents: 'independent',
+  GetATCFindings: 'independent',
+  RuntimeGetProfilerTraceData: 'independent',
+  RuntimeAnalyzeProfilerTrace: 'independent',
+  HandlerSearch: 'independent',
+  HandlerGetData: 'independent',
+  HandlerProfileView: 'independent',
+  HandlerWhereUsed: 'independent',
   HandlerGet: 'by-arguments',
-  GetWhereUsed: 'several',
-  SearchSource: 'several',
-  GetPackageContents: 'several',
-  GetPackageTree: 'several',
-  GetObjectsList: 'several',
-  GetStructuresList: 'several',
-  GetIncludesList: 'several',
-  RuntimeListFeeds: 'several',
-  ListTransports: 'several',
-  GetObjectInfo: 'several',
-  DescribeByList: 'several',
-  GetAbapSystemSymbols: 'several',
-  HandlerWhereUsed: 'several',
-  HandlerDumpList: 'several',
+  GetWhereUsed: 'by-arguments',
+  RuntimeListFeeds: 'by-arguments',
+  SearchSource: 'chained',
+  GetPackageContents: 'chained',
+  GetPackageTree: 'chained',
+  GetObjectsList: 'chained',
+  GetStructuresList: 'chained',
+  GetIncludesList: 'chained',
+  ListTransports: 'chained',
+  GetObjectInfo: 'chained',
+  DescribeByList: 'chained',
+  GetAbapSystemSymbols: 'chained',
+  HandlerDumpList: 'chained',
 };
 
-/** Whether a handler file names `tool`: as a literal, or through the per-type version template. */
-function namesTool(source: string, tool: string): boolean {
+const GROUPS_DIR = path.join(REPO, 'src/lib/handlers/groups');
+
+/**
+ * Whether a group registers `tool` with handler `fn`: a tool the full set
+ * names in its group (`name: 'ActivateDomain'`) over a low handler's
+ * definition, `handler: withContext(fn)` in the same registration.
+ */
+function groupRegisters(tool: string, fn: string): boolean {
+  for (const file of fs.readdirSync(GROUPS_DIR)) {
+    if (!file.endsWith('.ts')) continue;
+    const source = fs.readFileSync(path.join(GROUPS_DIR, file), 'utf8');
+    const at = source.indexOf(`name: '${tool}',`);
+    if (at === -1) continue;
+    const handlerAt = source.indexOf('handler:', at);
+    const nextName = source.indexOf('name:', at + 1);
+    const registration = source.slice(
+      handlerAt,
+      source.indexOf('\n', handlerAt),
+    );
+    if (
+      handlerAt !== -1 &&
+      (nextName === -1 || handlerAt < nextName) &&
+      registration.includes(`(${fn})`)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Whether a handler file names `tool`: as a literal, through the per-type version template, or its group's registration. */
+function namesTool(source: string, tool: string, fn: string): boolean {
   if (source.includes(`name: '${tool}'`)) return true;
-  for (const suffix of ['Versions', 'VersionSource']) {
+  if (groupRegisters(tool, fn)) return true;
+  for (const suffix of ['Versions', 'VersionSource', 'VersionDiff']) {
     if (
       tool.startsWith('Get') &&
       tool.endsWith(suffix) &&
@@ -201,34 +206,42 @@ describe('tools/batch-handlers.json', () => {
         exported:
           source.includes(`export async function ${fn}(`) ||
           source.includes(`export function ${fn}(`),
-        named: namesTool(source, entry.tool),
+        named: namesTool(source, entry.tool, fn ?? ''),
       }).toEqual({ tool: entry.tool, exported: true, named: true });
     }
   });
 
-  it("every entry's sends names one request", () => {
+  it('no tool name is served by both sets: eligible() keys entries by name alone', () => {
+    const both = [...served.full].filter((name) => served.compact.has(name));
+    expect(both).toEqual([]);
+    const sets = new Map<string, Set<string>>();
+    for (const entry of entries) {
+      sets.set(entry.tool, (sets.get(entry.tool) ?? new Set()).add(entry.set));
+    }
+    expect(
+      [...sets].filter(([, s]) => s.size > 1).map(([tool]) => tool),
+    ).toEqual([]);
+  });
+
+  it("every entry's sends names what it sends", () => {
     const offending = entries
-      .filter((e) => !namesOneRequest(e.sends))
+      .filter((e) => !METHODS.some((m) => e.sends.includes(m)))
       .map((e) => `${e.tool}: ${e.sends}`);
     expect(offending).toEqual([]);
   });
 
-  it('classifies every long tool, each as its sends says', () => {
+  it('classifies every long tool', () => {
     expect(Object.keys(LONG_BY_REQUESTS).sort()).toEqual(
       [...LONG_TOOLS].sort(),
     );
-    for (const [tool, kind] of Object.entries(LONG_BY_REQUESTS)) {
-      const one = longSends(tool).every(namesOneRequest);
-      expect({ tool, one }).toEqual({ tool, one: kind === 'one' });
-    }
   });
 
-  it("no entry's tool is a long read whose sends names more than one request", () => {
+  it("no entry's tool is a long read whose requests chain", () => {
     const offending = entries
-      .filter((e) => LONG_BY_REQUESTS[e.tool] === 'several')
+      .filter((e) => LONG_BY_REQUESTS[e.tool] === 'chained')
       .map((e) => e.tool);
     expect(offending).toEqual([]);
-    // A long read that picks its single-request modes by arguments is listed only under them.
+    // A long read that is chained in some modes is listed only under the others.
     for (const entry of entries) {
       if (LONG_BY_REQUESTS[entry.tool] === 'by-arguments') {
         expect({
@@ -239,10 +252,10 @@ describe('tools/batch-handlers.json', () => {
     }
   });
 
-  it('lists every long read that sends one request (spec §4.4)', () => {
+  it('lists every long read whose requests do not chain (spec §4.4)', () => {
     const tools = new Set(entries.map((e) => e.tool));
     for (const [tool, kind] of Object.entries(LONG_BY_REQUESTS)) {
-      if (kind === 'several') continue;
+      if (kind === 'chained') continue;
       expect({ tool, listed: tools.has(tool) }).toEqual({ tool, listed: true });
     }
   });
@@ -282,13 +295,5 @@ describe('tools/batch-handlers.json', () => {
     expect(
       BATCH_ENTRY_CASES.filter((c) => !tools.has(c.tool)).map((c) => c.tool),
     ).toEqual([]);
-  });
-
-  it('the one-request check reads a sends both ways (load-bearing)', () => {
-    expect(namesOneRequest('GET /sap/bc/adt/x')).toBe(true);
-    expect(namesOneRequest('GET /a, then GET /b')).toBe(false);
-    expect(namesOneRequest('POST /a per node')).toBe(false);
-    expect(namesOneRequest('one source GET per include')).toBe(false);
-    expect(namesOneRequest('the nodestructure walk')).toBe(false);
   });
 });

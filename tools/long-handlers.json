@@ -111,7 +111,7 @@
     "tool": "HandlerWhereUsed",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
-    "sends": "as GetWhereUsed"
+    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope: GetWhereUsed without a type filter"
   },
   {
     "tool": "HandlerSearch",

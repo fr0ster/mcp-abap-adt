@@ -5,7 +5,7 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { pair } from '../../../lib/strategies/sequence';
+import { both } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
@@ -56,7 +56,7 @@ export async function handleReadServiceDefinition(
   return answer(
     { tool: 'ReadServiceDefinition', detail: 'terse' },
     () =>
-      pair(
+      both(
         atStep('read', () =>
           obj.read({ serviceDefinitionName }, version, {
             analyse: analyseException,

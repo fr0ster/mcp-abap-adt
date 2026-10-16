@@ -2,12 +2,14 @@
  * Which calls may be recorded into a communication batch: the table
  * `tools/batch-handlers.json`, read once, and nothing else.
  *
- * The one criterion (the owner): a recorded call sends exactly one request —
- * its answer arrives only at `BatchEnd`, so a handler that needs a first
- * answer to build a second request, or sends several, cannot be recorded.
- * Long reads are judged the same way. Every entry is proven by running its
- * handler against a counting connection (`oneRequestPerEntry.test.ts`); a
- * tool not listed, or a call whose arguments no entry admits, is refused.
+ * The one criterion (the owner, 2026-10-16): none of a recorded call's
+ * requests needs another's answer — answers arrive only at `BatchEnd`, so a
+ * handler that reads a first answer to build or decide a second request (a
+ * create then its activation, a fallback after a `404`, a poll) cannot be
+ * recorded; several requests sent together can. Long reads are judged the
+ * same way. Every entry is proven by running its handler held open and
+ * answered (`oneRequestPerEntry.test.ts`); a tool not listed, or a call whose
+ * arguments no entry admits, is refused.
  *
  * An entry may narrow its tool with `when` — every rule must hold — and with
  * `connection: 'http'` when its one request holds only over HTTP (a package
@@ -31,7 +33,7 @@ export interface BatchEntry {
   set: 'full' | 'compact';
   /** `path#function`, from the repository root. */
   handler: string;
-  /** The one request the call sends, in words. */
+  /** The requests the call sends, in words. */
   sends: string;
   when?: WhenRule;
   connection?: 'http';
@@ -81,10 +83,12 @@ export function batchEntries(): BatchEntry[] {
 
 /**
  * What an absent argument reads as, per tool — the handler's own default:
- * `HandlerGet` reads `part ?? 'source'`.
+ * `HandlerGet` reads `part ?? 'source'`, `RuntimeListFeeds`
+ * `feed_type ?? 'descriptors'`.
  */
 const ABSENT_READS_AS: Readonly<Record<string, Record<string, string>>> = {
   HandlerGet: { part: 'source' },
+  RuntimeListFeeds: { feed_type: 'descriptors' },
 };
 
 /** An argument's value as the rules compare it: a string or boolean, upper-cased. */

@@ -5,7 +5,7 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { pair } from '../../../lib/strategies/sequence';
+import { both } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
@@ -53,7 +53,7 @@ export async function handleReadStructure(
   return answer(
     { tool: 'ReadStructure', detail: 'terse' },
     () =>
-      pair(
+      both(
         atStep('read', () =>
           obj.read({ structureName }, version, {
             analyse: analyseException,

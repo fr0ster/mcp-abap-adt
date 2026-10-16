@@ -18,17 +18,22 @@ Batch mode lets the LLM use that through the tools it already has.
 - **Every tool can be called in batch mode.** A tool called in batch mode
   records its requests and returns nothing. Its answer exists only after
   `BatchEnd`.
-- **`BatchEnd`** executes the recorded batch, returns the answers of every tool
-  called since `BatchBegin`, and switches the instance back to its plain
-  connection.
+- **`BatchEnd`** executes the recorded batch and switches the instance back to
+  its plain connection.
+- **Answers by number.** The calls made in batch mode are numbered in the order
+  they were made, from 1. The instance keeps the answers of its last executed
+  batch, and a tool returns the answer of a given number. The last batch's
+  answers stay until the next `BatchEnd` replaces them or the instance ends; no
+  timeout.
 - **The instance is the scope.** On stdio and SSE the MCP session has one
   instance, and batch mode is that instance's. On HTTP the instance is the one
   taken from the pool by `state_handle`, exactly as for any other call;
   `state_handle` exists for that reuse and has nothing to do with batching.
   Batch mode introduces no handle of its own.
 - **The tool descriptions say it.** `BatchBegin`, `BatchEnd` and every tool's
-  description tell the LLM that in batch mode a call returns nothing and all
-  answers come from `BatchEnd`.
+  description tell the LLM that in batch mode a call returns nothing, that calls
+  are numbered in the order made, and that the answers are read by number once
+  `BatchEnd` has run.
 - **The debugger has its own batch mode**, on its own stateful connection and
   `/sap/bc/adt/debugger/batch`, separate from the communication batch.
 
@@ -36,8 +41,8 @@ Batch mode lets the LLM use that through the tools it already has.
 
 - One MCP session, one connector, one main flow; tool calls on it are
   sequential. Only LOCK and UNLOCK go stateful.
-- The batch gives no transaction: what succeeded stays, and `BatchEnd`'s answers
-  say per call what happened.
+- The batch gives no transaction: what succeeded stays, and each numbered answer
+  says what happened to that call.
 - SAP's answers reach the LLM as they came; a credential refusal stops the
   batch and reaches the LLM as it came (adt-clients 33).
 - No timeout of the server's choosing.

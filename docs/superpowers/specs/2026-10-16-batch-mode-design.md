@@ -159,10 +159,10 @@ executed batch, communication or debugger.
 
 ### Wording
 
-- `BatchBegin`: "Switches this server into batch mode: from now on each call of a tool that sends
-  one request is recorded instead of sent, and returns nothing. Every recorded call is numbered,
-  in the order made, from 1. A tool that sends more than one request is refused in batch mode; use
-  the single-request tools (compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with
+- `BatchBegin`: "Switches this server into batch mode: from now on each call of a tool none of whose
+  requests depends on another's answer is recorded instead of sent, and returns nothing. Every
+  recorded call is numbered, in the order made, from 1. A tool that builds a request from an
+  earlier answer is refused in batch mode; use the low-level tools (compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with
   lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. BatchEnd sends the
   recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle
   this answers in the request header on every call of the batch."
@@ -182,7 +182,7 @@ executed batch, communication or debugger.
   by number with BatchAnswers once BatchEnd has run."; in the compact sets the sentence names
   `HandlerBatch` instead of BatchBegin / BatchAnswers; a tool eligible only for some arguments adds
   which (from its eligibility entry, §4.2); an ineligible tool — "In batch mode (BatchBegin) this
-  tool is refused: it sends more than one request." Tools of a registry that registers its own
+  tool is refused: a request of it depends on another's answer." Tools of a registry that registers its own
   (`trackingRegistrations`) get the ineligible sentence through the proxy's `registerTool`.
 
 ## 4. Recording
@@ -200,34 +200,41 @@ context exactly as any call), and before the handler is chosen:
    tools. For a communication batch the call is looked up in the eligibility table (§4.2) by tool
    name, arguments and connection. Not eligible → answered at once with the server's refusal
    `batch_not_recordable` (§8); the handler never runs; nothing goes into an envelope, so the call
-   has **no number**. A long read is judged as every tool: by whether it sends one request (§4.4).
+   has **no number**. A long read is judged as every tool: by whether any of its requests depends on another's answer
+   (§4.4). A tool that sends no request is refused.
 3. Eligible → recorded (below).
 
 Recording an eligible call:
 
 - The handler gets `{ ...context, connection: recorder }` — a **per-call recorder**, an
   `IAbapConnection` over the open `AdtBatchConnection` that forwards every call; at the call's
-  first `makeAdtRequest` it takes the batch's next number for the call, and it keeps the raw part
-  of the call's request when `batch.keepRawParts` is on (§5.3). Nothing else of the
-  context changes.
+  first `makeAdtRequest` it takes the batch's next number for the call and **keeps that number for
+  every further request of the call** — a call may put several independent parts into the envelope
+  (a source and its metadata, `both()` in `src/lib/strategies/sequence.ts`), all under its one
+  number; it keeps each part's raw answer when `batch.keepRawParts` is on (§5.3). Nothing else of
+  the context changes. `eligible()` is called on the arguments as the SDK parsed them, the same
+  object the handler receives.
 - The handler is started inside the same scopes as today (`inHeldFlow`, `withDestinationSystemContext`,
   `withKnownSystemContext`), but its request-signal scope is the **batch's** signal, not the call's
   (§4.3).
-- The call **waits until its handler has recorded its request or settled**, whichever is first —
-  no SAP answer is awaited, because none exists before `BatchEnd`. Waiting for the record keeps the
-  queue in call order (so phases stay in one run and envelopes do not alternate).
+- The call **waits until its handler has sent everything it sends before an answer** — every
+  request it records before awaiting an answer — **or settled**, whichever is first; no SAP answer
+  is awaited, because none exists before `BatchEnd`. Waiting for all of them, not only the first,
+  keeps the queue in call order: the next call's parts cannot interleave with this one's (so phases
+  stay in one run and envelopes do not alternate).
 - **Recorded** → the call returns `{ content: [] }` — "returns nothing" on the MCP wire:
   `CallToolResult.content` may be empty (SDK 1.32 `CallToolResultSchema`: "it may be empty"), no
   `isError`, no text, no number. The handler's promise gets a rejection handler at once, so it never
-  rejects unhandled. The handler continues; when `execute()` settles its part, its continuation runs
-  its own result and error strategies on that part — then, at `BatchEnd`, since before it there is
-  nothing to run them on — and the tool answer it builds is that number's answer (§5.3).
+  rejects unhandled. The handler continues; when `execute()` settles its parts, its continuation
+  runs its own result and error strategies on them — then, at `BatchEnd`, since before it there is
+  nothing to run them on — and the one tool answer it builds from all its parts is that number's
+  answer (§5.3).
 - **Settled without recording** (the handler refused its arguments before sending) → nothing went
   into an envelope: the call has **no number**, and it answers the handler's own answer at once, as
   outside batch mode.
 
 **Numbering.** Every call that put a request into an envelope has its own number, from 1, in the
-order made — and only those: a refused call, or a handler that refused before sending, takes none.
+order made — one number per call, covering all its parts — and only those: a refused call, or a handler that refused before sending, takes none.
 In batch mode there are no retries (§4.7): a part answered `406` or `415` is that call's answer,
 as any other failure, and the model reads it and decides.
 
@@ -237,19 +244,24 @@ A file `tools/batch-handlers.json`, in the style of `tools/long-handlers.json`, 
 may be recorded, with:
 
 - `tool`, `set` (`full` | `compact`; a `-ro` set serves an entry when its set's read half does),
-  `handler` (path#function), `sends` (the one request, in words — the same field as
-  `tools/long-handlers.json`' `sends`, and the criterion the source test checks);
-- `when` (optional): the arguments under which the call sends one request — an equality, a
+  `handler` (path#function), `sends` (the request or the independent requests it sends, in words —
+  the same field as `tools/long-handlers.json`' `sends`; it may name several);
+- `when` (optional): the arguments under which no request of the call depends on another's
+  answer — an equality, a
   membership or a presence on named arguments (as `longTools.ts`' `NOT_A_READ` reads
   `object_type`), e.g. `HandlerUpdate` only with `lock_handle`, and for DOMAIN, DATA_ELEMENT and
   PACKAGE only with `document` (§4.6); `HandlerCreate` only with `create_only: true`; `HandlerGet`
-  only for the parts that send one GET (not `contents`, not `UNIT_TEST`/`CDS_UNIT_TEST`);
-- `connection` (optional): `http` when the one request holds only over HTTP — `HandlerLock` /
+  only for the parts whose reads are independent (not `contents`, not `UNIT_TEST`/`CDS_UNIT_TEST`);
+- `connection` (optional): `http` when the entry holds only over HTTP — `HandlerLock` /
   `HandlerUnlock` of `PACKAGE`: over RFC the package lock opens an ABAP session of its own
   (`connectionForPackageLock`), outside the batch, so over RFC that entry is not eligible.
 
 `src/lib/batch/eligibility.ts` reads the file once and answers `eligible(tool, args, connection)`.
-Nothing outside the file decides eligibility; a tool not listed is refused.
+Nothing outside the file decides eligibility; a tool not listed is refused. The proof of an entry:
+run with its arguments, the requests the handler holds **pending** (before any answer) and the
+requests it sends when **answered** (an answer document, and a `404`) are identical and at least
+one — nothing it sends depends on an answer. A tool that sends no request is not listed. The table
+holds 170 entries (single-request write tools, such as `HandlerLock`, included).
 
 What the code settles about the first entries (each still proven by its test):
 
@@ -258,13 +270,14 @@ What the code settles about the first entries (each still proven by its test):
   `handleUnlockObject`). `HandlerUpdate` with `lock_handle` for the source-written types (CLASS,
   PROGRAM, INTERFACE, DDL, TABLE, STRUCTURE, FUNCTION_MODULE, BEHAVIOR_DEFINITION,
   METADATA_EXTENSION — each proven), and for DOMAIN, DATA_ELEMENT, PACKAGE with `document`
-  (§4.6). Single-GET reads of the full and compact sets — long reads included when they send one
-  request (§4.4) — and `HandlerGet` per part.
+  (§4.6). The reads of the full and compact sets whose requests are independent — one GET, or a
+  source and its metadata together (the twelve `Read<Type>` tools and `GetObjectVersionDiff`, via
+  `both()`) — long reads included (§4.4), and `HandlerGet` per part.
 - **Not eligible:** `HandlerUpdate` with `lock_handle` and `properties` for DOMAIN, DATA_ELEMENT,
   PACKAGE — it reads the metadata, then writes it patched (`handleUpdateDomain`'s `sequence(read,
   update)`): two requests, the second needing the first's answer. `HandlerCreate` without
   `create_only` and every high tool (validate → create → lock → write → unlock → check → activate,
-  `handleCreateDomain`). The long reads that send more than one request (§4.4, §11). Debugger tools, background runs, the leftover-session
+  `handleCreateDomain`), `404` fallbacks, polling. The long reads with a chain (§4.4, §11). Debugger tools, background runs, the leftover-session
   tools.
 
 ### 4.3 The recorded handler's signal and lifetime
@@ -278,15 +291,15 @@ tools (`registerActiveTool`): the shutdown's `logOffAtOnce` interrupts `BatchEnd
 
 ### 4.4 Long reads
 
-A long read is judged as every tool: **one request**. A listed long read (`isLongTool(tool) &&
-isLongRead(tool, args)`) that sends one request — `SearchObject`, `GetSqlQuery`, `GetTableContents`,
+A long read is judged as every tool: **no request depends on another's answer**. A listed long read
+(`isLongTool(tool) && isLongRead(tool, args)`) whose requests are independent — `SearchObject`, `GetSqlQuery`, `GetTableContents`,
 `GetATCFindings`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace` (one GET, then a
 local summary), `HandlerSearch`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` per part
-(its single-read modes, by arguments) — is in `tools/batch-handlers.json` and is recorded like any
-single-request tool: in batch mode it is not given a connection of its own (`runLongCall` /
-`openFreshConnection` are not called) and its request goes on the batch connection. A long read that
-sends several requests is refused in batch mode like a multi-request tool (`batch_not_recordable`);
-those tools run on internal batches of their own outside batch mode (§11).
+(its independent-read modes, by arguments) — is in `tools/batch-handlers.json` and is recorded
+like any eligible tool: in batch mode it is not given a connection of its own (`runLongCall` /
+`openFreshConnection` are not called) and its requests go on the batch connection. A long read with a
+chain is refused in batch mode (`batch_not_recordable`); those tools run on internal batches of
+their own outside batch mode (§11).
 
 **In batch mode there is no timeout**: a long read in batch mode takes none. A call that gives
 `timeout` in batch mode is **refused before anything is recorded** (`batch_no_timeout`: "in batch
@@ -403,7 +416,7 @@ work. A refusal after that reaches `execute()` as the connection's `AuthRefusedE
 ### 5.3 What came: the answers and `BatchEnd`'s answer
 
 **A number's answer is the tool's answer, as its handler builds it** with its own result and error
-strategies when its part settles at `BatchEnd` — the same answer the tool gives outside batch mode
+strategies from all its parts when they settle at `BatchEnd` — the same answer the tool gives outside batch mode
 for the same SAP answer: its projection of a success, the C6 shape of a failure (the method's error
 as it is plus `step`), the chain's answer for a credential refusal. Whatever SAP returned is what the
 strategies read; nothing else is put in its place. By how the part settled:
@@ -419,8 +432,9 @@ strategies read; nothing else is put in its place. By how the part settled:
 
 **Raw parts, by configuration.** With `batch.keepRawParts` on (default **off**) — a server
 configuration value the launcher reads and hands to each `InstanceBatch` it creates — each answer
-also carries, beside the tool's answer, SAP's raw part of the call's request as it came:
-`{ status, status_text, headers, body }` — the inner status, its text, the inner headers as
+also carries, beside the tool's answer, SAP's raw parts of the call's requests as they came — one
+per part, in the order sent, all under the call's number: each `{ status, status_text, headers,
+body }` — the inner status, its text, the inner headers as
 adt-clients parsed them (names lower-cased **[code]**), the body as text, `""` when the part had
 none (goal: "an empty line when there is none"); a request not sent has none. Off, no raw part is
 kept.
@@ -522,8 +536,8 @@ its own request only; the stack is in the batch when the model recorded `stack`.
   either is open, are refused `batch_mode_on` / `batch_mode_other`.
 - **Refusals** are the server's own (`ServerRefusal`, answered `{ error: <code>, message }` like the
   existing ones, no `kind`, nothing read from a server): `batch_mode_unavailable`, `batch_mode_on`,
-  `batch_mode_other`, `batch_mode_off`, `batch_not_recordable` ("<tool> sends more than one request
-  and cannot be recorded in batch mode; record its steps with the single-request tools —
+  `batch_mode_other`, `batch_mode_off`, `batch_not_recordable` ("<tool> builds a request from another's
+  answer and cannot be recorded in batch mode; record its steps with the low-level tools —
   compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle,
   HandlerUnlock, HandlerGet — each phase its own batch"), `batch_no_timeout`; for a tool refused only
   because a batch is open: "<tool> is not served while a batch is open"),
@@ -574,10 +588,14 @@ watch the test go red, revert (the *Break* line).
   DOMAIN with `properties`, a debugger tool during a communication batch, a leftover-session tool:
   refused, handler not called, nothing recorded or sent. *Break:* default eligibility to true.
 - **Eligibility proof per entry** — for every entry of `tools/batch-handlers.json`, the handler runs
-  with the entry's arguments against a counting connection and issues exactly one
-  `makeAdtRequest`; a source test fails when an entry has no case, names a tool its set does not
-  serve, or a served tool has an entry with no test. *Break:* add a second request to one listed
-  handler.
+  with the entry's arguments: the requests held pending and the requests sent when answered (a
+  document, a `404`) are identical and at least one; a source test fails when an entry has no case,
+  names a tool its set does not serve, or a served tool has an entry with no test. *Break:* make a
+  listed handler send a second request built from the first's answer; list a tool that sends none.
+- **One number per call** — a call sending two independent parts (a `Read<Type>`) takes one number;
+  both parts are in the envelope; its answer is the handler's one answer built from both; the next
+  call takes the next number; the next call's parts follow both of this call's. *Break:* number per
+  request; return after the first request.
 - **`create_only`** — per type in the create route: exactly one `POST`, the create's own, nothing
   else (no validate, lock, write, check, activate); a type whose `create()` sends more refuses
   `create_only` before sending; without `create_only` the high create runs unchanged. *Break:*
@@ -596,19 +614,20 @@ watch the test go red, revert (the *Break* line).
   failure in the C6 shape; an envelope SAP answered `500` (the parts' answers and `BatchEnd`'s); an
   envelope with no answer; the not-sent ones; the summary's `failed`; the strategies are not run
   before `execute()`. *Break:* answer the raw part instead of the handler's answer.
-- **`batch.keepRawParts`** — off (default): no raw part in any answer; on: each answer carries the
-  raw part as it came (status, text, headers, body, `""` for a bodyless `200`).
+- **`batch.keepRawParts`** — off (default): no raw part in any answer; on: each answer carries its
+  call's raw parts as they came, one per part, in the order sent (status, text, headers, body, `""`
+  for a bodyless `200`).
   *Break:* default it on.
 - **Credential refusal** — a refusal-shaped object (own `refusal.kind`, `refusal.reason`, `at`,
   no `response`) thrown by the target: `BatchEnd` answers it as `answerRead` does, every number's
   answer is it, mode off; the answered variant (`cause.response.status === 401`). *Break:* wrap
   the refusal in a "not sent" or summary-only answer.
-- **Long reads by one request** — a single-request long read in batch mode (`SearchObject`,
-  `HandlerGet` part `source`) is recorded: `openFreshConnection` and `runLongCall` not called, its
-  request in the envelope; a multi-request one (`SearchSource`, `HandlerGet` part `contents`) is
-  refused, nothing recorded; with `timeout` a single-request one is refused `batch_no_timeout`. The
-  source test of `tools/batch-handlers.json` checks each entry against its `sends` (one request),
-  not against long-list membership. *Break:* keep the long-read branch first.
+- **Long reads by independence** — a long read with independent requests in batch mode
+  (`SearchObject`, `HandlerGet` part `source`) is recorded: `openFreshConnection` and `runLongCall`
+  not called, its requests in the envelope; one with a chain (`SearchSource`, `HandlerGet` part
+  `contents`) is refused, nothing recorded; with `timeout` an eligible one is refused
+  `batch_no_timeout`. The source test of `tools/batch-handlers.json` checks each entry by its proof,
+  not by long-list membership. *Break:* keep the long-read branch first.
 - **`BatchEnd` failing before `execute()`** — a source whose `resolve` fails at `BatchEnd`: the call
   answers that failure, batch mode is off, every recorded call's answer is that failure as it came,
   nothing is sent. *Break:* end batch mode only around `execute()`.
@@ -767,8 +786,9 @@ kind:
   passed deadline answers what was gathered with `truncated.by_timeout`, as today.
 - **Over RFC** the internal batch runs as over HTTP; the live test measures it, and a failure there
   may be the RFC transport's.
-- **Never in LLM batch mode.** These tools send more than one request, so they are refused while the
-  instance is in batch mode (§4.1): an internal batch never runs inside the model's batch.
+- **Never in LLM batch mode.** These tools chain their phases (a later phase is built from an
+  earlier one's answers), so they are refused while the instance is in batch mode (§4.1): an
+  internal batch never runs inside the model's batch.
 
 ### Per tool
 

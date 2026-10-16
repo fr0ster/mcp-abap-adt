@@ -19,13 +19,16 @@ activates the group afterwards.
   instance's handlers work on a batch connection (`AdtBatchConnection`, endpoint
   `communication`) wrapping the instance's own connection, instead of the
   connection itself.
-- **A tool that sends one request can be called in batch mode.** It records
-  that request and returns nothing; its answer exists only after `BatchEnd`.
-- **A tool whose handler calls several endpoints is refused in batch mode**
+- **A tool none of whose requests depends on another's answer can be called
+  in batch mode** — one request, or several independent ones (a source and its
+  metadata together). It records its requests, all under the call's one
+  number, and returns nothing; its answer exists only after `BatchEnd`. A tool
+  that sends no request is refused.
+- **A tool whose handler chains its requests is refused in batch mode**
   (create → lock → write → unlock, validate → create → check, a read that
   follows one answer with another request): its later requests need the earlier
   answers, which do not exist until the batch runs. The refusal says so and
-  points to the single-request (low-level) tools of the compact set, through
+  points to the low-level tools of the compact set, through
   which the LLM drives each phase as its own batch.
 - **`BatchEnd`** executes the recorded batch, switches the instance back to its
   plain connection, and answers a short summary: how many calls were recorded
@@ -55,9 +58,11 @@ activates the group afterwards.
   description tell the LLM that in batch mode a call returns nothing, that calls
   are numbered in the order made, and that the answers are read by number once
   `BatchEnd` has run.
-- **One request is the criterion, for long reads too.** A long read that sends
-  one request is recorded like any single-request tool; one that sends several
-  is refused in batch mode, and the consumer runs it as a normal call.
+- **Independence is the criterion, for long reads too.** A long read none of
+  whose requests depends on another's answer is recorded like any other tool;
+  one with a chain (a request built from an earlier answer, a fallback after a
+  `404`, polling) is refused in batch mode, and the consumer runs it as a
+  normal call.
 - **The multi-request reads run on batches inside themselves.** A read tool
   whose handler sends several independent requests sends them in phases, each
   phase's independent requests in one envelope (a package tree level by level,
@@ -69,7 +74,8 @@ activates the group afterwards.
   envelopes, so one call can serve several objects.
 - **Every package has batch mode.** The full, read-only and compact sets all
   serve `BatchBegin`, `BatchEnd` and the answer tool; what a set can do in batch
-  mode is whatever of its tools send one request — reads everywhere, and in
+  mode is whatever of its tools send no request depending on another's answer
+  — reads everywhere, and in
   compact the low-level create, lock, update and unlock as well. LOCK and UNLOCK
   go in stateful envelopes, everything else stateless, as adt-clients' batch
   connection sends them (measured there).

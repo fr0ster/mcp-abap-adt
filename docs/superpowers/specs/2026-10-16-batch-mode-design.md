@@ -547,8 +547,10 @@ its own request only; the stack is in the batch when the model recorded `stack`.
 - **Instance close with a batch open** (stdio's client close, an SSE close, the pool's eviction,
   process shutdown): nothing recorded is sent. `closeInstance` gets a `dropBatch?()` step beside
   `cutBackgroundRuns` (the close lets go of state without `dispose()`), which aborts the batch's
-  signal and discards the `AdtBatchConnection` and the answers. Recorded part promises never settle
-  (adt-clients has no discard **[code]**); they and their handlers are released with the object.
+  signal and discards the `AdtBatchConnection` and the answers. adt-clients' part promises never
+  settle (it has no discard **[code]**), but the recorder races every part it hands a handler against
+  the batch's signal, so each waiting handler settles with `RequestAbortedError` at the drop and
+  leaves no unhandled rejection; a `BatchEnd` already executing re-installs no answers after it.
   A `BatchEnd` running at the close is
   interrupted like any running tool (`logOffAtOnce`): the logoff goes out under its envelopes.
 - **HTTP disconnect.** HTTP instances are built with `transportCloseEndsSession: false`: a dropped

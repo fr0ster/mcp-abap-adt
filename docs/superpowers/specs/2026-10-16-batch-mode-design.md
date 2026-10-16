@@ -10,9 +10,10 @@ Sources read: `src/embeddable/BaseMcpServer.ts`, `src/handlers/interfaces.ts`, `
 `compact-readonly-entries/src/**`, `src/handlers/common/low/**`, `src/lib/debugger/**`,
 `src/lib/state/InstanceState.ts`, `src/lib/instanceClose.ts`, `src/lib/answer.ts`,
 `src/lib/auth/serverRefusal.ts`, `http/src/InstancePool.ts`, `http/src/StreamableHttpServer.ts`, and
-adt-clients 33.0.0 (`src/batch/AdtBatchConnection.ts`, `src/batch/wire.ts`,
+adt-clients 33.0.0 and 34.0.0 (`src/batch/AdtBatchConnection.ts`, `src/batch/wire.ts`,
 `src/utils/adtResponse.ts`, `src/core/domain/AdtDomain.ts`, `docs/usage/BATCH.md`, `CHANGELOG.md`)
-in its `credential-refusals` worktree. Claims about adt-clients are tagged **[code]** (read in its
+(33.0.0 in its `credential-refusals` worktree; 34.0.0 at tag `v34.0.0`, with
+`docs/usage/MIGRATION-34.md`). Claims about adt-clients are tagged **[code]** (read in its
 source), **[doc]** (stated in its BATCH.md or CHANGELOG, not traced in code) or **[unverified]**.
 
 ## 1. What adt-clients gives, and what it does not
@@ -28,8 +29,7 @@ source), **[doc]** (stated in its BATCH.md or CHANGELOG, not traced in code) or 
   per envelope and restores it in `finally` **[code]**; resolves a part's promise with its inner
   response for 2xx, rejects with an `Error` carrying `response` otherwise **[code]**; after each
   envelope yields one turn and sends what members recorded meanwhile as follow-up envelopes,
-  up to 100 **[code]** — among them a member's `406`/`415` corrected retry, which batch mode
-  switches off (§4.7); an empty
+  up to 100 **[code]** — in 34.0.0 accept negotiation records none (§4.7); an empty
   queue answers a synthetic `204` without sending **[code]**; concurrent `execute()` is refused
   **[code]**.
 - On an envelope failure: parts of that envelope reject with the error, every later part (and
@@ -55,9 +55,10 @@ source), **[doc]** (stated in its BATCH.md or CHANGELOG, not traced in code) or 
   **[code]**; no raw text of a part — only `{ status, statusText, headers (names lower-cased),
   data }` **[code]**.
 
-The server depends on `@mcp-abap-adt/adt-clients ^33.0.0`. It is unpublished today (the registry
-has up to 32.2.0): the bump lands only after 33.0.0 is on the registry (owner's rule: no local
-link). `adt-strategies ^0.12.0` stays; its compatibility with 33.0.0 is checked by the build at the
+The server depends on `@mcp-abap-adt/adt-clients ^34.0.0` (34.0.0 keeps 33.0.0's credential
+refusals and exempts a batch from accept negotiation, §4.7). It is not on the registry yet (the
+owner publishes it): the bump lands only after 34.0.0 is on the registry (owner's rule: no local
+link). `adt-strategies ^0.12.0` stays; its compatibility with 34.0.0 is checked by the build at the
 bump **[unverified]**.
 
 ## 2. Where batch state lives
@@ -327,43 +328,25 @@ They are served by the `compact` binaries (not `compact-ro`) and are eligible in
 
 ### 4.7 No retries in batch mode
 
-The batch is the model's: nothing recorded is corrected and sent again. adt-clients' accept
-negotiation retries a request answered `406` (with a corrected `Accept`) or `415` (with a corrected
-`Content-Type`) **[code]**, `src/utils/acceptNegotiation.ts` at `v33.0.0`, from line 194
-(`makeAdtRequestWithAcceptNegotiation`). In a batch that retry would be recorded while settling and
-sent in a follow-up envelope; batch mode switches it off.
+The batch is the model's: nothing recorded is corrected and sent again, and a part answered `401`,
+`406` or `415` is that call's answer, as any other failure — the model reads it and decides.
 
-What adt-clients offers, at `v33.0.0` **[code]**:
+**adt-clients 34.0.0 guarantees it** (`docs/usage/MIGRATION-34.md`, `BATCH.md` at `v34.0.0`
+**[doc]**; `AdtBatchConnection.ts` and `acceptNegotiation.ts` at `v34.0.0` **[code]**): an
+`AdtBatchConnection` marks itself exempt from accept negotiation at construction; an `AdtClient`
+built over it never wraps it, whatever `enableAcceptCorrection` it is given; a member that
+negotiates by itself sends through it once; and the envelope goes out through the wrapped
+connection's base request, so a `406`/`415` answered to the envelope reaches `execute()` and its
+parts as it came and is not sent again. The connection's own handling of the envelope request —
+credential renewal, CSRF recovery, session — stays as it is (§5.1). The server adds no switch of its
+own; outside a batch, accept negotiation works as before.
 
-- The switch and the learned media types live **per connection object**, under a symbol on the
-  object itself (`acceptNegotiation.ts:25–45`, `stateOf`); `withRequestTrace` keeps the object's
-  identity (`requestTrace.ts:78–85`), and `withCallTimeout` forwards symbol reads to it (the file's
-  own header, `acceptNegotiation.ts:10–24`).
-- `makeAdtRequestWithAcceptNegotiation` reads the switch of the connection it is handed
-  (`acceptNegotiation.ts:202–203`: `options?.enableAcceptCorrection ??
-  getAcceptCorrectionEnabled(connection)`); the switch, when set, wins over the
-  `ADT_ACCEPT_CORRECTION` environment default (`acceptNegotiation.ts:73–79`).
-- `AdtClient`'s constructor option `enableAcceptCorrection` (`IAdtClientOptions`, interfaces-adt)
-  sets that switch on the connection the client is built with and, when `false`, does not wrap it
-  (`AdtClient.ts:1089–1104`). `setAcceptCorrectionEnabled` itself (`acceptNegotiation.ts:65–70`) is
-  not exported from the package's index **[code]**, so the constructor option is the way in.
-
-How the server uses it: a recorded call's clients are built over its per-call recorder —
-`createAdtClient(recorder, …)` — with `enableAcceptCorrection: false` (`GuardedAdtClient` passes its
-options through to `AdtClient`). The switch lands on the recorder, a different object from the
-instance's connection, so the members recorded through it never correct and retry, and the
-instance's plain connection keeps its own switch, untouched. The debugger batch's requests are sent
-by `src/runtime/debugger/abap.ts` with a plain `connection.makeAdtRequest` (e.g. lines 208, 262,
-277, 349, 372) **[code]** — no negotiation on that path.
-
-**Gap — the envelope itself.** The envelope `POST` goes through the late-bound target to the
-instance's connection's `makeAdtRequest`. When an `AdtClient` built over that connection with
-correction on (the default, or `ADT_ACCEPT_CORRECTION` unset) has wrapped it,
-`wrapConnectionAcceptNegotiation` has replaced that method (`acceptNegotiation.ts:171–192`), so a
-`406`/`415` answered to the **envelope** would be corrected and the envelope sent again. adt-clients
-offers no way to send one request with correction off on a connection whose switch is on, short of
-switching the whole connection: this is an adt-clients change (for example `AdtBatchConnection`
-sending its envelope past the negotiation), not something the server works around.
+The exemption is a mark read on the connection object a member is handed (a symbol property,
+`isExempt`, `acceptNegotiation.ts` at `v34.0.0`) **[code]**. The per-call recorder (§4.1) therefore
+reads every property, symbols included, from the `AdtBatchConnection` it records into, and
+overrides only `makeAdtRequest` (and keeps any property a client writes onto it, such as
+`withRequestTrace`'s method, on itself, never on the shared batch connection) — so the members see
+the batch connection's mark. The test of §9.1 ("No retry in batch mode") proves it end to end.
 
 ## 5. Execution at `BatchEnd`
 
@@ -449,7 +432,7 @@ secret, never rebuilt from a message).
 - **Unanswered** (the provider refused before SAP was asked): every part rejects with the same
   refusal object **[code]**, `execute()` rejects with it. `BatchEnd` ends batch mode (§5.2.4); its
   call answers that refusal (the owner's rule "a credential refusal ends the call"), and every
-  handler, meeting the same refusal (adt-clients 33 rethrows it as the same object), answers it as
+  handler, meeting the same refusal (adt-clients 33 and later rethrow it as the same object), answers it as
   it came under its number.
 - **Answered** (SAP's `401` the provider could not renew): the active envelope's parts carry the
   refusal, later ones "not sent" **[code]**; `BatchEnd` answers the refusal as it came; each number's answer
@@ -576,8 +559,9 @@ watch the test go red, revert (the *Break* line).
 - **No retry in batch mode** — a recorded read and a recorded write whose parts answer `406` (with a
   supported `Accept` in the answer) and `415`: each is that call's answer, built by its handler as
   any failure; the fake saw each request once and no follow-up envelope; the instance's plain
-  connection still corrects outside the batch. *Break:* build the recorded call's client without
-  `enableAcceptCorrection: false`.
+  connection still corrects outside the batch; also an envelope answered `406` is not sent again.
+  *Break:* make the per-call recorder a plain forwarding object that does not read the batch
+  connection's properties (the exemption mark is then not seen).
 - **Only batch tools and eligible tools while a batch is open** — a high tool, `HandlerUpdate`
   DOMAIN with `properties`, a debugger tool during a communication batch, a leftover-session tool:
   refused, handler not called, nothing recorded or sent. *Break:* default eligibility to true.
@@ -660,7 +644,7 @@ No unit test talks to SAP; no live test runs in CI.
 
 ## 10. Docs, changelog, dependency
 
-- **Dependency:** `@mcp-abap-adt/adt-clients` `^32.0.0` → `^33.0.0`, after 33.0.0 is on the registry;
+- **Dependency:** `@mcp-abap-adt/adt-clients` `^32.0.0` → `^34.0.0`, after 34.0.0 is on the registry;
   the lockfile checked for anything not from the registry.
 - **README.md** — a "Batch mode" section: what it is for, the phases (create / lock / write / unlock,
   each a batch), the tools, the handle header over HTTP.
@@ -680,18 +664,11 @@ No unit test talks to SAP; no live test runs in CI.
 - **docs/MIGRATION-19.0.md** — embedders: the new `batch` constructor option (absent → batch tools
   answer `batch_mode_unavailable`); the new tools in every set; the compact create and write modes.
 - **CHANGELOG.md** — the 19.0.0 entry (this PR's release) gains under *Added* the batch mode, the
-  debugger batch and the two compact modes, and under *Changed* adt-clients `^33.0.0` with what it
-  changes for the server (a credential refusal rethrown by every member). No earlier version's
+  debugger batch and the two compact modes, and under *Changed* adt-clients `^34.0.0` with what it
+  changes for the server (a credential refusal rethrown by every member; a batch corrects and
+  resends nothing). No earlier version's
   entry is touched.
 - Tool descriptions: §3.
-
-## Contradictions with the owner's answers
-
-- **"No retries" and the connection's `401` renewal.** On a `401` the connection asks its credential
-  to renew and sends that one request again (§5.1) — for an envelope too. SAP refused it before
-  running it, so nothing executed is repeated, but it is a second send of the envelope. This design
-  keeps the connection's behaviour as it is for every request; the owner confirms that "no retries"
-  covers the accept negotiation only.
 
 ## Open questions for the owner
 

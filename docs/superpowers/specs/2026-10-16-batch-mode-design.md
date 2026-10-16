@@ -163,7 +163,7 @@ executed batch, communication or debugger.
   one request is recorded instead of sent, and returns nothing. Every recorded call is numbered,
   in the order made, from 1. A tool that sends more than one request is refused in batch mode; use
   the single-request tools (compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with
-  lock_handle, HandlerUnlock) and run each phase as its own batch. BatchEnd sends the
+  lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. BatchEnd sends the
   recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle
   this answers in the request header on every call of the batch."
 - `BatchEnd`: "Sends every call recorded since BatchBegin, in parallel envelopes, with the
@@ -200,7 +200,7 @@ context exactly as any call), and before the handler is chosen:
    tools. For a communication batch the call is looked up in the eligibility table (§4.2) by tool
    name, arguments and connection. Not eligible → answered at once with the server's refusal
    `batch_not_recordable` (§8); the handler never runs; nothing goes into an envelope, so the call
-   has **no number**. A listed long read is refused the same way (§4.4).
+   has **no number**. A long read is judged as every tool: by whether it sends one request (§4.4).
 3. Eligible → recorded (below).
 
 Recording an eligible call:
@@ -237,11 +237,13 @@ A file `tools/batch-handlers.json`, in the style of `tools/long-handlers.json`, 
 may be recorded, with:
 
 - `tool`, `set` (`full` | `compact`; a `-ro` set serves an entry when its set's read half does),
-  `handler` (path#function), `sends` (the one request, in words);
+  `handler` (path#function), `sends` (the one request, in words — the same field as
+  `tools/long-handlers.json`' `sends`, and the criterion the source test checks);
 - `when` (optional): the arguments under which the call sends one request — an equality, a
   membership or a presence on named arguments (as `longTools.ts`' `NOT_A_READ` reads
   `object_type`), e.g. `HandlerUpdate` only with `lock_handle`, and for DOMAIN, DATA_ELEMENT and
-  PACKAGE only with `document` (§4.6); `HandlerCreate` only with `create_only: true`;
+  PACKAGE only with `document` (§4.6); `HandlerCreate` only with `create_only: true`; `HandlerGet`
+  only for the parts that send one GET (not `contents`, not `UNIT_TEST`/`CDS_UNIT_TEST`);
 - `connection` (optional): `http` when the one request holds only over HTTP — `HandlerLock` /
   `HandlerUnlock` of `PACKAGE`: over RFC the package lock opens an ABAP session of its own
   (`connectionForPackageLock`), outside the batch, so over RFC that entry is not eligible.
@@ -256,12 +258,13 @@ What the code settles about the first entries (each still proven by its test):
   `handleUnlockObject`). `HandlerUpdate` with `lock_handle` for the source-written types (CLASS,
   PROGRAM, INTERFACE, DDL, TABLE, STRUCTURE, FUNCTION_MODULE, BEHAVIOR_DEFINITION,
   METADATA_EXTENSION — each proven), and for DOMAIN, DATA_ELEMENT, PACKAGE with `document`
-  (§4.6). Single-GET reads of the full and compact sets that are not listed long reads (§4.4).
+  (§4.6). Single-GET reads of the full and compact sets — long reads included when they send one
+  request (§4.4) — and `HandlerGet` per part.
 - **Not eligible:** `HandlerUpdate` with `lock_handle` and `properties` for DOMAIN, DATA_ELEMENT,
   PACKAGE — it reads the metadata, then writes it patched (`handleUpdateDomain`'s `sequence(read,
   update)`): two requests, the second needing the first's answer. `HandlerCreate` without
   `create_only` and every high tool (validate → create → lock → write → unlock → check → activate,
-  `handleCreateDomain`). Every listed long read (§4.4). Debugger tools, background runs, the leftover-session
+  `handleCreateDomain`). The long reads that send more than one request (§4.4, §11). Debugger tools, background runs, the leftover-session
   tools.
 
 ### 4.3 The recorded handler's signal and lifetime
@@ -275,12 +278,21 @@ tools (`registerActiveTool`): the shutdown's `logOffAtOnce` interrupts `BatchEnd
 
 ### 4.4 Long reads
 
-**Long reads are not part of a batch.** A listed long read (`isLongTool(tool) && isLongRead(tool,
-args)`, `tools/long-handlers.json`) is refused in batch mode like a multi-request tool —
-`batch_not_recordable`, in the words for a long read: "<tool> is a long read and is not part of a
-batch; run it as a normal call outside batch mode" — before anything is recorded; it takes no
-number and runs nothing. The consumer decides when to run it. `tools/batch-handlers.json` lists no
-long-read tool (its source test refuses one).
+A long read is judged as every tool: **one request**. A listed long read (`isLongTool(tool) &&
+isLongRead(tool, args)`) that sends one request — `SearchObject`, `GetSqlQuery`, `GetTableContents`,
+`GetATCFindings`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace` (one GET, then a
+local summary), `HandlerSearch`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` per part
+(its single-read modes, by arguments) — is in `tools/batch-handlers.json` and is recorded like any
+single-request tool: in batch mode it is not given a connection of its own (`runLongCall` /
+`openFreshConnection` are not called) and its request goes on the batch connection. A long read that
+sends several requests is refused in batch mode like a multi-request tool (`batch_not_recordable`);
+those tools run on internal batches of their own outside batch mode (§11).
+
+**In batch mode there is no timeout**: a long read in batch mode takes none. A call that gives
+`timeout` in batch mode is **refused before anything is recorded** (`batch_no_timeout`: "in batch
+mode a read takes no timeout: the batch is sent at BatchEnd, with no deadline"), and takes no number
+— *this design's recommendation, marked as such:* refusing rather than ignoring, because a parameter
+silently dropped hides the caller's mistake.
 
 ### 4.5 What a recorded call touches outside the batch
 
@@ -513,7 +525,7 @@ its own request only; the stack is in the batch when the model recorded `stack`.
   `batch_mode_other`, `batch_mode_off`, `batch_not_recordable` ("<tool> sends more than one request
   and cannot be recorded in batch mode; record its steps with the single-request tools —
   compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle,
-  HandlerUnlock — each phase its own batch"; for a long read: §4.4's words; for a tool refused only
+  HandlerUnlock, HandlerGet — each phase its own batch"), `batch_no_timeout`; for a tool refused only
   because a batch is open: "<tool> is not served while a batch is open"),
   `debug_batch_amdp_unmeasured`. SAP's answers and errors reach the model as they came: a number's
   answer is the tool's answer built from what came (§5.3), a method's error the C6 shape (the
@@ -591,9 +603,12 @@ watch the test go red, revert (the *Break* line).
   no `response`) thrown by the target: `BatchEnd` answers it as `answerRead` does, every number's
   answer is it, mode off; the answered variant (`cause.response.status === 401`). *Break:* wrap
   the refusal in a "not sent" or summary-only answer.
-- **Long reads refused** — a listed long read in batch mode is refused with the long-read words,
-  nothing recorded, no number, `runLongCall` not called; the source test refuses a long-read tool
-  in `tools/batch-handlers.json`. *Break:* look up eligibility before the long-read check.
+- **Long reads by one request** — a single-request long read in batch mode (`SearchObject`,
+  `HandlerGet` part `source`) is recorded: `openFreshConnection` and `runLongCall` not called, its
+  request in the envelope; a multi-request one (`SearchSource`, `HandlerGet` part `contents`) is
+  refused, nothing recorded; with `timeout` a single-request one is refused `batch_no_timeout`. The
+  source test of `tools/batch-handlers.json` checks each entry against its `sends` (one request),
+  not against long-list membership. *Break:* keep the long-read branch first.
 - **`BatchEnd` failing before `execute()`** — a source whose `resolve` fails at `BatchEnd`: the call
   answers that failure, batch mode is off, every recorded call's answer is that failure as it came,
   nothing is sent. *Break:* end batch mode only around `execute()`.
@@ -668,8 +683,91 @@ No unit test talks to SAP; no live test runs in CI.
   changes for the server (a credential refusal rethrown by every member; a batch corrects and
   resends nothing). No earlier version's
   entry is touched.
-- Tool descriptions: §3.
+- Tool descriptions: §3. The long reads of §11 keep their descriptions; `docs/user-guide/` notes they
+  read in envelopes.
+- **CHANGELOG** also names §11 under *Changed* (the multi-request long reads send their independent
+  requests in envelopes).
+
+## 11. Multi-request long reads on internal batches
+
+Every long read that sends more than one request (`tools/long-handlers.json`' `sends`) is
+reimplemented on batches: its handler runs its own work through an `AdtBatchConnection`
+(`endpoint: 'communication'`) **in phases** — the requests of one phase that do not depend on each
+other go in one envelope; the next phase is built from those answers. One tool call for the model,
+as today; its answer is the same as the sequential version's.
+
+### The shared mechanism
+
+- `src/lib/batch/phases.ts`: `runPhase(connection, items, read)` — records `read(item, batch)` for
+  every item on one `AdtBatchConnection` over the call's connection, `execute()`s it once, and answers
+  each item's settlement in item order. Clients and inner handlers of a phase are built over the
+  batch connection (`createAdtClient(batch)`; an inner handler gets `{ ...context, connection: batch
+  }`); the batch connection is exempt from accept negotiation by adt-clients 34 (§4.7), so nothing
+  is corrected or resent — **no retries**.
+- **Where it runs.** On the long call's own connection, as today (`runLongCall`: a fresh stateless
+  connection); its `timeout` cuts the read by logging that connection off, under an envelope in
+  flight if one is. Reads are stateless, so a phase is one envelope.
+- **The 100-envelope bound.** Each phase is its own `execute()`, and a read phase sends one envelope
+  with no follow-ups (negotiation records none in 34 **[doc]**), so adt-clients' bound of 100
+  envelopes per `execute()` **[code]** is never reached. Parts per envelope have no adt-clients
+  limit; payload limits are unmeasured **[doc]** (open question 1).
+- **Failures.** A part's non-2xx is that item's failure, read by the item's own strategies, as the
+  per-item failure today (`FailedObject`, the C6 entry with its `step`). An envelope that fails
+  (no parts) is every item of that phase's failure, the envelope's error as it came, with its step.
+  A credential refusal ends the call: `execute()` rejects with the refusal **[code]**, the handler
+  rethrows it, and the call answers it as it came.
+- **Existing limits.** Each tool's limits bound what is put in a phase and how many phases run:
+  `max_objects` caps the units before their phase is recorded; `max_depth` / `maxDepth` and the
+  include depth (20) are the number of level phases; `time_budget_ms` (the caller's own deadline in
+  `SearchSource`) is checked between phases — an envelope in flight is never cut by it — and a
+  passed deadline answers what was gathered with `truncated.by_timeout`, as today.
+- **Over RFC** the internal batch runs as over HTTP; the live test measures it, and a failure there
+  may be the RFC transport's.
+- **Never in LLM batch mode.** These tools send more than one request, so they are refused while the
+  instance is in batch mode (§4.1): an internal batch never runs inside the model's batch.
+
+### Per tool
+
+| Tool (and its compact twin) | Phases — what goes in one envelope |
+|---|---|
+| `GetPackageContents`, `HandlerGet` part `contents` (`walkPackage`) | per level up to `max_depth`: (a) the root `nodestructure` of every package of the level; (b) every type-node `nodestructure` of those packages; the next level is the subpackages found |
+| `GetPackageTree` | (1) the package metadata GET and the root `nodestructure`; then the `walkPackage` levels as above |
+| `GetObjectsList` | per level: the `nodestructure` of every node of the level (recursing into every child node) |
+| `GetObjectInfo` | per tier up to `maxDepth`: the `nodestructure` of every node of the tier; with `enrich`, a last phase: one quickSearch per node |
+| `SearchSource` | (1) the quickSearch per package mask; (2) the package walk's levels (as `walkPackage`); (3) the source GETs of the units, up to `max_objects`; `time_budget_ms` checked between phases |
+| `GetStructuresList` | per level of the include tree: (a) the source GET of every node as a structure; (b) as a table, for the nodes the first did not find; with `include_extensions`, (c) the where-used pair (structure, table) of every node, (d) the source GET of every candidate |
+| `GetIncludesList` | function group: (1) the `nodestructure`; then per depth (up to 20): the source GET of every include of the level; class: its one metadata GET (no batch) |
+| `ListTransports` | (1) the search configurations GET; (2) the transport-request GET of every saved configuration (up to 5) |
+| `DescribeByList` | (1) the quickSearch of every object; (2) again without its type, for the objects whose first answer was empty |
+| `GetAbapSystemSymbols` | (1) the read of every symbol found (class / function module / interface / generic), through the inner handlers (open question 2) |
+| `GetWhereUsed` with a type filter, `HandlerWhereUsed` | (1) the where-used scope; (2) the scoped where-used request — two dependent requests, one part per envelope (open question 3) |
+| `RuntimeListFeeds`, `HandlerDumpList` | (1) the feed (or variants) GET; then each page from the previous page's next link — one part per envelope (open question 3) |
+
+Each row is to be confirmed against its handler when it is reimplemented; a dependency the table
+does not show splits a phase, never joins two.
+
+### Tests
+
+Per tool, against the ADT stand-in's fixtures: the batched handler gives the same answer as the
+sequential version; the request count and the envelope count are as the table says; a part's
+failure is that item's failure and the rest answer; an envelope failure; a credential refusal ends
+the call as it came. *Break:* send a phase's requests one by one (the envelope count goes red).
+
+Live (gated by `tests/test-config.yaml`, each test stating where it runs): every tool before and
+after, on-premise (HTTP and RFC) and ABAP Cloud — answers equal, time measured, results to the docs
+with the date.
 
 ## Open questions for the owner
 
-None.
+1. **Parts per envelope** in an internal batch. adt-clients sets none and payload limits are
+   unmeasured. *Recommendation:* no cap of the server's; the tools' existing limits (`max_objects`
+   500, depths) bound a phase, and the live test measures the largest phases.
+2. **`GetAbapSystemSymbols`' inner handlers** (`handleGetClass`, `handleGetFunctionModule`,
+   `handleGetInterface`) may send more than one request each. *Recommendation:* one phase per
+   request kind they send, confirmed when it is reimplemented.
+3. **Strictly dependent chains** (`GetWhereUsed` with a filter, `RuntimeListFeeds` paging): every
+   phase holds one request, so an envelope adds a multipart wrap with nothing in parallel.
+   *Recommendation:* leave them sequential.
+4. **`SearchSource`'s `concurrency`** (8, 16 cap, 1 on RFC) means parallel requests today; in a batch
+   a phase is one envelope. *Recommendation:* remove it from the batched version's schema — a
+   parameter read as nothing hides the caller's mistake.

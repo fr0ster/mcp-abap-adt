@@ -63,7 +63,10 @@ activates the group afterwards.
   phase's independent requests in one envelope (a package tree level by level,
   then the objects' reads), and still answers in one call. Nothing in such an
   internal batch is corrected or sent again; a part's failure is that item's,
-  and a credential refusal ends the call as it came.
+  and a credential refusal ends the call as it came. Where the batch works,
+  only the batched version is kept; the sequential one runs only on a system
+  without the communication batch. A dependent chain is a sequence of
+  envelopes, so one call can serve several objects.
 - **Every package has batch mode.** The full, read-only and compact sets all
   serve `BatchBegin`, `BatchEnd` and the answer tool; what a set can do in batch
   mode is whatever of its tools send one request — reads everywhere, and in

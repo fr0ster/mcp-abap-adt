@@ -5,6 +5,8 @@
  * and with a `404`; held open, both requests are out, where `pair()` sent one.
  */
 
+import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
+import { failureOf } from '../../../lib/auth/failures';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import * as sequenceModule from '../../../lib/strategies/sequence';
 import { both, pair } from '../../../lib/strategies/sequence';
@@ -172,5 +174,90 @@ describe('both()', () => {
         },
       ),
     ).toBe(failed);
+  });
+
+  /** A second request held open until `release()`, and whether `both()` has settled. */
+  function heldSecond() {
+    let release: () => void = () => {};
+    const second = () =>
+      new Promise<R<string>>((resolve) => {
+        release = () => resolve(ok('b'));
+      });
+    return { second, release: () => release() };
+  }
+  const flush = async () => {
+    for (let i = 0; i < 20; i += 1) {
+      await new Promise<void>((r) => setImmediate(r));
+    }
+  };
+
+  it('does not settle on a failed first answer while the second request is in flight', async () => {
+    const held = heldSecond();
+    const failed = no('first');
+    let settled = false;
+    const result = both(async () => failed, held.second).then((v) => {
+      settled = true;
+      return v;
+    });
+    await flush();
+    expect(settled).toBe(false);
+    held.release();
+    expect(await result).toBe(failed);
+    expect(settled).toBe(true);
+  });
+
+  it('does not settle on a rejected first call while the second request is in flight', async () => {
+    const held = heldSecond();
+    const thrown = new Error('first threw');
+    let settled = false;
+    const result = both(async () => {
+      throw thrown;
+    }, held.second).then(
+      () => {
+        settled = true;
+      },
+      (error) => {
+        settled = true;
+        throw error;
+      },
+    );
+    const rejected = expect(result).rejects.toBe(thrown);
+    await flush();
+    expect(settled).toBe(false);
+    held.release();
+    await rejected;
+    expect(settled).toBe(true);
+  });
+
+  it('a credential refusal ends the call as it came, in either position', async () => {
+    const refusal = () =>
+      new AuthProviderFailure(
+        authError['credential-refused']({ credential: 'token' }),
+      );
+    // The first rejects with it: the call rejects with that very value.
+    const first = refusal();
+    const asFirst = both(
+      async () => {
+        throw first;
+      },
+      async () => ok('b'),
+    );
+    await expect(asFirst).rejects.toBe(first);
+    await asFirst.catch((thrown) =>
+      expect(failureOf(thrown)).toEqual(failureOf(refusal())),
+    );
+    // The first answers, the second rejects with it: the same.
+    const second = refusal();
+    const asSecond = both(
+      async () => ok('a'),
+      async () => {
+        throw second;
+      },
+    );
+    await expect(asSecond).rejects.toBe(second);
+    await asSecond.catch((thrown) =>
+      expect(failureOf(thrown)).toEqual(failureOf(refusal())),
+    );
+    expect(failureOf(second)).toBeDefined();
   });
 });

@@ -170,8 +170,10 @@ export async function pair<A, B>(
  * be recorded whole. `both` sends the two requests at once and then reads the
  * answers in order, with `pair`'s answer exactly: the first failing answer,
  * untouched (the first's before the second's), else both values with any
- * held lock carried. A rejection of the second while the first is answered
- * first is never left unhandled.
+ * held lock carried. It settles only once both requests have: when the first
+ * fails or rejects, it waits for the second to settle (its outcome ignored)
+ * and then answers the first's failure, or rethrows its rejection, as it
+ * came. A rejection of the second is never left unhandled.
  *
  * Only for calls the second of which takes nothing of the first's answer;
  * a step built from an earlier answer stays a `pair` or a `sequence`.
@@ -182,9 +184,24 @@ export async function both<A, B>(
 ): Promise<IAdtResponse<[A, B], IAdtError>> {
   const answeringA = first();
   const answeringB = second();
-  answeringB.catch(() => undefined);
-  const a = await answeringA;
-  if (!a.ok) return a as unknown as IAdtResponse<[A, B], IAdtError>;
+  // Settled, whatever it answers: `both` never ends while its second request
+  // is still in flight — a tool call that ended with a request running would
+  // leave it outside the call's flow, where the next call could start beside it.
+  const settledB = answeringB.then(
+    () => undefined,
+    () => undefined,
+  );
+  let a: IAdtResponse<A, IAdtError>;
+  try {
+    a = await answeringA;
+  } catch (thrown) {
+    await settledB;
+    throw thrown;
+  }
+  if (!a.ok) {
+    await settledB;
+    return a as unknown as IAdtResponse<[A, B], IAdtError>;
+  }
   const b = await answeringB;
   if (!b.ok) return b as unknown as IAdtResponse<[A, B], IAdtError>;
   const both: [A, B] = [a.getResult().value, b.getResult().value];

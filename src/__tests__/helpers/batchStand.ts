@@ -172,6 +172,8 @@ class StandServer extends BaseMcpServer {
 
 export interface Stand {
   owner: InstanceBatch;
+  /** The server instance itself (its close, its state). */
+  server: BaseMcpServer;
   /** Every connection built, in order. */
   built: Fake[];
   /** The batch connection of the batch opened last. */
@@ -252,6 +254,7 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
       .then((answer) => answer as Answer);
   return {
     owner,
+    server,
     built,
     batch: () => {
       if (last === undefined) throw new Error('no batch begun');

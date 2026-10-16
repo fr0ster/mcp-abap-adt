@@ -25,7 +25,11 @@ import type {
   IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import type { InstanceBatch } from '@mcp-abap-adt/lib/embeddable';
+import {
+  CompositeHandlersRegistry,
+  type IHandlerGroup,
+} from '@mcp-abap-adt/lib/handlers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import {
@@ -294,6 +298,10 @@ export interface StandOptions {
   logger?: ILogger;
   /** Where the factory's prompt logger writes (`info`: stderr in the program). */
   promptLines?: string[];
+  /** The instance's batch owner, as the launcher gives its one instance. */
+  batch?: InstanceBatch;
+  /** Groups served beside the probe and shutdown tools. */
+  groups?: IHandlerGroup[];
 }
 
 export interface Stand {
@@ -442,7 +450,10 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
     return wrapper;
   };
   const server = new StdioServer(
-    new CompositeHandlersRegistry([probeGroup(shutdownTools())]),
+    new CompositeHandlersRegistry([
+      probeGroup(shutdownTools()),
+      ...(options.groups ?? []),
+    ]),
     {
       settingsFor: (d) => factory.settingsFor(d),
       systemContextFor: (d) => factory.systemContextFor(d),
@@ -454,6 +465,7 @@ export async function stand(options: StandOptions = {}): Promise<Stand> {
     },
     {
       sentenceFor: (e) => factory.sentenceFor(e),
+      ...(options.batch !== undefined && { batch: options.batch }),
     },
   );
 

@@ -445,6 +445,17 @@ export abstract class BaseMcpServer extends McpServer {
     this.state.letGo();
   }
 
+  /**
+   * The instance close's drop of the open batch (`closeInstance`, beside
+   * the logoffs): nothing recorded is sent, the batch's signal aborts so
+   * every recorded handler settles, the batch connection and the answers
+   * are let go. The close lets go of the state without `dispose()`, so the
+   * batch is dropped here.
+   */
+  dropBatch(): void {
+    this.batch?.drop();
+  }
+
   /** Dispose, settle, once more, settle — what a host awaits before letting the instance go; answers what is left. */
   shutdownState(): Promise<string[]> {
     return this.state.shutdown();
@@ -1623,15 +1634,19 @@ export abstract class BaseMcpServer extends McpServer {
     throwIfRequestAborted(call.signal);
 
     // The handler's promise, known only once it is started; its number is
-    // taken at its first request, possibly before.
-    let started!: (handler: Promise<unknown>) => void;
-    const handlerStarted = new Promise<Promise<unknown>>((resolve) => {
-      started = resolve;
-    });
+    // taken at its first request, possibly before. Boxed: a promise resolved
+    // with the handler's promise would adopt it, and a handler that throws
+    // would then reject the answer instead of reaching `recordedAnswer`.
+    let started!: (started: { handler: Promise<unknown> }) => void;
+    const handlerStarted = new Promise<{ handler: Promise<unknown> }>(
+      (resolve) => {
+        started = resolve;
+      },
+    );
     const recorder = createRecorder(open.connection, owner, (number) => {
       open.recorded.push({
         number,
-        answer: handlerStarted.then((handler) =>
+        answer: handlerStarted.then(({ handler }) =>
           this.recordedAnswer(number, handler, owner, () =>
             recorder.rawParts(),
           ),
@@ -1670,7 +1685,7 @@ export abstract class BaseMcpServer extends McpServer {
       // It never rejects unhandled: its answer is read by its number, or
       // below when it recorded nothing.
       handler.catch(() => undefined);
-      started(handler);
+      started({ handler });
       await untilSent(handler, recorder);
       if (recorder.number() !== undefined) return { content: [] };
       // Settled without recording: nothing went into an envelope.

@@ -43,6 +43,12 @@ so a phase can read the lock handles of the previous one while it is being recor
 held state's idle bound (`stateIdleMinutes`, 30 minutes by default) is the one clock that touches
 it.
 
+When the server instance ends with a batch open — the client closes its connection (stdio, an SSE
+stream), the HTTP pool lets the instance go, the process shuts down — or the idle bound ends the
+held state, the open batch is dropped: nothing recorded is sent, and the last batch's answers go
+with it. A `BatchEnd` after the idle bound is refused `batch_mode_off`, and `BatchAnswers` answers
+"no answer with that number".
+
 ## Phases
 
 A tool that builds a request from an earlier answer cannot be recorded — a high-level create

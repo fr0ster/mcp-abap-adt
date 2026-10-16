@@ -14,6 +14,14 @@
  * marked exempt from accept negotiation at creation: an `AdtClient` built
  * over it never corrects and resends what SAP answers to a recorded request
  * (a `406`/`415` part is that call's answer).
+ *
+ * Every request the recorder hands back is raced against the batch's signal
+ * (taken when the recorder is created): a drop (`drop()`, `dispose()`, the
+ * instance close) aborts it, and the handler's wait for a part that will
+ * never come ends with `RequestAbortedError` — adt-clients has no discard,
+ * its part promise stays pending and is let go with the batch connection.
+ * Nothing is sent by the drop. `BatchEnd` never aborts the signal, so an
+ * executed part reaches the handler as it came.
  */
 import {
   type AdtBatchConnection,
@@ -24,6 +32,7 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
+import { raceRequestSignal } from '../requestSignal';
 import type { InstanceBatch, RawPart } from './InstanceBatch';
 
 type Session = 'stateful' | 'stateless';
@@ -85,6 +94,7 @@ export function createRecorder(
   owner: InstanceBatch,
   onRecorded: (n: number) => void,
 ): Recorder {
+  const dropped = owner.signal();
   let taken: number | undefined;
   let count = 0;
   const listeners: Array<() => void> = [];
@@ -123,7 +133,11 @@ export function createRecorder(
         );
       }
       for (const listener of [...listeners]) listener();
-      return recorded;
+      const answered = raceRequestSignal(recorded, dropped);
+      // A handler that left (it threw on an earlier part) never reads this
+      // one: its rejection — the drop's above all — is never unhandled.
+      answered.catch(() => undefined);
+      return answered;
     },
     number: () => taken,
     requests: () => count,

@@ -400,6 +400,13 @@ creates.
   answers are kept — what keeps an HTTP instance in the pool between requests — so batch state is
   under the idle bound on every transport, the one clock that touches it. `dispose()` (the pool's
   undo, the idle bound) is `drop()`.
+- **The instance's end.** The instance close (`closeInstance`) lets go of the state without
+  `dispose()`, so it drops the batch itself: `BaseMcpServer.dropBatch()`, in the tick the close
+  begins, beside the logoffs and `cutBackgroundRuns`. Nothing recorded is sent. A recorded
+  handler waits for parts adt-clients never settles once the batch is let go (it has no discard),
+  so the recorder races every part it hands back against the batch's signal: the drop aborts it,
+  each waiting handler ends with `RequestAbortedError`, and its answer is built and let go with
+  the batch; no part's rejection is left unhandled.
 - **Who creates it.** core's launcher, one for its one instance (`StdioServer`'s `batch`);
   `StreamableHttpServer` and `SseServer` take `batch?: { keepRawParts }` and create one per pooled
   instance (`createPerRequestServer`) / per SSE connection; `EmbeddableMcpServer` takes the

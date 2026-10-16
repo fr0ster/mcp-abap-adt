@@ -18,7 +18,11 @@
  *    (`cutBackgroundRuns`) — and **every call of the instance is interrupted**: its
  *    signal aborts, a call queued in its main flow leaves without sending.
  *    A running tool's later requests fail against the ended session, and
- *    nobody reads their answer. Awaited only to each logoff's write;
+ *    nobody reads their answer. In the same tick **the open batch is
+ *    dropped** (`dropBatch`): nothing recorded is sent, the batch's signal
+ *    aborts — every recorded handler's wait for its parts ends —, and the
+ *    batch connection and the last batch's answers are let go. Awaited only
+ *    to each logoff's write;
  * 3. the state let go (`letGoOfState`): no idle bound any more, nothing
  *    undone — the logoff ended in SAP what the state held;
  * 4. the MCP server and its transport closed, awaited.
@@ -47,6 +51,12 @@ export interface ClosableInstance {
    * at once; resolves once each is written. Absent: none to cut.
    */
   cutBackgroundRuns?(): Promise<void>;
+  /**
+   * Drops the instance's open batch with nothing sent — its signal aborted,
+   * the batch connection and the answers let go — synchronously. Absent:
+   * no batch to drop.
+   */
+  dropBatch?(): void;
   close(): Promise<void>;
 }
 
@@ -63,6 +73,11 @@ export function closeInstance(instance: ClosableInstance): Promise<void> {
     cut = instance.cutBackgroundRuns?.() ?? cut;
   } catch {
     // Nothing to cut: the instance's own logoffs are written either way.
+  }
+  try {
+    instance.dropBatch?.();
+  } catch {
+    // Dropping sends nothing: the logoffs are written either way.
   }
   interrupt(instance);
   const closing = (async () => {

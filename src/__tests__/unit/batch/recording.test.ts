@@ -143,7 +143,13 @@ interface Answer {
 
 async function stand(
   groups: IHandlerGroup[],
-  options: { registry?: IHandlersRegistry; open?: boolean } = {},
+  options: {
+    registry?: IHandlersRegistry;
+    open?: boolean;
+    /** The system lookup; it may act on the stand (`onLookup`). */
+    onLookup?: (s: Stand) => void;
+    backgroundRuns?: boolean;
+  } = {},
 ): Promise<Stand> {
   const instance = fakeConnection();
   const owner = new InstanceBatch({ keepRawParts: false });
@@ -165,11 +171,21 @@ async function stand(
     systemType: 'onprem',
     logger: silent as never,
     batch: owner,
+    ...(options.onLookup !== undefined
+      ? {
+          systemContextResolver: async () => {
+            options.onLookup?.(self);
+            return null;
+          },
+        }
+      : {}),
+    // Never reached: a background run is refused before its strategy.
+    ...(options.backgroundRuns === true ? { backgroundRuns: {} as never } : {}),
   });
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'recording', version: '1.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
-  return {
+  const self: Stand = {
     owner,
     batch,
     target,
@@ -185,6 +201,7 @@ async function stand(
       await client.close().catch(() => undefined);
     },
   };
+  return self;
 }
 
 /** The `{ error, message }` of a server refusal's answer. */
@@ -497,6 +514,70 @@ describe('recording in batch mode', () => {
     await s.close();
   });
 
+  it('a background run in batch mode is not served: its handler not called, no number', async () => {
+    const run = jest.fn(oneGet('/run'));
+    const s = await stand(
+      [
+        groupOf([
+          tool('RuntimeRunClass', run as Handler, {
+            type: 'object',
+            properties: {
+              class_name: { type: 'string' },
+              background: { type: 'boolean' },
+            },
+          }),
+        ]),
+      ],
+      { backgroundRuns: true },
+    );
+    expect(
+      refusalOf(
+        await s.call('RuntimeRunClass', {
+          class_name: 'ZCL_PLACEHOLDER',
+          background: true,
+        }),
+      ),
+    ).toEqual({
+      error: 'batch_not_recordable',
+      message: batchNotServedWords('RuntimeRunClass'),
+    });
+    expect(run).not.toHaveBeenCalled();
+    expect(s.recorded).toEqual([]);
+    expect(recordedCalls(s)).toEqual([]);
+    await s.close();
+  });
+
+  it('a long read admitted on its own connection before the batch opened is not served once it opens: nothing recorded, no own connection', async () => {
+    const run = jest.spyOn(longCall, 'runLongCall');
+    const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
+    // The batch opens while the call is past its entry: during its system
+    // lookup, which it makes in a turn of its own (it holds none).
+    const s = await stand([shipped('SearchObject')], {
+      open: false,
+      onLookup: (stand) => {
+        if (stand.owner.mode() === 'off') {
+          stand.owner.begin('communication', {
+            connection: stand.batch,
+            target: stand.target,
+            recorded: [],
+          });
+        }
+      },
+    });
+    expect(
+      refusalOf(await s.call('SearchObject', { object_name: 'ZPLACEHOLDER*' })),
+    ).toEqual({
+      error: 'batch_not_recordable',
+      message: batchNotServedWords('SearchObject'),
+    });
+    expect(s.owner.mode()).toBe('communication');
+    expect(run).not.toHaveBeenCalled();
+    expect(fresh).not.toHaveBeenCalled();
+    expect(s.recorded).toEqual([]);
+    expect(recordedCalls(s)).toEqual([]);
+    await s.close();
+  });
+
   it('with no batch open nothing changes: the call goes to the instance connection', async () => {
     const s = await stand([groupOf([tool('GetProgram', oneGet('/program'))])], {
       open: false,
@@ -583,6 +664,31 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
       }),
     ).rejects.toMatchObject({ response: { status: 406 } });
     expect(sent).toHaveLength(1);
+  });
+
+  it('a batch connection that throws while recording takes no number: the next recorded request takes 1', () => {
+    const owner = new InstanceBatch({ keepRawParts: false });
+    const target = new LateBoundConnection();
+    const batch = new AdtBatchConnection(target, { endpoint: 'communication' });
+    owner.begin('communication', { connection: batch, target, recorded: [] });
+    const numbers: number[] = [];
+    const record = batch.makeAdtRequest.bind(batch);
+    let refuse = true;
+    batch.makeAdtRequest = ((request: IAbapRequestOptions) => {
+      if (refuse) throw new Error('the batch connection refused the request');
+      return record(request);
+    }) as typeof batch.makeAdtRequest;
+    const recorder = createRecorder(batch, owner, (n) => numbers.push(n));
+    expect(() =>
+      recorder.makeAdtRequest({ url: '/refused', method: 'GET', timeout: 0 }),
+    ).toThrow('the batch connection refused the request');
+    expect(recorder.number()).toBeUndefined();
+    expect(recorder.requests()).toBe(0);
+    expect(numbers).toEqual([]);
+    refuse = false;
+    void recorder.makeAdtRequest({ url: '/kept', method: 'GET', timeout: 0 });
+    expect(recorder.number()).toBe(1);
+    expect(numbers).toEqual([1]);
   });
 
   it('a handler settling without a request is settled, with no number', async () => {

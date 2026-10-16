@@ -98,11 +98,13 @@ export function createRecorder(
     makeAdtRequest<T = unknown, D = unknown>(
       request: IAbapRequestOptions,
     ): Promise<IAdtWireResponse<T, D>> {
+      // Recorded first: a call takes its number only once a request of it
+      // is in the envelope — a batch connection that throws takes none.
+      const recorded = batch.makeAdtRequest<T, D>(request);
       if (taken === undefined) {
         taken = owner.nextNumber();
         onRecorded(taken);
       }
-      const recorded = batch.makeAdtRequest<T, D>(request);
       count += 1;
       if (owner.keepRawParts) {
         const index = raw.length;

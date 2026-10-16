@@ -2,9 +2,8 @@
 
 Implements `docs/superpowers/2026-10-16-batch-mode-goal.md` (the goal). The goal is binding; this
 document says how, against the code as it is on `feat/auth-chain-6`, with the owner's answers to the
-questions an earlier draft raised folded in. Where something is still open, it is listed at the end
-with a recommendation and is **not** decided here; the design marks each such place
-"(open question N)".
+questions earlier drafts raised folded in. Where the text carries *[controller's recommendation,
+pending owner confirmation]*, the owner confirms it at review.
 
 Sources read: `src/embeddable/BaseMcpServer.ts`, `src/handlers/interfaces.ts`, `src/lib/clients.ts`,
 `src/lib/longCall.ts`, `src/lib/longTools.ts`, `tools/long-handlers.json`,
@@ -94,30 +93,23 @@ and the answers.
 - **stdio** — one instance for the process; batch mode is that instance's.
 - **SSE** — one instance per SSE connection; batch mode is that connection's.
 - **Streamable HTTP** — every request is an MCP session of its own, served by an instance from the
-  pool. **No tool takes a `state_handle` parameter for batch mode.** The handle travels as an
-  optional request **header** (name: open question 1):
-  - **Where it is read.** `StreamableHttpServer`'s request handler, where it reads the request's
-    other headers (`headerContext(req.headers)`, beside today's `handleOf(req.body)`), reads the
-    header and gives its value to `pool.serve({ handle }, …)` — the pool routes it exactly as it
-    routes a handle today (`byHandle`: the instance whose `stateHandle` is that value, else a new
-    instance).
-  - **How it reaches the instance.** The value is the instance's attribute for the request: passed
-    to the constructor when the pool creates the instance for this request
-    (`createPerRequestServer(stateHandle)` → `BaseMcpServer` option `requestStateHandle`), and set
-    on a kept instance for each request it serves (as the request's connection context is today,
-    `useConnectionContext`).
-  - **How the call uses it.** A call takes the handle from that attribute, never from its
-    arguments: the batch tools act on this instance's batch only when the attribute equals the
-    instance's own handle (`state.handle`); otherwise the request reached an instance that is not
-    the one the handle named (unknown or ended), batch mode is off there — `BatchEnd` is refused
-    `batch_mode_off`, `BatchAnswers` answers "no answer with that number", an eligible tool runs
-    as an ordinary call.
-  - `BatchBegin` answers the instance's handle, which the client sends in the header on every call
-    of the batch. It is the instance's handle (`InstanceState`), not a batch handle: batch mode
-    introduces no handle of its own, and the pool's routing is unchanged.
-
-  The debugger tools' existing `state_handle` argument and the pool's reading of it from the body
-  (`handleOf`) are not changed by this design (open question 2).
+  pool. On HTTP the call reaches the pooled instance by `state_handle`, and the batch is that
+  instance's; the instance has one destination, so there is no other case. No batch tool takes a
+  `state_handle` parameter.
+  - **The header.** The handle travels as the optional request header `x-mcp-state-handle`.
+    *[controller's recommendation, pending owner confirmation]* `StreamableHttpServer`'s request
+    handler, where it reads the request's other headers (`headerContext(req.headers)`), reads
+    `x-mcp-state-handle` first, then — when the header is absent — the `tools/call` argument as
+    today (`handleOf(req.body)`; the debugger tools keep their `state_handle` argument in this PR),
+    and gives the value to `pool.serve({ handle }, …)`, which routes it exactly as it routes a
+    handle today (`byHandle`: the instance whose `stateHandle` is that value, else a new instance).
+  - **`BatchBegin` holds state** and answers the instance's `state_handle`, as a debugger start does,
+    so the client's later calls of the batch, carrying it in the header, reach the same pooled
+    instance. It is the instance's handle (`InstanceState`), not a batch handle: batch mode
+    introduces no handle of its own.
+  - A call without the handle (or with one the pool does not know) reaches a new instance, where no
+    batch is open — as for any held state today.
+  - On stdio and SSE nothing changes: the header is not read there.
 
 ## 3. Tool surface
 
@@ -135,25 +127,39 @@ and the answers.
 (`src/lib/handlers/utils/schemaUtils.ts`) has no `oneOf`/union support; giving both or neither is
 refused before anything runs.
 
+**In the compact sets batch mode is one tool, not three** (owner's decision): `HandlerBatch`, whose
+`action` (`'begin' | 'end' | 'answers'`, required) begins, ends or answers, with `number` / `numbers`
+for `answers` (refused with another action); and, in `compact` (the compact set that serves the
+debugger), `HandlerDebugBatch` with the same three actions for the debugger batch. *The exact names
+(`HandlerBatch`, `HandlerDebugBatch`, `action`) are this design's proposal.* Each action behaves as
+the full set's tool of the same meaning (`begin` = `BatchBegin` / `DebugBatchBegin`, `end` =
+`BatchEnd` / `DebugBatchEnd`, `answers` = `BatchAnswers`); both `answers` actions read the same kept
+answers. Below, "the batch tools" means these in the compact sets.
+
 `BatchAnswers` serves the answers of either kind of batch — the instance keeps one set, of its last
 executed batch, communication or debugger.
 
 ### Which sets serve them
 
 - `BatchBegin`, `BatchEnd`, `BatchAnswers`: a new group `BatchHandlersGroup`
-  (`src/lib/handlers/groups/BatchHandlersGroup.ts`) in all four sets — `fullToolSet`,
-  `fullReadOnlyToolSet`, `compactToolSetOf`, `compactReadOnlyToolSetOf` — on every transport, under
-  these names.
-- `DebugBatchBegin`, `DebugBatchEnd`: a group `DebugBatchHandlersGroup` in `fullToolSet` and
-  `compactToolSetOf` only — the sets that serve the debugger. No `-ro` set serves them.
+  (`src/lib/handlers/groups/BatchHandlersGroup.ts`) in `fullToolSet` and `fullReadOnlyToolSet`, on
+  every transport.
+- `DebugBatchBegin`, `DebugBatchEnd`: a group `DebugBatchHandlersGroup` in `fullToolSet` only — the
+  full set that serves the debugger. No `-ro` set serves them.
+- `HandlerBatch`: a compact group (`src/lib/compact/batch/group.ts`, a real `BaseHandlerGroup` as the
+  other compact groups) in `compactToolSetOf` and `compactReadOnlyToolSetOf`.
+- `HandlerDebugBatch`: in `compactToolSetOf` only, beside `CompactDebugHandlersGroup`.
 - `BatchBegin` and `BatchAnswers` are `connectionless`; `BatchEnd` takes the instance's connection
-  (§5.1). `DebugBatchBegin` / `DebugBatchEnd` work on the debugger's connection and are listed in
-  `DEBUGGER_OWN_CONNECTION_TOOLS`.
+  (§5.1). `HandlerBatch` is connectionless for `begin` and `answers` and takes the instance's
+  connection for `end`: the dispatch reads its `action` before taking a connection, as it reads a
+  long tool's arguments today (`isLongRead`), so `begin` and `answers` never build or connect one.
+  `DebugBatchBegin`, `DebugBatchEnd` and `HandlerDebugBatch` work on the debugger's connection and
+  are listed in `DEBUGGER_OWN_CONNECTION_TOOLS`.
 
 ### Wording
 
 - `BatchBegin`: "Switches this server into batch mode: from now on each call of a tool that sends
-  one request is recorded instead of sent, and returns nothing. Every request recorded is numbered,
+  one request is recorded instead of sent, and returns nothing. Every recorded call is numbered,
   in the order made, from 1. A tool that sends more than one request is refused in batch mode; use
   the single-request tools (compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with
   lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. BatchEnd sends the
@@ -161,16 +167,19 @@ executed batch, communication or debugger.
   this answers in the request header on every call of the batch."
 - `BatchEnd`: "Sends every call recorded since BatchBegin, in parallel envelopes, with the
   credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers
-  how many requests were recorded and which numbers failed; read each answer with BatchAnswers."
-- `BatchAnswers`: "The answers of the last batch, by number: each is SAP's answer to that request as
-  it came — status, headers and body — or why it was not sent. A number the last batch does not have
-  answers: no answer with that number."
+  how many calls were recorded and which numbers failed; read each answer with BatchAnswers."
+- `BatchAnswers`: "The answers of the last batch, by number: each is the answer the tool gives for
+  that call, built when BatchEnd sent it — SAP's answer or why it was not sent. A number the last
+  batch does not have answers: no answer with that number."
+- `HandlerBatch` / `HandlerDebugBatch`: the same sentences, one per action, naming the actions
+  (`action: 'begin'` … `'end'` … `'answers'`) where the full set names a tool.
 - `DebugBatchBegin` / `DebugBatchEnd`: the same sentences, scoped to "the stopped debuggee: step,
   step to line, stack, variables, child variables, stack position, setting a variable".
 - **Every other tool** gets one sentence appended at registration (`BaseMcpServer.registerHandlers`,
   one place, so no handler file changes): an eligible tool — "In batch mode (BatchBegin) a call is
-  recorded and returns nothing; requests are numbered in the order made, and their answers are read
-  by number with BatchAnswers once BatchEnd has run."; a tool eligible only for some arguments adds
+  recorded and returns nothing; calls are numbered in the order made, and their answers are read
+  by number with BatchAnswers once BatchEnd has run."; in the compact sets the sentence names
+  `HandlerBatch` instead of BatchBegin / BatchAnswers; a tool eligible only for some arguments adds
   which (from its eligibility entry, §4.2); an ineligible tool — "In batch mode (BatchBegin) this
   tool is refused: it sends more than one request." Tools of a registry that registers its own
   (`trackingRegistrations`) get the ineligible sentence through the proxy's `registerTool`.
@@ -197,9 +206,10 @@ context exactly as any call), and before the handler is chosen:
 Recording an eligible call:
 
 - The handler gets `{ ...context, connection: recorder }` — a **per-call recorder**, an
-  `IAbapConnection` over the open `AdtBatchConnection` that forwards every call and, for each
-  `makeAdtRequest`, takes the batch's next number at that moment and captures that request's
-  settlement (its part, or its rejection) under the number. Nothing else of the context changes.
+  `IAbapConnection` over the open `AdtBatchConnection` that forwards every call; at the call's
+  first `makeAdtRequest` it takes the batch's next number for the call, and it keeps the raw part
+  of each of the call's requests when `batch.keepRawParts` is on (§5.3). Nothing else of the
+  context changes.
 - The handler is started inside the same scopes as today (`inHeldFlow`, `withDestinationSystemContext`,
   `withKnownSystemContext`), but its request-signal scope is the **batch's** signal, not the call's
   (§4.3).
@@ -209,19 +219,19 @@ Recording an eligible call:
 - **Recorded** → the call returns `{ content: [] }` — "returns nothing" on the MCP wire:
   `CallToolResult.content` may be empty (SDK 1.32 `CallToolResultSchema`: "it may be empty"), no
   `isError`, no text, no number. The handler's promise gets a rejection handler at once, so it never
-  rejects unhandled. The handler continues; when `execute()` settles its part its continuation
-  runs, and its result is not used for any answer — the answer is SAP's part as it came (§5.3).
+  rejects unhandled. The handler continues; when `execute()` settles its part, its continuation runs
+  its own result and error strategies on that part — then, at `BatchEnd`, since before it there is
+  nothing to run them on — and the tool answer it builds is that number's answer (§5.3).
 - **Settled without recording** (the handler refused its arguments before sending) → nothing went
   into an envelope: the call has **no number**, and it answers the handler's own answer at once, as
   outside batch mode.
 
-**Numbering.** Every request that goes into an envelope has its own number, from 1, in the order
-the requests were recorded — and only those: a refused call, or a handler that refused before
-sending, takes none. With the main flow sequential and each eligible call recording one request, the
-numbers follow the calls made. A request a member records **while settling** — the `406`/`415`
-corrected retry **[doc]** — also goes into an envelope (a follow-up one, inside the same
-`execute()`), so it gets its own number too: the next free one, after every number taken while
-recording (see "Contradictions" at the end).
+**Numbering.** Every call that put a request into an envelope has its own number, from 1, in the
+order made — and only those: a refused call, or a handler that refused before sending, takes none.
+A request a member records **while settling** — the `406`/`415` corrected retry **[doc]**, adt-clients'
+own accept negotiation, not a call of the model — *[controller's recommendation, pending owner
+confirmation]* takes no number of its own: it belongs to the call whose request it retries, and that
+call's answer is the answer after the retry, under the call's number.
 
 ### 4.2 Eligibility: declared, reviewed, proven
 
@@ -293,8 +303,10 @@ that call holds.
 
 ### 4.6 The two new single-request modes in compact
 
-Both live in the compact modify half (`compact-modify`), are served by `compact` (not `compact-ro`),
-and are eligible in batch mode. They work outside batch mode too, as one request each.
+*[controller's recommendation, pending owner confirmation]* Compact is its own library with its own
+servers: both are added in the compact library — its modify half (`compact-modify`) — as parameters
+of its existing `HandlerCreate` and `HandlerUpdate`, `create_only: boolean` and `document: string`.
+They are served by the `compact` binaries (not `compact-ro`) and are eligible in batch mode. They work outside batch mode too, as one request each.
 
 - **`HandlerCreate` with `create_only: true`** — sends only the create `POST` of the type's
   adt-clients `create()` (no validate, lock, write, unlock, check or activate): a new route in
@@ -314,9 +326,6 @@ and are eligible in batch mode. They work outside batch mode too, as one request
   `document` beside `properties` or the flat fields `properties` covers, is refused before anything
   is sent. With `properties` (no `document`) the existing read-patch-write stays, and stays
   ineligible. The source-written types already send one `PUT` under a lock and take no `document`.
-
-Names (`create_only`, `document`) are proposals under the owner's decision to add both modes (open
-question 3).
 
 ## 5. Execution at `BatchEnd`
 
@@ -355,7 +364,8 @@ work. A refusal after that reaches `execute()` as the connection's `AuthRefusedE
    open, `batch_mode_other`).
 2. Take the connection (§5.1), point the target at it.
 3. `execute()` — awaited to its end; no timeout. Every part settles inside it, follow-up envelopes
-   included (§1).
+   included (§1). Then every recorded handler is awaited until it has built its answer (no timeout;
+   a handler only reads its settled part then).
 4. In `finally`, whatever `execute()` did: mode → `off`, the queue and recorder dropped (nothing can
    be sent again — the `AdtBatchConnection` instance is discarded), the target cleared, the use
    released. **`BatchEnd` always ends batch mode**; there is no retry and no repeat.
@@ -363,27 +373,34 @@ work. A refusal after that reaches `execute()` as the connection's `AuthRefusedE
 
 ### 5.3 What came: the answers and `BatchEnd`'s answer
 
-**Whatever SAP returned is what is returned.** Each number's answer is built from what its recorder
-captured, never from the handler's result and never through a reading, a strategy or `analyse`:
+**A number's answer is the tool's answer, as its handler builds it** with its own result and error
+strategies when its part settles at `BatchEnd` — the same answer the tool gives outside batch mode
+for the same SAP answer: its projection of a success, the C6 shape of a failure (the method's error
+as it is plus `step`), the chain's answer for a credential refusal. Whatever SAP returned is what the
+strategies read; nothing else is put in its place. By how the part settled:
 
-- **SAP answered its part** (resolved 2xx, or rejected with `response`): `{ number, status,
-  status_text, headers, body }` — SAP's part as it came: the inner status, its text, the inner
-  headers as adt-clients parsed them (names lower-cased **[code]**), the body as text, `""` when
-  the part had none (goal: "an empty line when there is none").
-- **Its envelope failed** (rejected with the envelope's error): what came for the envelope — SAP's
-  outer response as it came (`status`, `status_text`, `headers`, `body`) when SAP answered it, else
-  the error as it came (its message, and the step `batch envelope`, as the server's C6 shape renders
-  a method's error).
-- **Not sent** (rejected with adt-clients' "not sent" wrapper): `{ number, not_sent: true, message }`
-  with the wrapper's message — the goal's "a call whose part was never sent … gets that as its
-  answer".
-- **A credential refusal**: as it came (§5.4).
+- **SAP answered the part** (2xx, or another status carrying `response`): the handler's answer for
+  that response, as for a direct request with the same answer.
+- **Its envelope failed** (the envelope's error): the handler's answer for that error — SAP's outer
+  response, when SAP answered the envelope, reaches the strategies as the response.
+- **Not sent** (adt-clients' "not sent" wrapper): the handler's answer for that error, its message
+  saying the request was not sent because an earlier envelope failed — the goal's "a call whose part
+  was never sent … gets that as its answer".
+- **A credential refusal**: §5.4.
 
-`BatchEnd` answers what came for the batch: `{ recorded: <count>, failed: [<numbers>] }` — a number
-fails when its part is not 2xx, it was not sent, or its envelope failed — and, when `execute()`
-rejected, beside it what came for that failure (SAP's outer response as it came, or the error as it
-came; a credential refusal per §5.4). An empty batch answers `{ recorded: 0, failed: [] }`
-(adt-clients sends nothing **[code]**) and replaces the kept answers with none.
+**Raw parts, by configuration.** With `batch.keepRawParts` on (default **off**) — a server
+configuration value the launcher reads and hands to each `InstanceBatch` it creates — each answer
+also carries, beside the tool's answer, SAP's raw part of each of the call's requests as it came:
+`{ status, status_text, headers, body }` — the inner status, its text, the inner headers as
+adt-clients parsed them (names lower-cased **[code]**), the body as text, `""` when the part had
+none (goal: "an empty line when there is none"); a request not sent has none. Off, no raw part is
+kept.
+
+`BatchEnd` answers `{ recorded: <count>, failed: [<numbers>] }` — a number fails when its tool answer
+is an error — and, when `execute()` rejected, beside it what came for that failure (SAP's outer
+response or the error, as it came; a credential refusal per §5.4). An empty batch answers
+`{ recorded: 0, failed: [] }` (adt-clients sends nothing **[code]**) and replaces the kept answers
+with none.
 
 ### 5.4 A credential refusal
 
@@ -394,10 +411,11 @@ secret, never rebuilt from a message).
 - **Unanswered** (the provider refused before SAP was asked): every part rejects with the same
   refusal object **[code]**, `execute()` rejects with it. `BatchEnd` ends batch mode (§5.2.4); its
   call answers that refusal (the owner's rule "a credential refusal ends the call"), and every
-  number's answer is the same refusal, as it came.
+  handler, meeting the same refusal (adt-clients 33 rethrows it as the same object), answers it as
+  it came under its number.
 - **Answered** (SAP's `401` the provider could not renew): the active envelope's parts carry the
-  refusal, later ones "not sent" **[code]**; `BatchEnd` answers the refusal as it came; the numbers'
-  answers are the refusal or "not sent" per §5.3.
+  refusal, later ones "not sent" **[code]**; `BatchEnd` answers the refusal as it came; each number's answer
+  is its handler's answer for what it met, per §5.3.
 
 ## 6. Answers by number
 
@@ -440,9 +458,9 @@ its own request only; the stack is in the batch when the model recorded `stack`.
 ### Mechanics
 
 - **Preconditions** of `DebugBatchBegin`: the instance's debugger holds a session with an ABAP stop
-  (`requireStop`) — the instance is the one the call reached (on HTTP, by the header, §2); the
+  (`requireStop`) — the instance is the one the call reached (on HTTP, by `state_handle`, §2); the
   communication batch off (else `batch_mode_other`); no debugger batch already open. The tool takes
-  no `state_handle` argument (open question 2).
+  no `state_handle` argument.
 - **The session's serial.** Every session change runs through `DebugSession.mutate` → `Serial`. A
   recorded operation must not await its answer inside the serial — the second recorded call would
   wait behind the first, which waits for `DebugBatchEnd`: a deadlock. So `DebugBatchBegin` takes the
@@ -480,9 +498,9 @@ its own request only; the stack is in the batch when the model recorded `stack`.
   compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle,
   HandlerUnlock, HandlerGet — each phase its own batch"; for a tool refused only because a batch is
   open: "<tool> is not served while a batch is open"), `batch_no_timeout`,
-  `debug_batch_amdp_unmeasured`. SAP's answers and errors reach the model as they came: a part is
-  SAP's part, an envelope's failure what came for it, a method's error the C6 shape (the method's
-  error as it is plus `step`), a credential refusal the chain's answer.
+  `debug_batch_amdp_unmeasured`. SAP's answers and errors reach the model as they came: a number's
+  answer is the tool's answer built from what came (§5.3), a method's error the C6 shape (the
+  method's error as it is plus `step`), a credential refusal the chain's answer.
 - **Instance close with a batch open** (stdio's client close, an SSE close, the pool's eviction,
   process shutdown): nothing recorded is sent. `closeInstance` gets a `dropBatch?()` step beside
   `cutBackgroundRuns` (the close lets go of state without `dispose()`), which aborts the batch's
@@ -517,7 +535,8 @@ watch the test go red, revert (the *Break* line).
 - **Numbers only for what went into an envelope** — a refused call and a handler that refuses its
   arguments before sending take no number and answer at once; the next recorded request takes the
   next number. A follow-up request recorded while settling (a fake member's corrected retry) takes
-  its own number after the last recorded one. *Break:* number at call entry.
+  no number: the call's answer is the one after the retry, under the call's number.
+  *Break:* number at call entry; number every request.
 - **Only batch tools and eligible tools while a batch is open** — a high tool, `HandlerUpdate`
   DOMAIN with `properties`, a debugger tool during a communication batch, a leftover-session tool:
   refused, handler not called, nothing recorded or sent. *Break:* default eligibility to true.
@@ -539,10 +558,14 @@ watch the test go red, revert (the *Break* line).
   retired one is not logged off under `BatchEnd`. *Break:* wrap the recording call's connection.
 - **`BatchEnd` always ends, nothing re-sent** — `execute` rejecting: mode off, a second `BatchEnd`
   refused `batch_mode_off`, the fake saw each envelope once. *Break:* reset the mode only on success.
-- **What came** — 2xx with body, bodyless `200` (`body: ""`), a `404` part beside 2xx parts, an
-  envelope SAP answered `500` (the outer response as it came, in the parts' answers and in
-  `BatchEnd`'s), an envelope with no answer, the not-sent ones; the summary's `failed`.
-  *Break:* run the member's strategy over the part.
+- **Answers built at `BatchEnd`** — a lock part answers the tool's lock answer (its lock handle,
+  through `analyseLock`); a read's part its projection; a `404` part beside 2xx parts the tool's
+  failure in the C6 shape; an envelope SAP answered `500` (the parts' answers and `BatchEnd`'s); an
+  envelope with no answer; the not-sent ones; the summary's `failed`; the strategies are not run
+  before `execute()`. *Break:* answer the raw part instead of the handler's answer.
+- **`batch.keepRawParts`** — off (default): no raw part in any answer; on: each answer carries the
+  raw part(s) as they came (status, text, headers, body, `""` for a bodyless `200`), the retry's
+  part beside the first. *Break:* default it on.
 - **Credential refusal** — a refusal-shaped object (own `refusal.kind`, `refusal.reason`, `at`,
   no `response`) thrown by the target: `BatchEnd` answers it as `answerRead` does, every number's
   answer is it, mode off; the answered variant (`cause.response.status === 401`). *Break:* wrap
@@ -550,7 +573,10 @@ watch the test go red, revert (the *Break* line).
 - **Long read recorded, no timeout** — a listed single-request long read in batch mode:
   `openFreshConnection` and `runLongCall` not called, the read is in the envelope; with `timeout`
   it is refused `batch_no_timeout`, nothing recorded. *Break:* keep the long-read branch first.
-- **Surface** — every set serves the three batch tools, `DebugBatch*` only in full and compact, no
+- **Surface** — the full and read-only sets serve the three batch tools and the compact sets
+  `HandlerBatch` alone; `DebugBatch*` only in full, `HandlerDebugBatch` only in `compact`; each
+  `HandlerBatch` action behaves as its full-set tool, `begin`/`answers` build no connection, `number`
+  with another action refused; no
   batch tool has a `state_handle` property, every tool's description carries its sentence;
   `compact/tests/fixtures/surface.json` updated (the new `create_only` and `document`).
 - **Close / dispose** — `closeInstance` with a batch open: zero envelopes, no unhandled rejection
@@ -563,12 +589,12 @@ watch the test go red, revert (the *Break* line).
 
 ### 9.2 Integration (no SAP)
 
-- **HTTP pool** (`http/src/__tests__`): the header is read and routes the request; `BatchBegin`
+- **HTTP pool** (`http/src/__tests__`): `x-mcp-state-handle` is read and routes the request, ahead
+  of the `tools/call` argument; a debugger tool's argument still routes; `BatchBegin` holds state and
   answers the handle; the instance is kept; a later call with the handle in the header is recorded
-  on that instance, and a kept instance gets each request's header value; a call without it (or
-  with an unknown one) lands on a fresh instance where `BatchAnswers` answers "no answer with that
-  number"; a dropped `BatchEnd` request keeps its answers. *Break:* `holdsState()` false while a
-  batch is open; read the handle from the arguments.
+  on that instance; a call without it lands on a fresh instance where `BatchAnswers` answers "no
+  answer with that number"; a dropped `BatchEnd` request keeps its answers. *Break:* `holdsState()`
+  false while a batch is open; read only the argument.
 - **stdio / SSE**: the batch is the instance's; an SSE close drops it with nothing sent.
 
 ### 9.3 Live (each test states where it runs and skips elsewhere with the reason)
@@ -576,6 +602,7 @@ watch the test go red, revert (the *Break* line).
 Gated by `tests/test-config.yaml`, as the existing integration suites, with a test case per check
 (disabled by default):
 
+- Over the compact binaries the same checks run through `HandlerBatch` / `HandlerDebugBatch`.
 - **Communication batch, on-premise over HTTP**, **on-premise over RFC** and **ABAP Cloud** — through
   the served tools (hard mode): N reads; then compact `HandlerCreate` `create_only` × N,
   `HandlerLock` × N, `HandlerUpdate` with `lock_handle` (sources; `document` for DOMAIN) × N,
@@ -604,10 +631,11 @@ No unit test talks to SAP; no live test runs in CI.
   `tools/batch-handlers.json`).
 - **docs/architecture/** — `STATEFUL_SESSION_GUIDE.md` (LOCK/UNLOCK stateful envelopes on the
   instance's connection), `ARCHITECTURE.md`.
-- **src/embeddable/docs/ARCHITECTURE.md** — the `batch` and `requestStateHandle` options, the owner,
+- **docs/user-guide/CLI_OPTIONS.md** and the configuration template — `batch.keepRawParts`.
+- **src/embeddable/docs/ARCHITECTURE.md** — the `batch` option, the owner,
   the pool keeping a batch-holding instance, the close.
-- **http/README.md** (the header), **compact/README.md**, **compact/docs/AVAILABLE_TOOLS.md**
-  (`create_only`, `document`).
+- **http/README.md** (the header), **compact/README.md**, **compact/docs/AVAILABLE_TOOLS.md** (`HandlerBatch`,
+  `HandlerDebugBatch`, `create_only`, `document`).
 - **docs/MIGRATION-19.0.md** — embedders: the new `batch` constructor option (absent → batch tools
   answer `batch_mode_unavailable`); the new tools in every set; the compact create and write modes.
 - **CHANGELOG.md** — the 19.0.0 entry (this PR's release) gains under *Added* the batch mode, the
@@ -618,25 +646,11 @@ No unit test talks to SAP; no live test runs in CI.
 
 ## Contradictions with the owner's answers
 
-- **A retry's own number vs "numbered in the order the calls were made".** A `406`/`415` corrected
-  retry is recorded while `execute()` settles, after every call of the batch, so its number comes
-  after the last call's: the numbers no longer map one to one onto the calls, and the model cannot
-  tell from the number alone which call the retry belongs to. The numbers taken while recording
-  still follow the calls. Nothing in the answers links a retry to its call (open question 4).
-- **"No `state_handle` parameter on tools" vs the debugger tools.** Every debugger "use" tool takes
-  `state_handle` today, and the pool reads it from the body; this design leaves them as they are and
-  gives the batch tools none (open question 2).
+- **Round 1's Q3 said the header's value is passed into the instance constructor as an attribute and
+  used on the call.** Round 2 drops the rule that used it ("act only when the header equals the
+  instance's handle"), and routing by the pool is all that remains — so this design passes no
+  attribute to the constructor: nothing would read it.
 
 ## Open questions for the owner
 
-1. **The header's name.** *Recommendation:* `x-mcp-state-handle` (the other headers this server
-   reads are `x-sap-*`, which name SAP credentials and system facts; the handle is the MCP
-   instance's).
-2. **The debugger tools' `state_handle` argument and the pool's reading of it from the body** —
-   keep, or move them to the header as well. *Recommendation:* keep them in this PR (not batch
-   mode's), and have the pool read the header first, the body's argument second.
-3. **Names of the compact modes**: `create_only: boolean` on `HandlerCreate`, `document: string` on
-   `HandlerUpdate`. *Recommendation:* as proposed.
-4. **Linking a retry's number to its call.** *Recommendation:* `BatchEnd`'s summary lists each
-   settlement number with the number it followed (`follow_ups: { <retry>: <original> }`), stating
-   what adt-clients sent without reading it.
+None.

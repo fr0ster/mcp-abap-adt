@@ -27,6 +27,42 @@
     "whose": "server"
   },
   {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/batch/AdtBatchConnection.js",
+    "function": "execute",
+    "site": "setSessionType(active[0].stateful ? 'stateful' : 'stateless')",
+    "count": 1,
+    "window": "one batch envelope: the wrapped connection is stateful while an envelope of LOCK, UNLOCK or other stateful parts is sent, stateless for a stateless one. The server builds no AdtBatchConnection.",
+    "stateless": "in the same call: execute's finally sets the wrapped connection back to the session type it had before the batch, on every path",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/batch/AdtBatchConnection.js",
+    "function": "execute",
+    "site": "setSessionType(previous)",
+    "count": 1,
+    "window": "none: it ends the batch envelopes' window, restoring the session type the wrapped connection had before execute. The server builds no AdtBatchConnection.",
+    "stateless": "execute's finally, on every path",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/batch/AdtBatchConnection.js",
+    "function": "setSessionType",
+    "site": "setSessionType(type)",
+    "count": 1,
+    "window": "none on the wire: the batch wrapper records the mode a member asks for, for the one request it records next; the wrapped connection is not touched. The server builds no AdtBatchConnection.",
+    "stateless": "the recorded mode falls back to the wrapper's default after that one request is recorded",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/batch/AdtBatchConnection.js",
+    "function": "makeAdtRequest",
+    "site": "x-sap-adt-sessiontype",
+    "count": 2,
+    "window": "none on the wire: a recorded request whose member asked for stateful (its mode or its own header) is marked stateful in the batch, and its envelope is sent stateful by execute. The server builds no AdtBatchConnection.",
+    "stateless": "execute's finally restores the wrapped connection's session type",
+    "whose": "adt-clients"
+  },
+  {
     "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/accessControl/AdtAccessControl.js",
     "function": "lock",
     "site": "inStatefulSession",

@@ -1,9 +1,11 @@
 /**
- * An auth failure inside a handler: there is
- * no structured refusal on adt-clients' error, so the tool's result carries
- * the connection's own message — its fixed words and its hint — as it is,
- * with no secret. Over a connection the server built, and over one the
- * consumer injected, which the server does not wrap.
+ * An auth failure inside a handler. A credential SAP refused (its `401`) is
+ * the failure adt-clients answers, carrying the connection's own message —
+ * its fixed words and its hint — as it is, with no secret. A credential the
+ * provider refused before SAP was asked rejects from the member as the
+ * connection's `AuthRefusedError` (adt-clients 33) and is answered as the
+ * credential failure, `authentication_failed`. Over a connection the server
+ * built, and over one the consumer injected, which the server does not wrap.
  */
 
 import { authError, render } from '@mcp-abap-adt/auth-errors';
@@ -99,7 +101,7 @@ describe('an auth failure inside a handler reaches the client in the connection�
     }
   });
 
-  it('an injected connection: its AuthRefusedError reaches the tool result with its own message, and the connection was not wrapped', async () => {
+  it('an injected connection: its AuthRefusedError, SAP never asked, is the credential failure in its own words, and the connection was not wrapped', async () => {
     stateSystemKind();
     const refusal = authError.connection({
       problem: 'refused-after-renewal',
@@ -166,16 +168,14 @@ describe('an auth failure inside a handler reaches the client in the connection�
         problem: 'refused-after-renewal',
         at: 'request',
       });
-      // The connection's own fixed words, as they are, with its hint when it
-      // has one; nothing of the server's.
-      const said =
-        words.hint !== undefined
-          ? `${words.reason} — ${words.hint}`
-          : words.reason;
-      expect(payload.origin).toBe('connection');
-      expect(payload.message).toBe(said);
-      expect(payload.error).toBeUndefined();
-      expect(JSON.stringify(result)).not.toContain('"authentication_failed"');
+      // adt-clients 33 rejects with the refusal as it came: the chain's
+      // answer, in the connection's own fixed words and hint; nothing of the
+      // server's, and not dressed as SAP's answer.
+      expect(payload.error).toBe('authentication_failed');
+      expect(payload.kind).toBe('connection');
+      expect(payload.message).toBe(words.reason);
+      expect(payload.hint).toBe(words.hint);
+      expect(payload.origin).toBeUndefined();
 
       await client.callTool({ name: 'CaptureConnection', arguments: {} });
       expect(seen).toBe(connection);

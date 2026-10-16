@@ -62,6 +62,15 @@ reach into the connection's session.
   instance's life.
 - **The debugger's session is its own**: a debug session opens connections of its
   own, stateful for their life, and ends them with the debug session.
+- **Batch mode sends LOCK and UNLOCK in envelopes of their own**: a recorded call's
+  `LOCK` or `UNLOCK` is marked stateful in the batch (the recorder forwards the
+  member's `setSessionType` to adt-clients' `AdtBatchConnection`, touching no
+  connection); at `BatchEnd`, `execute()` sends each run of LOCK / UNLOCK parts as a
+  stateful envelope and every other run stateless, on the instance's connection in
+  force then — reached through the batch's late-bound target
+  (`src/lib/batch/lateBound.ts`), which forwards the session type to it — and sets
+  that connection back to the session type it had before the batch, on every path.
+  See [Batch Mode](../user-guide/BATCH_MODE.md).
 
 ## Common pitfalls
 
@@ -73,4 +82,8 @@ reach into the connection's session.
 - **A missing `lockHandle` or `corrNr`** on the write.
 
 Every site that changes a session type is listed in `tools/stateful-sites.json`
-with the window it opens and where the connection returns to stateless.
+with the window it opens and where the connection returns to stateless — batch mode
+included: the late-bound target's `setSessionType` (its declaration and its forward
+to the connection in force) and the recorder's forward to the batch connection
+(`src/lib/batch/lateBound.ts`, `src/lib/batch/recorder.ts`), beside adt-clients'
+own `AdtBatchConnection` rows, whose envelopes the server's batch mode now sends.

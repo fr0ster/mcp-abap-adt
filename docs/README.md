@@ -22,6 +22,7 @@ Documentation for end users: configuration, usage, and available tools.
 - Configurator (auto-config): `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
+- `BATCH_MODE.md` - Batch mode: independent calls recorded, sent together at `BatchEnd`, answered by number; which calls are recorded
 - `DEBUGGER.md` - The debugger (the write binaries; no `-ro` one): debug sessions and their handle, the SAP ids, transports, what ends a session
 
 ### [configuration/](configuration/) - Configuration Guides
@@ -66,6 +67,7 @@ Documentation for developers: testing, development guides, and internal document
 - **Upgrading from 15.x**: [Migration to 16.0](MIGRATION-16.0.md)
 - **Terminology**: [Project Terms](user-guide/TERMINOLOGY.md)
 - **Handlers Management**: [Handler Groups](user-guide/HANDLERS_MANAGEMENT.md)
+- **Batch mode**: [Batch Mode](user-guide/BATCH_MODE.md)
 - **Debugger**: [Debug Sessions](user-guide/DEBUGGER.md)
 - **Server Configuration**: [YAML Config](configuration/YAML_CONFIG.md) | [CLI Options](user-guide/CLI_OPTIONS.md)
 - **Deployment**: [MCP Registry](deployment/MCP_REGISTRY.md) | [Docker](deployment/DOCKER.md)

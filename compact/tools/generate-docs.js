@@ -152,6 +152,8 @@ function page(entries) {
   md +=
     '- Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)\n';
   md +=
+    "- Batch mode: `HandlerBatch` of `@mcp-abap-adt/lib`, in every compact binary, on every transport. Every other tool's description, as the server lists it, ends with one sentence saying whether a call of it is recorded in batch mode, for which arguments, or refused; the descriptions on this page are the tools' own, without it ([Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md))\n";
+  md +=
     '- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`, the same without the leftover-session tools)\n\n';
   md += '## How it works\n\n';
   md +=
@@ -171,6 +173,8 @@ function page(entries) {
           ? '**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)\n\n'
           : half === 'session'
             ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both)\n\n'
+            : half === 'batch'
+              ? '**Half:** batch mode of `@mcp-abap-adt/lib`, in every compact binary\n\n'
             : half === 'readonly'
               ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
               : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
@@ -223,6 +227,11 @@ function main() {
     ...requireFresh('.', path.join('lib', 'compact', 'session', 'group.js'))
       .compactLeftoverSessionEntries()
       .map((entry) => ({ half: 'session', entry })),
+    // Batch mode lives in lib (`src/lib/compact/batch`), served by every
+    // compact binary.
+    ...requireFresh('.', path.join('lib', 'compact', 'batch', 'group.js'))
+      .compactBatchEntries()
+      .map((entry) => ({ half: 'batch', entry })),
   ];
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, page(entries), 'utf8');

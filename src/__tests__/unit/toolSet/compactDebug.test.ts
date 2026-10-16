@@ -57,10 +57,12 @@ describe('compact debug', () => {
       'CompactDebugHandlers',
       'CompactBackgroundRunHandlers',
       'CompactLeftoverSessionHandlers',
+      'CompactBatchHandlers',
     ]);
     expect(names(compactReadOnlyToolSetOf(compactReadOnlyEntries))).toEqual([
       'CompactReadOnlyHandlers',
       'CompactLeftoverSessionHandlers',
+      'CompactBatchHandlers',
     ]);
   });
   it('the start describes user mode and taking over as facts', () => {

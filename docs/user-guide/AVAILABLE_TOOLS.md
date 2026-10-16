@@ -4,11 +4,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 261
+- Total tools: 264
 - Read-only tools: 68
 - High-level tools: 161
 - Debug tools: 30
 - Session tools: 2
+- Batch tools: 3
 
 ## Handler Sets
 
@@ -18,6 +19,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `high` -> [High-Level Group](#high-level-group): `mcp-abap-adt`, `-http`, `-sse`
 - `debug` -> [Debug Group](#debug-group): `mcp-abap-adt`, `-http`, `-sse`; no `-ro` binary
 - every stdio binary -> [Session Group](#session-group) (leftover SAP sessions of an ended process: list and logoff). No http or sse binary serves them: such a server holds the sessions of many users and writes no session file
+- every binary -> [Batch Group](#batch-group) (batch mode: record independent calls, send them together at BatchEnd, read their answers by number; see [BATCH_MODE.md](BATCH_MODE.md)). The compact binaries serve batch mode as one tool, `HandlerBatch`. Every other tool's description, as the server lists it, ends with one sentence saying whether a call of it is recorded in batch mode, for which arguments, or refused; the descriptions on this page are the handlers' own, without it
 - compact -> [the compact package](../../compact/README.md): `mcp-abap-adt-compact` and `mcp-abap-adt-compact-ro` (and `-compact-http`, `-compact-sse`, each with its `-ro`)
 
 ## Navigation
@@ -340,6 +342,11 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Leftover Session](#session-leftover-session)
     - [ListLeftoverSessions](#listleftoversessions-session-leftover-session)
     - [LogoffLeftoverSession](#logoffleftoversession-session-leftover-session)
+- [Batch Group](#batch-group)
+  - [Batch](#batch-batch)
+    - [BatchAnswers](#batchanswers-batch-batch)
+    - [BatchBegin](#batchbegin-batch-batch)
+    - [BatchEnd](#batchend-batch-batch)
 
 ---
 
@@ -3952,4 +3959,44 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-15*
+<a id="batch-group"></a>
+## Batch Group
+
+<a id="batch-batch"></a>
+### Batch / Batch
+
+<a id="batchanswers-batch-batch"></a>
+#### BatchAnswers (Batch / Batch)
+**Description:** The answers of the last batch, by number: each is the answer the tool gives for that call, built when BatchEnd sent it — SAP's answer or why it was not sent. A number the last batch does not have answers: no answer with that number.
+
+**Source:** `src/handlers/batch/batch/handleBatchAnswers.ts`
+
+**Parameters:**
+- `number` (integer, optional) - One batch number to read (an integer of at least 1); give this or numbers, not both.
+- `numbers` (array, optional) - Several batch numbers to read, answered in the order given; give this or number, not both.
+
+---
+
+<a id="batchbegin-batch-batch"></a>
+#### BatchBegin (Batch / Batch)
+**Description:** Switches this server into batch mode: from now on each call of a tool none of whose requests depends on another's answer is recorded instead of sent, and returns nothing. Every recorded call is numbered, in the order made, from 1. A tool that builds a request from an earlier answer is refused in batch mode; use the low-level tools (compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. BatchEnd sends the recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle this answers in the request header on every call of the batch.
+
+**Source:** `src/handlers/batch/batch/handleBatchBegin.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="batchend-batch-batch"></a>
+#### BatchEnd (Batch / Batch)
+**Description:** Sends every call recorded since BatchBegin, in parallel envelopes, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with BatchAnswers.
+
+**Source:** `src/handlers/batch/batch/handleBatchEnd.ts`
+
+**Parameters:**
+- None
+
+---
+
+*Last updated: 2026-10-16*

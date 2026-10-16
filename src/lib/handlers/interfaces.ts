@@ -46,8 +46,10 @@ export interface HandlerEntry {
    * The tool works on no connection of the instance: the server calls it
    * without building or connecting one first (the leftover-session tools,
    * whose resume must not log on). Its context's `connection` is absent.
+   * A function decides per call, on the arguments as the SDK parsed them,
+   * before any connection is taken (`HandlerBatch`: every action but `end`).
    */
-  connectionless?: true;
+  connectionless?: true | ((args: unknown) => boolean);
 }
 
 /**

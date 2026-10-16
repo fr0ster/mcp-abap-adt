@@ -5,8 +5,8 @@
  *
  * The batch connection is adt-clients' own `AdtBatchConnection`; every built
  * connection is a fake that answers envelopes part by part (`batchStand`).
- * The batch tools are stand-ins over `executeBatch` / `readAnswers` (the
- * served tools are Task 7); the dispatch is the real one.
+ * The batch tools are the served ones (`BatchEnd`, `BatchAnswers`,
+ * `HandlerBatch`); the dispatch is the real one.
  */
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
@@ -321,6 +321,38 @@ describe('BatchEnd', () => {
     const { answer, summary } = await s.end();
     expect(answer.isError).toBeFalsy();
     expect(summary).toEqual({ recorded: 3, failed: [1, 3] });
+    await s.close();
+  });
+
+  it("the served BatchBegin opens the batch; HandlerBatch's end and answers execute and read it as BatchEnd and BatchAnswers do", async () => {
+    const s = await batchStand({ tools: TOOLS, part: sap });
+    const begun = await s.call('BatchBegin');
+    expect(payloadOf(begun)).toEqual({
+      batch: 'on',
+      state_handle: expect.any(String),
+    });
+    expect(s.owner.mode()).toBe('communication');
+    expect(await s.call('GetProgram', { program_name: 'MISSING' })).toEqual({
+      content: [],
+    });
+    await s.call('GetProgram', { program_name: 'PROG_A' });
+    // Nothing was sent while recording.
+    expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(0);
+    const ended = await s.call('HandlerBatch', { action: 'end' });
+    expect(ended.isError).toBeFalsy();
+    expect(payloadOf(ended)).toEqual({ recorded: 2, failed: [1] });
+    expect(s.owner.mode()).toBe('off');
+    expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(1);
+    const read = await s.call('HandlerBatch', {
+      action: 'answers',
+      numbers: [2, 1],
+    });
+    const entries = payloadOf(read) as BatchAnswer[];
+    expect(entries.map((e) => [e.number, e.isError === true])).toEqual([
+      [2, false],
+      [1, true],
+    ]);
+    expect(await s.answers([2, 1])).toEqual(entries);
     await s.close();
   });
 

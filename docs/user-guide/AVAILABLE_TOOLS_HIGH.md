@@ -2,6 +2,8 @@
 
 Generated from code in `src/handlers/**` (not from docs).
 
+The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recorded, recorded only for some arguments (which ones), or refused; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
+
 - Level: High-Level
 - Total tools: 161
 
@@ -2391,4 +2393,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-10-15*
+*Last updated: 2026-10-16*

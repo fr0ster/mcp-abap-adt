@@ -91,6 +91,14 @@ const ABSENT_READS_AS: Readonly<Record<string, Record<string, string>>> = {
   RuntimeListFeeds: { feed_type: 'descriptors' },
 };
 
+/** What `tool`'s absent `argument` reads as, or `undefined` when nothing is assumed. */
+export function absentReadsAs(
+  tool: string,
+  argument: string,
+): string | undefined {
+  return ABSENT_READS_AS[tool]?.[argument];
+}
+
 /** An argument's value as the rules compare it: a string or boolean, upper-cased. */
 function compared(value: unknown): string | undefined {
   if (typeof value === 'string' || typeof value === 'boolean') {

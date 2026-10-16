@@ -37,14 +37,30 @@ export type BatchSummary = {
 /** The step a failure of the envelopes is named at. */
 export const EXECUTE_STEP = 'execute';
 
+/**
+ * Why a `BatchEnd` now has nothing to end: no owner (`batch_mode_unavailable`),
+ * the debugger batch open (`batch_mode_other`), no batch open
+ * (`batch_mode_off`); `undefined` while a communication batch is open. The
+ * dispatch asks it before taking a connection (spec §5.2 step 1).
+ */
+export function communicationBatchRefusal(
+  owner: InstanceBatch | undefined,
+): ServerRefusal | undefined {
+  if (owner === undefined) return new ServerRefusal('batch_mode_unavailable');
+  const mode = owner.mode();
+  if (mode === 'debugger') return new ServerRefusal('batch_mode_other');
+  if (mode !== 'communication' || owner.opened() === undefined) {
+    return new ServerRefusal('batch_mode_off');
+  }
+  return undefined;
+}
+
 /** The open communication batch; refused `batch_mode_off`, or `batch_mode_other` while the debugger batch is open. */
 function openCommunication(owner: InstanceBatch) {
-  const mode = owner.mode();
-  if (mode === 'debugger') throw new ServerRefusal('batch_mode_other');
+  const refusal = communicationBatchRefusal(owner);
   const open = owner.opened();
-  if (mode !== 'communication' || open === undefined) {
-    throw new ServerRefusal('batch_mode_off');
-  }
+  if (refusal !== undefined) throw refusal;
+  if (open === undefined) throw new ServerRefusal('batch_mode_off');
   return open;
 }
 

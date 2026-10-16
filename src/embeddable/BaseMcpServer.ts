@@ -40,9 +40,17 @@ import {
   isBatchTool,
 } from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
-import { endBeforeExecute } from '../lib/batch/execute.js';
+import {
+  communicationBatchRefusal,
+  endBeforeExecute,
+} from '../lib/batch/execute.js';
 import type { BatchAnswer, InstanceBatch } from '../lib/batch/InstanceBatch.js';
 import { createRecorder, untilSent } from '../lib/batch/recorder.js';
+import {
+  ineligibleSentence,
+  withBatchSentence,
+} from '../lib/batch/sentence.js';
+import type { ToolSetKind } from '../lib/config/binaries.js';
 import {
   createAbapConnection,
   systemKindOf,
@@ -54,6 +62,7 @@ import {
 } from '../lib/debugger/DebuggerInstance.js';
 import { isDebuggerOwnConnectionTool } from '../lib/debugger/ownConnectionTools.js';
 import type {
+  IHandlerGroup,
   IHandlersRegistry,
   SapEnvironment,
 } from '../lib/handlers/interfaces.js';
@@ -274,6 +283,13 @@ export abstract class BaseMcpServer extends McpServer {
    * answer `batch_mode_unavailable`.
    */
   protected readonly batch: InstanceBatch | undefined;
+
+  /**
+   * Whose words the batch sentence of a tool's description uses: the full
+   * sets' (`BatchBegin`) or the compact sets' (`HandlerBatch`), read from
+   * the batch tools a registered registry serves; `undefined` before one.
+   */
+  private batchWords: ToolSetKind | undefined;
 
   constructor(options: {
     name: string;
@@ -1152,6 +1168,10 @@ export abstract class BaseMcpServer extends McpServer {
     // Get handler groups from registry
     if (handlersRegistry instanceof CompositeHandlersRegistry) {
       const groups = handlersRegistry.getHandlerGroups();
+      // The set's batch tools name the words every other tool's description
+      // ends with (spec §3); a registry serving none gets no sentence.
+      const words = batchWordsOf(groups);
+      if (words !== undefined) this.batchWords = words;
 
       for (const group of groups) {
         const handlers = group.getHandlers();
@@ -1167,7 +1187,11 @@ export abstract class BaseMcpServer extends McpServer {
           const runCall = async (args: unknown, signal: AbortSignal) => {
             // A tool that works on no connection (the leftover-session
             // tools): called without one being built or connected first.
-            if (entry.connectionless === true) {
+            if (
+              entry.connectionless === true ||
+              (typeof entry.connectionless === 'function' &&
+                entry.connectionless(args))
+            ) {
               // While a batch is open such a tool is not served: it is
               // neither a batch tool nor recordable.
               if (this.batchOpenFor(entry.toolDefinition.name)) {
@@ -1189,6 +1213,17 @@ export abstract class BaseMcpServer extends McpServer {
             )
               ? this.batch?.opened()
               : undefined;
+            // A `BatchEnd` with nothing to end is refused before a
+            // connection is taken (spec §5.2 step 1).
+            const nothingToEnd = endsCommunicationBatch(
+              entry.toolDefinition.name,
+              args,
+            )
+              ? communicationBatchRefusal(this.batch)
+              : undefined;
+            if (nothingToEnd !== undefined) {
+              return this.refusalAnswer(nothingToEnd);
+            }
             try {
               // A run tool's `background` is the wrapper's: read, refused
               // when it is not a boolean or when the host gave no strategy —
@@ -1256,6 +1291,7 @@ export abstract class BaseMcpServer extends McpServer {
                 state: this.state,
                 debugger: () => this.debuggerFor(),
                 onMainConnection: (send) => this.onMainConnection(signal, send),
+                ...(this.batch !== undefined ? { batch: this.batch } : {}),
                 ...(this.systemType !== undefined
                   ? { systemType: this.systemType }
                   : {}),
@@ -1464,7 +1500,14 @@ export abstract class BaseMcpServer extends McpServer {
           this.registerTool(
             entry.toolDefinition.name,
             {
-              description: entry.toolDefinition.description,
+              description:
+                words !== undefined && !isBatchTool(entry.toolDefinition.name)
+                  ? withBatchSentence(
+                      entry.toolDefinition.description,
+                      entry.toolDefinition.name,
+                      words,
+                    )
+                  : entry.toolDefinition.description,
               inputSchema: zodSchema,
             },
             wrappedHandler,
@@ -1690,6 +1733,7 @@ export abstract class BaseMcpServer extends McpServer {
         logger: this.logger,
         state: this.state,
         debugger: () => this.debuggerFor(),
+        ...(this.batch !== undefined ? { batch: this.batch } : {}),
         ...(this.systemType !== undefined
           ? { systemType: this.systemType }
           : {}),
@@ -2215,6 +2259,39 @@ export abstract class BaseMcpServer extends McpServer {
           ]
         : registerArgs;
     };
+    // A registry's own tool is refused in batch mode: where the instance
+    // has a batch owner, its description says so (spec §3).
+    const described = (registerArgs: unknown[]): unknown[] => {
+      if (this.batch === undefined) return registerArgs;
+      const name = registerArgs[0];
+      if (typeof name !== 'string' || isBatchTool(name)) return registerArgs;
+      const sentence = ineligibleSentence(this.batchWords ?? 'core');
+      const second = registerArgs[1];
+      const appended = (description: string) =>
+        description.trimEnd().length === 0
+          ? sentence
+          : `${description.trimEnd()} ${sentence}`;
+      if (typeof second === 'string') {
+        // `tool(name, description, …)`.
+        return [name, appended(second), ...registerArgs.slice(2)];
+      }
+      if (
+        second !== null &&
+        typeof second === 'object' &&
+        typeof second !== 'function'
+      ) {
+        // `registerTool(name, config, callback)`.
+        const config = second as { description?: unknown };
+        const description =
+          typeof config.description === 'string' ? config.description : '';
+        return [
+          name,
+          { ...config, description: appended(description) },
+          ...registerArgs.slice(2),
+        ];
+      }
+      return registerArgs;
+    };
     return new Proxy(this, {
       get: (target, property) => {
         if (property === 'registerTool' || property === 'tool') {
@@ -2222,7 +2299,7 @@ export abstract class BaseMcpServer extends McpServer {
             ...registerArgs: unknown[]
           ) => unknown;
           return (...registerArgs: unknown[]) =>
-            register.apply(target, wrapLast(registerArgs));
+            register.apply(target, wrapLast(described(registerArgs)));
         }
         const value = Reflect.get(target, property);
         return typeof value === 'function' ? value.bind(target) : value;
@@ -2393,4 +2470,20 @@ function statedEnvironment(
   return declared === 'onprem' || declared === 'cloud' || declared === 'legacy'
     ? declared
     : undefined;
+}
+
+/**
+ * The words of the batch sentence for a registry's groups: the compact sets'
+ * when `HandlerBatch` is served, the full sets' when `BatchBegin` is, none
+ * when the registry serves no batch tool.
+ */
+function batchWordsOf(groups: IHandlerGroup[]): ToolSetKind | undefined {
+  const names = new Set(
+    groups.flatMap((group) =>
+      group.getHandlers().map((entry) => entry.toolDefinition.name),
+    ),
+  );
+  if (names.has('HandlerBatch')) return 'compact';
+  if (names.has('BatchBegin')) return 'core';
+  return undefined;
 }

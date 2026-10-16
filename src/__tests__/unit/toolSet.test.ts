@@ -5,12 +5,12 @@
  *
  * - the four sets, one per kind of binary: `fullToolSet` (core: readonly
  *   with system and search, high, debug, the leftover-session list and
- *   logoff, background runs), `fullReadOnlyToolSet` (core-ro: readonly with
- *   system and search, the leftover-session list and logoff),
- *   `compactToolSetOf` (compact: both halves, the compact debugger, the
- *   compact leftover-session list and logoff, background runs) and
- *   `compactReadOnlyToolSetOf` (compact-ro: the read-only half, the
- *   leftover-session list and logoff);
+ *   logoff, background runs, batch mode), `fullReadOnlyToolSet` (core-ro:
+ *   readonly with system and search, the leftover-session list and logoff,
+ *   batch mode), `compactToolSetOf` (compact: both halves, the compact
+ *   debugger, the compact leftover-session list and logoff, background
+ *   runs, `HandlerBatch`) and `compactReadOnlyToolSetOf` (compact-ro: the
+ *   read-only half, the leftover-session list and logoff, `HandlerBatch`);
  * - no `-ro` set holds a write, debugger or background-run tool, and no
  *   set a resume tool (a stdio process is born on its one leftover session
  *   at its start); each write set holds every tool of its `-ro` set;
@@ -40,6 +40,7 @@ import {
 } from '../../lib/config/index';
 import {
   BackgroundRunHandlersGroup,
+  BatchHandlersGroup,
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   LeftoverSessionHandlersGroup,
@@ -99,7 +100,7 @@ const SETS: ReadonlyArray<readonly [string, ToolSet]> = [
 ];
 
 describe('the four tool sets', () => {
-  it('core: readonly (with system), background runs, high, debug, search, the leftover-session list and logoff', () => {
+  it('core: readonly (with system), background runs, high, debug, search, the leftover-session list and logoff, batch mode', () => {
     const overriding = [
       new HighLevelHandlersGroup(context),
       new DebugHandlersGroup(context),
@@ -116,11 +117,12 @@ describe('the four tool sets', () => {
         ...overriding,
         new SearchHandlersGroup(context),
         new LeftoverSessionHandlersGroup(context),
+        new BatchHandlersGroup(context),
       ]),
     );
   });
 
-  it('core-ro: readonly (with system), search, the leftover-session list and logoff', () => {
+  it('core-ro: readonly (with system), search, the leftover-session list and logoff, batch mode', () => {
     expect(shape(fullReadOnlyToolSet.groups(context, 'stdio'))).toEqual(
       shape([
         new ReadOnlyHandlersGroup(
@@ -131,11 +133,12 @@ describe('the four tool sets', () => {
         new SystemHandlersGroup(context),
         new SearchHandlersGroup(context),
         new LeftoverSessionHandlersGroup(context),
+        new BatchHandlersGroup(context),
       ]),
     );
   });
 
-  it('compact: both halves in one group, the debugger, background runs, the leftover-session list and logoff', () => {
+  it('compact: both halves in one group, the debugger, background runs, the leftover-session list and logoff, HandlerBatch', () => {
     const both = namesOf([
       new CompactReadOnlyHandlersGroup(context),
       new CompactModifyHandlersGroup(context),
@@ -164,10 +167,11 @@ describe('the four tool sets', () => {
         group: 'CompactLeftoverSessionHandlers',
         tools: ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'],
       },
+      { group: 'CompactBatchHandlers', tools: ['HandlerBatch'] },
     ]);
   });
 
-  it('compact-ro: the 16 that change nothing, the leftover-session list and logoff', () => {
+  it('compact-ro: the 16 that change nothing, the leftover-session list and logoff, HandlerBatch', () => {
     const half = namesOf([new CompactReadOnlyHandlersGroup(context)]);
     expect(half).toHaveLength(16);
     expect(shape(compactRo.groups(context, 'stdio'))).toEqual([
@@ -176,6 +180,7 @@ describe('the four tool sets', () => {
         group: 'CompactLeftoverSessionHandlers',
         tools: ['HandlerLeftoverSessionList', 'HandlerLeftoverSessionLogoff'],
       },
+      { group: 'CompactBatchHandlers', tools: ['HandlerBatch'] },
     ]);
   });
 

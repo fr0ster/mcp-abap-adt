@@ -13,10 +13,10 @@
  *
  * | Set | Binaries | Tools |
  * |---|---|---|
- * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs; on stdio the leftover-session list and logoff |
- * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search); on stdio the leftover-session list and logoff |
- * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs; on stdio the leftover-session list and logoff |
- * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half; on stdio the leftover-session list and logoff |
+ * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, batch mode; on stdio the leftover-session list and logoff |
+ * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), batch mode; on stdio the leftover-session list and logoff |
+ * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs, `HandlerBatch`; on stdio the leftover-session list and logoff |
+ * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half, `HandlerBatch`; on stdio the leftover-session list and logoff |
  *
  * **The leftover-session tools are stdio's**: the
  * runtime session files exist for stdio, where the process serves one user.
@@ -32,6 +32,7 @@
  */
 
 import { CompactBackgroundRunHandlersGroup } from './compact/backgroundRuns/group';
+import { CompactBatchHandlersGroup } from './compact/batch/group';
 import { CompactDebugHandlersGroup } from './compact/debug/group';
 import {
   type CompactEntryBuilder,
@@ -45,6 +46,7 @@ import {
   type ServedTransport,
   type ToolSetKind,
 } from './config/binaries';
+import { BatchHandlersGroup } from './handlers/groups/BatchHandlersGroup.js';
 import { LeftoverSessionHandlersGroup } from './handlers/groups/LeftoverSessionHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './handlers/groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from './handlers/groups/SearchHandlersGroup.js';
@@ -141,6 +143,10 @@ ${elsewhere.map(([what, other]) => `  ${what}: ${install(transport, other)}`).jo
 
 const READONLY_LINE =
   'readonly: Get*, Read*, List* (read operations), with search and system';
+const BATCH_LINE =
+  'batch mode: BatchBegin, BatchEnd, BatchAnswers — independent calls recorded, sent together in envelopes, answered by number';
+const COMPACT_BATCH_LINE =
+  "batch mode: HandlerBatch (action 'begin', 'end', 'answers') — independent calls recorded, sent together in envelopes, answered by number";
 const DEBUG_LINE =
   'debug: the debugger tools; a breakpoint or a listener catches every request of the connected SAP user';
 
@@ -165,6 +171,7 @@ export const fullToolSet: ToolSet = {
           'the leftover SAP sessions of an ended process: list, log off',
         ),
         'background runs of RuntimeRunClass and RuntimeRunProgram: read, list, discard',
+        BATCH_LINE,
       ],
       [
         ['The readonly tools alone', 'core-ro'],
@@ -178,12 +185,15 @@ export const fullToolSet: ToolSet = {
   // The writing groups first, so their names feed the readonly dedup; the
   // background-run tools beside the run tools; every leftover-session tool
   // on stdio.
-  groups: (context, transport) =>
-    expositionGroups(['readonly', 'high', 'debug'], context).filter(
+  groups: (context, transport) => [
+    ...expositionGroups(['readonly', 'high', 'debug'], context).filter(
       (group) =>
         servesLeftoverSessions(transport) ||
         !(group instanceof LeftoverSessionHandlersGroup),
     ),
+    // Batch mode, on every transport.
+    new BatchHandlersGroup(context),
+  ],
 };
 
 /**
@@ -205,6 +215,7 @@ export const fullReadOnlyToolSet: ToolSet = {
           transport,
           'the leftover SAP sessions of an ended process: list, log off',
         ),
+        BATCH_LINE,
       ],
       [
         ['The write, debugger and background-run tools', 'core'],
@@ -225,6 +236,7 @@ export const fullReadOnlyToolSet: ToolSet = {
     ...(servesLeftoverSessions(transport)
       ? [new LeftoverSessionHandlersGroup(context)]
       : []),
+    new BatchHandlersGroup(context),
   ],
 };
 
@@ -266,6 +278,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
             'the leftover SAP sessions of an ended process: list, log off',
           ),
           'background runs of HandlerProfileRun: read, list, discard',
+          COMPACT_BATCH_LINE,
         ],
         [
           ['The compact tools that change nothing', 'compact-ro'],
@@ -282,6 +295,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
       ...(servesLeftoverSessions(transport)
         ? [new CompactLeftoverSessionHandlersGroup(context)]
         : []),
+      new CompactBatchHandlersGroup(context),
     ],
   };
 }
@@ -309,6 +323,7 @@ export function compactReadOnlyToolSetOf(
             transport,
             'the leftover SAP sessions of an ended process: list, log off',
           ),
+          COMPACT_BATCH_LINE,
         ],
         [
           ['All compact tools, the debugger and background runs', 'compact'],
@@ -321,6 +336,7 @@ export function compactReadOnlyToolSetOf(
       ...(servesLeftoverSessions(transport)
         ? [new CompactLeftoverSessionHandlersGroup(context)]
         : []),
+      new CompactBatchHandlersGroup(context),
     ],
   };
 }

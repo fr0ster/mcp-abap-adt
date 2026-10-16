@@ -1,7 +1,7 @@
 # @mcp-abap-adt/compact
 
 The compact MCP server over **stdio** — the command that serves all 27, the four debugger verbs, the
-leftover sessions and background runs. The 16 that change nothing alone are
+leftover sessions, background runs and batch mode (`HandlerBatch`). The 16 that change nothing alone are
 [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro)
 (`mcp-abap-adt-compact-ro`): the binary fixes the tool set (19.0.0), there is no `--exposition`.
 Streamable HTTP is [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)
@@ -21,6 +21,18 @@ through MCP reliably. A consumer that does select per request (cloud-llm-hub, fo
 one) has no use for it and should take `@mcp-abap-adt/lib` instead.
 
 **The low set's analogue.** The low set left the full binaries in 19.0.0; its single-step operations are compact's: `HandlerLock`, `HandlerUpdate` with the `lock_handle` it answered (the write alone, under your lock), `HandlerUnlock`, `HandlerCheckRun`, `HandlerValidate`, `HandlerActivate`, and `HandlerGet` `part` `object_structure` / `node_structure` / `virtual_folders`. **Keeping a lock from `HandlerLock` short is your job:** the server releases nothing on its own clock — unlock as soon as the write is done. The tool-by-tool table: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+
+**Batch mode: `HandlerBatch`.** Every compact binary, `-ro` ones included, on every transport,
+serves batch mode as one tool: `action: 'begin'` switches the server into batch mode, every call
+none of whose requests depends on another's answer is then recorded (it answers nothing and takes
+the next number, from 1), `action: 'end'` sends them all in ADT batch envelopes and leaves batch
+mode whatever happens, and `action: 'answers'` with `number` or `numbers` reads each call's answer
+by its number. A tool that builds a request from an earlier answer is refused; run such work as
+phases, each its own batch — lock (`HandlerLock`), write (`HandlerUpdate` with `lock_handle`),
+unlock (`HandlerUnlock`). Every tool's description ends with one sentence saying whether it is
+recorded, for which arguments, or refused. Over Streamable HTTP send the `state_handle`
+`action: 'begin'` answers in the `x-mcp-state-handle` header on every call of the batch. See
+[Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md).
 
 ## Why two library packages
 

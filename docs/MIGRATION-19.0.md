@@ -1369,9 +1369,20 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `readBatchKeepRawParts`). `ServerRefusalCode` / `FailureCode` add `batch_mode_unavailable`,
   `batch_mode_on`, `batch_mode_other`, `batch_mode_off`, `batch_not_recordable`,
   `batch_no_timeout` and `debug_batch_amdp_unmeasured`.
-- **`HandlerEntry.connectionless?: true`** marks a tool that works on no connection of the
-  instance: the server calls it without building or connecting one, its context's `connection`
-  absent. The leftover-session tools are such tools (a list or a logoff must not log on).
+  **The batch tools are a group of their own**: `BatchHandlersGroup` (`BatchBegin`, `BatchEnd`,
+  `BatchAnswers`; `@mcp-abap-adt/lib/handlers`) is in every full tool set, `-ro` included, and the
+  compact sets serve `HandlerBatch` (`CompactBatchHandlersGroup`). `EmbeddableMcpServer`'s default
+  registry does not add it: a registry of your own that should offer batch mode adds
+  `new BatchHandlersGroup(context)`. The handlers reach the owner as `HandlerContext.batch`. Once a
+  registry serves a batch tool, every other tool's description is registered with one sentence
+  appended — recorded in batch mode, recorded only for some arguments, or refused; where the
+  instance has an owner, a registry that registers its own tools gets the refused sentence on each.
+  A client that compares tool descriptions sees them change.
+- **`HandlerEntry.connectionless?: true | ((args) => boolean)`** marks a tool that works on no
+  connection of the instance: the server calls it without building or connecting one, its
+  context's `connection` absent. The leftover-session tools are such tools (a list or a logoff
+  must not log on); a function decides per call, before any connection is taken (`HandlerBatch`:
+  every action but `end`).
   `HandlerContext` has `sessionFiles?` (the owner, which keeps a debugger's own connection) and
   `leftoverSessions?` (the tools' port: `list()` and `logoff(handle)`). `ServerRefusalCode` /
   `FailureCode` add `leftover_sessions_unavailable` and `leftover_session_not_available`.

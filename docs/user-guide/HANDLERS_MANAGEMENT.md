@@ -8,10 +8,10 @@ HTTP and SSE, each `-ro` binary a package of its own:
 
 | Kind | stdio | Streamable HTTP | SSE | Tools |
 |---|---|---|---|---|
-| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs; on stdio the leftover-session list and logoff |
-| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search); on stdio the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger, background runs; on stdio the leftover-session list and logoff |
-| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing; on stdio the leftover-session list and logoff |
+| core | `mcp-abap-adt` (`@mcp-abap-adt/core`) | `mcp-abap-adt-http` (`@mcp-abap-adt/http`) | `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs, batch mode; on stdio the leftover-session list and logoff |
+| core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`) | `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`) | `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search), batch mode; on stdio the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) | `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`) | `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the compact readonly and modify tools, the compact debugger, background runs, `HandlerBatch`; on stdio the leftover-session list and logoff |
+| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) | `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`) | `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the compact tools that change nothing, `HandlerBatch`; on stdio the leftover-session list and logoff |
 
 No `-ro` binary carries a debugger or a background run, no binary a resume of a leftover session
 (a stdio server takes up the one leftover session of its destination at its start), and no http or
@@ -20,9 +20,16 @@ so it writes no runtime session file. A
 write binary keeps every readonly tool: writing needs reading (in core a `Read<X>` gives way to
 the high group's `Get<X>` of the same object, see the dedup below).
 
-Tool counts (on-premise, measured by the tests), stdio / http and sse: core 251 / 249; core-ro
-68 / 66; compact 36 / 34 (27 + 4 debugger verbs + 3 background-run, + the 2 leftover-session tools,
-list and logoff, on stdio); compact-ro 18 / 16 (16, + the leftover-session list and logoff on stdio).
+Batch mode is in every binary, on every transport: the full binaries, `-ro` ones included, serve
+`BatchBegin`, `BatchEnd` and `BatchAnswers`; the compact ones serve it as one tool, `HandlerBatch`
+(`action: 'begin' | 'end' | 'answers'`). Every other tool's description ends with one sentence
+saying whether a call of it is recorded in batch mode, for which arguments, or refused — see
+[Batch Mode](BATCH_MODE.md).
+
+Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 / 252; core-ro
+71 / 69 (each with the 3 batch tools); compact 37 / 35 (27 + 4 debugger verbs + 3 background-run +
+`HandlerBatch`, + the 2 leftover-session tools, list and logoff, on stdio); compact-ro 19 / 17
+(16 + `HandlerBatch`, + the leftover-session list and logoff on stdio).
 
 ## Handler Sets
 

@@ -1,5 +1,5 @@
 /**
- * The compact surface stays frozen — the same 31 tools — 27, plus the four debug verbs the compact write binaries serve.
+ * The compact surface stays frozen — the same 32 tools — 27, plus the four debug verbs the compact write binaries serve and `HandlerBatch`, which every compact binary serves.
  *
  * **Why it lives here now.** `tests/fixtures/tools/surface.json` in `lib` froze all
  * 370 tools, 22 of them compact. The facade moved into packages, so `lib`'s fixture
@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import { compactBatchEntries } from '../../../lib/compact/batch/group';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 
 interface Row {
@@ -52,6 +53,7 @@ describe('the compact tool surface', () => {
     ...compactReadOnlyEntries(context),
     ...compactModifyEntries(context),
     ...compactDebugEntries(),
+    ...compactBatchEntries(),
   ].map((entry) => ({
     group: 'compact',
     name: entry.toolDefinition.name,
@@ -67,8 +69,8 @@ describe('the compact tool surface', () => {
   }));
 
   it('enumerates the whole facade, so the assertions below are not vacuous', () => {
-    expect(frozen).toHaveLength(31);
-    expect(current).toHaveLength(31);
+    expect(frozen).toHaveLength(32);
+    expect(current).toHaveLength(32);
   });
 
   it('has the same tools', () => {

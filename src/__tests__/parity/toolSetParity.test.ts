@@ -860,22 +860,33 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
             }
           : { full: [], fullRo: [], compact: [], compactRo: [] },
       );
-      // core: the debugger, high and background runs, always.
-      expect(full.tools).toHaveLength(onStdio ? 251 : 249);
+      // core: the debugger, high, background runs and the three batch
+      // tools, always.
+      expect(full.tools).toHaveLength(onStdio ? 254 : 252);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
           'DebugStop',
           'CreateClass',
           'GetBackgroundRun',
+          'BatchBegin',
+          'BatchEnd',
+          'BatchAnswers',
         ]),
       );
-      // core-ro: the readonly tools with system and search (and, on stdio,
-      // the list and the logoff); no write, debugger, background run or
-      // resume.
-      expect(fullRo.tools).toHaveLength(onStdio ? 68 : 66);
+      // core-ro: the readonly tools with system and search, the three batch
+      // tools (and, on stdio, the list and the logoff); no write, debugger,
+      // background run or resume.
+      expect(fullRo.tools).toHaveLength(onStdio ? 71 : 69);
       expect(fullRo.tools).toEqual(
-        expect.arrayContaining(['ReadClass', 'GetWhereUsed', 'SearchObject']),
+        expect.arrayContaining([
+          'ReadClass',
+          'GetWhereUsed',
+          'SearchObject',
+          'BatchBegin',
+          'BatchEnd',
+          'BatchAnswers',
+        ]),
       );
       for (const name of [
         'CreateClass',
@@ -889,16 +900,27 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         });
       }
       // compact: the 27, the four debugger verbs, the three background-run
-      // tools beside the run tool, and on stdio the leftover-session list
-      // and logoff (no set serves a resume).
-      expect(compact.tools).toHaveLength(27 + 4 + 3 + (onStdio ? 2 : 0));
+      // tools beside the run tool, HandlerBatch, and on stdio the
+      // leftover-session list and logoff (no set serves a resume).
+      expect(compact.tools).toHaveLength(27 + 4 + 3 + 1 + (onStdio ? 2 : 0));
       expect(compact.tools).toEqual(
-        expect.arrayContaining([...COMPACT_RW, ...COMPACT_DEBUG]),
+        expect.arrayContaining([
+          ...COMPACT_RW,
+          ...COMPACT_DEBUG,
+          'HandlerBatch',
+        ]),
       );
-      // compact-ro: the 16 that change nothing, and on stdio the list and
-      // the logoff.
-      expect(compactRo.tools).toHaveLength(16 + (onStdio ? 2 : 0));
+      // compact-ro: the 16 that change nothing, HandlerBatch, and on stdio
+      // the list and the logoff.
+      expect(compactRo.tools).toHaveLength(16 + 1 + (onStdio ? 2 : 0));
       expect(compactRo.tools).toContain('HandlerGet');
+      expect(compactRo.tools).toContain('HandlerBatch');
+      for (const tools of [full.tools, fullRo.tools]) {
+        expect(tools).not.toContain('HandlerBatch');
+      }
+      for (const tools of [compact.tools, compactRo.tools]) {
+        expect(tools.filter((n) => n.startsWith('Batch'))).toEqual([]);
+      }
       for (const name of [
         ...COMPACT_RW.filter((n) => n !== 'HandlerGet'),
         ...COMPACT_DEBUG,

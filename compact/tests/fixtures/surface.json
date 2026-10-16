@@ -184,5 +184,11 @@
     "name": "HandlerDebugStep",
     "inputs": "state_handle*, action*, object_type, object_name, line, include, parent_name, detail",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerBatch",
+    "inputs": "action*, number, numbers",
+    "available_in": "all"
   }
 ]

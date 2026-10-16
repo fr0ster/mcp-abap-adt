@@ -2,14 +2,18 @@
 
 Generated from code in `src/handlers/**` (not from docs).
 
-Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
+Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set without `ListLeftoverSessions` and `LogoffLeftoverSession`, which are stdio's only), with the parameters they take there — taken from `fullReadOnlyToolSet`, the set those binaries use. No high, debugger, background-run or resume tool; the run tools take no `background`. The batch tools are served here too: the reads none of whose requests depends on another's answer are recorded in batch mode. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recorded, recorded only for some arguments (which ones), or refused; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call). `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 68
+- Total tools: 71
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Batch](#read-only-batch)
+    - [BatchBegin](#batchbegin-read-only-batch)
+    - [BatchEnd](#batchend-read-only-batch)
+    - [BatchAnswers](#batchanswers-read-only-batch)
   - [Behavior Definition](#read-only-behavior-definition)
     - [ReadBehaviorDefinition](#readbehaviordefinition-read-only-behavior-definition)
   - [Behavior Implementation](#read-only-behavior-implementation)
@@ -109,6 +113,43 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 <a id="read-only-group"></a>
 ## Read-Only Group
+
+<a id="read-only-batch"></a>
+### Read-Only / Batch
+
+<a id="batchbegin-read-only-batch"></a>
+#### BatchBegin (Read-Only / Batch)
+**Description:** Switches this server into batch mode: from now on each call of a tool none of whose requests depends on another's answer is recorded instead of sent, and returns nothing. Every recorded call is numbered, in the order made, from 1. A tool that builds a request from an earlier answer is refused in batch mode; use the low-level tools (compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. BatchEnd sends the recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle this answers in the request header on every call of the batch.
+
+**Source:** `src/handlers/batch/batch/handleBatchBegin.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="batchend-read-only-batch"></a>
+#### BatchEnd (Read-Only / Batch)
+**Description:** Sends every call recorded since BatchBegin, in parallel envelopes, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with BatchAnswers.
+
+**Source:** `src/handlers/batch/batch/handleBatchEnd.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="batchanswers-read-only-batch"></a>
+#### BatchAnswers (Read-Only / Batch)
+**Description:** The answers of the last batch, by number: each is the answer the tool gives for that call, built when BatchEnd sent it — SAP's answer or why it was not sent. A number the last batch does not have answers: no answer with that number.
+
+**Source:** `src/handlers/batch/batch/handleBatchAnswers.ts`
+
+**Parameters:**
+- `number` (integer, optional) - One batch number to read (an integer of at least 1); give this or numbers, not both.
+- `numbers` (array, optional) - Several batch numbers to read, answered in the order given; give this or number, not both.
+
+---
 
 <a id="read-only-behavior-definition"></a>
 ### Read-Only / Behavior Definition
@@ -1086,4 +1127,4 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 ---
 
-*Last updated: 2026-10-15*
+*Last updated: 2026-10-16*

@@ -2,8 +2,9 @@
  * A server instance with batch mode, for the BatchEnd / BatchAnswers / no-retry
  * tests: a `BaseMcpServer` whose connection is built from a source (so a test
  * can change the credential, or make the source fail), the shipped handlers of
- * the tools a test names, and stand-ins of the batch tools over the real
- * functions (`executeBatch`, `readAnswers`) — Task 7 serves the real tools.
+ * the tools a test names, and the real batch tools (`BatchHandlersGroup`,
+ * and the compact `HandlerBatch`).
+ * `begin()` opens the batch directly, so a test can count `execute()`.
  *
  * Each built connection is a fake (`envelopeConnection`): an envelope is
  * answered part by part by the stand's `part` rule, a request outside a batch
@@ -30,12 +31,12 @@ import { CompactReadOnlyHandlersGroup } from '../../../compact-readonly-entries/
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import type { ConnectionSource } from '../../embeddable/ConnectionContext';
 import type { AnswerEntry } from '../../lib/batch/answers';
-import { batchAnswersAnswer, readAnswers } from '../../lib/batch/answers';
-import { batchEndAnswer, executeBatch } from '../../lib/batch/execute';
 import { InstanceBatch } from '../../lib/batch/InstanceBatch';
 import { LateBoundConnection } from '../../lib/batch/lateBound';
+import { CompactBatchHandlersGroup } from '../../lib/compact/batch/group';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import {
+  BatchHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
   SearchHandlersGroup,
@@ -43,7 +44,6 @@ import {
 } from '../../lib/handlers/groups';
 import type {
   HandlerContext,
-  HandlerEntry,
   IHandlerGroup,
 } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
@@ -152,50 +152,6 @@ function shippedGroup(names: string[]): IHandlerGroup[] {
   });
 }
 
-/** Stand-ins of the batch tools, over the real functions. */
-function batchToolsGroup(owner: InstanceBatch): IHandlerGroup {
-  const entries: HandlerEntry[] = [
-    {
-      toolDefinition: {
-        name: 'BatchEnd',
-        description: 'BatchEnd',
-        inputSchema: { type: 'object', properties: {} },
-      },
-      handler: (async (context: HandlerContext, _args: unknown) =>
-        batchEndAnswer(
-          await executeBatch(
-            owner,
-            owner.opened()?.target ?? new LateBoundConnection(),
-            context.connection,
-          ),
-        )) as never,
-    } as HandlerEntry,
-    {
-      toolDefinition: {
-        name: 'BatchAnswers',
-        description: 'BatchAnswers',
-        inputSchema: {
-          type: 'object',
-          properties: {
-            number: { type: 'number' },
-            numbers: { type: 'array', items: { type: 'number' } },
-          },
-        },
-      },
-      connectionless: true,
-      handler: (async (_context: HandlerContext, args: unknown) =>
-        batchAnswersAnswer(
-          readAnswers(owner, args as { number?: number; numbers?: number[] }),
-        )) as never,
-    } as HandlerEntry,
-  ];
-  return {
-    getName: () => 'batch-stand-ins',
-    getHandlers: () => entries,
-    registerHandlers: () => {},
-  } as unknown as IHandlerGroup;
-}
-
 class StandServer extends BaseMcpServer {
   constructor(
     groups: IHandlerGroup[],
@@ -222,7 +178,7 @@ export interface Stand {
   batch(): AdtBatchConnection;
   /** Every `execute()` of every batch opened here. */
   executes: jest.Mock;
-  /** Opens a communication batch, as BatchBegin will (Task 7). */
+  /** Opens a communication batch, as BatchBegin does, counting its `execute()`. */
   begin(): void;
   /** The source answers a new credential object from the next call on. */
   newCredential(): void;
@@ -277,7 +233,11 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     },
   };
   const server = new StandServer(
-    [...shippedGroup(options.tools), batchToolsGroup(owner)],
+    [
+      ...shippedGroup(options.tools),
+      new BatchHandlersGroup({ connection: undefined as never }),
+      new CompactBatchHandlersGroup({ connection: undefined as never }),
+    ],
     owner,
     source,
   );

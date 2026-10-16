@@ -220,6 +220,26 @@ below your MCP client's request limit (the TypeScript SDK's client cancels at 60
 cannot be cancelled** — a client's cancel aborts nothing, the call runs to its end. No other tool takes a `timeout`: a unit test, ATC, class or program run
 goes on to its end.
 
+### Batch mode
+
+Calls none of whose requests depends on another's answer can be recorded and sent together, in
+ADT batch envelopes, instead of one request each: `BatchBegin` switches the server into batch
+mode, every such call is then recorded, answers nothing and takes the next number (from 1, in the
+order made), `BatchEnd` sends them all and leaves batch mode whatever happens, and
+`BatchAnswers` reads each call's answer by its number — the answer the tool gives outside batch
+mode for what SAP answered. The compact binaries serve the same as one tool, `HandlerBatch`
+(`action: 'begin' | 'end' | 'answers'`). Every binary serves it, the `-ro` ones included, on every
+transport.
+
+A tool that builds a request from an earlier answer is refused in batch mode — a high-level
+create or update, a fallback after a `404`, a poll. Run such work as phases, each its own batch,
+with the single-step tools: create (`HandlerCreate` with `create_only`), lock (`HandlerLock`;
+the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`), unlock
+(`HandlerUnlock`). Every tool's description ends with one sentence saying whether it is recorded,
+for which arguments, or refused. Over Streamable HTTP, send the `state_handle` `BatchBegin`
+answers in the `x-mcp-state-handle` request header on every call of the batch. See
+[Batch Mode](docs/user-guide/BATCH_MODE.md), with the list of every recordable call.
+
 ## Registries
 
 Published in the official MCP Registry and listed on Glama.ai.
@@ -264,6 +284,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[RFC Setup](docs/installation/RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC SDK and a C++ toolchain before the install
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
+- **[Batch Mode](docs/user-guide/BATCH_MODE.md)** - Record independent calls, send them together in batch envelopes at `BatchEnd`, read their answers by number; which calls are recorded
 - **[Debugger](docs/user-guide/DEBUGGER.md)** - The `debug` set of the write binaries: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - The twelve binaries and the tools each serves
 - **Configurator**: `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)) provides the `mcp-conf` CLI to auto-configure clients

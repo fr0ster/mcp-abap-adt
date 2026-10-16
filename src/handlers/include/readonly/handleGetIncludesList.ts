@@ -1,5 +1,9 @@
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
-import { failurePayload } from '../../../lib/answer';
+import {
+  failureEntry,
+  failurePayload,
+  isCredentialPayload,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
@@ -197,6 +201,14 @@ export async function handleGetIncludesList(
       const answer = await readSource(await read);
       if (answer.kind === 'text') return answer.text;
       if (answer.kind === 'refused') {
+        // A credential SAP refused is every include's: the call ends with
+        // the method's error as it is — no further include is asked.
+        if (isCredentialPayload(failureEntry(answer.error, 'read source')))
+          throw carryingFailure(
+            new Error(answer.error.message),
+            answer.error,
+            'read source',
+          );
         logger?.warn?.(`could not read ${what}: ${answer.error.message}`);
         // The method's error as it is, with the step it arose at.
         unreadable.push({

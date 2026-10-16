@@ -1,8 +1,11 @@
 import {
+  answerCaught,
   type FailureEntry,
   failedPayloadOf,
+  isCredentialFailure,
   isCredentialPayload,
   type McpResult,
+  thrownEntry,
 } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
@@ -483,6 +486,21 @@ function refusalOf(
 /** The delegated answers that were credential failures, by their entry. */
 const credentialAnswers = new WeakMap<object, unknown>();
 
+/**
+ * A throw while resolving a symbol: that symbol's failure in the shape of
+ * every other — the carried error as it is, or `client_threw` — with the
+ * step. A credential failure is every symbol's: rethrown as it came, so the
+ * call ends with it and no further symbol is read.
+ */
+function threwAt(
+  symbol: AbapSymbolInfo,
+  thrown: unknown,
+  step: string,
+): AbapSymbolInfo {
+  if (isCredentialFailure(thrown)) throw thrown;
+  return { ...symbol, error: thrownEntry(thrown, step) };
+}
+
 class AbapSystemSymbolResolver {
   public async resolveSymbols(
     context: HandlerContext,
@@ -512,14 +530,7 @@ class AbapSystemSymbolResolver {
           failedCount++;
         }
       } catch (error) {
-        // If resolution fails, add original symbol with error info
-        resolvedSymbols.push({
-          ...symbol,
-          systemInfo: {
-            exists: false,
-            error: error instanceof Error ? error.message : String(error),
-          },
-        });
+        resolvedSymbols.push(threwAt(symbol, error, 'resolve symbol'));
         failedCount++;
       }
     }
@@ -550,13 +561,7 @@ class AbapSystemSymbolResolver {
           return await this.resolveGenericSymbol(context, symbol);
       }
     } catch (error) {
-      return {
-        ...symbol,
-        systemInfo: {
-          exists: false,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
+      return threwAt(symbol, error, 'resolve symbol');
     }
   }
 
@@ -617,13 +622,7 @@ class AbapSystemSymbolResolver {
         },
       };
     } catch (error) {
-      return {
-        ...symbol,
-        systemInfo: {
-          exists: false,
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
+      return threwAt(symbol, error, 'read class');
     }
   }
 
@@ -675,13 +674,7 @@ class AbapSystemSymbolResolver {
         } as AbapSystemInfo,
       };
     } catch (error) {
-      return {
-        ...symbol,
-        systemInfo: {
-          exists: false,
-          error: error instanceof Error ? error.message : String(error),
-        } as AbapSystemInfo,
-      };
+      return threwAt(symbol, error, 'read function module');
     }
   }
 
@@ -743,13 +736,7 @@ class AbapSystemSymbolResolver {
         } as AbapSystemInfo,
       };
     } catch (error) {
-      return {
-        ...symbol,
-        systemInfo: {
-          exists: false,
-          error: error instanceof Error ? error.message : String(error),
-        } as AbapSystemInfo,
-      };
+      return threwAt(symbol, error, 'read interface');
     }
   }
 
@@ -757,28 +744,18 @@ class AbapSystemSymbolResolver {
     _context: HandlerContext,
     symbol: AbapSymbolInfo,
   ): Promise<AbapSymbolInfo> {
-    try {
-      // For generic symbols, we don't have a specific handler
-      // Return symbol with basic system info indicating it exists locally
-      return {
-        ...symbol,
-        systemInfo: {
-          exists: false,
-          objectType: 'LOCAL',
-          description: `Local ${symbol.type} ${symbol.name}`,
-          package: 'LOCAL',
-          error: 'No system resolution available for this symbol type',
-        } as AbapSystemInfo,
-      };
-    } catch (error) {
-      return {
-        ...symbol,
-        systemInfo: {
-          exists: false,
-          error: error instanceof Error ? error.message : String(error),
-        } as AbapSystemInfo,
-      };
-    }
+    // For generic symbols, we don't have a specific handler
+    // Return symbol with basic system info indicating it exists locally
+    return {
+      ...symbol,
+      systemInfo: {
+        exists: false,
+        objectType: 'LOCAL',
+        description: `Local ${symbol.type} ${symbol.name}`,
+        package: 'LOCAL',
+        error: 'No system resolution available for this symbol type',
+      } as AbapSystemInfo,
+    };
   }
 }
 
@@ -829,14 +806,11 @@ export async function handleGetAbapSystemSymbols(
     return response;
   } catch (error) {
     logger?.error('Failed to resolve ABAP system symbols', error as any);
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: error instanceof Error ? error.message : String(error),
-        },
-      ],
-    };
+    // A credential failure as the chain made it, a carried error as it is,
+    // a throw of our own `client_threw` — never its message as bare text.
+    return answerCaught(error, {
+      tool: 'GetAbapSystemSymbols',
+      detail: 'terse',
+    });
   }
 }

@@ -15,6 +15,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import { answerCaught, answerRequestThrown } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   makeAdtRequest,
@@ -211,16 +212,27 @@ export async function handleGetTransport(
     logger?.debug(`GET from: ${url}`);
 
     // Get transport request
-    const response = await makeAdtRequest(
-      connection,
-      url,
-      'GET',
-      // No deadline of the server's: the request waits for SAP's answer.
-      0,
-      undefined,
-      undefined,
-      headers,
-    );
+    let response: Awaited<ReturnType<typeof makeAdtRequest>>;
+    try {
+      response = await makeAdtRequest(
+        connection,
+        url,
+        'GET',
+        // No deadline of the server's: the request waits for SAP's answer.
+        0,
+        undefined,
+        undefined,
+        headers,
+      );
+    } catch (error) {
+      // The request's error as SAP answered it, with its step — a
+      // credential failure as the chain made it.
+      return answerRequestThrown(
+        error,
+        { method: 'GET', url },
+        'read transport request',
+      );
+    }
 
     logger?.debug(`GetTransport response status: ${response.status}`);
 
@@ -248,6 +260,8 @@ export async function handleGetTransport(
       config: response.config,
     });
   } catch (error) {
-    return return_error(error);
+    // Not the request's failure (answered above): ours, such as a document
+    // we could not read.
+    return answerCaught(error, { tool: 'GetTransport', detail: 'terse' });
   }
 }

@@ -79,6 +79,14 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
         object_name: obj.name,
         object_type: type,
       });
+      // A credential failure is every object's: the call ends with it as it
+      // came, before any second search is sent.
+      const typedFailure = failedPayloadOf(
+        res as { isError?: boolean; content?: unknown },
+        'search',
+      );
+      if (typedFailure !== undefined && isCredentialPayload(typedFailure))
+        return res;
       let parsed: any;
       try {
         parsed = typeof res === 'string' ? JSON.parse(res) : res;

@@ -4,7 +4,6 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   type FailureEntry,
   failureEntry,
-  failurePayload,
   isCredentialFailure,
   isCredentialPayload,
   thrownEntry,
@@ -823,12 +822,9 @@ export async function handleGetEnhancements(
                   type: mainEnhancementResponse.object_type,
                 },
                 include_nested: true,
-                // A refusal: the method's error as it is, with its step.
-                error: (() => {
-                  const carried = methodFailureOf(error);
-                  if (carried !== undefined) return failurePayload(carried);
-                  return error instanceof Error ? error.message : String(error);
-                })(),
+                // A refusal: the method's error as it is, with its step; a
+                // throw of our own `client_threw` with the step.
+                error: thrownEntry(error, 'list includes'),
                 partial_result: true,
                 total_objects_analyzed: 1,
                 total_enhancements_found:

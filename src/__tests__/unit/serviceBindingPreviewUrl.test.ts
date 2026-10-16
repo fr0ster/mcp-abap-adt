@@ -331,7 +331,13 @@ describe('GetServiceBindingPreviewUrl', () => {
   it('still answers the URL when the system record cannot be read, and says so', async () => {
     // `getSystemInformation` answers null where the endpoint is absent and
     // THROWS on anything else. Neither is this tool's failure.
-    systemInfo.mockRejectedValue(new Error('403 Forbidden'));
+    // Beside the URL, the lookup's failure is the request's error as SAP
+    // answered it, with its step — not its message folded into a sentence.
+    systemInfo.mockRejectedValue(
+      Object.assign(new Error('Request failed with status code 403'), {
+        response: { status: 403, data: 'Forbidden body' },
+      }),
+    );
     fakeClient = clientFor({
       binding: BINDING,
       definition: DEFINITION,
@@ -343,7 +349,47 @@ describe('GetServiceBindingPreviewUrl', () => {
     expect(payload.success).toBe(true);
     expect(payload.preview_url).toContain('/feap/');
     expect(payload.preview_url).not.toContain('sap-client');
-    expect(payload.note).toContain('403 Forbidden');
+    expect(payload.system_information_failure).toEqual({
+      message: 'Request failed with status code 403',
+      origin: 'connection',
+      status: 403,
+      request: {
+        method: 'GET',
+        url: '/sap/bc/adt/core/http/systeminformation',
+      },
+      messages: [{ type: 'E', text: 'Request failed with status code 403' }],
+      raw_body: 'Forbidden body',
+      step: 'read system information',
+    });
+    expect(payload.note).toContain('could not be read');
+    expect(payload.note).not.toContain('status code 403');
+  });
+
+  it('a 401 SAP answered to the lookup ends the call with it; the binding is not read', async () => {
+    systemInfo.mockRejectedValue(
+      Object.assign(new Error('Request failed with status code 401'), {
+        response: { status: 401, data: '' },
+      }),
+    );
+    const reads: unknown[] = [];
+    fakeClient = fakeClientOf({
+      read: async (...args: unknown[]) => {
+        reads.push(args);
+        return okResponse(reading(BINDING));
+      },
+    });
+
+    const answered: any = await handleGetServiceBindingPreviewUrl(
+      context as never,
+      { service_binding_name: 'ZSB_STUDENT_V2' } as never,
+    );
+
+    expect(answered.isError).toBe(true);
+    expect(JSON.parse(answered.content[0].text)).toMatchObject({
+      status: 401,
+      step: 'read system information',
+    });
+    expect(reads).toEqual([]);
   });
 
   it('prefers the URL the system names over the one a rule composes', async () => {

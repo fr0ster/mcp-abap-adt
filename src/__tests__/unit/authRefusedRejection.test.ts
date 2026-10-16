@@ -278,6 +278,11 @@ describe('a direct request the credential refused ends the call as the credentia
     }) as any;
 
   it('GetInclude: the chain answer, not its message as text', async () => {
+    fakeClient = fakeClientOf({
+      getInclude: async () => {
+        throw refused();
+      },
+    });
     const result = await handleGetInclude(
       { connection: refusing(), logger: undefined } as any,
       { include_name: 'ZINC' },

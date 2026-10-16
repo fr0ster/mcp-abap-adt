@@ -1,6 +1,11 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import {
+  answer,
+  failedPayloadOf,
+  isCredentialPayload,
+  type McpResult,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
@@ -80,10 +85,20 @@ function ok(node: TreeNode): IAdtResponse<TreeNode, IAdtError> {
  * files were migrated together in this task, so the contract between them is
  * updated on both ends rather than one side guessing at the other's old shape.
  */
+/**
+ * Where a credential failure the enrichment search answered is kept: every
+ * further request would be refused again, so the call ends with that answer
+ * as it came (the tree is not read).
+ */
+interface Ended {
+  answer?: McpResult;
+}
+
 async function enrichNodeWithSearchObject(
   context: HandlerContext,
   objectType: string,
   objectName: string,
+  ended: Ended,
   fallbackDescription?: string,
 ): Promise<{ packageName?: string; description?: string; type: string }> {
   let packageName: string | undefined;
@@ -95,6 +110,11 @@ async function enrichNodeWithSearchObject(
       object_type: objectType,
       maxResults: 1,
     });
+    const failure = failedPayloadOf(searchResult, 'search');
+    if (failure !== undefined && isCredentialPayload(failure)) {
+      ended.answer = searchResult as McpResult;
+      return { packageName, description, type };
+    }
     if (!searchResult.isError && Array.isArray(searchResult.content)) {
       for (const entry of searchResult.content) {
         if (!('text' in entry) || typeof entry.text !== 'string') continue;
@@ -173,10 +193,14 @@ async function buildTree(
   depth: number,
   maxDepth: number,
   enrich: boolean,
+  ended: Ended,
 ): Promise<IAdtResponse<TreeNode, IAdtError>> {
   const enrichment = enrich
-    ? await enrichNodeWithSearchObject(context, objectType, objectName)
+    ? await enrichNodeWithSearchObject(context, objectType, objectName, ended)
     : { type: objectType, description: undefined, packageName: undefined };
+  // The credential failure ends the walk; the handler answers it as it came.
+  if (ended.answer !== undefined)
+    return ok({ OBJECT_TYPE: objectType, OBJECT_NAME: objectName });
 
   const children: TreeNode[] = [];
 
@@ -223,7 +247,9 @@ async function buildTree(
             depth + 1,
             maxDepth,
             enrich,
+            ended,
           );
+          if (ended.answer !== undefined) return subtree;
           if (!subtree.ok) {
             return subtree as IAdtResponse<TreeNode, IAdtError>;
           }
@@ -282,7 +308,8 @@ export async function handleGetObjectInfo(
   // no `.raw` for `detail: 'raw'` to answer without changing that shared
   // strategy. This tool's own answer besides is a composite tree assembled
   // from several such calls (`buildTree`, recursive), not one reading.
-  return answer(
+  const ended: Ended = {};
+  const answered = await answer(
     { tool: 'GetObjectInfo', detail: 'terse' },
     () =>
       buildTree(
@@ -293,7 +320,9 @@ export async function handleGetObjectInfo(
         0,
         maxDepth,
         enrich,
+        ended,
       ),
     (tree: TreeNode) => tree,
   );
+  return ended.answer ?? answered;
 }

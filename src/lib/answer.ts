@@ -6,7 +6,12 @@
  * only this file's: a handler that did it itself would repeat four lines per tool and
  * throw away everything the error contract carries.
  */
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  ADT_NO_FAILURE,
+  type IAdtError,
+  type IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
 import {
   answerRead,
   failurePayload as chainFailurePayload,
@@ -410,4 +415,87 @@ export async function answer<T>(
     // point a reader at the projection for a defect that may be in any of them.
     return local('adapter_threw', ctx, messageOf(thrown), thrown);
   }
+}
+
+/**
+ * A throw caught by a handler that works by throws, as the consumer gets it:
+ * a carried method error as it is with its step, a chain failure as the
+ * chain made it — and anything else the method's own failure,
+ * `client_threw`, never its message as bare text.
+ */
+export function answerCaught(thrown: unknown, ctx: AnswerContext): McpResult {
+  // Only our own throws carry an error (`carryingFailure`); a chain failure
+  // never does, and `answerThrown` reads it first.
+  const carried = methodFailureOf(thrown);
+  if (carried !== undefined) return answerFailure(carried, ctx);
+  return answerThrown(thrown, ctx);
+}
+
+/** What a direct request asked: its method and its url, as sent. */
+export interface SentRequest {
+  method: string;
+  url: string;
+}
+
+/**
+ * A direct request's throw (`makeAdtRequest`, for a resource no adt-clients
+ * member reads) as the method's error: read the way adt-clients reads a
+ * request that threw (`recogniseFailure`) and enriched by the strategy every
+ * read passes (`analyseException`) — SAP's status, `adt_type`, T100
+ * `messages` and body, with the request. `undefined` for a chain failure,
+ * which its own reader answers as it came.
+ */
+export function requestFailureOf(
+  thrown: unknown,
+  sent: SentRequest,
+): IAdtError | undefined {
+  if (failureOf(thrown) !== undefined) return undefined;
+  const carried =
+    thrown !== null && typeof thrown === 'object'
+      ? (thrown as { message?: unknown; response?: unknown })
+      : undefined;
+  const message =
+    typeof carried?.message === 'string'
+      ? carried.message
+      : typeof thrown === 'string'
+        ? thrown
+        : 'The request did not complete';
+  const verdict = {
+    origin: 'connection',
+    message,
+    response: carried?.response,
+    request: { method: sent.method, url: sent.url },
+  } as IAdtError;
+  const read = analyseException(
+    verdict,
+    carried?.response as Parameters<typeof analyseException>[1],
+  );
+  return read === ADT_NO_FAILURE ? verdict : read;
+}
+
+/**
+ * A direct request's throw, answered: a chain failure as it came, anything
+ * else the request's error as SAP answered it, with the step.
+ */
+export function answerRequestThrown(
+  thrown: unknown,
+  sent: SentRequest,
+  step: string,
+): McpResult {
+  const read = failureOf(thrown);
+  if (read !== undefined) return answerRead(read);
+  return answerFailure(
+    withStep(requestFailureOf(thrown, sent) as IAdtError, step),
+  );
+}
+
+/** A direct request's throw as an entry: the chain's payload, or the request's error, with the step. */
+export function requestThrownEntry(
+  thrown: unknown,
+  sent: SentRequest,
+  step: string,
+): FailureEntry {
+  const read = failureOf(thrown);
+  if (read !== undefined) return { ...chainFailurePayload(read), step };
+  return failureEntry(requestFailureOf(thrown, sent) as IAdtError, step);
 }

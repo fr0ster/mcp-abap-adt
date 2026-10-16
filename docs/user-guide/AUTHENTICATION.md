@@ -379,7 +379,16 @@ it arose. A tool never rewrites it:
   and no `raw_body`.
 - **The method failed** — a throw in the client, a reading or the tool itself (a document it
   could not parse, a defect): `error: "client_threw"` and the thrown message, with no `origin`
-  — it is not presented as SAP's answer.
+  — it is not presented as SAP's answer. The tools that only parse the source they are given
+  and send no request (`GetAbapAST` with `step: "parse"`, `GetAbapSemanticAnalysis` with
+  `step: "analyse"`) answer a throw of their parser this way.
+- **A tool that sends its own request** (`GetTypeInfo`, `GetTransport`,
+  `GetObjectNodeFromCache`: a resource no client method reads) answers SAP's refusal in the
+  same shape, read the way a client method reads one — `request` is the request it sent and
+  `step` names it (`read domain`, `read data element`, `read table type`, `read repository
+  information`, `read structure`; `read transport request`; `read OBJECT_URI`). A
+  `GetObjectNodeFromCache` whose `OBJECT_URI` read was refused fails the call with it; the
+  node is not answered with the failure as its content.
 - **Our own wait ran out** — a tool that waits a bounded number of polls for SAP (a unit-test
   include's activation run: 6) and gives up says so in plain words, as the method's failure
   (`client_threw`), never as SAP's refusal.
@@ -394,12 +403,16 @@ it arose. A tool never rewrites it:
 **Several failures in one answer.** Each is an entry in the shape above, with its step — never
 folded into one text:
 
-- a tool that reads a list of items — `SearchSource`, `DescribeByList`, `GetAbapSystemSymbols`
-  — does not end the call at the first refusal: each item that failed carries its failure
-  (`failures[]` with the object for `SearchSource`, `{ name, error }` for `DescribeByList`,
-  `error` on the symbol for `GetAbapSystemSymbols`) beside the other items' results, and the
-  rest are read on — except a credential failure (an authentication failure, a `401`): the
-  credentials are the same for every item, so it ends the whole call, as it came;
+- a tool that reads a list of items — `SearchSource`, `DescribeByList`, `GetAbapSystemSymbols`,
+  `GetIncludesList` — does not end the call at the first refusal: each item that failed carries
+  its failure (`failures[]` with the object for `SearchSource`, `{ name, error }` for
+  `DescribeByList`, `error` on the symbol for `GetAbapSystemSymbols` — a throw while resolving
+  one included, as `client_threw` with its step —, `unreadable` beside the tree for
+  `GetIncludesList`) beside the other items' results, and the rest are read on — except a
+  credential failure (an authentication failure, a `401`): the credentials are the same for
+  every item, so it ends the whole call, as it came, and no further request is sent
+  (`DescribeByList` sends no second, untyped search after it; `GetObjectInfo` reads no tree
+  after its enrichment search was refused so);
 - a tool that tries two endpoints — `GetStructuresList` reads a name as a structure, then as a
   table — answers both failures in one array (`read structure`, `read table`) when neither
   has it; a `404` from both stays absence; an append candidate that where-used named and SAP
@@ -409,7 +422,11 @@ folded into one text:
   is listed in `includes_unread` (`{ include, step: 'read enhancements', failures }`), beside the
   other includes' results, not swallowed; a credential failure ends the call, as it came;
 - a probe that was refused rather than finding nothing (`GetEnhancements`' `unreadable`; its
-  enhancements request itself is read the same way, step `read enhancements`), a
+  enhancements request itself is read the same way, step `read enhancements`; a nested walk
+  that failed as a whole is `error` beside the partial result, step `list includes`), the
+  system lookup `GetServiceBindingPreviewUrl` makes for the client and the language
+  (`system_information_failure`, step `read system information`, beside the URL; a `401` there
+  ends the call), a
   refused typing of a new transport task (`CreateTransportTask`'s `task_type_error`), and
   what a debugger stop could not undo (see [DEBUGGER.md](DEBUGGER.md#what-ends-a-session)).
   A credential failure is none of these. A `401` on `CreateTransportTask`'s task type change is

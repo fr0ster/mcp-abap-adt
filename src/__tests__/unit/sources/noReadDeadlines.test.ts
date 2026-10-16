@@ -161,11 +161,11 @@ describe('no built-in deadline on the server reads', () => {
     const reads = scans.flatMap((s) =>
       s.calls.filter((c) => c.callee === 'makeAdtRequest'),
     );
-    // 5 calls today (SearchSource's include and function-module reads,
-    // GetEnhancements' probes and elements read, and the enhancement spot and
-    // plugin reads go through adt-clients); the floor keeps the scan from
-    // passing on an empty set.
-    expect(reads.length).toBeGreaterThanOrEqual(5);
+    // 4 calls today (GetTypeInfo's lookups, GetTransport,
+    // GetObjectNodeFromCache and the enhancement availability probe;
+    // GetInclude reads through adt-clients since 19.0.0); the floor keeps the
+    // scan from passing on an empty set.
+    expect(reads.length).toBeGreaterThanOrEqual(4);
   });
 
   it('every makeAdtRequest call passes no deadline (0)', () => {

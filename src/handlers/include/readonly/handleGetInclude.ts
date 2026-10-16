@@ -1,16 +1,11 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
-import { isCredentialFailure } from '../../../lib/answer';
+import { answer } from '../../../lib/answer';
+import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  makeAdtRequest,
-  return_error,
-} from '../../../lib/utils';
-
-// TODO: Migrate to infrastructure module
-// This handler uses direct ADT endpoint: /sap/bc/adt/programs/includes/{name}/source/main
-// AdtClient doesn't have readInclude() method
-// Need infrastructure.readInclude() that returns source code
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetInclude',
@@ -24,44 +19,19 @@ export const TOOL_DEFINITION = {
 
 export async function handleGetInclude(context: HandlerContext, args: any) {
   const { connection, logger } = context;
-  try {
-    if (!args?.include_name) {
-      return return_error('Include name is required');
-    }
-    const url = `/sap/bc/adt/programs/includes/${encodeSapObjectName(args.include_name)}/source/main`;
-    logger?.info(`Fetching include: ${args.include_name}`);
-    const response = await makeAdtRequest(
-      connection,
-      url,
-      'GET',
-      // No deadline of the server's: the request waits for SAP's answer.
-      0,
-    );
-    const plainText = response.data;
-    logger?.info(`✅ GetInclude completed: ${args.include_name}`);
-    return {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: plainText,
-        },
-      ],
-    };
-  } catch (error) {
-    // A credential failure is the chain's answer, as it came: never reworded.
-    if (isCredentialFailure(error)) return return_error(error);
-    logger?.error(
-      `Error getting include ${args?.include_name ?? ''}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: error instanceof Error ? error.message : String(error),
-        },
-      ],
-    };
+  if (!args?.include_name) {
+    return return_error('Include name is required');
   }
+  logger?.info(`Fetching include: ${args.include_name}`);
+  // The adt-clients member, answered by `answer()`: SAP's refusal is the
+  // method's error as it is, a credential failure the chain's answer, a throw
+  // of our own `client_threw`.
+  return answer(
+    { tool: 'GetInclude', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getUtils(ourUtils)
+        .getInclude(args.include_name, { analyse: analyseException }),
+    (source: AdtReading<string>) => source.raw,
+  );
 }

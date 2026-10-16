@@ -45,6 +45,12 @@ activates the group afterwards.
   description tell the LLM that in batch mode a call returns nothing, that calls
   are numbered in the order made, and that the answers are read by number once
   `BatchEnd` has run.
+- **Every package has batch mode.** The full, read-only and compact sets all
+  serve `BatchBegin`, `BatchEnd` and the answer tool; what a set can do in batch
+  mode is whatever of its tools send one request — reads everywhere, and in
+  compact the low-level create, lock, update and unlock as well. LOCK and UNLOCK
+  go in stateful envelopes, everything else stateless, as adt-clients' batch
+  connection sends them (measured there).
 - **The debugger has its own batch mode**, on its own stateful connection and
   `/sap/bc/adt/debugger/batch`, separate from the communication batch.
 

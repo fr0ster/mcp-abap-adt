@@ -1,0 +1,670 @@
+[
+  {
+    "tool": "GetPackage",
+    "set": "full",
+    "handler": "src/handlers/package/high/handleGetPackage.ts#handleGetPackage",
+    "sends": "GET /sap/bc/adt/packages/{name}?version=active"
+  },
+  {
+    "tool": "GetDomain",
+    "set": "full",
+    "handler": "src/handlers/domain/high/handleGetDomain.ts#handleGetDomain",
+    "sends": "GET /sap/bc/adt/ddic/domains/{name}"
+  },
+  {
+    "tool": "GetDataElement",
+    "set": "full",
+    "handler": "src/handlers/data_element/high/handleGetDataElement.ts#handleGetDataElement",
+    "sends": "GET /sap/bc/adt/ddic/dataelements/{name}"
+  },
+  {
+    "tool": "GetTable",
+    "set": "full",
+    "handler": "src/handlers/table/high/handleGetTable.ts#handleGetTable",
+    "sends": "GET /sap/bc/adt/ddic/tables/{name}/source/main?version=active"
+  },
+  {
+    "tool": "GetStructure",
+    "set": "full",
+    "handler": "src/handlers/structure/high/handleGetStructure.ts#handleGetStructure",
+    "sends": "GET /sap/bc/adt/ddic/structures/{name}/source/main?version=active"
+  },
+  {
+    "tool": "GetDdl",
+    "set": "full",
+    "handler": "src/handlers/ddl/high/handleGetDdl.ts#handleGetDdl",
+    "sends": "GET /sap/bc/adt/ddic/ddl/sources/{name}/source/main?version=active"
+  },
+  {
+    "tool": "GetServiceDefinition",
+    "set": "full",
+    "handler": "src/handlers/service_definition/high/handleGetServiceDefinition.ts#handleGetServiceDefinition",
+    "sends": "GET /sap/bc/adt/ddic/srvd/sources/{name}/source/main?version=active"
+  },
+  {
+    "tool": "GetServiceBinding",
+    "set": "full",
+    "handler": "src/handlers/service_binding/high/handleGetServiceBinding.ts#handleGetServiceBinding",
+    "sends": "GET /sap/bc/adt/businessservices/bindings/{name}"
+  },
+  {
+    "tool": "ListServiceBindingTypes",
+    "set": "full",
+    "handler": "src/handlers/service_binding/high/handleListServiceBindingTypes.ts#handleListServiceBindingTypes",
+    "sends": "GET /sap/bc/adt/businessservices/bindings/bindingtypes"
+  },
+  {
+    "tool": "GetClass",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetClass.ts#handleGetClass",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/source/main?version=active"
+  },
+  {
+    "tool": "GetLocalTestClass",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetLocalTestClass.ts#handleGetLocalTestClass",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/testclasses?version=active"
+  },
+  {
+    "tool": "GetLocalTypes",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetLocalTypes.ts#handleGetLocalTypes",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/implementations?version=active"
+  },
+  {
+    "tool": "GetLocalDefinitions",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetLocalDefinitions.ts#handleGetLocalDefinitions",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/definitions?version=active"
+  },
+  {
+    "tool": "GetLocalMacros",
+    "set": "full",
+    "handler": "src/handlers/class/high/handleGetLocalMacros.ts#handleGetLocalMacros",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/macros?version=active"
+  },
+  {
+    "tool": "GetProgram",
+    "set": "full",
+    "handler": "src/handlers/program/high/handleGetProgram.ts#handleGetProgram",
+    "sends": "GET /sap/bc/adt/programs/programs/{name}/source/main?version=active"
+  },
+  {
+    "tool": "GetInterface",
+    "set": "full",
+    "handler": "src/handlers/interface/high/handleGetInterface.ts#handleGetInterface",
+    "sends": "GET /sap/bc/adt/oo/interfaces/{name}/source/main?version=active"
+  },
+  {
+    "tool": "GetFunctionGroup",
+    "set": "full",
+    "handler": "src/handlers/function_group/high/handleGetFunctionGroup.ts#handleGetFunctionGroup",
+    "sends": "GET /sap/bc/adt/functions/groups/{name}"
+  },
+  {
+    "tool": "GetBehaviorDefinition",
+    "set": "full",
+    "handler": "src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts#handleGetBehaviorDefinition",
+    "sends": "GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main?version=active"
+  },
+  {
+    "tool": "GetBehaviorImplementation",
+    "set": "full",
+    "handler": "src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts#handleGetBehaviorImplementation",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/source/main?version=active"
+  },
+  {
+    "tool": "GetMetadataExtension",
+    "set": "full",
+    "handler": "src/handlers/metadata_extension/high/handleGetMetadataExtension.ts#handleGetMetadataExtension",
+    "sends": "GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main"
+  },
+  {
+    "tool": "GetMessageClass",
+    "set": "full",
+    "handler": "src/handlers/message_class/high/handleGetMessageClass.ts#handleGetMessageClass",
+    "sends": "GET /sap/bc/adt/messageclass/{name}"
+  },
+  {
+    "tool": "GetMessageClassMessage",
+    "set": "full",
+    "handler": "src/handlers/message_class/high/handleGetMessageClassMessage.ts#handleGetMessageClassMessage",
+    "sends": "GET /sap/bc/adt/messageclass/{name}, the message picked from it locally"
+  },
+  {
+    "tool": "ReadPackage",
+    "set": "full",
+    "handler": "src/handlers/package/readonly/handleReadPackage.ts#handleReadPackage",
+    "sends": "GET /sap/bc/adt/packages/{name}?version=active"
+  },
+  {
+    "tool": "ReadDomain",
+    "set": "full",
+    "handler": "src/handlers/domain/readonly/handleReadDomain.ts#handleReadDomain",
+    "sends": "GET /sap/bc/adt/ddic/domains/{name}"
+  },
+  {
+    "tool": "ReadDataElement",
+    "set": "full",
+    "handler": "src/handlers/data_element/readonly/handleReadDataElement.ts#handleReadDataElement",
+    "sends": "GET /sap/bc/adt/ddic/dataelements/{name}"
+  },
+  {
+    "tool": "ReadFunctionGroup",
+    "set": "full",
+    "handler": "src/handlers/function_group/readonly/handleReadFunctionGroup.ts#handleReadFunctionGroup",
+    "sends": "GET /sap/bc/adt/functions/groups/{name}"
+  },
+  {
+    "tool": "ReadMessageClass",
+    "set": "full",
+    "handler": "src/handlers/message_class/readonly/handleReadMessageClass.ts#handleReadMessageClass",
+    "sends": "GET /sap/bc/adt/messageclass/{name}"
+  },
+  {
+    "tool": "ReadMessageClassMessage",
+    "set": "full",
+    "handler": "src/handlers/message_class/readonly/handleReadMessageClassMessage.ts#handleReadMessageClassMessage",
+    "sends": "GET /sap/bc/adt/messageclass/{name}, the message picked from it locally"
+  },
+  {
+    "tool": "GetInclude",
+    "set": "full",
+    "handler": "src/handlers/include/readonly/handleGetInclude.ts#handleGetInclude",
+    "sends": "GET /sap/bc/adt/programs/includes/{name}/source/main"
+  },
+  {
+    "tool": "GetTransport",
+    "set": "full",
+    "handler": "src/handlers/transport/readonly/handleGetTransport.ts#handleGetTransport",
+    "sends": "GET /sap/bc/adt/cts/transportrequests/{number}?includeObjects=…&includeTasks=…"
+  },
+  {
+    "tool": "ReadTransportObjects",
+    "set": "full",
+    "handler": "src/handlers/transport/readonly/handleReadTransportObjects.ts#handleReadTransportObjects",
+    "sends": "GET /sap/bc/adt/cts/transportrequests/{number}"
+  },
+  {
+    "tool": "ReadTransportActionLog",
+    "set": "full",
+    "handler": "src/handlers/transport/readonly/handleReadTransportActionLog.ts#handleReadTransportActionLog",
+    "sends": "GET /sap/bc/adt/cts/transportrequests/{number}/actionlogs"
+  },
+  {
+    "tool": "GetObjectVersions",
+    "set": "full",
+    "handler": "src/handlers/common/readonly/handleGetObjectVersions.ts#handleGetObjectVersions",
+    "sends": "GET the versions feed of the object (…/versions)"
+  },
+  {
+    "tool": "GetObjectVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/readonly/handleGetObjectVersionSource.ts#handleGetObjectVersionSource",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetClassVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/oo/classes/{name}/includes/main/versions"
+  },
+  {
+    "tool": "GetProgramVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/programs/programs/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetInterfaceVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/oo/interfaces/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetFunctionModuleVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetTableVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/tables/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetStructureVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/structures/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetDdlVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/ddl/sources/{name}/versions"
+  },
+  {
+    "tool": "GetBehaviorDefinitionVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetMetadataExtensionVersions",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main/versions"
+  },
+  {
+    "tool": "GetClassVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetProgramVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetInterfaceVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetFunctionModuleVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetTableVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetStructureVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetDdlVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetBehaviorDefinitionVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "GetMetadataExtensionVersionSource",
+    "set": "full",
+    "handler": "src/handlers/common/high/objectVersionTools.ts#buildObjectVersionTools",
+    "sends": "GET the content_uri given"
+  },
+  {
+    "tool": "SearchObject",
+    "set": "full",
+    "handler": "src/handlers/search/readonly/handleSearchObject.ts#handleSearchObject",
+    "sends": "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]"
+  },
+  {
+    "tool": "GetObjectsByType",
+    "set": "full",
+    "handler": "src/handlers/search/readonly/handleGetObjectsByType.ts#handleGetObjectsByType",
+    "sends": "POST /sap/bc/adt/repository/nodestructure for the one node asked"
+  },
+  {
+    "tool": "GetObjectStructure",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetObjectStructure.ts#handleGetObjectStructure",
+    "sends": "GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=…"
+  },
+  {
+    "tool": "GetInactiveObjects",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetInactiveObjects.ts#handleGetInactiveObjects",
+    "sends": "GET /sap/bc/adt/activation/inactiveobjects"
+  },
+  {
+    "tool": "GetAdtTypes",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetAllTypes.ts#handleGetAdtTypes",
+    "sends": "GET /sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider"
+  },
+  {
+    "tool": "GetSqlQuery",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetSqlQuery.ts#handleGetSqlQuery",
+    "sends": "POST /sap/bc/adt/datapreview/freestyle?rowNumber=N with the SQL as the body"
+  },
+  {
+    "tool": "GetTableContents",
+    "set": "full",
+    "handler": "src/handlers/table/readonly/handleGetTableContents.ts#handleGetTableContents",
+    "sends": "POST /sap/bc/adt/datapreview/ddic?rowNumber=N&ddicEntityName=…"
+  },
+  {
+    "tool": "GetATCRunStatus",
+    "set": "full",
+    "handler": "src/handlers/atc/high/handleGetATCRunStatus.ts#handleGetATCRunStatus",
+    "sends": "GET /sap/bc/adt/atc/runs/{id}"
+  },
+  {
+    "tool": "GetATCFindings",
+    "set": "full",
+    "handler": "src/handlers/atc/high/handleGetATCFindings.ts#handleGetATCFindings",
+    "sends": "GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false"
+  },
+  {
+    "tool": "RuntimeListProfilerTraceFiles",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts#handleRuntimeListProfilerTraceFiles",
+    "sends": "GET /sap/bc/adt/runtime/traces/abaptraces"
+  },
+  {
+    "tool": "RuntimeGetProfilerTraceData",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts#handleRuntimeGetProfilerTraceData",
+    "sends": "GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses"
+  },
+  {
+    "tool": "RuntimeAnalyzeProfilerTrace",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts#handleRuntimeAnalyzeProfilerTrace",
+    "sends": "GET …/abaptraces/{id}/hitlist or /statements, summarised locally"
+  },
+  {
+    "tool": "RuntimeGetDumpById",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetDumpById.ts#handleRuntimeGetDumpById",
+    "sends": "GET /sap/bc/adt/runtime/dump/{id} (the view asked)"
+  },
+  {
+    "tool": "RuntimeListSystemMessages",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeListSystemMessages.ts#handleRuntimeListSystemMessages",
+    "sends": "GET /sap/bc/adt/runtime/systemmessages"
+  },
+  {
+    "tool": "RuntimeGetGatewayErrorLog",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts#handleRuntimeGetGatewayErrorLog",
+    "sends": "GET /sap/bc/adt/gw/errorlog, or the error_url given"
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET the type's source, or its metadata document where it has no source (as the full set's Get<Type>)",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "source"
+        ]
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "TRANSPORT",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING",
+          "CLASS",
+          "LOCAL_TEST_CLASS",
+          "LOCAL_TYPES",
+          "LOCAL_DEFINITIONS",
+          "LOCAL_MACROS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET the metadata document (as ReadPackage, ReadDomain, ReadDataElement, ReadFunctionGroup)",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "metadata"
+        ]
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "FUNCTION_GROUP"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=…",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "object_structure"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "POST /sap/bc/adt/repository/nodestructure for the one node asked (a package's blank answer is checked with a second read, so DEVC/K is not listed)",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "node_structure"
+        ]
+      },
+      {
+        "argument": "object_adt_type",
+        "notEquals": [
+          "DEVC/K"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "POST /sap/bc/adt/repository/informationsystem/virtualfolders/contents",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "virtual_folders"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerSearch",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
+    "sends": "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]"
+  },
+  {
+    "tool": "HandlerGetData",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGetData.ts#handleHandlerGetData",
+    "sends": "POST /sap/bc/adt/datapreview/freestyle (sql_query) or /datapreview/ddic (object_name)"
+  },
+  {
+    "tool": "HandlerProfileList",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerProfileList.ts#handleHandlerProfileList",
+    "sends": "GET /sap/bc/adt/runtime/traces/abaptraces"
+  },
+  {
+    "tool": "HandlerProfileView",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerProfileView.ts#handleHandlerProfileView",
+    "sends": "GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses (mode analyze: summarised locally)"
+  },
+  {
+    "tool": "HandlerDumpView",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerDumpView.ts#handleHandlerDumpView",
+    "sends": "GET /sap/bc/adt/runtime/dump/{id} (the view asked)"
+  },
+  {
+    "tool": "HandlerServiceBindingListTypes",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerServiceBindingListTypes.ts#handleHandlerServiceBindingListTypes",
+    "sends": "GET /sap/bc/adt/businessservices/bindings/bindingtypes"
+  },
+  {
+    "tool": "HandlerUnitTestStatus",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerUnitTestStatus.ts#handleHandlerUnitTestStatus",
+    "sends": "GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true"
+  },
+  {
+    "tool": "HandlerCdsUnitTestStatus",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerCdsUnitTestStatus.ts#handleHandlerCdsUnitTestStatus",
+    "sends": "GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true"
+  },
+  {
+    "tool": "HandlerLock",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerLock.ts#handleHandlerLock",
+    "sends": "POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "CLASS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerLock",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerLock.ts#handleHandlerLock",
+    "sends": "POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE"
+        ]
+      }
+    ],
+    "connection": "http"
+  },
+  {
+    "tool": "HandlerUnlock",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUnlock.ts#handleHandlerUnlock",
+    "sends": "POST {object uri}?_action=UNLOCK&lockHandle=…, stateful",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "CLASS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerUnlock",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUnlock.ts#handleHandlerUnlock",
+    "sends": "POST /sap/bc/adt/packages/{name}?_action=UNLOCK&lockHandle=…, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE"
+        ]
+      }
+    ],
+    "connection": "http"
+  },
+  {
+    "tool": "HandlerUpdate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUpdate.ts#handleHandlerUpdate",
+    "sends": "PUT the source under the lock_handle given ({object uri}/source/main?lockHandle=…[&corrNr=…])",
+    "when": [
+      {
+        "argument": "lock_handle",
+        "present": true
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "CLASS",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_MODULE",
+          "BEHAVIOR_DEFINITION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  }
+]

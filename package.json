@@ -239,6 +239,7 @@
   },
   "files": [
     "dist/",
+    "tools/batch-handlers.json",
     "docs/",
     "!docs/superpowers/",
     "README.md",

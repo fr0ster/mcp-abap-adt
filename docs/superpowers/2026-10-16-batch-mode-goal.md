@@ -63,8 +63,17 @@ activates the group afterwards.
   compact the low-level create, lock, update and unlock as well. LOCK and UNLOCK
   go in stateful envelopes, everything else stateless, as adt-clients' batch
   connection sends them (measured there).
-- **The debugger has its own batch mode**, on its own stateful connection and
-  `/sap/bc/adt/debugger/batch`, separate from the communication batch.
+- **The debugger has its own batch mode**, through its own pair of tools,
+  `DebugBatchBegin` and `DebugBatchEnd`, on `/sap/bc/adt/debugger/batch`. It
+  covers the session attached to the debuggee — the operations at a stop:
+  step, step to line, stack, variables, child variables, stack position,
+  setting a variable — and its answers are read by number as the communication
+  batch's are. Breakpoints, the listener and attaching run on other connections
+  and are not part of it. AMDP debugging is meant to be covered the same way,
+  and is confirmed by a test against a system before it is offered.
+- **One batch at a time.** The communication batch is for running requests in
+  parallel; debugging is exclusive. While either batch mode is on, beginning
+  the other is refused.
 
 ## What stays true
 

@@ -1,0 +1,339 @@
+/**
+ * A server instance with batch mode, for the BatchEnd / BatchAnswers / no-retry
+ * tests: a `BaseMcpServer` whose connection is built from a source (so a test
+ * can change the credential, or make the source fail), the shipped handlers of
+ * the tools a test names, and stand-ins of the batch tools over the real
+ * functions (`executeBatch`, `readAnswers`) — Task 7 serves the real tools.
+ *
+ * Each built connection is a fake (`envelopeConnection`): an envelope is
+ * answered part by part by the stand's `part` rule, a request outside a batch
+ * by the same rule; nothing reaches a system.
+ *
+ * The test file must mock `lib/connectionFactory` so `createAbapConnection`
+ * is the jest mock this helper drives:
+ *
+ *   jest.mock('../../../lib/connectionFactory', () => ({
+ *     createAbapConnection: jest.fn(),
+ *     systemKindOf: jest.fn(() => 'onprem'),
+ *   }));
+ */
+import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
+import type {
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { CompactModifyHandlersGroup } from '../../../compact-modify/src/group';
+import { CompactReadOnlyHandlersGroup } from '../../../compact-readonly-entries/src/group';
+import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
+import type { ConnectionSource } from '../../embeddable/ConnectionContext';
+import type { AnswerEntry } from '../../lib/batch/answers';
+import { batchAnswersAnswer, readAnswers } from '../../lib/batch/answers';
+import { batchEndAnswer, executeBatch } from '../../lib/batch/execute';
+import { InstanceBatch } from '../../lib/batch/InstanceBatch';
+import { LateBoundConnection } from '../../lib/batch/lateBound';
+import { createAbapConnection } from '../../lib/connectionFactory';
+import {
+  HighLevelHandlersGroup,
+  ReadOnlyHandlersGroup,
+  SearchHandlersGroup,
+  SystemHandlersGroup,
+} from '../../lib/handlers/groups';
+import type {
+  HandlerContext,
+  HandlerEntry,
+  IHandlerGroup,
+} from '../../lib/handlers/interfaces';
+import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
+import {
+  type EnvelopeAnswer,
+  envelopeConnection,
+  type InnerRequest,
+  type PartAnswer,
+  partByPart,
+  statusError,
+} from './batchEnvelope';
+import { LOCK_SUCCESS_XML } from './recordingConnection';
+
+export { LOCK_SUCCESS_XML };
+
+/** The lock handle `LOCK_SUCCESS_XML` carries. */
+export const LOCK_HANDLE_OF_XML = 'B92E65858E83454C783181344F429D4BFD8E395D';
+
+const silent = { info() {}, debug() {}, warn() {}, error() {} };
+
+export interface Answer {
+  content?: Array<{ type: string; text?: string }>;
+  isError?: boolean;
+}
+
+type Fake = ReturnType<typeof envelopeConnection>;
+
+/** A credential object: what the source answers; a new one replaces the connection. */
+export function credential(): IAuthProvider {
+  return {
+    kind: 'test',
+    prepare: async () => ({ ok: true as const }),
+    establish: async () => ({ ok: true as const }),
+    authorize: async () => ({ ok: true as const }),
+    rejected: async () => ({ ok: true as const }),
+  } as unknown as IAuthProvider;
+}
+
+/** A request outside a batch answered by the part rule: 2xx returned, anything else thrown as a connection throws it. */
+function directBy(part: (inner: InnerRequest) => PartAnswer) {
+  return async (request: IAbapRequestOptions): Promise<IAdtWireResponse> => {
+    const params = request.params
+      ? new URLSearchParams(request.params as Record<string, string>).toString()
+      : '';
+    const url =
+      request.url +
+      (params ? `${request.url.includes('?') ? '&' : '?'}${params}` : '');
+    const headers: Record<string, string> = {};
+    for (const [k, v] of Object.entries(request.headers ?? {})) {
+      headers[k.toLowerCase()] = String(v);
+    }
+    const answer = part({
+      method: request.method,
+      url,
+      headers,
+      body: request.data === undefined ? '' : String(request.data),
+    });
+    const response = {
+      status: answer.status,
+      statusText: answer.statusText ?? '',
+      headers: answer.headers ?? {},
+      data: answer.body ?? '',
+    };
+    if (answer.status >= 200 && answer.status < 300) {
+      return response as IAdtWireResponse;
+    }
+    throw statusError(
+      answer.status,
+      answer.statusText ?? '',
+      answer.body ?? '',
+      answer.headers ?? {},
+    );
+  };
+}
+
+/** The shipped entries named, each reading its own group's context. */
+function shippedGroup(names: string[]): IHandlerGroup[] {
+  const placeholder = {
+    connection: null,
+    logger: undefined,
+  } as unknown as HandlerContext;
+  const groups = [
+    new ReadOnlyHandlersGroup(placeholder),
+    new SearchHandlersGroup(placeholder),
+    new SystemHandlersGroup(placeholder),
+    new HighLevelHandlersGroup(placeholder),
+    new CompactReadOnlyHandlersGroup(placeholder),
+    new CompactModifyHandlersGroup(placeholder),
+  ];
+  return names.map((name) => {
+    for (const group of groups) {
+      const entry = group
+        .getHandlers()
+        .find((e) => e.toolDefinition.name === name);
+      if (entry === undefined) continue;
+      return {
+        getName: () => `shipped-${name}`,
+        getHandlers: () => [entry],
+        registerHandlers: () => {},
+        setContext: (context: HandlerContext) => {
+          (group as unknown as { context: HandlerContext }).context = context;
+        },
+      } as unknown as IHandlerGroup;
+    }
+    throw new Error(`no shipped group registers ${name}`);
+  });
+}
+
+/** Stand-ins of the batch tools, over the real functions. */
+function batchToolsGroup(owner: InstanceBatch): IHandlerGroup {
+  const entries: HandlerEntry[] = [
+    {
+      toolDefinition: {
+        name: 'BatchEnd',
+        description: 'BatchEnd',
+        inputSchema: { type: 'object', properties: {} },
+      },
+      handler: (async (context: HandlerContext, _args: unknown) =>
+        batchEndAnswer(
+          await executeBatch(
+            owner,
+            owner.opened()?.target ?? new LateBoundConnection(),
+            context.connection,
+          ),
+        )) as never,
+    } as HandlerEntry,
+    {
+      toolDefinition: {
+        name: 'BatchAnswers',
+        description: 'BatchAnswers',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            number: { type: 'number' },
+            numbers: { type: 'array', items: { type: 'number' } },
+          },
+        },
+      },
+      connectionless: true,
+      handler: (async (_context: HandlerContext, args: unknown) =>
+        batchAnswersAnswer(
+          readAnswers(owner, args as { number?: number; numbers?: number[] }),
+        )) as never,
+    } as HandlerEntry,
+  ];
+  return {
+    getName: () => 'batch-stand-ins',
+    getHandlers: () => entries,
+    registerHandlers: () => {},
+  } as unknown as IHandlerGroup;
+}
+
+class StandServer extends BaseMcpServer {
+  constructor(
+    groups: IHandlerGroup[],
+    owner: InstanceBatch,
+    source: ConnectionSource,
+  ) {
+    super({
+      name: 'batch-stand',
+      version: '1.0.0',
+      logger: silent as never,
+      systemType: 'onprem',
+      batch: owner,
+    });
+    this.registerHandlers(new CompositeHandlersRegistry(groups));
+    this.setConnectionContext({ kind: 'built', source, sessionId: 'dest-a' });
+  }
+}
+
+export interface Stand {
+  owner: InstanceBatch;
+  /** Every connection built, in order. */
+  built: Fake[];
+  /** The batch connection of the batch opened last. */
+  batch(): AdtBatchConnection;
+  /** Every `execute()` of every batch opened here. */
+  executes: jest.Mock;
+  /** Opens a communication batch, as BatchBegin will (Task 7). */
+  begin(): void;
+  /** The source answers a new credential object from the next call on. */
+  newCredential(): void;
+  /** The source's next `resolve` fails with `error`. */
+  failResolve(error: unknown): void;
+  call(name: string, args?: Record<string, unknown>): Promise<Answer>;
+  /** BatchEnd's answer, parsed. */
+  end(): Promise<{ answer: Answer; summary: Record<string, unknown> }>;
+  /** BatchAnswers' entries for `numbers`, parsed. */
+  answers(numbers: number[]): Promise<AnswerEntry[]>;
+  close(): Promise<void>;
+}
+
+export interface StandOptions {
+  tools: string[];
+  /** How SAP answers each inner request (and each request outside a batch). */
+  part: (inner: InnerRequest) => PartAnswer;
+  /** How each built connection answers an envelope; default part by part. */
+  envelope?: EnvelopeAnswer;
+  keepRawParts?: boolean;
+}
+
+/**
+ * `build` is the `createAbapConnection` jest mock of the test file.
+ */
+export async function batchStand(options: StandOptions): Promise<Stand> {
+  const build = createAbapConnection as unknown as jest.Mock;
+  const owner = new InstanceBatch({
+    keepRawParts: options.keepRawParts ?? false,
+  });
+  const built: Fake[] = [];
+  build.mockReset();
+  build.mockImplementation(() => {
+    const fake = envelopeConnection(
+      options.envelope ?? partByPart(options.part),
+      directBy(options.part),
+    );
+    built.push(fake);
+    return fake.connection;
+  });
+  let current = credential();
+  let failure: { error: unknown } | undefined;
+  const source: ConnectionSource = {
+    resolve: async () => {
+      const failing = failure;
+      failure = undefined;
+      if (failing !== undefined) throw failing.error;
+      return {
+        settings: { url: 'https://system.invalid', authType: 'jwt' },
+        credential: current,
+      } as never;
+    },
+  };
+  const server = new StandServer(
+    [...shippedGroup(options.tools), batchToolsGroup(owner)],
+    owner,
+    source,
+  );
+  const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+  const client = new Client({ name: 'batch-stand', version: '1.0.0' });
+  await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+  let last: AdtBatchConnection | undefined;
+  const executes = jest.fn();
+  const call = (name: string, args: Record<string, unknown> = {}) =>
+    client
+      .callTool({ name, arguments: args })
+      .then((answer) => answer as Answer);
+  return {
+    owner,
+    built,
+    batch: () => {
+      if (last === undefined) throw new Error('no batch begun');
+      return last;
+    },
+    executes,
+    begin: () => {
+      const target = new LateBoundConnection();
+      const batch = new AdtBatchConnection(target, {
+        endpoint: 'communication',
+      });
+      const execute = batch.execute.bind(batch);
+      batch.execute = (() => {
+        executes();
+        return execute();
+      }) as typeof batch.execute;
+      last = batch;
+      owner.begin('communication', { connection: batch, target, recorded: [] });
+    },
+    newCredential: () => {
+      current = credential();
+    },
+    failResolve: (error) => {
+      failure = { error };
+    },
+    call,
+    end: async () => {
+      const answer = await call('BatchEnd');
+      const text = answer.content?.[0]?.text ?? '{}';
+      return { answer, summary: JSON.parse(text) };
+    },
+    answers: async (numbers) => {
+      const answer = await call('BatchAnswers', { numbers });
+      return JSON.parse(answer.content?.[0]?.text ?? '[]');
+    },
+    close: async () => {
+      await client.close().catch(() => undefined);
+    },
+  };
+}
+
+/** The parsed JSON of an answer's first text. */
+export function payloadOf(answer: { content?: Array<{ text?: string }> }) {
+  return JSON.parse(answer.content?.[0]?.text ?? 'null');
+}

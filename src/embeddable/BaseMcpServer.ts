@@ -35,8 +35,12 @@ import {
   readBackground,
   withoutBackground,
 } from '../lib/backgroundRuns/tools.js';
-import { isBatchTool } from '../lib/batch/batchTools.js';
+import {
+  endsCommunicationBatch,
+  isBatchTool,
+} from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
+import { endBeforeExecute } from '../lib/batch/execute.js';
 import type { BatchAnswer, InstanceBatch } from '../lib/batch/InstanceBatch.js';
 import { createRecorder, untilSent } from '../lib/batch/recorder.js';
 import {
@@ -1178,6 +1182,13 @@ export abstract class BaseMcpServer extends McpServer {
             }
             let inUse: AbapConnection | undefined;
             let leaveFlow: (() => void) | undefined;
+            // The batch a `BatchEnd` call ends: the one open when it came.
+            const ending = endsCommunicationBatch(
+              entry.toolDefinition.name,
+              args,
+            )
+              ? this.batch?.opened()
+              : undefined;
             try {
               // A run tool's `background` is the wrapper's: read, refused
               // when it is not a boolean or when the host gave no strategy —
@@ -1388,15 +1399,23 @@ export abstract class BaseMcpServer extends McpServer {
               // stderr only.
               // The reader may be an override or a host's: guarded, so its
               // own throw answers fixed words, never itself.
-              const read = readGuarded((t) => this.readFailure(t), error);
-              if (read !== undefined) return answerRead(read);
               // An uncaught throw (connection setup, handler, transport) becomes a
               // structured result. return_error extracts the ADT response body,
               // which the SDK's own error.message would discard.
-              return return_error(error) as {
-                isError: true;
-                content: { type: 'text'; text: string }[];
-              };
+              const failed = this.refusalAnswer(error);
+              // `BatchEnd` failing before `execute()` — taking the connection,
+              // the system lookup — ends batch mode: every recorded call's
+              // answer is this failure, as the call answers it; nothing is
+              // sent. Failing after, its batch has already ended — and a
+              // batch begun since is not this call's to end.
+              if (
+                this.batch !== undefined &&
+                ending !== undefined &&
+                this.batch.opened() === ending
+              ) {
+                endBeforeExecute(this.batch, failed);
+              }
+              return failed;
             } finally {
               if (inUse !== undefined) this.connectionReleased(inUse);
               leaveFlow?.();

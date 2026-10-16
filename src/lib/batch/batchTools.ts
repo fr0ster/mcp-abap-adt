@@ -19,3 +19,18 @@ const LISTED = new Set(BATCH_TOOLS);
 export function isBatchTool(tool: string): boolean {
   return LISTED.has(tool);
 }
+
+/**
+ * Whether a call of `tool` with `args` ends the communication batch:
+ * `BatchEnd`, or `HandlerBatch` with `action: 'end'`. Its failure before
+ * `execute()` ends the batch (`endBeforeExecute`).
+ */
+export function endsCommunicationBatch(tool: string, args: unknown): boolean {
+  if (tool === 'BatchEnd') return true;
+  return (
+    tool === 'HandlerBatch' &&
+    args !== null &&
+    typeof args === 'object' &&
+    (args as { action?: unknown }).action === 'end'
+  );
+}

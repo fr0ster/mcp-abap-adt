@@ -442,12 +442,13 @@ export interface SentRequest {
  * member reads) as the method's error: read the way adt-clients reads a
  * request that threw (`recogniseFailure`) and enriched by the strategy every
  * read passes (`analyseException`) — SAP's status, `adt_type`, T100
- * `messages` and body, with the request. `undefined` for a chain failure,
- * which its own reader answers as it came.
+ * `messages` and body, with the request (none named when `sent` is
+ * `undefined`: a request this server did not build, a batch's envelope).
+ * `undefined` for a chain failure, which its own reader answers as it came.
  */
 export function requestFailureOf(
   thrown: unknown,
-  sent: SentRequest,
+  sent: SentRequest | undefined,
 ): IAdtError | undefined {
   if (failureOf(thrown) !== undefined) return undefined;
   const carried =
@@ -464,7 +465,9 @@ export function requestFailureOf(
     origin: 'connection',
     message,
     response: carried?.response,
-    request: { method: sent.method, url: sent.url },
+    ...(sent !== undefined
+      ? { request: { method: sent.method, url: sent.url } }
+      : {}),
   } as IAdtError;
   const read = analyseException(
     verdict,
@@ -492,7 +495,7 @@ export function answerRequestThrown(
 /** A direct request's throw as an entry: the chain's payload, or the request's error, with the step. */
 export function requestThrownEntry(
   thrown: unknown,
-  sent: SentRequest,
+  sent: SentRequest | undefined,
   step: string,
 ): FailureEntry {
   const read = failureOf(thrown);

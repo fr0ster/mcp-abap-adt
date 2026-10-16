@@ -95,6 +95,14 @@ environment:
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
   connection_type: "http"                    # "http" | "rfc"
+  # RFC through a message server and a logon group (optional; rfc only).
+  # Each sets its SAP_* variable (SAP_MSHOST, ...) over the .env's. Leave "" to
+  # dial the application server of SAP_URL. With mshost, msserv or sysid is required.
+  mshost: ""                                 # message server host
+  msserv: ""                                 # message server service (name or port)
+  sysid: ""                                  # system id
+  group: ""                                  # logon group (connection default: PUBLIC)
+  saprouter: ""                              # SAProuter string
   # Test defaults
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)

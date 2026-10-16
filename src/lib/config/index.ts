@@ -50,6 +50,12 @@ export {
 } from './binaries.js';
 export type { HandlerSet, IServerConfig, TlsConfig } from './IServerConfig.js';
 export {
+  applyMessageServerFields,
+  MESSAGE_SERVER_ENV,
+  MESSAGE_SERVER_FIELDS,
+  type MessageServerField,
+} from './messageServer.js';
+export {
   answerVersionOrHelp,
   type LauncherEdges,
   processEdges,

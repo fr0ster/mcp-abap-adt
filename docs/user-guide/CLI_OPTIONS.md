@@ -100,6 +100,11 @@ that serves it. See [YAML Configuration](../configuration/YAML_CONFIG.md).
 | `--login-timeout=<seconds>` | `MCP_LOGIN_TIMEOUT` | `login-timeout` | 1-86400 | Ends a browser login not finished after this many seconds (default: none) |
 | `--auth-debug` | — | `auth-debug` | flag | Auth debugging: the token providers' debug lines go to stderr, and a refused token request's line names the first and last four characters of each secret it sent (default: off). **No environment variable** |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
+| `--mshost=<host>` | `SAP_MSHOST` | `mshost` | host | RFC: the message server host; needs `--msserv` or `--sysid` |
+| `--msserv=<service>` | `SAP_MSSERV` | `msserv` | name or port | RFC: the message server service |
+| `--sysid=<SID>` | `SAP_SYSID` | `sysid` | system id | RFC: the system id |
+| `--group=<group>` | `SAP_GROUP` | `group` | logon group | RFC: the logon group (connection's default `PUBLIC`) |
+| `--saprouter=<string>` | `SAP_SAPROUTER` | `saprouter` | SAProuter string | RFC: the SAProuter string, with either addressing |
 
 The environment forms `MCP_DESTINATION` and `MCP_ENV` do **not** exist; use `--mcp` and `--env`
 (or their YAML keys).
@@ -170,6 +175,29 @@ RFC requires the SAP NW RFC SDK installed and configured. See
 `SAP_CONNECTION_TYPE=rfc` in the process environment or in the `--env` / `--env-path` `.env`
 (which joins the environment, never over a value already set), or YAML `connection-type: rfc`.
 Precedence: the CLI flag, then the environment, then YAML.
+
+### --mshost, --msserv, --sysid, --group, --saprouter
+
+RFC through a message server and a logon group (load-balanced logon):
+
+```bash
+mcp-abap-adt --connection-type=rfc --env-path=my-system.env --system-type=onprem \
+  --mshost=<message server host> --sysid=<SID> --group=<logon group>
+```
+
+- `--mshost` needs `--msserv` or `--sysid`. With neither, `@mcp-abap-adt/connection` refuses the
+  connection naming both, and the refusal reaches you as it came.
+- With `--mshost` the RFC wire takes no host and no system number from `SAP_URL`; `SAP_SYSNR` is
+  not read.
+- `--group` absent: connection uses `PUBLIC`. The server adds no default and checks nothing; it
+  passes the five as configured.
+- `--saprouter` works with either addressing.
+- Each has an environment form (`SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`,
+  `SAP_SAPROUTER`), which the `--env` / `--env-path` `.env` may also state (it joins the
+  environment, never over a value already set), and a YAML key of the option's name. Precedence,
+  as for `--connection-type`: the CLI flag, then the environment, then YAML.
+
+See [RFC Setup](../installation/RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 
 ### --browser=\<name\>, --browser-program=\<program\>
 
@@ -333,7 +361,7 @@ the instance that holds it.
 |---|---|
 | `--transport`, `MCP_TRANSPORT`, YAML `transport` | the http sentence above |
 | `--exposition`, YAML `exposition`, with any value | the sentence of its word, naming the binary of this transport that serves it (see [Handler Exposition](#handler-exposition)) |
-| `--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
+| `--mcp`, `--env`, `--env-path`, `--auth-broker-path`, `--allow-destination-header`, `--unsafe`, `--connection-type`, `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`, `--browser*`, `--login-timeout`, `--renewal`, `--auth-debug`, and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
 | `--sse-host`, `--sse-port`, `--sse-path`, `--post-path`, `--sse-allowed-*`, `--sse-enable-dns-protection`, YAML `sse` | ``<form>: SSE is served by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)`` |
 
 `MCP_SSE_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`,
@@ -400,7 +428,7 @@ until the connection closes; see [Held State](#held-state).
 |---|---|
 | `--transport`, `MCP_TRANSPORT`, YAML `transport` | the sse sentence above |
 | `--exposition`, YAML `exposition`, with any value | the sentence of its word, naming the binary of this transport that serves it (see [Handler Exposition](#handler-exposition)) |
-| the destination and login options, as for `mcp-abap-adt-http` (`--auth-broker-path` and `--connection-type` included), and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
+| the destination and login options, as for `mcp-abap-adt-http` (`--auth-broker-path`, `--connection-type` and the message-server options included), and their YAML keys | ``<form>: destinations and logins are served only by `mcp-abap-adt` (stdio); send `x-sap-*` headers`` |
 | `--host`, `--port`, `--path`, `--http-*`, YAML `http` | ``<form>: Streamable HTTP is served by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)`` |
 
 `MCP_HTTP_*`, `MCP_ENV_PATH`, `MCP_UNSAFE`, `MCP_BROWSER*`, `MCP_LOGIN_TIMEOUT`, `MCP_RENEWAL`,
@@ -489,6 +517,7 @@ These are typically set in the destination's `.env` file:
 - `SAP_USERNAME` - SAP username (for basic auth). On-premise, also the login the responsible of created objects falls back to when no `SAP_RESPONSIBLE` is stated (the destination's own first, then the process environment's); not on a cloud system, whose login is the system's user. The environment is read once: a change while the server runs is not picked up
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (process environment, or the `--env` / `--env-path` `.env`)
+- `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER` - RFC through a message server and a logon group: `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID`, the logon group (connection's default `PUBLIC`), a SAProuter string. Process environment, or the `--env` / `--env-path` `.env`; see [--mshost, …](#--mshost---msserv---sysid---group---saprouter)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
 - `SAP_MASTER_SYSTEM` - Master system of created objects (the system id), optional; no tool takes it as an argument. In the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<destination>.env`) or the process environment; the destination's `.env` wins over the environment. Used only where an on-premise system has no `systeminformation` (`404`): elsewhere the system id the system names wins; with neither, the attribute is left out of the request and the system applies itself. Never refused
 - `SAP_RESPONSIBLE` - Responsible person of created objects, optional, and used only where an on-premise system has no `systeminformation` (it answers `404`): elsewhere the user the system names is the responsible, on every kind. Same order; when none is stated, the login (`SAP_USERNAME` of the destination, then of the environment). A create that finds none (SNC) is refused naming `SAP_RESPONSIBLE`, nothing sent. A message class is created with the system's own default responsible (the one exception)

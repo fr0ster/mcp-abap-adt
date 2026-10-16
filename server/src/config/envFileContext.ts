@@ -3,7 +3,10 @@ import * as dotenv from 'dotenv';
 
 /**
  * The keys of an `--env` file the process reads from `process.env`: the
- * client, the connection and system type, and the language.
+ * client, the connection and system type, the language, and the RFC message
+ * server's address (`SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`,
+ * `SAP_SAPROUTER`), which the launcher reads after the file as it reads the
+ * connection type.
  *
  * `--env-path` hands the file to the auth broker's session store, which
  * connects with it but never touches `process.env`, so these are bridged
@@ -21,6 +24,11 @@ export const ENV_FILE_CONTEXT_KEYS = [
   'SAP_CONNECTION_TYPE',
   'SAP_SYSTEM_TYPE',
   'SAP_LANGUAGE',
+  'SAP_MSHOST',
+  'SAP_MSSERV',
+  'SAP_SYSID',
+  'SAP_GROUP',
+  'SAP_SAPROUTER',
 ] as const;
 
 /**

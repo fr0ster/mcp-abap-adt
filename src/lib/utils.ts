@@ -7,6 +7,7 @@ import { answerFailure } from './answer';
 import { answerRead } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
+import { applyMessageServerFields } from './config/messageServer.js';
 import { parseAuthType } from './config/parseAuthType.js';
 import {
   notifyConnectionResetListeners,
@@ -1156,6 +1157,9 @@ export function getConfig(): SapConfig {
   if (client) {
     config.client = client;
   }
+
+  // RFC through a message server: carried as configured, no default.
+  applyMessageServerFields(config, process.env);
 
   if (authType === 'jwt') {
     const jwtToken = process.env.SAP_JWT_TOKEN;

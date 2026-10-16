@@ -127,8 +127,10 @@ SAP_SNC_PARTNERNAME=p:CN=<system>, O=<org>, C=<country>
 SAP_RESPONSIBLE=<your ABAP user>
 ```
 
-RFC with a user and password: `SAP_AUTH_TYPE=basic` with `SAP_USERNAME` and `SAP_PASSWORD`. The SDK,
-the install order and the SNC options: [RFC Setup](RFC_SETUP.md).
+RFC with a user and password: `SAP_AUTH_TYPE=basic` with `SAP_USERNAME` and `SAP_PASSWORD`. Through a
+message server and a logon group: `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID`, optionally `SAP_GROUP`
+and `SAP_SAPROUTER`. The SDK, the install order, the SNC options and the message server:
+[RFC Setup](RFC_SETUP.md).
 
 ### A company CA
 

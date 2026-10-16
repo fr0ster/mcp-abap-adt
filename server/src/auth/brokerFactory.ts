@@ -37,6 +37,10 @@ import {
   type DestinationSystemContext,
   SettingsError,
 } from '@mcp-abap-adt/lib/auth';
+import {
+  MESSAGE_SERVER_FIELDS,
+  type MessageServerField,
+} from '@mcp-abap-adt/lib/config';
 import { getPlatformPaths } from '../config/platformPaths';
 import { countedProvider, ProviderGate } from './countedProvider';
 import {
@@ -213,6 +217,16 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return settings;
   }
 
+  /** The message-server fields the server was started with, each only when set. */
+  private messageServer(): Pick<SapConfig, MessageServerField> {
+    const out: Pick<SapConfig, MessageServerField> = {};
+    for (const field of MESSAGE_SERVER_FIELDS) {
+      const value = this.config[field];
+      if (value !== undefined) out[field] = value;
+    }
+    return out;
+  }
+
   private async readSettings(destination: string): Promise<SapConfig> {
     const { broker, handler, vetted, stores } = await this.buildOf(destination);
     const means = await broker.getConnectionConfig(destination);
@@ -233,6 +247,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       ...(this.config.connectionType
         ? { connectionType: this.config.connectionType }
         : {}),
+      // RFC through a message server: as configured, an absent field no key.
+      ...this.messageServer(),
     };
     try {
       handler.checkSettings?.(settings, this.context);

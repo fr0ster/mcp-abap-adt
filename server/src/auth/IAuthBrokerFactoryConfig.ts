@@ -49,6 +49,17 @@ export interface IAuthBrokerFactoryConfig {
   browserAuthPort?: number;
   /** How the connector reaches the system (`--connection-type`). */
   connectionType?: 'http' | 'rfc';
+  /**
+   * RFC through a message server and a logon group (`--mshost`, `--msserv`,
+   * `--sysid`, `--group`, `--saprouter` and their `SAP_*` / YAML forms):
+   * each reaches the destination's `SapConfig` as configured; an absent one
+   * has no key. No default and no check here — connection's.
+   */
+  mshost?: string;
+  msserv?: string;
+  sysid?: string;
+  group?: string;
+  saprouter?: string;
   /** `--renewal`; absent: `refresh-then-login`. */
   renewal?: RenewalMode;
   /**

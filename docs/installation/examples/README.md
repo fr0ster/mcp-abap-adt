@@ -122,7 +122,10 @@ SAP_SYSTEM_TYPE=onprem
 ```
 
 For RFC with a user and password, use `SAP_AUTH_TYPE=basic` with `SAP_USERNAME` and `SAP_PASSWORD`
-instead of the SNC keys. The SDK, the install order and the SNC options: [RFC Setup](../RFC_SETUP.md).
+instead of the SNC keys. Through a message server and a logon group, add `SAP_MSHOST` with
+`SAP_MSSERV` or `SAP_SYSID`, and optionally `SAP_GROUP` and `SAP_SAPROUTER`: then the system number
+comes from neither the port nor `SAP_SYSNR`. The SDK, the install order, the SNC options and the
+message server: [RFC Setup](../RFC_SETUP.md).
 
 ## 4. A company CA
 

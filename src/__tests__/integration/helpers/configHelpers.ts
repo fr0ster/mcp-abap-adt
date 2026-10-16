@@ -199,6 +199,17 @@ export async function loadTestEnv(): Promise<void> {
     if (cfg?.environment?.system_type) {
       process.env.SAP_SYSTEM_TYPE = cfg.environment.system_type;
     }
+    // RFC through a message server and a logon group, as configured.
+    for (const [key, name] of [
+      ['mshost', 'SAP_MSHOST'],
+      ['msserv', 'SAP_MSSERV'],
+      ['sysid', 'SAP_SYSID'],
+      ['group', 'SAP_GROUP'],
+      ['saprouter', 'SAP_SAPROUTER'],
+    ] as const) {
+      const value = cfg?.environment?.[key];
+      if (value) process.env[name] = String(value);
+    }
   } catch {
     // ignore
   }

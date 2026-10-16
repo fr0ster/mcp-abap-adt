@@ -10,6 +10,9 @@ import {
   CONF_ROW,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
+  MESSAGE_SERVER_ENV,
+  MESSAGE_SERVER_FIELDS,
+  type MessageServerField,
   type Parameter,
   ParameterRefusal,
   type ParameterTable,
@@ -122,6 +125,32 @@ export const CORE_ROWS: readonly Parameter[] = [
     help: 'SAP connection type (default: http). rfc needs the SAP NW RFC SDK',
   },
 ];
+
+/**
+ * RFC through a message server and a logon group (connection 18), in
+ * `--connection-type`'s form: `SAP_X` → `--x` → `x`. Carried as configured;
+ * no default here (`group`'s `PUBLIC` is connection's), no check (connection
+ * refuses `mshost` with neither `msserv` nor `sysid`).
+ */
+const MESSAGE_SERVER_HELP: Readonly<Record<MessageServerField, string>> = {
+  mshost:
+    'RFC: the message server host. With it, RFC logs on through the message server and takes no host or system number from the URL; needs --msserv or --sysid',
+  msserv: 'RFC: the message server service (name or port)',
+  sysid: 'RFC: the system id, which names the message server service',
+  group: 'RFC: the logon group (connection default: PUBLIC)',
+  saprouter: 'RFC: the SAProuter string, with or without a message server',
+};
+
+export const MESSAGE_SERVER_ROWS: readonly Parameter[] =
+  MESSAGE_SERVER_FIELDS.map((field) => ({
+    key: field,
+    cli: `--${field}`,
+    env: MESSAGE_SERVER_ENV[field],
+    yaml: field,
+    kind: 'string',
+    section: DESTINATION,
+    help: MESSAGE_SERVER_HELP[field],
+  }));
 
 /** The longest login bound: a day. */
 export const MAX_LOGIN_TIMEOUT_SECONDS = 86_400;
@@ -242,6 +271,7 @@ export function coreParameters(
       CONF_ROW,
       SYSTEM_TYPE_ROW,
       ...CORE_ROWS,
+      ...MESSAGE_SERVER_ROWS,
       LOGIN_TIMEOUT_ROW,
       AUTH_DEBUG_ROW,
       STATE_IDLE_ROW,
@@ -313,6 +343,21 @@ export interface CoreConfig extends IServerConfig {
    * form beats an `SAP_CONNECTION_TYPE` the env file brings (as in 15.x).
    */
   connectionTypeSource?: string;
+  /** RFC: the message server host (`--mshost`, `SAP_MSHOST`, `mshost`). */
+  mshost?: string;
+  /** RFC: the message server service (`--msserv`, `SAP_MSSERV`, `msserv`). */
+  msserv?: string;
+  /** RFC: the system id (`--sysid`, `SAP_SYSID`, `sysid`). */
+  sysid?: string;
+  /** RFC: the logon group (`--group`, `SAP_GROUP`, `group`). */
+  group?: string;
+  /** RFC: the SAProuter string (`--saprouter`, `SAP_SAPROUTER`, `saprouter`). */
+  saprouter?: string;
+  /**
+   * The form each message-server field came from, as `connectionTypeSource`:
+   * only the CLI form beats what the env file brings.
+   */
+  messageServerSource?: Partial<Record<MessageServerField, string>>;
 }
 
 const str = (v: ParameterValue | undefined): string | undefined =>
@@ -380,5 +425,23 @@ export function readCoreConfig(
       values.loginTimeout === undefined ? undefined : source('loginTimeout'),
     connectionType: values.connectionType as CoreConfig['connectionType'],
     connectionTypeSource: source('connectionType'),
+    ...messageServerOf(values, source),
   };
+}
+
+/** The message-server fields set, each with its source; an unset one has no key. */
+function messageServerOf(
+  values: Record<string, ParameterValue>,
+  source: (key: string) => string | undefined,
+): Pick<CoreConfig, MessageServerField | 'messageServerSource'> {
+  const out: Pick<CoreConfig, MessageServerField> = {};
+  const sources: Partial<Record<MessageServerField, string>> = {};
+  for (const field of MESSAGE_SERVER_FIELDS) {
+    const value = str(values[field]);
+    if (value === undefined) continue;
+    out[field] = value;
+    const from = source(field);
+    if (from !== undefined) sources[field] = from;
+  }
+  return { ...out, messageServerSource: sources };
 }

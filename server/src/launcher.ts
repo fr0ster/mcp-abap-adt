@@ -11,6 +11,9 @@ import {
   answerVersionOrHelp,
   generateHelp,
   type LauncherEdges,
+  MESSAGE_SERVER_ENV,
+  MESSAGE_SERVER_FIELDS,
+  type MessageServerField,
   processEdges,
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
@@ -159,6 +162,16 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     SAP_USERNAME                   SAP username
     SAP_PASSWORD                   SAP password
     SAP_CLIENT                     SAP client number
+    Through a message server and a logon group (load-balanced logon); each also
+    --mshost, --msserv, --sysid, --group, --saprouter, or the YAML key of that name.
+    Precedence: the CLI, then the environment (this file joins it), then YAML:
+    SAP_MSHOST                     Message server host. With it, the URL gives no RFC host
+                                   and no system number (SAP_SYSNR is not read)
+    SAP_MSSERV                     Message server service (name or port)
+    SAP_SYSID                      System id; SAP_MSSERV or SAP_SYSID is required with
+                                   SAP_MSHOST (refused naming both otherwise)
+    SAP_GROUP                      Logon group (connection default: PUBLIC)
+    SAP_SAPROUTER                  SAProuter string, with either addressing
     Requires: SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite (an optional dependency,
     compiled by npm install: SAPNWRFC_HOME and a C++ toolchain must be there before it;
     npm ls -g @mcp-abap-adt/sap-rfc-lite shows (empty) when it was left out)
@@ -213,6 +226,9 @@ EXAMPLES:
   # RFC connection (any system with SAP NW RFC SDK)
   # (or SAP_CONNECTION_TYPE=rfc in the .env file)
   ${program} --env-path=my-system.env --connection-type=rfc
+
+  # RFC through a message server and a logon group
+  ${program} --env-path=my-system.env --connection-type=rfc --mshost=<host> --sysid=<SID> --group=<group>
 
   # Explicit system type (required: onprem, cloud or legacy)
   ${program} --env-path=<system>.env --system-type=onprem
@@ -379,6 +395,13 @@ function effectiveFromEnvironment<T extends string>(
   return raw as T;
 }
 
+/** `config` without its message-server fields: they are read again after the env file. */
+function withoutMessageServer(config: CoreConfig): CoreConfig {
+  const rest: CoreConfig = { ...config };
+  for (const field of MESSAGE_SERVER_FIELDS) delete rest[field];
+  return rest;
+}
+
 /** The connection type: see {@link effectiveFromEnvironment}. */
 export function effectiveConnectionType(
   config: CoreConfig,
@@ -391,6 +414,42 @@ export function effectiveConnectionType(
     ['http', 'rfc'] as const,
     env,
   );
+}
+
+/**
+ * The message server's fields (RFC, connection 18), each as
+ * {@link effectiveFromEnvironment} reads the connection type: the CLI, then
+ * the process environment — which by now holds what the env file states,
+ * never over a value set before — then YAML. Taken as given, trimmed; no
+ * default, no check: connection refuses what it cannot dial.
+ */
+export function effectiveMessageServer(
+  config: CoreConfig,
+  env: NodeJS.ProcessEnv,
+): Pick<CoreConfig, MessageServerField> {
+  const out: Pick<CoreConfig, MessageServerField> = {};
+  for (const field of MESSAGE_SERVER_FIELDS) {
+    const value = config[field];
+    const source = config.messageServerSource?.[field];
+    const fromCli = value !== undefined && (source?.startsWith('--') ?? true);
+    const stated = fromCli
+      ? value
+      : env[MESSAGE_SERVER_ENV[field]]?.trim() || value;
+    if (stated) out[field] = stated;
+  }
+  return out;
+}
+
+/** The message-server fields set on `config`, as `SapConfig` takes them. */
+function messageServerOf(
+  config: Pick<CoreConfig, MessageServerField>,
+): Pick<IAuthBrokerFactoryConfig, MessageServerField> {
+  const out: Pick<IAuthBrokerFactoryConfig, MessageServerField> = {};
+  for (const field of MESSAGE_SERVER_FIELDS) {
+    const value = config[field];
+    if (value !== undefined) out[field] = value;
+  }
+  return out;
 }
 
 /**
@@ -442,6 +501,7 @@ export function factoryConfigFrom(
       browserAuthPort: config.browserAuthPort,
     }),
     ...(config.connectionType && { connectionType: config.connectionType }),
+    ...messageServerOf(config),
     ...(config.renewal && { renewal: config.renewal }),
     ...(config.authDebug === true && { authDebug: true }),
     ...(config.loginTimeout !== undefined && {
@@ -631,7 +691,12 @@ export async function launch(
   if (connectionType) process.env.SAP_CONNECTION_TYPE = connectionType;
   // The connector reads the system type from the environment.
   if (systemType) process.env.SAP_SYSTEM_TYPE = systemType;
-  config = { ...config, connectionType, systemType };
+  config = {
+    ...withoutMessageServer(config),
+    connectionType,
+    systemType,
+    ...effectiveMessageServer(config, process.env),
+  };
 
   // The command's tool set: fixed by the command, never by a flag.
   const handlersRegistry = registryOf(options.toolSet, 'stdio');

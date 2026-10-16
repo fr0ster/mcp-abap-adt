@@ -219,7 +219,7 @@ It takes no destination and no `.env`: each request carries its credential in `x
 
 ### Environment Variables
 
-The connection lives in a `.env` file the server is told about (`--env-path`, `--env` or `--mcp`). Of that file only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE` and `SAP_LANGUAGE` reach the process environment; process-level settings (`NODE_EXTRA_CA_CERTS`, `SAP_SYSNR`, `PATH` for the RFC SDK on Windows) belong in the shell or the MCP client's `env` block.
+The connection lives in a `.env` file the server is told about (`--env-path`, `--env` or `--mcp`). Of that file only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE`, `SAP_LANGUAGE` and the RFC message server's `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER` (of an `--env` / `--env-path` file) reach the process environment; process-level settings (`NODE_EXTRA_CA_CERTS`, `SAP_SYSNR`, `PATH` for the RFC SDK on Windows) belong in the shell or the MCP client's `env` block.
 
 **A JWT you hold** is not served over stdio (19.0.0): send it in the `x-sap-jwt-token` header to
 `mcp-abap-adt-http` or `mcp-abap-adt-sse`, or create the session with `mcp-auth`. A `.env` stating
@@ -242,6 +242,18 @@ SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 ```
 Add `SAP_CONNECTION_TYPE=rfc` to the `.env`, or start the server with `--connection-type=rfc`. No user and no password: the SNC credential is mapped to an ABAP user by its SNC name.
+
+**For RFC through a message server and a logon group** (basic or SNC), add to the `.env`:
+```env
+SAP_CONNECTION_TYPE=rfc
+SAP_MSHOST=your-message-server.example
+# SAP_MSSERV or SAP_SYSID is required beside SAP_MSHOST
+SAP_SYSID=ABC
+# Optional: the logon group (connection's default PUBLIC) and a SAProuter string
+# SAP_GROUP=PUBLIC
+# SAP_SAPROUTER=/H/your-router.example/S/3299/H/
+```
+The RFC wire then takes no host and no system number from `SAP_URL`, and `SAP_SYSNR` is not read. The same fields are `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` and the YAML keys of those names; see [RFC Setup](../installation/RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 
 **For basic authentication (on-premise):**
 ```env

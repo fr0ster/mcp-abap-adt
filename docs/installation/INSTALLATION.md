@@ -161,6 +161,7 @@ SAP_RESPONSIBLE=<your ABAP user>
 Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`). For a URL
 whose port follows no such rule (an `https` port such as `44300`), set `SAP_SYSNR` in the process
 environment. See [RFC Setup](RFC_SETUP.md).
+Through a message server and a logon group instead, add `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (one is required), and optionally `SAP_GROUP` (default `PUBLIC`, connection's) and `SAP_SAPROUTER`; then no host and no system number come from `SAP_URL` and `SAP_SYSNR` is not read. See [RFC Setup](RFC_SETUP.md#through-a-message-server-and-a-logon-group).
 
 **Run the server:**
 ```bash
@@ -326,6 +327,7 @@ naming the binary that serves the tools it asked for.
 - `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login; `--browser-program=<program>` in place of `--browser`
 - `--renewal=refresh-then-login|refresh-only` - How an expired session is renewed (`refresh-only`: never a login)
 - `--connection-type=http|rfc` - SAP connection type (default `http`)
+- `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … in the `.env`); see [RFC Setup](RFC_SETUP.md#through-a-message-server-and-a-logon-group)
 
 **Note:** When no `--mcp`, `--env` or `--env-path` is given, there is no default destination: nothing is looked up in the working directory (`--env-path=./.env` names a `.env` there). An invalid port, enum or flag value is refused at startup.
 

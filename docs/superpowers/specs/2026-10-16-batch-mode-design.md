@@ -719,15 +719,25 @@ kind:
   from discovery means nothing.
 - **RFC offers nothing else to read**: an ADT request over RFC is the same request; the same rule
   applies.
-- **The system's own answer to the batch endpoint** (owner-approved). The
-  first internal batch on a destination sends its first envelope; when the outer answer is not a
-  multipart batch answer (adt-clients' `parseBatchResponse` refuses it: "missing multipart boundary"
-  **[code]**) and its status says the endpoint is not served (`404`), the destination is remembered
-  as having no communication batch — kept with the destination's known parameters, as
-  `systeminformation`'s answer is (`destinationSystems`, once per destination) — and that call and
-  later ones run sequentially. Any other envelope failure is that phase's failure (§11, Failures), not
-  a verdict on the endpoint. What a system without the endpoint answers is **[unverified]**; a live
-  test on such a system confirms it before the rule is relied on.
+- **The system's own answer to the batch endpoint** (owner-approved). Only the **outer** envelope
+  response decides: a `404` to the envelope request of the first internal batch on a destination
+  means the endpoint is not served, and the destination is remembered as having no communication
+  batch — kept with the destination's known parameters, as `systeminformation`'s answer is
+  (`destinationSystems`, once per destination) — and that call and later ones run sequentially. How
+  the server sees that outer status, given adt-clients v34.1.0's `execute()` awaits the wrapped
+  connection's base request before it calls `parseBatchResponse` **[code]**:
+  - **Ordinary transports (HTTP, RFC)** reject an outer `404` with `response` attached, so the
+    parser never runs: the server reads the rejected error's `response.status` of the envelope
+    request (`execute()` rejects with that error **[code]**).
+  - **A connection that resolves a `404`** (an injected connection, say) makes `parseBatchResponse`
+    throw a plain "missing multipart boundary" `Error` with no status **[code]**: the server reads
+    the status from a forwarding connection placed under the `AdtBatchConnection`, which sees the
+    outer response before it is parsed and keeps its status.
+  - **An inner part's `404`** (an object not found) is that item's answer and never disables
+    batching; neither does any other envelope failure, which is that phase's failure (§11, Failures).
+
+  What a system without the endpoint answers is **[unverified]**; a live test on such a system
+  confirms it before the rule is relied on.
 
 ### The shared mechanism
 
@@ -808,8 +818,10 @@ Per tool, against the ADT stand-in's fixtures: the batched handler gives the sam
 sequential version; no envelope holds a request that needs another of its parts' answers; with
 several objects asked, the envelope count does not grow with their number; the request count and the envelope count are as the table says; a part's
 failure is that item's failure and the rest answer; an envelope failure; a credential refusal ends
-the call as it came; a destination whose first envelope is answered `404` without a multipart
-answer is remembered and runs sequentially, any other envelope failure is not a verdict; no
+the call as it came; on the real adt-clients v34.1.0 `AdtBatchConnection`: an outer `404` the
+transport rejects (with `response`) and an outer `404` a connection resolves without a multipart
+body each mark the destination and run sequentially; an inner part's `404` leaves batching on; any
+other envelope failure is not a verdict; no
 `concurrency` in `SearchSource`'s schema. *Break:* send a phase's requests one by one (the envelope
 count goes red); treat every envelope failure as "no batch".
 

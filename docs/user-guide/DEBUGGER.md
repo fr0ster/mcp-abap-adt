@@ -415,6 +415,32 @@ ends by:
   began is attached and released by the stop; measured on premise (2026-10-11), an attach after
   the listener was stopped still succeeds, and a caught debuggee nobody attaches
   is held by the system for about 30 seconds and then runs on.
+- **a credential refusal during a stop** (the authentication chain's failure, or a `401` SAP
+  answered) ends the stop where it arose: no request follows it — no further release, listener
+  stop or breakpoint delete, ABAP and AMDP alike — since each would ask the credential again
+  and be refused again. The answer is that refusal as it came, with its step (an
+  `authentication_failed` answer, or SAP's `401` as the method's error), the stop's other
+  failures beside it under `failures`, and the steps it did not send under `not_attempted`:
+
+  ```json
+  { "error": "authentication_failed", "kind": "credential-refused", "message": "…",
+    "step": "release the debuggee",
+    "not_attempted": {
+      "message": "Not attempted: the credential was refused, and every further request would be refused again. They stay for the next stop.",
+      "steps": ["stop listener"] } }
+  ```
+
+  The steps named there (`release the debuggee`, `release <what>` for a release an earlier
+  stop owed, `stop listener`, `delete breakpoint <id>`, `release a debuggee caught during the
+  stop (<id>)`, and the AMDP part's `release debuggee <id>` and `stop`) stay owed like a
+  failure: the handle stays valid, a new start is refused, and the next stop — once the
+  credential is usable again — sends them. The session's connections are still closed: a
+  logoff carries the session's cookies and asks nothing of the credential provider (not
+  measured). A start the credential refused cleans up the same way: its undo sends no request,
+  and the answer is the refusal with its step, `not_attempted` naming what stays for the next
+  stop — not the `cleanup.failures` of another failed start. A start whose reconciling
+  listener stop (see [Restarting with stated ids](#restarting-with-stated-ids)) the credential
+  refused ends with that refusal, nothing armed.
 - **`AmdpDebugStop`**: the AMDP part only (below).
 - **the client's close and the shutdown**: when stdio's client closes stdin, when an SSE
   connection closes, and at the process shutdown (every transport), every ADT session the instance
@@ -463,6 +489,9 @@ it. Every IDE sharing the key loses its breakpoints with them (see
 ids nothing is reconciled: a predecessor's breakpoints under the key are replaced
 by the start's arming all the same, since every change replaces the set.
 
+Any other failure of the reconciliation's stop is no failure of the start. A
+credential refusal is: the start ends with it as it came, nothing armed.
+
 ## Memory and memory snapshots
 
 At a stop, `DebugGetMemorySizes` reads what the debuggee uses, and
@@ -509,7 +538,10 @@ class (`class_name`, `line`).
   (measured), so `AmdpDebugStop` — and `DebugStop` — delete it first, then stop the
   session, and return once the system has answered the event read it ended.
   `AmdpDebugStop` ends the handle only when nothing else is held; an ABAP session
-  under the same handle goes on.
+  under the same handle goes on. A credential refusal on one of these steps ends
+  the stop as it does the ABAP one ([What ends a session](#what-ends-a-session)):
+  the debuggees not yet released and the session's `stop` are named under
+  `not_attempted` and stay for the next stop.
 
 ## Timings
 

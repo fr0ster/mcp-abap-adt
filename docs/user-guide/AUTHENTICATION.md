@@ -388,7 +388,8 @@ it arose. A tool never rewrites it:
   a failed step left behind (a lock not released, cleanup not done) rides beside it as
   `cleanup` — and when that is itself a failure, as an entry of `cleanup.failures` in the same
   shape. A credential failure is never such an entry: on a write, its unlock or its activation it
-  is the answer itself, after the unlock was tried.
+  is the answer itself, after the unlock was tried — a `401` SAP answered to the unlock
+  included, answered as the unlock's error as it is with `step: "unlock"`.
 
 **Several failures in one answer.** Each is an entry in the shape above, with its step — never
 folded into one text:
@@ -411,6 +412,13 @@ folded into one text:
   enhancements request itself is read the same way, step `read enhancements`), a
   refused typing of a new transport task (`CreateTransportTask`'s `task_type_error`), and
   what a debugger stop could not undo (see [DEBUGGER.md](DEBUGGER.md#what-ends-a-session)).
+  A credential failure is none of these. A `401` on `CreateTransportTask`'s task type change is
+  the call's failure with `step: "change task type"`, not a `task_type_error` beside the
+  creation; the task was created all the same and the failure does not name it, so read the
+  request (`GetTransport`) to find it. A credential refusal during a debugger stop ends the
+  stop: no request follows it, the answer is the refusal as it came with its step, and
+  `not_attempted` (`{ message, steps }`, fixed words) names the steps it did not send, which
+  stay for the next stop.
 
 **An ADT authorization error is not a credential refusal.** A user who logged on but may not
 work with an object gets a `403` with SAP's exception document: it is answered as above, its

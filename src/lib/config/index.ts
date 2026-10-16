@@ -5,6 +5,10 @@
  */
 
 export {
+  BATCH_KEEP_RAW_PARTS_CLI,
+  BATCH_KEEP_RAW_PARTS_ENV,
+  BATCH_KEEP_RAW_PARTS_ROW,
+  BATCH_KEEP_RAW_PARTS_YAML,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
   DESTINATIONS_ELSEWHERE,
@@ -38,6 +42,7 @@ export {
   transportRemoved,
   validateYamlParameters,
 } from './authParameters.js';
+export { readBatchKeepRawParts } from './batchKeepRawParts.js';
 export {
   BINARIES,
   type Binary,

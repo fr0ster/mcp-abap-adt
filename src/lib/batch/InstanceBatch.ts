@@ -1,0 +1,177 @@
+/**
+ * The owner of one MCP server instance's batch state: the open batch (a
+ * communication batch or a debugger batch, one at a time) and the answers
+ * of the last executed batch.
+ *
+ * Created by the host and handed to the instance (`BaseMcpServer`'s `batch`
+ * option), like the leftover-session owner and the background-run store:
+ * nothing here is a module global or a singleton. It is a part of the
+ * instance's held state (`StatePart`): while a batch is open or answers are
+ * kept, the instance holds state — kept in the HTTP pool between requests,
+ * and under the state's idle bound on every transport, the one clock that
+ * touches it. Nothing of the batch's own runs on a clock.
+ *
+ * The owner sends nothing: what is recorded is sent by `BatchEnd` /
+ * `DebugBatchEnd`. A drop (`drop()`, `dispose()`) lets the open batch go
+ * with nothing sent, aborts its signal and forgets the answers.
+ */
+import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
+import { ServerRefusal } from '../auth/serverRefusal';
+import type { StatePart } from '../state/InstanceState';
+
+/** Which batch is open: none, the communication batch, or the debugger batch. */
+export type BatchMode = 'off' | 'communication' | 'debugger';
+
+/** The kind of a batch that can be begun. */
+export type BatchKind = Exclude<BatchMode, 'off'>;
+
+/** A part of the envelope's answer as it came, kept when `keepRawParts`. */
+export type RawPart = {
+  status: number;
+  status_text: string;
+  headers: Record<string, string>;
+  body: string;
+};
+
+/** The answer of one recorded call, by its number: the tool's answer built from what came. */
+export type BatchAnswer = {
+  number: number;
+  content: CallToolResult['content'];
+  isError?: true;
+  raw?: RawPart;
+};
+
+/** One recorded call: its number and the answer its handler builds once the batch is sent. */
+export interface RecordedCall {
+  number: number;
+  answer: Promise<BatchAnswer>;
+  raw?: RawPart;
+}
+
+/** What a begin hands the owner: the batch connection and the record of its calls. */
+export interface OpenBatch {
+  connection: AdtBatchConnection;
+  recorded: RecordedCall[];
+}
+
+interface Opened {
+  readonly kind: BatchKind;
+  readonly batch: OpenBatch;
+  readonly controller: AbortController;
+  /** The last number taken; the next is one more. */
+  counter: number;
+}
+
+export class InstanceBatch implements StatePart {
+  /** Whether each recorded call keeps its raw part (YAML `batch.keepRawParts`). */
+  readonly keepRawParts: boolean;
+
+  private opened_: Opened | undefined;
+  private answers: ReadonlyMap<number, BatchAnswer> | undefined;
+  private readonly listeners: Array<() => void> = [];
+
+  constructor(options: { keepRawParts: boolean }) {
+    this.keepRawParts = options.keepRawParts === true;
+  }
+
+  mode(): BatchMode {
+    return this.opened_?.kind ?? 'off';
+  }
+
+  /**
+   * Opens a batch of `kind`. Refused `batch_mode_on` while a batch of the
+   * same kind is open, `batch_mode_other` while the other kind is. The
+   * answers of the last batch stay readable until this one ends.
+   */
+  begin(kind: BatchKind, open: OpenBatch): void {
+    const current = this.opened_;
+    if (current !== undefined) {
+      throw new ServerRefusal(
+        current.kind === kind ? 'batch_mode_on' : 'batch_mode_other',
+      );
+    }
+    this.opened_ = {
+      kind,
+      batch: open,
+      controller: new AbortController(),
+      counter: 0,
+    };
+    this.changed();
+  }
+
+  /** The open batch, or `undefined` when none is open. */
+  opened(): OpenBatch | undefined {
+    return this.opened_?.batch;
+  }
+
+  /** The next number of the open batch: 1, 2, … in the order taken. Refused `batch_mode_off` with none open. */
+  nextNumber(): number {
+    const current = this.requireOpen();
+    current.counter += 1;
+    return current.counter;
+  }
+
+  /**
+   * The open batch's signal: aborted when the batch is dropped (`drop()`,
+   * `dispose()`), never by its end. Refused `batch_mode_off` with none open.
+   */
+  signal(): AbortSignal {
+    return this.requireOpen().controller.signal;
+  }
+
+  /** The batch was executed: mode off, its answers replace the last ones. */
+  end(answers: ReadonlyMap<number, BatchAnswer>): void {
+    this.opened_ = undefined;
+    this.answers = new Map(answers);
+    this.changed();
+  }
+
+  /** Lets the open batch go with nothing sent: mode off, its signal aborted, the answers gone. */
+  drop(): void {
+    const current = this.opened_;
+    this.opened_ = undefined;
+    this.answers = undefined;
+    current?.controller.abort();
+    this.changed();
+  }
+
+  /** The kept answer with number `n`, or `undefined`. */
+  answer(n: number): BatchAnswer | undefined {
+    return this.answers?.get(n);
+  }
+
+  holdsState(): boolean {
+    return (
+      this.opened_ !== undefined ||
+      (this.answers !== undefined && this.answers.size > 0)
+    );
+  }
+
+  pending(): boolean {
+    return false;
+  }
+
+  failures(): string[] {
+    return [];
+  }
+
+  /** The state's undo (the pool's, the idle bound's): drops the batch and the answers; nothing is sent. */
+  async dispose(): Promise<void> {
+    this.drop();
+  }
+
+  observe(onChange: () => void): void {
+    this.listeners.push(onChange);
+  }
+
+  private requireOpen(): Opened {
+    const current = this.opened_;
+    if (current === undefined) throw new ServerRefusal('batch_mode_off');
+    return current;
+  }
+
+  private changed(): void {
+    for (const listener of [...this.listeners]) listener();
+  }
+}

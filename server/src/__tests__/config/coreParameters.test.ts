@@ -359,6 +359,7 @@ describe('the YAML template and validation come from the table', () => {
       [
         'auth-broker-path',
         'auth-debug',
+        'batch',
         'browser',
         'browser-auth-port',
         'browser-program',

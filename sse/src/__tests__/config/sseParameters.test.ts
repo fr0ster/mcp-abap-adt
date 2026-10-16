@@ -429,8 +429,15 @@ describe('the YAML template and validation come from the table', () => {
 
   it('holds sse rows under sse, and no other binary keys', () => {
     expect(Object.keys(parsed).sort()).toEqual(
-      ['sse', 'shutdown-timeout', 'state-idle-minutes', 'system-type'].sort(),
+      [
+        'batch',
+        'sse',
+        'shutdown-timeout',
+        'state-idle-minutes',
+        'system-type',
+      ].sort(),
     );
+    expect(parsed.batch).toEqual({ keepRawParts: false });
     expect(Object.keys(parsed.sse as object).sort()).toEqual(
       [
         'allowed-hosts',

@@ -57,4 +57,11 @@ export interface IServerConfig {
    * `state-idle-minutes`). A whole number, at least 30; default 30.
    */
   stateIdleMinutes?: number;
+
+  /**
+   * Whether a batch's answers keep the raw part each came in
+   * (`--batch-keep-raw-parts`, `MCP_BATCH_KEEP_RAW_PARTS`,
+   * `batch.keepRawParts`). Default `false`.
+   */
+  batchKeepRawParts?: boolean;
 }

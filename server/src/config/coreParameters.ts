@@ -7,6 +7,7 @@
  */
 
 import {
+  BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   HTTP_OPTIONS_REMOVED,
   type IServerConfig,
@@ -275,6 +276,7 @@ export function coreParameters(
       LOGIN_TIMEOUT_ROW,
       AUTH_DEBUG_ROW,
       STATE_IDLE_ROW,
+      BATCH_KEEP_RAW_PARTS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
@@ -400,6 +402,7 @@ export function readCoreConfig(
     // (effectiveSystemType), as for the connection type.
     systemTypeSource: source('systemType'),
     stateIdleMinutes: values.stateIdleMinutes as number,
+    batchKeepRawParts: values.batchKeepRawParts === true,
     shutdownTimeout: values.shutdownTimeout as number | undefined,
     mcpDestination: str(values.mcpDestination),
     envDestination,

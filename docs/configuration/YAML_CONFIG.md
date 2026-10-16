@@ -39,6 +39,7 @@ mcp-abap-adt-http --conf=http.yaml --port=8080 --system-type=<onprem|cloud>
 |--------|------|---------|-------------|
 | `system-type` | string | — (required, here, as `--system-type` or `SAP_SYSTEM_TYPE`) | `onprem`, `cloud` or `legacy`; never guessed from the credential or the URL |
 | `state-idle-minutes` | number | `30` | See [Held State](#held-state) |
+| `batch.keepRawParts` | boolean | `false` | Batch mode: each answer of a batch (`BatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. `true` or `false` only; anything else is refused at startup. Also `--batch-keep-raw-parts`, `MCP_BATCH_KEEP_RAW_PARTS` |
 | `shutdown-timeout` | number | — | Seconds after which a shutdown is forced, 1-86400; no default: a shutdown logs off every ADT session at once and interrupts the running tools — it waits for no tool —, then waits for the logoffs to be written and (stdio) the session writes. Forced, it waits only for the logoffs' writes and exits `1`; a session write may be lost. See [CLI options: Shutdown](../user-guide/CLI_OPTIONS.md#shutdown) |
 
 `transport` is gone: the key, with any value, stops every binary naming the binary to run.

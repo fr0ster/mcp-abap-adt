@@ -8,6 +8,7 @@
  */
 
 import {
+  BATCH_KEEP_RAW_PARTS_ROW,
   CONF_ROW,
   DESTINATION_OPTIONS_REMOVED,
   HTTP_OPTIONS_REMOVED,
@@ -117,6 +118,7 @@ export function sseParameters(
       ...SSE_ROWS,
       ...tlsRows('sse'),
       STATE_IDLE_ROW,
+      BATCH_KEEP_RAW_PARTS_ROW,
       SHUTDOWN_TIMEOUT_ROW,
     ],
     removed: [
@@ -170,6 +172,7 @@ export function readSseConfig(
     systemType: values.systemType as SseConfig['systemType'],
     systemTypeSource: parameterSource(table, 'systemType', argv, env, yaml),
     stateIdleMinutes: values.stateIdleMinutes as number,
+    batchKeepRawParts: values.batchKeepRawParts === true,
     shutdownTimeout: values.shutdownTimeout as number | undefined,
     host: values.host as string,
     port: values.port as number,

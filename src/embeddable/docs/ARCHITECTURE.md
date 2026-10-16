@@ -377,6 +377,36 @@ their answers are kept is the host's: a strategy.
   and read the instance's port (`HandlerContext.backgroundRuns`: the strategy and the call's
   caller). A handle that is not a non-empty string of at most 512 characters names no run.
 
+### Batch mode: the owner
+
+Batch mode records each single-request tool call instead of sending it, and sends the recorded calls
+together at `BatchEnd` (batch-mode spec). Its state is one instance's, held by an owner the host
+creates.
+
+- **The owner** (`InstanceBatch`, `src/lib/batch/InstanceBatch.ts`, exported from
+  `@mcp-abap-adt/lib/embeddable`): `new InstanceBatch({ keepRawParts })`, one per instance, never
+  shared; no module global, nothing in `src/lib/batch` a singleton. It holds the mode (`mode()`:
+  `'off'`, `'communication'` or `'debugger'` — one batch at a time), the open batch (`begin(kind,
+  { connection, recorded })`, the batch's `AdtBatchConnection` and the record of its calls,
+  `opened()`), its counter (`nextNumber()`: 1, 2, … in the order taken), its signal (`signal()`,
+  aborted only when the batch is dropped), and the answers of the last executed batch
+  (`end(answers)` replaces them, `answer(n)` reads one), kept until the next `end` or the
+  instance's end. `begin` while a batch is open is refused `batch_mode_on` (the same kind) or
+  `batch_mode_other` (the other kind); `nextNumber()` and `signal()` with none open,
+  `batch_mode_off`. `drop()` lets the open batch go with nothing sent, aborts its signal and
+  forgets the answers. The owner sends nothing itself.
+- **Held state.** `InstanceBatch` is a `StatePart`, attached to the instance's `InstanceState` at
+  construction (`BaseMcpServer`'s `batch` option): `holdsState()` is true while a batch is open or
+  answers are kept — what keeps an HTTP instance in the pool between requests — so batch state is
+  under the idle bound on every transport, the one clock that touches it. `dispose()` (the pool's
+  undo, the idle bound) is `drop()`.
+- **Who creates it.** core's launcher, one for its one instance (`StdioServer`'s `batch`);
+  `StreamableHttpServer` and `SseServer` take `batch?: { keepRawParts }` and create one per pooled
+  instance (`createPerRequestServer`) / per SSE connection; `EmbeddableMcpServer` takes the
+  embedder's. `keepRawParts` is `--batch-keep-raw-parts` / `MCP_BATCH_KEEP_RAW_PARTS` / YAML
+  `batch.keepRawParts` (`BATCH_KEEP_RAW_PARTS_ROW`, in every binary's table; default `false`).
+  Absent, the batch tools answer `batch_mode_unavailable`.
+
 ## The servers
 
 ### StdioServer (`@mcp-abap-adt/core`)

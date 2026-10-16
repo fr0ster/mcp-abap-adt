@@ -1353,6 +1353,22 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `BaseHandlerGroup`: with rules it refuses with their codes (a chain failure as it is) instead of
   running its callback with no responsible. `ConnectionRole` adds `background`: the
   run's connection is owned by the strategy, so no instance's terminal close cuts it.
+- **Batch mode: give each instance its own owner, or the batch tools are refused.**
+  `EmbeddableMcpServer` and `BaseMcpServer` take `batch?: InstanceBatch`
+  (`@mcp-abap-adt/lib/embeddable`): `new InstanceBatch({ keepRawParts })`, created by you **for one
+  instance** and never shared with another — it holds that instance's open batch and the answers of
+  its last batch. It is attached to the instance's state: while a batch is open or answers are kept
+  the instance holds state (kept by your routing between requests, under the idle bound
+  `stateIdleMinutes`, which is the only clock that touches it); the state's undo drops the open batch
+  with nothing sent, and the answers. Absent: the batch tools answer `batch_mode_unavailable`
+  ("batch mode is not available here: the host gave this server none"). `StdioServer` takes the same
+  option (core's launcher passes one for its one instance); `StreamableHttpServer` and `SseServer`
+  take `batch?: { keepRawParts }` and create one `InstanceBatch` per pooled instance / per SSE
+  connection; their launchers pass it, `keepRawParts` from `--batch-keep-raw-parts` /
+  `MCP_BATCH_KEEP_RAW_PARTS` / YAML `batch.keepRawParts` (default `false`, read by
+  `readBatchKeepRawParts`). `ServerRefusalCode` / `FailureCode` add `batch_mode_unavailable`,
+  `batch_mode_on`, `batch_mode_other`, `batch_mode_off`, `batch_not_recordable`,
+  `batch_no_timeout` and `debug_batch_amdp_unmeasured`.
 - **`HandlerEntry.connectionless?: true`** marks a tool that works on no connection of the
   instance: the server calls it without building or connecting one, its context's `connection`
   absent. The leftover-session tools are such tools (a list or a logoff must not log on).

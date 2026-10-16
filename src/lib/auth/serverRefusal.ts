@@ -25,7 +25,14 @@ export type ServerRefusalCode =
   | 'cloud_without_systeminformation'
   | 'system_user_unknown'
   | 'system_type_required'
-  | 'instance_closed';
+  | 'instance_closed'
+  | 'batch_mode_unavailable'
+  | 'batch_mode_on'
+  | 'batch_mode_other'
+  | 'batch_mode_off'
+  | 'batch_not_recordable'
+  | 'batch_no_timeout'
+  | 'debug_batch_amdp_unmeasured';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -140,8 +147,52 @@ export function backgroundRunLimitWords(
 export const SYSTEM_TYPE_REQUIRED_WORDS =
   'the SAP system type is not stated: set --system-type, SAP_SYSTEM_TYPE (the environment or the --env file) or system-type (YAML) to onprem, cloud or legacy — an embedding host passes systemType; nothing was sent to the system';
 
+/** The batch tools on an instance whose host gave it no batch owner (`batch`). */
+export const BATCH_MODE_UNAVAILABLE_WORDS =
+  'batch mode is not available here: the host gave this server none';
+
+/** A begin while a batch of the same kind is open. */
+export const BATCH_MODE_ON_WORDS =
+  'a batch of this kind is already open on this server: end it before beginning another';
+
+/**
+ * A begin or an end while the batch of the other kind is open: a
+ * communication batch and a debugger batch are never open together.
+ */
+export const BATCH_MODE_OTHER_WORDS =
+  'the other kind of batch is open on this server (a communication batch and a debugger batch are never open together): end the open one first';
+
+/** An end, or a batch operation, with no batch of that kind open. */
+export const BATCH_MODE_OFF_WORDS =
+  'no batch of this kind is open on this server: begin one first';
+
+/** A long read given `timeout` in batch mode: refused before anything is recorded. */
+export const BATCH_NO_TIMEOUT_WORDS =
+  'in batch mode a read takes no timeout: the batch is sent at BatchEnd, with no deadline';
+
+/** `DebugBatchBegin` on an AMDP stop. */
+export const DEBUG_BATCH_AMDP_UNMEASURED_WORDS =
+  'AMDP debugging is not offered in a debugger batch: not yet confirmed against a system';
+
+/** A tool that sends more than one request, called in batch mode. */
+export function batchNotRecordableWords(tool: string): string {
+  return `${tool} sends more than one request and cannot be recorded in batch mode; record its steps with the single-request tools — compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet — each phase its own batch`;
+}
+
+/**
+ * A tool refused only because a batch is open (a debugger tool, a
+ * leftover-session tool, a registry's own tool), answered as
+ * `batch_not_recordable`.
+ */
+export function batchNotServedWords(tool: string): string {
+  return `${tool} is not served while a batch is open`;
+}
+
 /** The refusals whose words are given at construction. */
-type WordedCode = 'destination_refused' | 'background_run_limit';
+type WordedCode =
+  | 'destination_refused'
+  | 'background_run_limit'
+  | 'batch_not_recordable';
 
 /** The refusals whose words are fixed. */
 type FixedCode = Exclude<ServerRefusalCode, WordedCode>;
@@ -160,6 +211,12 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   system_user_unknown: SYSTEM_USER_UNKNOWN_WORDS,
   system_type_required: SYSTEM_TYPE_REQUIRED_WORDS,
   instance_closed: INSTANCE_CLOSED_WORDS,
+  batch_mode_unavailable: BATCH_MODE_UNAVAILABLE_WORDS,
+  batch_mode_on: BATCH_MODE_ON_WORDS,
+  batch_mode_other: BATCH_MODE_OTHER_WORDS,
+  batch_mode_off: BATCH_MODE_OFF_WORDS,
+  batch_no_timeout: BATCH_NO_TIMEOUT_WORDS,
+  debug_batch_amdp_unmeasured: DEBUG_BATCH_AMDP_UNMEASURED_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */
@@ -178,11 +235,15 @@ export class ServerRefusal extends Error {
    * `destination_refused` in vetted words: a parameter's label and the
    * user's own input (a path they gave) — never a file's content.
    * `background_run_limit` in `backgroundRunLimitWords`.
+   * `batch_not_recordable` in `batchNotRecordableWords` or
+   * `batchNotServedWords`.
    */
   constructor(code: WordedCode, words: string);
   constructor(code: ServerRefusalCode, words?: string) {
     const text =
-      code === 'destination_refused' || code === 'background_run_limit'
+      code === 'destination_refused' ||
+      code === 'background_run_limit' ||
+      code === 'batch_not_recordable'
         ? (words ?? '')
         : WORDS[code];
     super(text);

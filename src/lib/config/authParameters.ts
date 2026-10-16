@@ -278,6 +278,10 @@ function convert(
 
   if (p.kind === 'flag') {
     if (typeof raw === 'boolean') return raw;
+    // A list or a map is no flag, whatever its text (`[true]`).
+    if (typeof raw === 'object') {
+      throw new ParameterRefusal(`Invalid ${name}. Must be true or false`);
+    }
     const word = String(raw).trim().toLowerCase();
     if (word === '') return undefined;
     if (word === 'true') return true;
@@ -673,6 +677,28 @@ export const STATE_IDLE_ROW: Parameter = {
   valueHint: '=<minutes>',
   section: 'HELD STATE',
   help: `Held state (a debug session) ends after this many minutes without a tool call. Default and minimum: 30; maximum: ${MAX_STATE_IDLE_MINUTES}; a whole number. Activity is a tool call on the instance; a call in flight (a wait on the server) pauses the bound, and a listener's own background re-poll does not count.`,
+};
+
+export const BATCH_KEEP_RAW_PARTS_CLI = '--batch-keep-raw-parts';
+export const BATCH_KEEP_RAW_PARTS_ENV = 'MCP_BATCH_KEEP_RAW_PARTS';
+export const BATCH_KEEP_RAW_PARTS_YAML = 'batch.keepRawParts';
+
+/**
+ * `--batch-keep-raw-parts` / `MCP_BATCH_KEEP_RAW_PARTS` / YAML
+ * `batch.keepRawParts`: whether each answer of a batch keeps the raw part
+ * it came in (status, status text, headers, body). `true` or `false`,
+ * default `false`; anything else is refused at startup. In every binary's
+ * table, read alone by `readBatchKeepRawParts`.
+ */
+export const BATCH_KEEP_RAW_PARTS_ROW: Parameter = {
+  key: 'batchKeepRawParts',
+  cli: BATCH_KEEP_RAW_PARTS_CLI,
+  env: BATCH_KEEP_RAW_PARTS_ENV,
+  yaml: BATCH_KEEP_RAW_PARTS_YAML,
+  kind: 'flag',
+  default: false,
+  section: 'BATCH MODE',
+  help: "Each answer of a batch (BatchAnswers) also carries the raw part it came in: SAP's status, status text, headers and body, as they came. Default: false.",
 };
 
 /** The longest `--shutdown-timeout`: a day. */

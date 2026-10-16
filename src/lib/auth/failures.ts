@@ -42,7 +42,14 @@ export type FailureCode =
   | 'cloud_without_systeminformation'
   | 'system_user_unknown'
   | 'system_type_required'
-  | 'instance_closed';
+  | 'instance_closed'
+  | 'batch_mode_unavailable'
+  | 'batch_mode_on'
+  | 'batch_mode_other'
+  | 'batch_mode_off'
+  | 'batch_not_recordable'
+  | 'batch_no_timeout'
+  | 'debug_batch_amdp_unmeasured';
 
 /**
  * A failure as it was read: the fields of the failure answer, and the chain's

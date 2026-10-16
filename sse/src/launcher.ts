@@ -152,6 +152,8 @@ export async function launch(
   const server = new SseServer(registryOf(options.toolSet, 'sse'), {
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,
+    // Batch mode: one InstanceBatch per SSE connection's instance.
+    batch: { keepRawParts: config.batchKeepRawParts === true },
     // The state's lines go to stderr whatever the transport logger says.
     stateLogger: stderrStateLogger,
     host: config.host,

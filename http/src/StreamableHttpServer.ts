@@ -10,6 +10,7 @@ import type {
 import {
   BaseMcpServer,
   type IBackgroundRuns,
+  InstanceBatch,
 } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -50,6 +51,13 @@ export interface StreamableHttpServerOptions {
   stateIdleMinutes?: number;
   /** Where the state's lifecycle lines go; default stderr, always on. */
   stateLogger?: StateLogger;
+  /**
+   * Batch mode: each pooled instance (`createPerRequestServer`) gets an
+   * `InstanceBatch` of its own, created with these settings (the
+   * launcher's). Absent: no instance has one, and the batch tools answer
+   * `batch_mode_unavailable`.
+   */
+  batch?: { keepRawParts: boolean };
   /**
    * Host to bind to (only used when no external app is provided)
    * @default "127.0.0.1"
@@ -143,6 +151,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRunsStore: IBackgroundRuns | undefined;
+  private readonly batchSettings: { keepRawParts: boolean } | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -163,6 +172,10 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.stateIdleMinutes = opts?.stateIdleMinutes;
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRunsStore = opts?.backgroundRuns;
+    this.batchSettings =
+      opts?.batch === undefined
+        ? undefined
+        : { keepRawParts: opts.batch.keepRawParts === true };
     this.version = opts?.version ?? HTTP_VERSION;
     this.host = opts?.host ?? '127.0.0.1';
     this.port = opts?.port ?? 3000;
@@ -461,6 +474,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
+          batch?: InstanceBatch;
         },
       ) {
         // A transport per request: the client's disconnect closes that
@@ -502,6 +516,10 @@ export class StreamableHttpServer extends BaseMcpServer {
         stateLogger: this.stateLogger,
         ...(this.backgroundRunsStore !== undefined && {
           backgroundRuns: this.backgroundRunsStore,
+        }),
+        // Batch mode: this pooled instance's own, never shared with another.
+        ...(this.batchSettings !== undefined && {
+          batch: new InstanceBatch(this.batchSettings),
         }),
       },
     );

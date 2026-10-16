@@ -4,6 +4,7 @@ import { type ReadFailure, ServerRefusal } from '@mcp-abap-adt/lib/auth';
 import {
   BaseMcpServer,
   type IBackgroundRuns,
+  type InstanceBatch,
   type LeftoverSessions,
   type ResolvedConnection,
   type StartedConnection,
@@ -43,6 +44,12 @@ export interface StdioServerOptions {
    * `@mcp-abap-adt/background-runs-memory`). Absent: `background: true` is refused.
    */
   backgroundRuns?: IBackgroundRuns;
+  /**
+   * The owner of this instance's batch state (the launcher's, one for the
+   * process's one instance). Absent: the batch tools answer
+   * `batch_mode_unavailable`.
+   */
+  batch?: InstanceBatch;
 }
 
 /**
@@ -81,6 +88,7 @@ export class StdioServer extends BaseMcpServer {
       ...(opts?.backgroundRuns !== undefined && {
         backgroundRuns: opts.backgroundRuns,
       }),
+      ...(opts?.batch !== undefined && { batch: opts.batch }),
       // The responsible rules, once, at the start (`connectAtStart`).
       systemContextResolver: defaultSystemContextResolver,
       systemContextRules: responsibleRules,

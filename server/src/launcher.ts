@@ -19,6 +19,7 @@ import {
   readStartupConfig,
 } from '@mcp-abap-adt/lib/config';
 import {
+  InstanceBatch,
   LeftoverSessions,
   runtimeDirectory,
   sapAnswerOf,
@@ -831,6 +832,10 @@ export async function launch(
       // command has none, so a run's `background: true` is refused.
       ...(options.toolSet.backgroundRuns && {
         backgroundRuns: new InMemoryBackgroundRuns(),
+      }),
+      // Batch mode: the one instance's batch state, owned here.
+      batch: new InstanceBatch({
+        keepRawParts: config.batchKeepRawParts === true,
       }),
       stateIdleMinutes: config.stateIdleMinutes,
       stateLogger: stateLoggerForTransport,

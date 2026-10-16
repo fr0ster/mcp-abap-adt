@@ -149,6 +149,8 @@ export async function launch(
   const server = new StreamableHttpServer(registryOf(options.toolSet, 'http'), {
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,
+    // Batch mode: one InstanceBatch per pooled instance.
+    batch: { keepRawParts: config.batchKeepRawParts === true },
     // The state's lines go to stderr whatever the transport logger says.
     stateLogger: stderrStateLogger,
     host: config.host,

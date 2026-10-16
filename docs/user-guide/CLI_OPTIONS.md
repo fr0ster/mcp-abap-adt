@@ -48,6 +48,7 @@ These rows are lib's shared rows: each binary's table holds them, with the same 
 | `--conf=<path>` (alias `--config`) | — | — | path | The YAML config file of this binary; a missing file gets the binary's template and the start ends |
 | `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type, **required** (no default, never guessed): the tools offered, the connector and how the system's answers are read. stdio: a destination without it does not start; http/sse: the binary does not start (exit `1`, nothing listens). Inspection-only stdio needs none and lists every tool |
 | `--state-idle-minutes=<minutes>` | `MCP_STATE_IDLE_MINUTES` | `state-idle-minutes` | 30–35791 | The idle bound on held state; see [Held State](#held-state) |
+| `--batch-keep-raw-parts` | `MCP_BATCH_KEEP_RAW_PARTS` | `batch.keepRawParts` | `true`, `false` | Batch mode: each answer of a batch (`BatchAnswers`) also carries the raw part it came in — SAP's status, status text, headers and body, as they came. Default `false`; any other value is refused at startup |
 | `--shutdown-timeout=<seconds>` | `MCP_SHUTDOWN_TIMEOUT` | `shutdown-timeout` | 1-86400 | Forces a shutdown not finished after this many seconds (default: none); see [Shutdown](#shutdown) |
 | `--help`, `-h` | — | — | — | The binary's help |
 | `--version`, `-v` | — | — | — | The binary's version |

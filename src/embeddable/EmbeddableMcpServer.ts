@@ -3,6 +3,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
 import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
+import type { InstanceBatch } from '../lib/batch/InstanceBatch.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
@@ -70,6 +71,14 @@ export interface EmbeddableMcpServerOptions {
    * background-run tools are refused (`background_runs_unavailable`).
    */
   backgroundRuns?: IBackgroundRuns;
+
+  /**
+   * The owner of this instance's batch state (batch mode), created by the
+   * embedder for this instance alone — `new InstanceBatch({ keepRawParts })`
+   * — never shared with another instance. Absent: the batch tools answer
+   * `batch_mode_unavailable`.
+   */
+  batch?: InstanceBatch;
 
   /**
    * Logger instance
@@ -227,6 +236,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       ...(options.backgroundRuns !== undefined && {
         backgroundRuns: options.backgroundRuns,
       }),
+      ...(options.batch !== undefined && { batch: options.batch }),
     });
 
     // Used as given: no credential built, no wrap, no connect().

@@ -30,6 +30,20 @@ export type {
   IBackgroundRuns,
 } from '../lib/backgroundRuns/index.js';
 /**
+ * The owner of an instance's batch state (batch mode: the open batch and the
+ * last batch's answers): created by the host, one per instance, handed to it
+ * (`batch`). Without one the batch tools answer `batch_mode_unavailable`.
+ */
+export {
+  type BatchAnswer,
+  type BatchKind,
+  type BatchMode,
+  InstanceBatch,
+  type OpenBatch,
+  type RawPart,
+  type RecordedCall,
+} from '../lib/batch/InstanceBatch.js';
+/**
  * Closing an embedder's own instance when its client closed: the latch of that instance, its connections logged off at once and
  * its calls interrupted in the same tick — no running tool awaited —, its
  * state let go, its MCP server closed. The shutdown machinery itself is the launchers'

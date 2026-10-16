@@ -30,7 +30,8 @@ names, CLI prefixes, top-level YAML keys, and the env names of a parameter that 
 
 In every binary's table: `CONF_ROW` (`--conf` / `--config`), `STATE_IDLE_ROW`
 (`--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES` / `state-idle-minutes`, the idle bound on held
-state), and `SYSTEM_TYPE_ROW` (`--system-type` / `SAP_SYSTEM_TYPE`, required), which is
+state), `BATCH_KEEP_RAW_PARTS_ROW` (`--batch-keep-raw-parts` / `MCP_BATCH_KEEP_RAW_PARTS` /
+`batch.keepRawParts`, a flag, default `false`, read alone by `readBatchKeepRawParts`), and `SYSTEM_TYPE_ROW` (`--system-type` / `SAP_SYSTEM_TYPE`, required), which is
 `@mcp-abap-adt/responsible-rules`' with the rules that read it. In http's and sse's: `tlsRows('http' | 'sse')` (`--tls-cert` / `--tls-key` / `--tls-ca`,
 `MCP_TLS_*`), read with `tlsConfigOf(values)`.
 

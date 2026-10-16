@@ -31,6 +31,7 @@ import {
   readBackground,
   withoutBackground,
 } from '../lib/backgroundRuns/tools.js';
+import type { InstanceBatch } from '../lib/batch/InstanceBatch.js';
 import {
   createAbapConnection,
   systemKindOf,
@@ -255,6 +256,13 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly backgroundRuns: IBackgroundRuns | undefined;
 
+  /**
+   * The owner of this instance's batch state (`batch` option), given by the
+   * host, one per instance; attached to the state. Absent: the batch tools
+   * answer `batch_mode_unavailable`.
+   */
+  protected readonly batch: InstanceBatch | undefined;
+
   constructor(options: {
     name: string;
     version?: string;
@@ -290,6 +298,13 @@ export abstract class BaseMcpServer extends McpServer {
      */
     backgroundRuns?: IBackgroundRuns;
     /**
+     * The owner of this instance's batch state, created by the host for this
+     * instance alone (never shared between instances): the open batch and
+     * the last batch's answers, held state under the idle bound. Absent:
+     * the batch tools answer `batch_mode_unavailable`.
+     */
+    batch?: InstanceBatch;
+    /**
      * Whether the transport's close is the end of this instance's session
      * (default `true`): stdio's transport, an SSE stream, an embedder's
      * connected transport — its close is then the instance's close
@@ -316,6 +331,8 @@ export abstract class BaseMcpServer extends McpServer {
       // owns: its connections are closed whatever the undo answered.
       onIdleStop: () => this.idleStopped(),
     });
+    this.batch = options.batch;
+    if (this.batch !== undefined) this.state.attach(this.batch);
     this.systemType = options.systemType;
     this.systemContextResolver = options.systemContextResolver ?? null;
     this.systemContextRules = options.systemContextRules ?? null;

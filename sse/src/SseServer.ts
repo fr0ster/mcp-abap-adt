@@ -8,7 +8,11 @@ import type {
   IHttpApplication,
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
-import { BaseMcpServer, closeInstance } from '@mcp-abap-adt/lib/embeddable';
+import {
+  BaseMcpServer,
+  closeInstance,
+  InstanceBatch,
+} from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
   createServerListener,
@@ -45,6 +49,12 @@ export interface SseServerOptions {
   stateIdleMinutes?: number;
   /** Where the state's lifecycle lines go; default stderr, always on. */
   stateLogger?: StateLogger;
+  /**
+   * Batch mode: each SSE connection's instance gets an `InstanceBatch` of
+   * its own, created with these settings (the launcher's). Absent: no
+   * instance has one, and the batch tools answer `batch_mode_unavailable`.
+   */
+  batch?: { keepRawParts: boolean };
   /**
    * Host to bind to (only used when no external app is provided)
    * @default "127.0.0.1"
@@ -149,6 +159,7 @@ export class SseServer {
   private readonly stateIdleMinutes?: number;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
+  private readonly batchSettings: { keepRawParts: boolean } | undefined;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -173,6 +184,10 @@ export class SseServer {
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRuns = opts?.backgroundRuns;
+    this.batchSettings =
+      opts?.batch === undefined
+        ? undefined
+        : { keepRawParts: opts.batch.keepRawParts === true };
   }
 
   /**
@@ -355,6 +370,7 @@ export class SseServer {
           stateIdleMinutes?: number;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
+          batch?: InstanceBatch;
         },
       ) {
         super({
@@ -384,6 +400,10 @@ export class SseServer {
         stateLogger: this.stateLogger,
         ...(this.backgroundRuns !== undefined && {
           backgroundRuns: this.backgroundRuns,
+        }),
+        // Batch mode: this connection's own, never shared with another.
+        ...(this.batchSettings !== undefined && {
+          batch: new InstanceBatch(this.batchSettings),
         }),
       },
     );

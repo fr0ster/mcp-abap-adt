@@ -443,8 +443,15 @@ describe('the YAML template and validation come from the table', () => {
 
   it('holds http rows under http, and no other binary keys', () => {
     expect(Object.keys(parsed).sort()).toEqual(
-      ['http', 'shutdown-timeout', 'state-idle-minutes', 'system-type'].sort(),
+      [
+        'batch',
+        'http',
+        'shutdown-timeout',
+        'state-idle-minutes',
+        'system-type',
+      ].sort(),
     );
+    expect(parsed.batch).toEqual({ keepRawParts: false });
     expect(Object.keys(parsed.http as object).sort()).toEqual(
       [
         'allowed-hosts',

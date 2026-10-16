@@ -13,7 +13,7 @@ Sources read: `src/embeddable/BaseMcpServer.ts`, `src/handlers/interfaces.ts`, `
 adt-clients 33.0.0 and 34.0.0 (`src/batch/AdtBatchConnection.ts`, `src/batch/wire.ts`,
 `src/utils/adtResponse.ts`, `src/core/domain/AdtDomain.ts`, `docs/usage/BATCH.md`, `CHANGELOG.md`)
 (33.0.0 in its `credential-refusals` worktree; 34.0.0 at tag `v34.0.0`, with
-`docs/usage/MIGRATION-34.md`). Claims about adt-clients are tagged **[code]** (read in its
+`docs/usage/MIGRATION-34.md`; 34.1.0 at tag `v34.1.0`). Claims about adt-clients are tagged **[code]** (read in its
 source), **[doc]** (stated in its BATCH.md or CHANGELOG, not traced in code) or **[unverified]**.
 
 ## 1. What adt-clients gives, and what it does not
@@ -55,10 +55,10 @@ source), **[doc]** (stated in its BATCH.md or CHANGELOG, not traced in code) or 
   **[code]**; no raw text of a part — only `{ status, statusText, headers (names lower-cased),
   data }` **[code]**.
 
-The server depends on `@mcp-abap-adt/adt-clients ^34.0.0` (34.0.0 keeps 33.0.0's credential
-refusals and exempts a batch from accept negotiation, §4.7). It is not on the registry yet (the
-owner publishes it): the bump lands only after 34.0.0 is on the registry (owner's rule: no local
-link). `adt-strategies ^0.12.0` stays; its compatibility with 34.0.0 is checked by the build at the
+The server depends on `@mcp-abap-adt/adt-clients ^34.1.0` (34.0.0 keeps 33.0.0's credential
+refusals and exempts a batch from accept negotiation; 34.1.0 exports `exemptFromAcceptNegotiation`,
+§4.7). The bump lands only after 34.1.0 is on the registry (owner's rule: no local
+link). `adt-strategies ^0.12.0` stays; its compatibility with 34.1.0 is checked by the build at the
 bump **[unverified]**.
 
 ## 2. Where batch state lives
@@ -341,12 +341,11 @@ parts as it came and is not sent again. The connection's own handling of the env
 credential renewal, CSRF recovery, session — stays as it is (§5.1). The server adds no switch of its
 own; outside a batch, accept negotiation works as before.
 
-The exemption is a mark read on the connection object a member is handed (a symbol property,
-`isExempt`, `acceptNegotiation.ts` at `v34.0.0`) **[code]**. The per-call recorder (§4.1) therefore
-reads every property, symbols included, from the `AdtBatchConnection` it records into, and
-overrides only `makeAdtRequest` (and keeps any property a client writes onto it, such as
-`withRequestTrace`'s method, on itself, never on the shared batch connection) — so the members see
-the batch connection's mark. The test of §9.1 ("No retry in batch mode") proves it end to end.
+The exemption belongs to the connection object a member is handed. The per-call recorder (§4.1) is
+an object of its own, so the server marks it with adt-clients' exported
+`exemptFromAcceptNegotiation(recorder)` (package index, `src/index.ts:30` at `v34.1.0` **[code]**)
+when it creates it — a stated contract of adt-clients, nothing read through. The tests of §9.1 ("No
+retry in batch mode") prove it, the mark's absence included.
 
 ## 5. Execution at `BatchEnd`
 
@@ -560,8 +559,9 @@ watch the test go red, revert (the *Break* line).
   supported `Accept` in the answer) and `415`: each is that call's answer, built by its handler as
   any failure; the fake saw each request once and no follow-up envelope; the instance's plain
   connection still corrects outside the batch; also an envelope answered `406` is not sent again.
-  *Break:* make the per-call recorder a plain forwarding object that does not read the batch
-  connection's properties (the exemption mark is then not seen).
+  The mark is load-bearing: the same recorder created **without** `exemptFromAcceptNegotiation` is
+  negotiated — its `406` part is corrected and recorded again, a follow-up envelope is sent — and
+  the test asserts that too. *Break:* drop the `exemptFromAcceptNegotiation(recorder)` call.
 - **Only batch tools and eligible tools while a batch is open** — a high tool, `HandlerUpdate`
   DOMAIN with `properties`, a debugger tool during a communication batch, a leftover-session tool:
   refused, handler not called, nothing recorded or sent. *Break:* default eligibility to true.
@@ -644,7 +644,7 @@ No unit test talks to SAP; no live test runs in CI.
 
 ## 10. Docs, changelog, dependency
 
-- **Dependency:** `@mcp-abap-adt/adt-clients` `^32.0.0` → `^34.0.0`, after 34.0.0 is on the registry;
+- **Dependency:** `@mcp-abap-adt/adt-clients` `^32.0.0` → `^34.1.0`, after 34.1.0 is on the registry;
   the lockfile checked for anything not from the registry.
 - **README.md** — a "Batch mode" section: what it is for, the phases (create / lock / write / unlock,
   each a batch), the tools, the handle header over HTTP.
@@ -664,7 +664,7 @@ No unit test talks to SAP; no live test runs in CI.
 - **docs/MIGRATION-19.0.md** — embedders: the new `batch` constructor option (absent → batch tools
   answer `batch_mode_unavailable`); the new tools in every set; the compact create and write modes.
 - **CHANGELOG.md** — the 19.0.0 entry (this PR's release) gains under *Added* the batch mode, the
-  debugger batch and the two compact modes, and under *Changed* adt-clients `^34.0.0` with what it
+  debugger batch and the two compact modes, and under *Changed* adt-clients `^34.1.0` with what it
   changes for the server (a credential refusal rethrown by every member; a batch corrects and
   resends nothing). No earlier version's
   entry is touched.

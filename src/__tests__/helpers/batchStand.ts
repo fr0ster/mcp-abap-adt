@@ -201,6 +201,8 @@ export interface StandOptions {
   /** How each built connection answers an envelope; default part by part. */
   envelope?: EnvelopeAnswer;
   keepRawParts?: boolean;
+  /** Groups served beside the shipped tools named (a test's own handlers). */
+  groups?: IHandlerGroup[];
 }
 
 /**
@@ -237,6 +239,7 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
   const server = new StandServer(
     [
       ...shippedGroup(options.tools),
+      ...(options.groups ?? []),
       new BatchHandlersGroup({ connection: undefined as never }),
       new CompactBatchHandlersGroup({ connection: undefined as never }),
     ],

@@ -28,6 +28,8 @@ import { batchStand, payloadOf } from '../../helpers/batchStand';
 import { runPlainNode } from '../../helpers/plainNode';
 
 const SCENARIO = 'src/__tests__/unit/batch/scenarios/batchDrop.scenario.ts';
+const DURING_END =
+  'src/__tests__/unit/batch/scenarios/closeDuringEnd.scenario.ts';
 
 const sap = (inner: InnerRequest): PartAnswer => ({
   status: 200,
@@ -107,6 +109,26 @@ describe('the instance close with a batch open', () => {
       });
     },
   );
+});
+
+describe('the instance close while BatchEnd executes', () => {
+  it('plain node: nothing more sent after the drop, no answers afterwards, no unhandled rejection', async () => {
+    const report = await runPlainNode(DURING_END);
+    expect(report).toEqual({
+      numbers: [1, 2],
+      // The LOCK's envelope was on the wire at the drop; the read's never went.
+      envelopes: [1],
+      direct: [],
+      modeAtDrop: 'off',
+      mode: 'off',
+      holdsState: false,
+      // BatchEnd's end() after the drop re-installs nothing.
+      answers: [null, null],
+      settled: true,
+      endSettled: true,
+      unhandled: [],
+    });
+  });
 });
 
 describe('the idle bound with a batch open (Review Focus 4)', () => {

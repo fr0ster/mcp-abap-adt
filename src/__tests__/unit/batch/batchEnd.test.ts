@@ -20,6 +20,10 @@ import { failureOf } from '../../../lib/auth/failures';
 import { BATCH_MODE_OFF_WORDS } from '../../../lib/auth/serverRefusal';
 import { endsCommunicationBatch } from '../../../lib/batch/batchTools';
 import type { BatchAnswer } from '../../../lib/batch/InstanceBatch';
+import type {
+  HandlerContext,
+  IHandlerGroup,
+} from '../../../lib/handlers/interfaces';
 import type { InnerRequest, PartAnswer } from '../../helpers/batchEnvelope';
 import { envelopeResponse, statusError } from '../../helpers/batchEnvelope';
 import {
@@ -583,6 +587,58 @@ describe('BatchEnd', () => {
     expect(answer.isError).toBe(true);
     expect(s.owner.mode()).toBe('communication');
     expect(s.owner.opened()).not.toBe(first);
+    await s.close();
+  });
+
+  it("a recorded handler that throws: its number answers the handler's failure, the summary lists it, nothing rejects", async () => {
+    const throwing = {
+      getName: () => 'throwing',
+      getHandlers: () => [
+        {
+          toolDefinition: {
+            name: 'GetProgram',
+            description: 'GetProgram',
+            inputSchema: {
+              type: 'object',
+              properties: { program_name: { type: 'string' } },
+            },
+          },
+          // Two parameters: the server hands `(context, args)` by the arity.
+          handler: async (context: HandlerContext, _args: unknown) => {
+            await context.connection.makeAdtRequest({
+              url: '/sap/bc/adt/programs/programs/prog_a/source/main',
+              method: 'GET',
+              timeout: 0,
+            });
+            throw new Error('the handler failed after its part');
+          },
+        },
+      ],
+      registerHandlers: () => {},
+    } as unknown as IHandlerGroup;
+    const s = await batchStand({
+      tools: ['ReadClass'],
+      part: sap,
+      groups: [throwing],
+    });
+    s.begin();
+    expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
+      content: [],
+    });
+    expect(await s.call('ReadClass', { class_name: 'CL_A' })).toEqual({
+      content: [],
+    });
+    const { answer, summary } = await s.end();
+    expect(answer.isError).toBeFalsy();
+    expect(summary).toEqual({ recorded: 2, failed: [1] });
+    const [first, second] = await s.answers([1, 2]);
+    expect(first).toMatchObject({ number: 1, isError: true });
+    expect(
+      JSON.stringify((first as BatchAnswer | undefined)?.content),
+    ).toContain('the handler failed after its part');
+    expect(second?.number).toBe(2);
+    expect((second as BatchAnswer | undefined)?.isError).toBeUndefined();
+    expect(s.executes).toHaveBeenCalledTimes(1);
     await s.close();
   });
 

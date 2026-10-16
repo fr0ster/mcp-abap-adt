@@ -112,7 +112,7 @@ export async function executeBatch(
     }
   } finally {
     target.point(undefined);
-    owner.end(answers);
+    owner.end(answers, open);
   }
   if (rejected && failureOf(error) !== undefined) throw error;
   const numbers = [...answers.keys()].sort((a, b) => a - b);
@@ -151,7 +151,7 @@ export function endBeforeExecute(
     });
   }
   open.target.point(undefined);
-  owner.end(answers);
+  owner.end(answers, open);
 }
 
 /** `BatchEnd`'s answer: the summary, as JSON. */

@@ -8,7 +8,9 @@
  * The owner points the target: during a recording call's turn at the
  * connection that call took (what `connect()` / `getBaseUrl()` /
  * `getSessionId()` of the batch connection reach while recording), at
- * `BatchEnd` at the connection `BatchEnd` took — and clears it after.
+ * `BatchEnd` at the connection `BatchEnd` took — and clears it after. A
+ * dropped batch seals it (`seal()`): it points at nothing from then on, so
+ * an `execute()` running at the drop sends no further envelope.
  *
  * It sends nothing of its own: `makeAdtRequest` is reached only from the
  * batch connection's `execute()` (the envelopes), and the session members
@@ -42,17 +44,33 @@ interface SessionAware {
 export const LATE_BOUND_UNPOINTED_WORDS =
   'the batch connection points at no connection now: nothing was sent';
 
+/** A member reached after the batch was dropped. */
+export const LATE_BOUND_DROPPED_WORDS =
+  'the batch was dropped: nothing more was sent';
+
 export class LateBoundConnection implements IAbapConnection {
   private current: IAbapConnection | undefined;
+  private sealed = false;
 
-  /** Points the target at `connection`; `undefined` clears it. */
+  /** Points the target at `connection`; `undefined` clears it. Sealed, it stays cleared. */
   point(connection: IAbapConnection | undefined): void {
+    if (this.sealed) return;
     this.current = connection;
+  }
+
+  /** The batch was dropped: the target is cleared for good. */
+  seal(): void {
+    this.sealed = true;
+    this.current = undefined;
   }
 
   private target(): IAbapConnection {
     const current = this.current;
-    if (current === undefined) throw new Error(LATE_BOUND_UNPOINTED_WORDS);
+    if (current === undefined) {
+      throw new Error(
+        this.sealed ? LATE_BOUND_DROPPED_WORDS : LATE_BOUND_UNPOINTED_WORDS,
+      );
+    }
     return current;
   }
 

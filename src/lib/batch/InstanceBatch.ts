@@ -129,18 +129,31 @@ export class InstanceBatch implements StatePart {
     return this.requireOpen().controller.signal;
   }
 
-  /** The batch was executed: mode off, its answers replace the last ones. */
-  end(answers: ReadonlyMap<number, BatchAnswer>): void {
+  /**
+   * The batch was executed: mode off, its answers replace the last ones.
+   * Only the open batch ends — `ending`, when given, must be it: with none
+   * open (the batch was dropped while it executed) or another one open,
+   * nothing changes, so a drop is never undone by answers that come after.
+   */
+  end(answers: ReadonlyMap<number, BatchAnswer>, ending?: OpenBatch): void {
+    const current = this.opened_;
+    if (current === undefined) return;
+    if (ending !== undefined && current.batch !== ending) return;
     this.opened_ = undefined;
     this.answers = new Map(answers);
     this.changed();
   }
 
-  /** Lets the open batch go with nothing sent: mode off, its signal aborted, the answers gone. */
+  /**
+   * Lets the open batch go with nothing sent: mode off, its signal aborted,
+   * its target sealed (an `execute()` running now sends no further
+   * envelope), the answers gone.
+   */
   drop(): void {
     const current = this.opened_;
     this.opened_ = undefined;
     this.answers = undefined;
+    current?.batch.target.seal();
     current?.controller.abort();
     this.changed();
   }

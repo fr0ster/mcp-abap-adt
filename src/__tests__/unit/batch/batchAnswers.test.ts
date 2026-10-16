@@ -17,6 +17,7 @@ import {
   type BatchAnswer,
   InstanceBatch,
 } from '../../../lib/batch/InstanceBatch';
+import { LateBoundConnection } from '../../../lib/batch/lateBound';
 import { batchStand } from '../../helpers/batchStand';
 
 const answerOf = (number: number): BatchAnswer => ({
@@ -27,6 +28,11 @@ const answerOf = (number: number): BatchAnswer => ({
 /** An owner whose last batch answered 1, 2 and 3. */
 function answered(): InstanceBatch {
   const owner = new InstanceBatch({ keepRawParts: false });
+  owner.begin('communication', {
+    connection: {} as never,
+    target: new LateBoundConnection(),
+    recorded: [],
+  });
   owner.end(new Map([1, 2, 3].map((n) => [n, answerOf(n)])));
   return owner;
 }

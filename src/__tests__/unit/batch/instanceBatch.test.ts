@@ -148,6 +148,33 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
     expect(second.execute).not.toHaveBeenCalled();
   });
 
+  it('end after a drop leaves the dropped state: no answers re-installed, the target sealed', () => {
+    const batch = new InstanceBatch({ keepRawParts: false });
+    const dropped = fakeBatch();
+    batch.begin('communication', dropped.open);
+    batch.drop();
+    batch.end(new Map([[1, answerOf(1)]]), dropped.open);
+    expect(batch.mode()).toBe('off');
+    expect(batch.answer(1)).toBeUndefined();
+    expect(batch.holdsState()).toBe(false);
+    // Sealed: pointing it again changes nothing.
+    dropped.open.target.point({} as never);
+    expect(dropped.open.target.getSessionId()).toBeNull();
+  });
+
+  it('end of a dropped batch does not end the batch begun since', () => {
+    const batch = new InstanceBatch({ keepRawParts: false });
+    const dropped = fakeBatch();
+    batch.begin('communication', dropped.open);
+    batch.drop();
+    const next = fakeBatch();
+    batch.begin('communication', next.open);
+    batch.end(new Map([[1, answerOf(1)]]), dropped.open);
+    expect(batch.mode()).toBe('communication');
+    expect(batch.opened()).toBe(next.open);
+    expect(batch.answer(1)).toBeUndefined();
+  });
+
   it('signal aborts on drop and dispose, not on end', async () => {
     const batch = new InstanceBatch({ keepRawParts: false });
     batch.begin('communication', fakeBatch().open);

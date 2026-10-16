@@ -56,14 +56,14 @@
 ### Task 2: RFC through a message server and a logon group
 
 **Files:**
-- Modify: `src/lib/config.ts` (the env → `SapConfig` read), `server/src/config/envFileContext.ts` (`ENV_FILE_CONTEXT_KEYS`, only if these are per-destination keys as `SAP_CLIENT` is), `server/src/config/coreParameters.ts` and `src/lib/config/authParameters.ts` (CLI / YAML forms, beside `--connection-type`), `server/src/launcher.ts` (help text), `tests/test-config.yaml.template`, the `.env` templates the docs show
-- Test: `src/__tests__/unit/config/rfcMessageServer.test.ts`, `server/src/__tests__/rfcMessageServerParameters.test.ts`
+- Modify: the whole stdio chain — `server/src/launcher.ts` (its settings) → `server/src/auth/IAuthBrokerFactoryConfig.ts` (the fields on `IAuthBrokerFactoryConfig`) → `server/src/auth/brokerFactory.ts` (`readSettings`' `SapConfig` construction) — and `src/lib/config.ts` (`getConfig()`, the env → `SapConfig` read); `server/src/config/envFileContext.ts` (`ENV_FILE_CONTEXT_KEYS`, only if these are per-destination keys as `SAP_CLIENT` is), `server/src/config/coreParameters.ts` and `src/lib/config/authParameters.ts` (CLI / YAML forms, beside `--connection-type`), `server/src/launcher.ts` (help text), `tests/test-config.yaml.template`, the `.env` templates the docs show
+- Test: `src/__tests__/unit/config/rfcMessageServer.test.ts`, `server/src/__tests__/rfcMessageServerParameters.test.ts`, `server/src/__tests__/rfcMessageServerChain.test.ts`
 
 **Interfaces:**
 - Consumes: `ISapConfig.mshost`, `.msserv`, `.sysid`, `.group`, `.saprouter` (Task 1).
-- Produces: `SapConfig` carries `mshost`, `msserv`, `sysid`, `group`, `saprouter` exactly as configured. Environment names `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER` (connection's own gated test uses the first three); CLI and YAML spellings follow the `connection-type` entry's form. The server adds no default (`group`'s `PUBLIC` is connection's) and decides nothing: a config with `mshost` and neither `msserv` nor `sysid` reaches connection, which refuses it naming both.
+- Produces: `SapConfig` carries `mshost`, `msserv`, `sysid`, `group`, `saprouter` exactly as configured. Environment names `SAP_MSHOST`, `SAP_MSSERV`, `SAP_SYSID`, `SAP_GROUP`, `SAP_SAPROUTER` (owner-approved); CLI and YAML spellings follow the `connection-type` entry's form. The server adds no default (`group`'s `PUBLIC` is connection's) and decides nothing: a config with `mshost` and neither `msserv` nor `sysid` reaches connection, which refuses it naming both.
 
-- [ ] **Step 1: Write the failing tests** — `rfcMessageServer.test.ts`: `each of SAP_MSHOST, SAP_MSSERV, SAP_SYSID, SAP_GROUP, SAP_SAPROUTER reaches the SapConfig handed to createConnection, as given (trimmed only as SAP_CLIENT is)`; `absent fields are absent, not defaulted (no group: PUBLIC from the server)`; `mshost without msserv and sysid: connection's refusal reaches the caller as it came, naming both`; `with mshost, SAP_SYSNR is not read by the server either`. `rfcMessageServerParameters.test.ts`: `the CLI and YAML forms reach the same fields`; `another binary's form of them stops the start as other foreign parameters do`.
+- [ ] **Step 1: Write the failing tests** — `rfcMessageServer.test.ts`: `each of SAP_MSHOST, SAP_MSSERV, SAP_SYSID, SAP_GROUP, SAP_SAPROUTER reaches the SapConfig handed to createConnection, as given (trimmed only as SAP_CLIENT is)`; `absent fields are absent, not defaulted (no group: PUBLIC from the server)`; `mshost without msserv and sysid: connection's refusal reaches the caller as it came, naming both`; `with mshost, SAP_SYSNR is not read by the server either`. `rfcMessageServerParameters.test.ts`: `the CLI and YAML forms reach the same fields`; `another binary's form of them stops the start as other foreign parameters do`. `rfcMessageServerChain.test.ts` (launcher → broker factory, `createConnection` captured): for each input — process env, destination `.env` file, CLI, YAML — `the settings handed to createConnection carry the five fields as given`; `an absent field stays absent (no key, not undefined-as-default)`.
 - [ ] **Step 2:** Run `npm test -- src/__tests__/unit/config/rfcMessageServer.test.ts server/src/__tests__/rfcMessageServerParameters.test.ts` — FAIL.
 - [ ] **Step 3:** Carry the five fields through every configuration path (process env, destination `.env`, YAML, CLI) into `SapConfig`.
 - [ ] **Step 4:** Run — PASS.
@@ -223,11 +223,11 @@
 **Interfaces:**
 - Produces: schema `document: { type: 'string', description: <spec §4.6 words> }`; for DOMAIN, DATA_ELEMENT, PACKAGE with `lock_handle` + `document`: `get<Type>().updateMetadata({ name, transportRequest }, { source: document, lockHandle, analyse })`.
 
-- [ ] **Step 1: Write the failing tests** — `one PUT, body the given document byte for byte, the given lock handle, no read`; `document without lock_handle refused before sending`; `document beside properties refused`; `properties alone keeps the read-patch-write`.
+- [ ] **Step 1: Write the failing tests** — `one PUT, body the given document byte for byte, the given lock handle, no read`; `document without lock_handle refused before sending`; `document beside properties refused before any request`; parameterised over every flat metadata field `propertiesOf()` reads (`FLAT_PROPERTIES` of `handleUpdateUnderLock.ts`: `description`, `datatype`, `length`, `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`) × the values `false`, `0`, `''`: `document beside <field> = <value> refused before any request` (presence, not truthiness); `transport_request beside document is accepted` (it is the write's transport, not metadata); `properties alone keeps the read-patch-write`.
 - [ ] **Step 2:** Run — FAIL.
-- [ ] **Step 3:** Implement; add the three `HandlerUpdate`/`document` entries.
+- [ ] **Step 3:** Implement: the refusal of `document` beside `properties` or any of those fields (`!== undefined`), before any request; the `document` write; add the three `HandlerUpdate`/`document` entries.
 - [ ] **Step 4:** Run, with Task 4's tests — PASS.
-- [ ] **Step 5: Break it:** read before writing — red; revert.
+- [ ] **Step 5: Break it:** read before writing; test the fields by truthiness — each red; revert.
 - [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, surface fixture, CHANGELOG 19.0.0 *Added*.
 - [ ] **Step 7:** Commit `feat(compact): HandlerUpdate document under a lock`.
 
@@ -254,17 +254,20 @@
 
 **Files:**
 - Create: `src/lib/batch/phases.ts`, `src/lib/batch/availability.ts`
-- Modify: `src/embeddable/BaseMcpServer.ts` (destination known parameters gain `communicationBatch?: false`)
-- Test: `src/__tests__/unit/batch/phases.test.ts`, `src/__tests__/unit/batch/availability.test.ts`
+- Modify: `src/embeddable/BaseMcpServer.ts` (the destination record owns the availability port; `HandlerContext` gets it), `src/handlers/interfaces.ts` (`HandlerContext.batchAvailability?`), `src/lib/longCall.ts` (the port carried into the fresh long-call context `runLongCall` builds from `openFreshConnection`)
+- Test: `src/__tests__/unit/batch/phases.test.ts`, `src/__tests__/unit/batch/availability.test.ts`, `src/__tests__/unit/batch/availabilityAcrossFreshConnections.test.ts`
 
 **Interfaces:**
-- Produces: `runPhase<I, R>(connection: IAbapConnection, items: readonly I[], read: (item: I, batch: IAbapConnection) => Promise<R>): Promise<PhaseResult<R>[]>` with `type PhaseResult<R> = { ok: true; value: R } | { ok: false; error: unknown }` (a credential refusal rethrown, never a result); `batchAvailable(connection: IAbapConnection): boolean`; `noteOuterStatus(connection: IAbapConnection, status: number): void`; `withSequentialFallback<R>(connection, batched: () => Promise<R>, sequential: () => Promise<R>): Promise<R>`.
+- Produces:
+  - `interface BatchAvailability { available(): boolean; noteOuterStatus(status: number): void }` — **destination-scoped**: one per destination record of the instance (the record `destinationSystems` keeps today, found by the resolved credential and target), never keyed by a connection object; `HandlerContext.batchAvailability?: BatchAvailability`, set by the dispatch from the call's destination and kept in every context derived from it (`{ ...context, connection: own }` in `runLongCall`, inner handlers' contexts).
+  - `runPhase<I, R>(context: HandlerContext, items: readonly I[], read: (item: I, batch: IAbapConnection) => Promise<R>): Promise<PhaseResult<R>[]>` with `type PhaseResult<R> = { ok: true; value: R } | { ok: false; error: unknown }` (a credential refusal rethrown, never a result); it batches over `context.connection` and reports the outer status to `context.batchAvailability`.
+  - `withSequentialFallback<R>(context: HandlerContext, batched: () => Promise<R>, sequential: () => Promise<R>): Promise<R>` — `sequential` when `context.batchAvailability?.available() === false`, or when the first envelope of `batched` meets the outer `404`.
 
-- [ ] **Step 1: Write the failing tests** (real `AdtBatchConnection` 34.1.0) — `phases.test.ts`: `all items in one envelope; results in item order`; `a part's 404 is that item's failure, the rest answer`; `an envelope failure is every item's, as it came`; `a credential refusal rethrows`. `availability.test.ts`: `an outer 404 the transport rejects (with response) marks the destination; that call and later ones run sequentially`; `an outer 404 a connection resolves without a multipart body marks it (via the forwarding connection under the batch)`; `an inner part's 404 leaves batching on`; `any other envelope failure is not a verdict`.
+- [ ] **Step 1: Write the failing tests** (real `AdtBatchConnection` 34.1.0) — `phases.test.ts`: `all items in one envelope; results in item order`; `a part's 404 is that item's failure, the rest answer`; `an envelope failure is every item's, as it came`; `a credential refusal rethrows`. `availability.test.ts`: `an outer 404 the transport rejects (with response) marks the destination; that call and later ones run sequentially`; `an outer 404 a connection resolves without a multipart body marks it (via the forwarding connection under the batch)`; `an inner part's 404 leaves batching on`; `any other envelope failure is not a verdict`. `availabilityAcrossFreshConnections.test.ts` (a served long-read tool, two calls of one destination, each on its own fresh connection from `openFreshConnection`): `after the first call's outer 404 the second call sends no envelope and runs sequentially`; `a call of another destination still sends its envelope`.
 - [ ] **Step 2:** Run — FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run — PASS.
-- [ ] **Step 5: Break it:** treat every envelope failure as "no batch"; read the parser's error instead of the outer status — each red; revert.
+- [ ] **Step 5: Break it:** treat every envelope failure as "no batch"; read the parser's error instead of the outer status; key the availability by connection object (the second fresh connection then sends an envelope) — each red; revert.
 - [ ] **Step 6:** Commit `feat: internal batch phases and availability`.
 
 ### Task 14: Package walks on batches
@@ -274,7 +277,7 @@
 - Test: `src/__tests__/unit/batch/packageWalks.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase`, `withSequentialFallback` (Task 13).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 13).
 - Produces: schemas — `GetPackageContents.package_names: string[]`, `GetPackageTree.package_names: string[]`, `GetObjectsList.objects: [{ parent_type, parent_name }]` (names checked against the tool's current arguments), `GetObjectInfo.objects: [{ object_type, object_name }]`, `HandlerGet` part `contents` `package_names`; exactly one of single/list.
 
 - [ ] **Step 1: Write the failing tests** — per tool on fixtures: `same answer as the sequential version`; `envelopes per spec §11's row (per level: roots, then type nodes)`; `no envelope holds a request needing another of its parts`; `several roots: the envelope count does not grow with their number`; `a part failure is that item's`; `credential refusal ends the call as it came`; `no communication batch → the sequential path`.
@@ -292,7 +295,7 @@
 - Test: `src/__tests__/unit/batch/searchSource.test.ts`
 
 **Interfaces:**
-- Consumes: Tasks 13–14 (`walkPackage` by levels).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)` (Task 13); `walkPackage` by levels (Task 14).
 
 - [ ] **Step 1: Write the failing tests** — `same hits as the sequential version`; `phases: masks, walk levels, sources up to max_objects`; `time_budget_ms checked between phases, truncated.by_timeout as today`; `no concurrency in the schema`; part failure; credential refusal.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.
@@ -306,6 +309,7 @@
 - Test: `src/__tests__/unit/batch/includeTrees.test.ts`
 
 **Interfaces:**
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 13).
 - Produces: `GetIncludesList.objects`, `GetStructuresList.structure_names`, `GetEnhancements.objects` (exactly one of single/list).
 
 - [ ] **Step 1: Write the failing tests** — per tool: same answer; phases per spec §11 (includes per depth up to 20; structure-then-table; where-used pairs; candidates; enhancement probes one per phase, then enhancements + root, includes node, nested up to `max_includes`); several objects; part failure; credential refusal.
@@ -319,6 +323,9 @@
 - Modify: `src/handlers/transport/readonly/handleListTransports.ts`, `src/handlers/system/readonly/handleDescribeByList.ts`, `src/handlers/system/readonly/handleGetAbapSystemSymbols.ts`
 - Test: `src/__tests__/unit/batch/objectLists.test.ts`
 
+**Interfaces:**
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 13).
+
 - [ ] **Step 1: Write the failing tests** — `ListTransports: configurations, then every configuration's GET in one envelope`; `DescribeByList: all quickSearches, then the typeless ones for the empty answers`; `GetAbapSystemSymbols: each phase only independent requests; a failed call answers the error, nothing retried`; same answers; part failure; credential refusal.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.
 - [ ] **Step 5: Break it:** put a dependent request in the first envelope — red; revert.
@@ -331,6 +338,7 @@
 - Test: `src/__tests__/unit/batch/whereUsedAndFeeds.test.ts`
 
 **Interfaces:**
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 13).
 - Produces: `GetWhereUsed.objects: [{ object_type, object_name }]` (and `HandlerWhereUsed`), `RuntimeListFeeds.feed_types: string[]` (and `HandlerDumpList`).
 
 - [ ] **Step 1: Write the failing tests** — `where-used: one envelope of every object's scope, one of every scoped request — two for any number`; `feeds: every feed's first GET in one envelope, then per round the next page of every feed still paging`; single argument keeps today's answer shape; list answers one entry per object in order; part failure; credential refusal.

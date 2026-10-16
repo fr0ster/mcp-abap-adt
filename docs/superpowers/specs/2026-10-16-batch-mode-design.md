@@ -690,11 +690,44 @@ No unit test talks to SAP; no live test runs in CI.
 
 ## 11. Multi-request long reads on internal batches
 
-Every long read that sends more than one request (`tools/long-handlers.json`' `sends`) is
-reimplemented on batches: its handler runs its own work through an `AdtBatchConnection`
-(`endpoint: 'communication'`) **in phases** — the requests of one phase that do not depend on each
-other go in one envelope; the next phase is built from those answers. One tool call for the model,
-as today; its answer is the same as the sequential version's.
+Every read that sends more than one request — the multi-request long reads of
+`tools/long-handlers.json`, and `GetEnhancements`' include traversal — is reimplemented on batches,
+**wherever batching is possible**: its handler runs its own work through an `AdtBatchConnection`
+(`endpoint: 'communication'`) **in phases**. One tool call for the model, as today; its answer is the
+same as the sequential version's.
+
+**The rule for every phase: all requests in one envelope are independent of each other.** A request
+that needs another's answer goes in a later phase. Each level is read once, in one envelope, and
+then the answers are assembled. A sequence of envelopes lets one call get the information for
+**several** objects at once (§11's schema proposals).
+
+**Only the batched version stays.** The sequential version remains only for systems where the
+communication batch does not exist (below); there it is the same code path the handler has today.
+Parallelism knobs the batched version makes meaningless are removed: `SearchSource`'s `concurrency`
+(the only such parameter in the handlers today).
+
+### Whether the system has the communication batch
+
+The server learns it from the system, never from the system type, the release or the connection
+kind:
+
+- **Discovery does not settle it.** The server reads no ADT discovery today (only a `discovery`
+  result strategy exists, `src/lib/strategies/resultSets.ts:140`). The discovery documents in the
+  repository list `/sap/bc/adt/debugger/batch` (`docs/adt-discovery.xml:5865`,
+  `docs/discovery.json:31174`) but not `/sap/bc/adt/communication/batch`, although adt-clients
+  measured the communication batch working on-premise and on ABAP Cloud **[doc]** — so its absence
+  from discovery means nothing.
+- **RFC offers nothing else to read**: an ADT request over RFC is the same request; the same rule
+  applies.
+- *[Proposal, pending owner confirmation]* **The system's own answer to the batch endpoint.** The
+  first internal batch on a destination sends its first envelope; when the outer answer is not a
+  multipart batch answer (adt-clients' `parseBatchResponse` refuses it: "missing multipart boundary"
+  **[code]**) and its status says the endpoint is not served (`404`), the destination is remembered
+  as having no communication batch — kept with the destination's known parameters, as
+  `systeminformation`'s answer is (`destinationSystems`, once per destination) — and that call and
+  later ones run sequentially. Any other envelope failure is that phase's failure (§11, Failures), not
+  a verdict on the endpoint. What a system without the endpoint answers is **[unverified]**; a live
+  test on such a system confirms it before the rule is relied on.
 
 ### The shared mechanism
 
@@ -709,8 +742,9 @@ as today; its answer is the same as the sequential version's.
   flight if one is. Reads are stateless, so a phase is one envelope.
 - **The 100-envelope bound.** Each phase is its own `execute()`, and a read phase sends one envelope
   with no follow-ups (negotiation records none in 34 **[doc]**), so adt-clients' bound of 100
-  envelopes per `execute()` **[code]** is never reached. Parts per envelope have no adt-clients
-  limit; payload limits are unmeasured **[doc]** (open question 1).
+  envelopes per `execute()` **[code]** is never reached. **No cap of ours on parts per envelope**
+  (owner's decision): each level is read once, in one envelope; payload limits are unmeasured
+  **[doc]**, and the live test measures the largest phases.
 - **Failures.** A part's non-2xx is that item's failure, read by the item's own strategies, as the
   per-item failure today (`FailedObject`, the C6 entry with its `step`). An envelope that fails
   (no parts) is every item of that phase's failure, the envelope's error as it came, with its step.
@@ -739,19 +773,45 @@ as today; its answer is the same as the sequential version's.
 | `GetIncludesList` | function group: (1) the `nodestructure`; then per depth (up to 20): the source GET of every include of the level; class: its one metadata GET (no batch) |
 | `ListTransports` | (1) the search configurations GET; (2) the transport-request GET of every saved configuration (up to 5) |
 | `DescribeByList` | (1) the quickSearch of every object; (2) again without its type, for the objects whose first answer was empty |
-| `GetAbapSystemSymbols` | (1) the read of every symbol found (class / function module / interface / generic), through the inner handlers (open question 2) |
-| `GetWhereUsed` with a type filter, `HandlerWhereUsed` | (1) the where-used scope; (2) the scoped where-used request — two dependent requests, one part per envelope (open question 3) |
-| `RuntimeListFeeds`, `HandlerDumpList` | (1) the feed (or variants) GET; then each page from the previous page's next link — one part per envelope (open question 3) |
+| `GetAbapSystemSymbols` | the reads of every symbol found, through the inner handlers (`handleGetClass`, `handleGetFunctionModule`, `handleGetInterface`, generic): each phase holds every symbol's request of that step that is independent of the others, by the rule; a request needing an earlier answer goes in the next phase. If the call fails, the consumer gets the error and remakes the call — nothing is retried |
+| `GetWhereUsed` (with a type filter), `HandlerWhereUsed` | (1) the where-used scope of **every** object asked; (2) every scoped where-used request — two envelopes for any number of objects |
+| `RuntimeListFeeds`, `HandlerDumpList` | (1) the feed (or variants) GET of every feed asked; then per round, the next page of every feed still paging, in one envelope (a page needs its own feed's previous next link) |
+| `GetEnhancements` | (1) the type probes of the object (class → program → include, each only when the earlier answered none — dependent, one per phase); (2) the object's enhancements and its root `nodestructure`; (3) the includes `nodestructure`; (4) with `include_nested`, the enhancements of every include, up to `max_includes`, in one envelope |
 
 Each row is to be confirmed against its handler when it is reimplemented; a dependency the table
 does not show splits a phase, never joins two.
 
+### Schema proposals: several objects per call
+
+*[Proposal, pending owner confirmation]* By the owner's principle, a tool that today takes one root
+object takes several, so one call reads them all in the same envelopes: an optional list beside the
+existing single argument (exactly one of them given; the single one keeps today's answer shape, the
+list answers one entry per object, in the order asked):
+
+- `GetWhereUsed`: `objects: [{ object_type, object_name }]` beside `object_type` / `object_name`;
+  `HandlerWhereUsed` the same.
+- `RuntimeListFeeds`: `feed_types: string[]` beside `feed_type`; `HandlerDumpList` the same.
+- `GetPackageContents`: `package_names: string[]`; `HandlerGet` part `contents` the same.
+- `GetPackageTree`: `package_names: string[]`.
+- `GetObjectsList`: `objects: [{ parent_type, parent_name }]`.
+- `GetObjectInfo`: `objects: [{ object_type, object_name }]`.
+- `GetIncludesList`: `objects: [{ object_type, object_name }]`.
+- `GetStructuresList`: `structure_names: string[]`.
+- `GetEnhancements`: `objects: [{ object_type, object_name }]`.
+- `SearchSource`, `DescribeByList`, `GetAbapSystemSymbols`, `ListTransports` already take several
+  (packages, a list, the code, the configurations) and change only by losing `concurrency`
+  (`SearchSource`).
+
 ### Tests
 
 Per tool, against the ADT stand-in's fixtures: the batched handler gives the same answer as the
-sequential version; the request count and the envelope count are as the table says; a part's
+sequential version; no envelope holds a request that needs another of its parts' answers; with
+several objects asked, the envelope count does not grow with their number; the request count and the envelope count are as the table says; a part's
 failure is that item's failure and the rest answer; an envelope failure; a credential refusal ends
-the call as it came. *Break:* send a phase's requests one by one (the envelope count goes red).
+the call as it came; a destination whose first envelope is answered `404` without a multipart
+answer is remembered and runs sequentially, any other envelope failure is not a verdict; no
+`concurrency` in `SearchSource`'s schema. *Break:* send a phase's requests one by one (the envelope
+count goes red); treat every envelope failure as "no batch".
 
 Live (gated by `tests/test-config.yaml`, each test stating where it runs): every tool before and
 after, on-premise (HTTP and RFC) and ABAP Cloud — answers equal, time measured, results to the docs
@@ -759,15 +819,4 @@ with the date.
 
 ## Open questions for the owner
 
-1. **Parts per envelope** in an internal batch. adt-clients sets none and payload limits are
-   unmeasured. *Recommendation:* no cap of the server's; the tools' existing limits (`max_objects`
-   500, depths) bound a phase, and the live test measures the largest phases.
-2. **`GetAbapSystemSymbols`' inner handlers** (`handleGetClass`, `handleGetFunctionModule`,
-   `handleGetInterface`) may send more than one request each. *Recommendation:* one phase per
-   request kind they send, confirmed when it is reimplemented.
-3. **Strictly dependent chains** (`GetWhereUsed` with a filter, `RuntimeListFeeds` paging): every
-   phase holds one request, so an envelope adds a multipart wrap with nothing in parallel.
-   *Recommendation:* leave them sequential.
-4. **`SearchSource`'s `concurrency`** (8, 16 cap, 1 on RFC) means parallel requests today; in a batch
-   a phase is one envelope. *Recommendation:* remove it from the batched version's schema — a
-   parameter read as nothing hides the caller's mistake.
+None beyond the passages marked *[Proposal, pending owner confirmation]*.

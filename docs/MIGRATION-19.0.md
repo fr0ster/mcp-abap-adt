@@ -1234,12 +1234,14 @@ transport's options only:
   sends the one `POST /sap/bc/adt/runtime/traces/abaptraces/parameters` with the profiling flags
   (`description`, `all_procedural_units`, …, `max_time_for_tracing`, all optional) and answers
   `{ success, profiler_id }`; a `2xx` without a `Location` header is a failure. `HandlerProfileRun`
-  takes `profiler_id` (required) beside `target_type` and `class_name` / `program_name`, sends the
-  one `POST /sap/bc/adt/oo/classrun/{name}?profilerId=…` (a program:
+  takes an optional `profiler_id` beside `target_type` and `class_name` / `program_name`: with it,
+  it sends the one `POST /sap/bc/adt/oo/classrun/{name}?profilerId=…` (a program:
   `/sap/bc/adt/programs/programrun/{name}?profilerId=…`) and answers `{ success, class_name |
-  program_name, output, profile: { profiler_id } }`. A failure is the method's error with
-  `step: "schedule trace"` or `step: "run with profiler"`. `profiling` and the profiling flags are
-  gone from `HandlerProfileRun`, and with `profiling: false` its plain run. 18.x scheduled the
+  program_name, output, profile: { profiler_id } }`; without it, the one plain run request, answered
+  without `profile` (18.x's `profiling: false`); an empty `profiler_id` is refused before any
+  request. A failure is the method's error with `step: "schedule trace"`, `"run with profiler"`,
+  `"run class"` or `"run program"`. `profiling` and the profiling flags are gone from
+  `HandlerProfileRun`. 18.x scheduled the
   trace and ran under it inside the one call, and for a class first read the trace feed and
   afterwards searched it for the new trace — up to five reads, 2 s apart (as read from 18.x's code,
   not measured) — answering `profiler_id` and, for a class, `trace_id`; `profiling: false` was a
@@ -1250,8 +1252,8 @@ transport's options only:
   3. `HandlerProfileList` — find the trace the run wrote (call it again, at the pace you choose,
      until it appears), then read it with `HandlerProfileView`.
 
-  `trace_id` is gone from the run's answer. A plain run, without a trace, is the full set's
-  `RuntimeRunClass` / `RuntimeRunProgram`. The schedule and the run are one request each and are
+  `trace_id` is gone from the run's answer. A consumer of `profiling: false` drops it and calls
+  `HandlerProfileRun` without `profiler_id`. The schedule and the run are one request each and are
   recorded in batch mode: the schedule in one batch, the run in a later one with the id it answered.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it

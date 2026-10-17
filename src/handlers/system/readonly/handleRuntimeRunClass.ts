@@ -249,13 +249,14 @@ export async function handleRuntimeRunClass(
 }
 
 /**
- * A class run under a scheduled profiler trace, in one request (compact
- * `HandlerProfileRun`; spec §4.6, one ADT request per tool call).
+ * A class run in one request (compact `HandlerProfileRun`; spec §4.6, one
+ * ADT request per tool call).
  *
- * The one `POST /oo/classrun/{name}?profilerId=…` with the id the caller
- * scheduled: no feed snapshot, no schedule, no trace search. A missing or
- * empty `profiler_id` is refused before any request; a failure is the
- * method's error plus `step`.
+ * With `profiler_id`: the one `POST /oo/classrun/{name}?profilerId=…` under
+ * the trace the caller scheduled — no feed snapshot, no schedule, no trace
+ * search. Without it: the one plain `POST /oo/classrun/{name}`. An empty
+ * `profiler_id` is refused before any request; a failure is the method's
+ * error plus `step`.
  */
 export async function handleRuntimeRunClassUnderProfiler(
   context: HandlerContext,
@@ -267,13 +268,27 @@ export async function handleRuntimeRunClassUnderProfiler(
     return return_error(new Error('Parameter "class_name" is required'));
   }
   const profilerId = args.profiler_id;
-  if (typeof profilerId !== 'string' || profilerId === '') {
-    return return_error(new Error('Parameter "profiler_id" is required'));
+  if (
+    profilerId !== undefined &&
+    (typeof profilerId !== 'string' || profilerId === '')
+  ) {
+    return return_error(
+      new Error('Parameter "profiler_id", when given, must not be empty'),
+    );
   }
   const className = args.class_name.trim().toUpperCase();
   const classExecutor = new AdtExecutor(connection, logger).getClassExecutor(
     ourClassExecutor,
   );
+  if (profilerId === undefined) {
+    return answer(
+      { tool, detail: 'terse' },
+      atStep('run class', () =>
+        classExecutor.run({ className }, { analyse: analyseException }),
+      ),
+      (output: string) => terseClassRun({ className, output }),
+    );
+  }
   return answer(
     { tool, detail: 'terse' },
     atStep('run with profiler', () =>

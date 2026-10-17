@@ -1347,13 +1347,7 @@
     "tool": "HandlerProfileRun",
     "set": "compact",
     "handler": "compact-modify/src/handlers/handleHandlerProfileRun.ts#handleHandlerProfileRun",
-    "sends": "POST /sap/bc/adt/oo/classrun/{name} or /sap/bc/adt/programs/programrun/{name} with ?profilerId={profiler_id}",
-    "when": [
-      {
-        "argument": "profiler_id",
-        "present": true
-      }
-    ]
+    "sends": "POST /sap/bc/adt/oo/classrun/{name} or /sap/bc/adt/programs/programrun/{name}; with profiler_id, ?profilerId={profiler_id}"
   },
   {
     "tool": "HandlerUnitTestRun",

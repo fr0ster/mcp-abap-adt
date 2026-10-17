@@ -684,11 +684,12 @@ export const compactProfileRunSchema = {
     profiler_id: {
       type: 'string',
       minLength: 1,
-      description: 'The profiler id of a scheduled trace.',
+      description:
+        'The profiler id of a scheduled trace: the run goes under that trace. Without it the run is plain.',
     },
     background: COMPACT_BACKGROUND_PROPERTY,
   },
-  required: ['target_type', 'profiler_id'],
+  required: ['target_type'],
 } as const;
 
 export const compactProfileListSchema = {

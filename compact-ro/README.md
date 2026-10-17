@@ -15,9 +15,10 @@ It is [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core)'s
   (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries));
 - the **leftover-session list and logoff** (`HandlerLeftoverSessionList`,
   `HandlerLeftoverSessionLogoff`): the SAP sessions a killed server process left open, only the
-  caller's own.
+  caller's own;
+- **`HandlerBatch`** (`action: 'begin' | 'end' | 'answers'`): batch mode.
 
-19 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
+20 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run, trace schedule or profiler run
 is in the tool list at all, so a client cannot call one; nor the four debugger verbs, the
 background-run tools — those are `mcp-abap-adt-compact`'s ([`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact)).
 

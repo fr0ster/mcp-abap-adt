@@ -282,7 +282,7 @@ describe('eligible', () => {
         { target_type: 'CLASS', class_name: 'C' },
         'http',
       ),
-    ).toEqual(no);
+    ).toEqual({ ok: true });
     expect(eligible('HandlerProfileSchedule', {}, 'http')).toEqual({
       ok: true,
     });

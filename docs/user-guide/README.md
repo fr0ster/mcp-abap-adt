@@ -81,8 +81,8 @@ mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
 
 ## Background runs of a class or a program
 
-A run of ABAP code (`RuntimeRunClass`, `RuntimeRunProgram`; compact `HandlerProfileRun`, under
-a scheduled profiler trace) may write and may run long, and it cannot be cut: a running request dies with
+A run of ABAP code (`RuntimeRunClass`, `RuntimeRunProgram`; compact `HandlerProfileRun`, plain or
+under a scheduled profiler trace) may write and may run long, and it cannot be cut: a running request dies with
 its connection, and its write is lost. With **`background: true`** the call answers at once with
 a `run_handle`; the run goes on in an ABAP session of its own until SAP answers, then that session
 is logged off and the answer is kept for you. No default: without it the call waits, as before.

@@ -74,7 +74,7 @@
   {
     "group": "compact",
     "name": "HandlerProfileRun",
-    "inputs": "target_type*, class_name, program_name, profiler_id*, background",
+    "inputs": "target_type*, class_name, program_name, profiler_id, background",
     "available_in": "cloud, onprem"
   },
   {

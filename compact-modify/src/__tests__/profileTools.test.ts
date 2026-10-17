@@ -84,13 +84,20 @@ const schedule = (
 const run = (mode: Mode, args: Record<string, unknown>) =>
   runWith(handleHandlerProfileRun as never, mode, args);
 
-/** The runs, with the one request each sends and its answer's name key. */
-const RUN_CALLS: Array<[string, Record<string, unknown>, string, string]> = [
+/**
+ * The runs: the arguments under a profiler, the one request each sends, its
+ * answer's name key, the one request of the plain run and its step.
+ */
+const RUN_CALLS: Array<
+  [string, Record<string, unknown>, string, string, string, string]
+> = [
   [
     'CLASS',
     { target_type: 'CLASS', class_name: 'clas_a', profiler_id: PROFILER_ID },
     `POST /sap/bc/adt/oo/classrun/CLAS_A?profilerId=${ENCODED}`,
     'class_name',
+    'POST /sap/bc/adt/oo/classrun/CLAS_A',
+    'run class',
   ],
   [
     'PROGRAM',
@@ -101,6 +108,8 @@ const RUN_CALLS: Array<[string, Record<string, unknown>, string, string]> = [
     },
     `POST /sap/bc/adt/programs/programrun/PROG_A?profilerId=${ENCODED}`,
     'program_name',
+    'POST /sap/bc/adt/programs/programrun/PROG_A',
+    'run program',
   ],
 ];
 
@@ -143,7 +152,7 @@ describe('compact HandlerProfileSchedule', () => {
 });
 
 describe('compact HandlerProfileRun', () => {
-  describe.each(RUN_CALLS)('%s', (_label, args, request, nameKey) => {
+  describe.each(RUN_CALLS)('%s', (_label, args, request, nameKey, plainRequest, plainStep) => {
     it('HandlerProfileRun with profilerId: exactly one request', async () => {
       const [held, documented, refused] = await Promise.all(
         MODES.map((mode) => run(mode, args)),
@@ -163,16 +172,34 @@ describe('compact HandlerProfileRun', () => {
       expect(jsonOf(refused.answer).step).toBe('run with profiler');
     });
 
-    it('HandlerProfileRun without profilerId refused before any request', async () => {
-      for (const profiler_id of [undefined, '']) {
-        const { sent, answer } = await run('document', {
-          ...args,
-          profiler_id,
-        });
-        expect(sent).toEqual([]);
-        expect(answer?.isError).toBe(true);
-        expect(textOf(answer)).toContain('profiler_id');
-      }
+    it('HandlerProfileRun without profilerId: exactly one plain run request', async () => {
+      const { profiler_id: _absent, ...plain } = args;
+      const [held, documented, refused] = await Promise.all(
+        MODES.map((mode) => run(mode, plain)),
+      );
+      expect(held.sent).toEqual([plainRequest]);
+      expect(documented.sent).toEqual(held.sent);
+      expect(refused.sent).toEqual(held.sent);
+
+      expect(documented.answer?.isError).not.toBe(true);
+      const answered = jsonOf(documented.answer);
+      expect(answered.success).toBe(true);
+      expect(answered[nameKey]).toBe(String(args[nameKey]).toUpperCase());
+      expect(answered).not.toHaveProperty('profile');
+
+      expect(refused.answer?.isError).toBe(true);
+      expect(jsonOf(refused.answer).status).toBe(404);
+      expect(jsonOf(refused.answer).step).toBe(plainStep);
+    });
+
+    it('HandlerProfileRun with an empty profilerId refused before any request', async () => {
+      const { sent, answer } = await run('document', {
+        ...args,
+        profiler_id: '',
+      });
+      expect(sent).toEqual([]);
+      expect(answer?.isError).toBe(true);
+      expect(textOf(answer)).toContain('profiler_id');
     });
 
     it('no trace-list poll', async () => {
@@ -190,9 +217,10 @@ describe('compact HandlerProfileRun', () => {
     });
   });
 
-  it('declares profiler_id required and the profiling flags on the schedule', () => {
-    expect([...runTool.inputSchema.required]).toEqual(
-      expect.arrayContaining(['target_type', 'profiler_id']),
+  it('declares profiler_id optional and the profiling flags on the schedule', () => {
+    expect([...runTool.inputSchema.required]).toEqual(['target_type']);
+    expect(Object.keys(runTool.inputSchema.properties)).toContain(
+      'profiler_id',
     );
     expect(Object.keys(runTool.inputSchema.properties)).not.toContain(
       'sql_trace',

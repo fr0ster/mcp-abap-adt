@@ -924,6 +924,14 @@ const WRITES: BatchEntryCase[] = [
   },
   {
     tool: 'HandlerProfileRun',
+    args: { target_type: 'CLASS', class_name: 'CLAS_A' },
+  },
+  {
+    tool: 'HandlerProfileRun',
+    args: { target_type: 'PROGRAM', program_name: 'PROG_A' },
+  },
+  {
+    tool: 'HandlerProfileRun',
     args: {
       target_type: 'CLASS',
       class_name: 'CLAS_A',

@@ -557,7 +557,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Runs a class or a program under a scheduled profiler trace, in one request. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs], profiler_id* (the profiler id of a scheduled trace). Optional: background. Response: JSON { success, class_name | program_name, output, profile: { profiler_id } }.
+**Description:** Runs a class or a program in one request. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs]. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.
 
 **Available in:** cloud, onprem
 
@@ -566,7 +566,7 @@ per request.
 - `target_type` (required) — Profile execution target kind.
 - `class_name` — Class name for profiling.
 - `program_name` — Program name for profiling.
-- `profiler_id` (required) — The profiler id of a scheduled trace.
+- `profiler_id` — The profiler id of a scheduled trace: the run goes under that trace. Without it the run is plain.
 - `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
 
 ### HandlerDebugStart

@@ -160,7 +160,7 @@ describe('a background run', () => {
     );
   });
 
-  it('runs a program too, and compact runs under a profiler id, naming its own tools', async () => {
+  it('runs a program too, and compact runs plain and under a profiler id, naming its own tools', async () => {
     const program = await stand.a.call('RuntimeRunProgram', {
       program_name: 'PLACEHOLDER_PROGRAM',
       background: true,
@@ -172,11 +172,11 @@ describe('a background run', () => {
     await finished(program.payload.run_handle as string);
     expect(stand.standIn.requests.some(isProgramRun)).toBe(true);
 
-    {
+    for (const profiler of [{}, { profiler_id: 'PLACEHOLDER_PROFILER' }]) {
       const compact = await stand.a.call('HandlerProfileRun', {
         target_type: 'CLASS',
         class_name: 'PLACEHOLDER_CLASS',
-        profiler_id: 'PLACEHOLDER_PROFILER',
+        ...profiler,
         background: true,
       });
       expect(compact.isError).toBe(false);

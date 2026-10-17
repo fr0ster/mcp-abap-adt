@@ -114,13 +114,8 @@ describe('the MCP tool surface', () => {
       // captured in `check-ddlx-active-version` /
       // `check-ddlx-inactive-version`.
       //
-      // **Third exception: three compact runtime tools closed real coverage
-      // gaps against the readonly surface.** `HandlerProfileRun` could only
-      // ever run WITH profiling (`handleRuntimeRunClassWithProfiling`/
-      // `handleRuntimeRunProgramWithProfiling`) — a plain run
-      // (`handleRuntimeRunClass`/`handleRuntimeRunProgram`) was unreachable
-      // from compact mode, so `profiling` (default true) was added.
-      // `HandlerProfileView` only ever returned the raw trace payload
+      // **Third exception: two compact runtime tools closed real coverage
+      // gaps against the readonly surface.** `HandlerProfileView` only ever returned the raw trace payload
       // (`handleRuntimeGetProfilerTraceData`) — the dedicated analysis
       // endpoint (`handleRuntimeAnalyzeProfilerTrace`, totals + top-ranked
       // entries) had no compact tool at all, so `mode` (raw|analyze, default
@@ -195,7 +190,6 @@ describe('the MCP tool surface', () => {
       const EXTRA_ALLOWED_ADDITIONS: Record<string, string[]> = {
         // Background runs (19.0.0): the run tools take `background`, optional,
         // no default — without it a run waits as before.
-        'compact/HandlerProfileRun': ['background', 'profiling'],
         'system/RuntimeRunClass': ['background'],
         'system/RuntimeRunProgram': ['background'],
         'compact/HandlerProfileView': ['mode', 'top'],

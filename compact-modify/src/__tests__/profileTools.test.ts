@@ -152,70 +152,73 @@ describe('compact HandlerProfileSchedule', () => {
 });
 
 describe('compact HandlerProfileRun', () => {
-  describe.each(RUN_CALLS)('%s', (_label, args, request, nameKey, plainRequest, plainStep) => {
-    it('HandlerProfileRun with profilerId: exactly one request', async () => {
-      const [held, documented, refused] = await Promise.all(
-        MODES.map((mode) => run(mode, args)),
-      );
-      expect(held.sent).toEqual([request]);
-      expect(documented.sent).toEqual(held.sent);
-      expect(refused.sent).toEqual(held.sent);
+  describe.each(RUN_CALLS)(
+    '%s',
+    (_label, args, request, nameKey, plainRequest, plainStep) => {
+      it('HandlerProfileRun with profilerId: exactly one request', async () => {
+        const [held, documented, refused] = await Promise.all(
+          MODES.map((mode) => run(mode, args)),
+        );
+        expect(held.sent).toEqual([request]);
+        expect(documented.sent).toEqual(held.sent);
+        expect(refused.sent).toEqual(held.sent);
 
-      expect(documented.answer?.isError).not.toBe(true);
-      const answered = jsonOf(documented.answer);
-      expect(answered.success).toBe(true);
-      expect(answered[nameKey]).toBe(String(args[nameKey]).toUpperCase());
-      expect(answered.profile).toEqual({ profiler_id: PROFILER_ID });
+        expect(documented.answer?.isError).not.toBe(true);
+        const answered = jsonOf(documented.answer);
+        expect(answered.success).toBe(true);
+        expect(answered[nameKey]).toBe(String(args[nameKey]).toUpperCase());
+        expect(answered.profile).toEqual({ profiler_id: PROFILER_ID });
 
-      expect(refused.answer?.isError).toBe(true);
-      expect(jsonOf(refused.answer).status).toBe(404);
-      expect(jsonOf(refused.answer).step).toBe('run with profiler');
-    });
-
-    it('HandlerProfileRun without profilerId: exactly one plain run request', async () => {
-      const { profiler_id: _absent, ...plain } = args;
-      const [held, documented, refused] = await Promise.all(
-        MODES.map((mode) => run(mode, plain)),
-      );
-      expect(held.sent).toEqual([plainRequest]);
-      expect(documented.sent).toEqual(held.sent);
-      expect(refused.sent).toEqual(held.sent);
-
-      expect(documented.answer?.isError).not.toBe(true);
-      const answered = jsonOf(documented.answer);
-      expect(answered.success).toBe(true);
-      expect(answered[nameKey]).toBe(String(args[nameKey]).toUpperCase());
-      expect(answered).not.toHaveProperty('profile');
-
-      expect(refused.answer?.isError).toBe(true);
-      expect(jsonOf(refused.answer).status).toBe(404);
-      expect(jsonOf(refused.answer).step).toBe(plainStep);
-    });
-
-    it('HandlerProfileRun with an empty profilerId refused before any request', async () => {
-      const { sent, answer } = await run('document', {
-        ...args,
-        profiler_id: '',
+        expect(refused.answer?.isError).toBe(true);
+        expect(jsonOf(refused.answer).status).toBe(404);
+        expect(jsonOf(refused.answer).step).toBe('run with profiler');
       });
-      expect(sent).toEqual([]);
-      expect(answer?.isError).toBe(true);
-      expect(textOf(answer)).toContain('profiler_id');
-    });
 
-    it('no trace-list poll', async () => {
-      const timer = jest.spyOn(global, 'setTimeout');
-      try {
-        const { sent } = await run('document', args);
-        expect(sent).toEqual([request]);
-        expect(
-          sent.some((line) => line.includes('/runtime/traces/abaptraces')),
-        ).toBe(false);
-        expect(timer).not.toHaveBeenCalled();
-      } finally {
-        timer.mockRestore();
-      }
-    });
-  });
+      it('HandlerProfileRun without profilerId: exactly one plain run request', async () => {
+        const { profiler_id: _absent, ...plain } = args;
+        const [held, documented, refused] = await Promise.all(
+          MODES.map((mode) => run(mode, plain)),
+        );
+        expect(held.sent).toEqual([plainRequest]);
+        expect(documented.sent).toEqual(held.sent);
+        expect(refused.sent).toEqual(held.sent);
+
+        expect(documented.answer?.isError).not.toBe(true);
+        const answered = jsonOf(documented.answer);
+        expect(answered.success).toBe(true);
+        expect(answered[nameKey]).toBe(String(args[nameKey]).toUpperCase());
+        expect(answered).not.toHaveProperty('profile');
+
+        expect(refused.answer?.isError).toBe(true);
+        expect(jsonOf(refused.answer).status).toBe(404);
+        expect(jsonOf(refused.answer).step).toBe(plainStep);
+      });
+
+      it('HandlerProfileRun with an empty profilerId refused before any request', async () => {
+        const { sent, answer } = await run('document', {
+          ...args,
+          profiler_id: '',
+        });
+        expect(sent).toEqual([]);
+        expect(answer?.isError).toBe(true);
+        expect(textOf(answer)).toContain('profiler_id');
+      });
+
+      it('no trace-list poll', async () => {
+        const timer = jest.spyOn(global, 'setTimeout');
+        try {
+          const { sent } = await run('document', args);
+          expect(sent).toEqual([request]);
+          expect(
+            sent.some((line) => line.includes('/runtime/traces/abaptraces')),
+          ).toBe(false);
+          expect(timer).not.toHaveBeenCalled();
+        } finally {
+          timer.mockRestore();
+        }
+      });
+    },
+  );
 
   it('declares profiler_id optional and the profiling flags on the schedule', () => {
     expect([...runTool.inputSchema.required]).toEqual(['target_type']);

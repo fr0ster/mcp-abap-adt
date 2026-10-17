@@ -22,6 +22,9 @@
     "outDir": "./dist",
     "noImplicitAny": false,
     "paths": {
+      "@mcp-abap-adt/compact-modify": [
+        "../compact-modify/src/index.ts"
+      ],
       "@mcp-abap-adt/background-runs-memory": [
         "../background-runs-memory/src/index.ts"
       ],
@@ -30,6 +33,15 @@
       ],
       "@mcp-abap-adt/lib": [
         "../src/index.ts"
+      ],
+      "@mcp-abap-adt/lib/compact-shared": [
+        "../src/lib/compact/index.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers/write": [
+        "../src/lib/handlers/write.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers/read": [
+        "../src/lib/handlers/read.ts"
       ],
       "@mcp-abap-adt/lib/handlers": [
         "../src/lib/handlers/index.ts"

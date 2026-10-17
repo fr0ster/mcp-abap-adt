@@ -62,7 +62,12 @@ function recording(reply: Reply) {
         };
         throw error;
       }
-      return { status: reply.status, statusText: 'OK', headers: {}, data: reply.data };
+      return {
+        status: reply.status,
+        statusText: 'OK',
+        headers: {},
+        data: reply.data,
+      };
     },
   };
   return { connection, sent };
@@ -199,10 +204,7 @@ describe('HandlerDeletionCheck is the one deletion check', () => {
 
   it.each([
     [{ object_type: 'CLASS' }, 'object_name is required'],
-    [
-      { object_type: 'FUNCTION_MODULE', object_name: 'Z_FM_A' },
-      'GROUP|MODULE',
-    ],
+    [{ object_type: 'FUNCTION_MODULE', object_name: 'Z_FM_A' }, 'GROUP|MODULE'],
     [
       { object_type: 'LOCAL_TYPES', object_name: 'ZCL_A' },
       'Unsupported deletion check for object_type: LOCAL_TYPES',
@@ -224,8 +226,11 @@ describe('HandlerDeletionCheck is served by compact and compact-ro', () => {
     connection: null,
     logger: silent,
   } as unknown as HandlerContext;
-  const namesOf = (groups: Array<{ getHandlers(): Array<{ toolDefinition: { name: string } }> }>) =>
-    groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
+  const namesOf = (
+    groups: Array<{
+      getHandlers(): Array<{ toolDefinition: { name: string } }>;
+    }>,
+  ) => groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
   it('the read-only half carries it', () => {
     const read = compactReadOnlyEntries(() => context).map(
@@ -246,8 +251,8 @@ describe('HandlerDeletionCheck is served by compact and compact-ro', () => {
     ],
     ['compact-ro', compactReadOnlyToolSetOf(compactReadOnlyEntries)],
   ])('%s serves it', (_kind, set) => {
-    expect(
-      namesOf(set.groups(context, 'stdio') as never),
-    ).toContain('HandlerDeletionCheck');
+    expect(namesOf(set.groups(context, 'stdio') as never)).toContain(
+      'HandlerDeletionCheck',
+    );
   });
 });

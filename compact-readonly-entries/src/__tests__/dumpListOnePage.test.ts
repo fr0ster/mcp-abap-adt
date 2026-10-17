@@ -72,37 +72,35 @@ const IS_DUMPS = (line: string) =>
   line.startsWith('GET ') && line.includes('/sap/bc/adt/runtime/dumps');
 
 describe('HandlerDumpList reads one page', () => {
-  it.each([
-    undefined,
-    1,
-    10,
-    100,
-  ])('exactly one request for top %s', async (top) => {
-    const timer = jest.spyOn(global, 'setTimeout');
-    try {
-      const args = top === undefined ? {} : { top };
-      const [held, documented, refused] = await Promise.all(
-        MODES.map((mode) => runWith(mode, args, FEED)),
-      );
-      expect(held.sent).toHaveLength(1);
-      expect(IS_DUMPS(held.sent[0] ?? '')).toBe(true);
-      expect(documented.sent).toEqual(held.sent);
-      expect(refused.sent).toEqual(held.sent);
-      if (top !== undefined) {
-        expect(held.sent[0]).toContain(`%24top=${top}`);
+  it.each([undefined, 1, 10, 100])(
+    'exactly one request for top %s',
+    async (top) => {
+      const timer = jest.spyOn(global, 'setTimeout');
+      try {
+        const args = top === undefined ? {} : { top };
+        const [held, documented, refused] = await Promise.all(
+          MODES.map((mode) => runWith(mode, args, FEED)),
+        );
+        expect(held.sent).toHaveLength(1);
+        expect(IS_DUMPS(held.sent[0] ?? '')).toBe(true);
+        expect(documented.sent).toEqual(held.sent);
+        expect(refused.sent).toEqual(held.sent);
+        if (top !== undefined) {
+          expect(held.sent[0]).toContain(`%24top=${top}`);
+        }
+        expect(timer).not.toHaveBeenCalled();
+
+        expect(documented.answer?.isError).not.toBe(true);
+        expect(jsonOf(documented.answer).count).toBe(2);
+
+        expect(refused.answer?.isError).toBe(true);
+        expect(jsonOf(refused.answer).status).toBe(404);
+        expect(jsonOf(refused.answer).step).toBe('read dumps');
+      } finally {
+        timer.mockRestore();
       }
-      expect(timer).not.toHaveBeenCalled();
-
-      expect(documented.answer?.isError).not.toBe(true);
-      expect(jsonOf(documented.answer).count).toBe(2);
-
-      expect(refused.answer?.isError).toBe(true);
-      expect(jsonOf(refused.answer).status).toBe(404);
-      expect(jsonOf(refused.answer).step).toBe('read dumps');
-    } finally {
-      timer.mockRestore();
-    }
-  });
+    },
+  );
 
   it('top 101 is refused before any request, naming the cap', async () => {
     const { sent, answer } = await runWith('document', { top: 101 }, FEED);

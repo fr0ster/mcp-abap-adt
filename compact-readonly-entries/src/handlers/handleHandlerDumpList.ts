@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerDumpList',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    'Reads one page of a runtime feed in one request, newest first. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, runtime_error, exception, object_name, package, component, top (1 to 100), from, to. Response: JSON { feed_type, count, entries, next_to }; each dump carries dump_id; next_to is the `to` of SAP\'s next link, present when more remain. The next link\'s page starts at the boundary second, inclusive: entries of that second may repeat; match them by dump_id.',
+    "Reads one page of a runtime feed in one request, newest first. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, runtime_error, exception, object_name, package, component, top (1 to 100), from, to. Response: JSON { feed_type, count, entries, next_to }; each dump carries dump_id; next_to is the `to` of SAP's next link, present when more remain. The next link's page starts at the boundary second, inclusive: entries of that second may repeat; match them by dump_id.",
   ),
   inputSchema: compactDumpListSchema,
 } as const;

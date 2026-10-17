@@ -182,7 +182,11 @@ it('BatchBegin holds state and answers the handle; a later call with the header 
   expect(JSON.parse(ended.text)).toMatchObject({ recorded: 1, failed: [] });
   expect(envelopes().filter((r) => r.method === 'POST')).toHaveLength(1);
 
-  const answers = await s.call('BatchAnswers', { number: 1 }, withHeader(handle));
+  const answers = await s.call(
+    'BatchAnswers',
+    { number: 1 },
+    withHeader(handle),
+  );
   expect(answers.isError).toBe(false);
   expect(answers.text).toContain(partOf('PROG_A'));
   // The handle is a bearer value: no log line names it.
@@ -282,12 +286,13 @@ it('two requests with the same header at once: both recorded, numbered in arriva
     });
   const serve = InstancePool.prototype.serve;
   let served = 0;
-  jest
-    .spyOn(InstancePool.prototype, 'serve')
-    .mockImplementation(function (this: InstancePool<never>, ...args) {
-      served += 1;
-      return serve.apply(this, args);
-    });
+  jest.spyOn(InstancePool.prototype, 'serve').mockImplementation(function (
+    this: InstancePool<never>,
+    ...args
+  ) {
+    served += 1;
+    return serve.apply(this, args);
+  });
 
   const first = s.call(
     'GetProgram',

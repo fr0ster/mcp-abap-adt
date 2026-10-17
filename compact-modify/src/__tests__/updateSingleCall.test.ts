@@ -124,10 +124,7 @@ const DOCUMENT = (root: string) =>
 
 /** The types whose write is their metadata document: `source_code` sent byte for byte. */
 const DOCUMENTS: Array<[string, Record<string, unknown>]> = [
-  [
-    'PACKAGE',
-    { package_name: 'ZPKG_A', source_code: DOCUMENT('pak:package') },
-  ],
+  ['PACKAGE', { package_name: 'ZPKG_A', source_code: DOCUMENT('pak:package') }],
   ['DOMAIN', { domain_name: 'ZDOM_A', source_code: DOCUMENT('doma:domain') }],
   [
     'DATA_ELEMENT',
@@ -290,7 +287,10 @@ describe('HandlerUpdate is one write under lock_handle', () => {
   it('the publication carries the requested state', async () => {
     const [, publish] = PUBLICATIONS[0];
     const [, unpublish] = PUBLICATIONS[1];
-    const one = await run('pending', update('SERVICE_BINDING', underLock(publish)));
+    const one = await run(
+      'pending',
+      update('SERVICE_BINDING', underLock(publish)),
+    );
     const two = await run(
       'pending',
       update('SERVICE_BINDING', underLock(unpublish)),
@@ -390,7 +390,9 @@ describe('the HandlerUpdate schema and description', () => {
   it('names transport_request for each type whose write sends it, and only those', () => {
     const description: string = TOOL_DEFINITION.description;
     for (const [type] of TYPES) {
-      const args = description.match(new RegExp(`\\b${type}\\(([^)]*)\\)`))?.[1];
+      const args = description.match(
+        new RegExp(`\\b${type}\\(([^)]*)\\)`),
+      )?.[1];
       expect({ type, transport: args?.includes('transport_request') }).toEqual({
         type,
         transport: type !== 'SERVICE_BINDING',

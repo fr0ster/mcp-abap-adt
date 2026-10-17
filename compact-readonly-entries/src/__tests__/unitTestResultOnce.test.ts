@@ -26,8 +26,8 @@ import {
   handleHandlerGet,
 } from '../handlers/handleHandlerGet';
 import {
-  TOOL_DEFINITION as RESULT_TOOL,
   handleHandlerUnitTestResult,
+  TOOL_DEFINITION as RESULT_TOOL,
 } from '../handlers/handleHandlerUnitTestResult';
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };

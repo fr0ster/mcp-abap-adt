@@ -258,7 +258,9 @@ describe('HandlerDelete is one request', () => {
       expect(held.sent).toHaveLength(1);
       const [write] = held.sent;
       expect(write.method).toBe('PUT');
-      expect(write.url).toContain(`/sap/bc/adt/oo/classes/zcl_a/includes/${include}`);
+      expect(write.url).toContain(
+        `/sap/bc/adt/oo/classes/zcl_a/includes/${include}`,
+      );
       expect(write.url).toContain(`lockHandle=${LOCK}`);
       expect(write.url).toContain(`corrNr=${TRANSPORT}`);
       expect(write.data).toBe('');
@@ -376,7 +378,8 @@ describe('the HandlerDelete schema and description', () => {
       .sort();
     expect(
       [
-        ...(compactDeleteSchema.properties.object_type.enum as readonly string[]),
+        ...(compactDeleteSchema.properties.object_type
+          .enum as readonly string[]),
       ].sort(),
     ).toEqual(withDelete);
   });

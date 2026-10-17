@@ -146,7 +146,9 @@ describe('compact HandlerActivate: an activation run is started in one request',
         const { sent } = await activate('document', args);
         expect(sent).toHaveLength(1);
         expect(
-          sent.some((line) => line.includes('/activation/runs/RUN_PLACEHOLDER')),
+          sent.some((line) =>
+            line.includes('/activation/runs/RUN_PLACEHOLDER'),
+          ),
         ).toBe(false);
         expect(sent.some((line) => line.includes('/activation/results'))).toBe(
           false,
@@ -187,24 +189,27 @@ describe('compact HandlerGet: the activation run read by run_id', () => {
       'GET /sap/bc/adt/activation/results/RUN_A',
       RESULTS_DOCUMENT,
     ],
-  ])('activation_status and activation_results: one request each, SAP\'s answer as it came (%s)', async (part, request, body) => {
-    const args = { part, run_id: 'RUN_A' };
-    const [held, documented, refused] = await Promise.all(
-      MODES.map((mode) => get(mode, args, body)),
-    );
-    expect(held.sent).toEqual([request]);
-    expect(documented.sent).toEqual(held.sent);
-    expect(refused.sent).toEqual(held.sent);
+  ])(
+    "activation_status and activation_results: one request each, SAP's answer as it came (%s)",
+    async (part, request, body) => {
+      const args = { part, run_id: 'RUN_A' };
+      const [held, documented, refused] = await Promise.all(
+        MODES.map((mode) => get(mode, args, body)),
+      );
+      expect(held.sent).toEqual([request]);
+      expect(documented.sent).toEqual(held.sent);
+      expect(refused.sent).toEqual(held.sent);
 
-    expect(documented.answer?.isError).not.toBe(true);
-    const answered = jsonOf(documented.answer);
-    expect(answered.run_id).toBe('RUN_A');
-    expect(answered.part).toBe(part);
-    expect(answered.document).toBe(body);
+      expect(documented.answer?.isError).not.toBe(true);
+      const answered = jsonOf(documented.answer);
+      expect(answered.run_id).toBe('RUN_A');
+      expect(answered.part).toBe(part);
+      expect(answered.document).toBe(body);
 
-    expect(refused.answer?.isError).toBe(true);
-    expect(jsonOf(refused.answer).status).toBe(404);
-  });
+      expect(refused.answer?.isError).toBe(true);
+      expect(jsonOf(refused.answer).status).toBe(404);
+    },
+  );
 
   it('activation_status answers the run status as SAP stated it', async () => {
     const { answer } = await get(
@@ -225,13 +230,13 @@ describe('compact HandlerGet: the activation run read by run_id', () => {
     expect(messages.length).toBeGreaterThan(0);
   });
 
-  it.each([
-    'activation_status',
-    'activation_results',
-  ])('%s without run_id is refused before any request', async (part) => {
-    const { sent, answer } = await get('document', { part });
-    expect(sent).toEqual([]);
-    expect(answer?.isError).toBe(true);
-    expect(textOf(answer)).toContain('run_id');
-  });
+  it.each(['activation_status', 'activation_results'])(
+    '%s without run_id is refused before any request',
+    async (part) => {
+      const { sent, answer } = await get('document', { part });
+      expect(sent).toEqual([]);
+      expect(answer?.isError).toBe(true);
+      expect(textOf(answer)).toContain('run_id');
+    },
+  );
 });

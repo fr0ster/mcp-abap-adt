@@ -12,10 +12,7 @@
  */
 
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
-import type {
-  HandlerContext,
-  IHandlerGroup,
-} from '@mcp-abap-adt/lib/handlers';
+import type { HandlerContext, IHandlerGroup } from '@mcp-abap-adt/lib/handlers';
 import {
   basicHeaders,
   type HttpStand,
@@ -83,7 +80,10 @@ afterEach(async () => {
   jest.restoreAllMocks();
 });
 
-const withHeader = (handle: string, headers = basicHeaders(s.standIn.url)) => ({
+const withHeader = (
+  handle: string,
+  headers: Record<string, string> = basicHeaders(s.standIn.url),
+) => ({
   ...headers,
   'x-mcp-state-handle': handle,
 });

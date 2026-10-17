@@ -18,13 +18,13 @@
  * Real adt-clients code runs over the batch proof's counting connection.
  */
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { handleGetServiceBindingPreviewUrl } from '@mcp-abap-adt/lib/handlers/read';
 import {
   type Answer,
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
 import { corpusBody } from '../../../src/lib/adtCorpus';
-import { handleGetServiceBindingPreviewUrl } from '@mcp-abap-adt/lib/handlers/read';
 import { handleHandlerGet } from '../handlers/handleHandlerGet';
 
 const silent = { debug() {}, info() {}, warn() {}, error() {} };
@@ -110,15 +110,18 @@ describe('compact HandlerGet: one part, one request', () => {
     it.each([
       ['source', { part: 'source' }],
       ['absent', {}],
-    ])('part %s: exactly one request, held, answered and 404 alike', async (_label, part) => {
-      const args = { object_type, ...names, ...part };
-      const [held, documented, refused] = await Promise.all(
-        MODES.map((mode) => run(mode, args)),
-      );
-      expect(held.sent).toHaveLength(1);
-      expect(documented.sent).toEqual(held.sent);
-      expect(refused.sent).toEqual(held.sent);
-    });
+    ])(
+      'part %s: exactly one request, held, answered and 404 alike',
+      async (_label, part) => {
+        const args = { object_type, ...names, ...part };
+        const [held, documented, refused] = await Promise.all(
+          MODES.map((mode) => run(mode, args)),
+        );
+        expect(held.sent).toHaveLength(1);
+        expect(documented.sent).toEqual(held.sent);
+        expect(refused.sent).toEqual(held.sent);
+      },
+    );
 
     it('source answers the source only', async () => {
       const { answer } = await run('document', {
@@ -164,32 +167,38 @@ describe('compact HandlerGet: one part, one request', () => {
 
   // A service binding has one document: its source and its metadata are the
   // same read (adt-clients' `readMetadata` fetches the resource `read` does).
-  it.each(BOTH.filter(([t]) => t !== 'SERVICE_BINDING'))('%s: source and metadata are two different requests', async (object_type, names) => {
-    const source = await run('pending', { object_type, ...names });
-    const metadata = await run('pending', {
-      object_type,
-      ...names,
-      part: 'metadata',
-    });
-    expect(source.sent[0]).not.toEqual(metadata.sent[0]);
-  });
+  it.each(BOTH.filter(([t]) => t !== 'SERVICE_BINDING'))(
+    '%s: source and metadata are two different requests',
+    async (object_type, names) => {
+      const source = await run('pending', { object_type, ...names });
+      const metadata = await run('pending', {
+        object_type,
+        ...names,
+        part: 'metadata',
+      });
+      expect(source.sent[0]).not.toEqual(metadata.sent[0]);
+    },
+  );
 
   describe.each(SOURCELESS)('%s has no source', (object_type, names, parts) => {
     it.each([
       ['source', { part: 'source' }],
       ['absent', {}],
-    ])('part %s is refused before any request, naming its parts', async (_label, part) => {
-      const { sent, answer } = await run('document', {
-        object_type,
-        ...names,
-        ...part,
-      });
-      expect(sent).toEqual([]);
-      expect(answer?.isError).toBe(true);
-      expect(textOf(answer)).toContain(
-        `part=source is not available for object_type=${object_type}. It offers: ${parts}.`,
-      );
-    });
+    ])(
+      'part %s is refused before any request, naming its parts',
+      async (_label, part) => {
+        const { sent, answer } = await run('document', {
+          object_type,
+          ...names,
+          ...part,
+        });
+        expect(sent).toEqual([]);
+        expect(answer?.isError).toBe(true);
+        expect(textOf(answer)).toContain(
+          `part=source is not available for object_type=${object_type}. It offers: ${parts}.`,
+        );
+      },
+    );
   });
 
   describe('FUNCTION_MODULE: the group in the arguments', () => {
@@ -206,15 +215,18 @@ describe('compact HandlerGet: one part, one request', () => {
         'both, agreeing',
         { function_module_name: 'fugr_a|fm_a', function_group_name: 'FUGR_A' },
       ],
-    ])('source by %s: one request at that group, no metadata read', async (_label, names) => {
-      for (const mode of MODES) {
-        const { sent } = await run(mode, {
-          object_type: 'FUNCTION_MODULE',
-          ...names,
-        });
-        expect(sent).toEqual([MODULE_SOURCE]);
-      }
-    });
+    ])(
+      'source by %s: one request at that group, no metadata read',
+      async (_label, names) => {
+        for (const mode of MODES) {
+          const { sent } = await run(mode, {
+            object_type: 'FUNCTION_MODULE',
+            ...names,
+          });
+          expect(sent).toEqual([MODULE_SOURCE]);
+        }
+      },
+    );
 
     it("a caller's own isError argument is sent on as an argument, the read answered", async () => {
       const { sent, answer } = await run('document', {
@@ -296,7 +308,8 @@ describe('compact HandlerGet: one part, one request', () => {
       expect(jsonOf(answer)).toEqual({
         objects: [],
         childNodes: [],
-        blank: 'SAP answered a blank body: the package holds no objects, or no package of this name exists.',
+        blank:
+          'SAP answered a blank body: the package holds no objects, or no package of this name exists.',
       });
     });
 
@@ -322,15 +335,18 @@ describe('compact HandlerGet: one part, one request', () => {
       service_binding_name: 'SRVB_A',
     };
 
-    it.each(MODES.filter((m) => m !== 'pending'))('answers as GetServiceBindingPreviewUrl does (%s)', async (mode) => {
-      const compact = await run(mode, args);
-      const full = await runWith(
-        handleGetServiceBindingPreviewUrl as never,
-        mode,
-        args,
-      );
-      expect(compact.sent).toEqual(full.sent);
-      expect(textOf(compact.answer)).toEqual(textOf(full.answer));
-    });
+    it.each(MODES.filter((m) => m !== 'pending'))(
+      'answers as GetServiceBindingPreviewUrl does (%s)',
+      async (mode) => {
+        const compact = await run(mode, args);
+        const full = await runWith(
+          handleGetServiceBindingPreviewUrl as never,
+          mode,
+          args,
+        );
+        expect(compact.sent).toEqual(full.sent);
+        expect(textOf(compact.answer)).toEqual(textOf(full.answer));
+      },
+    );
   });
 });

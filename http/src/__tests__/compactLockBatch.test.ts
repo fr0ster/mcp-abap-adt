@@ -194,9 +194,7 @@ it('lock batch, write batch, unlock batch: the handles held for the instance, ev
   for (const [i, handle] of handles.entries()) {
     expect(puts[i]?.url).toContain(`lockHandle=${handle}`);
   }
-  expect(parts.filter((p) => p.url.includes('_action=UNLOCK'))).toHaveLength(
-    3,
-  );
+  expect(parts.filter((p) => p.url.includes('_action=UNLOCK'))).toHaveLength(3);
 });
 
 it('without the state_handle a write batch on another instance is refused before anything is recorded', async () => {

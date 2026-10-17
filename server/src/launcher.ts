@@ -15,8 +15,8 @@ import {
   MESSAGE_SERVER_FIELDS,
   type MessageServerField,
   processEdges,
-  rfcAddressRefusalOf,
   readStartupConfig,
+  rfcAddressRefusalOf,
 } from '@mcp-abap-adt/lib/config';
 import {
   InstanceBatch,

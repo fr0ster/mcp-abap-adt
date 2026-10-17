@@ -63,8 +63,7 @@ export const compactMetadataRoutes: Partial<
   INTERFACE: handleGetInterface as unknown as CompactHandler,
   FUNCTION_GROUP: handleGetFunctionGroup as unknown as CompactHandler,
   FUNCTION_MODULE: handleGetFunctionModule as unknown as CompactHandler,
-  BEHAVIOR_DEFINITION:
-    handleGetBehaviorDefinition as unknown as CompactHandler,
+  BEHAVIOR_DEFINITION: handleGetBehaviorDefinition as unknown as CompactHandler,
   BEHAVIOR_IMPLEMENTATION:
     handleGetBehaviorImplementation as unknown as CompactHandler,
   METADATA_EXTENSION: handleGetMetadataExtension as unknown as CompactHandler,

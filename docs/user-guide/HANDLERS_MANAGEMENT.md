@@ -68,7 +68,7 @@ Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 
    - `HandlerDeletionCheck`
    - `HandlerUnitTestRun`, `HandlerUnitTestStatus`, `HandlerUnitTestResult`
    - `HandlerCdsUnitTestStatus`, `HandlerCdsUnitTestResult`
-   - `HandlerProfileRun`, `HandlerProfileList`, `HandlerProfileView`
+   - `HandlerProfileSchedule`, `HandlerProfileRun`, `HandlerProfileList`, `HandlerProfileView`
    - `HandlerDumpList`, `HandlerDumpView`
    - `HandlerServiceBindingListTypes`, `HandlerServiceBindingValidate`
    - `HandlerTransportCreate`, `HandlerTransportSortAndCompress`, `HandlerTransportMoveObjects`
@@ -96,7 +96,7 @@ Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 
      - `CDS_UNIT_TEST`: `status`, `result`
      - `SERVICE_BINDING`: `list_types`, `validate`
      - `TRANSPORT`: `create_transport`, and read through `HandlerGet` (the objects of a request or task, each with its `position`)
-     - `CLASS` / `PROGRAM`: `runProfiling`
+     - `CLASS` / `PROGRAM`: profiling, `HandlerProfileSchedule` then `HandlerProfileRun`
      - `RUNTIME_PROFILE`: `viewProfiles`, `viewProfile`
      - `RUNTIME_DUMP`: `viewDumps`, `viewDump`
 

@@ -1,5 +1,5 @@
 /**
- * The compact tools that change nothing — seventeen of the twenty-eight.
+ * The compact tools that change nothing — seventeen of the twenty-nine.
  *
  * **Why a group of its own, and why it matters what it imports.** Compact is a
  * different decomposition of the same surface: the operation is the tool and the

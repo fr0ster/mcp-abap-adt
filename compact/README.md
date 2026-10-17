@@ -1,6 +1,6 @@
 # @mcp-abap-adt/compact
 
-The compact MCP server over **stdio** — the command that serves all 28, the four debugger verbs, the
+The compact MCP server over **stdio** — the command that serves all 29, the four debugger verbs, the
 leftover sessions, background runs and batch mode (`HandlerBatch`). The 17 that change nothing alone are
 [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro)
 (`mcp-abap-adt-compact-ro`): the binary fixes the tool set (19.0.0), there is no `--exposition`.
@@ -54,18 +54,18 @@ smaller install, and it is not a sandbox — code that deliberately reaches into
 
 ```bash
 npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact --system-type=<onprem|cloud> # stdio: all 28, the debugger verbs, leftover sessions, background runs
+mcp-abap-adt-compact --system-type=<onprem|cloud> # stdio: all 29, the debugger verbs, leftover sessions, background runs
 mcp-abap-adt-compact --version
 
 npm install -g @mcp-abap-adt/compact-ro
 mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 17 that change nothing, the leftover-session list and logoff
 ```
 
-**The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 28 tools (every access, which
-is what a local server gives), the four debugger verbs, the leftover-session list and logoff and the
-background-run tools — 37. `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing (no
+**The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 29 tools (every access, which
+is what a local server gives), the four debugger verbs, the leftover-session list and logoff, the
+background-run tools and `HandlerBatch` — 39. `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing (no
 create, update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool list at
-all, so a client cannot call one) and the leftover-session list and logoff — 19. `--exposition`
+all, so a client cannot call one), `HandlerBatch` and the leftover-session list and logoff — 20. `--exposition`
 (`ro`, `rw`, `debug`, any word) and a config file's `exposition` stop the start with a sentence
 naming the binary to install instead, e.g. *--exposition is gone (19.0.0): the binary fixes its tool
 set, so remove it; the compact tools that change nothing are served by `mcp-abap-adt-compact-ro`

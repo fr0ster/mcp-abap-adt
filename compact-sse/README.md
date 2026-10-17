@@ -1,7 +1,7 @@
 # @mcp-abap-adt/compact-sse
 
 The compact MCP server for SAP ABAP ADT over **HTTP+SSE**: one tool per operation, the object in
-`object_type` — 28 tools instead of hundreds, for a host that cannot build a retrieval pipeline
+`object_type` — 29 tools instead of hundreds, for a host that cannot build a retrieval pipeline
 of its own.
 
 It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s launcher with the
@@ -17,7 +17,7 @@ transport `@mcp-abap-adt/compact-http`. It does not depend on
 
 ```bash
 npm install -g @mcp-abap-adt/compact-sse
-mcp-abap-adt-compact-sse --sse-host=127.0.0.1 --sse-port=3001 --system-type=onprem # all 28, the debugger verbs, background runs
+mcp-abap-adt-compact-sse --sse-host=127.0.0.1 --sse-port=3001 --system-type=onprem # all 29, the debugger verbs, background runs
 mcp-abap-adt-compact-sse --help                     # every option, from this binary's table
 ```
 
@@ -28,8 +28,8 @@ There is no `--transport`: a binary is its transport.
 **Credentials** come only from the `x-sap-*` headers of the `GET` that opens each SSE connection — `x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`; a `POST` is routed by its `sessionId` alone. Nothing is shared with another connection, and nothing outlives it. A request without them is answered `400`; so is one
 carrying `x-mcp-destination` (destinations are served only by `mcp-abap-adt`, stdio).
 
-**The tools are fixed by the binary**: all 28, the four debugger verbs (`HandlerDebugStart`,
-`HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`) and the background-run tools — 35. `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
+**The tools are fixed by the binary**: all 29, the four debugger verbs (`HandlerDebugStart`,
+`HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`), the background-run tools and `HandlerBatch` — 37. `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
 `exposition` stop the start, naming the binary to install instead
 (`mcp-abap-adt-compact-sse-ro` for `ro`). No leftover-session tool and no runtime session file: one server holds the sessions of many
 users, so those are the stdio binaries' (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`); resuming

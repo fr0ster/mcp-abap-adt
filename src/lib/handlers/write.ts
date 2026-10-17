@@ -71,8 +71,18 @@ export { handleUpdateServiceDefinition } from '../../handlers/service_definition
 export { handleCreateStructure } from '../../handlers/structure/high/handleCreateStructure.js';
 export { handleDeleteStructure } from '../../handlers/structure/high/handleDeleteStructure.js';
 export { handleUpdateStructure } from '../../handlers/structure/high/handleUpdateStructure.js';
-export { handleRuntimeRunClass } from '../../handlers/system/readonly/handleRuntimeRunClass.js';
-export { handleRuntimeRunProgram } from '../../handlers/system/readonly/handleRuntimeRunProgram.js';
+export {
+  handleScheduleProfilerTraceOnce,
+  type ScheduleProfilerTraceArgs,
+} from '../../handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.js';
+export {
+  handleRuntimeRunClass,
+  handleRuntimeRunClassUnderProfiler,
+} from '../../handlers/system/readonly/handleRuntimeRunClass.js';
+export {
+  handleRuntimeRunProgram,
+  handleRuntimeRunProgramUnderProfiler,
+} from '../../handlers/system/readonly/handleRuntimeRunProgram.js';
 export { handleCreateTable } from '../../handlers/table/high/handleCreateTable.js';
 export { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable.js';
 export { handleUpdateTable } from '../../handlers/table/high/handleUpdateTable.js';

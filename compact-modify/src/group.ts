@@ -1,14 +1,15 @@
 /**
- * The compact tools that change the system, or run code on it — eleven of the
- * twenty-eight.
+ * The compact tools that change the system, or run code on it — twelve of the
+ * twenty-nine.
  *
  * The other half of the capability split described in
  * `CompactReadOnlyHandlersGroup`. Everything here either writes to the repository
  * (`HandlerCreate`, `HandlerUpdate`, `HandlerDelete`, `HandlerActivate`,
  * `HandlerTransportCreate`, `HandlerTransportSortAndCompress`,
  * `HandlerTransportMoveObjects`), takes an enqueue (`HandlerLock`, `HandlerUnlock` — a
- * lock changes state and blocks other users), or executes ABAP and leaves traces
- * (`HandlerUnitTestRun`, `HandlerProfileRun`).
+ * lock changes state and blocks other users), or schedules a trace or
+ * executes ABAP and leaves traces (`HandlerProfileSchedule`,
+ * `HandlerUnitTestRun`, `HandlerProfileRun`).
  *
  * A consumer that wants the whole compact surface takes this group beside the
  * read-only one, which is what `CompactHandlersGroup` does and what the compact
@@ -37,6 +38,10 @@ import {
   TOOL_DEFINITION as HandlerProfileRun_Tool,
   handleHandlerProfileRun,
 } from './handlers/handleHandlerProfileRun';
+import {
+  TOOL_DEFINITION as HandlerProfileSchedule_Tool,
+  handleHandlerProfileSchedule,
+} from './handlers/handleHandlerProfileSchedule';
 import {
   TOOL_DEFINITION as HandlerTransportCreate_Tool,
   handleHandlerTransportCreate,
@@ -118,6 +123,10 @@ export function compactModifyEntries(
     {
       toolDefinition: HandlerUnitTestRun_Tool,
       handler: withContext(handleHandlerUnitTestRun),
+    },
+    {
+      toolDefinition: HandlerProfileSchedule_Tool,
+      handler: withContext(handleHandlerProfileSchedule),
     },
     {
       toolDefinition: HandlerProfileRun_Tool,

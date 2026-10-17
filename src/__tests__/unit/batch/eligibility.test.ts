@@ -272,7 +272,7 @@ describe('eligible', () => {
     expect(
       eligible(
         'HandlerProfileRun',
-        { target_type: 'CLASS', class_name: 'C', profiling: false },
+        { target_type: 'CLASS', class_name: 'C', profiler_id: 'P' },
         'http',
       ),
     ).toEqual({ ok: true });
@@ -283,6 +283,9 @@ describe('eligible', () => {
         'http',
       ),
     ).toEqual(no);
+    expect(eligible('HandlerProfileSchedule', {}, 'http')).toEqual({
+      ok: true,
+    });
     expect(
       eligible(
         'CreateFunctionGroup',

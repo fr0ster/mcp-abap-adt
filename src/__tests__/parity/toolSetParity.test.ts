@@ -899,10 +899,10 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           served: false,
         });
       }
-      // compact: the 28, the four debugger verbs, the three background-run
+      // compact: the 29, the four debugger verbs, the three background-run
       // tools beside the run tool, HandlerBatch, and on stdio the
       // leftover-session list and logoff (no set serves a resume).
-      expect(compact.tools).toHaveLength(28 + 4 + 3 + 1 + (onStdio ? 2 : 0));
+      expect(compact.tools).toHaveLength(29 + 4 + 3 + 1 + (onStdio ? 2 : 0));
       expect(compact.tools).toEqual(
         expect.arrayContaining([
           ...COMPACT_RW,

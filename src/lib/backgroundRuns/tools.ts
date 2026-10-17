@@ -5,7 +5,7 @@
  *
  * The list is exactly the code-running tools whose run may write and run
  * long: `RuntimeRunClass`, `RuntimeRunProgram` and compact's
- * `HandlerProfileRun` (both its modes). A source test keeps every tool's
+ * `HandlerProfileRun`. A source test keeps every tool's
  * schema equal to it: a listed tool without the parameter, or a tool outside
  * the list with it, fails.
  */

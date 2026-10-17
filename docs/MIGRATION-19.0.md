@@ -122,7 +122,7 @@ every binary. Four kinds of binary, each on stdio, Streamable HTTP and SSE:
 |---|---|---|
 | core | `mcp-abap-adt` (`@mcp-abap-adt/core`), `mcp-abap-adt-http` (`@mcp-abap-adt/http`), `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs; on stdio the leftover-session list and logoff |
 | core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`), `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`), `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search); on stdio the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`), `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the 28 compact tools, the four compact debugger verbs, background runs; on stdio the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`), `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the 29 compact tools, the four compact debugger verbs, background runs; on stdio the leftover-session list and logoff |
 | compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`), `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`), `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the 17 compact tools that change nothing; on stdio the leftover-session list and logoff |
 
 No `-ro` binary serves the debugger or a background run, no binary a resume of a leftover session
@@ -224,7 +224,8 @@ section but one): it cannot be cut, so it gets no `timeout`.
   `RuntimeRunClass` / `RuntimeRunProgram` with `profile: true` (the same trace flags; the profiler
   id and, for a class, the trace id answer under `profile`), and the profiler tools
   (`RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`).
-  Compact's `HandlerProfileRun` answers as those two do.
+  Compact profiles in two tools, `HandlerProfileSchedule` then `HandlerProfileRun` (see "a
+  profiled run is two tools" under the compact section).
 - **`UpdateServiceBinding` sends its publication job with no deadline of the server's** (it was
   11 minutes), and none of the libraries' either: inside a lock window the connection applies no
   deadline at all (its 10-minute ceiling is gone, see below).
@@ -1041,11 +1042,11 @@ transport's options only:
   headers), `mcp-abap-adt-compact-sse` `mcp-abap-adt-sse`'s, and each `-ro` one the same as its
   write binary. The sections above apply to each as to its counterpart; only the tool list differs.
 - **The binary fixes the tool list** (see "`--exposition` is gone" above): `mcp-abap-adt-compact`
-  serves the 28 tools, the four debugger verbs (`HandlerDebugStart`, `…Wait`, `…View`, `…Step`),
-  the three background-run tools and the two leftover-session tools (list, logoff) — 37 (`-compact-http` and
-  `-compact-sse` the same without the leftover-session tools — 35); `mcp-abap-adt-compact-ro` the 17
-  that change nothing and the leftover-session list and logoff — 19 (`-compact-http-ro` and
-  `-compact-sse-ro` the 17 alone). `--exposition`, with `ro`, `rw`, `debug` or any word,
+  serves the 29 tools, the four debugger verbs (`HandlerDebugStart`, `…Wait`, `…View`, `…Step`),
+  the three background-run tools, `HandlerBatch` and the two leftover-session tools (list, logoff) — 39
+  (`-compact-http` and `-compact-sse` the same without the leftover-session tools — 37);
+  `mcp-abap-adt-compact-ro` the 17 that change nothing, `HandlerBatch` and the leftover-session list
+  and logoff — 20 (`-compact-http-ro` and `-compact-sse-ro` the 17 and `HandlerBatch`). `--exposition`, with `ro`, `rw`, `debug` or any word,
   stops the start.
 - **Compact is the low set's analogue.** See "The low set leaves the full binaries" above: the
   write under your `lock_handle`, the package operations, the creation and validation parameters,
@@ -1229,6 +1230,29 @@ transport's options only:
   then the result in later ones. `HandlerGet` with `UNIT_TEST` / `CDS_UNIT_TEST` still takes no
   `timeout` and runs on the instance's session. The full set's `GetUnitTestResult`,
   `GetCdsUnitTestResult`, `GetUnitTest` and `GetCdsUnitTest` are unchanged.
+- **BREAKING — a profiled run is two tools, one request each.** `HandlerProfileSchedule` (new)
+  sends the one `POST /sap/bc/adt/runtime/traces/abaptraces/parameters` with the profiling flags
+  (`description`, `all_procedural_units`, …, `max_time_for_tracing`, all optional) and answers
+  `{ success, profiler_id }`; a `2xx` without a `Location` header is a failure. `HandlerProfileRun`
+  takes `profiler_id` (required) beside `target_type` and `class_name` / `program_name`, sends the
+  one `POST /sap/bc/adt/oo/classrun/{name}?profilerId=…` (a program:
+  `/sap/bc/adt/programs/programrun/{name}?profilerId=…`) and answers `{ success, class_name |
+  program_name, output, profile: { profiler_id } }`. A failure is the method's error with
+  `step: "schedule trace"` or `step: "run with profiler"`. `profiling` and the profiling flags are
+  gone from `HandlerProfileRun`, and with `profiling: false` its plain run. 18.x scheduled the
+  trace and ran under it inside the one call, and for a class first read the trace feed and
+  afterwards searched it for the new trace — up to five reads, 2 s apart (as read from 18.x's code,
+  not measured) — answering `profiler_id` and, for a class, `trace_id`; `profiling: false` was a
+  plain run. A consumer of that answer now calls, in order:
+  1. `HandlerProfileSchedule` with the profiling flags — keep its `profiler_id`;
+  2. `HandlerProfileRun` with `target_type`, the class or program name and that `profiler_id`
+     (`background: true` as before);
+  3. `HandlerProfileList` — find the trace the run wrote (call it again, at the pace you choose,
+     until it appears), then read it with `HandlerProfileView`.
+
+  `trace_id` is gone from the run's answer. A plain run, without a trace, is the full set's
+  `RuntimeRunClass` / `RuntimeRunProgram`. The schedule and the run are one request each and are
+  recorded in batch mode: the schedule in one batch, the run in a later one with the id it answered.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.

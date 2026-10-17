@@ -915,12 +915,28 @@ const WRITES: BatchEntryCase[] = [
     args: { program_name: 'PROG_A', profile: false },
   },
   {
-    tool: 'HandlerProfileRun',
-    args: { target_type: 'CLASS', class_name: 'CLAS_A', profiling: false },
+    tool: 'HandlerProfileSchedule',
+    args: { description: 'text' },
+    headers: {
+      location:
+        '/sap/bc/adt/runtime/traces/abaptraces/parameters/PROFILER_PLACEHOLDER',
+    },
   },
   {
     tool: 'HandlerProfileRun',
-    args: { target_type: 'PROGRAM', program_name: 'PROG_A', profiling: false },
+    args: {
+      target_type: 'CLASS',
+      class_name: 'CLAS_A',
+      profiler_id: 'PROFILER_PLACEHOLDER',
+    },
+  },
+  {
+    tool: 'HandlerProfileRun',
+    args: {
+      target_type: 'PROGRAM',
+      program_name: 'PROG_A',
+      profiler_id: 'PROFILER_PLACEHOLDER',
+    },
   },
   {
     tool: 'HandlerUnitTestRun',

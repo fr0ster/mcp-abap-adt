@@ -626,27 +626,10 @@ export const compactUnitTestResultSchema = {
 export const compactCdsUnitTestStatusSchema = compactUnitTestStatusSchema;
 export const compactCdsUnitTestResultSchema = compactUnitTestResultSchema;
 
-export const compactProfileRunSchema = {
+export const compactProfileScheduleSchema = {
   type: 'object',
   properties: {
-    target_type: {
-      type: 'string',
-      enum: ['CLASS', 'PROGRAM'],
-      description: 'Profile execution target kind.',
-    },
-    class_name: { type: 'string', description: 'Class name for profiling.' },
-    program_name: {
-      type: 'string',
-      description: 'Program name for profiling.',
-    },
-    background: COMPACT_BACKGROUND_PROPERTY,
-    profiling: {
-      type: 'boolean',
-      default: true,
-      description:
-        'Whether to capture a profiler trace while running. Default true. Set false for a plain run with no tracing — the profiling flags below are then ignored.',
-    },
-    description: { type: 'string', description: 'Profiler run description.' },
+    description: { type: 'string', description: 'Profiler trace description.' },
     all_procedural_units: {
       type: 'boolean',
       description: 'Trace all procedural units.',
@@ -682,7 +665,30 @@ export const compactProfileRunSchema = {
       description: 'Maximum tracing time.',
     },
   },
-  required: ['target_type'],
+  required: [],
+} as const;
+
+export const compactProfileRunSchema = {
+  type: 'object',
+  properties: {
+    target_type: {
+      type: 'string',
+      enum: ['CLASS', 'PROGRAM'],
+      description: 'Profile execution target kind.',
+    },
+    class_name: { type: 'string', description: 'Class name for profiling.' },
+    program_name: {
+      type: 'string',
+      description: 'Program name for profiling.',
+    },
+    profiler_id: {
+      type: 'string',
+      minLength: 1,
+      description: 'The profiler id of a scheduled trace.',
+    },
+    background: COMPACT_BACKGROUND_PROPERTY,
+  },
+  required: ['target_type', 'profiler_id'],
 } as const;
 
 export const compactProfileListSchema = {

@@ -1,5 +1,5 @@
 /**
- * The compact surface stays frozen — the same 33 tools — 28, plus the four debug verbs the compact write binaries serve and `HandlerBatch`, which every compact binary serves.
+ * The compact surface stays frozen — the same 34 tools — 29, plus the four debug verbs the compact write binaries serve and `HandlerBatch`, which every compact binary serves.
  *
  * **Why it lives here now.** `tests/fixtures/tools/surface.json` in `lib` froze all
  * 370 tools, 22 of them compact. The facade moved into packages, so `lib`'s fixture
@@ -69,8 +69,8 @@ describe('the compact tool surface', () => {
   }));
 
   it('enumerates the whole facade, so the assertions below are not vacuous', () => {
-    expect(frozen).toHaveLength(33);
-    expect(current).toHaveLength(33);
+    expect(frozen).toHaveLength(34);
+    expect(current).toHaveLength(34);
   });
 
   it('has the same tools', () => {

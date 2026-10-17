@@ -81,6 +81,13 @@ Running unit tests is three phases, each its own batch:
 3. the result — `HandlerUnitTestResult` (`HandlerCdsUnitTestResult`, or `HandlerGet` with
    `object_type: UNIT_TEST` / `CDS_UNIT_TEST`) with the `run_id`.
 
+Profiling a run is three phases, each its own batch:
+
+1. schedule — `HandlerProfileSchedule` with the profiling flags, answering the `profiler_id`;
+2. run — `HandlerProfileRun` with `target_type`, the class or program name and that `profiler_id`;
+3. the trace, as often as you choose — `HandlerProfileList` until the run's trace is listed, then
+   `HandlerProfileView` with its id.
+
 Deleting is two phases, each its own batch:
 
 1. deletion check — `HandlerDeletionCheck` per object; read each verdict with `BatchAnswers`;
@@ -225,7 +232,7 @@ no raw part.
 
 <!-- batch-handlers:start -->
 
-168 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+169 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -387,7 +394,8 @@ no raw part.
 | `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
 | `HandlerLock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
 | `HandlerProfileList` | every call | GET /sap/bc/adt/runtime/traces/abaptraces |
-| `HandlerProfileRun` | when profiling is false | POST the class or program run (profiling false: with profiling the trace is also scheduled and listed) |
+| `HandlerProfileRun` | when profiler_id is given | POST /sap/bc/adt/oo/classrun/{name} or /sap/bc/adt/programs/programrun/{name} with ?profilerId={profiler_id} |
+| `HandlerProfileSchedule` | every call | POST /sap/bc/adt/runtime/traces/abaptraces/parameters: schedules a trace and answers its profiler_id |
 | `HandlerProfileView` | every call | GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses (mode analyze: summarised locally) |
 | `HandlerSearch` | every call | GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…] |
 | `HandlerServiceBindingListTypes` | every call | GET /sap/bc/adt/businessservices/bindings/bindingtypes |

@@ -247,3 +247,41 @@ export async function handleRuntimeRunClass(
     terseClassRun,
   );
 }
+
+/**
+ * A class run under a scheduled profiler trace, in one request (compact
+ * `HandlerProfileRun`; spec §4.6, one ADT request per tool call).
+ *
+ * The one `POST /oo/classrun/{name}?profilerId=…` with the id the caller
+ * scheduled: no feed snapshot, no schedule, no trace search. A missing or
+ * empty `profiler_id` is refused before any request; a failure is the
+ * method's error plus `step`.
+ */
+export async function handleRuntimeRunClassUnderProfiler(
+  context: HandlerContext,
+  args: { class_name?: string; profiler_id?: string },
+  tool: string,
+) {
+  const { connection, logger } = context;
+  if (!args?.class_name) {
+    return return_error(new Error('Parameter "class_name" is required'));
+  }
+  const profilerId = args.profiler_id;
+  if (typeof profilerId !== 'string' || profilerId === '') {
+    return return_error(new Error('Parameter "profiler_id" is required'));
+  }
+  const className = args.class_name.trim().toUpperCase();
+  const classExecutor = new AdtExecutor(connection, logger).getClassExecutor(
+    ourClassExecutor,
+  );
+  return answer(
+    { tool, detail: 'terse' },
+    atStep('run with profiler', () =>
+      classExecutor.runWithProfiler(
+        { className },
+        { analyse: analyseException, profilerId },
+      ),
+    ),
+    (output: string) => terseClassRun({ className, output, profilerId }),
+  );
+}

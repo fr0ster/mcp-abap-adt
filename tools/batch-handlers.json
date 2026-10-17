@@ -1338,16 +1338,20 @@
     ]
   },
   {
+    "tool": "HandlerProfileSchedule",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerProfileSchedule.ts#handleHandlerProfileSchedule",
+    "sends": "POST /sap/bc/adt/runtime/traces/abaptraces/parameters: schedules a trace and answers its profiler_id"
+  },
+  {
     "tool": "HandlerProfileRun",
     "set": "compact",
     "handler": "compact-modify/src/handlers/handleHandlerProfileRun.ts#handleHandlerProfileRun",
-    "sends": "POST the class or program run (profiling false: with profiling the trace is also scheduled and listed)",
+    "sends": "POST /sap/bc/adt/oo/classrun/{name} or /sap/bc/adt/programs/programrun/{name} with ?profilerId={profiler_id}",
     "when": [
       {
-        "argument": "profiling",
-        "equals": [
-          "false"
-        ]
+        "argument": "profiler_id",
+        "present": true
       }
     ]
   },

@@ -134,7 +134,7 @@ describe('the four tool sets', () => {
       new CompactReadOnlyHandlersGroup(context),
       new CompactModifyHandlersGroup(context),
     ]);
-    expect(both).toHaveLength(28);
+    expect(both).toHaveLength(29);
     expect(shape(compact.groups(context, 'stdio'))).toEqual([
       { group: 'CompactHandlers', tools: both },
       {

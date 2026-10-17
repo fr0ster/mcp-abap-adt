@@ -1,7 +1,7 @@
 /**
  * @mcp-abap-adt/compact — the compact ABAP ADT server over stdio, and its command.
  *
- * 28 tools instead of 370: one per operation, with the object in `object_type`. For
+ * 29 tools instead of 370: one per operation, with the object in `object_type`. For
  * a host that cannot build a retrieval pipeline of its own and must still drive ABAP
  * through MCP reliably.
  *

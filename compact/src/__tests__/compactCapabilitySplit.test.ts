@@ -125,7 +125,7 @@ describe('the compact capability split holds across the packages', () => {
     const read = handlersOf('compact-readonly-entries');
     const write = handlersOf('compact-modify');
     expect(read).toHaveLength(17);
-    expect(write).toHaveLength(11);
+    expect(write).toHaveLength(12);
     expect(read.filter((name) => write.includes(name))).toEqual([]);
   });
 });

@@ -21,10 +21,13 @@
  */
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourClassExecutor } from '../../../lib/strategies/resultSets';
+import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
+import { atStep, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -111,6 +114,81 @@ export async function handleRuntimeCreateProfilerTraceParameters(
         analyse: analyseException,
       }),
     (profilerId) => ({
+      success: true,
+      profiler_id: profilerId,
+    }),
+  );
+}
+
+/** The step a failed schedule names (C6). */
+const SCHEDULE_TRACE = 'schedule trace';
+
+/** A schedule SAP answered with no profiler id: the fixed words. */
+export const SCHEDULE_WITHOUT_ID =
+  'SAP answered the trace schedule without a profiler id: no Location header carried one, so no run can name it.';
+
+/** The profiling flags of a schedule, as compact's `HandlerProfileSchedule` takes them. */
+export type ScheduleProfilerTraceArgs = Omit<
+  RuntimeCreateProfilerTraceParametersArgs,
+  'description'
+> & { description?: string };
+
+/**
+ * The trace schedule in one request (compact `HandlerProfileSchedule`; spec
+ * §4.6, one ADT request per tool call).
+ *
+ * The one `POST /runtime/traces/abaptraces/parameters`, answered
+ * `{ success, profiler_id }`: the id SAP gave in `Location`, the only place it
+ * appears. A `2xx` without one is a failure, since a run is named by that id
+ * alone. A failure is the method's error plus `step`.
+ */
+export async function handleScheduleProfilerTraceOnce(
+  context: HandlerContext,
+  args: ScheduleProfilerTraceArgs,
+  tool: string,
+) {
+  const { connection, logger } = context;
+  const classExecutor = new AdtExecutor(connection, logger).getClassExecutor(
+    ourClassExecutor,
+  );
+
+  return answer(
+    { tool, detail: 'terse' },
+    async () => {
+      const scheduled = await atStep(SCHEDULE_TRACE, () =>
+        classExecutor.scheduleTrace({
+          ...definedOnly({
+            description: args?.description,
+            allMiscAbapStatements: args?.all_misc_abap_statements,
+            allProceduralUnits: args?.all_procedural_units,
+            allInternalTableEvents: args?.all_internal_table_events,
+            allDynproEvents: args?.all_dynpro_events,
+            aggregate: args?.aggregate,
+            explicitOnOff: args?.explicit_on_off,
+            withRfcTracing: args?.with_rfc_tracing,
+            allSystemKernelEvents: args?.all_system_kernel_events,
+            sqlTrace: args?.sql_trace,
+            allDbEvents: args?.all_db_events,
+            maxSizeForTraceFile: args?.max_size_for_trace_file,
+            amdpTrace: args?.amdp_trace,
+            maxTimeForTracing: args?.max_time_for_tracing,
+          }),
+          analyse: analyseException,
+        }),
+      )();
+      if (!scheduled.ok) return scheduled;
+      const profilerId = scheduled.getResult().value;
+      if (profilerId === '') {
+        return failedWith<string>(
+          withStep(
+            { message: SCHEDULE_WITHOUT_ID, origin: 'refusal' } as IAdtError,
+            SCHEDULE_TRACE,
+          ),
+        );
+      }
+      return succeededWith(profilerId);
+    },
+    (profilerId: string) => ({
       success: true,
       profiler_id: profilerId,
     }),

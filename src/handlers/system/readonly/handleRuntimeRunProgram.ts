@@ -165,3 +165,46 @@ export async function handleRuntimeRunProgram(
     }),
   );
 }
+
+/**
+ * A program run under a scheduled profiler trace, in one request (compact
+ * `HandlerProfileRun`; spec §4.6, one ADT request per tool call).
+ *
+ * The one `POST /programs/programrun/{name}?profilerId=…` with the id the
+ * caller scheduled. A missing or empty `profiler_id` is refused before any
+ * request; a failure is the method's error plus `step`.
+ */
+export async function handleRuntimeRunProgramUnderProfiler(
+  context: HandlerContext,
+  args: { program_name?: string; profiler_id?: string },
+  tool: string,
+) {
+  const { connection, logger } = context;
+  if (!args?.program_name) {
+    return return_error(new Error('Parameter "program_name" is required'));
+  }
+  const profilerId = args.profiler_id;
+  if (typeof profilerId !== 'string' || profilerId === '') {
+    return return_error(new Error('Parameter "profiler_id" is required'));
+  }
+  const programName = args.program_name.trim().toUpperCase();
+  const programExecutor = new AdtExecutor(
+    connection,
+    logger,
+  ).getProgramExecutor(ourProgramExecutor);
+  return answer(
+    { tool, detail: 'terse' },
+    atStep('run with profiler', () =>
+      programExecutor.runWithProfiler(
+        { programName },
+        { analyse: analyseException, profilerId },
+      ),
+    ),
+    (output: string) => ({
+      success: true,
+      program_name: programName,
+      output: output ?? '',
+      profile: { profiler_id: profilerId },
+    }),
+  );
+}

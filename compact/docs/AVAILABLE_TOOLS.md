@@ -3,7 +3,7 @@
 Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
-- Tools: 38
+- Tools: 39
 - Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
@@ -15,7 +15,7 @@ definitions a client receives.
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 38 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 39 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 
@@ -528,22 +528,17 @@ per request.
 - `risk_level` — Allowed risk levels.
 - `duration` — Allowed duration classes.
 
-### HandlerProfileRun
+### HandlerProfileSchedule
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs]. Optional: profiling(default true; set false for a plain run with no trace), profiling flags, description. Response: JSON.
+**Description:** Schedules an ABAP profiler trace in one request. object_type: not used. Optional: description, profiling flags (all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing). Response: JSON { success, profiler_id }, profiler_id the id of the scheduled trace.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `target_type` (required) — Profile execution target kind.
-- `class_name` — Class name for profiling.
-- `program_name` — Program name for profiling.
-- `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
-- `profiling` — Whether to capture a profiler trace while running. Default true. Set false for a plain run with no tracing — the profiling flags below are then ignored.
-- `description` — Profiler run description.
+- `description` — Profiler trace description.
 - `all_procedural_units` — Trace all procedural units.
 - `all_misc_abap_statements` — Trace miscellaneous ABAP statements.
 - `all_internal_table_events` — Trace internal table events.
@@ -557,6 +552,22 @@ per request.
 - `max_size_for_trace_file` — Maximum trace file size.
 - `amdp_trace` — Enable AMDP tracing.
 - `max_time_for_tracing` — Maximum tracing time.
+
+### HandlerProfileRun
+
+**Half:** `@mcp-abap-adt/compact-modify`
+
+**Description:** Runs a class or a program under a scheduled profiler trace, in one request. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs], profiler_id* (the profiler id of a scheduled trace). Optional: background. Response: JSON { success, class_name | program_name, output, profile: { profiler_id } }.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `target_type` (required) — Profile execution target kind.
+- `class_name` — Class name for profiling.
+- `program_name` — Program name for profiling.
+- `profiler_id` (required) — The profiler id of a scheduled trace.
+- `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
 
 ### HandlerDebugStart
 

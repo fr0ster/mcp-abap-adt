@@ -329,13 +329,12 @@ CHANGELOG 19.0.0).
   `get<Type>().updateMetadata({ name, transportRequest }, { source: source_code, lockHandle, analyse })`.
   `properties` and the flat metadata fields (`FLAT_PROPERTIES`) are no longer arguments of
   `HandlerUpdate`; given, they are refused by presence, naming them. `document` is not added.
-- **`HandlerDelete`** is only the `DELETE` under `lock_handle` (required): no deletion check of its
-  own, no lock or unlock of its own. The types whose delete today writes their section empty under a
-  lock of its own (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`,
-  `UNIT_TEST`, `CDS_UNIT_TEST`) send only that `PUT` under the caller's `lock_handle`. The code today
-  says the opposite of a delete under a lock ("no lock is taken because a held lock is what makes ADT
-  refuse", `src/handlers/class/high/handleDeleteClass.ts:4-7`); the live check (plan) measures the
-  `DELETE` under `lock_handle` per type and reports what came.
+- **`HandlerDelete`** sends only the deletion request, as adt-clients' `delete()` does today
+  (`src/lib/strategies/checkedDeletion.ts`: the bare deletion after the check) — no lock (deletion
+  takes none: a held lock is what makes ADT refuse, `src/handlers/class/high/handleDeleteClass.ts:4-7`)
+  and no check. The types whose delete today writes their section empty under a lock of its own
+  (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`, `UNIT_TEST`,
+  `CDS_UNIT_TEST`) send only that `PUT` under the caller's `lock_handle` — a write, not a deletion.
 - **`HandlerDeletionCheck`** — a new compact tool beside `HandlerValidate` and `HandlerCheckRun`,
   parameters `object_type`*, `object_name`* as theirs: one call, the deletion check request the
   deletion uses today (`checkDeletion` in `src/lib/strategies/checkedDeletion.ts:50-51`), answered as

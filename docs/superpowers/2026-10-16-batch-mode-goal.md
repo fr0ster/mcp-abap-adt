@@ -80,7 +80,7 @@ activates the group afterwards.
   refused, by presence, naming it); `HandlerUpdate` is only the `PUT` under
   `lock_handle` (no lock or unlock of its own, no read-patch-write; for a
   domain, a data element or a package the caller passes the whole document);
-  `HandlerDelete` only the `DELETE` under `lock_handle`; the deletion check is
+  `HandlerDelete` only the deletion request (no lock, no check); the deletion check is
   its own compact tool, `HandlerDeletionCheck`. Lock, unlock and activate
   already are single. `HandlerGet` honours `part` and returns only what was
   asked — code, metadata or another part: one part, one request. The

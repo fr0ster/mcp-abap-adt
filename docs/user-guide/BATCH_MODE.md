@@ -86,7 +86,8 @@ of the class include (`LOCAL_*`, `UNIT_TEST`, `CDS_UNIT_TEST`, `BEHAVIOR_IMPLEME
 the metadata document, and for `SERVICE_BINDING` its publication request. For PACKAGE, DOMAIN,
 DATA_ELEMENT and FUNCTION_GROUP, `source_code` is the whole metadata document, sent byte for byte:
 nothing is read before the write or after it. Locking, unlocking and activating are their own
-calls (`HandlerLock`, `HandlerUnlock`, `HandlerActivate`). A `PACKAGE` update is recorded over HTTP
+calls (`HandlerLock`, `HandlerUnlock`, `HandlerActivate`); for `LOCAL_*`, `UNIT_TEST` and
+`CDS_UNIT_TEST` the lock is the class's — `HandlerLock` with `object_type: CLASS`. A `PACKAGE` update is recorded over HTTP
 only: over RFC the package lock is held in an ABAP session of its own, outside the batch.
 
 **Every batch end sends one envelope.** Only LOCK and UNLOCK go stateful, as adt-clients sends

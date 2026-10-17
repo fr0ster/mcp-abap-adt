@@ -250,7 +250,10 @@ describe('HandlerUpdate is one write under lock_handle', () => {
       expect(answered.sent).toEqual(held.sent);
       expect(notFound.sent).toEqual(held.sent);
       expect(notFound.answer?.isError).toBe(true);
-      if (objectType !== 'SERVICE_BINDING') {
+      if (objectType === 'SERVICE_BINDING') {
+        // The publication request carries no transport request.
+        expect(write.url).not.toContain('corrNr');
+      } else {
         expect(write.url).toContain(`lockHandle=${LOCK}`);
         expect(write.url).toContain(`corrNr=${TRANSPORT}`);
         expect(answered.answer?.isError).not.toBe(true);
@@ -273,10 +276,10 @@ describe('HandlerUpdate is one write under lock_handle', () => {
   );
 
   it.each(SOURCES)(
-    '%s: the body is the given source',
+    '%s: the body is the given source, byte for byte',
     async (objectType, fields) => {
       const held = await run('pending', update(objectType, underLock(fields)));
-      expect(String(held.sent[0]?.data)).toContain('source text');
+      expect(held.sent[0]?.data).toBe('source text');
     },
   );
 
@@ -374,6 +377,21 @@ describe('the HandlerUpdate schema and description', () => {
     'behavior_definition',
   ])('%s is not in the schema', (name) => {
     expect(Object.keys(schemaProperties)).not.toContain(name);
+  });
+
+  it('names transport_request for each type whose write sends it, and only those', () => {
+    const description: string = TOOL_DEFINITION.description;
+    for (const [type] of TYPES) {
+      const args = description.match(new RegExp(`\\b${type}\\(([^)]*)\\)`))?.[1];
+      expect({ type, transport: args?.includes('transport_request') }).toEqual({
+        type,
+        transport: type !== 'SERVICE_BINDING',
+      });
+    }
+  });
+
+  it('names no other tool', () => {
+    expect(TOOL_DEFINITION.description).not.toMatch(/Handler[A-Z]/);
   });
 
   it('transport_request is in the schema', () => {

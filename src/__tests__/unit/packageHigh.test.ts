@@ -51,6 +51,13 @@ const REFUSAL =
   '<namespace id="com.sap.adt"/><type id="ExceptionResourceNoAccess"/>' +
   '<message lang="EN">refused</message></exc:exception>';
 
+/** A document with its master system as a placeholder. */
+const neutral = (data: unknown) =>
+  String(data).replace(
+    /adtcore:masterSystem="[^"]*"/,
+    'adtcore:masterSystem="SYSTEM_PLACEHOLDER"',
+  );
+
 const ctx = (connection: unknown) =>
   ({ connection, logger: silentLogger }) as unknown as HandlerContext;
 
@@ -139,7 +146,11 @@ describe('UpdatePackage (high)', () => {
     expect(low).toHaveLength(2);
     expect(inner.map((r) => r.method)).toEqual(['GET', 'PUT']);
     expect(inner[0]).toEqual(low[0]);
-    expect(inner[1]?.data).toEqual((low[1] as { data?: unknown }).data);
+    // The table carries the system as a placeholder; the corpus answer the
+    // stand-in serves carries the recorded one.
+    expect(neutral(inner[1]?.data)).toEqual(
+      neutral((low[1] as { data?: unknown }).data),
+    );
   });
 });
 

@@ -307,11 +307,13 @@ export const compactUpdateSchema = {
     object_type: commonObjectTypeSchema,
     lock_handle: {
       type: 'string',
-      description: 'Lock handle from HandlerLock: the write is sent under it.',
+      description:
+        'The lock handle of the object (for a class include, of the class): the write is sent under it.',
     },
     transport_request: {
       type: 'string',
-      description: 'Transport request id (if required by system).',
+      description:
+        "Transport request id, sent as the write's corrNr (the types whose description names it).",
     },
     class_name: { type: 'string', description: 'ABAP class name.' },
     program_name: { type: 'string', description: 'ABAP program name.' },

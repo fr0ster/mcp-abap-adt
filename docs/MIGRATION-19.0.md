@@ -554,8 +554,7 @@ design. Send a long run to the background where the tool offers it.
   instance's connection lives across calls; the calls in between are stateless, and the instance's
   end (its logoff) releases a lock you never unlocked. **Over Streamable HTTP it does not**: the
   next request's credential retires the lock's connection, and that connection's logoff releases
-  the lock. Over HTTP, update with the full set's `Update<Type>` — lock, write and unlock in one
-  call; compact `HandlerUpdate` is the write alone under a `lock_handle` (see "compact users").
+  the lock. Compact `HandlerUpdate` is the write alone under a `lock_handle` (see "compact users").
 - **The debugger's sessions are its own**, stateful for their life, and end with the debug session.
 - Every site that turns a session type is listed in `tools/stateful-sites.json`.
 
@@ -1077,7 +1076,10 @@ transport's options only:
   document and wrote it back patched. What a consumer of 18.x's `HandlerUpdate` now calls, in
   order, each its own call:
   1. `HandlerLock` — it answers the `lock_handle` (SERVICE_DEFINITION and SERVICE_BINDING are
-     new on `HandlerLock` and `HandlerUnlock`; a binding's lock is SAP's answer as it came);
+     new on `HandlerLock` and `HandlerUnlock`; a binding's lock is SAP's answer as it came). For
+     `LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`, `UNIT_TEST` and
+     `CDS_UNIT_TEST` the lock is the class's: `HandlerLock` with `object_type: CLASS` and the class
+     name (`BEHAVIOR_IMPLEMENTATION`: its own object type, the same class lock);
   2. for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP: `HandlerGet` part `metadata` — the
      metadata document; change in it what 18.x took as `description`, `datatype`, `length`,
      `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`,

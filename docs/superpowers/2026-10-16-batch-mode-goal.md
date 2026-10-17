@@ -54,10 +54,13 @@ activates the group afterwards.
   taken from the pool by `state_handle`, exactly as for any other call;
   `state_handle` exists for that reuse and has nothing to do with batching.
   Batch mode introduces no handle of its own.
-- **The tool descriptions say it.** `BatchBegin`, `BatchEnd` and every tool's
-  description tell the LLM that in batch mode a call returns nothing, that calls
-  are numbered in the order made, and that the answers are read by number once
-  `BatchEnd` has run.
+- **The tool descriptions say it, purely functionally.** Every tool's
+  description, in every set, states only what the tool does, its parameters
+  and its result — no negations, no list of steps it skips, no pointer to
+  another tool's work, no migration wording. `BatchBegin`, `BatchEnd`, the
+  answer tool and the sentence every tool carries for batch mode follow the
+  same rule: in batch mode a call is recorded under the next number, from 1,
+  and its answer is read by number once the batch has run.
 - **Independence is the criterion, for long reads too.** A long read none of
   whose requests depends on another's answer is recorded like any other tool;
   one with a chain (a request built from an earlier answer, a fallback after a

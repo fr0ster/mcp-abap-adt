@@ -159,31 +159,35 @@ executed batch, communication or debugger.
 
 ### Wording
 
-- `BatchBegin`: "Switches this server into batch mode: from now on each call of a tool none of whose
-  requests depends on another's answer is recorded instead of sent, and returns nothing. Every
-  recorded call is numbered, in the order made, from 1. A tool that builds a request from an
-  earlier answer is refused in batch mode; use the compact tools, one operation each (HandlerCreate, HandlerLock, HandlerUpdate,
-  HandlerUnlock, HandlerDelete, HandlerGet) and run each phase as its own batch. BatchEnd sends the
-  recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle
-  this answers in the request header on every call of the batch."
-- `BatchEnd`: "Sends every call recorded since BatchBegin, in one envelope, with the
-  credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers
-  how many calls were recorded and which numbers failed; read each answer with BatchAnswers."
-- `BatchAnswers`: "The answers of the last batch, by number: each is the answer the tool gives for
-  that call, built when BatchEnd sent it — SAP's answer or why it was not sent. A number the last
-  batch does not have answers: no answer with that number."
-- `HandlerBatch` / `HandlerDebugBatch`: the same sentences, one per action, naming the actions
-  (`action: 'begin'` … `'end'` … `'answers'`) where the full set names a tool.
+**The rule (owner, binding, for every tool in every set — full, `-ro`, compact, batch, debugger):** a
+description is purely functional — only what the tool does, its parameters and its result. No
+negations ("does not …"), no list of steps it skips, no pointer to another tool's work, no migration
+wording. The words below follow it; the plan's description sweep holds every other tool to it.
+
+- `BatchBegin`: "Starts batch mode on this server. In batch mode each call of a tool marked
+  recordable is recorded under the next number, starting at 1, and answers with empty content.
+  Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call
+  of the batch."
+- `BatchEnd`: "Sends the recorded calls in one envelope with the credentials in force and ends batch
+  mode. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer
+  to the envelope when the envelope failed."
+- `BatchAnswers`: "Answers the calls of the last executed batch by number: for each number asked,
+  the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of
+  numbers; an unknown number answers as unknown."
+- `HandlerBatch` / `HandlerDebugBatch`: the same sentences, one per action (`action: 'begin'`,
+  `'end'`, `'answers'`).
 - `DebugBatchBegin` / `DebugBatchEnd`: the same sentences, scoped to "the stopped debuggee: step,
   step to line, stack, variables, child variables, stack position, setting a variable".
 - **Every other tool** gets one sentence appended at registration (`BaseMcpServer.registerHandlers`,
-  one place, so no handler file changes): an eligible tool — "In batch mode (BatchBegin) a call is
-  recorded and returns nothing; calls are numbered in the order made, and their answers are read
-  by number with BatchAnswers once BatchEnd has run."; in the compact sets the sentence names
-  `HandlerBatch` instead of BatchBegin / BatchAnswers; a tool eligible only for some arguments adds
-  which (from its eligibility entry, §4.2); an ineligible tool — "In batch mode (BatchBegin) this
-  tool is refused: a request of it depends on another's answer." Tools of a registry that registers its own
-  (`trackingRegistrations`) get the ineligible sentence through the proxy's `registerTool`.
+  one place, so no handler file changes), positive in every case:
+  - a recordable tool — "Recordable: in batch mode a call is recorded under the next number and
+    answers with empty content; its answer is read by number after the batch ends.";
+  - a tool recordable for some arguments — the same sentence, prefixed "With <the entry's `when`
+    in words>,";
+  - any other tool — "Runs outside batch mode."
+  In the compact sets the sentences name `HandlerBatch`'s actions where the full sets name the batch
+  tools. Tools of a registry that registers its own (`trackingRegistrations`) get "Runs outside batch
+  mode." through the proxy's `registerTool`.
 
 ## 4. Recording
 
@@ -394,11 +398,11 @@ and its MEASURED lines); the plan lists each violator with file and line.
   No background listen loop; the consumer chains the calls (breakpoints → listen → attach → step /
   view → continue / terminate / detach → delete breakpoint / stop listener). `HandlerDebugWait` goes;
   the old `HandlerDebugStart`, `HandlerDebugStep`, `HandlerDebugView`, `HandlerDebugWait` map onto the
-  four (migration rows; `HandlerDebugView` → `HandlerDebugMaintain`). MEASURED facts stay in the descriptions
-  (`.superpowers/sdd/2026-10-16-batch-mode/debugger-probe-report.md`): a step's answer carries no
-  position (the stack is a `HandlerDebugMaintain` call); `terminateDebuggee` / `terminateDebugger` answer
-  `500` even when they work; `detachDebugger` releases the debuggee only without an id on the
-  attaching session.
+  four (migration rows; `HandlerDebugView` → `HandlerDebugMaintain`). MEASURED facts stay in the descriptions, stated
+  positively (`.superpowers/sdd/2026-10-16-batch-mode/debugger-probe-report.md`): a step answers
+  SAP's step result, and the stopped position is read from the stack; `terminateDebuggee` /
+  `terminateDebugger` answer `500` when they succeed, and success shows in the next answer;
+  detach sends `detachDebugger` without an id on the attaching session, which releases the debuggee.
 - `HandlerLock`, `HandlerUnlock` and the single-object `HandlerActivate` already are one request.
 
 Every compact call is proven to issue exactly one request (§4.2's proof: held, answered with a

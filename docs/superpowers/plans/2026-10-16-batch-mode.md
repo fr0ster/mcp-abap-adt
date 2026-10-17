@@ -399,7 +399,7 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 **Interfaces:**
 - Produces (spec §4.6; each call one `AbapDebugger` / `AmdpDebugger` method, chosen by the tool's operation argument; the three new names are proposals): `HandlerDebugBreakpoints` (ABAP setBreakpoints, syncBreakpoints, deleteBreakpoint, createWatchpoint, listWatchpoints, deleteWatchpoint; AMDP syncBreakpoints); `HandlerDebugSession` (ABAP checkListener, listen with the caller's `hold_seconds`, stopListener, attach, detachDebugger without an id on the attaching session, terminateDebuggee, terminateDebugger, setDebuggerSettings; AMDP start, getEvents, stop, deleteDebuggee); `HandlerDebugStep` (ABAP step into/over/return/continue, stepToLine with an address, setStackPosition; AMDP step); `HandlerDebugMaintain` — maintain variables (ABAP getStack, getVariables, getChildVariables, getMemorySizes, createMemorySnapshot, setVariableValue; AMDP getDataPreview).
 
-- [ ] **Step 1: Write the failing tests** — per tool and operation, ABAP and AMDP: `exactly one request, the named method (held / document / 404)`; `no background listen loop: nothing is sent between calls`; `listen holds exactly the caller's hold_seconds`; `stepToLine without an address refused before any request`; `detach sends detachDebugger without an id on the attaching session`; `descriptions: a step carries no position (use HandlerDebugMaintain getStack); terminate answers 500 even when it works; detach releases only without an id`; `HandlerDebugStart, HandlerDebugView and HandlerDebugWait are not served`.
+- [ ] **Step 1: Write the failing tests** — per tool and operation, ABAP and AMDP: `exactly one request, the named method (held / document / 404)`; `no background listen loop: nothing is sent between calls`; `listen holds exactly the caller's hold_seconds`; `stepToLine without an address refused before any request`; `detach sends detachDebugger without an id on the attaching session`; `descriptions, positive: a step answers SAP's step result and the stopped position is read from the stack; terminate answers 500 when it succeeds; detach releases the debuggee on the attaching session`; `HandlerDebugStart, HandlerDebugView and HandlerDebugWait are not served`.
 - [ ] **Step 2:** Run — FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run, with Task 4's proof — PASS.
@@ -555,7 +555,24 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 - [ ] **Step 1:** `src/__tests__/integration/rfc/messageServer.test.ts`: a logon through `mshost` + `sysid` (and `mshost` + `msserv`), `group`, and with `saprouter` where the system needs one; one read through the server. States where it runs (a system with a message server), skips elsewhere with the reason.
 - [ ] **Step 2:** On the owner's word, run; record the result with the date in the RFC docs (whether `mshost` + `msserv` without `sysid` is accepted). Commit.
 
-### Task 34: Final consistency
+### Task 34: Tool descriptions: purely functional
+
+**Files:**
+- Modify: the `TOOL_DEFINITION.description` of every tool in every set (`src/handlers/**`, `compact-modify/src/handlers/**`, `compact-readonly-entries/src/handlers/**`, `src/lib/compact/**`, the batch and debugger groups), `src/embeddable/BaseMcpServer.ts` (the appended batch sentences, spec §3), the regenerated tool docs (`docs/user-guide/AVAILABLE_TOOLS*.md`, `compact/docs/AVAILABLE_TOOLS.md`, `compact/tests/fixtures/surface.json`)
+- Create: `src/__tests__/unit/sources/descriptionsFunctional.test.ts`
+
+**Interfaces:**
+- Produces: every description states what the tool does, its parameters and its result; the appended sentences are spec §3's ("Recordable: …", "With …, recordable: …", "Runs outside batch mode.").
+
+- [ ] **Step 1: Write the failing test** — `descriptionsFunctional.test.ts`: for every served tool in every set (taken from the registered tool lists, the appended sentence included), split the description into word tokens with plain code (letters and apostrophes kept, everything else a separator — no regular expression) and assert none of the tokens, lower-cased, is in the list `not`, `no`, `never`, `nothing`, `none`, `neither`, `nor`, `without`, `cannot`, `can't`, `doesn't`, `don't`, `isn't`, `won't`, `instead`, `formerly`, `deprecated`, `removed`, `replaces`, `migrate`; the failure names the tool and the token.
+- [ ] **Step 2:** Run — FAIL (listing today's offenders).
+- [ ] **Step 3:** Rewrite each offending description to the rule (what it does, its parameters, its result) and the appended sentences to spec §3's words; regenerate the tool docs.
+- [ ] **Step 4:** Run, and the surface tests — PASS.
+- [ ] **Step 5: Break it:** put "does not lock" back into one description — red; revert.
+- [ ] **Step 6:** CHANGELOG 19.0.0 *Changed*: tool descriptions state only what each tool does, its parameters and its result.
+- [ ] **Step 7:** Commit `docs: tool descriptions purely functional`.
+
+### Task 35: Final consistency
 
 - [ ] **Step 1:** Re-read README, `docs/**`, compact docs and the CHANGELOG 19.0.0 entry against the code; fix what drifted. Nothing under `docs/superpowers/` is deleted here (that happens before the release, as a later step).
 - [ ] **Step 2:** All gates on the final tree. Commit `docs: batch mode docs consistent`.

@@ -1300,7 +1300,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports; applied client-side. Default: true.
 - `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
-- `user` (string, optional) - SAP user name to filter to; applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.
+- `user` (string, optional) - The user to filter to: an SAP user id (matched in upper case); applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.
 
 ---
 
@@ -1317,12 +1317,12 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="readtransportobjects-read-only-transport"></a>
 #### ReadTransportObjects (Read-Only / Transport)
-**Description:** [read-only] List the objects a transport request or task holds, each with the `position` that RemoveTransportObject needs. Objects live on TASKS: a request shows its tasks' entries, but a removal addressed at the request is refused. Read a task number to get entries that can be acted on.
+**Description:** [read-only] List the objects a transport request or task holds, each with the `position` that RemoveTransportObject needs. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
 **Parameters:**
-- `transport_number` (string, required) - Transport REQUEST or TASK number. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.
+- `transport_number` (string, required) - Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.
 
 ---
 
@@ -3243,7 +3243,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
 **Parameters:**
-- `target_user` (string, required) - SAP user the task belongs to, e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
+- `target_user` (string, required) - The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
 - `task_type` (string, optional (default: S)) - S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).
 - `transport_number` (string, required) - The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.
 

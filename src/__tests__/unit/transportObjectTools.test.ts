@@ -94,6 +94,104 @@ describe('ReadTransportObjects', () => {
     });
   });
 
+  const object = (type: string, name: string, position: string) => ({
+    '@': {
+      'tm:pgmid': 'R3TR',
+      'tm:type': type,
+      'tm:name': name,
+      'tm:position': position,
+    },
+  });
+
+  /**
+   * A request document as measured: each task's entries under
+   * `tm:request/tm:task`, and beside them `tm:all_objects`, the request's
+   * aggregate list — every object once more. Read whole, every object came
+   * twice (684 rows for 342 entries).
+   */
+  it("answers a request's task entries once each, with their task numbers", async () => {
+    fakeClient = fakeClientOf({
+      readObjects: () =>
+        okResponse(
+          reading({
+            'tm:root': {
+              'tm:request': {
+                '@': { 'tm:number': 'SIDK900100' },
+                'tm:all_objects': {
+                  'tm:abap_object': [
+                    object('PROG', 'ZP_ONE', '000001'),
+                    object('CLAS', 'ZCL_TWO', '000002'),
+                    object('PROG', 'ZP_THREE', '000003'),
+                  ],
+                },
+                'tm:task': [
+                  {
+                    '@': { 'tm:number': 'SIDK900101' },
+                    'tm:abap_object': [
+                      object('PROG', 'ZP_ONE', '000001'),
+                      object('CLAS', 'ZCL_TWO', '000002'),
+                    ],
+                  },
+                  {
+                    '@': { 'tm:number': 'SIDK900102' },
+                    'tm:abap_object': object('PROG', 'ZP_THREE', '000001'),
+                  },
+                ],
+              },
+            },
+          } as never),
+        ),
+    });
+
+    const answered = body(
+      await handleReadTransportObjects(context as any, {
+        transport_number: 'SIDK900100',
+      }),
+    );
+
+    expect(answered.count).toBe(3);
+    expect(
+      answered.objects.map((o: any) => [o.task, o.type, o.name, o.position]),
+    ).toEqual([
+      ['SIDK900101', 'PROG', 'ZP_ONE', '000001'],
+      ['SIDK900101', 'CLAS', 'ZCL_TWO', '000002'],
+      ['SIDK900102', 'PROG', 'ZP_THREE', '000001'],
+    ]);
+  });
+
+  /** A task document as measured: its entries under `tm:root/tm:task`. */
+  it('answers a task document as before: its own entries, once each', async () => {
+    fakeClient = fakeClientOf({
+      readObjects: () =>
+        okResponse(
+          reading({
+            'tm:root': {
+              'tm:request': { '@': { 'tm:number': 'SIDK900100' } },
+              'tm:task': {
+                '@': { 'tm:number': 'SIDK900101' },
+                'tm:abap_object': [
+                  object('PROG', 'ZP_ONE', '000001'),
+                  object('CLAS', 'ZCL_TWO', '000002'),
+                ],
+              },
+            },
+          } as never),
+        ),
+    });
+
+    const answered = body(
+      await handleReadTransportObjects(context as any, {
+        transport_number: 'SIDK900101',
+      }),
+    );
+
+    expect(answered.count).toBe(2);
+    expect(answered.objects).toEqual([
+      { pgmid: 'R3TR', type: 'PROG', name: 'ZP_ONE', position: '000001' },
+      { pgmid: 'R3TR', type: 'CLAS', name: 'ZCL_TWO', position: '000002' },
+    ]);
+  });
+
   /**
    * An entry the server described without a position cannot be removed, and
    * the tool must not invent one: `''` satisfies the member's required

@@ -930,6 +930,10 @@ make two calls, or one with the part you need.
 | `ReadMessageClass` | `GetMessageClass` (the same arguments; one request, as before) |
 | `ReadMessageClassMessage` | `GetMessageClassMessage` (the same arguments; one request, as before) |
 
+## Every binary: `ReadTransportObjects` on a request, each task entry once
+
+`ReadTransportObjects` (and compact `HandlerGet` `object_type: TRANSPORT`) given a **request** number answers every task's entries, each once, and each entry carries `task`, the number of the task it is on — the task `RemoveTransportObject` and `MoveTransportObjects` address. 18.x also collected the request's aggregate list (`tm:all_objects`), so each object came twice, once without a usable task. A consumer that counted a request's rows, or dropped the doubles itself, now gets each entry once; one that looked for the holding task reads `task`. A **task** read is unchanged.
+
 ## HTTP users
 
 - **Install `@mcp-abap-adt/http` and run `mcp-abap-adt-http`**, without `--transport` (see

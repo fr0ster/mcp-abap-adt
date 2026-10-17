@@ -71,6 +71,10 @@ The server split by transport and tool set into packages of their own — sevent
 - **The paired reads send their two requests at once**: `GetObjectVersionDiff` sends its two version reads together, neither waiting for the other — the second is sent even when the first fails. The answer is unchanged.
 - **An SAP user id a transport tool names is sent in upper case, trimmed**: `CreateTransport` `owner` (compact `HandlerCreate` `TRANSPORT` too) and `CreateTransportTask` `target_user`; `ListTransports` matches its `user` filter in upper case. SAP stores user ids in upper case: a lower-case owner was refused `400` "User … does not exist in the system (or locked)" (measured).
 
+### Fixed
+
+- **`ReadTransportObjects` on a request answers each task entry once, with its `task` number** (compact `HandlerGet` `TRANSPORT` too). A request's document also carries `tm:all_objects`, the request's aggregate list, and it was collected beside the tasks' entries, so every object came twice (measured: 684 rows for 342 entries). A task read is unchanged.
+
 ### Measured
 
 - Live measurements of 19.0.0 (2026-10-15; on premise BASIS 816 and an SAP BTP ABAP trial; Linux, Node.js 26.7.0; SNC on Windows): every transport and binary kind answered with basic, a token and SNC; a token refused by the system was renewed with the refresh token and written back; a logoff released the locks on a shutdown and on an SSE stream close; a long read's `timeout` left the instance's session and its lock in place; the stdio start took up its leftover session. A shutdown during the start's browser login hung and is fixed (exit `1`, the callback port freed). Details: [`docs/development/tests/TESTING_AUTH.md`](docs/development/tests/TESTING_AUTH.md#live-measurements-of-1900-2026-10-15).

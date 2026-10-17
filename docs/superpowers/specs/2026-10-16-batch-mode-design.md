@@ -388,15 +388,15 @@ and its MEASURED lines); the plan lists each violator with file and line.
      `terminateDebugger`, `setDebuggerSettings`; AMDP `start`, `getEvents`, `stop`, `deleteDebuggee`.
   3. **`HandlerDebugStep`** — ABAP `step` (into / over / return / continue), `stepToLine` (with an
      address), `setStackPosition`; AMDP `step`.
-  4. **`HandlerDebugVariables`** (name proposed; maintain variables) — ABAP `getStack`,
+  4. **`HandlerDebugMaintain`** (owner's name; a parameter says what: stack, variables, child variables, memory, snapshot, set value, AMDP data preview) — ABAP `getStack`,
      `getVariables`, `getChildVariables`, `getMemorySizes`, `createMemorySnapshot`,
      `setVariableValue`; AMDP `getDataPreview`.
   No background listen loop; the consumer chains the calls (breakpoints → listen → attach → step /
   view → continue / terminate / detach → delete breakpoint / stop listener). `HandlerDebugWait` goes;
   the old `HandlerDebugStart`, `HandlerDebugStep`, `HandlerDebugView`, `HandlerDebugWait` map onto the
-  four (migration rows; `HandlerDebugView` → `HandlerDebugVariables`). MEASURED facts stay in the descriptions
+  four (migration rows; `HandlerDebugView` → `HandlerDebugMaintain`). MEASURED facts stay in the descriptions
   (`.superpowers/sdd/2026-10-16-batch-mode/debugger-probe-report.md`): a step's answer carries no
-  position (the stack is a `HandlerDebugVariables` call); `terminateDebuggee` / `terminateDebugger` answer
+  position (the stack is a `HandlerDebugMaintain` call); `terminateDebuggee` / `terminateDebugger` answer
   `500` even when they work; `detachDebugger` releases the debuggee only without an id on the
   attaching session.
 - `HandlerLock`, `HandlerUnlock` and the single-object `HandlerActivate` already are one request.
@@ -546,11 +546,11 @@ reach them:
 |---|---|---|
 | step (into, over, return, continue) | `DebugStep` | `HandlerDebugStep` (step) |
 | step to line | `DebugStepToLine` | `HandlerDebugStep` (stepToLine, address required) |
-| stack | `DebugGetStack` | `HandlerDebugVariables` (getStack) |
-| variables | `DebugGetVariables` with names | `HandlerDebugVariables` (getVariables) |
-| child variables | `DebugGetVariables` with parents | `HandlerDebugVariables` (getChildVariables) |
+| stack | `DebugGetStack` | `HandlerDebugMaintain` (getStack) |
+| variables | `DebugGetVariables` with names | `HandlerDebugMaintain` (getVariables) |
+| child variables | `DebugGetVariables` with parents | `HandlerDebugMaintain` (getChildVariables) |
 | stack position | `DebugSetStackPosition` | `HandlerDebugStep` (setStackPosition) |
-| set a variable | `DebugSetVariable` | `HandlerDebugVariables` (setVariableValue) |
+| set a variable | `DebugSetVariable` | `HandlerDebugMaintain` (setVariableValue) |
 
 Every other tool is refused while the debugger batch is open (§4.1): breakpoints, watchpoints, the
 listener, start / wait / take-over / stop, attach, detach, `release_debugger`, terminate, memory

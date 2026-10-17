@@ -21,19 +21,19 @@
     "tool": "GetPackageContents",
     "set": "full",
     "handler": "src/handlers/package/readonly/handleGetPackageContents.ts#handleGetPackageContents",
-    "sends": "POST /sap/bc/adt/repository/nodestructure for the package and each type node, again per subpackage up to max_depth"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch), per level up to max_depth: the nodestructure POST of every package of the level, then of every type node they list; the next level is the subpackages found; package_names reads several packages in the same envelopes; sequential reads where the system has no communication batch"
   },
   {
     "tool": "GetPackageTree",
     "set": "full",
     "handler": "src/handlers/system/high/handleGetPackageTree.ts#handleGetPackageTree",
-    "sends": "GET the package metadata, then the nodestructure walk (subpackages by default, max_depth 5)"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): the package metadata GET with the root nodestructure POST, then the nodestructure walk by levels (subpackages by default, max_depth 5); package_names reads several packages in the same envelopes; sequential reads where the system has no communication batch"
   },
   {
     "tool": "GetObjectsList",
     "set": "full",
     "handler": "src/handlers/search/readonly/handleGetObjectsList.ts#handleGetObjectsList",
-    "sends": "POST /sap/bc/adt/repository/nodestructure per node, recursing into every child node"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch), per level: the nodestructure POST of every node of the level, recursing into every child node; objects reads several parents in the same envelopes; sequential reads where the system has no communication batch"
   },
   {
     "tool": "GetStructuresList",
@@ -75,7 +75,7 @@
     "tool": "GetObjectInfo",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleGetObjectInfo.ts#handleGetObjectInfo",
-    "sends": "POST /sap/bc/adt/repository/nodestructure for the root and each child node to maxDepth; with enrich=true also one quickSearch GET per node"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch), per tier to maxDepth: the root nodestructure POST of every node of the tier, then of every type node; with enrich=true a last envelope of one quickSearch GET per node; objects reads several objects in the same envelopes; sequential reads where the system has no communication batch"
   },
   {
     "tool": "DescribeByList",
@@ -141,6 +141,6 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "one GET per mode; part 'contents' of a package runs the nodestructure walk; the timeout applies to its reads only — UNIT_TEST / CDS_UNIT_TEST poll a run in SAP, run as an ordinary call on the instance's connection, and refuse a timeout"
+    "sends": "one GET per mode; part 'contents' of a package (or package_names) runs the nodestructure walk in ADT batch envelopes, as GetPackageContents; the timeout applies to its reads only — UNIT_TEST / CDS_UNIT_TEST poll a run in SAP, run as an ordinary call on the instance's connection, and refuse a timeout"
   }
 ]

@@ -198,10 +198,17 @@ export const compactGetSchema = {
     object_type: commonObjectTypeSchema,
     part: readPartSchema,
     package_name: { type: 'string', description: 'Package name.' },
+    package_names: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'Several package names (part contents), read together: one entry per package, in the order given, each { package_name, contents } or { package_name, error }.',
+    },
     max_results: {
       type: 'number',
       default: 100,
-      description: 'Maximum number of members listed (part contents).',
+      description:
+        'Maximum number of members listed per package (part contents).',
     },
     class_name: { type: 'string', description: 'Class name.' },
     interface_name: { type: 'string', description: 'Interface name.' },

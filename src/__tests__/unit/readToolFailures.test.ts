@@ -387,14 +387,17 @@ describe('DescribeByList: a credential failure on the typed search', () => {
 });
 
 describe('GetObjectInfo: the enrichment search was a credential failure', () => {
-  it('ends the call with it; the tree is not read', async () => {
-    const trees: unknown[] = [];
+  // The searches are the tree's last phase (spec §11): the tree is read
+  // first, and nothing is read after the search that met the failure.
+  it('ends the call with it; nothing is read after it', async () => {
+    const calls: string[] = [];
     fakeClient = fakeClientOf({
       search: async () => {
+        calls.push('search');
         throw credential();
       },
-      fetchNodeStructure: async (...args: unknown[]) => {
-        trees.push(args);
+      fetchNodeStructure: async () => {
+        calls.push('tree');
         return okResponse({ objects: [], childNodes: [] });
       },
     });
@@ -404,15 +407,18 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
     );
     expect(result.isError).toBe(true);
     expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(trees).toEqual([]);
+    expect(calls).toEqual(['tree', 'search']);
   });
 
   it('a 401 SAP answered to the search ends the call the same way', async () => {
-    const trees: unknown[] = [];
+    const calls: string[] = [];
     fakeClient = fakeClientOf({
-      search: async () => unauthorized(),
-      fetchNodeStructure: async (...args: unknown[]) => {
-        trees.push(args);
+      search: async () => {
+        calls.push('search');
+        return unauthorized();
+      },
+      fetchNodeStructure: async () => {
+        calls.push('tree');
         return okResponse({ objects: [], childNodes: [] });
       },
     });
@@ -422,7 +428,7 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
     );
     expect(result.isError).toBe(true);
     expect(payloadOf(result)).toMatchObject({ status: 401 });
-    expect(trees).toEqual([]);
+    expect(calls).toEqual(['tree', 'search']);
   });
 
   it('any other search refusal stays best effort: the tree answers', async () => {

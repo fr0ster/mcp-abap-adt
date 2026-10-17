@@ -6,11 +6,22 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import { answerFailure } from '../../../lib/answer';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { answerFailure, failureEntry, thrownEntry } from '../../../lib/answer';
+import type { PhaseResult } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
-import { assembleTree, walkPackage } from '../../../lib/strategies/packageWalk';
+import {
+  assembleTree,
+  byLevels,
+  levelReader,
+  type NodeRequest,
+  type ReadMode,
+  readNode,
+  type WalkedItem,
+  walkPackages,
+} from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
@@ -19,7 +30,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackageTree',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions.',
+    '[high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk.',
   ),
   inputSchema: {
     type: 'object',
@@ -27,7 +38,13 @@ export const TOOL_DEFINITION = {
       timeout: TIMEOUT_PROPERTY,
       package_name: {
         type: 'string',
-        description: 'Package name',
+        description: 'Package name (give this or package_names)',
+      },
+      package_names: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'Several package names, read together (give this or package_name)',
       },
       include_subpackages: {
         type: 'boolean',
@@ -53,16 +70,116 @@ export const TOOL_DEFINITION = {
         default: false,
       },
     },
-    required: ['package_name'],
+    required: [],
   },
 } as const;
 
 interface GetPackageTreeArgs {
-  package_name: string;
+  package_name?: string;
+  package_names?: string[];
   include_subpackages?: boolean;
   max_depth?: number;
   include_descriptions?: boolean;
   debug?: boolean;
+}
+
+/** One package's metadata read and its walk. */
+interface TreeRead {
+  metadata: PhaseResult<unknown>;
+  walked?: PhaseResult<WalkedItem[]>;
+}
+
+/** An item of the first phase: a package's metadata, or a root node structure. */
+type FirstItem = { metadata: string } | { node: NodeRequest };
+
+/**
+ * Every package's metadata and walk, in `mode` (spec §11): (1) the metadata
+ * GET and the root node structure of every package, in one phase; then the
+ * walk's levels for the packages whose metadata was read.
+ */
+async function readTrees(
+  context: HandlerContext,
+  mode: ReadMode,
+  packageNames: readonly string[],
+  options: {
+    includeSubpackages: boolean;
+    maxDepth: number;
+    includeDescriptions: boolean;
+  },
+): Promise<TreeRead[]> {
+  const { logger } = context;
+  const read = levelReader<FirstItem, unknown>(context, mode, (item, c) => {
+    const client = createAdtClient(c, logger);
+    // Verify package exists before building tree (fixes #38).
+    // `IPackageContract` has no `.read()` — a package is a container with no
+    // source of its own, so `readMetadata` is the one call (see
+    // `handleGetPackage.ts`, migrated the same way).
+    return 'metadata' in item
+      ? client
+          .getPackage()
+          .readMetadata(
+            { packageName: item.metadata },
+            { analyse: analyseException },
+          )
+      : readNode(client.getUtils(ourUtils), item.node);
+  });
+  const first = await read([
+    ...packageNames.map((metadata) => ({ metadata })),
+    ...packageNames.map((name) => ({
+      node: {
+        parentType: 'DEVC/K',
+        parentName: name,
+        withShortDescriptions: options.includeDescriptions,
+      },
+    })),
+  ]);
+  const reads: TreeRead[] = packageNames.map((_, i) => ({
+    metadata: first[i] ?? { ok: false, error: undefined },
+  }));
+  // Walked further: the packages whose metadata was read.
+  const kept = packageNames
+    .map((name, i) => ({ name, i }))
+    .filter(({ i }) => {
+      const metadata = reads[i]?.metadata;
+      return (
+        metadata?.ok === true &&
+        (metadata.value as { ok?: boolean } | undefined)?.ok !== false
+      );
+    });
+  const walked = await walkPackages(
+    (requests) => read(requests.map((node) => ({ node }))),
+    kept.map(({ name }) => name),
+    options,
+    kept.map(
+      ({ i }) => first[packageNames.length + i] ?? { ok: false, error: i },
+    ),
+  );
+  kept.forEach(({ i }, k) => {
+    const tree = reads[i];
+    if (tree !== undefined) tree.walked = walked[k];
+  });
+  return reads;
+}
+
+/** A package's tree, as the single answer carries it. */
+function treeOf(
+  packageName: string,
+  walked: WalkedItem[],
+  options: {
+    includeSubpackages: boolean;
+    maxDepth: number;
+    includeDescriptions: boolean;
+  },
+) {
+  return {
+    package_name: packageName,
+    tree: assembleTree(packageName, walked),
+    metadata: {
+      include_subpackages: options.includeSubpackages,
+      max_depth: options.maxDepth,
+      include_descriptions: options.includeDescriptions,
+    },
+  };
 }
 
 /**
@@ -72,52 +189,29 @@ export async function handleGetPackageTree(
   context: HandlerContext,
   args: GetPackageTreeArgs,
 ) {
-  const { connection, logger } = context;
+  const { logger } = context;
   try {
-    // Validate required parameters
-    if (!args?.package_name) {
-      return return_error(new Error('package_name is required'));
-    }
-
-    const packageName = args.package_name.toUpperCase();
-    const includeSubpackages = args.include_subpackages !== false;
-    const maxDepth = args.max_depth || 5;
-    const includeDescriptions = args.include_descriptions !== false;
-
-    logger?.info(
-      `Fetching package tree for ${packageName} (include_subpackages: ${includeSubpackages}, max_depth: ${maxDepth}) using adt-clients`,
-    );
-
-    const client = createAdtClient(connection, logger);
-    const utils = client.getUtils(ourUtils);
-
-    // Verify package exists before building tree (fixes #38).
-    // `IPackageContract` has no `.read()` — a package is a container with no
-    // source of its own, so `readMetadata` is the one call (see
-    // `handleGetPackage.ts`, migrated the same way). Without an `analyse`
-    // strategy the default error contract still answers `ok: false` for a
-    // refusal, which is all a plain existence check needs — no message
-    // enrichment is read here, only the boolean.
-    //
-    // **Fix round 1, task 25.** The pre-migration code branched on the wire
-    // status: a 404 said "not found", anything else rethrew the original
-    // error unworded. The first pass here collapsed every refusal — a lock,
-    // a permission failure, a connection error, an actual not-found — into
-    // one hardcoded "not found" message, which is wrong for every refusal
-    // that is not one. `readMetadata`'s default error strategy carries no
-    // status/code to branch on the way the old 404 check did, so rather than
-    // guess a code this has not measured, the message says only what is
-    // true of every case: the read did not produce a document.
-    const readResult = await client
-      .getPackage()
-      .readMetadata({ packageName }, { analyse: analyseException });
-    if (!readResult.ok) {
-      // The method's error as it is, with the step it arose at.
-      return answerFailure(
-        withStep(readResult.getError(), 'read package metadata'),
-        { tool: 'GetPackageTree', detail: 'terse' },
+    const single = typeof args?.package_name === 'string' && args.package_name;
+    const list = Array.isArray(args?.package_names) ? args.package_names : [];
+    if ((single ? 1 : 0) + (list.length > 0 ? 1 : 0) !== 1) {
+      return return_error(
+        new Error(
+          'Give exactly one of package_name or package_names (a non-empty list)',
+        ),
       );
     }
+    const packageNames = (single ? [single] : list).map((name) =>
+      name.toUpperCase(),
+    );
+    const options = {
+      includeSubpackages: args.include_subpackages !== false,
+      maxDepth: args.max_depth || 5,
+      includeDescriptions: args.include_descriptions !== false,
+    };
+
+    logger?.info(
+      `Fetching package tree for ${packageNames.join(', ')} (include_subpackages: ${options.includeSubpackages}, max_depth: ${options.maxDepth}) using adt-clients`,
+    );
 
     // Walked here, not in the client. `getPackageHierarchy` makes one request
     // per object type plus a walk into subpackages, so `IResultStrategy`, which
@@ -126,36 +220,61 @@ export async function handleGetPackageTree(
     // `fetchNodeStructure` is one request and takes our reading, so the walk is
     // composed of steps we can read and the assembly is ours.
     // See mcp-abap-adt-clients#141.
-    const packageTree = assembleTree(
-      packageName,
-      await walkPackage(utils, packageName, {
-        includeSubpackages,
-        maxDepth,
-        includeDescriptions,
-      }),
+    const reads = await byLevels(context, (mode) =>
+      readTrees(context, mode, packageNames, options),
     );
 
-    if (!packageTree) {
-      return return_error(
-        new Error(`Failed to fetch package tree for ${packageName}`),
-      );
+    if (single) {
+      const [only] = reads;
+      const metadata = only?.metadata;
+      if (metadata === undefined || !metadata.ok) throw metadata?.error;
+      const readResult = metadata.value as IAdtResponse<unknown, IAdtError>;
+      if (!readResult.ok) {
+        // The method's error as it is, with the step it arose at.
+        return answerFailure(
+          withStep(readResult.getError(), 'read package metadata'),
+          { tool: 'GetPackageTree', detail: 'terse' },
+        );
+      }
+      const walked = only?.walked;
+      if (walked === undefined || !walked.ok) throw walked?.error;
+      logger?.debug(`Package tree fetched successfully for ${single}`);
+      return return_response({
+        data: JSON.stringify(
+          treeOf(packageNames[0] ?? '', walked.value, options),
+          null,
+          2,
+        ),
+      } as any);
     }
 
-    logger?.debug(`Package tree fetched successfully for ${packageName}`);
-
-    // Format response
-    const response = {
-      package_name: packageName,
-      tree: packageTree,
-      metadata: {
-        include_subpackages: includeSubpackages,
-        max_depth: maxDepth,
-        include_descriptions: includeDescriptions,
-      },
-    };
-
+    const entries = reads.map((read, i) => {
+      const package_name = packageNames[i] ?? '';
+      const metadata = read.metadata;
+      if (!metadata.ok) {
+        return {
+          package_name,
+          error: thrownEntry(metadata.error, 'read package metadata'),
+        };
+      }
+      const readResult = metadata.value as IAdtResponse<unknown, IAdtError>;
+      if (!readResult.ok) {
+        return {
+          package_name,
+          error: failureEntry(readResult.getError(), 'read package metadata'),
+        };
+      }
+      const walked = read.walked;
+      if (walked === undefined || !walked.ok) {
+        return {
+          package_name,
+          error: thrownEntry(walked?.error, 'read package node structure'),
+        };
+      }
+      return treeOf(package_name, walked.value, options);
+    });
     return return_response({
-      data: JSON.stringify(response, null, 2),
+      data: JSON.stringify(entries, null, 2),
     } as any);
   } catch (error: any) {
     logger?.error('Failed to fetch package tree', error);

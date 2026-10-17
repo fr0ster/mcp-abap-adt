@@ -97,11 +97,32 @@ type ContentsAnswer = {
   content?: Array<{ type?: string; text?: string }>;
 };
 
+type ContentsItem = { name?: string; type?: string; description?: string };
+
 /**
  * A package's members, one per line: name, type, description — the shape a
- * search answers. The core reader answers pretty-printed JSON that repeats the
- * package's own name and the type's kind on every row; for a package with a few
- * hundred members that is tens of kilobytes carrying three facts per object.
+ * search answers — capped at `max`. The core reader answers pretty-printed
+ * JSON that repeats the package's own name and the type's kind on every row;
+ * for a package with a few hundred members that is tens of kilobytes
+ * carrying three facts per object.
+ */
+function contentsLines(items: ContentsItem[], max: number): string {
+  const lines = ['name\ttype\tdescription'];
+  for (const item of items.slice(0, max)) {
+    lines.push(
+      `${item.name ?? ''}\t${item.type ?? ''}\t${item.description ?? ''}`,
+    );
+  }
+  if (items.length > max) {
+    lines.push(`(${max} of ${items.length} shown; raise max_results for more)`);
+  }
+  return lines.join('\n');
+}
+
+/**
+ * The members as lines: for `package_name`, one listing; for
+ * `package_names`, one entry per package, in the order given —
+ * `{ package_name, contents }` with its listing, or `{ package_name, error }`.
  */
 async function packageContentsLines(
   context: HandlerContext,
@@ -113,33 +134,38 @@ async function packageContentsLines(
   )) as ContentsAnswer;
   const text = answered?.content?.[0]?.text;
   if (answered?.isError || typeof text !== 'string') return answered;
+  // Capped like a where-used list: a structure package's members are its
+  // sub-packages, and on the cloud trial one had 5,813 of them.
+  const max =
+    typeof args.max_results === 'number' && args.max_results > 0
+      ? args.max_results
+      : 100;
   try {
-    const items = JSON.parse(text) as Array<{
-      name?: string;
-      type?: string;
-      description?: string;
-    }>;
-    if (!Array.isArray(items)) return answered;
-    // Capped like a where-used list: a structure package's members are its
-    // sub-packages, and on the cloud trial one had 5,813 of them.
-    const max =
-      typeof args.max_results === 'number' && args.max_results > 0
-        ? args.max_results
-        : 100;
-    const lines = ['name\ttype\tdescription'];
-    for (const item of items.slice(0, max)) {
-      lines.push(
-        `${item.name ?? ''}\t${item.type ?? ''}\t${item.description ?? ''}`,
-      );
-    }
-    if (items.length > max) {
-      lines.push(
-        `(${max} of ${items.length} shown; raise max_results for more)`,
-      );
-    }
+    const parsed = JSON.parse(text) as unknown;
+    if (!Array.isArray(parsed)) return answered;
+    const listed = Array.isArray(args.package_names)
+      ? JSON.stringify(
+          (
+            parsed as Array<{
+              package_name?: string;
+              objects?: ContentsItem[];
+              error?: unknown;
+            }>
+          ).map((entry) =>
+            Array.isArray(entry.objects)
+              ? {
+                  package_name: entry.package_name,
+                  contents: contentsLines(entry.objects, max),
+                }
+              : entry,
+          ),
+          null,
+          2,
+        )
+      : contentsLines(parsed as ContentsItem[], max);
     return {
       ...answered,
-      content: [{ type: 'text', text: lines.join('\n') }],
+      content: [{ type: 'text', text: listed }],
     };
   } catch {
     return answered;

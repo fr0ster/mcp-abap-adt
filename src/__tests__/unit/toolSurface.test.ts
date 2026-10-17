@@ -160,6 +160,35 @@ describe('the MCP tool surface', () => {
         'low/CheckPackageLow': 'super_package',
       };
       const relaxed = MAY_RELAX_REQUIRED[tool];
+      // **19.0.0, several objects per call (spec §11, owner-approved).** A
+      // tool that took one root object takes several, read in the same
+      // envelopes: the list argument arrives beside the single one, exactly
+      // one of them given (the handler checks it), so the single one stops
+      // being required. Each pair below is that move and nothing else.
+      const LIST_ARGUMENTS: Record<
+        string,
+        { relaxed: string[]; added: string[] }
+      > = {
+        'readonly/GetPackageContents': {
+          relaxed: ['package_name'],
+          added: ['package_names'],
+        },
+        'system/GetPackageTree': {
+          relaxed: ['package_name'],
+          added: ['package_names'],
+        },
+        'search/GetObjectsList': {
+          relaxed: ['parent_name', 'parent_tech_name', 'parent_type'],
+          added: ['objects'],
+        },
+        'system/GetObjectInfo': {
+          relaxed: ['parent_type', 'parent_name'],
+          added: ['objects'],
+        },
+      };
+      const listed = LIST_ARGUMENTS[tool];
+      const listRelaxed = (p: string) =>
+        listed?.relaxed.some((name) => p === `${name}*` || p === name) === true;
       // **One tightening, decided by the user (2026-10-11).** The two ABAP
       // debugger starts require at least one breakpoint (`minItems: 1`), as the
       // compact start already did: a model may start a run and forget the
@@ -177,7 +206,8 @@ describe('the MCP tool surface', () => {
           (p) =>
             !has.includes(p) &&
             p !== `${relaxed ?? '\u0000'}*` &&
-            p !== tightened,
+            p !== tightened &&
+            !(listRelaxed(p) && has.includes(p.replace(/\*$/, ''))),
         ),
       }).toEqual({
         tool,
@@ -264,6 +294,7 @@ describe('the MCP tool surface', () => {
           !had.includes(p) &&
           p !== relaxed &&
           p !== `${tightened}*` &&
+          !(listRelaxed(p) && had.includes(`${p}*`)) &&
           !(gainsTimeout && p === 'timeout'),
       );
       // A long tool whose only change is its `timeout` (gained, or moved
@@ -272,11 +303,13 @@ describe('the MCP tool surface', () => {
       expect({ tool, added: [...added].sort() }).toEqual({
         tool,
         added: [
-          ...(MAY_GAIN_VERSION.has(tool)
-            ? ['version']
-            : relaxed !== undefined
-              ? []
-              : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail'])),
+          ...(listed !== undefined
+            ? listed.added
+            : MAY_GAIN_VERSION.has(tool)
+              ? ['version']
+              : relaxed !== undefined
+                ? []
+                : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail'])),
         ].sort(),
       });
     }

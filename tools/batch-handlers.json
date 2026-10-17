@@ -616,6 +616,12 @@
     ]
   },
   {
+    "tool": "HandlerDumpList",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerDumpList.ts#handleHandlerDumpList",
+    "sends": "GET /sap/bc/adt/runtime/dumps (feed_type system_messages: /sap/bc/adt/runtime/systemmessages; gateway_errors: /sap/bc/adt/gw/errorlog) with $top (1 to 100), to, from and the dump filters: one page, SAP's next link answered as next_to"
+  },
+  {
     "tool": "HandlerCdsUnitTestResult",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerCdsUnitTestResult.ts#handleHandlerCdsUnitTestResult",

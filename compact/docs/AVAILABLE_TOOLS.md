@@ -249,7 +249,7 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** Runtime feed list, newest first. object_type: not used. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, runtime_error, exception, object_name, package, component, top, from, to. Response: JSON; each dump carries dump_id, and next_to when more remain. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+**Description:** Reads one page of a runtime feed in one request, newest first. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, runtime_error, exception, object_name, package, component, top (1 to 100), from, to. Response: JSON { feed_type, count, entries, next_to }; each dump carries dump_id; next_to is the `to` of SAP's next link, present when more remain. The next link's page starts at the boundary second, inclusive: entries of that second may repeat; match them by dump_id. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Available in:** cloud, onprem
 
@@ -263,9 +263,9 @@ per request.
 - `object_name` — Dumps whose terminated object name contains this text, in any case.
 - `package` — Dumps whose object package contains this text, in any case.
 - `component` — Dumps whose application component contains this text, in any case.
-- `top` — Most entries, up to 1000 (default 50); SAP answers 100 per request and the pages are read in turn.
+- `top` — Entries the page holds, 1 to 100 (SAP answers 100 when top is absent).
 - `from` — Start of time range (YYYYMMDDHHMMSS).
-- `to` — End of time range (YYYYMMDDHHMMSS); a previous next_to reads on.
+- `to` — End of time range (YYYYMMDDHHMMSS), inclusive: the page holds the entries up to that second; a previous answer's next_to is the next page's to, and that page starts at the boundary second, inclusive.
 
 ### HandlerDumpView
 

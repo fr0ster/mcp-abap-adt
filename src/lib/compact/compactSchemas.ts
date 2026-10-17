@@ -776,7 +776,7 @@ export const compactDumpListSchema = {
     top: {
       type: 'number',
       description:
-        'Most entries, up to 1000 (default 50); SAP answers 100 per request and the pages are read in turn.',
+        'Entries the page holds, 1 to 100 (SAP answers 100 when top is absent).',
     },
     from: {
       type: 'string',
@@ -785,7 +785,7 @@ export const compactDumpListSchema = {
     to: {
       type: 'string',
       description:
-        'End of time range (YYYYMMDDHHMMSS); a previous next_to reads on.',
+        "End of time range (YYYYMMDDHHMMSS), inclusive: the page holds the entries up to that second; a previous answer's next_to is the next page's to, and that page starts at the boundary second, inclusive.",
     },
   },
   required: [],

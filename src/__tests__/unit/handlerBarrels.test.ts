@@ -75,8 +75,9 @@ describe("lib's read and write handler barrels", () => {
     // `activation_status` / `activation_results` (49); a unit-test run's
     // result read once, ABAP and CDS, for compact `HandlerUnitTestResult`,
     // `HandlerCdsUnitTestResult` and `HandlerGet` UNIT_TEST /
-    // CDS_UNIT_TEST (51).
-    expect(read).toHaveLength(51);
+    // CDS_UNIT_TEST (51); one page of a runtime feed, for compact
+    // `HandlerDumpList` (52).
+    expect(read).toHaveLength(52);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the

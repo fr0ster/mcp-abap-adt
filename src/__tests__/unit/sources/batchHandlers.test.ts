@@ -94,7 +94,7 @@ const LONG_BY_REQUESTS: Readonly<
   GetObjectInfo: 'chained',
   DescribeByList: 'chained',
   GetAbapSystemSymbols: 'chained',
-  HandlerDumpList: 'chained',
+  HandlerDumpList: 'independent',
 };
 
 const GROUPS_DIR = path.join(REPO, 'src/lib/handlers/groups');

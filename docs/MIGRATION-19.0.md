@@ -1230,6 +1230,26 @@ transport's options only:
   then the result in later ones. `HandlerGet` with `UNIT_TEST` / `CDS_UNIT_TEST` still takes no
   `timeout` and runs on the instance's session. The full set's `GetUnitTestResult`,
   `GetCdsUnitTestResult`, `GetUnitTest` and `GetCdsUnitTest` are unchanged.
+- **BREAKING — `HandlerDumpList` reads one page per call.** It sends the one `GET
+  /sap/bc/adt/runtime/dumps` (`feed_type` `system_messages` and `gateway_errors`: their feeds) with
+  `$top` = `top`, at most 100, and answers `{ success, feed_type, count, entries, next_to }`; each
+  dump carries `dump_id`. `next_to` is the `to` of SAP's next link, as it came, and is absent when
+  SAP offers no next page. A `top` above 100 is refused before any request, naming the cap. A
+  failure is the method's error with `step: "read dumps"` (`"read system messages"`,
+  `"read gateway errors"`). 18.x answered a `top` up to 1000 by requesting page after page inside
+  the call, cutting the answer at a second boundary and reading a crowded second on its own (as
+  read from 18.x's code, not measured), and answered `incomplete_second` when a second held more
+  than one request returns; `incomplete_second` is gone, and a call without `top` answers SAP's own
+  first page (measured: 100 entries) where 18.x answered 50 (as read from 18.x's code). A consumer of the longer list now
+  calls, in order:
+  1. `HandlerDumpList` with `top` of at most 100 - the first page;
+  2. `HandlerDumpList` again with `to` set to the previous answer's `next_to` (the same filters),
+     until an answer carries no `next_to`.
+
+  The next link's page starts at the boundary second, inclusive (measured: the page after a `top` of 10
+  answered 11 entries): entries of that second may repeat; match them by `dump_id`.
+  The call is one request and is recorded in batch mode. The full set's `RuntimeListFeeds` is
+  unchanged.
 - **BREAKING — a profiled run is two tools, one request each.** `HandlerProfileSchedule` (new)
   sends the one `POST /sap/bc/adt/runtime/traces/abaptraces/parameters` with the profiling flags
   (`description`, `all_procedural_units`, …, `max_time_for_tracing`, all optional) and answers

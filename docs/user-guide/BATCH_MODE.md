@@ -156,6 +156,14 @@ yet (an answer without a run id is a failure with `step: start activation run`).
 `{ run_id, part, messages, document }`), each with SAP's document as it came. Asking again until the
 status settles is yours: the server sets no timer.
 
+Compact `HandlerDumpList` reads one page per call: the one `GET /sap/bc/adt/runtime/dumps` (or the
+system-messages or gateway-errors feed) with `$top` from 1 to 100 (SAP answers at most 100; `top`
+101 is refused before any request, naming the cap), answered `{ feed_type, count, entries, next_to }`.
+`next_to` is the `to` of SAP's next link, as it came. Listing further is a chain of calls, each its
+own batch: `HandlerDumpList` with `to` set to the previous answer's `next_to`, until an answer
+carries no `next_to`. The next link's page starts at the boundary second, inclusive: entries of that
+second may repeat; match them by `dump_id`.
+
 Compact `HandlerUnitTestResult`, `HandlerCdsUnitTestResult` and `HandlerGet` with `object_type:
 UNIT_TEST` / `CDS_UNIT_TEST` are one request each, in batch mode and outside it alike: the
 `GET /sap/bc/adt/abapunit/results/{run_id}` alone, answered `{ success, run_id, run_result }` with
@@ -232,7 +240,7 @@ no raw part.
 
 <!-- batch-handlers:start -->
 
-169 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+170 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -381,6 +389,7 @@ no raw part.
 | `HandlerDelete` | when object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | the deletion request alone: POST /sap/bc/adt/deletion/delete (a metadata extension: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}[?corrNr=…]) |
 | `HandlerDelete` | when lock_handle is given and object_type is one of LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST | PUT of empty content to the class include under the lock_handle given ({class uri}/includes/{include}?lockHandle=…[&corrNr=…]) |
 | `HandlerDeletionCheck` | every call | POST /sap/bc/adt/deletion/check for the one object |
+| `HandlerDumpList` | every call | GET /sap/bc/adt/runtime/dumps (feed_type system_messages: /sap/bc/adt/runtime/systemmessages; gateway_errors: /sap/bc/adt/gw/errorlog) with $top (1 to 100), to, from and the dump filters: one page, SAP's next link answered as next_to |
 | `HandlerDumpView` | every call | GET /sap/bc/adt/runtime/dump/{id} (the view asked) |
 | `HandlerGet` | when part is source (absent reads as source) and object_type is one of TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | one request: GET the type's source (as the full set's Get<Type>, part source); FUNCTION_MODULE at the group its arguments name |
 | `HandlerGet` | when part is metadata and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | one request: GET the type's metadata document (as the full set's Get<Type>, part metadata); FUNCTION_MODULE at the group its arguments name |

@@ -421,6 +421,11 @@ const COMPACT: BatchEntryCase[] = [
     tool: 'HandlerDumpView',
     args: { dump_id: 'DUMP_A', view },
   })),
+  {
+    tool: 'HandlerDumpList',
+    args: { top: 10 },
+    body: '<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"/>',
+  },
   { tool: 'HandlerServiceBindingListTypes', args: {} },
   { tool: 'HandlerUnitTestStatus', args: { run_id: 'RUN_A' } },
   { tool: 'HandlerCdsUnitTestStatus', args: { run_id: 'RUN_A' } },

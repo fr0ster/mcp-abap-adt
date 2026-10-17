@@ -60,7 +60,10 @@ export { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWher
 export { handleRuntimeAnalyzeProfilerTrace } from '../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.js';
 export { handleRuntimeGetDumpById } from '../../handlers/system/readonly/handleRuntimeGetDumpById.js';
 export { handleRuntimeGetProfilerTraceData } from '../../handlers/system/readonly/handleRuntimeGetProfilerTraceData.js';
-export { handleRuntimeListFeeds } from '../../handlers/system/readonly/handleRuntimeListFeeds.js';
+export {
+  handleRuntimeListFeedPage,
+  handleRuntimeListFeeds,
+} from '../../handlers/system/readonly/handleRuntimeListFeeds.js';
 export { handleRuntimeListProfilerTraceFiles } from '../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles.js';
 export { handleGetTable } from '../../handlers/table/high/handleGetTable.js';
 export { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';

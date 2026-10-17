@@ -72,17 +72,18 @@ activates the group afterwards.
   only the batched version is kept; the sequential one runs only on a system
   without the communication batch. A dependent chain is a sequence of
   envelopes, so one call can serve several objects.
-- **Compact's CRUD tools make no multi-calls.** Each compact tool does its
-  one operation, with no mode parameter: `HandlerCreate` only creates the
+- **Every compact tool makes one call.** This is compact's general
+  principle, not only for CRUD; an exception exists only by the owner's
+  explicit word. Each compact tool does its one operation, with no mode
+  parameter: `HandlerCreate` only creates the
   initial object (one `POST`; an argument its create does not send is
   refused, by presence, naming it); `HandlerUpdate` is only the `PUT` under
   `lock_handle` (no lock or unlock of its own, no read-patch-write; for a
   domain, a data element or a package the caller passes the whole document);
-  `HandlerDelete` only the `DELETE`. Lock, unlock and activate already are
-  single. `HandlerGet`'s contract does not change: a read may return an
-  object's metadata and source together, as today; the caller says by `part`
-  what to read, and every type answers the same `part` the same way. A read
-  sending two independent requests stays eligible in batch mode. The
+  `HandlerDelete` only the `DELETE` under `lock_handle`; the deletion check is
+  its own compact tool, `HandlerDeletionCheck`. Lock, unlock and activate
+  already are single. `HandlerGet` honours `part` and returns only what was
+  asked — code, metadata or another part: one part, one request. The
   full chains stay in the full sets. This changes compact's behaviour for its
   consumers.
 - **Every package has batch mode.** The full, read-only and compact sets all

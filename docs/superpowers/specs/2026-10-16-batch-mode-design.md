@@ -309,12 +309,14 @@ not the tool's, and it has no number). While recording, `connect()` / `getBaseUr
 connection is a late-bound target (§5.1) pointing, during a recording call's turn, at the connection
 that call holds.
 
-### 4.6 Compact CRUD: one operation per call
+### 4.6 Compact: one call per tool
 
-**Compact's CRUD handlers make no multi-calls** (the owner's architecture). Each compact tool does its
-one operation; there is no mode parameter. The full chains (validate → create → lock → write →
-unlock → check → activate) stay in the full sets. This is a behaviour change for compact consumers
-(MIGRATION-19.0, CHANGELOG 19.0.0).
+**Every compact tool makes one call** — compact's general principle, not only for CRUD (the owner's
+architecture). An exception exists only by the owner's explicit word; a survey of all compact tools
+goes to the owner, and this design decides none of its findings. Each tool does its one operation;
+there is no mode parameter. The full chains (validate → create → lock → write → unlock → check →
+activate) stay in the full sets. This is a behaviour change for compact consumers (MIGRATION-19.0,
+CHANGELOG 19.0.0).
 
 - **`HandlerCreate`** only creates the initial object: the type's adt-clients `create()` — one
   `POST`. An argument its create does not send is refused, by presence (`!== undefined`), naming
@@ -327,26 +329,33 @@ unlock → check → activate) stay in the full sets. This is a behaviour change
   `get<Type>().updateMetadata({ name, transportRequest }, { source: source_code, lockHandle, analyse })`.
   `properties` and the flat metadata fields (`FLAT_PROPERTIES`) are no longer arguments of
   `HandlerUpdate`; given, they are refused by presence, naming them. `document` is not added.
-- **`HandlerDelete`** is only the `DELETE` (no deletion check of its own, no lock). The types whose
-  delete today writes their section empty under a lock of its own (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`,
-  `LOCAL_DEFINITIONS`, `LOCAL_MACROS`, `UNIT_TEST`, `CDS_UNIT_TEST`) send only that `PUT` under the
-  caller's `lock_handle`.
-- **`HandlerGet`'s contract does not change** (the single-call rule is for compact's writes): where an
-  object has both metadata and source, a read may return both, as today. What changes is
-  uniformity: the caller says by the existing `part` what to read, and every type answers the same
-  `part` the same way, without breaking any existing part's answer. Where types differ today (the
-  plan's survey, with file and line): `part: 'source'` answers the source for the source types but
-  the metadata document for DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and PACKAGE (they have no source);
-  `part: 'metadata'` answers metadata **and** source (`both()`) for the source types but metadata
-  alone for those four; FUNCTION_MODULE reads its metadata, then its source with the group the
-  metadata names (a chain, `handleGetFunctionModule.ts:81-93`); the answers' field names differ by
-  type (`<type>_data`, `source`, `payload`, `source_code`/`metadata`). A read sending two independent
-  requests (`metadata` today) stays eligible in batch mode; the FUNCTION_MODULE chain is not.
+- **`HandlerDelete`** is only the `DELETE` under `lock_handle` (required): no deletion check of its
+  own, no lock or unlock of its own. The types whose delete today writes their section empty under a
+  lock of its own (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`,
+  `UNIT_TEST`, `CDS_UNIT_TEST`) send only that `PUT` under the caller's `lock_handle`. The code today
+  says the opposite of a delete under a lock ("no lock is taken because a held lock is what makes ADT
+  refuse", `src/handlers/class/high/handleDeleteClass.ts:4-7`); the live check (plan) measures the
+  `DELETE` under `lock_handle` per type and reports what came.
+- **`HandlerDeletionCheck`** — a new compact tool beside `HandlerValidate` and `HandlerCheckRun`,
+  parameters `object_type`*, `object_name`* as theirs: one call, the deletion check request the
+  deletion uses today (`checkDeletion` in `src/lib/strategies/checkedDeletion.ts:50-51`), answered as
+  `analyseDeletion` reads it. The consumer calls it before `HandlerDelete` when it wants the check.
+- **`HandlerGet`** honours `part` and returns only what was asked — code (`source`), `metadata`, or
+  another part: **one part, one request**, the same for every type. `part: 'metadata'` answers the
+  metadata alone for every type, `part: 'source'` the source alone; a type without source
+  (DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, PACKAGE) refuses `source`, naming the parts it offers.
+  FUNCTION_MODULE's `source` reads the source with the group the caller gives (`function_group_name`,
+  already required), with no metadata read first. Where types differ today (the plan's survey, with
+  file and line): `source` answers the metadata document for those four types; `metadata` answers
+  metadata and source (`both()`) for the source types; FUNCTION_MODULE chains metadata → source
+  (`handleGetFunctionModule.ts:81-93`); the field names differ by type. Parts that send several
+  requests today (`urls`, `contents`, `node_structure` of a package, `UNIT_TEST` / `CDS_UNIT_TEST`
+  polling) are among the survey's findings for the owner; until his word they are not changed here.
 - `HandlerLock`, `HandlerUnlock` and `HandlerActivate` already are single.
 
-The handlers that chain today, and what each becomes, are listed in the plan (its compact CRUD
-tasks), with file and line. Every compact CRUD call is proven to issue exactly one request
-(§4.2's proof: held, answered with a document, answered `404`).
+The handlers that chain today are listed in the plan (its compact tasks), with file and line. Every
+compact call is proven to issue exactly one request (§4.2's proof: held, answered with a document,
+answered `404`).
 
 ### 4.7 No retries in batch mode
 
@@ -860,11 +869,4 @@ with the date.
 
 ## Open questions for the owner
 
-1. **One consistent part for "both".** The owner's example (`metadata` → metadata, `source` →
-   source, one part for both) and "no existing answer breaks" pull apart: `metadata` answers both
-   today for the source types. *Recommendation:* add a part `source_and_metadata`, the same for every
-   type that has both; keep `metadata` and `source` answering exactly as today, documented per type;
-   the FUNCTION_MODULE read keeps its chain (it verifies the group) and stays ineligible.
-2. **The deletion check** `HandlerDelete` drops (`deleteIfDeletable`: check, then delete).
-   *Recommendation:* a `HandlerGet` part `deletion_check` (one request), the consumer calling it before
-   the delete.
+None in this document; the compact survey's findings go to the owner separately.

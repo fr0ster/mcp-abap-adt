@@ -197,14 +197,14 @@
 - [ ] **Step 6:** Docs: `http/README.md`, `docs/user-guide/CLIENT_CONFIGURATION.md` (the header on every call of a batch).
 - [ ] **Step 7:** Commit `feat(http): x-mcp-state-handle routes a batch`.
 
-### Task 10: Compact CRUD single-call: `HandlerCreate`
+### Task 10: Compact one call: `HandlerCreate`
 
 **What chains today** (survey of the compact routes; each line: the handler the compact route reaches, what it sends):
 
 - `HandlerCreate` → the full creates (`compact-modify/src/handlers/compactWriteRoutes.ts`): BEHAVIOR_DEFINITION create → lock → check → unlock → read → activate (`src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts:135-177`); CDS_UNIT_TEST checkCdsTestDoubles → create (`src/handlers/unit_test/high/handleCreateCdsUnitTest.ts:95-104`); DATA_ELEMENT validate → create → lock → readMetadata → updateMetadata → unlock → readMetadata → check → activate (`src/handlers/data_element/high/handleCreateDataElement.ts:213-311`); DOMAIN the same (`src/handlers/domain/high/handleCreateDomain.ts:197-290`); FUNCTION_GROUP create → readMetadata → activate (`src/handlers/function/high/handleCreateFunctionGroup.ts:118-154`); METADATA_EXTENSION create → lock → check → unlock → read → activate (`src/handlers/ddlx/high/handleCreateMetadataExtension.ts:114-158`); SERVICE_BINDING create → activate (`src/handlers/service_binding/high/handleCreateServiceBinding.ts:184-205`); SERVICE_DEFINITION create → lock → update → unlock → activate (`src/handlers/service_definition/high/handleCreateServiceDefinition.ts:129-179`); STRUCTURE validate → create → check → activate (`src/handlers/structure/high/handleCreateStructure.ts:230-264`); UNIT_TEST lock → update → unlock → activate (`writeClassTests`, `src/handlers/unit_test/shared/writeTests.ts:76-97`). One `create()` each (to be proven per type): BEHAVIOR_IMPLEMENTATION, CLASS, DDL, FUNCTION_MODULE, INTERFACE, PACKAGE, PROGRAM, TABLE, TRANSPORT. `create_only` (`src/handlers/common/low/handleCreateOnly.ts`, Task 10 as first implemented) already sends the one `POST` per type.
 - `HandlerUpdate` without `lock_handle` → the full updates, each `withLock` lock → write → (check) → unlock → activate: BEHAVIOR_DEFINITION `:116`, BEHAVIOR_IMPLEMENTATION `:139`, CLASS `:107`, DATA_ELEMENT `:222`, DDL `:96`, DOMAIN `:185`, FUNCTION_GROUP `:97`, FUNCTION_MODULE `:124`, INTERFACE `:102`, LOCAL_DEFINITIONS / LOCAL_MACROS / LOCAL_TYPES `:100`, LOCAL_TEST_CLASS `:116`, METADATA_EXTENSION `:118`, PACKAGE `:94`, PROGRAM `:108`, SERVICE_BINDING `:267`, SERVICE_DEFINITION `:100`, STRUCTURE `:102`, TABLE `:103` (each `src/handlers/<type>/high/handleUpdate<Type>.ts`), UNIT_TEST / CDS_UNIT_TEST (`writeTests.ts:76-97`). With `lock_handle`: DOMAIN, DATA_ELEMENT, PACKAGE readMetadata → updateMetadata (`src/handlers/domain/low/handleUpdateDomain.ts:110-117`, `src/handlers/data_element/low/handleUpdateDataElement.ts:151-158`, `src/handlers/package/low/handleUpdatePackage.ts:130-137`); the source types one `PUT`.
 - `HandlerDelete` → checkDeletion → delete for 19 types (`deleteIfDeletable`, `src/lib/strategies/checkedDeletion.ts:50-64`); LOCAL_TEST_CLASS / LOCAL_TYPES / LOCAL_DEFINITIONS / LOCAL_MACROS lock → update → unlock → activate (`src/handlers/class/high/handleDeleteLocal*.ts:86-121`); UNIT_TEST, CDS_UNIT_TEST (`writeTests.ts:76-97`; `handleDeleteCdsUnitTest.ts:85`).
-- `HandlerGet` (reads; contract unchanged): FUNCTION_MODULE readMetadata → read with the group it names (`src/handlers/function_module/high/handleGetFunctionModule.ts:81-93`, `src/handlers/function_module/readonly/handleReadFunctionModule.ts:83-95`); `UNIT_TEST` / `CDS_UNIT_TEST` polling (`src/handlers/unit_test/high/handleGetUnitTest.ts:57-64`, `handleGetCdsUnitTest.ts:59-63`); part `urls` three reads in sequence (`src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts:195-236`); part `contents` the package walk; `node_structure` of a `DEVC/K` parent reads the package first (`src/handlers/system/low/handleGetNodeStructure.ts:22-27`). Part `metadata` sends source and metadata together via `both()` — independent, eligible.
+- `HandlerGet`: part `metadata` sends source and metadata via `both()` for the source types (`src/handlers/<type>/readonly/handleRead<Type>.ts`), part `source` answers the metadata for DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, PACKAGE; FUNCTION_MODULE readMetadata → read with the group it names (`src/handlers/function_module/high/handleGetFunctionModule.ts:81-93`, `src/handlers/function_module/readonly/handleReadFunctionModule.ts:83-95`); `UNIT_TEST` / `CDS_UNIT_TEST` polling (`src/handlers/unit_test/high/handleGetUnitTest.ts:57-64`, `handleGetCdsUnitTest.ts:59-63`); part `urls` three reads in sequence (`src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts:195-236`); part `contents` the package walk; `node_structure` of a `DEVC/K` parent reads the package first (`src/handlers/system/low/handleGetNodeStructure.ts:22-27`). The multi-request parts (`urls`, `contents`, package `node_structure`, unit-test polling) go to the owner with the compact survey; none is changed without his word.
 
 
 **Files:**
@@ -222,36 +222,37 @@
 - [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases: create, lock, update, unlock, activate), README; `docs/MIGRATION-19.0.md` (compact `HandlerCreate` creates only; what to call after); CHANGELOG 19.0.0 *Changed* (breaking for compact).
 - [ ] **Step 7:** Commit `feat(compact)!: HandlerCreate creates only`.
 
-### Task 11: Compact CRUD single-call: `HandlerUpdate` and `HandlerDelete`
+### Task 11: Compact one call: `HandlerUpdate`, `HandlerDelete`, new `HandlerDeletionCheck`
 
 **Files:**
-- Modify: `compact-modify/src/handlers/handleHandlerUpdate.ts` (`lock_handle` required; always `handleUpdateUnderLock`), `src/handlers/common/low/handleUpdateUnderLock.ts` (DOMAIN, DATA_ELEMENT, PACKAGE: `source_code` sent as the whole document; `properties` and `FLAT_PROPERTIES` refused), `compact-modify/src/handlers/handleHandlerDelete.ts` and `compactWriteRoutes.ts` (the DELETE alone; the section types the `PUT` under `lock_handle`), `src/lib/compact/compactSchemas.ts`, `tools/batch-handlers.json`
-- Test: `compact-modify/src/__tests__/updateDeleteSingleCall.test.ts`
+- Modify: `compact-modify/src/handlers/handleHandlerUpdate.ts` (`lock_handle` required; always `handleUpdateUnderLock`), `src/handlers/common/low/handleUpdateUnderLock.ts` (DOMAIN, DATA_ELEMENT, PACKAGE: `source_code` sent as the whole document; `properties` and `FLAT_PROPERTIES` refused), `compact-modify/src/handlers/handleHandlerDelete.ts` and `compactWriteRoutes.ts` (the `DELETE` under `lock_handle`; the section types the `PUT` under `lock_handle`), `src/lib/compact/compactSchemas.ts`, `tools/batch-handlers.json`
+- Create: `compact-readonly-entries/src/handlers/handleHandlerDeletionCheck.ts` (beside `handleHandlerValidate.ts` and `handleHandlerCheckRun.ts`), its registration in `compact-readonly-entries/src/group.ts`
+- Test: `compact-modify/src/__tests__/updateDeleteSingleCall.test.ts`, `compact-readonly-entries/src/__tests__/deletionCheck.test.ts`
 
 **Interfaces:**
-- Produces: `HandlerUpdate` = one `PUT` under `lock_handle`; for DOMAIN / DATA_ELEMENT / PACKAGE `get<Type>().updateMetadata({ name, transportRequest }, { source: source_code, lockHandle, analyse })`; `HandlerDelete` = one `DELETE` (the section types: one `PUT` under `lock_handle`). No `document` argument.
+- Produces: `HandlerUpdate` = one `PUT` under `lock_handle`; for DOMAIN / DATA_ELEMENT / PACKAGE `get<Type>().updateMetadata({ name, transportRequest }, { source: source_code, lockHandle, analyse })`; `HandlerDelete` = one `DELETE` under `lock_handle` (required; the section types one `PUT` under it); tool `HandlerDeletionCheck` (`object_type`*, `object_name`*) = one call, `checkDeletion` as `src/lib/strategies/checkedDeletion.ts:50-51` sends it, read by `analyseDeletion`. No `document` argument.
 
-- [ ] **Step 1: Write the failing tests** — per type: `HandlerUpdate issues exactly one PUT under the given lock_handle — held, answered, 404`; `no lock_handle refused before any request`; `DOMAIN/DATA_ELEMENT/PACKAGE: the body is source_code byte for byte, no read`; parameterised over `properties` and `FLAT_PROPERTIES` (`description`, `datatype`, `length`, `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`) × `false`, `0`, `''`: `refused by presence before any request, naming it`; `transport_request is accepted`; per type: `HandlerDelete issues exactly one DELETE, no deletion check`; `the section types send one PUT under the given lock_handle`.
+- [ ] **Step 1: Write the failing tests** — per type: `HandlerUpdate issues exactly one PUT under the given lock_handle — held, answered, 404`; `no lock_handle refused before any request`; `DOMAIN/DATA_ELEMENT/PACKAGE: the body is source_code byte for byte, no read`; parameterised over `properties` and `FLAT_PROPERTIES` (`description`, `datatype`, `length`, `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`) × `false`, `0`, `''`: `refused by presence before any request, naming it`; `transport_request is accepted`; per type: `HandlerDelete issues exactly one DELETE carrying the given lock_handle, no deletion check`; `HandlerDelete without lock_handle refused before any request`; `the section types send one PUT under the given lock_handle`; `HandlerDeletionCheck issues exactly one request, the deletion check, and answers what analyseDeletion reads (deletable / refused with SAP's words)`; `HandlerDeletionCheck is served by compact and compact-ro`.
 - [ ] **Step 2:** Run — FAIL.
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run, with Task 4's proof — PASS.
-- [ ] **Step 5: Break it:** read before writing; test the fields by truthiness; keep the deletion check — each red; revert.
-- [ ] **Step 6:** Docs as Task 10's (update and delete); `MIGRATION-19.0.md` (lock first, update under the handle, unlock, activate; the delete without its check); CHANGELOG 19.0.0 *Changed*.
-- [ ] **Step 7:** Commit `feat(compact)!: HandlerUpdate and HandlerDelete do one operation`.
+- [ ] **Step 4:** Run, with Task 4's proof (and the new tool's entry in `tools/batch-handlers.json`) — PASS.
+- [ ] **Step 5: Break it:** read before writing; test the fields by truthiness; keep the deletion check inside `HandlerDelete`; send the delete without the lock handle — each red; revert.
+- [ ] **Step 6:** Docs as Task 10's (update, delete, `HandlerDeletionCheck`); `MIGRATION-19.0.md` (lock first, update or delete under the handle, unlock, activate; the check is `HandlerDeletionCheck`); CHANGELOG 19.0.0 *Added* `HandlerDeletionCheck`, *Changed* (breaking for compact).
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerUpdate and HandlerDelete do one operation; HandlerDeletionCheck`.
 
-### Task 12: `HandlerGet` uniform parts
+### Task 12: `HandlerGet`: one part, one request
 
 **Files:**
-- Modify: `compact-readonly-entries/src/handlers/handleHandlerGet.ts`, `compact-readonly-entries/src/handlers/compactPartRoutes.ts`, `compact-readonly-entries/src/handlers/compactReadRoutes.ts`, `src/lib/compact/compactSchemas.ts` (`part`), `tools/batch-handlers.json`
-- Test: `compact-readonly-entries/src/__tests__/uniformParts.test.ts`
+- Modify: `compact-readonly-entries/src/handlers/handleHandlerGet.ts`, `compact-readonly-entries/src/handlers/compactPartRoutes.ts` (`metadata` → the metadata read alone per type), `compact-readonly-entries/src/handlers/compactReadRoutes.ts` (`source` → the source read alone; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, PACKAGE refuse it naming their parts), the FUNCTION_MODULE source read (with the caller's `function_group_name`, no metadata first), `src/lib/compact/compactSchemas.ts` (`part`), `tools/batch-handlers.json`
+- Test: `compact-readonly-entries/src/__tests__/onePartOneRequest.test.ts`
 
 **Interfaces:**
-- Produces: the same `part` reads the same kind of thing for every type (spec §4.6's survey); no existing part's answer changes; the part for "both" per the owner's answer to the spec's open question 1.
+- Produces: for every type, `part: 'source'` = one source read, `part: 'metadata'` = one metadata read, each answering only what was asked; a type without source refuses `source` naming its parts. The multi-request parts (`urls`, `contents`, package `node_structure`, unit-test polling) stay as they are until the owner's word on the compact survey.
 
-- [ ] **Step 1: Write the failing tests** — `for every type, each existing part answers exactly as before (recorded answers)`; `for every type that has both, the "both" part answers source and metadata with the same field names`; `part metadata stays eligible (two independent requests)`; `FUNCTION_MODULE's chain stays ineligible`.
-- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.
-- [ ] **Step 5: Break it:** answer one type's "both" part with different field names — red; revert.
-- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md` (parts per type), surface fixture, CHANGELOG 19.0.0 *Added*. Commit `feat(compact): HandlerGet parts uniform across types`.
+- [ ] **Step 1: Write the failing tests** — per type: `part metadata issues exactly one request (held, answered, 404) and answers metadata only`; `part source issues exactly one request and answers source only`; `DOMAIN/DATA_ELEMENT/FUNCTION_GROUP/PACKAGE refuse source before any request, naming their parts`; `FUNCTION_MODULE source: one request with the given group, no metadata read`.
+- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run, with Task 4's proof — PASS.
+- [ ] **Step 5: Break it:** route `metadata` back to the `both()` read; read FUNCTION_MODULE's metadata first — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md` (parts per type), `compact/README.md`, surface fixture, `docs/user-guide/BATCH_MODE.md`; `MIGRATION-19.0.md` (`metadata` no longer carries the source; ask `source` for it; source-less types refuse `source`); CHANGELOG 19.0.0 *Changed* (breaking for compact). Commit `feat(compact)!: HandlerGet one part, one request`.
 
 ### Task 13: The debugger batch
 
@@ -373,7 +374,7 @@
 **Files:**
 - Create: `src/__tests__/integration/batch/communicationBatch.test.ts`; `tests/test-config.yaml.template` (`batch.test_cases.communication`, disabled)
 
-- [ ] **Step 1:** Write the test: hard mode through the served tools; N reads; then compact `HandlerCreate` × N, `HandlerLock` × N, `HandlerUpdate` (sources; the whole document in `source_code` for DOMAIN) × N, `HandlerUnlock` × N, `HandlerActivate`, each phase a batch; answers per number; cleanup. States where it runs (on-premise HTTP, on-premise RFC, ABAP Cloud), skips elsewhere with the reason.
+- [ ] **Step 1:** Write the test: hard mode through the served tools; N reads; then compact `HandlerCreate` × N, `HandlerLock` × N, `HandlerUpdate` (sources; the whole document in `source_code` for DOMAIN) × N, `HandlerUnlock` × N, `HandlerActivate`, each phase a batch; answers per number; cleanup through `HandlerDeletionCheck` and `HandlerDelete` under `lock_handle` per type — what SAP answers to a `DELETE` under a lock is recorded as it came (the code today says a held lock makes ADT refuse a delete). States where it runs (on-premise HTTP, on-premise RFC, ABAP Cloud), skips elsewhere with the reason.
 - [ ] **Step 2:** On the owner's word, run on each; record the results with the date in `docs/user-guide/BATCH_MODE.md`. Commit.
 
 ### Task 21 (live, owner's VPN/tunnel, on his word): debugger batch and AMDP

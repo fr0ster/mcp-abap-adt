@@ -10,6 +10,7 @@
  * as it reads a long tool's arguments. `end` takes the instance's connection
  * in its turn.
  */
+import { asksNumbers } from '../../batch/batchTools';
 import { answersOf, beginBatch, endBatch } from '../../batch/tools';
 import type { ArgsOf, HandlerContext } from '../../handlers/index';
 
@@ -58,13 +59,6 @@ export const NUMBER_WITHOUT_ANSWERS_WORDS =
   "number and numbers are given only with action 'answers'";
 
 type BatchArgs = ArgsOf<typeof TOOL_DEFINITION.inputSchema>;
-
-/** Whether `args` ask for numbers: `number` or `numbers` given. */
-function asksNumbers(args: unknown): boolean {
-  if (args === null || typeof args !== 'object') return false;
-  const given = args as { number?: unknown; numbers?: unknown };
-  return given.number !== undefined || given.numbers !== undefined;
-}
 
 /**
  * Whether a `HandlerBatch` call works on no connection: every call but a

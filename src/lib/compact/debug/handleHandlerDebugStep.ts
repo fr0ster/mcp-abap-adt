@@ -1,8 +1,9 @@
 import {
+  debugBatchRecorder,
   LINE_TARGET_PROPERTIES,
   lineUriOf,
-  type OnceStep,
   STATE_HANDLE_PROPERTY,
+  terseOnceStep,
 } from '../../debugger/index';
 import type { ArgsOf, HandlerContext } from '../../handlers/index';
 import { DETAIL_PROPERTY } from '../index';
@@ -60,14 +61,13 @@ const STEPS = {
   stepContinue: 'stepContinue',
 } as const;
 
-const terseStep = (v: OnceStep) =>
-  'ended' in v ? { state: 'ended', reason: v.ended } : v.step;
-
 export async function handleHandlerDebugStep(
   context: HandlerContext,
   args: Args,
 ) {
   const op = args.operation;
+  // Recorded in the debugger batch: each operation's own request.
+  const recorder = debugBatchRecorder(context);
   if (args.kind === 'amdp') {
     return onceAnswer(context, args, 'amdp', false, async (d) => {
       if (op !== 'stepOver' && op !== 'stepContinue')
@@ -88,8 +88,11 @@ export async function handleHandlerDebugStep(
         args,
         'abap',
         false,
-        async (d) => d.abap.stepOnce(STEPS[op]),
-        terseStep,
+        async (d) =>
+          recorder !== undefined
+            ? d.abap.recordStep(recorder, STEPS[op])
+            : d.abap.stepOnce(STEPS[op]),
+        terseOnceStep,
       );
     case 'stepRunToLine':
     case 'stepJumpToLine':
@@ -110,16 +113,22 @@ export async function handleHandlerDebugStep(
             },
             needed(args.line, what),
           );
-          return d.abap.stepToLineOnce(op, uri);
+          return recorder !== undefined
+            ? d.abap.recordStepToLine(recorder, op, uri)
+            : d.abap.stepToLineOnce(op, uri);
         },
-        terseStep,
+        terseOnceStep,
       );
     case 'setStackPosition':
-      return onceAnswer(context, args, 'abap', false, async (d) =>
-        d.abap.setStackPositionOnce(
-          needed(args.position, 'position: needed for setStackPosition'),
-        ),
-      );
+      return onceAnswer(context, args, 'abap', false, async (d) => {
+        const position = needed(
+          args.position,
+          'position: needed for setStackPosition',
+        );
+        return recorder !== undefined
+          ? d.abap.recordStackPosition(recorder, position)
+          : d.abap.setStackPositionOnce(position);
+      });
     default:
       return onceAnswer(context, args, 'abap', false, async () =>
         refuseOperation('abap', op, ABAP_OPERATIONS),

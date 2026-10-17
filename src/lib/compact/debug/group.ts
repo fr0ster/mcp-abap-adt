@@ -16,6 +16,10 @@ import {
   type HandlerEntry,
 } from '../../handlers/index';
 import {
+  TOOL_DEFINITION as HandlerDebugBatch_Tool,
+  handleHandlerDebugBatch,
+} from './handleHandlerDebugBatch';
+import {
   TOOL_DEFINITION as HandlerDebugBreakpoints_Tool,
   handleHandlerDebugBreakpoints,
 } from './handleHandlerDebugBreakpoints';
@@ -51,5 +55,22 @@ export class CompactDebugHandlersGroup extends BaseHandlerGroup {
 
   getHandlers(): HandlerEntry[] {
     return compactDebugEntries();
+  }
+}
+
+/**
+ * The debugger batch in the compact set (`compactToolSetOf` only):
+ * `HandlerDebugBatch`, beside the four debugger tools. It works on the ABAP
+ * stop's connection and is listed in `DEBUGGER_OWN_CONNECTION_TOOLS`.
+ */
+export function compactDebugBatchEntries(): HandlerEntry[] {
+  return [defineTool(HandlerDebugBatch_Tool, handleHandlerDebugBatch)];
+}
+
+export class CompactDebugBatchHandlersGroup extends BaseHandlerGroup {
+  protected groupName = 'CompactDebugBatchHandlers';
+
+  getHandlers(): HandlerEntry[] {
+    return compactDebugBatchEntries();
   }
 }

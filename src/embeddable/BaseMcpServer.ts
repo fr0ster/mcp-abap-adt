@@ -40,16 +40,14 @@ import {
   type BatchAvailability,
   createBatchAvailability,
 } from '../lib/batch/availability.js';
-import {
-  endsCommunicationBatch,
-  isBatchTool,
-} from '../lib/batch/batchTools.js';
+import { endsBatch, isBatchTool } from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
-import {
-  communicationBatchRefusal,
-  endBeforeExecute,
-} from '../lib/batch/execute.js';
-import type { BatchAnswer, InstanceBatch } from '../lib/batch/InstanceBatch.js';
+import { batchRefusal, endBeforeExecute } from '../lib/batch/execute.js';
+import type {
+  BatchAnswer,
+  InstanceBatch,
+  OpenBatch,
+} from '../lib/batch/InstanceBatch.js';
 import { createRecorder, untilSent } from '../lib/batch/recorder.js';
 import {
   NOT_SERVED_SENTENCE,
@@ -65,7 +63,10 @@ import {
   createDebuggerInstance,
   type DebuggerInstance,
 } from '../lib/debugger/DebuggerInstance.js';
-import { isDebuggerOwnConnectionTool } from '../lib/debugger/ownConnectionTools.js';
+import {
+  isDebuggerOwnConnectionTool,
+  recordableInDebugBatch,
+} from '../lib/debugger/ownConnectionTools.js';
 import type {
   IHandlerGroup,
   IHandlersRegistry,
@@ -1271,21 +1272,17 @@ export abstract class BaseMcpServer extends McpServer {
             }
             let inUse: AbapConnection | undefined;
             let leaveFlow: (() => void) | undefined;
-            // The batch a `BatchEnd` call ends: the one open when it came.
-            const ending = endsCommunicationBatch(
-              entry.toolDefinition.name,
-              args,
-            )
-              ? this.batch?.opened()
-              : undefined;
-            // A `BatchEnd` with nothing to end is refused before a
-            // connection is taken (spec §5.2 step 1).
-            const nothingToEnd = endsCommunicationBatch(
-              entry.toolDefinition.name,
-              args,
-            )
-              ? communicationBatchRefusal(this.batch)
-              : undefined;
+            // The batch a `BatchEnd` (or `DebugBatchEnd`) call ends: the one
+            // of its kind open when it came.
+            const endingKind = endsBatch(entry.toolDefinition.name, args);
+            const ending =
+              endingKind !== undefined ? this.batch?.opened() : undefined;
+            // An end with nothing to end is refused before a connection is
+            // taken (spec §5.2 step 1).
+            const nothingToEnd =
+              endingKind !== undefined
+                ? batchRefusal(this.batch, endingKind)
+                : undefined;
             if (nothingToEnd !== undefined) {
               return this.refusalAnswer(nothingToEnd);
             }
@@ -1315,9 +1312,12 @@ export abstract class BaseMcpServer extends McpServer {
               // While a batch is open every call but a batch tool's takes its
               // turn: a recorded call is recorded in call order, a refused one
               // is refused there — a long read in batch mode gets no
-              // connection of its own.
+              // connection of its own. The debugger batch is the debugger
+              // tools': they keep working outside the flow, their numbers
+              // in record order (spec §7).
               const ownConnection =
-                !this.batchOpenFor(entry.toolDefinition.name) &&
+                (!this.batchOpenFor(entry.toolDefinition.name) ||
+                  this.inDebuggerBatch(entry.toolDefinition.name)) &&
                 worksOnOwnConnection(
                   entry.toolDefinition.name,
                   args,
@@ -1520,10 +1520,11 @@ export abstract class BaseMcpServer extends McpServer {
               // batch begun since is not this call's to end.
               if (
                 this.batch !== undefined &&
+                endingKind !== undefined &&
                 ending !== undefined &&
                 this.batch.opened() === ending
               ) {
-                endBeforeExecute(this.batch, failed);
+                endBeforeExecute(this.batch, failed, endingKind);
               }
               return failed;
             } finally {
@@ -1609,6 +1610,15 @@ export abstract class BaseMcpServer extends McpServer {
     );
   }
 
+  /** Whether a call of `tool` meets the open debugger batch as a debugger tool. */
+  private inDebuggerBatch(tool: string): boolean {
+    return (
+      this.batch !== undefined &&
+      this.batch.mode() === 'debugger' &&
+      isDebuggerOwnConnectionTool(tool)
+    );
+  }
+
   /** A failure answered as a tool's: through the failure reader, else `return_error`. */
   private refusalAnswer(error: unknown): {
     content: { type: 'text'; text: string }[];
@@ -1667,14 +1677,15 @@ export abstract class BaseMcpServer extends McpServer {
     const open = owner?.opened();
     const notServed = () =>
       new ServerRefusal('batch_not_recordable', batchNotServedWords(call.tool));
-    // The debugger batch serves its own tools alone (§7).
-    if (
-      owner === undefined ||
-      open === undefined ||
-      owner.mode() !== 'communication'
-    ) {
-      throw notServed();
+    if (owner === undefined || open === undefined) throw notServed();
+    // The debugger batch records the operations of spec §7's table alone,
+    // each on the ABAP stop; every other call is refused.
+    if (owner.mode() === 'debugger') {
+      if (!recordableInDebugBatch(call.tool, call.args)) throw notServed();
+      throwIfRequestAborted(call.signal);
+      return this.runRecorded(call, owner, open);
     }
+    if (owner.mode() !== 'communication') throw notServed();
     if (
       !call.holdsFlow ||
       call.runsInBackground ||
@@ -1694,7 +1705,33 @@ export abstract class BaseMcpServer extends McpServer {
       );
     }
     throwIfRequestAborted(call.signal);
+    return this.runRecorded(call, owner, open);
+  }
 
+  /**
+   * An admitted call recorded: its handler runs on a per-call recorder over
+   * `open`'s batch connection, in the call's scopes but under the batch's
+   * signal, and the call waits until it has recorded everything it sends
+   * before an answer, or settled (`recordCall`). A communication batch's
+   * late-bound target points at the call's connection for its turn.
+   */
+  private async runRecorded(
+    call: {
+      tool: string;
+      handler: unknown;
+      group: unknown;
+      context: HandlerContext;
+      args: unknown;
+      holdsFlow: boolean;
+      system: ResolvedSystemContext | undefined;
+    },
+    owner: InstanceBatch,
+    open: OpenBatch,
+  ): Promise<{
+    content: { type: 'text'; text: string }[];
+    isError?: true;
+  }> {
+    const connection = call.context.connection;
     // The handler's promise, known only once it is started; its number is
     // taken at its first request, possibly before. Boxed: a promise resolved
     // with the handler's promise would adopt it, and a handler that throws
@@ -1728,12 +1765,12 @@ export abstract class BaseMcpServer extends McpServer {
       ...call.context,
       connection: recorder as unknown as AbapConnection,
     };
-    open.target.point(connection);
+    open.target?.point(connection);
     try {
       let handler: Promise<unknown>;
       try {
         handler = Promise.resolve(
-          this.inHeldFlow(true, connection, () =>
+          this.inHeldFlow(call.holdsFlow, connection, () =>
             runWithRequestSignal(owner.signal(), () =>
               withDestinationSystemContext(
                 this.systemContexts.get(connection),
@@ -1775,7 +1812,7 @@ export abstract class BaseMcpServer extends McpServer {
         ? { content, isError: true }
         : { content };
     } finally {
-      open.target.point(undefined);
+      open.target?.point(undefined);
     }
   }
 

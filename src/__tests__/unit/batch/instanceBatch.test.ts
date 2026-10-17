@@ -10,7 +10,10 @@ import { LateBoundConnection } from '../../../lib/batch/lateBound';
 import { InstanceState } from '../../../lib/state/InstanceState';
 
 /** A batch connection that only counts what would be sent: the owner sends nothing. */
-function fakeBatch(): { open: OpenBatch; execute: jest.Mock } {
+function fakeBatch(): {
+  open: OpenBatch & { target: LateBoundConnection };
+  execute: jest.Mock;
+} {
   const execute = jest.fn(async () => undefined);
   const connection = { execute } as unknown as AdtBatchConnection;
   return {

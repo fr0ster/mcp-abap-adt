@@ -1,5 +1,8 @@
 // src/handlers/debugger/debug/handleDebugGetStack.ts
-import { requireDebugger } from '../../../lib/debugger/access';
+import {
+  debugBatchRecorder,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseStop } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
@@ -25,7 +28,13 @@ export async function handleDebugGetStack(
 ) {
   return debugAnswer(
     args,
-    async () => requireDebugger(context, args, 'use').abap.getStack(),
+    async () => {
+      const abap = requireDebugger(context, args, 'use').abap;
+      const recorder = debugBatchRecorder(context);
+      return recorder !== undefined
+        ? abap.recordStack(recorder)
+        : abap.getStack();
+    },
     (stop) => terseStop(stop.debuggee, stop.stack, stop.attach),
   );
 }

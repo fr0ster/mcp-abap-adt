@@ -1,5 +1,8 @@
 // src/handlers/debugger/debug/handleDebugSetStackPosition.ts
-import { requireDebugger } from '../../../lib/debugger/access';
+import {
+  debugBatchRecorder,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseStop } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
@@ -31,6 +34,19 @@ export async function handleDebugSetStackPosition(
   context: HandlerContext,
   args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
+  const recorder = debugBatchRecorder(context);
+  if (recorder !== undefined) {
+    // Recorded in the debugger batch: the move's own request alone.
+    return debugAnswer(
+      args,
+      async () =>
+        requireDebugger(context, args, 'use').abap.recordStackPosition(
+          recorder,
+          args.position,
+        ),
+      (v) => v,
+    );
+  }
   return debugAnswer(
     args,
     async () =>

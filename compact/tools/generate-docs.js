@@ -214,6 +214,10 @@ function main() {
     ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
       .compactDebugEntries()
       .map((entry) => ({ half: 'debug', entry })),
+    // The debugger batch beside them (`HandlerDebugBatch`).
+    ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
+      .compactDebugBatchEntries()
+      .map((entry) => ({ half: 'debug', entry })),
     // The background-run tools live in lib (`src/lib/compact/backgroundRuns`),
     // served by the compact write binaries.
     ...requireFresh(

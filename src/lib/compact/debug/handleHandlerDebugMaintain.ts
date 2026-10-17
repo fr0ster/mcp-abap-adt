@@ -1,4 +1,5 @@
 import {
+  debugBatchRecorder,
   placeOf,
   readMemorySizes,
   readXmlDocument,
@@ -92,6 +93,8 @@ export async function handleHandlerDebugMaintain(
   args: Args,
 ) {
   const op = args.operation;
+  // Recorded in the debugger batch: each operation's own request.
+  const recorder = debugBatchRecorder(context);
   if (args.kind === 'amdp') {
     return onceAnswer(
       context,
@@ -126,7 +129,10 @@ export async function handleHandlerDebugMaintain(
         args,
         'abap',
         false,
-        async (d) => d.abap.getStack(),
+        async (d) =>
+          recorder !== undefined
+            ? d.abap.recordStack(recorder)
+            : d.abap.getStack(),
         (stop) => {
           const top = stop.stack.frames[0];
           const kept = terseFrames(stop.stack.frames, placeOf);
@@ -147,7 +153,9 @@ export async function handleHandlerDebugMaintain(
           const names = args.names ?? [];
           if (!names.length)
             throw new Error('names: needed for getVariables, at least one');
-          return d.abap.getVariables(names);
+          return recorder !== undefined
+            ? d.abap.recordVariables(recorder, names)
+            : d.abap.getVariables(names);
         },
         terseVariables,
       );
@@ -157,10 +165,12 @@ export async function handleHandlerDebugMaintain(
         args,
         'abap',
         false,
-        async (d) =>
-          d.abap.getChildVariables(
-            args.parents?.length ? args.parents : ['@ROOT'],
-          ),
+        async (d) => {
+          const parents = args.parents?.length ? args.parents : ['@ROOT'];
+          return recorder !== undefined
+            ? d.abap.recordChildVariables(recorder, parents)
+            : d.abap.getChildVariables(parents);
+        },
         (v) => {
           // Every member keeps the id a further read takes as a parent.
           const variables = new Map(terseVariables(v).map((t) => [t.id, t]));
@@ -193,14 +203,16 @@ export async function handleHandlerDebugMaintain(
         args,
         'abap',
         false,
-        async (d) =>
-          d.abap.setVariable(
-            needed(
-              args.variable_name,
-              'variable_name: needed for setVariableValue',
-            ),
-            newValueOf(args.value),
-          ),
+        async (d) => {
+          const name = needed(
+            args.variable_name,
+            'variable_name: needed for setVariableValue',
+          );
+          const value = newValueOf(args.value);
+          return recorder !== undefined
+            ? d.abap.recordSetVariable(recorder, name, value)
+            : d.abap.setVariable(name, value);
+        },
         terseVariables,
       );
     default:

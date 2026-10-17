@@ -860,9 +860,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
             }
           : { full: [], fullRo: [], compact: [], compactRo: [] },
       );
-      // core: the debugger, high, background runs and the three batch
-      // tools, always.
-      expect(full.tools).toHaveLength(onStdio ? 254 : 252);
+      // core: the debugger, high, background runs, the three batch tools
+      // and the two debugger batch tools, always.
+      expect(full.tools).toHaveLength(onStdio ? 256 : 254);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',
@@ -872,6 +872,8 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           'BatchBegin',
           'BatchEnd',
           'BatchAnswers',
+          'DebugBatchBegin',
+          'DebugBatchEnd',
         ]),
       );
       // core-ro: the readonly tools with system and search, the three batch
@@ -893,20 +895,25 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         'DebugStartListener',
         'GetBackgroundRun',
         'ResumeLeftoverSession',
+        'DebugBatchBegin',
+        'DebugBatchEnd',
       ]) {
         expect({ name, served: fullRo.tools.includes(name) }).toEqual({
           name,
           served: false,
         });
       }
-      // compact: the 29, the four debugger tools, the three background-run
-      // tools beside the run tool, HandlerBatch, and on stdio the
-      // leftover-session list and logoff (no set serves a resume).
-      expect(compact.tools).toHaveLength(29 + 4 + 3 + 1 + (onStdio ? 2 : 0));
+      // compact: the 29, the four debugger tools, HandlerDebugBatch, the
+      // three background-run tools beside the run tool, HandlerBatch, and on
+      // stdio the leftover-session list and logoff (no set serves a resume).
+      expect(compact.tools).toHaveLength(
+        29 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0),
+      );
       expect(compact.tools).toEqual(
         expect.arrayContaining([
           ...COMPACT_RW,
           ...COMPACT_DEBUG,
+          'HandlerDebugBatch',
           'HandlerBatch',
         ]),
       );
@@ -927,6 +934,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
         ...COMPACT_DEBUG,
         'HandlerBackgroundRunGet',
         'HandlerLeftoverSessionResume',
+        'HandlerDebugBatch',
       ]) {
         expect({ name, served: compactRo.tools.includes(name) }).toEqual({
           name,

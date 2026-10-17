@@ -4,10 +4,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 264
+- Total tools: 266
 - Read-only tools: 68
 - High-level tools: 161
-- Debug tools: 30
+- Debug tools: 32
 - Session tools: 2
 - Batch tools: 3
 
@@ -315,6 +315,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
     - [AmdpDebugStep](#amdpdebugstep-debug-debugger)
     - [AmdpDebugStop](#amdpdebugstop-debug-debugger)
     - [AmdpDebugWait](#amdpdebugwait-debug-debugger)
+    - [DebugBatchBegin](#debugbatchbegin-debug-debugger)
+    - [DebugBatchEnd](#debugbatchend-debug-debugger)
     - [DebugCreateMemorySnapshot](#debugcreatememorysnapshot-debug-debugger)
     - [DebugCreateWatchpoint](#debugcreatewatchpoint-debug-debugger)
     - [DebugDeleteBreakpoint](#debugdeletebreakpoint-debug-debugger)
@@ -3640,6 +3642,28 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `hold_seconds` (number, optional (default: 10)) - Longest wait for a change, at most 30 seconds.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
+
+---
+
+<a id="debugbatchbegin-debug-debugger"></a>
+#### DebugBatchBegin (Debug / Debugger)
+**Description:** [debug] Starts the debugger batch on the stopped debuggee. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch.
+
+**Source:** `src/handlers/debugger/debug/handleDebugBatchBegin.ts`
+
+**Parameters:**
+- None
+
+---
+
+<a id="debugbatchend-debug-debugger"></a>
+#### DebugBatchEnd (Debug / Debugger)
+**Description:** [debug] Sends the recorded calls of the stopped debuggee in one envelope on the debuggee's session and ends the debugger batch. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed.
+
+**Source:** `src/handlers/debugger/debug/handleDebugBatchEnd.ts`
+
+**Parameters:**
+- None
 
 ---
 

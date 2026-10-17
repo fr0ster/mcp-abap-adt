@@ -14,6 +14,10 @@ export {
   BatchHandlersGroup,
   batchToolEntries,
 } from './BatchHandlersGroup.js';
+export {
+  DebugBatchHandlersGroup,
+  debugBatchToolEntries,
+} from './DebugBatchHandlersGroup.js';
 export { DebugHandlersGroup } from './DebugHandlersGroup.js';
 export { HighLevelHandlersGroup } from './HighLevelHandlersGroup.js';
 export {

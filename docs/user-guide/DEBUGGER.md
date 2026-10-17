@@ -19,8 +19,8 @@ every request of the request user — the connected SAP user unless another is n
 [What a breakpoint catches](#what-a-breakpoint-catches)):
 
 ```bash
-mcp-abap-adt            # the full server (and -http, -sse): 30 debugger tools beside the rest
-mcp-abap-adt-compact    # compact (and -compact-http, -compact-sse): four debugger tools beside the 29
+mcp-abap-adt            # the full server (and -http, -sse): 30 debugger tools and the debugger batch beside the rest
+mcp-abap-adt-compact    # compact (and -compact-http, -compact-sse): four debugger tools and HandlerDebugBatch beside the 29
 mcp-abap-adt-ro         # no debugger (nor -http-ro, -sse-ro, -compact-ro, -compact-http-ro, -compact-sse-ro)
 ```
 
@@ -220,6 +220,56 @@ as it is, with the operation's step (`set breakpoints`, `listen`, `attach`, `det
 `end` logs off; a debug state that is never ended closes at the idle bound, the host's stop or the
 instance's close, whose cleanup also stops the listener a listen or a breakpoint left and an AMDP
 session still running.
+
+## The debugger batch: several calls at a stop in one envelope
+
+At an ABAP stop, several debugger calls that need no answer of each other — step, then read the
+stack and the variables — go to SAP in one debugger batch envelope (`POST
+/sap/bc/adt/debugger/batch`) on the stop's connection, the attached session:
+
+| | Full set (`mcp-abap-adt`, `-http`, `-sse`) | Compact (`mcp-abap-adt-compact`, `-compact-http`, `-compact-sse`) |
+|---|---|---|
+| begin | `DebugBatchBegin` | `HandlerDebugBatch` `action: 'begin'` |
+| end | `DebugBatchEnd` | `HandlerDebugBatch` `action: 'end'` |
+| answers | `BatchAnswers` (`number` or `numbers`) | `HandlerDebugBatch` `action: 'answers'` (`number` or `numbers`) |
+
+No `-ro` binary serves them. None takes a `state_handle`: the batch is the instance's (over
+Streamable HTTP the `x-mcp-state-handle` header reaches the instance, as for the communication
+batch, see [BATCH_MODE.md](BATCH_MODE.md)); begin answers `{ debug_batch: 'on', state_handle }`.
+
+**What is recorded**, one request each:
+
+| Operation | Full set | Compact |
+|---|---|---|
+| step (into, over, return, continue) | `DebugStep` | `HandlerDebugStep` `stepInto`, `stepOver`, `stepReturn`, `stepContinue` |
+| step to line | `DebugStepToLine` | `HandlerDebugStep` `stepRunToLine` / `stepJumpToLine` (`object_type`, `object_name`, `line` required) |
+| stack | `DebugGetStack` | `HandlerDebugMaintain` `getStack` |
+| variables | `DebugGetVariables` with `names` | `HandlerDebugMaintain` `getVariables` |
+| child variables | `DebugGetVariables` with `parents` | `HandlerDebugMaintain` `getChildVariables` |
+| stack position | `DebugSetStackPosition` | `HandlerDebugStep` `setStackPosition` |
+| set a variable | `DebugSetVariable` | `HandlerDebugMaintain` `setVariableValue` |
+
+A recorded call answers empty content and takes the next number, from 1, in the order recorded.
+In the batch each operation sends its own request alone: a full-set step reads no stack after it
+and `DebugSetStackPosition` answers the position — record `DebugGetStack` beside them to have the
+stack in the same envelope. A call refused for its arguments before any request (a step to line
+without its address) answers at once and takes no number. Every other tool is refused while the
+debugger batch is open (`batch_not_recordable`, "<tool> is not served while a batch is open"):
+breakpoints, watchpoints, the listener, start / wait / take-over / stop, attach, detach,
+`release_debugger`, terminate, memory sizes and snapshots, settings, and every non-debugger tool.
+
+**The end** sends the envelope on the stop's connection, keeps each call's answer by number — the
+answer the tool gives for what SAP answered to its part — ends the batch whatever happens and
+answers `{ recorded, failed }`. It leaves the debug session as it was: the stop, its view and its
+connection stay; when a recorded step's answer says the program ended, that answer under its
+number shows it, and the next ordinary debugger call learns it from SAP.
+
+**Refusals.** Begin needs an ABAP stop (`no debuggee is stopped in this debug session`); while a
+communication batch is open, or the debugger batch already is, begin is refused `batch_mode_other`
+/ `batch_mode_on`, and `BatchBegin` while the debugger batch is open `batch_mode_other`. **AMDP is
+not offered in the debugger batch yet**: begin at an AMDP debug session is refused
+`debug_batch_amdp_unmeasured` ("AMDP debugging is not offered in a debugger batch: not yet
+confirmed against a system") until a test against a system that runs AMDP debugging confirms it.
 
 ## Catching, and one debuggee at a time
 

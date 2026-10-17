@@ -199,6 +199,12 @@
   },
   {
     "group": "compact",
+    "name": "HandlerDebugBatch",
+    "inputs": "action*, number, numbers",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
     "name": "HandlerBatch",
     "inputs": "action*, number, numbers",
     "available_in": "all"

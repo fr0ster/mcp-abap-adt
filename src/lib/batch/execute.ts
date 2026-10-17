@@ -13,6 +13,9 @@
  * batch connection is discarded with it, so nothing recorded can be sent
  * again). Nothing is retried or repeated.
  *
+ * `DebugBatchEnd` executes the open debugger batch the same way, on the
+ * stop's connection its batch connection wraps (spec §7).
+ *
  * A failure before `execute()` (taking the connection, the system lookup the
  * dispatch runs before the tool) never reaches here: the dispatch ends the
  * batch with `endBeforeExecute`, every recorded call answering that failure.
@@ -21,8 +24,12 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type McpResult, requestThrownEntry } from '../answer';
 import { failureOf } from '../auth/failures';
 import { ServerRefusal } from '../auth/serverRefusal';
-import type { BatchAnswer, InstanceBatch, OpenBatch } from './InstanceBatch';
-import type { LateBoundConnection } from './lateBound';
+import type {
+  BatchAnswer,
+  BatchKind,
+  InstanceBatch,
+  OpenBatch,
+} from './InstanceBatch';
 
 /**
  * What `BatchEnd` answers: how many calls were recorded, the numbers whose
@@ -40,45 +47,66 @@ export type BatchSummary = {
 /** The step a failure of the envelopes is named at. */
 export const EXECUTE_STEP = 'execute';
 
-/** The open communication batch, or why there is none to end. */
-function communicationState(
+/** The open batch of `kind`, or why there is none to end. */
+function openState(
   owner: InstanceBatch | undefined,
+  kind: BatchKind,
 ): OpenBatch | ServerRefusal {
   if (owner === undefined) return new ServerRefusal('batch_mode_unavailable');
-  if (owner.mode() === 'debugger') return new ServerRefusal('batch_mode_other');
+  const mode = owner.mode();
+  if (mode !== 'off' && mode !== kind) {
+    return new ServerRefusal('batch_mode_other');
+  }
   const open = owner.opened();
-  if (owner.mode() !== 'communication' || open === undefined) {
+  if (mode !== kind || open === undefined) {
     return new ServerRefusal('batch_mode_off');
   }
   return open;
 }
 
 /**
- * Why a `BatchEnd` now has nothing to end: no owner (`batch_mode_unavailable`),
- * the debugger batch open (`batch_mode_other`), no batch open
- * (`batch_mode_off`); `undefined` while a communication batch is open. The
- * dispatch asks it before taking a connection (spec §5.2 step 1).
+ * Why an end of the `kind` batch now has nothing to end: no owner
+ * (`batch_mode_unavailable`), the other batch open (`batch_mode_other`), no
+ * batch open (`batch_mode_off`); `undefined` while a batch of `kind` is open.
+ * The dispatch asks it before taking a connection (spec §5.2 step 1).
  */
-export function communicationBatchRefusal(
+export function batchRefusal(
   owner: InstanceBatch | undefined,
+  kind: BatchKind,
 ): ServerRefusal | undefined {
-  const state = communicationState(owner);
+  const state = openState(owner, kind);
   return state instanceof ServerRefusal ? state : undefined;
 }
 
-/** The open communication batch; throws `communicationBatchRefusal`'s refusal when there is none. */
-export function openCommunication(owner: InstanceBatch | undefined): OpenBatch {
-  const state = communicationState(owner);
+/** `batchRefusal` of the communication batch. */
+export function communicationBatchRefusal(
+  owner: InstanceBatch | undefined,
+): ServerRefusal | undefined {
+  return batchRefusal(owner, 'communication');
+}
+
+/** The open batch of `kind`; throws `batchRefusal`'s refusal when there is none. */
+export function openBatchOf(
+  owner: InstanceBatch | undefined,
+  kind: BatchKind,
+): OpenBatch {
+  const state = openState(owner, kind);
   if (state instanceof ServerRefusal) throw state;
   return state;
 }
 
+/** The open communication batch; throws `communicationBatchRefusal`'s refusal when there is none. */
+export function openCommunication(owner: InstanceBatch | undefined): OpenBatch {
+  return openBatchOf(owner, 'communication');
+}
+
 /**
- * Executes `owner`'s open communication batch on `connection` (spec §5.2):
- * `target` — the batch connection's late-bound target — points at it for
- * the whole `execute()`. Every recorded handler's answer is awaited (none
- * rejects); then, whatever failed, batch mode is off and the answers by
- * number replace the kept ones.
+ * Executes `open`, the open batch of `owner` (spec §5.2): a communication
+ * batch's late-bound target points at `connection` for the whole
+ * `execute()`; a debugger batch's connection wraps the stop's connection
+ * itself, and `connection` is absent. Every recorded handler's answer is
+ * awaited (none rejects); then, whatever failed, batch mode is off and the
+ * answers by number replace the kept ones.
  *
  * A credential refusal (or another failure the server's reader answers —
  * its own refusal, a closed instance) that `execute()` rejected with ends
@@ -92,14 +120,13 @@ export function openCommunication(owner: InstanceBatch | undefined): OpenBatch {
  */
 export async function executeBatch(
   owner: InstanceBatch,
-  target: LateBoundConnection,
-  connection: IAbapConnection,
+  open: OpenBatch,
+  connection?: IAbapConnection,
 ): Promise<BatchSummary> {
-  const open = openCommunication(owner);
   const answers = new Map<number, BatchAnswer>();
   let rejected = false;
   let error: unknown;
-  target.point(connection);
+  open.target?.point(connection);
   try {
     try {
       await open.connection.execute();
@@ -114,7 +141,7 @@ export async function executeBatch(
       answers.set(answer.number, answer);
     }
   } finally {
-    target.point(undefined);
+    open.target?.point(undefined);
     owner.end(answers, open);
   }
   if (rejected && failureOf(error) !== undefined) throw error;
@@ -129,8 +156,9 @@ export async function executeBatch(
 }
 
 /**
- * `BatchEnd` failed before `execute()` (spec §5.2 step 2): the dispatch's
- * catch hands it the call's own answer. With a communication batch open,
+ * `BatchEnd` (or `DebugBatchEnd`, `kind` `debugger`) failed before
+ * `execute()` (spec §5.2 step 2): the dispatch's catch hands it the call's
+ * own answer. With a batch of `kind` open,
  * batch mode ends and every recorded call's answer is that failure, as it
  * came; nothing is sent (the batch connection is discarded unexecuted). With
  * none open — the call failed for another reason, or the batch already ended
@@ -139,8 +167,9 @@ export async function executeBatch(
 export function endBeforeExecute(
   owner: InstanceBatch,
   failure: McpResult,
+  kind: BatchKind = 'communication',
 ): void {
-  if (owner.mode() !== 'communication') return;
+  if (owner.mode() !== kind) return;
   const open = owner.opened();
   if (open === undefined) return;
   const answers = new Map<number, BatchAnswer>();
@@ -153,7 +182,7 @@ export function endBeforeExecute(
       ...(owner.keepRawParts ? { raw: [] } : {}),
     });
   }
-  open.target.point(undefined);
+  open.target?.point(undefined);
   owner.end(answers, open);
 }
 

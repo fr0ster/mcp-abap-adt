@@ -41,6 +41,7 @@ import {
 import {
   BackgroundRunHandlersGroup,
   BatchHandlersGroup,
+  DebugBatchHandlersGroup,
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   LeftoverSessionHandlersGroup,
@@ -99,7 +100,7 @@ const SETS: ReadonlyArray<readonly [string, ToolSet]> = [
 ];
 
 describe('the four tool sets', () => {
-  it('core: readonly (with system), background runs, high, debug, search, the leftover-session list and logoff, batch mode', () => {
+  it('core: readonly (with system), background runs, high, debug, search, the leftover-session list and logoff, batch mode, the debugger batch', () => {
     const overriding = [
       new HighLevelHandlersGroup(context),
       new DebugHandlersGroup(context),
@@ -113,6 +114,7 @@ describe('the four tool sets', () => {
         new SearchHandlersGroup(context),
         new LeftoverSessionHandlersGroup(context),
         new BatchHandlersGroup(context),
+        new DebugBatchHandlersGroup(context),
       ]),
     );
   });
@@ -129,7 +131,7 @@ describe('the four tool sets', () => {
     );
   });
 
-  it('compact: both halves in one group, the debugger, background runs, the leftover-session list and logoff, HandlerBatch', () => {
+  it('compact: both halves in one group, the debugger, the debugger batch, background runs, the leftover-session list and logoff, HandlerBatch', () => {
     const both = namesOf([
       new CompactReadOnlyHandlersGroup(context),
       new CompactModifyHandlersGroup(context),
@@ -146,6 +148,7 @@ describe('the four tool sets', () => {
           'HandlerDebugMaintain',
         ],
       },
+      { group: 'CompactDebugBatchHandlers', tools: ['HandlerDebugBatch'] },
       {
         group: 'CompactBackgroundRunHandlers',
         tools: [

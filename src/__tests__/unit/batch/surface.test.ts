@@ -16,6 +16,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { ConnectionSource } from '../../../embeddable/ConnectionContext';
+import { isBatchTool } from '../../../lib/batch/batchTools';
 import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
 import { batchSentence, eligibleSentence } from '../../../lib/batch/sentence';
 import type { ToolSetKind } from '../../../lib/config/binaries';
@@ -135,7 +136,7 @@ describe('the batch tools on the surface', () => {
       )) {
         for (const entry of group.getHandlers()) {
           const name = entry.toolDefinition.name;
-          if (!FULL_BATCH.includes(name) && name !== 'HandlerBatch') continue;
+          if (!isBatchTool(name)) continue;
           expect(
             Object.keys(entry.toolDefinition.inputSchema.properties ?? {}),
           ).not.toContain('state_handle');
@@ -161,7 +162,7 @@ describe('the batch tools on the surface', () => {
       );
       for (const tool of tools) {
         const description = tool.description ?? '';
-        if (FULL_BATCH.includes(tool.name) || tool.name === 'HandlerBatch') {
+        if (isBatchTool(tool.name)) {
           expect(description).not.toContain('In batch mode (');
           continue;
         }

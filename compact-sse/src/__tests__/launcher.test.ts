@@ -51,11 +51,11 @@ describe('mcp-abap-adt-compact-sse', () => {
     expect(stderr.join('\n')).not.toContain('--exposition=<');
   });
 
-  it("serves the compact tool set: the 29 tools, the four debugger tools, the three background-run tools and HandlerBatch — no leftover-session tool, which is stdio's", () => {
+  it("serves the compact tool set: the 29 tools, the four debugger tools, HandlerDebugBatch, the three background-run tools and HandlerBatch — no leftover-session tool, which is stdio's", () => {
     const tools = compactToolSet
       .groups({ connection: undefined as never, logger: undefined }, 'sse')
       .flatMap((group) => group.getHandlers());
-    expect(tools).toHaveLength(37);
+    expect(tools).toHaveLength(38);
     expect(
       tools
         .map((entry) => entry.toolDefinition.name)

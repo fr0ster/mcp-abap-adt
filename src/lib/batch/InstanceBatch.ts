@@ -57,11 +57,12 @@ export interface RecordedCall {
 /**
  * What a begin hands the owner: the batch connection, the late-bound target
  * it wraps (pointed by the dispatch and `BatchEnd`), and the record of its
- * calls, in number order.
+ * calls, in number order. A debugger batch wraps the stop's connection
+ * itself (`DebugSession.openBatch`), and has no target.
  */
 export interface OpenBatch {
   connection: AdtBatchConnection;
-  target: LateBoundConnection;
+  target?: LateBoundConnection;
   recorded: RecordedCall[];
 }
 
@@ -97,12 +98,7 @@ export class InstanceBatch implements StatePart {
    * answers of the last batch stay readable until this one ends.
    */
   begin(kind: BatchKind, open: OpenBatch): void {
-    const current = this.opened_;
-    if (current !== undefined) {
-      throw new ServerRefusal(
-        current.kind === kind ? 'batch_mode_on' : 'batch_mode_other',
-      );
-    }
+    this.refuseBegin(kind);
     this.opened_ = {
       kind,
       batch: open,
@@ -111,6 +107,20 @@ export class InstanceBatch implements StatePart {
       holds: undefined,
     };
     this.changed();
+  }
+
+  /**
+   * Throws the refusal a begin of `kind` meets now: `batch_mode_on` while a
+   * batch of the same kind is open, `batch_mode_other` while the other kind
+   * is; nothing while none is open.
+   */
+  refuseBegin(kind: BatchKind): void {
+    const current = this.opened_;
+    if (current !== undefined) {
+      throw new ServerRefusal(
+        current.kind === kind ? 'batch_mode_on' : 'batch_mode_other',
+      );
+    }
   }
 
   /** The open batch, or `undefined` when none is open. */
@@ -177,7 +187,7 @@ export class InstanceBatch implements StatePart {
     const current = this.opened_;
     this.opened_ = undefined;
     this.answers = undefined;
-    current?.batch.target.seal();
+    current?.batch.target?.seal();
     current?.controller.abort();
     this.changed();
   }

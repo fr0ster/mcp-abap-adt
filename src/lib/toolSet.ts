@@ -13,9 +13,9 @@
  *
  * | Set | Binaries | Tools |
  * |---|---|---|
- * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, batch mode; on stdio the leftover-session list and logoff |
+ * | {@link fullToolSet} | `mcp-abap-adt`, `-http`, `-sse` | readonly (with system and search), high, debug, background runs, batch mode, the debugger batch; on stdio the leftover-session list and logoff |
  * | {@link fullReadOnlyToolSet} | `mcp-abap-adt-ro`, `-http-ro`, `-sse-ro` | readonly (with system and search), batch mode; on stdio the leftover-session list and logoff |
- * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs, `HandlerBatch`; on stdio the leftover-session list and logoff |
+ * | `compactToolSetOf` | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the compact readonly and modify halves, the compact debugger, background runs, `HandlerBatch`, `HandlerDebugBatch`; on stdio the leftover-session list and logoff |
  * | `compactReadOnlyToolSetOf` | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the compact readonly half, `HandlerBatch`; on stdio the leftover-session list and logoff |
  *
  * **The leftover-session tools are stdio's**: the
@@ -33,7 +33,10 @@
 
 import { CompactBackgroundRunHandlersGroup } from './compact/backgroundRuns/group';
 import { CompactBatchHandlersGroup } from './compact/batch/group';
-import { CompactDebugHandlersGroup } from './compact/debug/group';
+import {
+  CompactDebugBatchHandlersGroup,
+  CompactDebugHandlersGroup,
+} from './compact/debug/group';
 import {
   type CompactEntryBuilder,
   CompactHandlersGroup,
@@ -47,6 +50,7 @@ import {
   type ToolSetKind,
 } from './config/binaries';
 import { BatchHandlersGroup } from './handlers/groups/BatchHandlersGroup.js';
+import { DebugBatchHandlersGroup } from './handlers/groups/DebugBatchHandlersGroup.js';
 import { LeftoverSessionHandlersGroup } from './handlers/groups/LeftoverSessionHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './handlers/groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from './handlers/groups/SearchHandlersGroup.js';
@@ -148,6 +152,10 @@ const COMPACT_BATCH_LINE =
   "batch mode: HandlerBatch (action 'begin', 'end', 'answers') — independent calls recorded, sent together in envelopes, answered by number";
 const DEBUG_LINE =
   'debug: the debugger tools; a breakpoint or a listener catches every request of the connected SAP user';
+const DEBUG_BATCH_LINE =
+  'the debugger batch: DebugBatchBegin, DebugBatchEnd — calls at the stopped debuggee recorded, sent together in one envelope, answered by number';
+const COMPACT_DEBUG_BATCH_LINE =
+  "the debugger batch: HandlerDebugBatch (action 'begin', 'end', 'answers') — calls at the stopped debuggee recorded, sent together in one envelope, answered by number";
 
 /**
  * The object-oriented tool set of `mcp-abap-adt`, `mcp-abap-adt-http` and
@@ -165,6 +173,7 @@ export const fullToolSet: ToolSet = {
         READONLY_LINE,
         'high: Create*, Update*, Delete*, Activate* (each a whole workflow via ADT)',
         DEBUG_LINE,
+        DEBUG_BATCH_LINE,
         ...leftoverLine(
           transport,
           'the leftover SAP sessions of an ended process: list, log off',
@@ -190,8 +199,9 @@ export const fullToolSet: ToolSet = {
         servesLeftoverSessions(transport) ||
         !(group instanceof LeftoverSessionHandlersGroup),
     ),
-    // Batch mode, on every transport.
+    // Batch mode, on every transport; the debugger batch beside the debugger.
     new BatchHandlersGroup(context),
+    new DebugBatchHandlersGroup(context),
   ],
 };
 
@@ -268,6 +278,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
         [
           'the compact tools, one per operation with the object in object_type: HandlerGet, HandlerCreate, HandlerUpdate, HandlerDelete, HandlerActivate, HandlerLock, ...',
           'the compact debugger, one request per call: HandlerDebugBreakpoints, ...Session, ...Step, ...Maintain; the breakpoints catch every request of the connected SAP user',
+          COMPACT_DEBUG_BATCH_LINE,
           ...leftoverLine(
             transport,
             'the leftover SAP sessions of an ended process: list, log off',
@@ -284,6 +295,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
     groups: (context, transport) => [
       new CompactHandlersGroup(context, [halves.readOnly, halves.modify]),
       new CompactDebugHandlersGroup(context),
+      new CompactDebugBatchHandlersGroup(context),
       // Beside the run tool (HandlerProfileRun): its background runs, read,
       // listed and discarded.
       new CompactBackgroundRunHandlersGroup(context),

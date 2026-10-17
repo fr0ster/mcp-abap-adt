@@ -12,6 +12,7 @@
  */
 import {
   type AbapDebugger,
+  AdtBatchConnection,
   type abapDebuggerDocuments,
   type IDebuggerListenerConflict,
   readListenerConflict,
@@ -33,6 +34,7 @@ import type {
   IDebuggerStepToLineMethod,
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   type FailureEntry,
   isCredentialFailure,
@@ -400,6 +402,59 @@ function listenerError(
     step,
   );
 }
+
+/** A stack answer read into `stop`'s view — a new view; the stop's own is the caller's to replace. */
+function stackView(
+  stop: Stop,
+  stack: IAdtResponse<string>,
+): DebugView<StopView> {
+  if (!stack.ok) {
+    throw failedAt(
+      new DebugRequestError(messageOf(stack)),
+      stack,
+      'read stack',
+    );
+  }
+  const view: StopView = {
+    ...stop.view,
+    stack: readStack(bodyOf(stack)),
+    stackError: undefined,
+    raw: { ...stop.view.raw, stack: bodyOf(stack) },
+  };
+  return { value: view, raw: bodyOf(stack) };
+}
+
+/** A variables answer, read; its failure at `step`. */
+function variablesView(
+  answer: IAdtResponse<string>,
+  step: string,
+): DebugView<VariablesReading> {
+  if (!answer.ok) {
+    throw failedAt(new DebugRequestError(messageOf(answer)), answer, step);
+  }
+  return { value: readVariables(bodyOf(answer)), raw: bodyOf(answer) };
+}
+
+/** A stack position answer: the position asked; its failure at `set stack position`. */
+function positionView(
+  answer: IAdtResponse<unknown>,
+  position: number,
+): DebugView<{ position: number }> {
+  if (!answer.ok)
+    throw failedAt(
+      new DebugRequestError(messageOf(answer)),
+      answer,
+      'set stack position',
+    );
+  return { value: { position }, raw: bodyOf(answer) };
+}
+
+const readVariablesOf = (d: Debugger, names: string[]) =>
+  d.getVariables(names.map((n) => n.toUpperCase()));
+const readChildVariablesOf = (d: Debugger, parents: string[]) =>
+  d.getChildVariables(parents.map((n) => n.toUpperCase()));
+const writeVariableOf = (d: Debugger, name: string, value: string) =>
+  d.setVariableValue(name.toUpperCase(), value);
 
 export class DebugSession<O = unknown> {
   protected readonly serial = new Serial();
@@ -1333,21 +1388,9 @@ export class DebugSession<O = unknown> {
   getStack(): Promise<DebugView<StopView>> {
     return this.mutate(async () => {
       const stop = this.requireStop();
-      const stack = await stop.debugger.getStack();
-      if (!stack.ok) {
-        throw failedAt(
-          new DebugRequestError(messageOf(stack)),
-          stack,
-          'read stack',
-        );
-      }
-      stop.view = {
-        ...stop.view,
-        stack: readStack(bodyOf(stack)),
-        stackError: undefined,
-        raw: { ...stop.view.raw, stack: bodyOf(stack) },
-      };
-      return { value: stop.view, raw: bodyOf(stack) };
+      const read = stackView(stop, await stop.debugger.getStack());
+      stop.view = read.value;
+      return read;
     });
   }
 
@@ -1383,27 +1426,121 @@ export class DebugSession<O = unknown> {
     step: string,
     call: (d: Debugger) => Promise<IAdtResponse<string>>,
   ): Promise<DebugView<VariablesReading>> {
-    return this.mutate(async () => {
-      const answer = await call(this.requireStop().debugger);
-      if (!answer.ok) {
-        throw failedAt(new DebugRequestError(messageOf(answer)), answer, step);
-      }
-      return { value: readVariables(bodyOf(answer)), raw: bodyOf(answer) };
-    });
+    return this.mutate(async () =>
+      variablesView(await call(this.requireStop().debugger), step),
+    );
   }
   getVariables(names: string[]) {
-    return this.variables('read variables', (d) =>
-      d.getVariables(names.map((n) => n.toUpperCase())),
-    );
+    return this.variables('read variables', (d) => readVariablesOf(d, names));
   }
   getChildVariables(parents: string[]) {
     return this.variables('read child variables', (d) =>
-      d.getChildVariables(parents.map((n) => n.toUpperCase())),
+      readChildVariablesOf(d, parents),
     );
   }
   setVariable(name: string, value: string) {
     return this.variables('set variable', (d) =>
-      d.setVariableValue(name.toUpperCase(), value),
+      writeVariableOf(d, name, value),
+    );
+  }
+
+  // --- the debugger batch (spec §7) ---------------------------------------------
+  /**
+   * The debugger batch of the stop: an `AdtBatchConnection` with endpoint
+   * `debugger` over the stop's connection — the attached stateful session —
+   * whose envelope goes out on it. Sends nothing; refused with no stop.
+   */
+  openBatch(options: { logger?: ILogger } = {}): AdtBatchConnection {
+    const stop = this.requireStop();
+    return new AdtBatchConnection(stop.connection, {
+      endpoint: 'debugger',
+      ...(options.logger !== undefined ? { logger: options.logger } : {}),
+    });
+  }
+
+  /**
+   * The batch path: each `record…` checks there is a stop and sends its one
+   * request on a fresh debugger over `recorder` — a per-call recorder of the
+   * debugger batch — so the request is recorded and its answer comes when
+   * the batch is sent. It runs outside the serial: the second recorded call
+   * records while the first waits for its answer. Nothing of the stop
+   * changes: its view and its connection stay as they are, whatever the
+   * answer says.
+   */
+  private batchDebugger(recorder: IAbapConnection): {
+    stop: Stop;
+    debugger: Debugger;
+  } {
+    const stop = this.requireStop();
+    return { stop, debugger: this.ports.abapDebugger(recorder, this.mode) };
+  }
+  /** Batch path: a step, answered with SAP's step result, or the end it reports. */
+  async recordStep(
+    recorder: IAbapConnection,
+    method: IDebuggerStepMethod,
+  ): Promise<DebugView<OnceStep>> {
+    const { stop, debugger: dbg } = this.batchDebugger(recorder);
+    return this.afterStepOnce(
+      stop,
+      await dbg.step(method, { analyse: analyseDebuggeeEnd }),
+      'step',
+    );
+  }
+  /** Batch path: run or jump to the line `uri` names. */
+  async recordStepToLine(
+    recorder: IAbapConnection,
+    method: IDebuggerStepToLineMethod,
+    uri: string,
+  ): Promise<DebugView<OnceStep>> {
+    const { stop, debugger: dbg } = this.batchDebugger(recorder);
+    return this.afterStepOnce(
+      stop,
+      await dbg.stepToLine(method, uri, { analyse: analyseDebuggeeEnd }),
+      'step to line',
+    );
+  }
+  /** Batch path: the stack, answered in the stop's view; the stop's own view stays. */
+  async recordStack(recorder: IAbapConnection): Promise<DebugView<StopView>> {
+    const { stop, debugger: dbg } = this.batchDebugger(recorder);
+    return stackView(stop, await dbg.getStack());
+  }
+  /** Batch path: the variables by name. */
+  async recordVariables(
+    recorder: IAbapConnection,
+    names: string[],
+  ): Promise<DebugView<VariablesReading>> {
+    const { debugger: dbg } = this.batchDebugger(recorder);
+    return variablesView(await readVariablesOf(dbg, names), 'read variables');
+  }
+  /** Batch path: the members of `parents`. */
+  async recordChildVariables(
+    recorder: IAbapConnection,
+    parents: string[],
+  ): Promise<DebugView<VariablesReading>> {
+    const { debugger: dbg } = this.batchDebugger(recorder);
+    return variablesView(
+      await readChildVariablesOf(dbg, parents),
+      'read child variables',
+    );
+  }
+  /** Batch path: the frame variables are read in. */
+  async recordStackPosition(
+    recorder: IAbapConnection,
+    position: number,
+  ): Promise<DebugView<{ position: number }>> {
+    const { debugger: dbg } = this.batchDebugger(recorder);
+    return positionView(await dbg.setStackPosition(position), position);
+  }
+  /** Batch path: a variable set to `value`. */
+  async recordSetVariable(
+    recorder: IAbapConnection,
+    name: string,
+    value: string,
+  ): Promise<DebugView<VariablesReading>> {
+    const { debugger: dbg } = this.batchDebugger(recorder);
+    return variablesView(
+      await writeVariableOf(dbg, name, value),
+      'set variable',
     );
   }
 
@@ -1737,17 +1874,12 @@ export class DebugSession<O = unknown> {
   setStackPositionOnce(
     position: number,
   ): Promise<DebugView<{ position: number }>> {
-    return this.mutate(async () => {
-      const stop = this.requireStop();
-      const answer = await stop.debugger.setStackPosition(position);
-      if (!answer.ok)
-        throw failedAt(
-          new DebugRequestError(messageOf(answer)),
-          answer,
-          'set stack position',
-        );
-      return { value: { position }, raw: bodyOf(answer) };
-    });
+    return this.mutate(async () =>
+      positionView(
+        await this.requireStop().debugger.setStackPosition(position),
+        position,
+      ),
+    );
   }
 
   /** One request: `detachDebugger` without an id, on the attaching session — the debuggee runs on. */

@@ -16,7 +16,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.',
+    'Read an ABAP package in one request: its ADT metadata document (description, super-package, sub-packages, ...), active or inactive version. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -59,11 +59,10 @@ export async function handleGetPackage(
 
   // A package is a container: it has no source of its own —
   // `IPackageContract` composes `IAdtMetadataReadable` and nothing else, so
-  // unlike its siblings there is no `.read()` to call at all (same
-  // defect/fix as `ReadPackage`). Unlike Domain, DataElement and
+  // unlike its siblings there is no `.read()` to call at all. Unlike Domain, DataElement and
   // FunctionGroup, `AdtPackage` actually honours `version` — it forwards
-  // `options.version` into the query string — so it is passed through here,
-  // the same fix `ReadPackage` carries (task 11 fix round 1).
+  // `options.version` into the query string — so it is passed through here
+  // (task 11 fix round 1).
   return answer(
     { tool: 'GetPackage', detail },
     () =>
@@ -72,11 +71,13 @@ export async function handleGetPackage(
       success: true,
       package_name: packageName,
       version,
-      ...(detail === 'raw'
-        ? { package_data: metadata.raw }
-        : detail === 'full'
-          ? { package: packageDetails(metadata.raw) }
-          : { package: packageSummary(metadata.raw) }),
+      part: 'metadata',
+      metadata:
+        detail === 'raw'
+          ? metadata.raw
+          : detail === 'full'
+            ? packageDetails(metadata.raw)
+            : packageSummary(metadata.raw),
     }),
   );
 }

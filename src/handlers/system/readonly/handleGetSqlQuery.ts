@@ -2,6 +2,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -36,11 +37,13 @@ export interface SqlQueryResponse {
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries.',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       sql_query: {
         type: 'string',
         description: 'SQL query to execute',

@@ -1,6 +1,13 @@
 // src/handlers/debugger/debug/handleDebugStepToLine.ts
-import { requireDebugger } from '../../../lib/debugger/access';
-import { debugStateAnswer } from '../../../lib/debugger/answer';
+import {
+  debugBatchRecorder,
+  requireDebugger,
+} from '../../../lib/debugger/access';
+import {
+  debugAnswer,
+  debugStateAnswer,
+  terseOnceStep,
+} from '../../../lib/debugger/answer';
 import { lineUriOf } from '../../../lib/debugger/objectUri';
 import {
   LINE_TARGET_PROPERTIES,
@@ -35,9 +42,24 @@ export async function handleDebugStepToLine(
   context: HandlerContext,
   args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
 ) {
+  const method = args.mode === 'jump' ? 'stepJumpToLine' : 'stepRunToLine';
+  const recorder = debugBatchRecorder(context);
+  if (recorder !== undefined) {
+    // Recorded in the debugger batch: the move's own request alone.
+    return debugAnswer(
+      args,
+      async () =>
+        requireDebugger(context, args, 'use').abap.recordStepToLine(
+          recorder,
+          method,
+          lineUriOf(args, args.line),
+        ),
+      terseOnceStep,
+    );
+  }
   return debugStateAnswer(args, async () =>
     requireDebugger(context, args, 'use').abap.stepToLine(
-      args.mode === 'jump' ? 'stepJumpToLine' : 'stepRunToLine',
+      method,
       lineUriOf(args, args.line),
     ),
   );

@@ -87,7 +87,7 @@ Windows it warns when `System32` holds `sapnwrfc.dll`, which Windows could load 
 Unpack the archive anywhere and start it as an MCP client would start the npm server:
 
 ```bash
-mcp-abap-adt --env-path=<your .env>
+mcp-abap-adt --env-path=<your .env> --system-type=<onprem|cloud>
 ```
 
 Everything else — destinations, `.env`, authentications, HTTP/SSE transports — is the npm server's: see

@@ -223,7 +223,7 @@ describe('the failure payload carries everything it has', () => {
           response: { data: document },
         } as never),
         project,
-        { tool: 'ReadClass', detail },
+        { tool: 'GetClass', detail },
       );
       expect(JSON.parse(result.content[0].text).raw_body).toBe(document);
     },
@@ -239,7 +239,7 @@ describe('the failure payload carries everything it has', () => {
     const result = return_answer(
       failure({ message: 'Nope', origin: 'refusal', ...extra } as never),
       project,
-      { tool: 'ReadClass', detail: 'raw' },
+      { tool: 'GetClass', detail: 'raw' },
     );
     expect('raw_body' in JSON.parse(result.content[0].text)).toBe(false);
   });

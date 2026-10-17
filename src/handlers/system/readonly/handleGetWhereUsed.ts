@@ -18,11 +18,13 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import { answer } from '../../../lib/answer';
+import { answer, answerFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { withStep } from '../../../lib/strategies/step';
 import {
   fetchWhereUsedReferences,
   type WhereUsedListResult,
@@ -32,11 +34,13 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Where-used list of an ABAP object: every object that uses, calls or references it, with its type and package.',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       object_name: {
         type: 'string',
         description:
@@ -117,7 +121,10 @@ export async function handleGetWhereUsed(
       { analyse: analyseException },
     );
     if (!scopeResponse.ok) {
-      return return_error(scopeResponse.getError().message);
+      return answerFailure(
+        withStep(scopeResponse.getError(), 'read where-used scope'),
+        { tool: 'GetWhereUsed', detail: 'terse' },
+      );
     }
     const scopeXml = scopeResponse.getResult().value?.raw ?? '';
     const available = new Set<string>(

@@ -9,6 +9,7 @@ import {
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
+import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
@@ -94,4 +95,16 @@ export async function handleGetCdsUnitTestResult(
             message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; no result to fetch yet.`,
           },
   );
+}
+
+/**
+ * Compact: the run's result read once — `getResult` alone, answered as SAP
+ * gave it (`readResultOnce`). The run's status is the caller's to read.
+ */
+export async function handleGetCdsUnitTestResultOnce(
+  context: HandlerContext,
+  args: ResultOnceArgs,
+  tool = 'HandlerCdsUnitTestResult',
+) {
+  return readResultOnce(context, tool, 'read CDS unit test result', args);
 }

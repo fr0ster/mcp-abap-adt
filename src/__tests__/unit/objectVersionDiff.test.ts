@@ -172,7 +172,7 @@ describe('version diff tools (#30)', () => {
     expect(payload.origin).toBe('refusal');
   });
 
-  it('per-object GetClassVersionDiff returns clean error on UNSUPPORTED_OPERATION', async () => {
+  it('per-object GetClassVersionDiff answers the error of the read as it is, with its step', async () => {
     // `objectVersionTools.ts` (untouched by this task) still catches
     // `buildVersionDiff`'s throw and reads `.code` off it directly — a plain
     // reject here exercises exactly that path, same as before this migration.
@@ -190,9 +190,12 @@ describe('version diff tools (#30)', () => {
     expect(result.isError).toBe(true);
     const errText =
       (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
-    expect(errText).toContain('not supported');
     expect(errText).not.toContain('stack');
-    expect(errText).not.toContain('ADT_UNSUPPORTED_OPERATION');
+    const payload = JSON.parse(errText);
+    expect(payload.message).toBe('version diff not available');
+    expect(payload.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(payload.origin).toBe('refusal');
+    expect(payload.step).toBe('read version source (from)');
   });
 
   it('the factory builds 9 VersionDiff tools (27 total) and they register in High', () => {

@@ -15,8 +15,8 @@
  */
 
 import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
+import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
-import { handleDeleteProgram } from '../../../../handlers/program/low/handleDeleteProgram';
 import { getTimeout } from '../../helpers/configHelpers';
 import { HighTester } from '../../helpers/testers/HighTester';
 

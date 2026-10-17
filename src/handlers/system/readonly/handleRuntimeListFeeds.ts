@@ -7,6 +7,7 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
   FEED_ENTRIES_CEILING,
   FEED_PAGE_DEFAULT,
@@ -17,16 +18,19 @@ import {
 } from '../../../lib/strategies/feedPages';
 import { feedVariantsOf } from '../../../lib/strategies/feedVariants';
 import { ourFeeds } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request.',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       feed_type: {
         type: 'string',
         enum: [
@@ -340,5 +344,124 @@ export async function handleRuntimeListFeeds(
         new Error(`Unknown feed_type: ${String(exhaustive)}`),
       );
     }
+  }
+}
+
+/** The most entries SAP answers in one request (measured). */
+export const FEED_PAGE_CAP = FEED_PAGE_MAX;
+
+const PAGE_FEEDS = {
+  dumps: 'read dumps',
+  system_messages: 'read system messages',
+  gateway_errors: 'read gateway errors',
+} as const;
+
+/**
+ * Compact: one page of a runtime feed — one request, answered as SAP gave it.
+ * `top` is the request's `$top` (at most {@link FEED_PAGE_CAP}), `to` its
+ * upper bound, and `next_to` the `to` of SAP's next link as it came; the
+ * next link's page starts at the boundary second, inclusive.
+ */
+export async function handleRuntimeListFeedPage(
+  context: HandlerContext,
+  args: Omit<RuntimeListFeedsArgs, 'feed_type'> & {
+    feed_type?: keyof typeof PAGE_FEEDS;
+    top?: number;
+  },
+  tool = 'HandlerDumpList',
+) {
+  const { connection, logger } = context;
+  const feedType = args?.feed_type ?? 'dumps';
+  const step = PAGE_FEEDS[feedType];
+  if (!step) {
+    return return_error(new Error(`Unknown feed_type: ${String(feedType)}`));
+  }
+  const top = args?.top;
+  if (
+    top !== undefined &&
+    (typeof top !== 'number' ||
+      !Number.isInteger(top) ||
+      top < 1 ||
+      top > FEED_PAGE_CAP)
+  ) {
+    return return_error(
+      new Error(
+        `top must be a whole number from 1 to ${FEED_PAGE_CAP}, the most entries SAP answers in one request; read on with the next_to of the answer as to.`,
+      ),
+    );
+  }
+  const dumpOnly = DUMP_FILTERS.filter(
+    ([param]) => param !== 'user' && args?.[param]?.trim(),
+  ).map(([param]) => param);
+  if (feedType !== 'dumps' && dumpOnly.length > 0) {
+    return return_error(
+      new Error(
+        `${dumpOnly.join(', ')} filter the dumps feed; feed_type is ${feedType}.`,
+      ),
+    );
+  }
+  let query: string | undefined;
+  try {
+    query = feedType === 'dumps' ? dumpQueryOf(args ?? {}) : undefined;
+  } catch (thrown) {
+    return return_error(thrown as Error);
+  }
+  const base = { user: args?.user, query, from: args?.from };
+  const page = { maxResults: top, to: args?.to };
+  const feeds = pagedFeeds(connection, logger);
+  const ctx = { tool, detail: 'terse' as const };
+  const shown = (read: FeedPage<unknown>) => {
+    const answered: Record<string, unknown> = {
+      success: true,
+      feed_type: feedType,
+      count: read.entries.length,
+      entries: read.entries,
+    };
+    if (read.next_to) answered.next_to = read.next_to;
+    return answered;
+  };
+  switch (feedType) {
+    case 'dumps':
+      return answer(
+        ctx,
+        () =>
+          atStep(step, () =>
+            feeds.dumps({ ...base, ...page, analyse: analyseException }),
+          )() as never,
+        (read: FeedPage<{ id: string }>) =>
+          shown({
+            ...read,
+            entries: read.entries.map((entry) => ({
+              dump_id: dumpIdOf(entry.id),
+              ...entry,
+            })),
+          }),
+      );
+    case 'system_messages':
+      return answer(
+        ctx,
+        () =>
+          atStep(step, () =>
+            feeds.systemMessages({
+              ...base,
+              ...page,
+              analyse: analyseException,
+            }),
+          )() as never,
+        shown,
+      );
+    default:
+      return answer(
+        ctx,
+        () =>
+          atStep(step, () =>
+            feeds.gatewayErrors({
+              ...base,
+              ...page,
+              analyse: analyseException,
+            }),
+          )() as never,
+        shown,
+      );
   }
 }

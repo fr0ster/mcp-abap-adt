@@ -1,4 +1,12 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
+import type { HandlerContext } from '../../handlers/interfaces';
+import { isCredentialFailure } from '../answer';
+import { failureOf } from '../auth/failures';
+import { type PhaseResult, runPhase } from '../batch/phases';
+import { carryingFailure } from './step';
 
 /**
  * The one call this walk needs, named structurally.
@@ -12,8 +20,82 @@ export interface NodeStructureSource {
   fetchNodeStructure(
     parentType: string,
     parentName: string,
-    options?: { nodeId?: string; withShortDescriptions?: boolean },
+    options?: {
+      nodeId?: string;
+      withShortDescriptions?: boolean;
+      analyse?: typeof analyseException;
+    },
   ): Promise<unknown>;
+}
+
+/** Reads every item of one level; each item's settlement, in item order. */
+export type LevelReader<I, R> = (
+  items: readonly I[],
+) => Promise<PhaseResult<R>[]>;
+
+/**
+ * One level's reads in one ADT batch envelope (spec §11): `read(item,
+ * connection)` for every item, on the phase's batch connection (`runPhase`).
+ */
+export function batchReader<I, R>(
+  context: HandlerContext,
+  read: (item: I, connection: IAbapConnection) => Promise<R>,
+): LevelReader<I, R> {
+  return (items) => runPhase(context, items, read);
+}
+
+/**
+ * Whether a root's failure ends a call that reads several roots: a failure
+ * the server's reader answers (a chain failure, the server's own refusal), or
+ * a credential failure — a `401` SAP answered included (`isCredentialFailure`).
+ */
+export function endsTheCall(thrown: unknown): boolean {
+  return failureOf(thrown) !== undefined || isCredentialFailure(thrown);
+}
+
+/**
+ * The sequential version of a call that reads several roots (spec §11: the
+ * handler's own code path, where the destination has no communication
+ * batch): `read(root)` for one root after another; each root's settlement,
+ * in order. A failure that ends the call (`endsTheCall`) is thrown as it
+ * came, and no root after it is read.
+ */
+export async function rootByRoot<I, R>(
+  roots: readonly I[],
+  read: (root: I) => Promise<R>,
+): Promise<PhaseResult<R>[]> {
+  const out: PhaseResult<R>[] = [];
+  for (const root of roots) {
+    try {
+      out.push({ ok: true, value: await read(root) });
+    } catch (error) {
+      if (endsTheCall(error)) throw error;
+      out.push({ ok: false, error });
+    }
+  }
+  return out;
+}
+
+/** One node structure request of a walk. */
+export interface NodeRequest {
+  parentType: string;
+  parentName: string;
+  nodeId?: string;
+  withShortDescriptions: boolean;
+  /** Read with `analyseException`: a refusal answered as `ok: false`. */
+  analysed?: boolean;
+}
+
+/** `request` read on `utils`: one `fetchNodeStructure`. */
+export function readNode(
+  utils: NodeStructureSource,
+  request: NodeRequest,
+): Promise<unknown> {
+  return utils.fetchNodeStructure(request.parentType, request.parentName, {
+    ...(request.analysed ? { analyse: analyseException } : {}),
+    ...(request.nodeId !== undefined ? { nodeId: request.nodeId } : {}),
+    withShortDescriptions: request.withShortDescriptions,
+  });
 }
 
 /**
@@ -121,8 +203,19 @@ function levelOf(answer: unknown): NodeLevel {
     getResult?: () => { value: unknown };
     data?: unknown;
   };
+  if (a?.ok === false) {
+    const error = (answer as { getError: () => IAdtError }).getError();
+    // A level that is not there stays what it was: empty. Any other refusal
+    // is the method's error as it is, with the step — not an empty level that
+    // reads as "nothing here".
+    if (error?.response?.status === 404) return { objects: [], childNodes: [] };
+    throw carryingFailure(
+      new Error(error.message),
+      error,
+      'read package node structure',
+    );
+  }
   if (typeof a?.getResult === 'function') {
-    if (a.ok === false) return { objects: [], childNodes: [] };
     const value = a.getResult().value;
     // The injected reading may be ours, the library's own, or the raw wire;
     // each is recognised by what it carries, never assumed. Having
@@ -318,6 +411,145 @@ export interface WalkOptions {
   includeSubpackages?: boolean;
   maxDepth?: number;
   includeDescriptions?: boolean;
+}
+
+/** A package of a walk: what was found in it, and the subpackages walked from it. */
+interface PackageWalk {
+  root: number;
+  name: string;
+  depth: number;
+  found: WalkedItem[];
+  subs: PackageWalk[];
+}
+
+function flatten(walk: PackageWalk): WalkedItem[] {
+  return [...walk.found, ...walk.subs.flatMap(flatten)];
+}
+
+/**
+ * Every object in each package of `packageNames`, walked one level at a time
+ * (spec §11): per level, (a) the root node structure of every package of the
+ * level, read together; (b) every type node those roots list, read together;
+ * the next level is the subpackages found — walked only when asked for, and
+ * never past `maxDepth`. `read` reads one level's requests in one envelope
+ * (`batchReader`): no request of a level needs another's answer. Where the
+ * destination has no communication batch the handler runs `walkPackage`.
+ *
+ * One settlement per package asked, in the order asked: its objects — the
+ * package's own, then those of each subpackage walked from it, depth first —
+ * or its failure: the first refused read of its walk (a level that is not
+ * there, `404`, stays empty); a credential failure (a `401` SAP answered
+ * included) ends the walk, thrown as it came. `roots`: the first level's root answers, when
+ * the caller read them already in a phase of its own.
+ */
+export async function walkPackages(
+  read: LevelReader<NodeRequest, unknown>,
+  packageNames: readonly string[],
+  options: WalkOptions = {},
+  roots?: readonly PhaseResult<unknown>[],
+): Promise<PhaseResult<WalkedItem[]>[]> {
+  const withShortDescriptions = options.includeDescriptions !== false;
+  const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
+  const failures = new Map<number, unknown>();
+  const seen = packageNames.map((name) => new Set([name.toUpperCase()]));
+  const walks: PackageWalk[] = packageNames.map((name, root) => ({
+    root,
+    name: name.toUpperCase(),
+    depth: 1,
+    found: [],
+    subs: [],
+  }));
+
+  /** The level an answer carries, or undefined once its package failed. */
+  const settle = (
+    walk: PackageWalk,
+    result: PhaseResult<unknown>,
+  ): NodeLevel | undefined => {
+    if (failures.has(walk.root)) return undefined;
+    try {
+      if (!result.ok) throw result.error;
+      return levelOf(result.value);
+    } catch (error) {
+      // A credential failure is every root's: it ends the walk as it came.
+      if (endsTheCall(error)) throw error;
+      failures.set(walk.root, error);
+      return undefined;
+    }
+  };
+  const alive = (walk: PackageWalk) => !failures.has(walk.root);
+
+  let level = walks;
+  let first = roots;
+  while (level.length > 0) {
+    const rootAnswers =
+      first ??
+      (await read(
+        level.map((walk) => ({
+          parentType: 'DEVC/K',
+          parentName: walk.name,
+          withShortDescriptions,
+        })),
+      ));
+    first = undefined;
+    const typeNodes: Array<{ walk: PackageWalk; nodeId: string }> = [];
+    level.forEach((walk, i) => {
+      const root = settle(walk, rootAnswers[i]);
+      if (root === undefined) return;
+      walk.found.push(
+        ...root.objects.map((o) => ({ ...o, packageName: walk.name })),
+      );
+      for (const child of root.childNodes) {
+        typeNodes.push({ walk, nodeId: child.nodeId });
+      }
+    });
+
+    if (typeNodes.length > 0) {
+      const typeAnswers = await read(
+        typeNodes.map(({ walk, nodeId }) => ({
+          parentType: 'DEVC/K',
+          parentName: walk.name,
+          nodeId,
+          withShortDescriptions,
+        })),
+      );
+      typeNodes.forEach(({ walk }, i) => {
+        const typed = settle(walk, typeAnswers[i]);
+        if (typed === undefined) return;
+        walk.found.push(
+          ...typed.objects.map((o) => ({ ...o, packageName: walk.name })),
+        );
+      });
+    }
+
+    if (!options.includeSubpackages) break;
+    const next: PackageWalk[] = [];
+    for (const walk of level) {
+      if (!alive(walk) || walk.depth >= limit) continue;
+      for (const item of walk.found) {
+        if (kindOf(item.type) !== 'package') continue;
+        const name = item.name.toUpperCase();
+        const own = seen[walk.root] as Set<string>;
+        if (own.has(name)) continue;
+        own.add(name);
+        const sub: PackageWalk = {
+          root: walk.root,
+          name,
+          depth: walk.depth + 1,
+          found: [],
+          subs: [],
+        };
+        walk.subs.push(sub);
+        next.push(sub);
+      }
+    }
+    level = next.filter(alive);
+  }
+
+  return walks.map((walk) =>
+    failures.has(walk.root)
+      ? { ok: false, error: failures.get(walk.root) }
+      : { ok: true, value: flatten(walk) },
+  );
 }
 
 /**

@@ -28,6 +28,7 @@
  */
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtReading } from './reading';
+import { withStep } from './step';
 
 /** What a run answered, once it stopped running. */
 export interface ActivationRunOutcome {
@@ -41,6 +42,12 @@ export interface ActivationRunOutcome {
   messages: ActivationMessage[];
   /** The results document, for a caller that wants it verbatim. */
   results?: string;
+  /**
+   * Reading the run or its results failed: the method's error as it is, with
+   * its step (`read activation run`, `read activation results`). The run's
+   * outcome is then unknown, not "no messages".
+   */
+  failure?: IAdtError;
 }
 
 export interface ActivationMessage {
@@ -64,7 +71,11 @@ export interface ActivationRunSource {
 /** A status that ends the wait. Anything else is progress. */
 const SETTLED = new Set(['finished', 'error', 'failed']);
 
-function readingOf(value: unknown): { parsed: unknown; raw: string } {
+/** A reading's parse and its document as it came, from a reading or a bare value. */
+export function readingOf(value: unknown): {
+  parsed: unknown;
+  raw: string;
+} {
   const reading = value as { value?: unknown; raw?: unknown } | null;
   if (
     reading !== null &&
@@ -177,8 +188,9 @@ export function isRefusal(message: ActivationMessage): boolean {
  * and only one of them is the caller's problem.
  *
  * Never throws for a refusal: a refused `getActivationRun` or
- * `getActivationResults` comes back in the outcome's `messages`, so one caller
- * can log them and another can fail on them.
+ * `getActivationResults` comes back as the outcome's `failure` — the method's
+ * error as it is, with its step — never folded into `messages`, which are
+ * SAP's messages about the run.
  */
 export async function awaitActivationRun(
   utils: ActivationRunSource,
@@ -212,12 +224,8 @@ export async function awaitActivationRun(
         runId,
         status,
         settled: false,
-        messages: [
-          {
-            type: 'E',
-            text: `Reading activation run ${runId} was refused: ${answered.getError().message}`,
-          },
-        ],
+        messages: [],
+        failure: withStep(answered.getError(), 'read activation run'),
       };
     }
     status = runStatusOf(answered.getResult().value);
@@ -235,12 +243,8 @@ export async function awaitActivationRun(
       runId,
       status,
       settled: SETTLED.has(status),
-      messages: [
-        {
-          type: 'E',
-          text: `Reading the results of activation run ${runId} was refused: ${produced.getError().message}`,
-        },
-      ],
+      messages: [],
+      failure: withStep(produced.getError(), 'read activation results'),
     };
   }
   const value = produced.getResult().value;

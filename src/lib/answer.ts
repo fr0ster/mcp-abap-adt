@@ -5,12 +5,21 @@
  * injected strategies. Turning either half into an MCP result is this file's job, and
  * only this file's: a handler that did it itself would repeat four lines per tool and
  * throw away everything the error contract carries.
- *
- * See docs/superpowers/specs/2026-09-08-result-error-strategies-design.md.
  */
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  ADT_NO_FAILURE,
+  type IAdtError,
+  type IAdtResponse,
+} from '@mcp-abap-adt/interfaces-adt';
+import {
+  answerRead,
+  failurePayload as chainFailurePayload,
+} from './auth/answerFailure';
+import { failureOf } from './auth/failures';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
+import { methodFailureOf, stepOf, withStep } from './strategies/step';
 import {
   isSystemContextRefusal,
   SystemContextMissingError,
@@ -67,6 +76,9 @@ function local(
   ) {
     payload.operation = 'succeeded';
   }
+  // The step the handler was doing when it threw (`atStep`).
+  const step = stepOf(thrown);
+  if (step !== undefined) payload.step = step;
 
   return json(payload, true);
 }
@@ -96,13 +108,21 @@ interface MessageCarrier {
  * circular references, and its body is reachable as `raw_body` at
  * `detail: 'raw'`.
  */
-function failurePayload(
+export function failurePayload(
   error: IAdtError & MessageCarrier,
 ): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     message: error.message,
     origin: error.origin,
   };
+  // Where the error arose, added by the handler (`atStep`) — beside the
+  // method's error, never in place of any of it.
+  const step = stepOf(error);
+  if (step !== undefined) payload.step = step;
+  // The status SAP answered with, when SAP answered: what tells a refusal by
+  // SAP from a failure with no answer behind it (no status, no `raw_body`).
+  const status = (error.response as { status?: unknown } | undefined)?.status;
+  if (typeof status === 'number') payload.status = status;
   if (error.code !== undefined) payload.code = error.code;
   if (error.adtType !== undefined) payload.adt_type = error.adtType;
   if (error.namespace !== undefined) payload.namespace = error.namespace;
@@ -158,19 +178,156 @@ function failurePayload(
   return payload;
 }
 
+/**
+ * A method's failed answer, as the consumer gets it: the method's error as it
+ * is, plus the step it arose at when the handler named one. The one rendering
+ * every handler shares — `return_answer` and a handler that works by throws
+ * (`methodFailureOf`) alike.
+ */
+export function answerFailure(
+  failed: IAdtError,
+  ctx?: AnswerContext,
+): McpResult {
+  const error = failed as IAdtError & MessageCarrier;
+  // A failure that carries a refusal: answered as the chain
+  // made it, never rebuilt from the error's message.
+  const read = failureOf(error);
+  if (read !== undefined) return answerRead(read);
+  // Refused here, before any request: not a claim about the server.
+  if (ctx !== undefined && isSystemContextRefusal(error.message)) {
+    return local('system_context_missing', ctx, error.message);
+  }
+  return json(failurePayload(error), true);
+}
+
+/**
+ * One failure as an entry of a list — several failures in one answer (a
+ * batch's items, a cleanup's steps): the payload the consumer gets for that
+ * failure alone, with its step. A chain failure is its own payload,
+ * never the method's message.
+ */
+export type FailureEntry = Record<string, unknown>;
+
+/** A method's failed answer as an entry: its error as it is, with the step. */
+export function failureEntry(failed: IAdtError, step: string): FailureEntry {
+  const read = failureOf(failed);
+  if (read !== undefined) return { ...chainFailurePayload(read), step };
+  return failurePayload(withStep(failed, step) as IAdtError & MessageCarrier);
+}
+
+/**
+ * A throw as an entry: a carried method error as it is, a chain failure as
+ * its own payload, anything else the method's own failure — `client_threw`,
+ * never dressed as SAP's answer.
+ */
+export function thrownEntry(thrown: unknown, step: string): FailureEntry {
+  const read = failureOf(thrown);
+  if (read !== undefined) return { ...chainFailurePayload(read), step };
+  const carried = methodFailureOf(thrown);
+  if (carried !== undefined) return failureEntry(carried, step);
+  return { error: 'client_threw', message: messageOf(thrown), step };
+}
+
+/**
+ * Whether a failure is a credential failure — the credentials are the same
+ * for every item of a batch, so it ends the call instead of being one item's
+ * answer: a chain failure (`authentication_failed`), or a `401` SAP answered.
+ */
+export function isCredentialFailure(thrown: unknown): boolean {
+  if (failureOf(thrown)?.error === 'authentication_failed') return true;
+  const carried = methodFailureOf(thrown);
+  return (
+    (carried?.response as { status?: unknown } | undefined)?.status === 401
+  );
+}
+
+/**
+ * The catch of a best-effort call (a wait for a write to be visible): a
+ * credential failure is rethrown as it came — every further request would be
+ * refused again, so the tool's call ends with it; anything else is dropped.
+ */
+export function unlessCredentialFailure(thrown: unknown): undefined {
+  if (isCredentialFailure(thrown)) throw thrown;
+  return undefined;
+}
+
+/** A failed payload (a delegated handler's answer) that is a credential failure. */
+export function isCredentialPayload(payload: FailureEntry): boolean {
+  return payload.error === 'authentication_failed' || payload.status === 401;
+}
+
+/**
+ * A delegated handler's failed answer as an entry: its payload as it is,
+ * with the step added unless it names one. `undefined` for a success or an
+ * answer whose text is not a JSON object.
+ */
+export function failedPayloadOf(
+  result: { isError?: boolean; content?: unknown } | undefined,
+  step: string,
+): FailureEntry | undefined {
+  if (result?.isError !== true || !Array.isArray(result.content)) return;
+  const text = (result.content[0] as { text?: unknown } | undefined)?.text;
+  if (typeof text !== 'string') return;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    return;
+  }
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
+    return;
+  return 'step' in payload
+    ? (payload as FailureEntry)
+    : { ...(payload as FailureEntry), step };
+}
+
+/**
+ * Another handler's failed answer, delegated to, with the step it arose at
+ * added beside its payload — nothing of the payload changes. A success, a
+ * payload that already names a step, or text that is not a JSON object is
+ * returned as it is.
+ */
+export function failedAtStep(
+  result: { isError?: boolean; content?: unknown },
+  step: string,
+): { isError?: boolean; content?: unknown } {
+  if (result?.isError !== true || !Array.isArray(result.content)) return result;
+  const [first, ...rest] = result.content as Array<{
+    type?: string;
+    text?: unknown;
+  }>;
+  if (typeof first?.text !== 'string') return result;
+  let payload: unknown;
+  try {
+    payload = JSON.parse(first.text);
+  } catch {
+    return result;
+  }
+  if (payload === null || typeof payload !== 'object' || Array.isArray(payload))
+    return result;
+  if ('step' in payload) return result;
+  return {
+    ...result,
+    content: [
+      {
+        ...first,
+        text: JSON.stringify(
+          { ...(payload as Record<string, unknown>), step },
+          null,
+          2,
+        ),
+      },
+      ...rest,
+    ],
+  };
+}
+
 export function return_answer<T>(
   answer: IAdtResponse<T, IAdtError>,
   project: (value: T) => unknown,
   ctx: AnswerContext,
 ): McpResult {
-  if (!answer.ok) {
-    const error = answer.getError() as IAdtError & MessageCarrier;
-    // Refused here, before any request: not a claim about the server.
-    if (isSystemContextRefusal(error.message)) {
-      return local('system_context_missing', ctx, error.message);
-    }
-    return json(failurePayload(error), true);
-  }
+  if (!answer.ok) return answerFailure(answer.getError(), ctx);
 
   const projected = project(answer.getResult().value);
 
@@ -213,6 +370,21 @@ function messageOf(thrown: unknown): string {
 }
 
 /**
+ * A throw from a handler's call, as the consumer gets it — the one rendering
+ * `answer()` and a handler that works by throws share.
+ */
+export function answerThrown(thrown: unknown, ctx: AnswerContext): McpResult {
+  // The failure reader first: a thrown refusal is the chain's.
+  const read = failureOf(thrown);
+  if (read !== undefined) return answerRead(read);
+  // Refused here, before any request: not a claim about the server.
+  if (thrown instanceof SystemContextMissingError) {
+    return local('system_context_missing', ctx, thrown.message);
+  }
+  return local('client_threw', ctx, messageOf(thrown), thrown);
+}
+
+/**
  * The single entry point a handler uses.
  *
  * `IAdtResponse` covers what the server said; it does not cover a throw.
@@ -231,11 +403,7 @@ export async function answer<T>(
   try {
     response = await call();
   } catch (thrown) {
-    // Refused here, before any request: not a claim about the server.
-    if (thrown instanceof SystemContextMissingError) {
-      return local('system_context_missing', ctx, thrown.message);
-    }
-    return local('client_threw', ctx, messageOf(thrown), thrown);
+    return answerThrown(thrown, ctx);
   }
 
   try {
@@ -247,4 +415,90 @@ export async function answer<T>(
     // point a reader at the projection for a defect that may be in any of them.
     return local('adapter_threw', ctx, messageOf(thrown), thrown);
   }
+}
+
+/**
+ * A throw caught by a handler that works by throws, as the consumer gets it:
+ * a carried method error as it is with its step, a chain failure as the
+ * chain made it — and anything else the method's own failure,
+ * `client_threw`, never its message as bare text.
+ */
+export function answerCaught(thrown: unknown, ctx: AnswerContext): McpResult {
+  // Only our own throws carry an error (`carryingFailure`); a chain failure
+  // never does, and `answerThrown` reads it first.
+  const carried = methodFailureOf(thrown);
+  if (carried !== undefined) return answerFailure(carried, ctx);
+  return answerThrown(thrown, ctx);
+}
+
+/** What a direct request asked: its method and its url, as sent. */
+export interface SentRequest {
+  method: string;
+  url: string;
+}
+
+/**
+ * A direct request's throw (`makeAdtRequest`, for a resource no adt-clients
+ * member reads) as the method's error: read the way adt-clients reads a
+ * request that threw (`recogniseFailure`) and enriched by the strategy every
+ * read passes (`analyseException`) — SAP's status, `adt_type`, T100
+ * `messages` and body, with the request (none named when `sent` is
+ * `undefined`: a request this server did not build, a batch's envelope).
+ * `undefined` for a chain failure, which its own reader answers as it came.
+ */
+export function requestFailureOf(
+  thrown: unknown,
+  sent: SentRequest | undefined,
+): IAdtError | undefined {
+  if (failureOf(thrown) !== undefined) return undefined;
+  const carried =
+    thrown !== null && typeof thrown === 'object'
+      ? (thrown as { message?: unknown; response?: unknown })
+      : undefined;
+  const message =
+    typeof carried?.message === 'string'
+      ? carried.message
+      : typeof thrown === 'string'
+        ? thrown
+        : 'The request did not complete';
+  const verdict = {
+    origin: 'connection',
+    message,
+    response: carried?.response,
+    ...(sent !== undefined
+      ? { request: { method: sent.method, url: sent.url } }
+      : {}),
+  } as IAdtError;
+  const read = analyseException(
+    verdict,
+    carried?.response as Parameters<typeof analyseException>[1],
+  );
+  return read === ADT_NO_FAILURE ? verdict : read;
+}
+
+/**
+ * A direct request's throw, answered: a chain failure as it came, anything
+ * else the request's error as SAP answered it, with the step.
+ */
+export function answerRequestThrown(
+  thrown: unknown,
+  sent: SentRequest,
+  step: string,
+): McpResult {
+  const read = failureOf(thrown);
+  if (read !== undefined) return answerRead(read);
+  return answerFailure(
+    withStep(requestFailureOf(thrown, sent) as IAdtError, step),
+  );
+}
+
+/** A direct request's throw as an entry: the chain's payload, or the request's error, with the step. */
+export function requestThrownEntry(
+  thrown: unknown,
+  sent: SentRequest | undefined,
+  step: string,
+): FailureEntry {
+  const read = failureOf(thrown);
+  if (read !== undefined) return { ...chainFailurePayload(read), step };
+  return failureEntry(requestFailureOf(thrown, sent) as IAdtError, step);
 }

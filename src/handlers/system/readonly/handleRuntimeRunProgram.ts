@@ -3,7 +3,7 @@
  *
  * Uses `new AdtExecutor(connection, logger).getProgramExecutor()` from
  * @mcp-abap-adt/adt-clients 19 — not `createAdtClient`, per
- * `AdtExecutor`'s own shape (see `handleRuntimeRunProgramWithProfiling.ts`
+ * `AdtExecutor`'s own shape (see `handleRuntimeRunClass.ts`
  * and Task 24's class-profiling pair for the same door).
  *
  * **`runWithProfiling` was split, not deleted.** `ProgramExecutor`'s own
@@ -28,10 +28,12 @@
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
+import { BACKGROUND_PROPERTY } from '../../../lib/backgroundRuns/tools';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -46,6 +48,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'ABAP program name to execute.',
       },
+      background: BACKGROUND_PROPERTY,
       profile: {
         type: 'boolean',
         description:
@@ -123,7 +126,7 @@ export async function handleRuntimeRunProgram(
     { tool: 'RuntimeRunProgram', detail: 'terse' },
     () =>
       pair(
-        () =>
+        atStep('schedule trace', () =>
           programExecutor.scheduleTrace({
             ...definedOnly({
               description: args.description,
@@ -143,11 +146,13 @@ export async function handleRuntimeRunProgram(
             }),
             analyse: analyseException,
           }),
-        (profilerId: string) =>
+        ),
+        atStep('run with profiler', (profilerId: string) =>
           programExecutor.runWithProfiler(
             { programName },
             { analyse: analyseException, profilerId },
           ),
+        ),
       ),
     ([profilerId, output]: [string, string]) => ({
       success: true,
@@ -157,6 +162,68 @@ export async function handleRuntimeRunProgram(
         profiler_id: profilerId,
         // traceId is not returned for programs — use RuntimeListProfilerTraceFiles to find it.
       },
+    }),
+  );
+}
+
+/**
+ * A program run in one request (compact `HandlerProfileRun`; spec §4.6, one
+ * ADT request per tool call).
+ *
+ * With `profiler_id`: the one `POST /programs/programrun/{name}?profilerId=…`
+ * under the trace the caller scheduled. Without it: the one plain program
+ * run. An empty `profiler_id` is refused before any request; a failure is
+ * the method's error plus `step`.
+ */
+export async function handleRuntimeRunProgramUnderProfiler(
+  context: HandlerContext,
+  args: { program_name?: string; profiler_id?: string },
+  tool: string,
+) {
+  const { connection, logger } = context;
+  if (!args?.program_name) {
+    return return_error(new Error('Parameter "program_name" is required'));
+  }
+  const profilerId = args.profiler_id;
+  if (
+    profilerId !== undefined &&
+    (typeof profilerId !== 'string' || profilerId === '')
+  ) {
+    return return_error(
+      new Error('Parameter "profiler_id", when given, must not be empty'),
+    );
+  }
+  const programName = args.program_name.trim().toUpperCase();
+  const programExecutor = new AdtExecutor(
+    connection,
+    logger,
+  ).getProgramExecutor(ourProgramExecutor);
+  if (profilerId === undefined) {
+    return answer(
+      { tool, detail: 'terse' },
+      atStep('run program', () =>
+        programExecutor.run({ programName }, { analyse: analyseException }),
+      ),
+      (output: string) => ({
+        success: true,
+        program_name: programName,
+        output: output ?? '',
+      }),
+    );
+  }
+  return answer(
+    { tool, detail: 'terse' },
+    atStep('run with profiler', () =>
+      programExecutor.runWithProfiler(
+        { programName },
+        { analyse: analyseException, profilerId },
+      ),
+    ),
+    (output: string) => ({
+      success: true,
+      program_name: programName,
+      output: output ?? '',
+      profile: { profiler_id: profilerId },
     }),
   );
 }

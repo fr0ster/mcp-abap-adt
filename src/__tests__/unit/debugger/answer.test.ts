@@ -130,6 +130,17 @@ describe('debug answers', () => {
   });
 
   it('a terse stop names the settings in force and a settings failure', async () => {
+    const SETTINGS_REFUSED = {
+      message: 'Settings not allowed',
+      origin: 'refusal',
+      step: 'set settings',
+      status: 403,
+    };
+    const STACK_REFUSED = {
+      message: 'Stack not readable',
+      origin: 'refusal',
+      step: 'read stack',
+    };
     const r = await debugStateAnswer({}, async () => ({
       state: 'stopped' as const,
       stop: {
@@ -138,11 +149,15 @@ describe('debug answers', () => {
         stack: readStack(corpusBody('debugger-run-to-line--04-stack')),
         raw: { debuggee: '', attach: '', stack: '' },
         settings: { systemDebugging: true },
-        settingsError: 'Settings not allowed',
+        settingsError: SETTINGS_REFUSED,
+        stackError: STACK_REFUSED,
       },
     }));
     const json = JSON.parse((r.content[0] as { text: string }).text);
     expect(json.settings).toEqual({ system_debugging: true });
-    expect(json.settings_error).toBe('Settings not allowed');
+    // Each failure in the shape of every other: the method's error as it is,
+    // with its step — not text.
+    expect(json.settings_error).toEqual(SETTINGS_REFUSED);
+    expect(json.stack_error).toEqual(STACK_REFUSED);
   });
 });

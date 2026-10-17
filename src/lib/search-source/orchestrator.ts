@@ -1,4 +1,18 @@
+import { type FailureEntry, isCredentialFailure, thrownEntry } from '../answer';
+import { failureOf } from '../auth/failures';
+import { type PhaseResult, withSequentialFallback } from '../batch/phases';
+import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
+import {
+  assembleList,
+  batchReader,
+  type NodeRequest,
+  readNode,
+  type WalkedItem,
+  walkPackages,
+} from '../strategies/packageWalk';
+import { ourUtils } from '../strategies/resultSets';
+import { methodFailureOf } from '../strategies/step';
 import { scanLines } from './lineScanner';
 import {
   createPackageContentsFetcher,
@@ -8,15 +22,22 @@ import {
   type ScanObjectType,
 } from './packageEnumerator';
 import {
+  answeredSearch,
   createPackagePatternResolver,
   type PackageResolverDeps,
   resolvePackagePatterns,
+  type SearchObjectsArgs,
+  searchPackagesInPhase,
 } from './packageResolver';
 import {
+  answeredReaderDeps,
   createSourceReaderDeps,
   type ReadSourceUnitsDeps,
+  readSourcesInPhase,
   readSourceUnits,
+  type SourceRead,
   type SourceVersion,
+  sourceReadKey,
 } from './sourceReader';
 
 export interface OrchestratorInput {
@@ -52,9 +73,19 @@ export interface NoHitEntry {
   object_name: string;
 }
 
+/** An object whose read failed: the failure as it is, with its step. */
+export interface FailedObject {
+  devclass: string;
+  object_type: ScanObjectType;
+  object_name: string;
+  error: FailureEntry;
+}
+
 export interface OrchestratorResult {
   results: SearchHit[];
   no_hits?: NoHitEntry[];
+  /** Objects whose read failed, beside the others' hits; present only when any did. */
+  failures?: FailedObject[];
   scanned: { packages: number; objects: number; sources: number };
   truncated: {
     by_object_cap: boolean;
@@ -91,19 +122,31 @@ async function runWithLimit<T>(
   shouldStop?: () => boolean,
 ): Promise<void> {
   let next = 0;
+  // A failure the worker does not answer as its item's (a defect, not a
+  // read) ends the run: no pump takes another item, and the failure is
+  // answered once every pump has stopped — nothing runs on after the call has
+  // answered.
+  let failed: { error: unknown } | undefined;
   async function pump(): Promise<void> {
     while (true) {
+      if (failed) return;
       if (shouldStop?.()) {
         onStop?.();
         return;
       }
       const idx = next++;
       if (idx >= items.length) return;
-      await worker(items[idx]);
+      try {
+        await worker(items[idx]);
+      } catch (error) {
+        failed ??= { error };
+        return;
+      }
     }
   }
   const n = Math.max(1, Math.min(limit, items.length));
   await Promise.all(Array.from({ length: n }, () => pump()));
+  if (failed) throw failed.error;
 }
 
 export async function runSearchSource(
@@ -155,6 +198,7 @@ export async function runSearchSource(
 
   const allHits: SearchHit[] = [];
   const noHits: NoHitEntry[] = [];
+  const failures: FailedObject[] = [];
   let sourcesScanned = 0;
   let truncatedByObjectCap = false;
   let timedOut = false;
@@ -167,11 +211,33 @@ export async function runSearchSource(
       let capHitForTarget = false;
       const targetHits: SearchHit[] = [];
 
-      for await (const unit of readSourceUnits(
-        deps.sourceReader,
-        target,
-        version,
-      )) {
+      const units = readSourceUnits(deps.sourceReader, target, version);
+      for (;;) {
+        let next: IteratorResult<{ include: string; lines: string[] }>;
+        try {
+          next = await units.next();
+        } catch (error) {
+          // A read that failed — SAP's refusal, a chain failure — is this
+          // object's answer, with its step; the others are scanned on. The
+          // hits read before it stay.
+          // A credential failure is every item's: it ends the call as it came.
+          if (
+            isCredentialFailure(error) ||
+            (methodFailureOf(error) === undefined &&
+              failureOf(error) === undefined)
+          )
+            throw error;
+          failures.push({
+            devclass: target.devclass,
+            object_type: target.object_type,
+            object_name: target.object_name,
+            error: thrownEntry(error, 'read source'),
+          });
+          allHits.push(...targetHits);
+          return;
+        }
+        if (next.done) break;
+        const unit = next.value;
         if (deadlinePassed()) {
           timedOut = true;
           break;
@@ -265,22 +331,213 @@ export async function runSearchSource(
     },
   };
   if (emitNoHits) result.no_hits = noHits;
+  if (failures.length > 0) {
+    failures.sort((a, b) => {
+      if (a.devclass !== b.devclass) return a.devclass < b.devclass ? -1 : 1;
+      return a.object_name < b.object_name ? -1 : 1;
+    });
+    result.failures = failures;
+  }
   return result;
 }
 
+/** The passed `time_budget_ms` of the batched version, between two phases. */
+const PAST_DEADLINE = new Error('time_budget_ms passed');
+
+/** A credential failure in a phase is every item's: it ends the call as it came. */
+function endOnCredential(answers: Iterable<PhaseResult<unknown>>): void {
+  for (const answer of answers) {
+    if (!answer.ok && isCredentialFailure(answer.error)) throw answer.error;
+  }
+}
+
+/**
+ * The batched version of `SearchSource` (spec §11): its independent reads in
+ * one ADT batch envelope per phase — (1) the quickSearch of every package
+ * mask; (2) the package walk's levels (`walkPackages`: per level the root
+ * node structures, then their type nodes); (3) the source reads of the scan
+ * targets, up to `max_objects`: the main sources and function group
+ * structures, then the function groups' includes and function modules.
+ * `time_budget_ms` is checked between phases: once it passed, no further
+ * phase is sent, and what was gathered is answered with
+ * `truncated.by_timeout`. The answer is assembled by `runSearchSource` over
+ * the phases' answers, so the hits, the failures and the limits are the
+ * sequential version's.
+ */
+async function runSearchSourceInPhases(
+  ctx: HandlerContext,
+  input: OrchestratorInput,
+): Promise<OrchestratorResult> {
+  if (!input.query || input.query.length === 0) {
+    throw new Error('query must be a non-empty string');
+  }
+  if (!input.packages || input.packages.length === 0) {
+    throw new Error('packages must contain at least one entry');
+  }
+  if (input.exclude && input.exclude.length > 3) {
+    throw new Error('exclude may not contain more than 3 entries');
+  }
+  const maxObjects = input.max_objects ?? DEFAULTS.max_objects;
+  const emitNoHits = input.emit_no_hits ?? DEFAULTS.emit_no_hits;
+  const version = input.version ?? DEFAULTS.version;
+  const deadline =
+    input.time_budget_ms != null && input.time_budget_ms > 0
+      ? Date.now() + input.time_budget_ms
+      : null;
+  const deadlinePassed = (): boolean =>
+    deadline != null && Date.now() >= deadline;
+  const timedOut = (
+    packages: number,
+    objects: number,
+    byMaxObjects: boolean,
+  ): OrchestratorResult => {
+    const result: OrchestratorResult = {
+      results: [],
+      scanned: { packages, objects, sources: 0 },
+      truncated: {
+        by_object_cap: false,
+        by_max_objects: byMaxObjects,
+        by_timeout: true,
+      },
+    };
+    if (emitNoHits) result.no_hits = [];
+    return result;
+  };
+
+  // (1) The quickSearch of every package mask.
+  const searches = new Map<string, PhaseResult<string[]>>();
+  const askedSearches: SearchObjectsArgs[] = [];
+  const resolverDeps: PackageResolverDeps = {
+    searchObjects: answeredSearch(searches, askedSearches),
+  };
+  await resolvePackagePatterns(resolverDeps, input.packages);
+  if (askedSearches.length > 0) {
+    const answered = await searchPackagesInPhase(ctx, askedSearches);
+    endOnCredential(answered.values());
+    for (const [key, answer] of answered) searches.set(key, answer);
+  }
+  const resolved = await resolvePackagePatterns(resolverDeps, input.packages);
+
+  // (2) The package walk's levels; the deadline is checked before each.
+  const names = resolved.map((name) => name.toUpperCase());
+  const levels = batchReader<NodeRequest, unknown>(ctx, (request, connection) =>
+    readNode(
+      createAdtClient(connection, ctx.logger).getUtils(ourUtils),
+      request,
+    ),
+  );
+  let walked: PhaseResult<WalkedItem[]>[];
+  try {
+    walked =
+      names.length === 0
+        ? []
+        : await walkPackages(
+            (requests) =>
+              deadlinePassed()
+                ? Promise.reject(PAST_DEADLINE)
+                : levels(requests),
+            names,
+            {
+              includeSubpackages:
+                input.include_subpackages ?? DEFAULTS.include_subpackages,
+            },
+          );
+  } catch (error) {
+    if (error === PAST_DEADLINE) return timedOut(resolved.length, 0, false);
+    throw error;
+  }
+  const fetchPackageContents: PackageContentsFetcher = async (packageName) => {
+    const answer = walked[names.indexOf(packageName.toUpperCase())];
+    if (answer === undefined) return [];
+    if (!answer.ok) throw answer.error;
+    return assembleList(packageName, answer.value);
+  };
+  const enumerateInput: EnumerateInput = {
+    packages: resolved,
+    include_subpackages:
+      input.include_subpackages ?? DEFAULTS.include_subpackages,
+    object_filter: input.object_filter,
+    object_types: input.object_types ?? DEFAULTS.object_types,
+  };
+  const allTargets =
+    resolved.length === 0
+      ? []
+      : await enumerateScanTargets(fetchPackageContents, enumerateInput);
+  const truncatedByMaxObjects = allTargets.length > maxObjects;
+  const targets = allTargets.slice(0, maxObjects);
+
+  // (3) The source reads of the targets: each phase holds the reads the
+  // answers so far name — the main sources and function group structures,
+  // then the function groups' includes and function modules.
+  const sources = new Map<string, PhaseResult<unknown>>();
+  let passed = false;
+  for (;;) {
+    const asked: SourceRead[] = [];
+    const naming = answeredReaderDeps(sources, asked);
+    for (const target of targets) {
+      try {
+        for await (const _unit of readSourceUnits(naming, target, version)) {
+          // Only the reads it names are wanted here.
+        }
+      } catch {
+        // A failure answered: the scan below answers it.
+      }
+    }
+    const unique = [
+      ...new Map(asked.map((read) => [sourceReadKey(read), read])).values(),
+    ];
+    if (unique.length === 0) break;
+    if (deadlinePassed()) {
+      passed = true;
+      break;
+    }
+    const answered = await readSourcesInPhase(ctx, unique);
+    endOnCredential(answered.values());
+    for (const [key, answer] of answered) sources.set(key, answer);
+  }
+  if (passed && sources.size === 0) {
+    return timedOut(resolved.length, targets.length, truncatedByMaxObjects);
+  }
+
+  // The scan, over the phases' answers: the sequential version's own.
+  const { time_budget_ms: _budget, ...scanned } = input;
+  const result = await runSearchSource(
+    {
+      fetchPackageContents,
+      sourceReader: answeredReaderDeps(sources, [], ctx.logger),
+      resolvePackages: async () => resolved,
+    },
+    { ...scanned, concurrency: 1 },
+  );
+  result.truncated.by_timeout = passed;
+  return result;
+}
+
+/**
+ * `SearchSource` on the call's connection: the batched version
+ * (`runSearchSourceInPhases`), or — where the destination has no
+ * communication batch — the sequential version, today's reads one object
+ * after another.
+ */
 export function runSearchSourceWithContext(
   ctx: HandlerContext,
   input: OrchestratorInput,
 ): Promise<OrchestratorResult> {
-  const searchObjects = createPackagePatternResolver(ctx);
-  const resolverDeps: PackageResolverDeps = { searchObjects };
-  return runSearchSource(
-    {
-      fetchPackageContents: createPackageContentsFetcher(ctx),
-      sourceReader: createSourceReaderDeps(ctx),
-      resolvePackages: (entries) =>
-        resolvePackagePatterns(resolverDeps, entries),
+  return withSequentialFallback(
+    ctx,
+    () => runSearchSourceInPhases(ctx, input),
+    () => {
+      const searchObjects = createPackagePatternResolver(ctx);
+      const resolverDeps: PackageResolverDeps = { searchObjects };
+      return runSearchSource(
+        {
+          fetchPackageContents: createPackageContentsFetcher(ctx),
+          sourceReader: createSourceReaderDeps(ctx),
+          resolvePackages: (entries) =>
+            resolvePackagePatterns(resolverDeps, entries),
+        },
+        input,
+      );
     },
-    input,
   );
 }

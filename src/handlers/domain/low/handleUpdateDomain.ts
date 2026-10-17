@@ -24,14 +24,15 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answerFailure, answerThrown } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { patchDomainXml } from '../../../lib/strategies/domainPatch';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
-  restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -58,21 +59,6 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockObject. Required for update operation.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
     required: ['domain_name', 'properties', 'lock_handle'],
   },
@@ -82,12 +68,6 @@ interface UpdateDomainArgs {
   domain_name: string;
   properties: Record<string, any>;
   lock_handle: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 /**
@@ -101,8 +81,7 @@ export async function handleUpdateDomain(
 ) {
   const { connection, logger } = context;
   try {
-    const { domain_name, properties, lock_handle, session_id, session_state } =
-      args as UpdateDomainArgs;
+    const { domain_name, properties, lock_handle } = args as UpdateDomainArgs;
 
     // Validation
     if (!domain_name || !properties || !lock_handle) {
@@ -117,11 +96,6 @@ export async function handleUpdateDomain(
 
     logger?.info(`Starting domain update: ${domainName}`);
 
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
     // `properties` always took both spellings, the same fallback
     // `UpdateDataElementLow`'s own `transportRequest` reads out of its
     // `properties` bag.
@@ -134,11 +108,12 @@ export async function handleUpdateDomain(
       // different failures, and whichever comes back is the one the caller
       // sees, built by the strategy rather than summarised here.
       const written = await sequence(
-        () =>
+        atStep('read metadata', () =>
           client
             .getDomain()
             .readMetadata({ domainName }, { analyse: analyseException }),
-        (current) =>
+        ),
+        atStep('update metadata', (current) =>
           client.getDomain().updateMetadata(
             {
               domainName,
@@ -153,12 +128,17 @@ export async function handleUpdateDomain(
               analyse: analyseException,
             },
           ),
+        ),
       );
 
       if (!written.ok) {
         const failure = written.getError();
         logger?.error(`UpdateDomain refused: ${failure.message}`);
-        return return_error(new Error(failure.message));
+        // The method's error as it is, with the step it arose at.
+        return answerFailure(failure, {
+          tool: 'UpdateDomainLow',
+          detail: 'terse',
+        });
       }
 
       logger?.info(`✅ UpdateDomain completed: ${domainName}`);
@@ -168,8 +148,6 @@ export async function handleUpdateDomain(
           {
             success: true,
             domain_name: domainName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
             message: `Domain ${domainName} updated successfully. Remember to unlock using UnlockObject.`,
           },
           null,
@@ -187,7 +165,7 @@ export async function handleUpdateDomain(
       // checks for exactly this).
       const message = error?.message ?? String(error);
       logger?.error(`Error updating domain ${domainName}: ${message}`);
-      return return_error(new Error(`Failed to update domain: ${message}`));
+      return answerThrown(error, { tool: 'UpdateDomainLow', detail: 'terse' });
     }
   } catch (error: any) {
     return return_error(error);

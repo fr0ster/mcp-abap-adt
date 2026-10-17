@@ -1,5 +1,8 @@
 // src/handlers/debugger/debug/handleDebugSetVariable.ts
-import { requireDebugger } from '../../../lib/debugger/access';
+import {
+  debugBatchRecorder,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseVariables } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
@@ -36,11 +39,13 @@ export async function handleDebugSetVariable(
 ) {
   return debugAnswer(
     args,
-    async () =>
-      requireDebugger(context, args, 'use').abap.setVariable(
-        args.name,
-        args.value,
-      ),
+    async () => {
+      const abap = requireDebugger(context, args, 'use').abap;
+      const recorder = debugBatchRecorder(context);
+      return recorder !== undefined
+        ? abap.recordSetVariable(recorder, args.name, args.value)
+        : abap.setVariable(args.name, args.value);
+    },
     terseVariables,
   );
 }

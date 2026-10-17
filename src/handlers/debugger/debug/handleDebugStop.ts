@@ -31,7 +31,7 @@ export async function handleDebugStop(
       const notes = await d.stop();
       return {
         value: { state: 'stopped', ...(notes.length ? { notes } : {}) },
-        raw: notes.join('\n'),
+        raw: JSON.stringify(notes, null, 2),
       };
     },
     (v) => v,

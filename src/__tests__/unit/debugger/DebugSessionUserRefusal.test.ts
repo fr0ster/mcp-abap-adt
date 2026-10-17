@@ -201,10 +201,16 @@ describe("the system's refusal of a request user", () => {
         const notes = await stopped;
         expect(world.calls).toEqual(['stopListener']);
         // SAP's answer reaches the model as a note that is no debt, naming what stays.
+        // The note is the method's error as it is, with its step; what stays
+        // on the system rides beside it as `cleanup`.
         expect(notes).toHaveLength(1);
-        expect(notes[0]).toMatch(SAID);
-        expect(notes[0]).toMatch(
-          /the breakpoints placed stay on the system: L10 \(line .*\), E1 \(exception CX_A\)/,
+        expect(notes[0]).toMatchObject({
+          step: 'stop listener',
+          origin: 'refusal',
+        });
+        expect(notes[0].raw_body).toMatch(SAID);
+        expect((notes[0].cleanup as { message: string }).message).toMatch(
+          /^the breakpoints placed stay on the system: L10 \(line .*\), E1 \(exception CX_A\)$/,
         );
         expect(new Set(world.closed)).toEqual(new Set(world.opened));
         expect(session.currentIdentity()).toBeUndefined();
@@ -224,7 +230,7 @@ describe("the system's refusal of a request user", () => {
       await until(() => world.polls.length === 1);
       world.polls[0].resolve(refusedResponse('listener broke'));
       await expect(started).rejects.toThrow(
-        /listener broke; listener: .*User SAPUSER03 does not exist.*; the breakpoints placed stay on the system: L10 \(line .*\), E1 \(exception CX_A\)/,
+        /listener broke; stop listener: .*User SAPUSER03 does not exist.*; the breakpoints placed stay on the system: L10 \(line .*\), E1 \(exception CX_A\)/,
       );
       await expect(started).rejects.not.toThrow(/not undone/);
       expect(world.calls).toEqual([
@@ -245,7 +251,7 @@ describe("the system's refusal of a request user", () => {
       const { session, started } = armedStart(world);
       await until(() => world.polls.length === 1);
       world.polls[0].resolve(refusedResponse('listener broke'));
-      await expect(started).rejects.toThrow(/not undone: listener: /);
+      await expect(started).rejects.toThrow(/not undone: stop listener: /);
       expect(world.calls).toEqual([
         'checkListener',
         'setBreakpoints:2',
@@ -297,7 +303,7 @@ describe("the system's refusal of a request user", () => {
         requestUser: 'SAPUSER03',
       });
       await expect(started).rejects.toThrow(
-        /User SAPUSER03 does not exist.*; listener: .*User SAPUSER03 does not exist/,
+        /User SAPUSER03 does not exist.*; stop listener: .*User SAPUSER03 does not exist/,
       );
       await expect(started).rejects.not.toThrow(/not undone/);
       expect(world.calls).toEqual([

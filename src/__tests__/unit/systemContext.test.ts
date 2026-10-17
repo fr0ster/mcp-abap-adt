@@ -1,5 +1,5 @@
 import {
-  getEffectiveSystemContext,
+  getStatedSystemContext,
   getSystemContext,
   resetSystemContextCache,
   systemContextFromConfiguration,
@@ -36,19 +36,18 @@ describe('systemContextFromConfiguration', () => {
     expect(getSystemContext().masterSystem).toBe('SYSTEM_FROM_CONFIG');
   });
 
-  it('SAP_USERNAME is the login: the responsible when SAP_RESPONSIBLE is not set', () => {
+  it('SAP_USERNAME is no responsible here: the login standing in is a host rule (responsible-rules), not lib', () => {
     process.env.SAP_USERNAME = 'USER_FROM_LOGON';
     systemContextFromConfiguration();
-    expect(getEffectiveSystemContext().responsible).toBe('USER_FROM_LOGON');
-    // The process context holds what is stated; the login is a fallback.
+    expect(getStatedSystemContext().responsible).toBeUndefined();
     expect(getSystemContext().responsible).toBeUndefined();
   });
 
-  it('SAP_RESPONSIBLE wins over SAP_USERNAME', () => {
+  it('SAP_RESPONSIBLE is the stated responsible', () => {
     process.env.SAP_USERNAME = 'USER_FROM_LOGON';
     process.env.SAP_RESPONSIBLE = 'USER_FROM_CONFIG';
     systemContextFromConfiguration();
-    expect(getEffectiveSystemContext().responsible).toBe('USER_FROM_CONFIG');
+    expect(getStatedSystemContext().responsible).toBe('USER_FROM_CONFIG');
   });
 
   it('states nothing when nothing is configured', () => {

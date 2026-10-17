@@ -1,7 +1,7 @@
 {
   "$schema": "https://glama.ai/mcp/schemas/server.json",
   "name": "mcp-abap-adt",
-  "description": "MCP server for ABAP ADT in SAP ECC/S/4HANA (on-premise) and SAP BTP ABAP Cloud: repository analysis and CRUD for RAP and classic ABAP, as the full or the compact server, over HTTP, RFC or SNC",
+  "description": "MCP server for ABAP ADT in SAP ECC/S/4HANA (on-premise) and SAP BTP ABAP Cloud: repository analysis and CRUD for RAP and classic ABAP. Twelve packages, one binary each: the full, compact and read-only tool sets over stdio (destinations and logins; SAP over HTTP, RFC or SNC), Streamable HTTP or HTTP+SSE (credentials from x-sap-* headers)",
   "maintainers": [
     "fr0ster"
   ]

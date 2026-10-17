@@ -1,7 +1,7 @@
 /**
  * The launcher's destination: what the parameters build (one factory, one
  * destination, the browser reaching the login strategy), what stops a start
- * before any transport, and the startup summary's mask, unchanged.
+ * before any transport, and the startup summary's presence-only secrets.
  */
 
 import { EventEmitter } from 'node:events';
@@ -9,6 +9,21 @@ import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
+
+// The shipped browsers are stand-ins tagged with what they were built for:
+// the launcher's mapping is observed, and nothing is ever launched.
+jest.mock('@mcp-abap-adt/auth-providers', () => {
+  const actual = jest.requireActual('@mcp-abap-adt/auth-providers');
+  const tagged = (factory: string) => (argument?: string) => ({
+    open: async () => {},
+    built: argument === undefined ? factory : `${factory}(${argument})`,
+  });
+  return {
+    ...actual,
+    linuxDefaultBrowser: tagged('linuxDefaultBrowser'),
+    linuxBrowser: tagged('linuxBrowser'),
+  };
+});
 
 // Every broker the factory builds is counted; nothing else changes.
 jest.mock('@mcp-abap-adt/auth-broker', () => {
@@ -22,19 +37,24 @@ jest.mock('@mcp-abap-adt/auth-broker', () => {
   };
 });
 
+import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
-import {
-  AuthBrokerFactory,
-  browserCallbackStrategy,
-} from '@mcp-abap-adt/lib/auth';
-import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
-import { factoryConfigFrom, launch } from '../launcher.js';
-import { SseServer } from '../SseServer.js';
+import { readConfigFile } from '@mcp-abap-adt/lib/config';
+import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { AuthBrokerFactory, type LoginStrategyOptions } from '../auth';
+import { CORE_PARAMETERS, readCoreConfig } from '../config/coreParameters';
+import { AUTH_DEBUG_WARNING, factoryConfigFrom, launch } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
-import { StreamableHttpServer } from '../StreamableHttpServer.js';
+
+/** The launcher's options as `mcp-abap-adt` passes them. */
+const TEST_OPTIONS = {
+  toolSet: fullToolSet,
+  program: 'mcp-abap-adt',
+  version: '0.0.0-test',
+};
 
 const constructed = (
   jest.requireMock('@mcp-abap-adt/auth-broker') as { AuthBroker: jest.Mock }
@@ -52,8 +72,6 @@ let root: string;
 let keysDir: string;
 let sessionsDir: string;
 let stdioStart: jest.SpyInstance;
-let httpStart: jest.SpyInstance;
-let sseStart: jest.SpyInstance;
 
 beforeEach(() => {
   // Real path: on macOS the temp dir is under /var, a link to /private/var.
@@ -68,6 +86,8 @@ beforeEach(() => {
   process.chdir(root);
   for (const name of [
     'MCP_BROWSER',
+    'MCP_BROWSER_PROGRAM',
+    'MCP_RENEWAL',
     'MCP_BROWSER_AUTH_PORT',
     'MCP_ENV_PATH',
     'MCP_UNSAFE',
@@ -78,14 +98,17 @@ beforeEach(() => {
   ]) {
     delete process.env[name];
   }
+  // The system kind is required: the stand-in's is stated for every case
+  // (a case about the type itself deletes or restates it).
+  process.env.SAP_SYSTEM_TYPE = 'onprem';
   constructed.mockClear();
   stdioStart = jest
     .spyOn(StdioServer.prototype, 'start')
     .mockResolvedValue(undefined);
-  httpStart = jest
-    .spyOn(StreamableHttpServer.prototype, 'start')
-    .mockResolvedValue(undefined);
-  sseStart = jest.spyOn(SseServer.prototype, 'start').mockResolvedValue();
+  // The connection at start is the launcher's own step: not made here.
+  jest
+    .spyOn(StdioServer.prototype, 'connectAtStart')
+    .mockResolvedValue({ session: 'logged_on' });
 });
 
 afterEach(() => {
@@ -96,12 +119,13 @@ afterEach(() => {
   fs.rmSync(root, { recursive: true, force: true });
 });
 
+const silent = { info() {}, warn() {}, error() {}, debug() {} };
+
 function recordingStrategy() {
-  const calls: Array<{ browser: string; port?: number }> = [];
-  const browserStrategy = (options: {
-    browser: string;
-    port?: number;
-  }): IAuthorizationStrategy<string> => {
+  const calls: LoginStrategyOptions[] = [];
+  const browserStrategy = (
+    options: LoginStrategyOptions,
+  ): IAuthorizationStrategy<string> => {
     calls.push(options);
     return {
       authorize: async (request: AuthorizationRequest) => {
@@ -117,9 +141,17 @@ function recordingStrategy() {
 async function run(
   argv: string[],
   browserStrategy?: ReturnType<typeof recordingStrategy>['browserStrategy'],
+  platform = 'linux',
 ) {
   process.argv = ['node', 'mcp-abap-adt', ...argv];
-  const config = await new ServerConfigManager().getConfig();
+  // As the program reads it: the --conf / --config file, then core's table.
+  const args = process.argv.slice(2);
+  const file = readConfigFile(CORE_PARAMETERS, args);
+  const config = readCoreConfig(
+    args,
+    process.env,
+    file.template ? null : file.yaml,
+  );
   const strategy = recordingStrategy();
   const stderr: string[] = [];
   const exits: number[] = [];
@@ -128,16 +160,13 @@ async function run(
   });
   const stdout = jest.spyOn(process.stdout, 'write');
   try {
-    await launch(
-      config,
-      { exposition: ['readonly'], includeSearch: false },
-      {
-        browserStrategy: browserStrategy ?? strategy.browserStrategy,
-        stderr: (line) => stderr.push(line),
-        exit: (code) => exits.push(code),
-        processLike,
-      },
-    );
+    await launch(config, TEST_OPTIONS, {
+      browserStrategy: browserStrategy ?? strategy.browserStrategy,
+      stderr: (line) => stderr.push(line),
+      exit: (code) => exits.push(code),
+      processLike,
+      platform,
+    });
   } finally {
     // The launcher writes nothing to stdout (H3).
     expect(stdout).not.toHaveBeenCalled();
@@ -170,7 +199,7 @@ const writeSession = (name: string, lines: string[]) =>
     `${lines.join('\n')}\n`,
   );
 
-/** Runs the login the factory's only broker was given; answers the browser the strategy got. */
+/** Runs the login the factory's only broker was given; answers what the strategy was built with. */
 async function browserOfTheLogin(
   strategy: ReturnType<typeof recordingStrategy>,
 ) {
@@ -180,12 +209,22 @@ async function browserOfTheLogin(
   await login.authorize({
     buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
   });
-  expect(strategy.calls).toHaveLength(1);
-  return strategy.calls[0];
+  // The broker composes a strategy per build of the provider — the startup
+  // check's build among them — and each is built with the same options.
+  expect(strategy.calls.length).toBeGreaterThanOrEqual(1);
+  const last = strategy.calls[strategy.calls.length - 1];
+  expect(strategy.calls.every((c) => c.browser === last.browser)).toBe(true);
+  const { browser, ...rest } = last;
+  return {
+    ...rest,
+    ...(browser !== undefined && {
+      browser: (browser as unknown as { built: string }).built,
+    }),
+  };
 }
 
-describe('the browser reaches the login strategy', () => {
-  const stdio = ['--transport=stdio', '--mcp=dest'];
+describe('the browser reaches the login strategy, mapped for the platform', () => {
+  const stdio = ['--mcp=dest'];
 
   it('--browser', async () => {
     writeKey('dest', abapKey);
@@ -194,14 +233,18 @@ describe('the browser reaches the login strategy', () => {
       `--auth-broker-path=${root}`,
       '--browser=firefox',
     ]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe('firefox');
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(firefox)',
+    );
   });
 
   it('MCP_BROWSER', async () => {
     writeKey('dest', abapKey);
     process.env.MCP_BROWSER = 'edge';
     const { strategy } = await run([...stdio, `--auth-broker-path=${root}`]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe('edge');
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(microsoft-edge)',
+    );
   });
 
   it('YAML browser', async () => {
@@ -212,16 +255,45 @@ describe('the browser reaches the login strategy', () => {
       `browser: chrome\nauth-broker-path: ${JSON.stringify(root)}\n`,
     );
     const { strategy } = await run([...stdio, `--config=${yamlFile}`]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe('chrome');
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(google-chrome)',
+    );
   });
 
-  it('none given: system, and no port — the strategy keeps its own 61001', async () => {
+  it('--browser-program: the named browser with that program', async () => {
+    writeKey('dest', abapKey);
+    const { strategy } = await run([
+      ...stdio,
+      `--auth-broker-path=${root}`,
+      '--browser-program=my-browser',
+    ]);
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(my-browser)',
+    );
+  });
+
+  it('--browser-program on a platform with no browser: the linux launch of that program', async () => {
+    writeKey('dest', abapKey);
+    const { strategy, exits } = await run(
+      [...stdio, `--auth-broker-path=${root}`, '--browser-program=my-browser'],
+      undefined,
+      'freebsd',
+    );
+    expect(exits).toEqual([]);
+    expect((await browserOfTheLogin(strategy)).browser).toBe(
+      'linuxBrowser(my-browser)',
+    );
+  });
+
+  it('none given: the system browser, and no port — the strategy keeps its own 61001', async () => {
     writeKey('dest', abapKey);
     const { strategy } = await run([...stdio, `--auth-broker-path=${root}`]);
-    expect(await browserOfTheLogin(strategy)).toEqual({ browser: 'system' });
+    expect(await browserOfTheLogin(strategy)).toEqual({
+      browser: 'linuxDefaultBrowser',
+    });
   });
 
-  it('--browser-auth-port reaches it beside the browser', async () => {
+  it('--browser=none: no browser; --browser-auth-port reaches the strategy', async () => {
     writeKey('dest', abapKey);
     const { strategy } = await run([
       ...stdio,
@@ -229,10 +301,28 @@ describe('the browser reaches the login strategy', () => {
       '--browser=none',
       '--browser-auth-port=61005',
     ]);
-    expect(await browserOfTheLogin(strategy)).toEqual({
-      browser: 'none',
-      port: 61005,
-    });
+    expect(await browserOfTheLogin(strategy)).toEqual({ port: 61005 });
+  });
+});
+
+describe('a browser that cannot be served stops the start', () => {
+  it.each([
+    [['--browser=opera'], '--browser=none'],
+    [
+      ['--browser=firefox', '--browser-program=x'],
+      '--browser-program excludes --browser',
+    ],
+  ])('%j: its words on stderr, exit 1, nothing read', async (args, words) => {
+    writeKey('dest', abapKey);
+    const { stderr, exits } = await run([
+      '--mcp=dest',
+      `--auth-broker-path=${root}`,
+      ...args,
+    ]);
+    expect(exits).toEqual([1]);
+    expect(stderr.join('\n')).toContain(words);
+    expect(constructed).not.toHaveBeenCalled();
+    expect(stdioStart).not.toHaveBeenCalled();
   });
 });
 
@@ -261,7 +351,6 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
       const port = await freePort();
       const { stderr } = await run(
         [
-          '--transport=stdio',
           '--mcp=dest',
           `--auth-broker-path=${root}`,
           `--browser=${browser}`,
@@ -269,27 +358,55 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
         ],
         browserCallbackStrategy,
       );
+      // auth-providers 6 writes the authorization URL to stderr itself, never
+      // through a logger (it carries `state`); the prompt logger carries the
+      // rest — the "waiting on" line among it.
+      const written: string[] = [];
+      const direct = jest
+        .spyOn(process.stderr, 'write')
+        .mockImplementation((chunk: unknown) => {
+          written.push(String(chunk));
+          return true;
+        });
       const stdout = jest.spyOn(process.stdout, 'write');
       const broker = constructed.mock.results[0].value;
       const login = broker.getToken('dest');
       const failed = expect(login).rejects.toThrow();
       const redirect = `http://localhost:${port}/callback`;
-      const url =
-        'https://uaa.example.test/oauth/authorize?client_id=client-id' +
-        `&redirect_uri=${encodeURIComponent(redirect)}&response_type=code`;
-      for (let i = 0; i < 100 && !stderr.join('\n').includes(url); i++) {
+      const said = () => [...written, ...stderr].join('\n');
+      for (
+        let i = 0;
+        i < 100 && !said().includes(encodeURIComponent(redirect));
+        i++
+      ) {
         await new Promise((r) => setTimeout(r, 20));
       }
       try {
-        const said = stderr.join('\n');
-        expect(said).toContain('Open this URL in your browser to authenticate');
-        expect(said).toContain(url);
-        expect(said).toContain(`Waiting for callback on ${redirect}`);
-        expect(said).not.toContain('client-secret');
+        const text = said();
+        expect(text).toContain(
+          'https://uaa.example.test/oauth/authorize?client_id=client-id',
+        );
+        expect(text).toContain(`redirect_uri=${encodeURIComponent(redirect)}`);
+        expect(stderr.join('\n')).toContain(
+          `Waiting for callback on ${redirect}`,
+        );
+        expect(text).not.toContain('client-secret');
       } finally {
-        // End the login: the identity provider says no.
-        await fetch(`${redirect}?error=access_denied`).catch(() => undefined);
+        // End the login: the identity provider says no — with this attempt's
+        // state, so the callback is not ignored.
+        const shown = said();
+        const from = shown.indexOf('https://uaa.example.test/oauth/authorize?');
+        let to = from;
+        while (to >= 0 && to < shown.length && shown[to].trim() !== '') to++;
+        const state =
+          from < 0
+            ? ''
+            : (new URL(shown.slice(from, to)).searchParams.get('state') ?? '');
+        await fetch(`${redirect}?error=access_denied&state=${state}`).catch(
+          () => undefined,
+        );
         await failed;
+        direct.mockRestore();
         expect(stdout).not.toHaveBeenCalled();
         stdout.mockRestore();
       }
@@ -304,11 +421,7 @@ describe('one destination per process', () => {
     // .env and a destination named default.
     fs.writeFileSync(path.join(root, '.env'), basicLines().join('\n'));
     writeSession('default', basicLines());
-    const { exits } = await run([
-      '--transport=stdio',
-      '--mcp=dest',
-      `--auth-broker-path=${root}`,
-    ]);
+    const { exits } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
     expect(exits).toEqual([]);
     expect(constructed).toHaveBeenCalledTimes(1);
     expect(stdioStart).toHaveBeenCalledTimes(1);
@@ -318,49 +431,50 @@ describe('one destination per process', () => {
   it('an --env-path file → the destination default, one broker', async () => {
     const file = path.join(root, 'conn.env');
     fs.writeFileSync(file, `${basicLines().join('\n')}\n`);
-    const { exits, stderr } = await run([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const { exits, stderr } = await run([`--env-path=${file}`]);
     expect(exits).toEqual([]);
     expect(constructed).toHaveBeenCalledTimes(1);
     expect(stdioStart).toHaveBeenCalledWith('default');
     expect(stderr.join('\n')).toContain(`Source:        ${file}`);
   });
 
+  it('the runtime session files live beside the sessions: <auth-broker-path>/runtime', async () => {
+    writeSession('dest', basicLines());
+    const { exits } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
+    expect(exits).toEqual([]);
+    const server = stdioStart.mock.instances[0] as unknown as {
+      leftoverSessions?: { directory: string };
+    };
+    expect(server.leftoverSessions?.directory).toBe(path.join(root, 'runtime'));
+  });
+
   it('neither: inspection-only, no broker', async () => {
-    const { stderr } = await run(['--transport=stdio']);
+    const { stderr } = await run([]);
     expect(constructed).not.toHaveBeenCalled();
-    expect(stdioStart).toHaveBeenCalledWith('mock');
+    expect(stdioStart).toHaveBeenCalledWith(undefined);
     expect(stderr[0]).toContain('inspection-only mode');
   });
 });
 
 describe('a destination that cannot be served stops the start', () => {
-  it.each([
-    ['stdio', () => stdioStart],
-    ['http', () => httpStart],
-    ['sse', () => sseStart],
-  ] as const)(
-    '%s: its words on stderr, exit 1, no transport started',
-    async (transport, started) => {
-      // Malformed: no system URL.
-      writeSession('dest', [
-        'SAP_AUTH_TYPE=basic',
-        'SAP_USERNAME=placeholder-user',
-        `SAP_PASSWORD=${PASSWORD}`,
-      ]);
-      const { stderr, exits } = await run([
-        `--transport=${transport}`,
-        '--mcp=dest',
-        `--auth-broker-path=${root}`,
-      ]);
-      expect(exits).toEqual([1]);
-      expect(stderr.join('\n')).toContain('Destination "dest" lacks: SAP_URL');
-      expect(stderr.join('\n')).not.toContain(PASSWORD);
-      expect(started()).not.toHaveBeenCalled();
-    },
-  );
+  it('its words on stderr, exit 1, no transport started', async () => {
+    // Malformed: no system URL.
+    writeSession('dest', [
+      'SAP_AUTH_TYPE=basic',
+      'SAP_USERNAME=placeholder-user',
+      `SAP_PASSWORD=${PASSWORD}`,
+    ]);
+    const { stderr, exits } = await run([
+      '--mcp=dest',
+      `--auth-broker-path=${root}`,
+    ]);
+    expect(exits).toEqual([1]);
+    expect(stderr.join('\n')).toContain(
+      'Destination "dest" cannot be used: SAP_URL',
+    );
+    expect(stderr.join('\n')).not.toContain(PASSWORD);
+    expect(stdioStart).not.toHaveBeenCalled();
+  });
 
   it('a key that does not parse: its class, never a slice of the file (H4)', async () => {
     fs.writeFileSync(
@@ -368,7 +482,6 @@ describe('a destination that cannot be served stops the start', () => {
       '{"uaa":{"clientsecret":PLACEHOLDERSECRET}}',
     );
     const { stderr, exits } = await run([
-      '--transport=stdio',
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
@@ -386,10 +499,7 @@ describe('a destination that cannot be served stops the start', () => {
 
   it('an --env-path file that does not exist: the parameter and the path', async () => {
     const missing = path.join(root, 'nope.env');
-    const { stderr, exits } = await run([
-      '--transport=stdio',
-      `--env-path=${missing}`,
-    ]);
+    const { stderr, exits } = await run([`--env-path=${missing}`]);
     expect(exits).toEqual([1]);
     expect(stderr).toEqual([
       `[MCP] --env-path: the file does not exist: ${missing}`,
@@ -399,7 +509,6 @@ describe('a destination that cannot be served stops the start', () => {
 
   it('--mcp that is a path: refused naming --mcp, nothing read', async () => {
     const { stderr, exits } = await run([
-      '--transport=stdio',
       '--mcp=../outside',
       `--auth-broker-path=${root}`,
     ]);
@@ -411,13 +520,9 @@ describe('a destination that cannot be served stops the start', () => {
 });
 
 describe('the startup summary', () => {
-  it('a basic destination: the password masked exactly as before', async () => {
+  it('a basic destination: the password by its presence only', async () => {
     writeSession('dest', basicLines());
-    const { stderr } = await run([
-      '--transport=stdio',
-      '--mcp=dest',
-      `--auth-broker-path=${root}`,
-    ]);
+    const { stderr } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
     const summary = stderr.join('\n');
     expect(summary).toContain(
       `║  Source:        ${'service-key: dest'.padEnd(45)}║`,
@@ -428,27 +533,53 @@ describe('the startup summary', () => {
     expect(summary).toContain(
       `║  Username:      ${'placeholder-user'.padEnd(45)}║`,
     );
-    // Over 20 characters: the first four and the last four, as before.
-    expect(summary).toContain(`║  Password:      ${'plac***long'.padEnd(45)}║`);
+    expect(summary).toContain(`║  Password:      ${'set'.padEnd(45)}║`);
     expect(summary).not.toContain(PASSWORD);
   });
 });
 
-describe('the shutdown is installed for every transport', () => {
-  it.each([
-    ['stdio', true],
-    ['http', false],
-    ['sse', false],
-  ] as const)('%s: SIGTERM settles and exits 0', async (transport, stdin) => {
+describe('--auth-debug', () => {
+  it('prints one start warning line and hands the factory authDebug', async () => {
+    writeSession('dest', basicLines());
+    // The debug lines go through console.error: stderr in the program.
+    const lines = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const { stderr } = await run([
+      '--mcp=dest',
+      `--auth-broker-path=${root}`,
+      '--auth-debug',
+    ]);
+    expect(lines).toHaveBeenCalled();
+    lines.mockRestore();
+    expect(stderr.filter((line) => line.includes('--auth-debug'))).toEqual([
+      AUTH_DEBUG_WARNING,
+    ]);
+    expect(
+      factoryConfigFrom(readCoreConfig(['--auth-debug'], {}), {
+        browserStrategy: () => {
+          throw new Error('not built');
+        },
+        promptLogger: { info() {}, warn() {}, error() {}, debug() {} },
+      }).authDebug,
+    ).toBe(true);
+  });
+
+  it('says nothing without it', async () => {
+    writeSession('dest', basicLines());
+    const { stderr } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
+    expect(stderr.join('\n')).not.toContain('--auth-debug');
+  });
+});
+
+describe('the shutdown is installed', () => {
+  it('stdio: SIGTERM settles and exits 0', async () => {
     writeSession('dest', basicLines());
     const { processLike, exits } = await run([
-      `--transport=${transport}`,
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
     expect(processLike.listenerCount('SIGTERM')).toBe(1);
     expect(processLike.listenerCount('SIGINT')).toBe(1);
-    expect(processLike.stdin.listenerCount('end')).toBe(stdin ? 1 : 0);
+    expect(processLike.stdin.listenerCount('end')).toBe(1);
     processLike.emit('SIGTERM');
     await new Promise((r) => setTimeout(r, 20));
     expect(exits).toEqual([0]);
@@ -458,18 +589,22 @@ describe('the shutdown is installed for every transport', () => {
 describe('factoryConfigFrom: the env file', () => {
   const browserStrategy = recordingStrategy().browserStrategy;
 
-  it("envFilePath, IServerConfig's alias, is read too, naming the field", () => {
+  it("envFilePath, CoreConfig's alias, is read too, naming the field", () => {
     expect(
-      factoryConfigFrom({ envFilePath: '/x/conn.env' }, { browserStrategy })
-        .envFile,
-    ).toEqual({ path: '/x/conn.env', source: 'IServerConfig.envFilePath' });
+      factoryConfigFrom(
+        { envFilePath: '/x/conn.env' },
+        { browserStrategy, promptLogger: silent },
+      ).envFile,
+    ).toEqual({ path: '/x/conn.env', source: 'CoreConfig.envFilePath' });
   });
 
   it('envFile by hand: named by its field', () => {
     expect(
-      factoryConfigFrom({ envFile: '/x/conn.env' }, { browserStrategy })
-        .envFile,
-    ).toEqual({ path: '/x/conn.env', source: 'IServerConfig.envFile' });
+      factoryConfigFrom(
+        { envFile: '/x/conn.env' },
+        { browserStrategy, promptLogger: silent },
+      ).envFile,
+    ).toEqual({ path: '/x/conn.env', source: 'CoreConfig.envFile' });
   });
 
   it('the source the parser stated wins', () => {
@@ -480,7 +615,7 @@ describe('factoryConfigFrom: the env file', () => {
           envFilePath: '/x/conn.env',
           envFileSource: 'MCP_ENV_PATH',
         },
-        { browserStrategy },
+        { browserStrategy, promptLogger: silent },
       ).envFile,
     ).toEqual({ path: '/x/conn.env', source: 'MCP_ENV_PATH' });
   });
@@ -489,18 +624,14 @@ describe('factoryConfigFrom: the env file', () => {
     const file = path.join(root, 'conn.env');
     fs.writeFileSync(file, `${basicLines().join('\n')}\n`);
     const exits: number[] = [];
-    await launch(
-      { transport: 'stdio', envFilePath: file },
-      { exposition: ['readonly'], includeSearch: false },
-      {
-        browserStrategy,
-        stderr: () => {},
-        exit: (code) => exits.push(code),
-        processLike: Object.assign(new EventEmitter(), {
-          stdin: new EventEmitter(),
-        }),
-      },
-    );
+    await launch({ envFilePath: file }, TEST_OPTIONS, {
+      browserStrategy,
+      stderr: () => {},
+      exit: (code) => exits.push(code),
+      processLike: Object.assign(new EventEmitter(), {
+        stdin: new EventEmitter(),
+      }),
+    });
     expect(exits).toEqual([]);
     expect(stdioStart).toHaveBeenCalledWith('default');
   });
@@ -527,10 +658,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
 
   it('basic + rfc in the file: rfc', async () => {
     const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
-    const settings = await settingsOf([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.connectionType).toBe('rfc');
   });
 
@@ -541,10 +669,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
       'SAP_SNC_PARTNERNAME=p:placeholder',
       'SAP_CONNECTION_TYPE=rfc',
     ]);
-    const settings = await settingsOf([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.authType).toBe('snc');
     expect(settings.connectionType).toBe('rfc');
   });
@@ -552,7 +677,6 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   it('--connection-type=http beats the file', async () => {
     const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
     const settings = await settingsOf([
-      '--transport=stdio',
       `--env-path=${file}`,
       '--connection-type=http',
     ]);
@@ -564,7 +688,6 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
     const yamlFile = path.join(root, 'config.yaml');
     fs.writeFileSync(yamlFile, 'connection-type: http\n');
     const settings = await settingsOf([
-      '--transport=stdio',
       `--env-path=${file}`,
       `--config=${yamlFile}`,
     ]);
@@ -574,10 +697,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   it('the process environment beats the file', async () => {
     const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
     process.env.SAP_CONNECTION_TYPE = 'http';
-    const settings = await settingsOf([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const settings = await settingsOf([`--env-path=${file}`]);
     expect(settings.connectionType).toBe('http');
   });
 
@@ -586,10 +706,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
       ...basicLines(),
       'SAP_CONNECTION_TYPE=carrier-pigeon',
     ]);
-    const { exits, stderr } = await run([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const { exits, stderr } = await run([`--env-path=${file}`]);
     expect(exits).toEqual([1]);
     expect(stderr.join('\n')).toContain('SAP_CONNECTION_TYPE');
     expect(stderr.join('\n')).not.toContain('carrier-pigeon');
@@ -605,15 +722,15 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
 describe('the working directory .env is never the destination', () => {
   it('with no --env / --env-path / --mcp: no destination, inspection-only under stdio', async () => {
     fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
-    const { exits } = await run(['--transport=stdio']);
+    const { exits } = await run([]);
     expect(exits).toEqual([]);
     expect(constructed).not.toHaveBeenCalled();
-    expect(stdioStart).toHaveBeenCalledWith('mock');
+    expect(stdioStart).toHaveBeenCalledWith(undefined);
   });
 
   it('named with --env-path=./.env, it is the destination default', async () => {
     fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
-    await run(['--transport=stdio', '--env-path=./.env']);
+    await run(['--env-path=./.env']);
     expect(stdioStart).toHaveBeenCalledWith('default');
   });
 });
@@ -625,6 +742,10 @@ describe('the working directory .env is never the destination', () => {
  * environment, so that is where the outcome is checked.
  */
 describe('SAP_SYSTEM_TYPE inside the env file', () => {
+  // These cases are about where the type comes from: none is preset.
+  beforeEach(() => {
+    delete process.env.SAP_SYSTEM_TYPE;
+  });
   const envFile = (lines: string[]) => {
     const file = path.join(root, 'conn.env');
     fs.writeFileSync(file, `${lines.join('\n')}\n`);
@@ -636,7 +757,7 @@ describe('SAP_SYSTEM_TYPE inside the env file', () => {
     return file;
   };
   async function systemTypeOf(argv: string[]) {
-    const result = await run(['--transport=stdio', ...argv]);
+    const result = await run([...argv]);
     expect(result.exits).toEqual([]);
     return process.env.SAP_SYSTEM_TYPE;
   }
@@ -676,10 +797,7 @@ describe('SAP_SYSTEM_TYPE inside the env file', () => {
 
   it('a word that is not a system type: refused naming the key, not quoting it', async () => {
     const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=mainframe']);
-    const { exits, stderr } = await run([
-      '--transport=stdio',
-      `--env-path=${file}`,
-    ]);
+    const { exits, stderr } = await run([`--env-path=${file}`]);
     expect(exits).toEqual([1]);
     expect(stderr).toEqual([
       '[MCP] SAP_SYSTEM_TYPE (environment or env file) must be onprem, cloud or legacy',

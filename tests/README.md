@@ -122,7 +122,6 @@ To enable S4HANA tests, set `enabled: true` in `test-config.yaml` for the corres
   node tests/deprecated/test-activate-object.js
   ```
   
-  See [README_GROUP_ACTIVATION.md](README_GROUP_ACTIVATION.md) for detailed guide.
 
 ### Enhancement Tests
 - `test-enhancement-by-name.js` - Test getting enhancements by specific name

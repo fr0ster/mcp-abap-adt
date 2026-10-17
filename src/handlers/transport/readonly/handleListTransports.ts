@@ -15,26 +15,30 @@ import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-ad
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { parseStructure } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { MAX_SEARCH_CONFIGURATIONS } from '../../../lib/strategies/transportSearch';
-import { getEffectiveSystemContext } from '../../../lib/systemContext';
+import { getStatedSystemContext } from '../../../lib/systemContext';
 
 export const TOOL_DEFINITION = {
   name: 'ListTransports',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     "[read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers — not sent to ADT as filters.",
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       user: {
         type: 'string',
         description:
-          "SAP user name to filter to; applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.",
+          "The user to filter to: an SAP user id (matched in upper case); applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.",
       },
       modifiable_only: {
         type: 'boolean',
@@ -178,15 +182,22 @@ export async function handleListTransports(
 ) {
   const { connection, logger } = context;
   const modifiableOnly = args?.modifiable_only !== false;
-  // `getEffectiveSystemContext`, not `getSystemContext`: the responsible a
+  // `getStatedSystemContext`, not `getSystemContext`: the responsible a
   // request carries wins over the process-wide one, so a host serving several
   // SAP users from one process does not hand every concurrent request
   // whichever user resolved last. Arrived on `main` while this branch was
   // open (#202, #206); the migrated body below is this branch's.
-  // The effective context alone: it already falls back to the login
-  // (SAP_USERNAME included) where the login counts, and not on a cloud
-  // connection, where the system's user does.
-  const user = args?.user || getEffectiveSystemContext().responsible || '';
+  // The stated context alone: the connection's parameters, where a host's
+  // rules made them, are in it.
+  // SAP stores user ids in upper case, and the owners a listing answers are
+  // upper case: the filter is upper-cased to match them.
+  const user = (
+    args?.user?.trim() ||
+    getStatedSystemContext().responsible ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
 
   logger?.debug(
     `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,
@@ -249,9 +260,11 @@ export async function handleListTransports(
         searchConfigurations: transportSearchConfigurations,
       });
 
-      const answered = await request.searchConfigurations({
-        analyse: analyseException,
-      });
+      const answered = await atStep('read search configurations', () =>
+        request.searchConfigurations({
+          analyse: analyseException,
+        }),
+      )();
       // The endpoint's own refusal, forwarded — not a sentence composed here
       // about a call this handler made on the caller's behalf.
       if (!answered.ok) {
@@ -274,10 +287,12 @@ export async function handleListTransports(
 
       const readings: AdtReading<unknown>[] = [];
       for (const configuration of running) {
-        const listed = await request.list({
-          analyse: analyseException,
-          configUri: configuration.uri,
-        });
+        const listed = await atStep('list', () =>
+          request.list({
+            analyse: analyseException,
+            configUri: configuration.uri,
+          }),
+        )();
         // The failing search's own answer, untouched — the rule `sequence()`
         // follows, for the same reason: a sentence composed here would stand
         // beside the strategy's own account of the same refusal.

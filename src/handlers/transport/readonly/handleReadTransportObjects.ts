@@ -38,14 +38,14 @@ export const TOOL_DEFINITION = {
   name: 'ReadTransportObjects',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] List the objects a transport request or task holds, each with the `position` that RemoveTransportObject needs. Objects live on TASKS: a request shows its tasks' entries, but a removal addressed at the request is refused. Read a task number to get entries that can be acted on.",
+    "[read-only] List the objects a transport request or task holds, each with the `position` that RemoveTransportObject needs. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.",
   inputSchema: {
     type: 'object',
     properties: {
       transport_number: {
         type: 'string',
         description:
-          'Transport REQUEST or TASK number. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.',
+          'Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.',
       },
       ...DETAIL_PROPERTY,
     },
@@ -66,32 +66,52 @@ interface Entry {
   description?: string;
   position?: string;
   lockStatus?: string;
+  /** The task the entry is on, when a request was read. */
+  task?: string;
 }
 
 /**
- * Every `tm:abap_object` in the parsed document, wherever it sits.
+ * Every `tm:abap_object` in the parsed document, with the task it is on.
  *
- * A walk rather than a path, for the reason the package's own reading gives:
- * a request holds its objects on its tasks, a task holds them directly, and a
- * user action echoes one under `tm:request`. Only the elements and their
- * attributes were measured, so only those are relied on.
+ * A walk rather than a path: a task document holds its objects on
+ * `tm:root/tm:task`, a request document on each `tm:request/tm:task`, and a
+ * user action echoes one under `tm:request`. **A request document also
+ * carries `tm:all_objects`** — the request's aggregate list, every object
+ * once more beside its task's entry (measured: 342 there and 342 on the one
+ * task, read twice as 684) — so that subtree is not collected: a request's
+ * objects are its tasks' entries, each once, each with its task number.
  */
-function collect(node: unknown, found: Record<string, string>[]): void {
+function collect(
+  node: unknown,
+  found: { attributes: Record<string, string>; task?: string }[],
+  task?: string,
+  inRequest = false,
+): void {
   if (Array.isArray(node)) {
-    for (const child of node) collect(child, found);
+    for (const child of node) collect(child, found, task, inRequest);
     return;
   }
   if (!node || typeof node !== 'object') return;
   for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
-    if (key === '@') continue;
+    if (key === '@' || key === 'tm:all_objects') continue;
     if (key === 'tm:abap_object') {
       for (const entry of Array.isArray(value) ? value : [value]) {
         const attributes = (entry as { '@'?: Record<string, string> })?.['@'];
-        if (attributes) found.push(attributes);
+        if (attributes) found.push({ attributes, task });
       }
       continue;
     }
-    collect(value, found);
+    if (key === 'tm:task' && inRequest) {
+      // A task of the request: its entries carry its number.
+      for (const child of Array.isArray(value) ? value : [value]) {
+        const number = (child as { '@'?: Record<string, string> })?.['@']?.[
+          'tm:number'
+        ];
+        collect(child, found, text(number), false);
+      }
+      continue;
+    }
+    collect(value, found, task, key === 'tm:request');
   }
 }
 
@@ -99,10 +119,10 @@ const text = (value: string | undefined): string | undefined =>
   value === undefined || value === '' ? undefined : value;
 
 function entriesOf(value: unknown): Entry[] {
-  const found: Record<string, string>[] = [];
+  const found: { attributes: Record<string, string>; task?: string }[] = [];
   collect(value, found);
   const entries: Entry[] = [];
-  for (const attributes of found) {
+  for (const { attributes, task } of found) {
     const name = text(attributes['tm:name']);
     const type = text(attributes['tm:type']);
     // Nothing can be done with a nameless entry, and a caller counting
@@ -115,6 +135,7 @@ function entriesOf(value: unknown): Entry[] {
       description: text(attributes['tm:obj_desc']),
       position: text(attributes['tm:position']),
       lockStatus: text(attributes['tm:lock_status']),
+      task,
     });
   }
   return entries;
@@ -146,6 +167,7 @@ export async function handleReadTransportObjects(
         // cannot be removed, and inventing an empty string would produce a
         // call that answers 200 and removes nothing.
         position: entry.position ?? null,
+        ...(entry.task ? { task: entry.task } : {}),
         ...(entry.description ? { description: entry.description } : {}),
         ...(entry.lockStatus ? { lock_status: entry.lockStatus } : {}),
       })),

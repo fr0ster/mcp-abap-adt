@@ -33,7 +33,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -43,6 +43,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -194,7 +195,7 @@ export async function handleCreateDomain(
       );
 
       const checked = await sequence(
-        () =>
+        atStep('validate', () =>
           obj.validate(
             {
               domainName,
@@ -203,7 +204,8 @@ export async function handleCreateDomain(
             },
             { analyse: analyseException },
           ),
-        () =>
+        ),
+        atStep('create', () =>
           obj.create(
             {
               domainName,
@@ -214,6 +216,7 @@ export async function handleCreateDomain(
             },
             { analyse: analyseException },
           ),
+        ),
         () =>
           withLock(
             () => obj.lock({ domainName }, { analyse: analyseLock }),
@@ -221,12 +224,13 @@ export async function handleCreateDomain(
               lockHandle,
             ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
               sequence(
-                () =>
+                atStep('read metadata', () =>
                   obj.readMetadata(
                     { domainName },
                     { analyse: analyseException },
                   ),
-                (current) =>
+                ),
+                atStep('update metadata', (current) =>
                   obj.updateMetadata(
                     {
                       domainName,
@@ -251,36 +255,40 @@ export async function handleCreateDomain(
                       analyse: analyseException,
                     },
                   ),
+                ),
               ),
             (lockHandle) =>
               obj.unlock({ domainName }, lockHandle, {
                 analyse: analyseException,
               }),
           ),
-        // Best-effort: wait for the write to be visible, right before the
+        // Best-effort (a credential failure ends the call): wait for the write to be visible, right before the
         // first call that reads it back — this is the call most likely to
         // meet a not-yet-ready object (see `xmlPatch.ts`), so the wait sits
         // immediately ahead of it, exactly where the pre-migration handler
         // put it (between `unlock` and `check`).
-        async () => {
+        atStep('check', async () => {
           await obj
             .readMetadata(
               { domainName },
               { withLongPolling: true, analyse: analyseException },
             )
-            .catch(() => undefined);
+            .catch(unlessCredentialFailure);
           return obj.check({ domainName }, undefined, {
             analyse: analyseException,
           });
-        },
+        }),
       );
 
       if (!checked.ok || !shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(checked, () =>
-        obj.activate({ domainName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        checked,
+        atStep('activate', () =>
+          obj.activate({ domainName }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

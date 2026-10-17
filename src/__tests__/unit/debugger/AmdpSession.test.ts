@@ -1,6 +1,10 @@
+import { authError } from '@mcp-abap-adt/auth-errors';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
+import { payloadCarriedBy } from '../../../lib/strategies/step';
+import { return_error } from '../../../lib/utils';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   AMDP_BREAK_LINE,
@@ -322,7 +326,9 @@ describe('AmdpSession', () => {
     await expect(stopping).rejects.toThrow(/release debuggee D1: busy/);
     expect(refusedDeletes).toBe(1);
     expect(w.session.pending()).toBe(false);
-    expect(w.session.failures()).toEqual(['release debuggee D1: busy']);
+    expect(w.session.failures()).toEqual([
+      { message: 'busy', origin: 'refusal', step: 'release debuggee D1' },
+    ]);
     expect(w.closed).toHaveLength(0);
     w.dbg.deleteDebuggee = realDelete;
     await w.session.stop();
@@ -357,7 +363,11 @@ describe('AmdpSession', () => {
       /release debuggee D1: release failed/,
     );
     expect(w.session.failures()).toEqual([
-      'release debuggee D1: release failed',
+      {
+        message: 'release failed',
+        origin: 'refusal',
+        step: 'release debuggee D1',
+      },
     ]);
     expect(w.session.holdsState()).toBe(true);
   });
@@ -372,7 +382,9 @@ describe('AmdpSession', () => {
     w.dbg.deleteDebuggee = async () => refusedResponse('busy');
     w.reads[1].resolve(okResponse(BREAK));
     await expect(first).rejects.toThrow(/release debuggee D1: busy/);
-    expect(w.session.failures()).toEqual(['release debuggee D1: busy']);
+    expect(w.session.failures()).toEqual([
+      { message: 'busy', origin: 'refusal', step: 'release debuggee D1' },
+    ]);
     expect(w.session.holdsState()).toBe(true);
   });
 
@@ -426,7 +438,7 @@ describe('AmdpSession', () => {
     await expect(
       w.session.start({ stopExisting: true, breakpoints: [] }),
     ).rejects.toThrow(
-      /socket hang up; not undone: the events' connection was not closed: logoff failed/,
+      /socket hang up; not undone: close the events' connection: logoff failed/,
     );
     expect(w.session.holdsState()).toBe(true);
     refuse = false;
@@ -496,8 +508,16 @@ describe('AmdpSession', () => {
     await expect(w.session.stop()).rejects.toThrow(/logoff failed/);
     expect(w.session.pending()).toBe(false);
     expect(w.session.failures()).toEqual([
-      "the events' connection was not closed: logoff failed",
-      "the commands' connection was not closed: logoff failed",
+      {
+        error: 'client_threw',
+        message: 'logoff failed',
+        step: "close the events' connection",
+      },
+      {
+        error: 'client_threw',
+        message: 'logoff failed',
+        step: "close the commands' connection",
+      },
     ]);
     expect(w.session.holdsState()).toBe(true);
     refuse = false;
@@ -539,6 +559,39 @@ describe('AmdpSession', () => {
     await expect(w.session.wait(0)).rejects.toThrow(/socket closed/);
     expect((await w.session.wait(0)).state).toBe('idle');
     expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('an event read that throws outside its answer carries the throw as an entry with the step read events', async () => {
+    const w = await started();
+    w.dbg.getEvents = () => {
+      throw new Error('socket closed');
+    };
+    w.reads[1].resolve(okResponse(''));
+    await until(() => w.closed.length === 2);
+    const thrown = await w.session.wait(0).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(payloadCarriedBy(thrown)).toEqual({
+      error: 'client_threw',
+      message: 'socket closed',
+      step: 'read events',
+    });
+  });
+
+  it('an event read that rejects carries the throw as an entry with the step read events', async () => {
+    const w = await started();
+    w.reads[1].reject(new Error('socket reset'));
+    await until(() => w.closed.length === 2);
+    const thrown = await w.session.wait(0).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(payloadCarriedBy(thrown)).toEqual({
+      error: 'client_threw',
+      message: 'socket reset',
+      step: 'read events',
+    });
   });
 
   it('two runs are fenced each by its own token: both outcomes arrive, and stop closes the one in flight', async () => {
@@ -586,7 +639,9 @@ describe('AmdpSession', () => {
     await expect(w.session.wait(0)).rejects.toThrow(
       /session gone; not undone: stop: not stopped/,
     );
-    expect(w.session.failures()).toEqual(['stop: not stopped']);
+    expect(w.session.failures()).toEqual([
+      { message: 'not stopped', origin: 'refusal', step: 'stop' },
+    ]);
   });
 
   it('observers hear of changes the read loop makes', async () => {
@@ -596,5 +651,34 @@ describe('AmdpSession', () => {
     w.reads[1].resolve(okResponse(BREAK));
     await until(() => heard.mock.calls.length > 0);
     expect(await w.session.wait(0)).toMatchObject({ state: 'event' });
+  });
+
+  it('a breakpoint clear the credential refused (AuthRefusedError): the stop is not sent, the refusal is the answer with its step, the stop named not attempted', async () => {
+    const w = await started();
+    const realSync = w.dbg.syncBreakpoints;
+    w.dbg.syncBreakpoints = async (m: string, b: any[]) => {
+      if (b.length) return realSync(m, b);
+      throw new AuthRefusedError(
+        authError.connection({
+          problem: 'refused-after-renewal',
+          at: 'request',
+        }),
+        'request',
+      );
+    };
+    w.calls.length = 0;
+    const error = await w.session.stop().then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(DebugCleanupError);
+    expect(w.calls).not.toContain('stop');
+    const payload = JSON.parse((return_error(error) as any).content[0].text);
+    expect(payload).toMatchObject({
+      error: 'authentication_failed',
+      step: 'clear breakpoints',
+      not_attempted: { steps: ['stop'] },
+    });
+    expect(w.session.holdsState()).toBe(true);
   });
 });

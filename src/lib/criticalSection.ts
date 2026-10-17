@@ -8,11 +8,12 @@
  * (A normal error keeps the session alive, so the finally-unlock works; only a
  * timeout leaves it locked — see @mcp-abap-adt/connection 1.10.0.)
  *
- * `@mcp-abap-adt/connection` (>= 1.10.0) exposes reference-counted
- * `beginCriticalSection()` / `endCriticalSection()`: while active, the request
- * timeout is raised to a large ceiling (SAP_TIMEOUT_CRITICAL) so slow
- * write requests run to completion instead of being aborted. We bracket the
- * whole mutating handler with it — begin before it runs, end in a `finally`.
+ * `@mcp-abap-adt/connection` exposes reference-counted
+ * `beginCriticalSection()` / `endCriticalSection()`: while active, a request
+ * carries no deadline at all — not even one its caller passed (connection 17;
+ * before, the timeout was raised to a ceiling) — so slow write requests run to
+ * completion instead of being aborted. We bracket the whole mutating handler
+ * with it — begin before it runs, end in a `finally`.
  *
  * The methods are feature-detected via a structural cast, so this degrades to a
  * no-op against an older connection that lacks them (no hard dependency on the

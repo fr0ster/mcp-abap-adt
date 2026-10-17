@@ -15,8 +15,8 @@
  */
 
 import { handleCreateTable } from '../../../../handlers/table/high/handleCreateTable';
+import { handleDeleteTable } from '../../../../handlers/table/high/handleDeleteTable';
 import { handleUpdateTable } from '../../../../handlers/table/high/handleUpdateTable';
-import { handleDeleteTable } from '../../../../handlers/table/low/handleDeleteTable';
 import { getTimeout } from '../../helpers/configHelpers';
 import { HighTester } from '../../helpers/testers/HighTester';
 

@@ -1,0 +1,146 @@
+[
+  {
+    "tool": "GetWhereUsed",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetWhereUsed.ts#handleGetWhereUsed",
+    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=…; with a type filter also POST …/usageReferences/scope?uri=…; read-only RIS queries"
+  },
+  {
+    "tool": "SearchObject",
+    "set": "full",
+    "handler": "src/handlers/search/readonly/handleSearchObject.ts#handleSearchObject",
+    "sends": "GET /sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=…&maxResults=…[&objectType=…]"
+  },
+  {
+    "tool": "SearchSource",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleSearchSource.ts#handleSearchSource",
+    "sends": "quickSearch GETs for masks; POST /sap/bc/adt/repository/nodestructure per package and type node; one source GET per unit (program, include, function module, class), up to max_objects; keeps time_budget_ms (partial hits)"
+  },
+  {
+    "tool": "GetPackageContents",
+    "set": "full",
+    "handler": "src/handlers/package/readonly/handleGetPackageContents.ts#handleGetPackageContents",
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch), per level up to max_depth: the nodestructure POST of every package of the level, then of every type node they list; the next level is the subpackages found; package_names reads several packages in the same envelopes; sequential reads where the system has no communication batch"
+  },
+  {
+    "tool": "GetPackageTree",
+    "set": "full",
+    "handler": "src/handlers/system/high/handleGetPackageTree.ts#handleGetPackageTree",
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): the package metadata GET with the root nodestructure POST, then the nodestructure walk by levels (subpackages by default, max_depth 5); package_names reads several packages in the same envelopes; sequential reads where the system has no communication batch"
+  },
+  {
+    "tool": "GetObjectsList",
+    "set": "full",
+    "handler": "src/handlers/search/readonly/handleGetObjectsList.ts#handleGetObjectsList",
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch), per level: the nodestructure POST of every node of the level, recursing into every child node; objects reads several parents in the same envelopes; sequential reads where the system has no communication batch"
+  },
+  {
+    "tool": "GetStructuresList",
+    "set": "full",
+    "handler": "src/handlers/structure/readonly/handleGetStructuresList.ts#handleGetStructuresList",
+    "sends": "1–2 source GETs per node; with include_extensions a where-used POST pair per node and a source GET per candidate; recursive"
+  },
+  {
+    "tool": "GetIncludesList",
+    "set": "full",
+    "handler": "src/handlers/include/readonly/handleGetIncludesList.ts#handleGetIncludesList",
+    "sends": "one source GET per include, recursive to depth 20; for a function group the nodestructure POST and every include; for a class one metadata GET"
+  },
+  {
+    "tool": "RuntimeListFeeds",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeListFeeds.ts#handleRuntimeListFeeds",
+    "sends": "GET /sap/bc/adt/feeds or /feeds/variants; dumps, system messages and gateway errors paged: up to about 11 GETs of /sap/bc/adt/runtime/dumps (or /runtime/systemmessages, /gw/errorlog)"
+  },
+  {
+    "tool": "ListTransports",
+    "set": "full",
+    "handler": "src/handlers/transport/readonly/handleListTransports.ts#handleListTransports",
+    "sends": "GET /sap/bc/adt/cts/transportrequests/searchconfiguration/configurations, then GET /sap/bc/adt/cts/transportrequests?configUri=… per saved configuration, up to 5"
+  },
+  {
+    "tool": "GetSqlQuery",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetSqlQuery.ts#handleGetSqlQuery",
+    "sends": "POST /sap/bc/adt/datapreview/freestyle?rowNumber=N with the SQL as the body"
+  },
+  {
+    "tool": "GetTableContents",
+    "set": "full",
+    "handler": "src/handlers/table/readonly/handleGetTableContents.ts#handleGetTableContents",
+    "sends": "POST /sap/bc/adt/datapreview/ddic?rowNumber=N&ddicEntityName=…"
+  },
+  {
+    "tool": "GetObjectInfo",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetObjectInfo.ts#handleGetObjectInfo",
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch), per tier to maxDepth: the root nodestructure POST of every node of the tier, then of every type node; with enrich=true a last envelope of one quickSearch GET per node; objects reads several objects in the same envelopes; sequential reads where the system has no communication batch"
+  },
+  {
+    "tool": "DescribeByList",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleDescribeByList.ts#handleDescribeByList",
+    "sends": "one quickSearch GET per object, in sequence, retried without its type when the first answer is empty"
+  },
+  {
+    "tool": "GetAbapSystemSymbols",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleGetAbapSystemSymbols.ts#handleGetAbapSystemSymbols",
+    "sends": "one source or metadata GET per symbol found in the given code, in sequence"
+  },
+  {
+    "tool": "GetATCFindings",
+    "set": "full",
+    "handler": "src/handlers/atc/high/handleGetATCFindings.ts#handleGetATCFindings",
+    "sends": "GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false"
+  },
+  {
+    "tool": "RuntimeGetProfilerTraceData",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts#handleRuntimeGetProfilerTraceData",
+    "sends": "GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses"
+  },
+  {
+    "tool": "RuntimeAnalyzeProfilerTrace",
+    "set": "full",
+    "handler": "src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts#handleRuntimeAnalyzeProfilerTrace",
+    "sends": "GET …/abaptraces/{id}/hitlist or /statements, then a local summary"
+  },
+  {
+    "tool": "HandlerWhereUsed",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
+    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope: GetWhereUsed without a type filter"
+  },
+  {
+    "tool": "HandlerSearch",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
+    "sends": "as SearchObject"
+  },
+  {
+    "tool": "HandlerDumpList",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerDumpList.ts#handleHandlerDumpList",
+    "sends": "as RuntimeListFeeds"
+  },
+  {
+    "tool": "HandlerGetData",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGetData.ts#handleHandlerGetData",
+    "sends": "as GetSqlQuery or GetTableContents"
+  },
+  {
+    "tool": "HandlerProfileView",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerProfileView.ts#handleHandlerProfileView",
+    "sends": "as RuntimeGetProfilerTraceData or RuntimeAnalyzeProfilerTrace"
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "one GET per mode; part 'contents' of a package (or package_names) runs the nodestructure walk in ADT batch envelopes, as GetPackageContents; the timeout applies to its reads only — UNIT_TEST / CDS_UNIT_TEST poll a run in SAP, run as an ordinary call on the instance's connection, and refuse a timeout"
+  }
+]

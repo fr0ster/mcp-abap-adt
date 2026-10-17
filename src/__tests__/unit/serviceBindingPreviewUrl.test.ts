@@ -9,6 +9,7 @@
  * url rather than a plausible one.
  */
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
+import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
@@ -331,7 +332,13 @@ describe('GetServiceBindingPreviewUrl', () => {
   it('still answers the URL when the system record cannot be read, and says so', async () => {
     // `getSystemInformation` answers null where the endpoint is absent and
     // THROWS on anything else. Neither is this tool's failure.
-    systemInfo.mockRejectedValue(new Error('403 Forbidden'));
+    // Beside the URL, the lookup's failure is the request's error as SAP
+    // answered it, with its step — not its message folded into a sentence.
+    systemInfo.mockRejectedValue(
+      Object.assign(new Error('Request failed with status code 403'), {
+        response: { status: 403, data: 'Forbidden body' },
+      }),
+    );
     fakeClient = clientFor({
       binding: BINDING,
       definition: DEFINITION,
@@ -343,7 +350,47 @@ describe('GetServiceBindingPreviewUrl', () => {
     expect(payload.success).toBe(true);
     expect(payload.preview_url).toContain('/feap/');
     expect(payload.preview_url).not.toContain('sap-client');
-    expect(payload.note).toContain('403 Forbidden');
+    expect(payload.system_information_failure).toEqual({
+      message: 'Request failed with status code 403',
+      origin: 'connection',
+      status: 403,
+      request: {
+        method: 'GET',
+        url: '/sap/bc/adt/core/http/systeminformation',
+      },
+      messages: [{ type: 'E', text: 'Request failed with status code 403' }],
+      raw_body: 'Forbidden body',
+      step: 'read system information',
+    });
+    expect(payload.note).toContain('could not be read');
+    expect(payload.note).not.toContain('status code 403');
+  });
+
+  it('a 401 SAP answered to the lookup ends the call with it; the binding is not read', async () => {
+    systemInfo.mockRejectedValue(
+      Object.assign(new Error('Request failed with status code 401'), {
+        response: { status: 401, data: '' },
+      }),
+    );
+    const reads: unknown[] = [];
+    fakeClient = fakeClientOf({
+      read: async (...args: unknown[]) => {
+        reads.push(args);
+        return okResponse(reading(BINDING));
+      },
+    });
+
+    const answered: any = await handleGetServiceBindingPreviewUrl(
+      context as never,
+      { service_binding_name: 'ZSB_STUDENT_V2' } as never,
+    );
+
+    expect(answered.isError).toBe(true);
+    expect(JSON.parse(answered.content[0].text)).toMatchObject({
+      status: 401,
+      step: 'read system information',
+    });
+    expect(reads).toEqual([]);
   });
 
   it('prefers the URL the system names over the one a rule composes', async () => {
@@ -386,6 +433,71 @@ describe('GetServiceBindingPreviewUrl', () => {
     );
     expect(payload.metadata_url).toBe(`${payload.service_url}$metadata`);
     expect(payload.annotation_url).toBe('/sap/opu/odata/annotations/X/');
+  });
+
+  describe('the service URL lookup: a credential failure ends the call as it came', () => {
+    const run = (thrown: () => unknown) => {
+      fakeClient = clientFor({
+        binding: BINDING,
+        definition: DEFINITION,
+        view: ROOT_VIEW,
+      });
+      return handleGetServiceBindingPreviewUrl(
+        {
+          connection: {
+            getBaseUrl: async () => 'https://example.invalid/',
+            getSessionId: () => null,
+            makeAdtRequest: async () => {
+              throw thrown();
+            },
+          } as never,
+          logger: undefined,
+        } as never,
+        { service_binding_name: 'ZSB_STUDENT_V2' } as never,
+      ) as Promise<any>;
+    };
+
+    it("a 401 SAP answered: the lookup's error as it is, with its step, not the composed URL", async () => {
+      const answered = await run(() =>
+        Object.assign(new Error('Request failed with status code 401'), {
+          response: { status: 401, data: '' },
+        }),
+      );
+      expect(answered.isError).toBe(true);
+      expect(JSON.parse(answered.content[0].text)).toMatchObject({
+        status: 401,
+        step: 'read service URL',
+        request: {
+          method: 'GET',
+          url: '/sap/bc/adt/businessservices/odatav2/ZSB_STUDENT_V2',
+        },
+      });
+    });
+
+    it('a thrown credential refusal: the chain answer', async () => {
+      const answered = await run(
+        () =>
+          new AuthProviderFailure(
+            authError['credential-refused']({ credential: 'token' }),
+          ),
+      );
+      expect(answered.isError).toBe(true);
+      expect(JSON.parse(answered.content[0].text).error).toBe(
+        'authentication_failed',
+      );
+    });
+
+    it('any other refusal stays best effort: the composed URL answers', async () => {
+      const answered = await run(() =>
+        Object.assign(new Error('Request failed with status code 403'), {
+          response: { status: 403, data: '' },
+        }),
+      );
+      expect(answered.isError).toBe(false);
+      expect(JSON.parse(answered.content[0].text).service_url_source).toBe(
+        'composed',
+      );
+    });
   });
 
   it('says the URL was composed when the system names none', async () => {

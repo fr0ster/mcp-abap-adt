@@ -3,16 +3,19 @@
 Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
-- Tools: 29
-- Read-only half: `@mcp-abap-adt/compact-readonly`
+- Tools: 40
+- Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
-- Debugger verbs: `@mcp-abap-adt/compact`, served only with `--exposition=ro,debug` or `rw,debug`
-- Command: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`)
+- Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
+- Leftover-session tools: `@mcp-abap-adt/lib`, on stdio only (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`): the list and the logoff in both; no `-compact-http` or `-compact-sse` binary serves them
+- Background-run tools: `@mcp-abap-adt/lib`, in the write binaries (where `HandlerProfileRun` is)
+- Batch mode: `HandlerBatch` of `@mcp-abap-adt/lib`, in every compact binary, on every transport. Every other tool's description, as the server lists it, ends with one sentence saying whether a call of it is recorded in batch mode, for which arguments, refused, or not served; the descriptions on this page are the tools' own, without it ([Batch Mode](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/BATCH_MODE.md))
+- Commands: `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`) serves every tool below; `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`) the read-only half and the leftover-session list and logoff (and `-compact-http`, `-compact-sse`, each with its `-ro`, the same without the leftover-session tools)
 
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 29 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 40 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 
@@ -20,16 +23,17 @@ per request.
 
 ### HandlerGet
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** Read operation. part selects the aspect: source (default), metadata, urls, or contents (the objects of a PACKAGE); a part the type does not offer is refused, naming the ones it does. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Reads one part of an object. part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or no package of that name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, messages, document }, the messages the run produced and its results document as SAP answered it. Otherwise object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `object_type` (required) — ABAP object type for routed compact operation.
-- `part` — Which aspect to read: the source, the ADT metadata document, the service and preview URLs, or the objects a package contains. A part this object type does not offer is refused, naming the parts it does.
+- `timeout` — Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP. Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, and the parts object_structure, node_structure, virtual_folders.
+- `object_type` — ABAP object type for routed compact operation.
+- `part` — The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced).
 - `package_name` — Package name.
 - `max_results` — Maximum number of members listed (part contents).
 - `class_name` — Class name.
@@ -40,41 +44,53 @@ per request.
 - `table_name` — Table name.
 - `structure_name` — Structure name.
 - `ddl_name` — DDL source name.
-- `function_module_name` — Function module name.
-- `function_group_name` — Function group name.
+- `function_module_name` — Function module name: GROUP|MODULE, its function group first, or the module alone with function_group_name.
+- `function_group_name` — Function group name (FUNCTION_GROUP; FUNCTION_MODULE given as the module's name).
 - `behavior_definition_name` — Behavior definition name.
 - `behavior_implementation_name` — Behavior implementation name.
 - `metadata_extension_name` — Metadata extension name.
 - `service_definition_name` — Service definition name.
 - `service_binding_name` — Service binding name.
-- `run_id` — Unit test run id.
+- `transport_number` — Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own.
+- `run_id` — Run id: a unit test run (UNIT_TEST, CDS_UNIT_TEST) or an activation run (parts activation_status, activation_results).
 - `response_format` — Response format for SERVICE_BINDING reads.
 - `version` — Object version to read/check.
+- `object_adt_type` — ADT type code of the object (object_structure) or of the parent node (node_structure).
+- `object_name` — Object name (object_structure) or parent name (node_structure).
+- `node_id` — Node id to expand (node_structure); the root when absent.
+- `with_short_descriptions` — Include short descriptions (node_structure).
+- `object_search_pattern` — Object name pattern (virtual_folders).
+- `preselection` — Facet preselections (virtual_folders).
+- `facet_order` — Facet order (virtual_folders).
+- `with_versions` — Include versions (virtual_folders).
+- `ignore_short_descriptions` — Leave out short descriptions (virtual_folders).
 
 ### HandlerSearch
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** Search ABAP repository objects by name or mask. Required: query*. Optional: object_type, max_results (default 100). Response: one object per line.
+**Description:** Search ABAP repository objects by name or mask. Required: query*. Optional: object_type, max_results (default 100). Response: one object per line. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
+- `timeout` — Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `query` (required) — Object name or mask, with * as a wildcard.
 - `object_type` — ADT object type to restrict the search to.
 - `max_results` — Maximum number of objects returned.
 
 ### HandlerWhereUsed
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** Where-used list of an ABAP object: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON.
+**Description:** Where-used list of an ABAP object: the objects that use, call or reference it, with type and package. Required: object_type*, object_name*. Optional: function_group_name (FUNCTION_MODULE), max_results (default 100). Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
+- `timeout` — Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `object_type` (required) — Type of the object whose usages are listed.
 - `object_name` (required) — Object name.
 - `function_group_name` — Function group of the function module (FUNCTION_MODULE).
@@ -82,59 +98,72 @@ per request.
 
 ### HandlerGetData
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** Read rows of a table or CDS view: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON.
+**Description:** Read rows of a table or CDS view: every column of object_name, or what sql_query selects with its columns, conditions and order. Required: object_name or sql_query. Optional: max_rows (default 100). Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
+- `timeout` — Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `object_name` — Table or CDS view whose rows are read, all columns. Used when sql_query is absent.
 - `sql_query` — ABAP SQL SELECT naming the columns, conditions and order to read.
 - `max_rows` — Maximum number of rows returned.
 
 ### HandlerValidate
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** Validate before create only. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
+**Description:** Validate before create only. object_type required: CLASS(object_name*, superclass), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `object_type` (required) — Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.
-- `object_name` (required) — Required object name. For SERVICE_BINDING this is the service binding name.
+- `object_name` (required) — Required object name. For SERVICE_BINDING this is the service binding name; a function module is named GROUP|MODULE.
 - `package_name` — Optional package context for validation (especially for create scenarios).
+- `super_package` — Super package of the package to validate (PACKAGE).
+- `superclass` — Superclass of the class to validate (CLASS).
 - `description` — Optional object description used during validation.
 - `behavior_definition` — Optional behavior definition name, used when validating behavior implementation.
 - `root_entity` — Optional CDS root entity name, used for behavior-related validation.
 - `implementation_type` — Optional implementation type, used for behavior implementation validation.
 - `service_definition_name` — Required when object_type=SERVICE_BINDING. Service definition paired with the binding.
 - `service_binding_version` — Optional service binding version for SERVICE_BINDING.
-- `session_id` — Optional ADT session id for stateful validation flow.
-- `session_state` — Optional ADT session state container (cookies/CSRF) for stateful validation flow.
 
 ### HandlerCheckRun
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
+**Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), METADATA_EXTENSION(object_name*). source_code checks source that is not saved, for CLASS, STRUCTURE and DDL.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `object_type` (required) — ABAP object type for routed compact operation.
-- `object_name` (required) — Primary object name for lifecycle operation.
+- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, METADATA_EXTENSION.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `version` — Version to syntax-check.
-- `session_id` — Optional ADT session id for stateful check flow.
-- `session_state` — Optional ADT session state container (cookies/CSRF) for stateful check flow.
+- `source_code` — Source to check instead of the saved one; nothing is saved. CLASS, STRUCTURE and DDL only.
+
+### HandlerDeletionCheck
+
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
+
+**Description:** Asks SAP whether the object can be deleted: sends the deletion check request for the given type, and answers SAP's verdict as it came: deletable true with the object and SAP's message when it carries one, or SAP's refusal with its words. object_type and object_name required: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST (its test class), PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE (object_name GROUP|MODULE), BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `object_type` (required) — Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 
 ### HandlerUnitTestStatus
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** ABAP Unit test run status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.
 
@@ -147,9 +176,9 @@ per request.
 
 ### HandlerUnitTestResult
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** ABAP Unit test run result. object_type: not used. Required: run_id*. Optional: with_navigation_uris, format(abapunit|junit). Response: JSON.
+**Description:** Reads the result of an ABAP Unit test run by run_id*, in one request (GET /sap/bc/adt/abapunit/results/{run_id}), and answers { success, run_id, run_result }: run_result is the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. Optional: with_navigation_uris, format (abapunit or junit).
 
 **Available in:** cloud, onprem
 
@@ -161,7 +190,7 @@ per request.
 
 ### HandlerCdsUnitTestStatus
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** CDS unit test run status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.
 
@@ -174,9 +203,9 @@ per request.
 
 ### HandlerCdsUnitTestResult
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** CDS unit test run result. object_type: not used. Required: run_id*. Optional: with_navigation_uris, format(abapunit|junit). Response: JSON.
+**Description:** Reads the result of a CDS unit test run by run_id*, in one request (GET /sap/bc/adt/abapunit/results/{run_id}), and answers { success, run_id, run_result }: run_result is the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. Optional: with_navigation_uris, format (abapunit or junit).
 
 **Available in:** cloud, onprem
 
@@ -188,7 +217,7 @@ per request.
 
 ### HandlerProfileList
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Runtime profiling list. object_type: not used. Required: none. Response: JSON.
 
@@ -198,14 +227,15 @@ per request.
 
 ### HandlerProfileView
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** Runtime profiling view. object_type: not used. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: mode(raw|analyze, default raw), top(analyze only), with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.
+**Description:** Runtime profiling view. object_type: not used. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: mode(raw|analyze, default raw), top(analyze only), with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
+- `timeout` — Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `trace_id_or_uri` (required) — Profiler trace id or URI.
 - `view` (required) — Profiler trace view kind.
 - `mode` — "raw" returns the parsed trace payload as-is (default). "analyze" returns a compact summary instead — totals plus the top-ranked entries — via the same trace view.
@@ -217,14 +247,15 @@ per request.
 
 ### HandlerDumpList
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
-**Description:** Runtime feed list, newest first. object_type: not used. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, runtime_error, exception, object_name, package, component, top, from, to. Response: JSON; each dump carries dump_id, and next_to when more remain.
+**Description:** Reads one page of a runtime feed in one request, newest first. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, runtime_error, exception, object_name, package, component, top (1 to 100), from, to. Response: JSON { feed_type, count, entries, next_to }; each dump carries dump_id; next_to is the `to` of SAP's next link, present when more remain. The next link's page starts at the boundary second, inclusive: entries of that second may repeat; match them by dump_id. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
+- `timeout` — Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `feed_type` — Which runtime feed to list. Default "dumps" (ABAP short dumps). "system_messages" and "gateway_errors" read the other two ADT runtime feeds through the same call.
 - `user` — Entries of this user.
 - `runtime_error` — Dumps whose runtime error contains this text, in any case.
@@ -232,13 +263,13 @@ per request.
 - `object_name` — Dumps whose terminated object name contains this text, in any case.
 - `package` — Dumps whose object package contains this text, in any case.
 - `component` — Dumps whose application component contains this text, in any case.
-- `top` — Most entries, up to 1000 (default 50); SAP answers 100 per request and the pages are read in turn.
+- `top` — Entries the page holds, 1 to 100 (SAP answers 100 when top is absent).
 - `from` — Start of time range (YYYYMMDDHHMMSS).
-- `to` — End of time range (YYYYMMDDHHMMSS); a previous next_to reads on.
+- `to` — End of time range (YYYYMMDDHHMMSS), inclusive: the page holds the entries up to that second; a previous answer's next_to is the next page's to, and that page starts at the boundary second, inclusive.
 
 ### HandlerDumpView
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Runtime dump view. object_type: not used. Required: dump_id* (id or URI). Optional: view(default|summary|formatted). Response: JSON.
 
@@ -251,7 +282,7 @@ per request.
 
 ### HandlerServiceBindingListTypes
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Service binding types list. object_type: not used. Required: none. Optional: response_format(xml|json|plain). Response: XML/JSON/plain by response_format.
 
@@ -263,7 +294,7 @@ per request.
 
 ### HandlerServiceBindingValidate
 
-**Half:** `@mcp-abap-adt/compact-readonly`
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
 
 **Description:** Service binding validate before create. object_type: not used. Required: service_binding_name*, service_definition_name*. Optional: service_binding_version, package_name, description. Response: JSON.
 
@@ -281,58 +312,62 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(cds_view_name*, class_name*, package_name*, test_class_source*).
+**Description:** Creates the object: sends the create request for the given type with the given parameters, and answers SAP's result. The object is created inactive. object_type required: PACKAGE(package_name*, super_package*), DOMAIN(domain_name*, package_name*), DATA_ELEMENT(data_element_name*, package_name*), TRANSPORT(description*), TABLE(table_name*, package_name*), STRUCTURE(structure_name*, package_name*), DDL(ddl_name*, package_name*), SERVICE_DEFINITION(service_definition_name*, package_name*), SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*), CLASS(class_name*, package_name*), PROGRAM(program_name*, package_name*) [onprem only], INTERFACE(interface_name*, package_name*), FUNCTION_GROUP(function_group_name*, package_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, package_name*), METADATA_EXTENSION(name*, package_name*). Optional for every type: description, transport_request.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `object_type` (required) — ABAP object type for routed compact operation.
-- `class_name` — ABAP class name.
+- `class_name` — ABAP class name (CLASS, BEHAVIOR_IMPLEMENTATION).
 - `program_name` — ABAP program name.
 - `domain_name` — ABAP domain name.
 - `function_module_name` — ABAP function module name.
-- `function_group_name` — ABAP function group name.
+- `function_group_name` — ABAP function group name (FUNCTION_GROUP; the group of a FUNCTION_MODULE).
 - `package_name` — ABAP package name.
 - `ddl_name` — DDL source name (CDS view, AMDP table function, etc.).
 - `description` — Human-readable object description.
 - `transport_request` — Transport request id (if required by system).
-- `activate` — Activate object after create.
-- `program_type` — ABAP program type.
-- `application` — Domain application area.
-- `datatype` — ABAP data type.
-- `length` — Length for typed artifacts.
-- `decimals` — Decimal places.
-- `conversion_exit` — Conversion exit name.
-- `lowercase` — Allow lowercase values (domain setting).
-- `sign_exists` — Allow signed values (domain setting).
-- `value_table` — Foreign key value table.
-- `fixed_values` — Domain fixed values list.
+- `master_language` — Original language of the created object; the session language when absent.
+- `super_package` — Super package (PACKAGE create).
+- `package_type` — Package type (PACKAGE create).
+- `software_component` — Software component (PACKAGE create).
+- `transport_layer` — Transport layer (PACKAGE create).
+- `record_changes` — Record changes (PACKAGE create).
+- `application_component` — Application component (PACKAGE create).
+- `transport_type` — Transport request type (TRANSPORT create).
+- `target_system` — Target system of the transport request (TRANSPORT create).
+- `owner` — Owner of the transport request (TRANSPORT create).
+- `superclass` — Superclass name (CLASS create).
+- `final` — Mark the class final (CLASS create).
+- `create_protected` — Protected constructor (CLASS create).
+- `program_type` — ABAP program type (PROGRAM create).
+- `application` — Application area (PROGRAM create).
 - `table_name` — Table name.
 - `structure_name` — Structure name.
 - `data_element_name` — Data element name.
 - `interface_name` — Interface name.
-- `service_definition_name` — Service definition name.
+- `service_definition_name` — Service definition name (SERVICE_DEFINITION; the definition a SERVICE_BINDING binds).
 - `service_binding_name` — Service binding name.
+- `service_name` — Service name of the binding (SERVICE_BINDING create); the binding name when absent.
+- `service_version` — Service version of the binding (SERVICE_BINDING create); 0001 when absent.
+- `binding_variant` — Binding variant (SERVICE_BINDING create); ODATA_V4_UI when absent.
 - `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `root_entity` — Root CDS entity name (behavior definition create).
 - `implementation_type` — Behavior definition implementation type.
-- `behavior_definition` — Referenced behavior definition name (behavior implementation create).
-- `cds_view_name` — CDS view name to validate for unit test doubles.
-- `fields` — Structure fields (for STRUCTURE create).
-- `test_class_source` — ABAP source of the local test classes (UNIT_TEST and CDS_UNIT_TEST create).
 
 ### HandlerUpdate
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(class_name*, test_class_source*).
+**Description:** Writes the object under its lock: sends the one write request of the given type under lock_handle, the lock handle of the object, and answers SAP's result. The write replaces the whole content with the one given. lock_handle and object_type required: PACKAGE(package_name*, source_code*, transport_request), DOMAIN(domain_name*, source_code*, transport_request), DATA_ELEMENT(data_element_name*, source_code*, transport_request), FUNCTION_GROUP(function_group_name*, source_code*, transport_request), TABLE(table_name*, ddl_code*, transport_request), STRUCTURE(structure_name*, ddl_code*, transport_request), DDL(ddl_name*, ddl_source*, transport_request), SERVICE_DEFINITION(service_definition_name*, source_code*, transport_request), CLASS(class_name*, source_code*, transport_request), LOCAL_TEST_CLASS(class_name*, test_class_code*, transport_request), LOCAL_TYPES(class_name*, local_types_code*, transport_request), LOCAL_DEFINITIONS(class_name*, definitions_code*, transport_request), LOCAL_MACROS(class_name*, macros_code*, transport_request), UNIT_TEST(class_name*, test_class_source*, transport_request), CDS_UNIT_TEST(class_name*, test_class_source*, transport_request), PROGRAM(program_name*, source_code*, transport_request) [onprem only], INTERFACE(interface_name*, source_code*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*, transport_request), BEHAVIOR_DEFINITION(name*, source_code*, transport_request), BEHAVIOR_IMPLEMENTATION(class_name*, implementation_code*, transport_request), METADATA_EXTENSION(name*, source_code*, transport_request), SERVICE_BINDING(service_binding_name*, desired_publication_state*, binding_variant*, service_name, service_version). For PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP, source_code is the whole metadata document, sent as given. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST and BEHAVIOR_IMPLEMENTATION, lock_handle is the class's lock handle. For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding. transport_request is sent as the write's corrNr. Over Streamable HTTP the request carries the lock's state_handle in the x-mcp-state-handle header: the write is sent only under a lock the instance it reaches holds.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `object_type` (required) — ABAP object type for routed compact operation.
+- `lock_handle` (required) — The lock handle of the object (for a class include, of the class): the write is sent under it.
+- `transport_request` — Transport request id, sent as the write's corrNr (the types whose description names it).
 - `class_name` — ABAP class name.
 - `program_name` — ABAP program name.
 - `domain_name` — ABAP domain name.
@@ -340,28 +375,17 @@ per request.
 - `function_group_name` — ABAP function group name.
 - `package_name` — ABAP package name.
 - `ddl_name` — DDL source name (CDS view, AMDP table function, etc.).
-- `source_code` — ABAP source code payload.
+- `source_code` — The content written: the source, or for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP the whole metadata document.
 - `ddl_source` — Complete DDL source code (for DDL update).
-- `transport_request` — Transport request id (if required by system).
-- `activate` — Activate object after update.
-- `description` — Human-readable object description.
-- `datatype` — ABAP data type.
-- `length` — Length for typed artifacts.
-- `decimals` — Decimal places.
-- `conversion_exit` — Conversion exit name.
-- `lowercase` — Allow lowercase values (domain setting).
-- `sign_exists` — Allow signed values (domain setting).
-- `value_table` — Foreign key value table.
-- `fixed_values` — Domain fixed values list.
 - `table_name` — Table name.
 - `structure_name` — Structure name.
 - `data_element_name` — Data element name.
 - `interface_name` — Interface name.
 - `service_definition_name` — Service definition name.
 - `service_binding_name` — Service binding name.
-- `service_name` — Published service name (service binding update).
+- `service_name` — Published service name (SERVICE_BINDING, an OData V2 binding).
+- `service_version` — Published service version (SERVICE_BINDING, an OData V2 binding). Default 0001.
 - `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `behavior_definition` — Referenced behavior definition name (behavior implementation update).
 - `ddl_code` — Complete DDL source code (for TABLE/STRUCTURE update).
 - `implementation_code` — Behavior implementation methods source code.
 - `test_class_source` — ABAP source of the local test classes (UNIT_TEST and CDS_UNIT_TEST update).
@@ -376,20 +400,22 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Delete operation. object_type required: DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(class_name*), CDS_UNIT_TEST(class_name*).
+**Description:** Deletes the object: sends the deletion request for the given type, and answers SAP's result. object_type required: PACKAGE(package_name*, transport_request), DOMAIN(domain_name*, transport_request), DATA_ELEMENT(data_element_name*, transport_request), TABLE(table_name*, transport_request), STRUCTURE(structure_name*, transport_request), DDL(ddl_name*, transport_request), SERVICE_DEFINITION(service_definition_name*, transport_request), SERVICE_BINDING(service_binding_name*, transport_request), CLASS(class_name*, transport_request), CDS_UNIT_TEST(class_name*, transport_request), PROGRAM(program_name*, transport_request) [onprem only], INTERFACE(interface_name*, transport_request), FUNCTION_GROUP(function_group_name*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, transport_request), BEHAVIOR_DEFINITION(behavior_definition_name*, transport_request), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*, transport_request), METADATA_EXTENSION(metadata_extension_name*, transport_request), LOCAL_TEST_CLASS(class_name*, lock_handle*, transport_request), LOCAL_TYPES(class_name*, lock_handle*, transport_request), LOCAL_DEFINITIONS(class_name*, lock_handle*, transport_request), LOCAL_MACROS(class_name*, lock_handle*, transport_request), UNIT_TEST(class_name*, lock_handle*, transport_request). CDS_UNIT_TEST deletes its test class. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS and LOCAL_MACROS (the class's local includes) and UNIT_TEST (its test classes include) the include is written empty under lock_handle, the class's lock handle. transport_request is sent with the request. Over Streamable HTTP an include write carries the lock's state_handle in the x-mcp-state-handle header: it is sent only under a lock the instance it reaches holds.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `object_type` (required) — ABAP object type for routed compact operation.
+- `object_type` (required) — Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST.
+- `lock_handle` — The lock handle of the class (LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST): the include is written empty under it.
+- `package_name` — ABAP package name.
 - `class_name` — ABAP class name.
 - `program_name` — ABAP program name.
 - `domain_name` — ABAP domain name.
 - `function_module_name` — ABAP function module name.
 - `function_group_name` — ABAP function group name.
 - `ddl_name` — DDL source name (CDS view, AMDP table function, etc.).
-- `transport_request` — Transport request id (if required by system).
+- `transport_request` — Transport request id, sent with the deletion (or the include write).
 - `table_name` — Table name.
 - `structure_name` — Structure name.
 - `data_element_name` — Data element name.
@@ -404,16 +430,16 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). FUNCTION_MODULE needs the batch mode with objects[].parentName set to its function group, because a module is addressed under the group. Batch mode(objects[].name*, objects[].type*, objects[].parentName, objects[].uri).
+**Description:** Activates objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type takes object_adt_type (e.g. "CLAS/OC"). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); a function module is listed with objects[].parentName set to its function group, type FUGR/FF. One object of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION or METADATA_EXTENSION (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `object_type` — ABAP object type for routed compact operation. For single-object activation, this alone is enough — no ADT type code needed.
-- `object_name` — Object name for single-object activation form.
-- `object_adt_type` — ADT object type code (e.g. CLAS/OC, PROG/P), for a type object_type does not cover. Only needed when object_type is not enough; prefer object_type otherwise.
-- `objects` — Explicit objects list for batch activation.
+- `object_type` — ABAP object type for routed compact operation. Names the object's type in the single form.
+- `object_name` — Object name (single form).
+- `object_adt_type` — ADT object type code (e.g. CLAS/OC, PROG/P) of the object (single form).
+- `objects` — The objects activated together (list form).
 - `preaudit` — Run pre-audit checks before activation.
 
 ### HandlerTransportCreate
@@ -431,37 +457,59 @@ per request.
 - `target_system` — Target system id.
 - `owner` — Transport owner user.
 
-### HandlerLock
+### HandlerTransportSortAndCompress
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
+**Description:** Transport task sort and compress: sorts a task's object list and merges its duplicate entries. object_type: not used. Required: transport_number* (a task). A task holding the same entry twice refuses removing an entry until this has run. Response: JSON — acceptance only; a re-read of the task's objects with HandlerGet (object_type TRANSPORT) confirms it.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `object_type` (required) — ABAP object type for routed compact operation.
-- `object_name` (required) — Primary object name for lifecycle operation.
+- `transport_number` (required) — Number of the transport task to sort and compress.
+
+### HandlerTransportMoveObjects
+
+**Half:** `@mcp-abap-adt/compact-modify`
+
+**Description:** Transport move objects: moves object entries from one task to another. Top-level object_type: not used. Required: transport_number* (the source task), target_number* (the target task), objects* (at least one: object_name*, object_type*, position* in the source task's object list, pgmid). The positions come from HandlerGet with object_type TRANSPORT on the source task. Response: JSON — acceptance only; a re-read of both tasks with HandlerGet (object_type TRANSPORT) confirms it.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `transport_number` (required) — Number of the transport task that holds the entries.
+- `target_number` (required) — Number of the transport task the entries move to.
+- `objects` (required) — The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.
+
+### HandlerLock
+
+**Half:** `@mcp-abap-adt/compact-modify`
+
+**Description:** Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_DEFINITION(object_name*), SERVICE_BINDING(object_name*). Answers the lock_handle; a SERVICE_BINDING open in an editing session answers an empty one, under which its publication runs. Over Streamable HTTP the answer also carries the state_handle of the instance that holds the lock: the write and the unlock under this lock send it in the x-mcp-state-handle header.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `super_package` — Super package context when relevant.
-- `session_id` — Optional ADT session id for stateful lock flow.
-- `session_state` — Optional ADT session state container (cookies/CSRF) for stateful lock flow.
 
 ### HandlerUnlock
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*, session_id*), PROGRAM(object_name*, lock_handle*, session_id*) [onprem only], INTERFACE(object_name*, lock_handle*, session_id*), FUNCTION_GROUP(object_name*, lock_handle*, session_id*), FUNCTION_MODULE(object_name*, lock_handle*, session_id*), TABLE(object_name*, lock_handle*, session_id*), STRUCTURE(object_name*, lock_handle*, session_id*), DDL(object_name*, lock_handle*, session_id*), DOMAIN(object_name*, lock_handle*, session_id*), DATA_ELEMENT(object_name*, lock_handle*, session_id*), PACKAGE(object_name*, lock_handle*, session_id*), BEHAVIOR_DEFINITION(object_name*, lock_handle*, session_id*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*, session_id*), METADATA_EXTENSION(object_name*, lock_handle*, session_id*).
+**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*), PROGRAM(object_name*, lock_handle*) [onprem only], INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*), SERVICE_DEFINITION(object_name*, lock_handle*), SERVICE_BINDING(object_name*, lock_handle*); an empty lock_handle of a SERVICE_BINDING answers that there is nothing to unlock. Over Streamable HTTP the request carries the lock's state_handle in the x-mcp-state-handle header; the unlock ends the instance's hold on the lock.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `object_type` (required) — ABAP object type for routed compact operation.
-- `object_name` (required) — Primary object name for lifecycle operation.
+- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `lock_handle` (required) — Lock handle returned by lock.
-- `session_id` (required) — ADT session id used during lock.
-- `session_state` — Optional ADT session state container (cookies/CSRF) for stateful unlock flow.
 
 ### HandlerUnitTestRun
 
@@ -480,21 +528,17 @@ per request.
 - `risk_level` — Allowed risk levels.
 - `duration` — Allowed duration classes.
 
-### HandlerProfileRun
+### HandlerProfileSchedule
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs]. Optional: profiling(default true; set false for a plain run with no trace), profiling flags, description. Response: JSON.
+**Description:** Schedules an ABAP profiler trace in one request. object_type: not used. Optional: description, profiling flags (all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing). Response: JSON { success, profiler_id }, profiler_id the id of the scheduled trace.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `target_type` (required) — Profile execution target kind.
-- `class_name` — Class name for profiling.
-- `program_name` — Program name for profiling.
-- `profiling` — Whether to capture a profiler trace while running. Default true. Set false for a plain run with no tracing — the profiling flags below are then ignored.
-- `description` — Profiler run description.
+- `description` — Profiler trace description.
 - `all_procedural_units` — Trace all procedural units.
 - `all_misc_abap_statements` — Trace miscellaneous ABAP statements.
 - `all_internal_table_events` — Trace internal table events.
@@ -509,70 +553,193 @@ per request.
 - `amdp_trace` — Enable AMDP tracing.
 - `max_time_for_tracing` — Maximum tracing time.
 
-### HandlerDebugStart
+### HandlerProfileRun
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+**Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. request_user, debugging_mode and settings apply to abap only. take_over: abap — Displaces another debugger listening for the same user; amdp — ends an AMDP session of this user left behind. Without take_over, abap is refused before anything is placed while another debugger listens for that user. abap: in user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server. abap: the breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole. amdp: catches every request of the connected SAP user, not only programs run by this server.
+**Description:** Runs a class or a program in one request. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs]. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `kind` (required) — abap debugs ABAP code; amdp debugs SQLScript methods of a class.
-- `breakpoints` (required) — abap: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. amdp: object_name (the class) and line of each.
-- `take_over` — abap: takes over from another debugger listening for this user instead of refusing; the breakpoints of this SAP user (in user mode, for the same request user) are replaced. amdp: ends an AMDP session of this user left behind instead of refusing.
-- `request_user` — User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
-- `debugging_mode` — user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
-- `settings` — Debugger settings, applied after each attach; a field left out keeps its value.
-- `run` — A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
+- `target_type` (required) — Run target kind.
+- `class_name` — Class to run.
+- `program_name` — Program to run.
+- `profiler_id` — The profiler id of a scheduled trace. Given, the run goes under that trace; absent, the run is plain.
+- `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
+
+### HandlerDebugBreakpoints
+
+**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
+
+**Description:** Debugger breakpoints and watchpoints: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: setBreakpoints replaces the breakpoint set of this debugging identity with breakpoints and answers each row SAP placed or refused; syncBreakpoints replaces the full set (sync_scope full) or the part of the objects in sync_objects (sync_scope partial); deleteBreakpoint deletes breakpoint_id; createWatchpoint, listWatchpoints and deleteWatchpoint work on the attached debuggee. In user mode the breakpoints catch every request of the request user; the set is one per SAP user and request user, shared by every IDE of that user, and each change replaces it as a whole. kind amdp: syncBreakpoints replaces the breakpoints of the running AMDP session and answers the request id; SAP confirms them in a SYNC_BREAKPOINTS event. The answer carries state_handle, and for abap the identity in force.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `state_handle` — The handle of this server's debug state. abap setBreakpoints and syncBreakpoints open the debug state when it is omitted and answer its handle; every other operation takes it.
+- `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
+- `operation` (required) — The one request: abap setBreakpoints, syncBreakpoints, deleteBreakpoint, createWatchpoint, listWatchpoints or deleteWatchpoint; amdp syncBreakpoints.
+- `breakpoints` — setBreakpoints and syncBreakpoints: abap a line, an exception class, an ABAP statement or a message, a line breakpoint may carry a condition; amdp object_name (the class) and line of each, an empty list clears them.
+- `sync_scope` — abap syncBreakpoints: full replaces every breakpoint of the set; partial replaces those of the objects in sync_objects and takes line breakpoints.
+- `sync_objects` — abap syncBreakpoints with sync_scope partial: the ADT URIs of the objects whose breakpoints are replaced.
+- `breakpoint_id` — abap deleteBreakpoint: the id SAP gave the breakpoint.
+- `variable_name` — abap createWatchpoint: the variable watched.
+- `condition` — abap createWatchpoint: the ABAP condition the watchpoint stops on.
+- `watchpoint_id` — abap deleteWatchpoint: the id SAP gave the watchpoint.
+- `request_user` — abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.
+- `debugging_mode` — abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 
-### HandlerDebugWait
+### HandlerDebugSession
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** State of a debug session after waiting up to hold_seconds; for AMDP, its events.
-
-**Available in:** cloud, onprem
-
-**Parameters:**
-
-- `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
-- `hold_seconds` — Longest wait for a change, at most 30 seconds.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
-
-### HandlerDebugView
-
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
-
-**Description:** The stopped debuggee: stack, variables (by name, or the scopes), memory, or an AMDP table variable's rows.
+**Description:** Debugger listener and session. Each operation up to end sends one SAP request, the operation's, and answers what SAP answered. kind abap: checkListener answers whether another debugger holds this identity's debugging (SAP's 409 names the holder); listen waits for a debuggee for exactly hold_seconds, SAP's hold, and answers the debuggee caught (debuggee_id, its server) or caught: false; a breakpoint stops a program while a listen is open; stopListener ends the listener and deletes the identity's breakpoints; attach attaches debuggee_id on the attaching session, which the first attach opens and every later attach, step and reading uses; detachDebugger sends detachDebugger on the attaching session, which releases the debuggee, and the program runs on; terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger; each answers SAP's answer as it came, which is a 500 when it succeeded, and the next answer shows the success (noSessionAttached, or the program's end); setDebuggerSettings sends the settings given at the attached debuggee. kind amdp: start opens an AMDP session for the connected SAP user and answers its main_id; getEvents answers the events SAP sends (breaks with their debuggee ids, breakpoint confirmations, ends); stop ends the AMDP session; deleteDebuggee cancels the execution of debuggee_id. end, for either kind, takes state_handle and logs off each connection the debug state opened, one logoff each: an attached debuggee runs on, an AMDP debug session ends, and the user's breakpoints stay set until removed (stopListener removes them); the debug state and its handle end with it, and a new debug state of either kind and any identity opens after it. The answer carries state_handle while the debug state holds something, and for abap the identity in force.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
-- `what` (required) — stack, variables and memory read an ABAP stop; table reads an AMDP stop.
-- `names` — variables: names to read, a path reads a component or a table row; the scopes when omitted. table: the table variable, first entry.
+- `state_handle` — The handle of this server's debug state. abap checkListener, listen, stopListener and attach, and amdp start, open the debug state when it is omitted and answer its handle; every other operation takes it.
+- `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
+- `operation` (required) — The one request: abap checkListener, listen, stopListener, attach, detachDebugger, terminateDebuggee, terminateDebugger or setDebuggerSettings; amdp start, getEvents, stop or deleteDebuggee. end, for either kind, logs off the debug state.
+- `hold_seconds` — abap listen: how long SAP holds the listen, in seconds; SAP answers at a catch or when the hold ends.
+- `take_over` — abap listen: true displaces another debugger listening for the same user; false, or omitted, answers its 409. amdp start: true ends an AMDP session of this user left behind.
+- `debuggee_id` — abap attach: the debuggee_id listen answered. amdp deleteDebuggee: the debuggee id of a break event.
+- `server` — abap attach: the debuggee's application server, as listen answered it.
+- `settings` — abap setDebuggerSettings: the settings sent; a field left out keeps its value.
+- `request_user` — abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.
+- `debugging_mode` — abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerDebugStep
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (opt-in: `debug` in `--exposition`)
+**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** Moves the stopped debuggee (into, over, return, continue, run or jump to a line), leaves it running (detach, release_debugger), ends it where it stands, or ends the debug session.
+**Description:** Moves the stopped debuggee: each call sends one SAP request, the operation's. kind abap, on the attached debuggee: stepInto, stepOver, stepReturn and stepContinue step from where it stands; stepRunToLine runs to the line object_type, object_name and line name, stepJumpToLine moves there and skips what lies between; a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack. setStackPosition makes frame position the one variables are read in. kind amdp: stepOver and stepContinue move debuggee_id and answer the request id; the next stop arrives as a break event.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
-- `action` (required) — into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.
+- `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
+- `operation` (required) — The one request: abap stepInto, stepOver, stepReturn, stepContinue, stepRunToLine, stepJumpToLine or setStackPosition; amdp stepOver or stepContinue.
 - `object_type` — For a line: CLAS, PROG, INCL or FUNC.
 - `object_name` — For a line: the object holding it.
 - `line` — For a line: the line in the object source.
 - `include` — For a class: definitions, implementations, macros or testclasses; the main source when omitted.
 - `parent_name` — For a function module: its function group.
+- `position` — abap setStackPosition: the frame's position in the stack.
+- `debuggee_id` — amdp: the debuggee id of the break event.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+### HandlerDebugMaintain
+
+**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
+
+**Description:** Reads and changes the stopped debuggee: each call sends one SAP request, chosen by operation. kind abap, on the attached debuggee: getStack answers the frames, each with its program, include, line and ADT address, the stopped position on top; getVariables answers the variables in names (a path reads a component or a table row); getChildVariables answers the members of the ids in parents, the scopes (@ROOT) when parents is omitted; getMemorySizes answers the memory sizes; createMemorySnapshot creates a memory snapshot; setVariableValue sets variable_name to value and answers the variable. kind amdp: getDataPreview answers the rows of the table variable variable_name of debuggee_id.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
+- `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
+- `operation` (required) — What the call does: abap getStack (the stack), getVariables (variables by name), getChildVariables (child variables), getMemorySizes (memory sizes), createMemorySnapshot (a snapshot) or setVariableValue (set a value); amdp getDataPreview (the data preview of a table variable).
+- `names` — abap getVariables: the variables read.
+- `parents` — abap getChildVariables: the ids whose members are read; @ROOT, the scopes, when omitted.
+- `variable_name` — abap setVariableValue: the variable set. amdp getDataPreview: the table variable read.
+- `value` — abap setVariableValue: the new value.
+- `debuggee_id` — amdp getDataPreview: the debuggee id of the break event.
+- `query` — amdp getDataPreview: a SELECT over the table variable; every column when omitted.
+- `row_number` — amdp getDataPreview: how many rows SAP answers; SAP's own count when omitted.
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+### HandlerDebugBatch
+
+**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
+
+**Description:** action 'begin': Starts the debugger batch on the stopped debuggee. In the debugger batch each call of step, step to line, stack, variables, child variables, stack position or setting a variable is recorded under the next number, starting at 1, and answers with empty content. Answers the state_handle, which HTTP clients send in the x-mcp-state-handle header with every call of the batch. action 'end': Sends the recorded calls of the stopped debuggee in one envelope on the debuggee's session and ends the debugger batch. Answers the number of recorded calls, the numbers whose answer is an error, and SAP's answer to the envelope when the envelope failed. action 'answers' (with number or numbers): Answers the calls of the last executed batch by number: for each number asked, the tool's answer built from SAP's response at the end of the batch. Takes one number or a list of numbers; an unknown number answers as unknown.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `action` (required) — begin starts the debugger batch on the stopped debuggee; end sends the recorded calls and ends it; answers reads the last batch's answers by number, with number or numbers.
+- `number` — answers: one batch number to read, at least 1.
+- `numbers` — answers: several batch numbers to read, each at least 1, answered in the order given.
+
+### HandlerBackgroundRunGet
+
+**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)
+
+**Description:** Reads one of your background runs by its run_handle: running, or finished with what HandlerProfileRun answered (the system answer as it is, an error included). Reading does not remove it.
+
+**Available in:** all
+
+**Parameters:**
+
+- `run_handle` (required) — The run_handle a run started with background=true answered.
+
+### HandlerBackgroundRunList
+
+**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)
+
+**Description:** Lists your background runs: run_handle, tool, object, when it started, and running or finished. No output.
+
+**Available in:** all
+
+**Parameters:** none
+
+### HandlerBackgroundRunDiscard
+
+**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)
+
+**Description:** Removes the kept answer of one of your finished background runs. A run still running cannot be discarded: a started run cannot be stopped.
+
+**Available in:** all
+
+**Parameters:**
+
+- `run_handle` (required) — The run_handle a run started with background=true answered.
+
+### HandlerLeftoverSessionList
+
+**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both)
+
+**Description:** Lists the SAP sessions of this server's destination an ended server process left open (it was killed before logging them off): handle, role (built or debugger), destination, user, when recorded. Nothing is sent to SAP. Sessions of a running process are not listed. A server starting while exactly one built session of its destination is left is born on it; with several, none is taken.
+
+**Available in:** all
+
+**Parameters:** none
+
+### HandlerLeftoverSessionLogoff
+
+**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both)
+
+**Description:** Logs off a leftover SAP session (any role), releasing every lock it holds; only the logoff is sent, with no credential. Its record is deleted afterwards.
+
+**Available in:** all
+
+**Parameters:**
+
+- `handle` (required) — The handle of a leftover session, as the list answers it.
+
+### HandlerBatch
+
+**Half:** batch mode of `@mcp-abap-adt/lib`, in every compact binary
+
+**Description:** action 'begin': Switches this server into batch mode: from now on each call of a tool none of whose requests depends on another's answer is recorded instead of sent, and returns nothing. Every recorded call is numbered, in the order made, from 1. A tool that builds a request from an earlier answer is refused in batch mode; use the low-level tools (HandlerCreate, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. action 'end' sends the recorded calls; read their answers by number with action 'answers'. Over HTTP, send the state_handle this answers in the request header on every call of the batch. action 'end': Sends every call recorded since action 'begin', in one envelope, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with action 'answers'. action 'answers' (with number or numbers): The answers of the last batch, by number: each is the answer the tool gives for that call, built when action 'end' sent it — SAP's answer or why it was not sent. A number the last batch does not have answers: no answer with that number.
+
+**Available in:** all
+
+**Parameters:**
+
+- `action` (required) — begin: switch into batch mode; end: send the recorded calls and leave batch mode; answers: read the last batch's answers by number (with number or numbers).
+- `number` — answers only: one batch number to read (an integer of at least 1); give this or numbers, not both.
+- `numbers` — answers only: several batch numbers to read, answered in the order given; give this or number, not both.
 

@@ -1,3 +1,5 @@
+import { COMPACT_BACKGROUND_PROPERTY } from '../backgroundRuns/tools';
+import { TIMEOUT_PROPERTY } from '../longTools';
 import { COMPACT_OBJECT_TYPES } from './compactObjectTypes';
 
 const versionSchema = {
@@ -13,11 +15,19 @@ const commonObjectTypeSchema = {
   description: 'ABAP object type for routed compact operation.',
 } as const;
 
+/**
+ * `HandlerCreate`: one request, the type's create alone (spec §4.6). Only what
+ * some type's create sends is named; anything else a caller gives is refused
+ * by `handleCreateOnly`, naming it.
+ */
 export const compactCreateSchema = {
   type: 'object',
   properties: {
     object_type: commonObjectTypeSchema,
-    class_name: { type: 'string', description: 'ABAP class name.' },
+    class_name: {
+      type: 'string',
+      description: 'ABAP class name (CLASS, BEHAVIOR_IMPLEMENTATION).',
+    },
     program_name: { type: 'string', description: 'ABAP program name.' },
     domain_name: { type: 'string', description: 'ABAP domain name.' },
     function_module_name: {
@@ -26,7 +36,8 @@ export const compactCreateSchema = {
     },
     function_group_name: {
       type: 'string',
-      description: 'ABAP function group name.',
+      description:
+        'ABAP function group name (FUNCTION_GROUP; the group of a FUNCTION_MODULE).',
     },
     package_name: { type: 'string', description: 'ABAP package name.' },
     ddl_name: {
@@ -41,33 +52,67 @@ export const compactCreateSchema = {
       type: 'string',
       description: 'Transport request id (if required by system).',
     },
-    activate: { type: 'boolean', description: 'Activate object after create.' },
-    program_type: { type: 'string', description: 'ABAP program type.' },
-    application: { type: 'string', description: 'Domain application area.' },
-    datatype: { type: 'string', description: 'ABAP data type.' },
-    length: { type: 'number', description: 'Length for typed artifacts.' },
-    decimals: { type: 'number', description: 'Decimal places.' },
-    conversion_exit: { type: 'string', description: 'Conversion exit name.' },
-    lowercase: {
-      type: 'boolean',
-      description: 'Allow lowercase values (domain setting).',
+    master_language: {
+      type: 'string',
+      description:
+        'Original language of the created object; the session language when absent.',
     },
-    sign_exists: {
-      type: 'boolean',
-      description: 'Allow signed values (domain setting).',
+    super_package: {
+      type: 'string',
+      description: 'Super package (PACKAGE create).',
     },
-    value_table: { type: 'string', description: 'Foreign key value table.' },
-    fixed_values: {
-      type: 'array',
-      description: 'Domain fixed values list.',
-      items: {
-        type: 'object',
-        properties: {
-          low: { type: 'string', description: 'Fixed value key.' },
-          text: { type: 'string', description: 'Fixed value text.' },
-        },
-        required: ['low', 'text'],
-      },
+    package_type: {
+      type: 'string',
+      description: 'Package type (PACKAGE create).',
+    },
+    software_component: {
+      type: 'string',
+      description: 'Software component (PACKAGE create).',
+    },
+    transport_layer: {
+      type: 'string',
+      description: 'Transport layer (PACKAGE create).',
+    },
+    record_changes: {
+      type: 'boolean',
+      description: 'Record changes (PACKAGE create).',
+    },
+    application_component: {
+      type: 'string',
+      description: 'Application component (PACKAGE create).',
+    },
+    transport_type: {
+      type: 'string',
+      enum: ['workbench', 'customizing'],
+      description: 'Transport request type (TRANSPORT create).',
+    },
+    target_system: {
+      type: 'string',
+      description: 'Target system of the transport request (TRANSPORT create).',
+    },
+    owner: {
+      type: 'string',
+      description: 'Owner of the transport request (TRANSPORT create).',
+    },
+    superclass: {
+      type: 'string',
+      description: 'Superclass name (CLASS create).',
+    },
+    final: {
+      type: 'boolean',
+      description: 'Mark the class final (CLASS create).',
+    },
+    create_protected: {
+      type: 'boolean',
+      description: 'Protected constructor (CLASS create).',
+    },
+    program_type: {
+      type: 'string',
+      description: 'ABAP program type (PROGRAM create).',
+    },
+    application: {
+      type: 'string',
+      description: 'Application area (PROGRAM create).',
     },
     table_name: { type: 'string', description: 'Table name.' },
     structure_name: { type: 'string', description: 'Structure name.' },
@@ -75,64 +120,43 @@ export const compactCreateSchema = {
     interface_name: { type: 'string', description: 'Interface name.' },
     service_definition_name: {
       type: 'string',
-      description: 'Service definition name.',
+      description:
+        'Service definition name (SERVICE_DEFINITION; the definition a SERVICE_BINDING binds).',
     },
     service_binding_name: {
       type: 'string',
       description: 'Service binding name.',
+    },
+    service_name: {
+      type: 'string',
+      description:
+        'Service name of the binding (SERVICE_BINDING create); the binding name when absent.',
+    },
+    service_version: {
+      type: 'string',
+      description:
+        'Service version of the binding (SERVICE_BINDING create); 0001 when absent.',
+    },
+    binding_variant: {
+      type: 'string',
+      enum: [
+        'ODATA_V2_UI',
+        'ODATA_V2_WEB_API',
+        'ODATA_V4_UI',
+        'ODATA_V4_WEB_API',
+      ],
+      description:
+        'Binding variant (SERVICE_BINDING create); ODATA_V4_UI when absent.',
     },
     name: {
       type: 'string',
       description:
         'Object name for handlers that require a generic `name` (behavior definition, metadata extension).',
     },
-    root_entity: {
-      type: 'string',
-      description: 'Root CDS entity name (behavior definition create).',
-    },
     implementation_type: {
       type: 'string',
       enum: ['Managed', 'Unmanaged', 'Abstract', 'Projection'],
       description: 'Behavior definition implementation type.',
-    },
-    behavior_definition: {
-      type: 'string',
-      description:
-        'Referenced behavior definition name (behavior implementation create).',
-    },
-    cds_view_name: {
-      type: 'string',
-      description: 'CDS view name to validate for unit test doubles.',
-    },
-    fields: {
-      type: 'array',
-      description: 'Structure fields (for STRUCTURE create).',
-      items: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', description: 'Field name.' },
-          data_type: { type: 'string', description: 'Field data type.' },
-          length: { type: 'number', description: 'Field length.' },
-          decimals: { type: 'number', description: 'Decimal places.' },
-          domain: { type: 'string', description: 'Domain reference.' },
-          data_element: {
-            type: 'string',
-            description: 'Data element reference.',
-          },
-          structure_ref: {
-            type: 'string',
-            description: 'Included structure reference.',
-          },
-          table_ref: { type: 'string', description: 'Table type reference.' },
-          description: { type: 'string', description: 'Field description.' },
-        },
-        required: ['name'],
-      },
-    },
-    test_class_source: {
-      type: 'string',
-      description:
-        'ABAP source of the local test classes (UNIT_TEST and CDS_UNIT_TEST create).',
     },
   },
   required: ['object_type'],
@@ -148,22 +172,43 @@ export const compactCreateSchema = {
  */
 const readPartSchema = {
   type: 'string',
-  enum: ['source', 'metadata', 'urls', 'contents'],
+  enum: [
+    'source',
+    'metadata',
+    'urls',
+    'contents',
+    'object_structure',
+    'node_structure',
+    'virtual_folders',
+    'activation_status',
+    'activation_results',
+  ],
   default: 'source',
   description:
-    'Which aspect to read: the source, the ADT metadata document, the service and preview URLs, or the objects a package contains. A part this object type does not offer is refused, naming the parts it does.',
+    'The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced).',
 } as const;
 
 export const compactGetSchema = {
   type: 'object',
   properties: {
+    timeout: {
+      ...TIMEOUT_PROPERTY,
+      description: `${TIMEOUT_PROPERTY.description} Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, and the parts object_structure, node_structure, virtual_folders.`,
+    },
     object_type: commonObjectTypeSchema,
     part: readPartSchema,
     package_name: { type: 'string', description: 'Package name.' },
+    package_names: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'Several package names (part contents), read together: one entry per package, in the order given, each { package_name, contents } or { package_name, error }.',
+    },
     max_results: {
       type: 'number',
       default: 100,
-      description: 'Maximum number of members listed (part contents).',
+      description:
+        'Maximum number of members listed per package (part contents).',
     },
     class_name: { type: 'string', description: 'Class name.' },
     interface_name: { type: 'string', description: 'Interface name.' },
@@ -175,11 +220,13 @@ export const compactGetSchema = {
     ddl_name: { type: 'string', description: 'DDL source name.' },
     function_module_name: {
       type: 'string',
-      description: 'Function module name.',
+      description:
+        'Function module name: GROUP|MODULE, its function group first, or the module alone with function_group_name.',
     },
     function_group_name: {
       type: 'string',
-      description: 'Function group name.',
+      description:
+        "Function group name (FUNCTION_GROUP; FUNCTION_MODULE given as the module's name).",
     },
     behavior_definition_name: {
       type: 'string',
@@ -201,21 +248,91 @@ export const compactGetSchema = {
       type: 'string',
       description: 'Service binding name.',
     },
-    run_id: { type: 'string', description: 'Unit test run id.' },
+    transport_number: {
+      type: 'string',
+      description:
+        'Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own.',
+    },
+    run_id: {
+      type: 'string',
+      description:
+        'Run id: a unit test run (UNIT_TEST, CDS_UNIT_TEST) or an activation run (parts activation_status, activation_results).',
+    },
     response_format: {
       type: 'string',
       enum: ['xml', 'json', 'plain'],
       description: 'Response format for SERVICE_BINDING reads.',
     },
     version: versionSchema,
+    object_adt_type: {
+      type: 'string',
+      description:
+        'ADT type code of the object (object_structure) or of the parent node (node_structure).',
+    },
+    object_name: {
+      type: 'string',
+      description:
+        'Object name (object_structure) or parent name (node_structure).',
+    },
+    node_id: {
+      type: 'string',
+      description: 'Node id to expand (node_structure); the root when absent.',
+    },
+    with_short_descriptions: {
+      type: 'boolean',
+      description: 'Include short descriptions (node_structure).',
+    },
+    object_search_pattern: {
+      type: 'string',
+      description: 'Object name pattern (virtual_folders).',
+    },
+    preselection: {
+      type: 'array',
+      description: 'Facet preselections (virtual_folders).',
+      items: {
+        type: 'object',
+        properties: {
+          facet: { type: 'string', description: 'Facet name.' },
+          values: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Facet values.',
+          },
+        },
+        required: ['facet', 'values'],
+      },
+    },
+    facet_order: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Facet order (virtual_folders).',
+    },
+    with_versions: {
+      type: 'boolean',
+      description: 'Include versions (virtual_folders).',
+    },
+    ignore_short_descriptions: {
+      type: 'boolean',
+      description: 'Leave out short descriptions (virtual_folders).',
+    },
   },
-  required: ['object_type'],
+  required: [],
 } as const;
 
 export const compactUpdateSchema = {
   type: 'object',
   properties: {
     object_type: commonObjectTypeSchema,
+    lock_handle: {
+      type: 'string',
+      description:
+        'The lock handle of the object (for a class include, of the class): the write is sent under it.',
+    },
+    transport_request: {
+      type: 'string',
+      description:
+        "Transport request id, sent as the write's corrNr (the types whose description names it).",
+    },
     class_name: { type: 'string', description: 'ABAP class name.' },
     program_name: { type: 'string', description: 'ABAP program name.' },
     domain_name: { type: 'string', description: 'ABAP domain name.' },
@@ -232,44 +349,14 @@ export const compactUpdateSchema = {
       type: 'string',
       description: 'DDL source name (CDS view, AMDP table function, etc.).',
     },
-    source_code: { type: 'string', description: 'ABAP source code payload.' },
+    source_code: {
+      type: 'string',
+      description:
+        'The content written: the source, or for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP the whole metadata document.',
+    },
     ddl_source: {
       type: 'string',
       description: 'Complete DDL source code (for DDL update).',
-    },
-    transport_request: {
-      type: 'string',
-      description: 'Transport request id (if required by system).',
-    },
-    activate: { type: 'boolean', description: 'Activate object after update.' },
-    description: {
-      type: 'string',
-      description: 'Human-readable object description.',
-    },
-    datatype: { type: 'string', description: 'ABAP data type.' },
-    length: { type: 'number', description: 'Length for typed artifacts.' },
-    decimals: { type: 'number', description: 'Decimal places.' },
-    conversion_exit: { type: 'string', description: 'Conversion exit name.' },
-    lowercase: {
-      type: 'boolean',
-      description: 'Allow lowercase values (domain setting).',
-    },
-    sign_exists: {
-      type: 'boolean',
-      description: 'Allow signed values (domain setting).',
-    },
-    value_table: { type: 'string', description: 'Foreign key value table.' },
-    fixed_values: {
-      type: 'array',
-      description: 'Domain fixed values list.',
-      items: {
-        type: 'object',
-        properties: {
-          low: { type: 'string', description: 'Fixed value key.' },
-          text: { type: 'string', description: 'Fixed value text.' },
-        },
-        required: ['low', 'text'],
-      },
     },
     table_name: { type: 'string', description: 'Table name.' },
     structure_name: { type: 'string', description: 'Structure name.' },
@@ -285,17 +372,18 @@ export const compactUpdateSchema = {
     },
     service_name: {
       type: 'string',
-      description: 'Published service name (service binding update).',
+      description:
+        'Published service name (SERVICE_BINDING, an OData V2 binding).',
+    },
+    service_version: {
+      type: 'string',
+      description:
+        'Published service version (SERVICE_BINDING, an OData V2 binding). Default 0001.',
     },
     name: {
       type: 'string',
       description:
         'Object name for handlers that require a generic `name` (behavior definition, metadata extension).',
-    },
-    behavior_definition: {
-      type: 'string',
-      description:
-        'Referenced behavior definition name (behavior implementation update).',
     },
     ddl_code: {
       type: 'string',
@@ -338,17 +426,71 @@ export const compactUpdateSchema = {
     },
     desired_publication_state: {
       type: 'string',
-      enum: ['published', 'unpublished', 'unchanged'],
+      enum: ['published', 'unpublished'],
       description: 'Target publication state (service binding update).',
     },
   },
-  required: ['object_type'],
+  required: ['object_type', 'lock_handle'],
 } as const;
 
+/** The types a deletion request removes, each with its deletion check. */
+export const DELETION_CHECK_TYPES = [
+  'PACKAGE',
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'TABLE',
+  'STRUCTURE',
+  'DDL',
+  'SERVICE_DEFINITION',
+  'SERVICE_BINDING',
+  'CLASS',
+  'CDS_UNIT_TEST',
+  'PROGRAM',
+  'INTERFACE',
+  'FUNCTION_GROUP',
+  'FUNCTION_MODULE',
+  'BEHAVIOR_DEFINITION',
+  'BEHAVIOR_IMPLEMENTATION',
+  'METADATA_EXTENSION',
+] as const;
+
+/**
+ * The class includes compact's delete writes empty under the class lock (a
+ * `DELETE` on an include answers `405`).
+ */
+export const EMPTIED_INCLUDE_TYPES = [
+  'LOCAL_TEST_CLASS',
+  'LOCAL_TYPES',
+  'LOCAL_DEFINITIONS',
+  'LOCAL_MACROS',
+  'UNIT_TEST',
+] as const;
+
+/** The types `HandlerDelete` removes: by the deletion request, or by an empty include write. */
+export const DELETABLE_TYPES = [
+  ...DELETION_CHECK_TYPES,
+  ...EMPTIED_INCLUDE_TYPES,
+] as const;
+
+/**
+ * `HandlerDelete`: one request (spec §4.6) — the deletion request, or for a
+ * class include and the unit tests the include written empty under
+ * `lock_handle`. Only what that request sends is named.
+ */
 export const compactDeleteSchema = {
   type: 'object',
   properties: {
-    object_type: commonObjectTypeSchema,
+    object_type: {
+      type: 'string',
+      enum: DELETABLE_TYPES,
+      description: `Object type. Supported: ${DELETABLE_TYPES.join(', ')}.`,
+    },
+    lock_handle: {
+      type: 'string',
+      description:
+        'The lock handle of the class (LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST): the include is written empty under it.',
+    },
+    package_name: { type: 'string', description: 'ABAP package name.' },
     class_name: { type: 'string', description: 'ABAP class name.' },
     program_name: { type: 'string', description: 'ABAP program name.' },
     domain_name: { type: 'string', description: 'ABAP domain name.' },
@@ -366,7 +508,8 @@ export const compactDeleteSchema = {
     },
     transport_request: {
       type: 'string',
-      description: 'Transport request id (if required by system).',
+      description:
+        'Transport request id, sent with the deletion (or the include write).',
     },
     table_name: { type: 'string', description: 'Table name.' },
     structure_name: { type: 'string', description: 'Structure name.' },
@@ -490,26 +633,10 @@ export const compactUnitTestResultSchema = {
 export const compactCdsUnitTestStatusSchema = compactUnitTestStatusSchema;
 export const compactCdsUnitTestResultSchema = compactUnitTestResultSchema;
 
-export const compactProfileRunSchema = {
+export const compactProfileScheduleSchema = {
   type: 'object',
   properties: {
-    target_type: {
-      type: 'string',
-      enum: ['CLASS', 'PROGRAM'],
-      description: 'Profile execution target kind.',
-    },
-    class_name: { type: 'string', description: 'Class name for profiling.' },
-    program_name: {
-      type: 'string',
-      description: 'Program name for profiling.',
-    },
-    profiling: {
-      type: 'boolean',
-      default: true,
-      description:
-        'Whether to capture a profiler trace while running. Default true. Set false for a plain run with no tracing — the profiling flags below are then ignored.',
-    },
-    description: { type: 'string', description: 'Profiler run description.' },
+    description: { type: 'string', description: 'Profiler trace description.' },
     all_procedural_units: {
       type: 'boolean',
       description: 'Trace all procedural units.',
@@ -545,6 +672,30 @@ export const compactProfileRunSchema = {
       description: 'Maximum tracing time.',
     },
   },
+  required: [],
+} as const;
+
+export const compactProfileRunSchema = {
+  type: 'object',
+  properties: {
+    target_type: {
+      type: 'string',
+      enum: ['CLASS', 'PROGRAM'],
+      description: 'Run target kind.',
+    },
+    class_name: { type: 'string', description: 'Class to run.' },
+    program_name: {
+      type: 'string',
+      description: 'Program to run.',
+    },
+    profiler_id: {
+      type: 'string',
+      minLength: 1,
+      description:
+        'The profiler id of a scheduled trace. Given, the run goes under that trace; absent, the run is plain.',
+    },
+    background: COMPACT_BACKGROUND_PROPERTY,
+  },
   required: ['target_type'],
 } as const;
 
@@ -557,6 +708,7 @@ export const compactProfileListSchema = {
 export const compactProfileViewSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     trace_id_or_uri: {
       type: 'string',
       description: 'Profiler trace id or URI.',
@@ -595,6 +747,7 @@ export const compactProfileViewSchema = {
 export const compactDumpListSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     feed_type: {
       type: 'string',
       enum: ['dumps', 'system_messages', 'gateway_errors'],
@@ -630,7 +783,7 @@ export const compactDumpListSchema = {
     top: {
       type: 'number',
       description:
-        'Most entries, up to 1000 (default 50); SAP answers 100 per request and the pages are read in turn.',
+        'Entries the page holds, 1 to 100 (SAP answers 100 when top is absent).',
     },
     from: {
       type: 'string',
@@ -639,7 +792,7 @@ export const compactDumpListSchema = {
     to: {
       type: 'string',
       description:
-        'End of time range (YYYYMMDDHHMMSS); a previous next_to reads on.',
+        "End of time range (YYYYMMDDHHMMSS), inclusive: the page holds the entries up to that second; a previous answer's next_to is the next page's to, and that page starts at the boundary second, inclusive.",
     },
   },
   required: [],
@@ -713,6 +866,67 @@ export const compactTransportCreateSchema = {
   required: ['description'],
 } as const;
 
+export const compactTransportSortAndCompressSchema = {
+  type: 'object',
+  properties: {
+    transport_number: {
+      type: 'string',
+      description: 'Number of the transport task to sort and compress.',
+    },
+  },
+  required: ['transport_number'],
+} as const;
+
+/**
+ * One entry of `objects`, as a constant of its own: the tool docs are read
+ * from the sources as text, and a nested `default` inside the `objects`
+ * property would be reported as the default of `objects` itself.
+ */
+const compactMovedTransportEntry = {
+  type: 'object',
+  properties: {
+    object_name: { type: 'string', description: 'Object name.' },
+    object_type: {
+      type: 'string',
+      description:
+        'Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.',
+    },
+    position: {
+      type: 'string',
+      description:
+        "Position of the object's entry in the source task's object list.",
+    },
+    pgmid: {
+      type: 'string',
+      description: "Program id. Defaults to R3TR, a workbench object's.",
+      default: 'R3TR',
+    },
+  },
+  required: ['object_name', 'object_type', 'position'],
+} as const;
+
+export const compactTransportMoveObjectsSchema = {
+  type: 'object',
+  properties: {
+    transport_number: {
+      type: 'string',
+      description: 'Number of the transport task that holds the entries.',
+    },
+    target_number: {
+      type: 'string',
+      description: 'Number of the transport task the entries move to.',
+    },
+    objects: {
+      type: 'array',
+      minItems: 1,
+      description:
+        'The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.',
+      items: compactMovedTransportEntry,
+    },
+  },
+  required: ['transport_number', 'target_number', 'objects'],
+} as const;
+
 const compactLifecycleObjectSchema = {
   object_type: commonObjectTypeSchema,
   object_name: {
@@ -720,6 +934,57 @@ const compactLifecycleObjectSchema = {
     description: 'Primary object name for lifecycle operation.',
   },
 } as const;
+
+/** The types a lock and an unlock are sent for. */
+const LOCKABLE_TYPES = [
+  'CLASS',
+  'PROGRAM',
+  'INTERFACE',
+  'FUNCTION_GROUP',
+  'FUNCTION_MODULE',
+  'TABLE',
+  'STRUCTURE',
+  'DDL',
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'PACKAGE',
+  'BEHAVIOR_DEFINITION',
+  'BEHAVIOR_IMPLEMENTATION',
+  'METADATA_EXTENSION',
+  'SERVICE_DEFINITION',
+  'SERVICE_BINDING',
+] as const;
+
+/** The types a syntax check is sent for. */
+const CHECKABLE_TYPES = [
+  'CLASS',
+  'PROGRAM',
+  'INTERFACE',
+  'FUNCTION_GROUP',
+  'FUNCTION_MODULE',
+  'TABLE',
+  'STRUCTURE',
+  'DDL',
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'PACKAGE',
+  'BEHAVIOR_DEFINITION',
+  'METADATA_EXTENSION',
+] as const;
+
+const lifecycleObjectSchema = (types: readonly string[]) =>
+  ({
+    object_type: {
+      type: 'string',
+      enum: types,
+      description: `Object type. Supported: ${types.join(', ')}.`,
+    },
+    object_name: {
+      type: 'string',
+      description:
+        'Object name. A function module is named GROUP|MODULE, its function group first.',
+    },
+  }) as const;
 
 export const compactValidateSchema = {
   type: 'object',
@@ -750,12 +1015,20 @@ export const compactValidateSchema = {
     object_name: {
       type: 'string',
       description:
-        'Required object name. For SERVICE_BINDING this is the service binding name.',
+        'Required object name. For SERVICE_BINDING this is the service binding name; a function module is named GROUP|MODULE.',
     },
     package_name: {
       type: 'string',
       description:
         'Optional package context for validation (especially for create scenarios).',
+    },
+    super_package: {
+      type: 'string',
+      description: 'Super package of the package to validate (PACKAGE).',
+    },
+    superclass: {
+      type: 'string',
+      description: 'Superclass of the class to validate (CLASS).',
     },
     description: {
       type: 'string',
@@ -785,29 +1058,15 @@ export const compactValidateSchema = {
       type: 'string',
       description: 'Optional service binding version for SERVICE_BINDING.',
     },
-    session_id: {
-      type: 'string',
-      description: 'Optional ADT session id for stateful validation flow.',
-    },
-    session_state: {
-      type: 'object',
-      description:
-        'Optional ADT session state container (cookies/CSRF) for stateful validation flow.',
-      properties: {
-        cookies: {
-          type: 'string',
-          description: 'Serialized Cookie header to reuse server session.',
-        },
-        csrf_token: {
-          type: 'string',
-          description: 'CSRF token to reuse server session.',
-        },
-        cookie_store: {
-          type: 'object',
-          description: 'Cookie key/value map to reuse server session.',
-        },
-      },
-    },
+  },
+  required: ['object_type', 'object_name'],
+} as const;
+
+/** `HandlerDeletionCheck`: the one deletion-check request. */
+export const compactDeletionCheckSchema = {
+  type: 'object',
+  properties: {
+    ...lifecycleObjectSchema(DELETION_CHECK_TYPES),
   },
   required: ['object_type', 'object_name'],
 } as const;
@@ -815,33 +1074,10 @@ export const compactValidateSchema = {
 export const compactLockSchema = {
   type: 'object',
   properties: {
-    ...compactLifecycleObjectSchema,
+    ...lifecycleObjectSchema(LOCKABLE_TYPES),
     super_package: {
       type: 'string',
       description: 'Super package context when relevant.',
-    },
-    session_id: {
-      type: 'string',
-      description: 'Optional ADT session id for stateful lock flow.',
-    },
-    session_state: {
-      type: 'object',
-      description:
-        'Optional ADT session state container (cookies/CSRF) for stateful lock flow.',
-      properties: {
-        cookies: {
-          type: 'string',
-          description: 'Serialized Cookie header to reuse server session.',
-        },
-        csrf_token: {
-          type: 'string',
-          description: 'CSRF token to reuse server session.',
-        },
-        cookie_store: {
-          type: 'object',
-          description: 'Cookie key/value map to reuse server session.',
-        },
-      },
     },
   },
   required: ['object_type', 'object_name'],
@@ -850,70 +1086,29 @@ export const compactLockSchema = {
 export const compactUnlockSchema = {
   type: 'object',
   properties: {
-    ...compactLifecycleObjectSchema,
+    ...lifecycleObjectSchema(LOCKABLE_TYPES),
     lock_handle: {
       type: 'string',
       description: 'Lock handle returned by lock.',
     },
-    session_id: {
-      type: 'string',
-      description: 'ADT session id used during lock.',
-    },
-    session_state: {
-      type: 'object',
-      description:
-        'Optional ADT session state container (cookies/CSRF) for stateful unlock flow.',
-      properties: {
-        cookies: {
-          type: 'string',
-          description: 'Serialized Cookie header to reuse server session.',
-        },
-        csrf_token: {
-          type: 'string',
-          description: 'CSRF token to reuse server session.',
-        },
-        cookie_store: {
-          type: 'object',
-          description: 'Cookie key/value map to reuse server session.',
-        },
-      },
-    },
   },
-  required: ['object_type', 'object_name', 'lock_handle', 'session_id'],
+  required: ['object_type', 'object_name', 'lock_handle'],
 } as const;
 
 export const compactCheckRunSchema = {
   type: 'object',
   properties: {
-    ...compactLifecycleObjectSchema,
+    ...lifecycleObjectSchema(CHECKABLE_TYPES),
     version: {
       type: 'string',
       enum: ['active', 'inactive'],
       default: 'active',
       description: 'Version to syntax-check.',
     },
-    session_id: {
+    source_code: {
       type: 'string',
-      description: 'Optional ADT session id for stateful check flow.',
-    },
-    session_state: {
-      type: 'object',
       description:
-        'Optional ADT session state container (cookies/CSRF) for stateful check flow.',
-      properties: {
-        cookies: {
-          type: 'string',
-          description: 'Serialized Cookie header to reuse server session.',
-        },
-        csrf_token: {
-          type: 'string',
-          description: 'CSRF token to reuse server session.',
-        },
-        cookie_store: {
-          type: 'object',
-          description: 'Cookie key/value map to reuse server session.',
-        },
-      },
+        'Source to check instead of the saved one; nothing is saved. CLASS, STRUCTURE and DDL only.',
     },
   },
   required: ['object_type', 'object_name'],
@@ -924,20 +1119,20 @@ export const compactActivateSchema = {
   properties: {
     object_type: {
       ...commonObjectTypeSchema,
-      description: `${commonObjectTypeSchema.description} For single-object activation, this alone is enough — no ADT type code needed.`,
+      description: `${commonObjectTypeSchema.description} Names the object's type in the single form.`,
     },
     object_name: {
       type: 'string',
-      description: 'Object name for single-object activation form.',
+      description: 'Object name (single form).',
     },
     object_adt_type: {
       type: 'string',
       description:
-        'ADT object type code (e.g. CLAS/OC, PROG/P), for a type object_type does not cover. Only needed when object_type is not enough; prefer object_type otherwise.',
+        'ADT object type code (e.g. CLAS/OC, PROG/P) of the object (single form).',
     },
     objects: {
       type: 'array',
-      description: 'Explicit objects list for batch activation.',
+      description: 'The objects activated together (list form).',
       items: {
         type: 'object',
         properties: {
@@ -947,7 +1142,7 @@ export const compactActivateSchema = {
           parentName: {
             type: 'string',
             description:
-              'Owning object, for a part of one — a function module needs its function group here, or the address is built under a group named after the module.',
+              "Owning object, for a part of one: a function module's function group.",
           },
         },
         required: ['name', 'type'],
@@ -964,6 +1159,7 @@ export const compactActivateSchema = {
 export const compactSearchSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     query: {
       type: 'string',
       description: 'Object name or mask, with * as a wildcard.',
@@ -985,6 +1181,7 @@ export const compactSearchSchema = {
 export const compactWhereUsedSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     object_type: {
       type: 'string',
       enum: [
@@ -1021,6 +1218,7 @@ export const compactWhereUsedSchema = {
 export const compactGetDataSchema = {
   type: 'object',
   properties: {
+    timeout: TIMEOUT_PROPERTY,
     object_name: {
       type: 'string',
       description:

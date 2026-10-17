@@ -3,7 +3,13 @@
     "mcp-abap-adt-http": {
       "type": "streamableHttp",
       "url": "http://localhost:3000/mcp/stream/http",
-      "disabled": false
+      "disabled": false,
+      "headers": {
+        "x-sap-url": "https://your-sap-system.example",
+        "x-sap-client": "100",
+        "x-sap-login": "<your ABAP user>",
+        "x-sap-password": "<your password>"
+      }
     }
   }
 }

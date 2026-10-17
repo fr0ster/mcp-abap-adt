@@ -1,8 +1,11 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
+import { failureOf } from '../auth/failures';
+import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
-import { encodeSapObjectName, makeAdtRequestWithTimeout } from '../utils';
+import { carryingFailure, methodFailureOf } from '../strategies/step';
 import type { EnumeratedObject, ScanObjectType } from './packageEnumerator';
 
 export type SourceVersion = 'active' | 'inactive';
@@ -44,6 +47,10 @@ async function safe<T>(
   try {
     return await op();
   } catch (e: any) {
+    // SAP refused a read, or the chain failed it: the failure as it is, with
+    // its step — the scan answers it, it is not skipped as if the source were
+    // empty.
+    if (methodFailureOf(e) !== undefined || failureOf(e) !== undefined) throw e;
     logger?.debug?.(`[search-source] ${desc} failed: ${e?.message ?? e}`);
     return null;
   }
@@ -157,6 +164,19 @@ function parseFugrChildrenFromXml(xml: string): FugrChild[] {
   return out;
 }
 
+/**
+ * A failed read: a source that is not there (`404`) is skipped as before;
+ * any other refusal is thrown as the method's error, with the step.
+ */
+function refusedOrAbsent(
+  answer: { ok: false; getError(): IAdtError },
+  step: string,
+): null {
+  const error = answer.getError();
+  if (error.response?.status === 404) return null;
+  throw carryingFailure(new Error(error.message), error, step);
+}
+
 export function createSourceReaderDeps(
   ctx: HandlerContext,
 ): ReadSourceUnitsDeps {
@@ -174,38 +194,138 @@ export function createSourceReaderDeps(
       const r = await client
         .getProgram()
         .read({ programName }, version, { analyse: analyseException });
-      return r.ok ? r.getResult().value : null;
+      return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read program');
     },
     async readInclude(includeName) {
-      const r = await makeAdtRequestWithTimeout(
-        ctx.connection,
-        `/sap/bc/adt/programs/includes/${encodeSapObjectName(includeName)}/source/main`,
-        'GET',
-        'default',
-      );
-      return typeof r?.data === 'string' ? r.data : null;
+      // The include endpoint has no version selector: none is sent, as before.
+      const r = await client
+        .getInclude()
+        .read({ includeName }, undefined, { analyse: analyseException });
+      return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read include');
     },
     async readClassMain(className, version) {
       const r = await client
         .getClass()
         .read({ className }, version, { analyse: analyseException });
-      return r.ok ? r.getResult().value : null;
+      return r.ok ? r.getResult().value : refusedOrAbsent(r, 'read class');
     },
     async fetchFugrStructure(fugrName) {
       const r = await client
         .getUtils()
         .getObjectStructure('FUGR/F', fugrName, { analyse: analyseException });
-      return r.ok ? parseFugrChildrenFromXml(r.getResult().value) : [];
+      if (r.ok) return parseFugrChildrenFromXml(r.getResult().value);
+      refusedOrAbsent(r, 'read function group structure');
+      return [];
     },
     async readFugrFm(fugrName, fmName) {
-      const r = await makeAdtRequestWithTimeout(
-        ctx.connection,
-        `/sap/bc/adt/functions/groups/${encodeSapObjectName(fugrName.toLowerCase())}/fmodules/${encodeSapObjectName(fmName.toLowerCase())}/source/main`,
-        'GET',
-        'default',
-      );
-      return typeof r?.data === 'string' ? r.data : null;
+      const r = await client
+        .getFunctionModule()
+        .read(
+          { functionGroupName: fugrName, functionModuleName: fmName },
+          undefined,
+          { analyse: analyseException },
+        );
+      return r.ok
+        ? r.getResult().value
+        : refusedOrAbsent(r, 'read function module');
     },
     logger: ctx.logger,
   };
+}
+
+/** One read of the source reader: its method and its arguments. */
+export type SourceRead =
+  | { method: 'readProgram'; name: string; version: SourceVersion }
+  | { method: 'readClassMain'; name: string; version: SourceVersion }
+  | { method: 'readInclude'; name: string }
+  | { method: 'fetchFugrStructure'; name: string }
+  | { method: 'readFugrFm'; group: string; name: string };
+
+/** The key of one read: its method and its arguments. */
+export function sourceReadKey(read: SourceRead): string {
+  switch (read.method) {
+    case 'readProgram':
+    case 'readClassMain':
+      return `${read.method}|${read.name}|${read.version}`;
+    case 'readFugrFm':
+      return `${read.method}|${read.group}|${read.name}`;
+    default:
+      return `${read.method}|${read.name}`;
+  }
+}
+
+/**
+ * `ReadSourceUnitsDeps` answering from `answers`, for the batched version of
+ * `SearchSource` (spec §11): a read answered there gives its value (or throws
+ * its failure, as it came); a read with no answer is recorded in `asked` and
+ * gives nothing — no source, no function group child. `readSourceUnits` run
+ * over it names the reads of the next phase; run once every phase answered,
+ * it yields the units exactly as over the connection.
+ */
+export function answeredReaderDeps(
+  answers: ReadonlyMap<string, PhaseResult<unknown>>,
+  asked: SourceRead[],
+  logger?: ReadSourceUnitsDeps['logger'],
+): ReadSourceUnitsDeps {
+  const answer = async <T>(read: SourceRead, none: T): Promise<T> => {
+    const found = answers.get(sourceReadKey(read));
+    if (found === undefined) {
+      asked.push(read);
+      return none;
+    }
+    if (!found.ok) throw found.error;
+    return found.value as T;
+  };
+  return {
+    readProgram: (name, version) =>
+      answer<string | null>({ method: 'readProgram', name, version }, null),
+    readClassMain: (name, version) =>
+      answer<string | null>({ method: 'readClassMain', name, version }, null),
+    readInclude: (name) =>
+      answer<string | null>({ method: 'readInclude', name }, null),
+    fetchFugrStructure: (name) =>
+      answer<FugrChild[]>({ method: 'fetchFugrStructure', name }, []),
+    readFugrFm: (group, name) =>
+      answer<string | null>({ method: 'readFugrFm', group, name }, null),
+    ...(logger !== undefined ? { logger } : {}),
+  };
+}
+
+/** `read` on `deps`: one call of its method. */
+function perform(
+  deps: ReadSourceUnitsDeps,
+  read: SourceRead,
+): Promise<unknown> {
+  switch (read.method) {
+    case 'readProgram':
+      return deps.readProgram(read.name, read.version);
+    case 'readClassMain':
+      return deps.readClassMain(read.name, read.version);
+    case 'readInclude':
+      return deps.readInclude(read.name);
+    case 'fetchFugrStructure':
+      return deps.fetchFugrStructure(read.name);
+    case 'readFugrFm':
+      return deps.readFugrFm(read.group, read.name);
+  }
+}
+
+/**
+ * Every read of `reads` in one ADT batch envelope (`runPhase`), each through
+ * the source reader over the phase's batch connection; the answers keyed for
+ * `answeredReaderDeps`.
+ */
+export async function readSourcesInPhase(
+  ctx: HandlerContext,
+  reads: readonly SourceRead[],
+): Promise<Map<string, PhaseResult<unknown>>> {
+  const results = await runPhase(ctx, reads, (read, connection) =>
+    perform(createSourceReaderDeps({ ...ctx, connection }), read),
+  );
+  return new Map(
+    reads.map((read, i) => [
+      sourceReadKey(read),
+      results[i] as PhaseResult<unknown>,
+    ]),
+  );
 }

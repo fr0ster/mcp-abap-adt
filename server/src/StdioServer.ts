@@ -1,11 +1,26 @@
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
-import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
+import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAuthProviderError } from '@mcp-abap-adt/interfaces-auth';
+import { type ReadFailure, ServerRefusal } from '@mcp-abap-adt/lib/auth';
+import {
+  BaseMcpServer,
+  type IBackgroundRuns,
+  type InstanceBatch,
+  type LeftoverSessions,
+  type ResolvedConnection,
+  type StartedConnection,
+} from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
+import { defaultSystemContextResolver } from '@mcp-abap-adt/lib/request-context';
 import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
+import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
+import { destinationFailureOf } from './auth/destinationFailure';
+import type { IDestinations } from './auth/IAuthBrokerFactory.js';
 import { CORE_VERSION } from './coreVersion.js';
+import { destinationSource } from './destinationSource.js';
 
 export interface StdioServerOptions {
   name?: string;
@@ -15,18 +30,49 @@ export interface StdioServerOptions {
   stateIdleMinutes?: number;
   /** Where the state's lifecycle lines go; default stderr, always on. */
   stateLogger?: StateLogger;
+  /** The server's own sentence beside a chain failure: the factory's `sentenceFor`. */
+  sentenceFor?: (error: IAuthProviderError) => string | undefined;
+  /**
+   * The owner of the process's runtime session files (the launcher's): the
+   * SAP sessions this server holds, kept until their logoff is written, and
+   * the leftover-session tools. Absent: none kept, the tools not available.
+   */
+  leftoverSessions?: LeftoverSessions;
+  /**
+   * Where background runs and their answers are kept (the launcher's
+   * `InMemoryBackgroundRuns` of
+   * `@mcp-abap-adt/background-runs-memory`). Absent: `background: true` is refused.
+   */
+  backgroundRuns?: IBackgroundRuns;
+  /**
+   * The owner of this instance's batch state (the launcher's, one for the
+   * process's one instance). Absent: the batch tools answer
+   * `batch_mode_unavailable`.
+   */
+  batch?: InstanceBatch;
 }
 
 /**
- * Minimal stdio server implementation based on BaseMcpServer.
- * Sets connection context once at startup and connects stdio transport.
- * The destination's settings and provider come from `IDestinations` — the
- * factory, or the inspection-only stand-in.
+ * The stdio server: one instance, one destination. Its source is the
+ * destination (`destinationSource`), set once at startup; the settings and
+ * the provider come from `IDestinations` — the factory — per request. The
+ * launcher has its connection born before the transport opens
+ * (`connectAtStart`): the destination's one leftover session taken up, or a
+ * logon, and the system information with it.
+ * Without destinations the server is in inspection-only mode: the tools are
+ * listed, and a tool call answers the server's own `inspection_only` refusal
+ * before any connection is built.
  */
 export class StdioServer extends BaseMcpServer {
+  private readonly sentenceFor:
+    | ((error: IAuthProviderError) => string | undefined)
+    | undefined;
+  /** The destination served, named by a refusal whose error does not carry it. */
+  private destination: string | undefined;
+
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
-    private readonly destinations: IDestinations,
+    private readonly destinations: IDestinations | undefined,
     opts?: StdioServerOptions,
   ) {
     super({
@@ -36,40 +82,101 @@ export class StdioServer extends BaseMcpServer {
       stateIdleMinutes: opts?.stateIdleMinutes,
       // From the options as given: the silent default above is never the state's.
       stateLogger: stateLoggerOf(opts ?? {}),
+      ...(opts?.leftoverSessions !== undefined && {
+        leftoverSessions: opts.leftoverSessions,
+      }),
+      ...(opts?.backgroundRuns !== undefined && {
+        backgroundRuns: opts.backgroundRuns,
+      }),
+      ...(opts?.batch !== undefined && { batch: opts.batch }),
+      // The responsible rules, once, at the start (`connectAtStart`).
+      systemContextResolver: defaultSystemContextResolver,
+      systemContextRules: responsibleRules,
+    });
+    this.sentenceFor = opts?.sentenceFor;
+  }
+
+  /** The destination layer's failures first, then lib's reader. */
+  protected override readFailure(thrown: unknown): ReadFailure | undefined {
+    return destinationFailureOf(thrown, {
+      sentenceFor: this.sentenceFor,
+      ...(this.destination !== undefined && { destination: this.destination }),
     });
   }
 
-  async start(destination: string): Promise<void> {
-    await this.setConnectionContext(destination, this.destinations);
-    this.registerHandlers(this.handlersRegistry);
+  /**
+   * The connection to `destination` born before the transport opens: the
+   * destination's one leftover session taken up, or a logon (an interactive
+   * login included: its prompts go to stderr), and the system information
+   * (BaseMcpServer's `bornAtStart`). Rejects with what failed; the
+   * launcher ends the process with it. The start's own signal, aborted once
+   * the birth ended, as the startup check's.
+   */
+  async connectAtStart(destination: string): Promise<StartedConnection> {
+    if (!this.destinations) throw new ServerRefusal('inspection_only');
+    this.serve(destination);
+    const startup = new AbortController();
+    try {
+      return await this.bornAtStart(startup.signal);
+    } finally {
+      startup.abort();
+    }
+  }
 
-    const transport = new StdioServerTransport();
+  /**
+   * Serves `destination` (none: inspection-only mode) over `transport` —
+   * stdio unless a host passes its own. Its connection is the one
+   * `connectAtStart` made, when the launcher called it; otherwise the first
+   * tool call makes it.
+   */
+  async start(
+    destination: string | undefined,
+    transport: Transport = new StdioServerTransport(),
+  ): Promise<void> {
+    if (destination !== undefined && this.destinations) {
+      this.serve(destination);
+    }
+    this.registerHandlers(this.handlersRegistry);
     await this.connect(transport);
   }
-}
 
-const INSPECTION_ONLY =
-  'inspection-only mode: no connection parameters. To connect to an SAP system, use --mcp=<destination> or --env-path=<path>.';
+  /** The destination's source, set once. */
+  private serve(destination: string): void {
+    if (this.destination !== undefined || !this.destinations) return;
+    this.destination = destination;
+    this.setConnectionContext({
+      kind: 'built',
+      // The user is fixed for the process: getProvider answers the same
+      // provider while the session is renewed (refresh, or a new login when
+      // the refresh fails) and written back, so the connection is replaced
+      // only when SAP lost its session.
+      source: destinationSource(destination, this.destinations),
+      sessionId: destination,
+      // Who calls, for the leftover sessions: on stdio the destination —
+      // its user and credential are fixed for the process.
+      destination,
+      metadata: { destination },
+    });
+  }
 
-/**
- * The destinations of inspection-only mode (stdio with neither `--mcp` nor an
- * `--env` file): the tools can be listed, and a tool call answers with the
- * refusal of a provider that has no credential, instead of dialling anywhere.
- */
-export function inspectionOnlyDestinations(): IDestinations {
-  const refused = async () => ({
-    ok: false as const,
-    refusal: { reason: INSPECTION_ONLY },
-  });
-  const provider: Awaited<ReturnType<IDestinations['getProvider']>> = {
-    kind: 'inspection-only',
-    prepare: refused,
-    establish: refused,
-    authorize: refused,
-    rejected: refused,
-  };
-  return {
-    settingsFor: async () => ({ url: 'http://mock', authType: 'basic' }),
-    getProvider: async () => provider,
-  };
+  /**
+   * Inspection-only mode refuses here, before any connection is built. A
+   * login ends with its result, the server (the bound, the shutdown) or the
+   * session — never by another call's cancel, since a tool call cannot be
+   * cancelled — so nothing is retried.
+   */
+  protected override async getConnection(
+    signal: AbortSignal,
+  ): Promise<AbapConnection> {
+    if (!this.destinations) throw new ServerRefusal('inspection_only');
+    return super.getConnection(signal);
+  }
+
+  /** Inspection-only mode refuses the leftover-session tools too, before anything is read. */
+  protected override resolveCaller(
+    signal: AbortSignal,
+  ): Promise<ResolvedConnection> {
+    if (!this.destinations) throw new ServerRefusal('inspection_only');
+    return super.resolveCaller(signal);
+  }
 }

@@ -19,8 +19,13 @@ import type {
   AmdpDebugger,
   amdpDebuggerDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  carryingFailure,
+  carryingPayload,
+  noteLeftBehind,
+} from '../strategies/step';
 import {
   type AmdpBreakpointState,
   type AmdpEvent,
@@ -39,6 +44,16 @@ import {
   type RunTarget,
   WAIT_MAX_SECONDS,
 } from './DebugSession';
+import {
+  asFailure,
+  credentialRefusalIn,
+  type DebugFailure,
+  describeFailures,
+  failedEntry,
+  isFromThrow,
+  leaveBehind,
+  thrownFailure,
+} from './failures';
 import { lineUriOf } from './objectUri';
 import { failureText } from './readings';
 import { Serial } from './serial';
@@ -75,9 +90,25 @@ interface Open {
   stopped: boolean; // the stop request was answered ok
   readDone: boolean; // the read loop's last batch arrived (its cleanup may still run)
   /** What the last batch could not undo, set once its cleanup finished and was recorded. */
-  lastBatchFailures?: string[];
+  lastBatchFailures?: DebugFailure[];
+  /** The steps the last cleanup did not attempt once the credential was refused. */
+  notAttempted?: string[];
   readFailed?: string; // the event read failed: a sync waiting for confirmation hears it at once
+  readFailedWith?: IAdtError; // the method's error behind `readFailed`, when the read answered one
+  readThrown?: DebugFailure; // the entry of the throw behind `readFailed`, when the read threw (step `read events`)
   failureReported: boolean; // that failure was already thrown by a sync
+}
+
+/** The AMDP session of the one-request path: its two connections and the ids `start` answered. */
+interface OnceAmdp {
+  events: IAbapConnection;
+  commands: IAbapConnection;
+  onEvents: AmdpDebuggerT;
+  onCommands: AmdpDebuggerT;
+  mainId: string;
+  hanaSession: string;
+  /** The stop request was answered ok. */
+  stopped: boolean;
 }
 
 const bodyOf = (a: IAdtResponse<unknown>): string =>
@@ -85,11 +116,15 @@ const bodyOf = (a: IAdtResponse<unknown>): string =>
 const messageOf = (a: IAdtResponse<unknown>): string =>
   a.ok ? '' : failureText(a.getError());
 const thrown = (e: unknown) => (e instanceof Error ? e.message : String(e));
-const asFailure = (e: unknown) =>
-  ({
-    ok: false as const,
-    getError: () => ({ origin: 'connection', message: thrown(e) }),
-  }) as unknown as IAdtResponse<never>;
+/** A debug error that carries the method's error as it is, with its step. */
+const failedAt = <E extends Error>(
+  error: E,
+  a: IAdtResponse<unknown>,
+  step: string,
+): E =>
+  a.ok || isFromThrow(a.getError())
+    ? error
+    : carryingFailure(error, a.getError(), step);
 type Wire = { headers?: Record<string, unknown>; data?: unknown };
 const wireOf = (a: IAdtResponse<unknown>): Wire =>
   (a.ok ? (a.getResult().value ?? {}) : {}) as Wire;
@@ -106,7 +141,13 @@ export class AmdpSession<O = unknown> {
   private readonly abandoned = new Set<string>(); // syncs no call waits for any more
   private notices: AmdpState[] = [];
   private failure?: string;
-  private cleanupFailures: string[] = [];
+  /** The failed event read behind `failure`: the method's error, and what was not undone. */
+  private failedRead?: {
+    error?: IAdtError;
+    thrown?: DebugFailure;
+    failures: DebugFailure[];
+  };
+  private cleanupFailures: DebugFailure[] = [];
   /** Runs in flight, each its own token: stop() forgets them all, so a late end changes nothing. */
   private readonly runs = new Set<{ connection?: IAbapConnection }>();
   private readonly waiters = new Set<() => void>();
@@ -164,7 +205,7 @@ export class AmdpSession<O = unknown> {
   private async closeOrKeep(
     c: IAbapConnection | undefined,
     what: string,
-    failures: string[],
+    failures: DebugFailure[],
   ): Promise<void> {
     if (!c) return;
     try {
@@ -172,7 +213,7 @@ export class AmdpSession<O = unknown> {
       this.unclosed.delete(c);
     } catch (e) {
       this.unclosed.add(c);
-      failures.push(`${what} was not closed: ${thrown(e)}`);
+      failures.push(thrownFailure(e, `close ${what}`));
     }
   }
   /** Inside the serial: the session is no longer the running one; its cleanup is owed. */
@@ -211,7 +252,13 @@ export class AmdpSession<O = unknown> {
         const started = await onEvents.start(user, {
           stopExisting: options.stopExisting,
         });
-        if (!started.ok) throw new DebugListenerError(messageOf(started));
+        if (!started.ok) {
+          throw failedAt(
+            new DebugListenerError(messageOf(started)),
+            started,
+            'start',
+          );
+        }
         const { mainId, hanaSession } = readAmdpStart(wireOf(started));
         if (!mainId)
           throw new DebugListenerError(
@@ -233,7 +280,7 @@ export class AmdpSession<O = unknown> {
           failureReported: false,
         };
       } catch (error) {
-        const failures: string[] = [];
+        const failures: DebugFailure[] = [];
         await this.closeOrKeep(events, "the events' connection", failures);
         await this.closeOrKeep(commands, "the commands' connection", failures);
         throw withNotUndone(error, failures);
@@ -273,7 +320,13 @@ export class AmdpSession<O = unknown> {
       open.mainId,
       breakpoints,
     );
-    if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+    if (!answer.ok) {
+      throw failedAt(
+        new DebugRequestError(messageOf(answer)),
+        answer,
+        'set breakpoints',
+      );
+    }
     const requestId = locationId(wireOf(answer));
     if (!requestId)
       throw new DebugRequestError(
@@ -304,7 +357,12 @@ export class AmdpSession<O = unknown> {
     if (event) return event.breakpoints;
     if (open.readFailed !== undefined) {
       open.failureReported = true;
-      throw new DebugListenerError(open.readFailed);
+      const failed = new DebugListenerError(open.readFailed);
+      if (open.readFailedWith !== undefined)
+        throw carryingFailure(failed, open.readFailedWith, 'read events');
+      if (open.readThrown !== undefined)
+        throw carryingPayload(failed, open.readThrown);
+      throw failed;
     }
     this.abandoned.add(requestId); // a late confirmation is dropped, not kept
     throw new DebugRequestError(
@@ -355,6 +413,10 @@ export class AmdpSession<O = unknown> {
         }
         if (current && failed !== undefined) {
           open.readFailed = failed;
+          if (!answer.ok && !isFromThrow(answer.getError()))
+            open.readFailedWith = answer.getError();
+          else if (!answer.ok)
+            open.readThrown = failedEntry(answer, 'read events');
           this.notify(); // a sync waiting in the serial hears it now, not after its bound
         }
         await this.lastBatch(open, events);
@@ -364,7 +426,11 @@ export class AmdpSession<O = unknown> {
       // Thrown outside an answer (the ask itself, an observer): the same end as a failed read.
       // A stale loop changes nothing.
       const message = `the event read failed: ${thrown(error)}`;
-      if (!open.stopping && this.open === open) open.readFailed ??= message;
+      if (!open.stopping && this.open === open) {
+        if (open.readFailed === undefined)
+          open.readThrown = thrownFailure(error, 'read events');
+        open.readFailed ??= message;
+      }
       try {
         await this.lastBatch(open, []);
       } catch {
@@ -392,10 +458,17 @@ export class AmdpSession<O = unknown> {
       const owed = this.closing === open;
       const failures = owed ? await this.finishClosing(open, events) : [];
       if (owed) this.cleanupFailures = failures;
-      if (failedHere && !open.failureReported)
+      if (failedHere && !open.failureReported) {
         this.failure = `${open.readFailed ?? 'the event read failed'}${
-          failures.length ? `; not undone: ${failures.join('; ')}` : ''
+          failures.length ? `; not undone: ${describeFailures(failures)}` : ''
         }`;
+        this.failedRead =
+          open.readFailedWith !== undefined
+            ? { error: open.readFailedWith, failures }
+            : open.readThrown !== undefined
+              ? { thrown: open.readThrown, failures }
+              : undefined;
+      }
       // Last: a stop waiting for this batch returns only now, with what it could not undo.
       open.lastBatchFailures = failures;
     });
@@ -412,32 +485,43 @@ export class AmdpSession<O = unknown> {
   private async finishClosing(
     open: Open,
     lastBatch: AmdpEvent[],
-  ): Promise<string[]> {
+  ): Promise<DebugFailure[]> {
     if (this.closing !== open) return [];
     for (const e of lastBatch)
       if (e.kind === 'ON_BREAK' && !open.released.has(e.debuggeeId))
         open.unreleased.add(e.debuggeeId);
-    const failures: string[] = [];
+    const failures: DebugFailure[] = [];
+    // A credential failure stops it: no request after it is sent — each would
+    // ask the credential again — and each step left is named, kept for the
+    // next stop.
+    const notAttempted: string[] = [];
+    open.notAttempted = notAttempted;
+    const skipped = (step: string): boolean => {
+      if (credentialRefusalIn(failures) === undefined) return false;
+      notAttempted.push(step);
+      return true;
+    };
     if (!open.cleared) {
       const cleared = await open.onCommands
         .syncBreakpoints(open.mainId, [])
         .catch(asFailure);
       if (cleared.ok) open.cleared = true;
-      else failures.push(`clear breakpoints: ${messageOf(cleared)}`);
+      else failures.push(failedEntry(cleared, 'clear breakpoints'));
     }
     for (const id of [...open.unreleased]) {
+      if (skipped(`release debuggee ${id}`)) continue;
       const released = await open.onCommands
         .deleteDebuggee(open.mainId, id)
         .catch(asFailure);
       if (released.ok) {
         open.unreleased.delete(id);
         open.released.add(id);
-      } else failures.push(`release debuggee ${id}: ${messageOf(released)}`);
+      } else failures.push(failedEntry(released, `release debuggee ${id}`));
     }
-    if (!open.stopped) {
+    if (!open.stopped && !skipped('stop')) {
       const stopped = await open.onCommands.stop(open.mainId).catch(asFailure);
       if (stopped.ok) open.stopped = true;
-      else failures.push(`stop: ${messageOf(stopped)}`);
+      else failures.push(failedEntry(stopped, 'stop'));
     }
     if (failures.length || !open.readDone) return failures; // kept: retried by stop(), or finished by the read loop
     // Done with the session; a connection whose close throws stays in `unclosed` for the next stop.
@@ -480,9 +564,22 @@ export class AmdpSession<O = unknown> {
     }
     if (this.failure !== undefined) {
       const message = this.failure;
+      const read = this.failedRead;
       this.failure = undefined;
+      this.failedRead = undefined;
       this.changed?.(); // consuming it may leave nothing held
-      throw new DebugListenerError(message);
+      const failed = new DebugListenerError(message);
+      if (read === undefined) throw failed;
+      if (read.error !== undefined)
+        carryingFailure(failed, read.error, 'read events');
+      else if (read.thrown !== undefined) carryingPayload(failed, read.thrown);
+      if (read.failures.length > 0) {
+        noteLeftBehind(failed, {
+          message: 'not undone',
+          failures: read.failures,
+        });
+      }
+      throw failed;
     }
     if (this.queue.length) {
       const events = this.queue.splice(0);
@@ -503,7 +600,13 @@ export class AmdpSession<O = unknown> {
       const debuggee = this.requireDebuggee();
       const breaksBefore = this.breaks;
       const answer = await open.onCommands.step(open.mainId, debuggee, step);
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'step',
+        );
+      }
       // Moving until the next ON_BREAK — unless one already arrived while the step was answered.
       if (this.breaks === breaksBefore) this.debuggeeId = undefined;
       return { value: 'moving', raw: '' };
@@ -526,7 +629,13 @@ export class AmdpSession<O = unknown> {
         rowNumber: 100,
         ...(query ? { query } : {}),
       });
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'read table',
+        );
+      }
       const raw = bodyOf(answer);
       return { value: readAmdpPreview(raw), raw };
     });
@@ -540,9 +649,267 @@ export class AmdpSession<O = unknown> {
         open.mainId,
         debuggee,
       );
-      if (!answer.ok) throw new DebugRequestError(messageOf(answer));
+      if (!answer.ok) {
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'cancel',
+        );
+      }
       open.released.add(debuggee);
       this.debuggeeId = undefined;
+    });
+  }
+
+  // --- one request per call (the compact debugger) -----------------------------
+  /**
+   * Each method below sends exactly one `AmdpDebugger` request and answers what
+   * SAP answered, read; no event read runs in the background and no command
+   * waits for its confirmation event. The two connections are opened by
+   * `startOnce` (an open sends nothing) and closed by the cleanup.
+   */
+  private once?: OnceAmdp;
+  /** Connections of an earlier one-request session: the cleanup closes them. */
+  private readonly retiredOnce = new Set<IAbapConnection>();
+
+  private requireOnce(): OnceAmdp {
+    if (!this.once || this.once.stopped)
+      throw new DebugStateError('no AMDP debug session is running');
+    return this.once;
+  }
+
+  /** One request: the AMDP debugger started for the connected user; its session id and HANA session. */
+  startOnce(
+    stopExisting: boolean,
+  ): Promise<DebugView<{ mainId: string; hanaSession: string }>> {
+    return this.mutate(async () => {
+      if (this.open || this.closing || (this.once && !this.once.stopped))
+        throw new DebugStateError(
+          'an AMDP debug session is already running for this debug session',
+        );
+      const origin = this.requireOrigin();
+      const user = (await this.ports.requestUser(origin)).toUpperCase();
+      if (this.once) {
+        this.retiredOnce.add(this.once.events);
+        this.retiredOnce.add(this.once.commands);
+        this.once = undefined;
+      }
+      const events = await this.ports.openConnection(origin);
+      this.retiredOnce.add(events);
+      const commands = await this.ports.openConnection(origin);
+      this.retiredOnce.add(commands);
+      const onEvents = this.ports.amdpDebugger(events);
+      const answer = await onEvents.start(user, { stopExisting });
+      if (!answer.ok)
+        throw failedAt(
+          new DebugListenerError(messageOf(answer)),
+          answer,
+          'start',
+        );
+      const { mainId, hanaSession } = readAmdpStart(wireOf(answer));
+      if (!mainId)
+        throw new DebugListenerError(
+          'the AMDP debugger started without naming its session',
+        );
+      this.retiredOnce.delete(events);
+      this.retiredOnce.delete(commands);
+      this.once = {
+        events,
+        commands,
+        onEvents,
+        onCommands: this.ports.amdpDebugger(commands),
+        mainId,
+        hanaSession,
+        stopped: false,
+      };
+      return {
+        value: { mainId, hanaSession },
+        raw: JSON.stringify({ mainId, hanaSession }),
+      };
+    });
+  }
+
+  /**
+   * One request: the events SAP answers on the events connection. It runs
+   * outside the serial, so the commands go on while it holds.
+   */
+  async getEventsOnce(): Promise<DebugView<AmdpEvent[]>> {
+    const once = await this.mutate(async () => this.requireOnce());
+    try {
+      const answer = await once.onEvents.getEvents(once.mainId);
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'read events',
+        );
+      const raw = bodyOf(answer);
+      return { value: readAmdpEvents(raw), raw };
+    } finally {
+      this.notify();
+    }
+  }
+
+  /** One request: the breakpoints replaced; SAP answers the request id its SYNC_BREAKPOINTS event names. */
+  syncBreakpointsOnce(list: AmdpBreakpoint[]): Promise<
+    DebugView<{
+      requestId: string;
+      breakpoints: Array<{ clientId: string; uri: string }>;
+    }>
+  > {
+    return this.mutate(async () => {
+      const once = this.requireOnce();
+      const breakpoints = list.map((b) => ({
+        clientId: randomUUID(),
+        uri: lineUriOf(
+          { object_type: 'CLAS', object_name: b.class_name },
+          b.line,
+        ),
+      }));
+      const answer = await once.onCommands.syncBreakpoints(
+        once.mainId,
+        breakpoints,
+      );
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'sync breakpoints',
+        );
+      const value = { requestId: locationId(wireOf(answer)), breakpoints };
+      return { value, raw: JSON.stringify(value) };
+    });
+  }
+
+  /** One request: the stopped debuggee steps over or continues; SAP answers the request id. */
+  stepOnce(
+    debuggeeId: string,
+    step: 'over' | 'continue',
+  ): Promise<DebugView<{ requestId: string }>> {
+    return this.command('step', (once) =>
+      once.onCommands.step(once.mainId, debuggeeId, step),
+    );
+  }
+
+  /** One request: the debuggee deleted — its execution cancelled. */
+  deleteDebuggeeOnce(
+    debuggeeId: string,
+  ): Promise<DebugView<{ requestId: string }>> {
+    return this.command('delete debuggee', (once) =>
+      once.onCommands.deleteDebuggee(once.mainId, debuggeeId),
+    );
+  }
+
+  /** One request: the AMDP session stopped. */
+  stopOnce(): Promise<DebugView<{ requestId: string }>> {
+    return this.mutate(async () => {
+      const once = this.requireOnce();
+      const answer = await once.onCommands.stop(once.mainId);
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'stop',
+        );
+      once.stopped = true;
+      const value = { requestId: locationId(wireOf(answer)) };
+      return { value, raw: JSON.stringify(value) };
+    });
+  }
+
+  /** One request: the rows of a table variable of the stopped debuggee. */
+  getDataPreviewOnce(options: {
+    debuggeeId: string;
+    variable: string;
+    query?: string;
+    rowNumber?: number;
+  }): Promise<
+    DebugView<{ rows: Array<Record<string, string>>; columns: string[] }>
+  > {
+    return this.mutate(async () => {
+      const once = this.requireOnce();
+      const answer = await once.onCommands.getDataPreview({
+        sessionId: once.hanaSession,
+        debuggerId: once.mainId,
+        debuggeeId: options.debuggeeId,
+        variableName: options.variable.toUpperCase(),
+        ...(options.rowNumber !== undefined
+          ? { rowNumber: options.rowNumber }
+          : {}),
+        ...(options.query ? { query: options.query } : {}),
+      });
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'read table',
+        );
+      const raw = bodyOf(answer);
+      return { value: readAmdpPreview(raw), raw };
+    });
+  }
+
+  private command(
+    step: string,
+    send: (once: OnceAmdp) => Promise<IAdtResponse<unknown>>,
+  ): Promise<DebugView<{ requestId: string }>> {
+    return this.mutate(async () => {
+      const answer = await send(this.requireOnce());
+      if (!answer.ok)
+        throw failedAt(new DebugRequestError(messageOf(answer)), answer, step);
+      const value = { requestId: locationId(wireOf(answer)) };
+      return { value, raw: JSON.stringify(value) };
+    });
+  }
+
+  /** Inside stop: the one-request session stopped where it runs, its connections closed. */
+  private async finishOnce(failures: DebugFailure[]): Promise<void> {
+    const once = this.once;
+    if (once) {
+      if (!once.stopped) {
+        const stopped = await once.onCommands
+          .stop(once.mainId)
+          .catch(asFailure);
+        if (stopped.ok) once.stopped = true;
+        else failures.push(failedEntry(stopped, 'stop'));
+      }
+      this.once = undefined;
+      this.retiredOnce.add(once.events);
+      this.retiredOnce.add(once.commands);
+    }
+    for (const c of [...this.retiredOnce]) {
+      const before = failures.length;
+      await this.closeOrKeep(c, 'a connection', failures);
+      if (failures.length === before) this.retiredOnce.delete(c);
+    }
+  }
+
+  /**
+   * The end of the one-request path: one logoff per connection the AMDP
+   * session opened — the events and the commands connection, the retired ones
+   * — and nothing else: no stop, no breakpoint sync. The logoff of both ends
+   * the AMDP debug session (measured 2026-10-17). A close that throws keeps
+   * its connection for a later end or stop, and is answered.
+   */
+  endOnce(): Promise<DebugView<{ ended: true; logoffs: number }>> {
+    return this.mutate(async () => {
+      const failures: DebugFailure[] = [];
+      let logoffs = 0;
+      const once = this.once;
+      this.once = undefined;
+      const connections = [
+        ...(once ? [once.events, once.commands] : []),
+        ...this.retiredOnce,
+        ...this.unclosed,
+      ];
+      this.retiredOnce.clear();
+      for (const c of connections) {
+        logoffs += 1;
+        await this.closeOrKeep(c, 'a connection', failures);
+      }
+      this.cleanupFailures = failures;
+      if (failures.length) throw new DebugCleanupError(failures);
+      return { value: { ended: true, logoffs }, raw: '' };
     });
   }
 
@@ -555,16 +922,19 @@ export class AmdpSession<O = unknown> {
    */
   async stop(): Promise<void> {
     let ending: Open | undefined;
+    let notAttempted: readonly string[] = [];
     await this.mutate(async () => {
-      const failures: string[] = [];
+      const failures: DebugFailure[] = [];
       try {
         for (const c of [...this.unclosed])
           await this.closeOrKeep(c, 'a connection', failures);
+        await this.finishOnce(failures);
         if (this.open) this.retire(this.open);
         if (this.closing) {
           const open = this.closing;
           const stoppedBefore = open.stopped;
           failures.push(...(await this.finishClosing(open, [])));
+          notAttempted = open.notAttempted ?? [];
           // Accepted in this call: the system answers the open read now, and the read loop
           // handles that answer as the last batch. This call waits for it outside the serial,
           // so a read that never answers holds this call only — never another call, a
@@ -572,7 +942,7 @@ export class AmdpSession<O = unknown> {
           if (!stoppedBefore && open.stopped && !open.readDone) ending = open;
         }
       } catch (error) {
-        failures.push(thrown(error));
+        failures.push(thrownFailure(error, 'stop'));
       } finally {
         const runs = [...this.runs];
         this.runs.clear();
@@ -589,13 +959,15 @@ export class AmdpSession<O = unknown> {
         this.abandoned.clear();
         this.cleanupFailures = failures;
       }
-      if (failures.length) throw new DebugCleanupError(failures.join('; '));
+      if (failures.length)
+        throw new DebugCleanupError(failures, [], notAttempted);
     });
     // Outside the serial: the read's last batch, and what it could not undo is this
     // stop's failure too — its own, not whatever a later call left in cleanupFailures.
     if (ending) {
       const failures = await this.lastBatchHandled(ending);
-      if (failures.length) throw new DebugCleanupError(failures.join('; '));
+      if (failures.length)
+        throw new DebugCleanupError(failures, [], ending.notAttempted ?? []);
     }
   }
 
@@ -604,7 +976,7 @@ export class AmdpSession<O = unknown> {
    * finished and been recorded. Anything else that wakes the waiters meanwhile (a
    * run ending, a wait) changes nothing.
    */
-  private lastBatchHandled(open: Open): Promise<string[]> {
+  private lastBatchHandled(open: Open): Promise<DebugFailure[]> {
     return new Promise((resolve) => {
       const check = () => {
         const failures = open.lastBatchFailures;
@@ -659,7 +1031,9 @@ export class AmdpSession<O = unknown> {
       this.runs.size > 0 ||
       this.failure !== undefined ||
       this.cleanupFailures.length > 0 ||
-      this.unclosed.size > 0
+      this.unclosed.size > 0 ||
+      !!this.once ||
+      this.retiredOnce.size > 0
     );
   }
 
@@ -668,19 +1042,18 @@ export class AmdpSession<O = unknown> {
     return !!this.closing && this.closing.lastBatchFailures === undefined;
   }
 
-  /** What the last cleanup could not undo. */
-  failures(): string[] {
+  /** What the last cleanup could not undo, each in the shape of every other failure. */
+  failures(): DebugFailure[] {
     return [...this.cleanupFailures];
   }
 }
 
-/** The original error, with what could not be undone appended. */
-function withNotUndone(error: unknown, failures: string[]): unknown {
+/** The original error, with what could not be undone beside it, each as an entry. */
+function withNotUndone(error: unknown, failures: DebugFailure[]): unknown {
   if (failures.length === 0) return error;
-  const notUndone = `not undone: ${failures.join('; ')}`;
-  if (error instanceof Error) {
-    error.message = `${error.message}; ${notUndone}`;
-    return error;
-  }
-  return new DebugListenerError(`${thrown(error)}; ${notUndone}`);
+  const failed =
+    error instanceof Error ? error : new DebugListenerError(thrown(error));
+  leaveBehind(failed, { message: 'not undone', failures });
+  failed.message = `${failed.message}; not undone: ${describeFailures(failures)}`;
+  return failed;
 }

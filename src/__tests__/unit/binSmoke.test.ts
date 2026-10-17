@@ -27,7 +27,7 @@
  * is why this is one test and not one per bin. It is skipped where the network or
  * a writable temp directory is not available, and says which.
  */
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -89,7 +89,7 @@ describe('the published bins start from an installed package', () => {
       rmSync(workdir, { recursive: true, force: true });
   });
 
-  it('answers --version with the core package version, not the library one', () => {
+  it('answers --version and --help from each of the twelve bins, each with its own package', () => {
     if (process.env.SKIP_BIN_SMOKE === 'true') {
       console.log('[bin-smoke] skipped by SKIP_BIN_SMOKE');
       return;
@@ -97,16 +97,27 @@ describe('the published bins start from an installed package', () => {
 
     workdir = mkdtempSync(join(tmpdir(), 'mcp-bin-smoke-'));
 
-    // Pack all five, because each depends on the others by version and the
-    // versions being released are not on the registry yet. `compact` is here
-    // because a third bin is a third chance to ship a launcher that cannot find
-    // its own manifest.
+    // Pack all seventeen, because each depends on the others by version and the
+    // versions being released are not on the registry yet. Every bin is a
+    // chance to ship a launcher that cannot find its own manifest.
     installPackedRelease(workdir, [
       '.',
+      'background-runs-memory',
+      'responsible-rules',
+      'http',
+      'sse',
       'server',
-      'compact-readonly',
+      'compact-readonly-entries',
       'compact-modify',
       'compact',
+      'compact-http',
+      'compact-sse',
+      'core-ro',
+      'http-ro',
+      'sse-ro',
+      'compact-ro',
+      'compact-http-ro',
+      'compact-sse-ro',
     ]);
 
     const bin = installedFile(workdir, 'core', 'bin', 'mcp-abap-adt.js');
@@ -122,12 +133,40 @@ describe('the published bins start from an installed package', () => {
       'bin',
       'mcp-abap-adt-compact.js',
     );
-    expect(existsSync(compactBin)).toBe(true);
-    // And the compact command answers ITS version, not the one core would print
-    // — a launcher that reports a sibling's manifest reads as the truth.
-    expect(runNode([compactBin, '--version'], workdir).trim()).toBe(
-      version('compact/package.json'),
-    );
+
+    // The twelve bins: each answers ITS package's version — a launcher that
+    // reports a sibling's manifest reads as the truth — and its own help,
+    // whose USAGE names it.
+    for (const [pkg, binName, manifest] of [
+      ['core', 'mcp-abap-adt', 'server'],
+      ['http', 'mcp-abap-adt-http', 'http'],
+      ['sse', 'mcp-abap-adt-sse', 'sse'],
+      ['compact', 'mcp-abap-adt-compact', 'compact'],
+      ['compact-http', 'mcp-abap-adt-compact-http', 'compact-http'],
+      ['compact-sse', 'mcp-abap-adt-compact-sse', 'compact-sse'],
+      ['core-ro', 'mcp-abap-adt-ro', 'core-ro'],
+      ['http-ro', 'mcp-abap-adt-http-ro', 'http-ro'],
+      ['sse-ro', 'mcp-abap-adt-sse-ro', 'sse-ro'],
+      ['compact-ro', 'mcp-abap-adt-compact-ro', 'compact-ro'],
+      ['compact-http-ro', 'mcp-abap-adt-compact-http-ro', 'compact-http-ro'],
+      ['compact-sse-ro', 'mcp-abap-adt-compact-sse-ro', 'compact-sse-ro'],
+    ] as const) {
+      const installed = installedFile(workdir, pkg, 'bin', `${binName}.js`);
+      expect(existsSync(installed)).toBe(true);
+      expect(runNode([installed, '--version'], workdir).trim()).toBe(
+        version(`${manifest}/package.json`),
+      );
+      // `--help` goes to stderr, nothing to stdout, and exits 0.
+      const usage = spawnSync(process.execPath, [installed, '--help'], {
+        cwd: workdir,
+        encoding: 'utf8',
+      });
+      expect({ status: usage.status, stdout: usage.stdout }).toEqual({
+        status: 0,
+        stdout: '',
+      });
+      expect(usage.stderr).toContain(`USAGE:\n  ${binName} [options]`);
+    }
 
     expect(printed).toBe(version('server/package.json'));
     // And not the library's, which is what two levels up answered in a checkout
@@ -143,5 +182,17 @@ describe('the published bins start from an installed package', () => {
     expect(serverInfoVersion(compactBin, workdir)).toBe(
       version('compact/package.json'),
     );
+    // The stdio -ro bins too: each its own package's version.
+    for (const [pkg, binName] of [
+      ['core-ro', 'mcp-abap-adt-ro'],
+      ['compact-ro', 'mcp-abap-adt-compact-ro'],
+    ] as const) {
+      expect(
+        serverInfoVersion(
+          installedFile(workdir, pkg, 'bin', `${binName}.js`),
+          workdir,
+        ),
+      ).toBe(version(`${pkg}/package.json`));
+    }
   });
 });

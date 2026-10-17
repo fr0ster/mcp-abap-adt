@@ -27,16 +27,18 @@ the sessions store, or `--mcp=<destination>` for a service key):
 cat > /path/to/<destination>.env << 'EOF'
 SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
-SAP_AUTH_TYPE=jwt
-SAP_GRANT_TYPE=none
-SAP_JWT_TOKEN=<token>
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=<your ABAP user>
+SAP_PASSWORD=<your password>
 EOF
 
-# stdio (for MCP clients)
-mcp-abap-adt --env-path=/path/to/<destination>.env
+# A token you hold is not served over stdio: send it in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse, or create the session with mcp-auth.
 
-# HTTP server
-mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
+# stdio (for MCP clients)
+mcp-abap-adt --env-path=/path/to/<destination>.env --system-type=<onprem|cloud>
+
+# Streamable HTTP server (@mcp-abap-adt/http): no destination, each request sends x-sap-* headers
+mcp-abap-adt-http --port=3000 --system-type=<onprem|cloud>
 ```
 
 ---
@@ -46,14 +48,15 @@ mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
 - **[CLIENT_CONFIGURATION.md](CLIENT_CONFIGURATION.md)** - Guide for configuring MCP clients to connect to the server, including HTTP header configuration for dynamic SAP connection setup
 - **[AVAILABLE_TOOLS_READONLY.md](AVAILABLE_TOOLS_READONLY.md)** - Read-only tools (auto-generated)
 - **[AVAILABLE_TOOLS_HIGH.md](AVAILABLE_TOOLS_HIGH.md)** - High-level tools (auto-generated)
-- **[AVAILABLE_TOOLS_LOW.md](AVAILABLE_TOOLS_LOW.md)** - Low-level tools (auto-generated)
+- **[Compact tools](../../compact/docs/AVAILABLE_TOOLS.md)** - the compact set, which does what the low set did (auto-generated)
 - **Compact facade tools** — moved to `@mcp-abap-adt/compact` and documented there (`compact/docs/AVAILABLE_TOOLS.md`) (auto-generated)
 - **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Full combined tools reference (auto-generated)
 - **[AUTHENTICATION.md](AUTHENTICATION.md)** - The four supported authentications, destinations, service key locations, and header-based auth
-- **[CLI_OPTIONS.md](CLI_OPTIONS.md)** - Every command-line option with its environment and YAML forms
+- **[CLI_OPTIONS.md](CLI_OPTIONS.md)** - Each binary's command-line options with their environment and YAML forms
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups and exposure
-- **[DEBUGGER.md](DEBUGGER.md)** - The opt-in debugger: debug sessions, the SAP ids, transports, what ends a session
+- **[BATCH_MODE.md](BATCH_MODE.md)** - Batch mode (every binary): independent calls recorded, sent together at `BatchEnd`, answered by number; which calls are recorded
+- **[DEBUGGER.md](DEBUGGER.md)** - The debugger (the write binaries; no `-ro` one): debug sessions, the SAP ids, transports, what ends a session
 
 ## Getting Started
 
@@ -64,8 +67,82 @@ mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
 3. **Explore available tools**:
    - [Read-only tools](AVAILABLE_TOOLS_READONLY.md)
    - [High-level tools](AVAILABLE_TOOLS_HIGH.md)
-   - [Low-level tools](AVAILABLE_TOOLS_LOW.md)
+   - [Compact tools](../../compact/docs/AVAILABLE_TOOLS.md) (the low set's analogue since 19.0.0)
    - Compact tools — in the `@mcp-abap-adt/compact` package
+4. **Long reads take a `timeout`** (seconds, no default) — the approved list, each on an ABAP
+   session of its own. When it passes the read is cancelled (its session logged off) and nothing
+   was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels
+   at 60 s — because a tool call cannot be cancelled: a client's cancel aborts nothing, the call
+   runs to its end. No run (unit test, ATC, class, program) takes
+   one. The list:
+   [MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own).
+5. **A class or program run may go on in the background** (`background: true`): it cannot be
+   cut, so instead of waiting the call answers at once with a `run_handle` — see below.
+
+## Background runs of a class or a program
+
+A run of ABAP code (`RuntimeRunClass`, `RuntimeRunProgram`; compact `HandlerProfileRun`, plain or
+under a scheduled profiler trace) may write and may run long, and it cannot be cut: a running request dies with
+its connection, and its write is lost. With **`background: true`** the call answers at once with
+a `run_handle`; the run goes on in an ABAP session of its own until SAP answers, then that session
+is logged off and the answer is kept for you. No default: without it the call waits, as before.
+
+- `GetBackgroundRun { run_handle }` (compact `HandlerBackgroundRunGet`) — `running`, or `finished`
+  followed by what the run tool would have answered, SAP's error included. Reading keeps it.
+- `ListBackgroundRuns` (compact `HandlerBackgroundRunList`) — your runs: handle, tool, object,
+  start, running or finished; no output.
+- `DiscardBackgroundRun { run_handle }` (compact `HandlerBackgroundRunDiscard`) — removes a
+  finished run's answer. A running run cannot be discarded: it cannot be stopped.
+
+A run is yours when its destination and SAP user equal those of your request (for a token
+credential, the user SAP answers); another user's handle reads as an unknown one. You may hold 16
+runs, running and kept together; discard a finished one to start another. Kept answers live in the
+server's memory (`@mcp-abap-adt/background-runs-memory`) and end with the process. An application
+embedding `@mcp-abap-adt/lib` keeps runs in a store of its own (`IBackgroundRuns`), or takes that
+package. An SSE connection that closes cuts the runs it started: their sessions are logged off at
+once, as stdio's are when its client closes stdin; over Streamable HTTP a run goes on. The
+process's end (a signal, or stdio's client closing stdin) logs every run's session off at once,
+which cuts it. Details:
+[MIGRATION-19.0](../MIGRATION-19.0.md#every-transport-background-runs-of-the-class-and-program-runs).
+
+## Leftover SAP sessions of a killed process
+
+A server process killed from outside (`SIGKILL`, out of memory, a client that kills its child)
+cannot log off, so its SAP sessions — and the locks a lock tool took in them — stay open until
+SAP's idle timeout. A stdio server keeps a record of the HTTP sessions it holds in
+`<config dir>/runtime/` (`~/.config/mcp-abap-adt/runtime`, `Documents\mcp-abap-adt\runtime` on
+Windows; `--auth-broker-path` moves it) and deletes each record once that session's logoff is
+written, so only a killed process leaves records behind. A later stdio server process of the same
+destination **starts on the one it finds**: at its start, before your MCP client sees its tools, it
+connects on that session instead of logging on, so a `lock_handle` taken there works again —
+finish the write, or unlock. If SAP says the old session has ended (much time passed), it logs on
+normally and starts a new session instead; its locks are gone. The record stays the server's
+either way. With several records, none is picked: the server logs on normally and leaves them for
+the tools below. A debugger's session is never taken up. After a start on a leftover session the
+server checks and repairs nothing: if the session ended or its locks are gone, SAP's answers say
+so, and you redo your requests. Two tools act on the leftover sessions of the destination the
+server serves:
+
+- `ListLeftoverSessions` (compact `HandlerLeftoverSessionList`) — the handle, role, destination,
+  user and time of each session a dead process left; never a cookie, and nothing is sent to SAP.
+- `LogoffLeftoverSession { handle }` (compact `HandlerLeftoverSessionLogoff`) — logs the session off
+  (every lock in it is released) — one request, the logoff, with no credential and nothing sent
+  before it — and deletes the record.
+
+A record is the server's when it names the destination the server serves (`--mcp=<name>`, or
+`default` for an `--env` file) and points where that destination points (URL, client, system
+kind): on stdio the user and the credential are fixed for the process. A session of a server still running is never shown; off Linux a
+server's liveness is read by its process id alone, so a reused id hides a record until that other
+process ends. Two servers never act on one record at once: the first to claim it acts, the other
+answers that it is not available. The records hold
+the session's cookies, which act as you while the session lives: on Linux and macOS the directory
+is owner-only (`0700`, files `0600`); on Windows the directory's inherited ACL applies, so keep it
+in your own profile — and everywhere keep it out of backups and shared folders.
+
+The http and sse binaries keep no record and serve none of these tools: one such server holds
+the sessions of many users. There, resuming a SAP session is yours to do if you hold what it
+takes; otherwise SAP ends it on its own timeout, which releases its locks. Details:
+[MIGRATION-19.0](../MIGRATION-19.0.md#stdio-leftover-sap-sessions-of-a-killed-process).
 
 ## Package Tree Output
 
@@ -79,39 +156,42 @@ objects for each package. Each object includes:
 
 ## Command Reference
 
-After installing, these commands are available (`mcp-abap-adt-compact` takes the same options):
+A binary is its transport; there is no `--transport` option. Each binary reads only its own options
+(`<binary> --help`); an option of another binary, on the command line or in the config file, stops the
+start, naming the binary that serves it. Another binary's environment variables are not read.
 
-### `mcp-abap-adt` - Default stdio transport
+### `mcp-abap-adt` - stdio (`@mcp-abap-adt/core`)
 ```bash
-mcp-abap-adt [--env <destination>] [--env-path /path/to/.env]
+mcp-abap-adt [--mcp <destination>] [--env <destination>] [--env-path /path/to/.env] --system-type=<onprem|cloud>
 ```
-Use with MCP clients like Claude Desktop, VSCode extensions.
+Use with MCP clients like Claude Desktop, VSCode extensions. `mcp-abap-adt-compact` takes the same
+options with the compact tool set.
 
-### `mcp-abap-adt --transport=http` - HTTP server
+### `mcp-abap-adt-http` - Streamable HTTP (`@mcp-abap-adt/http`)
 ```bash
-mcp-abap-adt --transport=http [--port 3000] [--host localhost] [--env <destination>] [--env-path /path/to/.env]
+mcp-abap-adt-http [--port 3000] [--host 127.0.0.1] --system-type=<onprem|cloud>
 ```
-Starts HTTP server with StreamableHTTP transport.
+Credentials come only from each request's `x-sap-*` headers.
 
-### `mcp-abap-adt --transport=sse` - SSE server
+### `mcp-abap-adt-sse` - HTTP+SSE (`@mcp-abap-adt/sse`)
 ```bash
-mcp-abap-adt --transport=sse [--port 3001] [--host localhost] [--env <destination>] [--env-path /path/to/.env]
+mcp-abap-adt-sse [--sse-port 3001] [--sse-host 127.0.0.1] --system-type=<onprem|cloud>
 ```
-Starts HTTP server with Server-Sent Events transport.
+Credentials come only from the `x-sap-*` headers of the `GET` that opens each SSE connection.
 
 ## Examples
 
-### Example 1: HTTP Server on Port 8080
+### Example 1: Streamable HTTP Server on Port 8080
 ```bash
-mcp-abap-adt --transport=http --port=8080
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 ```
 
 ### Example 2: SSE Server Accessible from Network
 ```bash
-mcp-abap-adt --transport=sse --host=0.0.0.0 --port=3001
+mcp-abap-adt-sse --sse-host=0.0.0.0 --sse-port=3001 --system-type=<onprem|cloud>
 ```
 
-### Example 3: Custom Environment File
+### Example 3: Custom Environment File (stdio)
 ```bash
-mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port=8080
+mcp-abap-adt --env-path /opt/config/.env.production --system-type=<onprem|cloud>
 ```

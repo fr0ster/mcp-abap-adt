@@ -33,12 +33,12 @@
  */
 
 import { handleActivateObject } from '../../../handlers/common/low/handleActivateObject';
-import { handleCreateDdl } from '../../../handlers/ddl/low/handleCreateDdl';
-import { handleDeleteDdl } from '../../../handlers/ddl/low/handleDeleteDdl';
-import { handleLockDdl } from '../../../handlers/ddl/low/handleLockDdl';
-import { handleUnlockDdl } from '../../../handlers/ddl/low/handleUnlockDdl';
+import { handleLockObject } from '../../../handlers/common/low/handleLockObject';
+import { handleUnlockObject } from '../../../handlers/common/low/handleUnlockObject';
+import { handleValidateObject } from '../../../handlers/common/low/handleValidateObject';
+import { handleCreateDdl } from '../../../handlers/ddl/high/handleCreateDdl';
+import { handleDeleteDdl } from '../../../handlers/ddl/high/handleDeleteDdl';
 import { handleUpdateDdl } from '../../../handlers/ddl/low/handleUpdateDdl';
-import { handleValidateDdl } from '../../../handlers/ddl/low/handleValidateDdl';
 import { handleGetInactiveObjects } from '../../../handlers/system/readonly/handleGetInactiveObjects';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { assertNotSharedDependency } from './configHelpers';
@@ -94,9 +94,8 @@ export async function assertNameAvailable(
 /**
  * Write a view's source under a lock of its own, and release it.
  *
- * The release is checked: `UnlockDdlLow` wants the `session_id` the lock
- * answered with — an empty one is refused — and a refused unlock leaves the
- * object locked with nothing said. Both outcomes are collected so a failed
+ * The release is checked: a refused unlock leaves the object locked with
+ * nothing said. Both outcomes are collected so a failed
  * write and an unreleased lock can be reported together; neither hides the
  * other.
  */
@@ -105,22 +104,15 @@ async function writeViewSource(
   view: ViewFixture,
   transportRequest?: string,
 ): Promise<void> {
-  const locked = (await handleLockDdl(context, {
-    ddl_name: view.name,
+  const locked = (await handleLockObject(context, {
+    object_type: 'ddl',
+    object_name: view.name,
   })) as HandlerAnswer;
   if (locked.isError) {
     throw new Error(`lock ${view.name}: ${extractErrorMessage(locked)}`);
   }
   const lockData = parseHandlerResponse(locked);
   const lockHandle = extractLockHandle(lockData);
-  const sessionId = String(
-    (lockData as { session_id?: unknown })?.session_id ?? '',
-  );
-  if (!sessionId) {
-    throw new Error(
-      `lock ${view.name} answered no session_id, so the lock it took cannot be released — refusing to write under it.`,
-    );
-  }
 
   const failures: string[] = [];
   try {
@@ -137,10 +129,10 @@ async function writeViewSource(
     failures.push(`write threw: ${(error as Error)?.message ?? String(error)}`);
   }
   try {
-    const released = (await handleUnlockDdl(context, {
-      ddl_name: view.name,
+    const released = (await handleUnlockObject(context, {
+      object_type: 'ddl',
+      object_name: view.name,
       lock_handle: lockHandle,
-      session_id: sessionId,
     })) as HandlerAnswer;
     if (released.isError) {
       failures.push(
@@ -174,8 +166,9 @@ export async function createView(
   }
   assertNotSharedDependency('view', view.name);
   await assertNameAvailable(`view ${view.name}`, () =>
-    handleValidateDdl(context, {
-      ddl_name: view.name,
+    handleValidateObject(context, {
+      object_type: 'ddl',
+      object_name: view.name,
       package_name: packageName,
       description: view.description,
     }),

@@ -22,7 +22,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -31,6 +31,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -100,7 +101,7 @@ export async function handleUpdateServiceDefinition(
         () => obj.lock({ serviceDefinitionName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
-            () =>
+            atStep('update', () =>
               obj.update(
                 {
                   serviceDefinitionName,
@@ -112,10 +113,12 @@ export async function handleUpdateServiceDefinition(
                   analyse: analyseException,
                 },
               ),
-            () =>
+            ),
+            atStep('check', () =>
               obj.check({ serviceDefinitionName }, undefined, {
                 analyse: analyseException,
               }),
+            ),
           ),
         (lockHandle) =>
           obj.unlock({ serviceDefinitionName }, lockHandle, {
@@ -127,20 +130,26 @@ export async function handleUpdateServiceDefinition(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      // Best-effort: wait for the write to be visible before activating.
+      // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.
       await obj
         .read({ serviceDefinitionName }, 'inactive', {
           withLongPolling: true,
           analyse: analyseException,
         })
-        .catch(() => undefined);
+        .catch(unlessCredentialFailure);
 
       if (!shouldActivate) {
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ serviceDefinitionName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate(
+            { serviceDefinitionName },
+            { analyse: analyseActivation },
+          ),
+        ),
       );
     },
     project(detail, terseWrite),

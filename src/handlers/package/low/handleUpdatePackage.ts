@@ -38,10 +38,10 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import { patchPackageXml } from '../../../lib/strategies/packagePatch';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
-  restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -50,7 +50,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
+    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -77,43 +77,17 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockObject. Required for update operation.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
     },
-    required: [
-      'package_name',
-      'super_package',
-      'updated_description',
-      'lock_handle',
-    ],
+    required: ['package_name', 'updated_description', 'lock_handle'],
   },
 } as const;
 
 interface UpdatePackageArgs {
   package_name: string;
-  super_package: string;
+  super_package?: string;
   updated_description: string;
   lock_handle: string;
   transport_request?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 export async function handleUpdatePackage(
@@ -128,19 +102,12 @@ export async function handleUpdatePackage(
       updated_description,
       lock_handle,
       transport_request,
-      session_id,
-      session_state,
     } = args as UpdatePackageArgs;
 
-    if (
-      !package_name ||
-      !super_package ||
-      !updated_description ||
-      !lock_handle
-    ) {
+    if (!package_name || !updated_description || !lock_handle) {
       return return_error(
         new Error(
-          'package_name, super_package, updated_description, and lock_handle are required',
+          'package_name, updated_description, and lock_handle are required',
         ),
       );
     }
@@ -155,21 +122,18 @@ export async function handleUpdatePackage(
 
     logger?.info(`Starting package update: ${packageName}`);
 
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
     try {
       // The three steps, in the handler because 19 put them there. `analyse`
       // on each one: a refusal from the read and a refusal from the write are
       // different failures, and whichever comes back is the one the caller
       // sees, built by the strategy rather than summarised here.
       const written = await sequence(
-        () =>
+        atStep('read metadata', () =>
           client
             .getPackage()
             .readMetadata({ packageName }, { analyse: analyseException }),
-        (current) =>
+        ),
+        atStep('update metadata', (current) =>
           client.getPackage().updateMetadata(
             {
               packageName,
@@ -186,6 +150,7 @@ export async function handleUpdatePackage(
               analyse: analyseException,
             },
           ),
+        ),
       );
 
       // A refusal goes out through `answer()`, with what SAP said (T100,
@@ -207,10 +172,10 @@ export async function handleUpdatePackage(
           {
             success: true,
             package_name: packageName,
-            super_package: super_package.toUpperCase(),
+            ...(super_package && {
+              super_package: super_package.toUpperCase(),
+            }),
             updated_description,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
             message: `Package ${packageName} updated successfully. Remember to unlock using UnlockObject.`,
           },
           null,

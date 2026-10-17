@@ -77,6 +77,32 @@ SAP_CONNECTION_TYPE=rfc
 - The transport layer (`http` or `rfc`): `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env` or the process environment, `--connection-type=rfc`, or YAML `connection-type: rfc`. Precedence: CLI, then the environment (the `.env` value joins it, never over one already set), then YAML.
 - **The address comes from `SAP_URL`**: the host is the application server RFC connects to directly (not a message server), and the system number is derived from the port — `80NN` → `NN`, so `:8000` is `00` and `:8001` is `01`. A port that follows no such rule — an `https` port such as `44300` — gives a wrong number: set **`SAP_SYSNR`** (two digits) in the **process environment**; it is not read from the `.env`.
 
+## Through a message server and a logon group
+
+For load-balanced logon, the message server chooses the application server:
+
+```env
+SAP_URL=http://saphost:8000
+SAP_USERNAME=DEVELOPER
+SAP_PASSWORD=secret
+SAP_CLIENT=100
+SAP_AUTH_TYPE=basic
+SAP_CONNECTION_TYPE=rfc
+SAP_MSHOST=msghost.example
+SAP_SYSID=ABC
+# Optional:
+# SAP_MSSERV=sapmsABC
+# SAP_GROUP=PUBLIC
+# SAP_SAPROUTER=/H/router.example/S/3299/H/
+```
+
+- `SAP_MSHOST` — the message server host. With it, the RFC wire takes **no host and no system number from `SAP_URL`**, and `SAP_SYSNR` is not read. `SAP_URL` is still the system's URL.
+- `SAP_MSSERV` (the message server service, a name or a port) or `SAP_SYSID` (the system id) — **one of the two is required** beside `SAP_MSHOST`. With neither, `@mcp-abap-adt/connection` refuses the connection naming both, and that refusal reaches you as it came.
+- `SAP_GROUP` — the logon group. When absent, connection uses `PUBLIC`; the server adds no default of its own.
+- `SAP_SAPROUTER` — a SAProuter string. It works with either addressing (message server or application server).
+- Each is also a CLI option (`--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`) and a YAML key of the same name. Precedence is that of the connection type: CLI, then the environment (the `--env` / `--env-path` `.env` value joins it, never over one already set), then YAML. The server passes them to connection as configured and decides nothing.
+- **Not yet run against a live message server** (connection 18.0.0). The address follows the SAP NW RFC SDK's own parameters. `SAP_MSHOST` + `SAP_MSSERV` without `SAP_SYSID` is accepted but unconfirmed; if the SDK refuses it, add `SAP_SYSID`.
+
 ## SNC (passwordless logon)
 
 SNC logs on over RFC with the credential of an installed SNC product (for example SAP Secure Login Client). **The `.env` has no user and no password**: the system maps the client's SNC name to an ABAP user.
@@ -99,9 +125,9 @@ SAP_RESPONSIBLE=<your ABAP user>
 - `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` — optional: quality of protection (default `9`), the SNC library, and the client's own SNC name (otherwise taken from the credential).
 - **The SNC library is found without `SAP_SNC_LIB`**, in this order: `SNC_LIB_64` (64-bit process), `SNC_LIB`, the Secure Login Client's install path in the Windows registry, then the macOS bundle `/Applications/Secure Login Client.app/Contents/MacOS/lib/libsapcrypto.dylib`. A candidate that is missing or built for the wrong architecture is skipped — the Secure Login Client installer sets `SNC_LIB` to its 32-bit library, and the registry then supplies the 64-bit one. Nothing usable is refused with `no usable SNC library was found`, listing each candidate tried; set `SAP_SNC_LIB` then.
 - **The Secure Login Client need not be running.** The library starts it when the first RFC connection opens, and that call can wait on its logon window until you answer it. Logged out and the window closed, the call is refused with `A2200019`.
-- `SAP_RESPONSIBLE` — every create needs a responsible person; over SNC the server knows no login to fall back to, so without it creates are refused with `system_context_missing`. Reads do not need it.
+- `SAP_RESPONSIBLE` — the server names the responsible person from the system (`systeminformation`, asked once at the start). Where an on-premise system gives no information (it answers `404`), it takes `SAP_RESPONSIBLE`, else the login — and over SNC there is no login, so without `SAP_RESPONSIBLE` the start ends with `system_user_unknown` (exit `1`).
 - SNC needs `SAP_CONNECTION_TYPE=rfc` (see above). With `http` the destination is refused at startup, naming `connection-type`.
-- A destination that states `snc` without `SAP_SNC_PARTNERNAME` is refused with `Destination "X" lacks: sncPartnerName`.
+- A destination that states `snc` without `SAP_SNC_PARTNERNAME` is refused with `Destination "X" cannot be used: sncPartnerName`.
 - Prerequisites on the system side: SNC enabled on the application server, and the client's SNC name mapped to an ABAP user (user maintenance, SNC tab). If SAP GUI logs on to this system through SNC without a password, both are in place.
 
 ## How It Works
@@ -109,7 +135,7 @@ SAP_RESPONSIBLE=<your ABAP user>
 1. `SAP_CONNECTION_TYPE=rfc` (or `--connection-type=rfc`) tells the server to connect over the RFC transport instead of HTTP
 2. The connection calls SAP function module `SADT_REST_RFC_ENDPOINT` for every ADT request
 3. The RFC session is inherently stateful — lock handles persist across calls
-4. Host and system number are derived from `SAP_URL` (port 80NN → system number NN), `SAP_SYSNR` overriding the number
+4. Host and system number are derived from `SAP_URL` (port 80NN → system number NN), `SAP_SYSNR` overriding the number — unless `SAP_MSHOST` is set: then the message server, with `SAP_MSSERV` or `SAP_SYSID` and `SAP_GROUP`, chooses the application server
 5. The RFC module is loaded when the first RFC connection opens, not at startup
 
 ## Known limitation: a package cannot be changed by the session that created or changed it
@@ -234,4 +260,4 @@ The Secure Login Client is not logged on: log on to the profile used for SAP app
 
 ### "RFC connection is not open"
 
-The server failed to connect via RFC. Check that the host in `SAP_URL` is an application server reachable from this machine, the system number (`SAP_SYSNR`), the credentials, and `S_RFC` authorization.
+The server failed to connect via RFC. Check that the host in `SAP_URL` is an application server reachable from this machine, the system number (`SAP_SYSNR`), the credentials, and `S_RFC` authorization. Through a message server, check `SAP_MSHOST`, `SAP_MSSERV` / `SAP_SYSID` and the logon group `SAP_GROUP` instead of the host and the system number.

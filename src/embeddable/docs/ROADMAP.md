@@ -2,6 +2,12 @@
 
 Implementation roadmap for the new simplified architecture based on `BaseMcpServer` extending `McpServer` from SDK.
 
+> **Historical.** This roadmap records how the v2 server was planned; it is not maintained and does
+> not describe the code. Since 19.0.0 there is no `--transport` (each binary is its transport —
+> `mcp-abap-adt`, `-http`, `-sse` and their compact and `-ro` siblings), no `ArgumentsParser` (each
+> binary reads its own parameter table) and no `--exposition`. What is built: [ARCHITECTURE.md](ARCHITECTURE.md)
+> and [MIGRATION-19.0](../../../docs/MIGRATION-19.0.md).
+
 ## Status
 
 - ✅ **Completed**: Phase 1.2, Phase 1.3, Phase 2.1 (BaseMcpServer implementation)

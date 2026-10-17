@@ -1,8 +1,8 @@
 {
   "name": "@mcp-abap-adt/core",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "18.1.0",
-  "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports; connects to the system over HTTP, RFC or SNC (passwordless). RFC and SNC need the SAP NW RFC SDK at install time. The compact variant is @mcp-abap-adt/compact.",
+  "version": "19.0.0",
+  "description": "Standalone MCP server for SAP ABAP ADT over stdio: one destination through the auth broker (service keys, sessions, the browser login); connects to the system over HTTP, RFC or SNC (passwordless). RFC and SNC need the SAP NW RFC SDK at install time. Streamable HTTP is @mcp-abap-adt/http, SSE @mcp-abap-adt/sse; the compact variant is @mcp-abap-adt/compact.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -42,12 +42,20 @@
       "types": "./dist/launcher.d.ts",
       "import": "./dist/launcher.js",
       "require": "./dist/launcher.js"
+    },
+    "./auth": {
+      "types": "./dist/auth/index.d.ts",
+      "import": "./dist/auth/index.js",
+      "require": "./dist/auth/index.js"
     }
   },
   "typesVersions": {
     "*": {
       "launcher": [
         "dist/launcher.d.ts"
+      ],
+      "auth": [
+        "dist/auth/index.d.ts"
       ]
     }
   },
@@ -63,55 +71,30 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npx tsc -p tsconfig.json",
-    "test": "jest --passWithNoTests",
+    "test": "npm --prefix .. test -- --roots server/src",
     "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "lint:check": "npx biome check src",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@mcp-abap-adt/auth-broker": "^5.0.6",
+    "@mcp-abap-adt/auth-errors": "^2.2.1",
+    "@mcp-abap-adt/auth-providers": "^6.0.2",
+    "@mcp-abap-adt/auth-stores": "^5.0.1",
+    "@mcp-abap-adt/connection": "^18.0.0",
+    "@mcp-abap-adt/interfaces-auth": "^7.5.0",
+    "@mcp-abap-adt/interfaces-auth-broker": "^1.3.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.1",
-    "@mcp-abap-adt/lib": "^18.1.0",
+    "@mcp-abap-adt/background-runs-memory": "^19.0.0",
+    "@mcp-abap-adt/lib": "^19.0.0",
     "@mcp-abap-adt/logger": "^0.4.1",
+    "@mcp-abap-adt/responsible-rules": "^19.0.0",
     "@modelcontextprotocol/sdk": "^1.32.0",
-    "express": "^5.2.1"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "roots": [
-      "<rootDir>/src"
-    ],
-    "testMatch": [
-      "**/__tests__/**/*.test.ts"
-    ],
-    "transform": {
-      "^.+\\.ts$": [
-        "ts-jest",
-        {
-          "tsconfig": "tsconfig.test.json"
-        }
-      ]
-    },
-    "moduleNameMapper": {
-      "^@mcp-abap-adt/lib$": "<rootDir>/../src/index.ts",
-      "^@mcp-abap-adt/lib/handlers$": "<rootDir>/../src/lib/handlers/index.ts",
-      "^@mcp-abap-adt/lib/utils$": "<rootDir>/../src/lib/utils.ts",
-      "^@mcp-abap-adt/lib/embeddable$": "<rootDir>/../src/embeddable/index.ts",
-      "^@mcp-abap-adt/lib/config$": "<rootDir>/../src/lib/config/index.ts",
-      "^@mcp-abap-adt/lib/auth$": "<rootDir>/../src/lib/auth/index.ts",
-      "^@mcp-abap-adt/lib/logger$": "<rootDir>/../src/lib/handlerLogger.ts",
-      "^@mcp-abap-adt/lib/request-context$": "<rootDir>/../src/lib/requestContext.ts",
-      "^@mcp-abap-adt/lib/debugger$": "<rootDir>/../src/lib/debugger/index.ts",
-      "^@mcp-abap-adt/lib/state$": "<rootDir>/../src/lib/state/index.ts",
-      "^(\\.{1,2}/.*)\\.js$": "$1"
-    }
+    "dotenv": "^18.0.5"
   },
   "devDependencies": {
-    "@types/express": "*",
     "@types/jest": "*",
     "@types/node": "*",
-    "jest": "*",
-    "ts-jest": "*",
     "typescript": "*"
   }
 }

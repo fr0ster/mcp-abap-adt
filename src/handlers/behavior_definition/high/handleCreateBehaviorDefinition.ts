@@ -24,7 +24,7 @@ import type {
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
@@ -32,6 +32,7 @@ import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
@@ -130,23 +131,27 @@ export async function handleCreateBehaviorDefinition(
         resultsFor(behaviorDefinitionDocuments),
       );
 
-      const created = await obj.create(
-        {
-          name,
-          description: args.description || name,
-          packageName: args.package_name,
-          transportRequest: args.transport_request,
-          rootEntity: args.root_entity,
-          implementationType: args.implementation_type,
-          masterLanguage: args.master_language,
-        },
-        { analyse: analyseException },
-      );
+      const created = await atStep('create', () =>
+        obj.create(
+          {
+            name,
+            description: args.description || name,
+            packageName: args.package_name,
+            transportRequest: args.transport_request,
+            rootEntity: args.root_entity,
+            implementationType: args.implementation_type,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+      )();
       if (!created.ok) return created;
 
       const checked = await withLock(
         () => obj.lock({ name }, { analyse: analyseLock }),
-        () => obj.check({ name }, undefined, { analyse: analyseException }),
+        atStep('check', () =>
+          obj.check({ name }, undefined, { analyse: analyseException }),
+        ),
         (lockHandle) =>
           obj.unlock({ name }, lockHandle, { analyse: analyseException }),
       );
@@ -154,20 +159,23 @@ export async function handleCreateBehaviorDefinition(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      // Best-effort: wait for the write to be visible before activating.
+      // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.
       await obj
         .read({ name }, 'inactive', {
           withLongPolling: true,
           analyse: analyseException,
         })
-        .catch(() => undefined);
+        .catch(unlessCredentialFailure);
 
       if (!shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(checked, () =>
-        obj.activate({ name }, { analyse: analyseActivation }),
+      return carryCleanup(
+        checked,
+        atStep('activate', () =>
+          obj.activate({ name }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

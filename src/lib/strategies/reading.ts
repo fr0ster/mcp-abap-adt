@@ -126,8 +126,8 @@ export const structured = reading((answer) => parseStructure(rawOf(answer)));
  * **This is the right reading for more members than it looks.** Source is
  * obvious: the text is the answer and parsing it would be a lie. Metadata is
  * the one worth saying out loud — it is XML, and the tools return JSON, but
- * they carry the XML through as a string inside that JSON. `handleReadClass`
- * puts `metadataResult.data` in a `metadata` field verbatim and has never
+ * they carry the XML through as a string inside that JSON. `handleGetClass`
+ * (`part: metadata`) puts the document in a `metadata` field verbatim and has never
  * parsed it.
  *
  * So the eight media types and seven root elements the corpus found in metadata

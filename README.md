@@ -11,7 +11,7 @@
 - **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
 - Works with **On-Premise (ECC/S/4HANA)** and **ABAP Cloud (BTP)** systems
 - Legacy systems (BASIS < 7.50) are **not supported at present**: that support is parked on the `parked/legacy-support` branch until it can be tried against a live legacy system
-- Four authentications: **basic** (HTTP or RFC), **SNC** (passwordless, RFC), **JWT with browser login** (service key, ABAP or XSUAA) and **JWT you already hold**
+- Three authentications over stdio: **basic** (HTTP or RFC), **SNC** (passwordless, RFC), **JWT with browser login** (service key, ABAP or XSUAA); a **JWT you already hold** goes in the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse`
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Several installation variants: the **full** server (`@mcp-abap-adt/core`) or the **compact** one (`@mcp-abap-adt/compact`), each connecting to the system over **HTTP**, **RFC** or **SNC** — see [Installation variants](docs/installation/INSTALLATION.md#installation-variants)
 - Rich tool surface for ABAP objects, metadata, transports, and search
@@ -50,7 +50,7 @@ npm install -g @mcp-abap-adt/configurator
 mcp-conf --client cline --name abap --mcp TRIAL
 
 # HTTP (streamable HTTP)
-mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http --mcp trial
+mcp-conf --client copilot --name abap --transport http --url http://localhost:3000/mcp/stream/http
 ```
 
 Full configurator usage (separate repo): [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md).
@@ -66,60 +66,84 @@ See [docs/user-guide/TERMINOLOGY.md](docs/user-guide/TERMINOLOGY.md) for the ful
 Destination-based auth is the default. Drop service keys into the standard platform folder and use the filename as your destination:
 
 ```bash
-mcp-abap-adt --transport=stdio --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 ```
 
 Standard service key paths:
 - Unix (Linux/macOS): `~/.config/mcp-abap-adt/service-keys/<destination>.json`
 - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\<destination>.json`
 
-The server supports exactly four authentications; each is a destination stated in a service key, a `.env`, or both:
+`mcp-abap-adt` (stdio) supports exactly three authentications, each a destination stated in a service key, a `.env`, or both; a JWT you hold is sent in headers to the HTTP or SSE server:
 
 | Authentication | `.env` keys |
 |----------------|-------------|
 | Basic (HTTP or RFC) | `SAP_AUTH_TYPE=basic`, `SAP_USERNAME`, `SAP_PASSWORD` |
 | SNC (RFC only, passwordless) | `SAP_AUTH_TYPE=snc`, `SAP_SNC_PARTNERNAME`, optional `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` — no user, no password |
 | JWT, browser login | `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=authorization_code`, a service key (ABAP or XSUAA) or `SAP_UAA_*` |
-| JWT you hold | `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN` (or the `x-sap-jwt-token` header) |
+| JWT you hold | the `x-sap-jwt-token` header of `mcp-abap-adt-http` / `mcp-abap-adt-sse` (stdio serves none) |
 
 A `jwt` `.env` must state `SAP_GRANT_TYPE`. The `mcp-auth` command that writes such a `.env` comes from
 `@mcp-abap-adt/auth-broker-cli`. The browser login listens on port `61001` unless `--browser-auth-port` says otherwise.
 
-A created object always carries its responsible person: the first stated of the tool's own argument,
-the `x-sap-responsible` header, `SAP_RESPONSIBLE` in the destination's own `.env`, then in the process
-environment — else the login: on-premise the destination's `SAP_USERNAME`, the `x-sap-login` of an
-`x-sap-url` connection, the process `SAP_USERNAME`; on a cloud system only the system's user. A create
-that finds none (SNC, a token you hold) is refused naming `SAP_RESPONSIBLE`; nothing is sent — a message class included, from 17.0.0. The master system
-comes from `x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, then process) — no tool
-takes it as an argument — else from a cloud system itself; otherwise it is left out and the system
-applies itself — never refused. Reads are unaffected. The process environment is read once: a change
-made to it while the server runs is not picked up. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, and a debugger start needs at least one breakpoint. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
+A created object always carries its responsible person and, where known, its master system. The
+servers name them once per destination — its credentials and its ABAP system — when its connection
+is created, by the rules of `@mcp-abap-adt/responsible-rules`: the system's `systeminformation`
+answer (its user, its system id) wins, on-premise and on ABAP Cloud alike; a tool argument that
+names the value (a transport's `owner`, say) still states it for that call. When the system gives
+no information, ABAP Cloud is an error (`cloud_without_systeminformation` for a `404`, else
+`system_lookup_failed`); on-premise the responsible is `SAP_RESPONSIBLE` / `x-sap-responsible` if
+stated, else the login (`SAP_USERNAME`, `x-sap-login`), and the master system
+`SAP_MASTER_SYSTEM` / `x-sap-master-system` when stated; with no user at all the call is refused
+`system_user_unknown`, and a stdio start ends with exit `1`. A `401` is answered as it came. The
+library applies no rules unless an embedder passes them. See
+[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
+Coming from 18.x? See the [19.0 migration note](docs/MIGRATION-19.0.md) — the server split into a
+package per transport and tool set, the system type required, the low set gone, the auth chain on
+6.0. Coming from 17.x? See the [18.0 migration note](docs/MIGRATION-18.0.md) — the debugger's embedder surface moved to adt-clients 29, and a debugger start needs at least one breakpoint. From 16.x, the [17.0 note](docs/MIGRATION-17.0.md) first.
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
 ## Architecture
 
-The project ships as **two packages** — and a compact variant of each — because the two usage patterns want
+The project ships a **library and the servers** — and a compact variant of each server — because the two usage patterns want
 different licences. Embedding the tools in a network service should not drag in
 the obligations of a server that service never runs.
 
 | Package | Licence | What it is |
 |---|---|---|
 | [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib) | Apache-2.0 | The ADT tool handlers and the embeddable MCP server. No transport: the host supplies one. |
-| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | AGPL-3.0-only | The standalone server — stdio, SSE and streamable HTTP, the launcher and the `mcp-abap-adt` CLI. Depends on the library. |
-| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | AGPL-3.0-only | The compact standalone server, `mcp-abap-adt-compact`: one tool per operation, the object type in the arguments. Same launcher and configuration as `core`. |
-| [`@mcp-abap-adt/compact-readonly`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes. |
+| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | AGPL-3.0-only | The standalone stdio server, `mcp-abap-adt`: one destination through the auth broker. Depends on the library. |
+| [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http) | AGPL-3.0-only | The Streamable HTTP server, `mcp-abap-adt-http`: credentials from each request's `x-sap-*` headers. |
+| [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse) | AGPL-3.0-only | The HTTP+SSE server, `mcp-abap-adt-sse`: credentials from the `x-sap-*` headers of each SSE connection's `GET`. |
+| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | AGPL-3.0-only | The compact server over stdio, `mcp-abap-adt-compact`: one tool per operation, the object type in the arguments. `core`'s launcher and configuration with the compact tool set. |
+| [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http) | AGPL-3.0-only | The compact server over Streamable HTTP, `mcp-abap-adt-compact-http`: `http`'s launcher and configuration with the compact tool set. |
+| [`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse) | AGPL-3.0-only | The compact server over HTTP+SSE, `mcp-abap-adt-compact-sse`: `sse`'s launcher and configuration with the compact tool set. |
+| [`@mcp-abap-adt/background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Apache-2.0 | The in-memory store of background runs (`IBackgroundRuns` of the library): the servers' store, for an embedder that keeps runs in its process. `core`, `http` and `sse` depend on it. |
+| [`@mcp-abap-adt/responsible-rules`](https://www.npmjs.com/package/@mcp-abap-adt/responsible-rules) | Apache-2.0 | The rules that name a call's responsible, user and system from `systeminformation` (`SystemContextRules` of the library), and the system type the binaries require. `core`, `http` and `sse` pass them; the library applies none, so an embedder opts in. |
+| [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro), [`http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/http-ro), [`sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/sse-ro) | AGPL-3.0-only | The read-only servers, `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: `core`'s, `http`'s and `sse`'s launcher with the readonly tools (with system and search) and, on stdio, the leftover-session list and logoff — no high, debugger, background-run or resume tool. |
+| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 17 compact tools that change nothing and, on stdio, the leftover-session list and logoff. |
+| [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes (`compact-readonly-entries` was `compact-readonly` before 19.0.0). |
 
-Install `@mcp-abap-adt/core` (or `@mcp-abap-adt/compact`) to run a server. Install `@mcp-abap-adt/lib` to
-embed the tools in your own application.
+Seventeen packages, twelve binaries: four kinds of binary — core, core-ro, compact, compact-ro — on
+each transport. **The binary fixes the tool set** (19.0.0; there is no `--exposition`): install the
+one for your transport and the tools you want to run a server — `@mcp-abap-adt/core`, `http` or
+`sse` (readonly, high, the debugger), their `-ro` packages (the readonly tools alone), `compact`,
+`compact-http`, `compact-sse`, or their `-ro` packages (the compact tools that change nothing).
+Install `@mcp-abap-adt/lib` to embed the tools in your own application. Every binary and its
+tools: [Handler sets](docs/user-guide/HANDLERS_MANAGEMENT.md).
 
 ### 1. Standalone MCP Server (Default)
-Run as a standalone MCP server with stdio, HTTP, or SSE transport:
+Run as a standalone MCP server; a binary is its transport (there is no `--transport` option):
 ```bash
-mcp-abap-adt                           # stdio (default)
-mcp-abap-adt --transport=http          # HTTP mode
-mcp-abap-adt --transport=sse           # SSE mode
+mcp-abap-adt --mcp=TRIAL --system-type=cloud # stdio (@mcp-abap-adt/core): one destination
+mcp-abap-adt-http --system-type=<onprem|cloud> # Streamable HTTP (@mcp-abap-adt/http): x-sap-* headers per request
+mcp-abap-adt-sse --system-type=<onprem|cloud> # SSE (@mcp-abap-adt/sse): x-sap-* headers per SSE connection
+mcp-abap-adt-compact --mcp=TRIAL --system-type=cloud # the compact tool set over stdio (@mcp-abap-adt/compact)
+mcp-abap-adt-compact-http --system-type=<onprem|cloud> # ... over Streamable HTTP (@mcp-abap-adt/compact-http)
+mcp-abap-adt-compact-sse --system-type=<onprem|cloud> # ... over SSE (@mcp-abap-adt/compact-sse)
+mcp-abap-adt-ro --mcp=TRIAL --system-type=cloud # the readonly tools alone over stdio (@mcp-abap-adt/core-ro)
+mcp-abap-adt-compact-ro --mcp=TRIAL --system-type=cloud # the compact tools that change nothing (@mcp-abap-adt/compact-ro)
+                                       # (and -http-ro, -sse-ro, -compact-http-ro, -compact-sse-ro)
 ```
 
 ### 2. Embeddable Server (For Integration)
@@ -129,23 +153,19 @@ This needs `@mcp-abap-adt/lib` only — not the AGPL server:
 npm install @mcp-abap-adt/lib
 ```
 ```typescript
-import {
-  EmbeddableMcpServer,
-  NoDedupStrategy, // optional: expose both Read<X> and Get<X>
-} from '@mcp-abap-adt/lib/embeddable';
+import { EmbeddableMcpServer } from '@mcp-abap-adt/lib/embeddable';
 
 const server = new EmbeddableMcpServer({
   connection,              // Your AbapConnection instance
   logger,                  // Optional logger
   exposition: ['readonly', 'high'],  // Handler groups to expose
-  // Default hides Read<X> when Get<X> is exposed (ReadVsGetDedupStrategy).
-  // Pass NoDedupStrategy to expose both variants instead.
-  // readOnlyDedupStrategy: new NoDedupStrategy(),
+  // A tool both groups serve under one name (Get<Type>) is listed once.
+  // readOnlyDedupStrategy: a custom IReadOnlyDedupStrategy hides more.
 });
 await server.connect(transport);
 ```
 
-See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high/low, how to opt out with `NoDedupStrategy`, and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
+See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
 
 ## Quick Start
 
@@ -155,7 +175,7 @@ See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-gui
 4. **Use**:
    - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
    - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
-   - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
+   - [Compact Tools](compact/docs/AVAILABLE_TOOLS.md) — the single-step operations (lock, write under the lock, unlock, check, activate) the low set had; the low set left `mcp-abap-adt` / `-http` / `-sse` in 19.0.0 ([MIGRATION-19.0](docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries))
 
 ## Use Cases
 
@@ -184,6 +204,42 @@ Key examples of high-value workflows and tools:
 - **Function module/group CRUD**: `CreateFunctionGroup`, `UpdateFunctionGroup`, `GetFunctionGroup`, `DeleteFunctionGroup`, `CreateFunctionModule`, `UpdateFunctionModule`, `GetFunctionModule`, `DeleteFunctionModule`
 - **Transport and activation support**: `CreateTransport`, `GetTransport`, `ActivateObject`
 - **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (a run waits for its result; `GetUnitTestResult` for one that outlasts the wait) — `CheckClass` and the rest of the `Check*` family
+
+### Long reads take a `timeout`
+
+The long reads on an approved list (where-used and search, package walks, data preview, the
+dump feed, profiler traces, … — the list in
+[MIGRATION-19.0](docs/MIGRATION-19.0.md#every-transport-the-long-reads-take-a-timeout-each-on-an-abap-session-of-its-own))
+run on an ABAP session of their own and take an optional `timeout` in seconds, with no default.
+When it passes the read is cancelled — its session logged off — and nothing was changed. Set it
+below your MCP client's request limit (the TypeScript SDK's client cancels at 60 s): **a tool call
+cannot be cancelled** — a client's cancel aborts nothing, the call runs to its end. No other tool takes a `timeout`: a unit test, ATC, class or program run
+goes on to its end.
+
+### Batch mode
+
+Calls none of whose requests depends on another's answer can be recorded and sent together, in
+one ADT batch envelope, instead of one request each: `BatchBegin` switches the server into batch
+mode, every such call is then recorded, answers nothing and takes the next number (from 1, in the
+order made), `BatchEnd` sends them all and leaves batch mode whatever happens, and
+`BatchAnswers` reads each call's answer by its number — the answer the tool gives outside batch
+mode for what SAP answered. The compact binaries serve the same as one tool, `HandlerBatch`
+(`action: 'begin' | 'end' | 'answers'`). Every binary serves it, the `-ro` ones included, on every
+transport.
+
+A tool that builds a request from an earlier answer is refused in batch mode — a high-level
+create or update, a fallback after a `404`, a poll. Run such work as phases, each its own batch,
+with the single-step tools: create (compact `HandlerCreate`, one request), lock (`HandlerLock`;
+the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`, one request;
+the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP), unlock
+(`HandlerUnlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`, as often as you choose); a unit-test run is its start (`HandlerUnitTestRun`, answering `run_id`), its status (`HandlerUnitTestStatus`, as often as you choose, until `FINISHED`) and its result (`HandlerUnitTestResult`, one request); a profiled run is its schedule (`HandlerProfileSchedule`, answering `profiler_id`), the run under it (`HandlerProfileRun` with that `profiler_id`) and its trace (`HandlerProfileList`, as often as you choose, then `HandlerProfileView`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
+the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
+recorded call decides — so each batch end sends one envelope; a call of another kind is refused
+`batch_other_kind`: record it in the next batch. Every tool's description ends with
+one sentence saying whether it is recorded, for which arguments, refused, or not served in batch
+mode. Over Streamable HTTP, send the `state_handle` `BatchBegin` answers in the
+`x-mcp-state-handle` request header on every call of the batch. See
+[Batch Mode](docs/user-guide/BATCH_MODE.md), with the list of every recordable call.
 
 ## Registries
 
@@ -214,9 +270,9 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🌐 Service Binding Preview**: `GetServiceBindingPreviewUrl` - The browser URL that opens a published service binding's Fiori preview, beside its OData service and `$metadata` URLs. Composed from the binding, its service definition and the exposed root view — no document carries it. OData V2 and V4; a Web API binding has no preview and says so. On SAP BTP the preview URL carries the browser host (`abap-web`), where the BTP logon answers, while the service URLs keep the ADT host
 - **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
 - **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader (dumps — filtered by user, runtime error, exception, object, package or component, and read past SAP's 100 entries per request — system messages, gateway errors), SM02 system messages, Gateway error log
-- **🐞 Debugger** (opt-in, `--exposition=…,debug`): ABAP and AMDP — breakpoints (line, exception, statement, message; a line breakpoint may carry a condition), a background run of a class or report caught at them, another user's requests and terminal mode, stack, variables, watchpoints, steps, leaving a debuggee running, the debugger settings, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. In user mode a breakpoint catches every request of the request user (the connected SAP user unless another is named), so the set is never on by default. See [Debugger](docs/user-guide/DEBUGGER.md)
+- **🐞 Debugger** (in `mcp-abap-adt`, `-http`, `-sse` and the compact write binaries; in no `-ro` binary): ABAP and AMDP — breakpoints (line, exception, statement, message; a line breakpoint may carry a condition), a background run of a class or report caught at them, another user's requests and terminal mode, stack, variables, watchpoints, steps, leaving a debuggee running, the debugger settings, memory sizes and snapshots. A debug session is named by a `state_handle` and survives between tool calls on every transport. In user mode a breakpoint catches every request of the request user (the connected SAP user unless another is named): where that must not be possible, install a `-ro` binary. See [Debugger](docs/user-guide/DEBUGGER.md)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
-- **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
+- **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destinations))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
 
 > ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.
@@ -229,13 +285,14 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[RFC Setup](docs/installation/RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC SDK and a C++ toolchain before the install
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
-- **[Debugger](docs/user-guide/DEBUGGER.md)** - The opt-in `debug` set: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
-- **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups
+- **[Batch Mode](docs/user-guide/BATCH_MODE.md)** - Record independent calls, send them together in batch envelopes at `BatchEnd`, read their answers by number; which calls are recorded
+- **[Debugger](docs/user-guide/DEBUGGER.md)** - The `debug` set of the write binaries: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
+- **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - The twelve binaries and the tools each serves
 - **Configurator**: `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)) provides the `mcp-conf` CLI to auto-configure clients
 - **Tools by level**
   - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
   - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
-  - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
+  - [Compact Tools](compact/docs/AVAILABLE_TOOLS.md) (the low set's analogue since 19.0.0)
 
 ### For Administrators
 - **[Security](SECURITY.md)** - Never more secure than its host: who may call the server, HTTPS, TLS to SAP, credentials and state handles, a deployment checklist
@@ -246,6 +303,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-19.0.md](docs/MIGRATION-19.0.md)** - A package per transport and tool set (seventeen packages, twelve binaries), the system type required, the low set gone, the auth chain on 6.0, logoff at every session end
 - **[docs/MIGRATION-18.0.md](docs/MIGRATION-18.0.md)** - The debugger on adt-clients 29: what an embedder of lib/debugger changes; a start needs a breakpoint
 - **[docs/MIGRATION-17.0.md](docs/MIGRATION-17.0.md)** - The HTTPS certificate is verified; a message class needs a responsible
 - **[docs/MIGRATION-16.0.md](docs/MIGRATION-16.0.md)** - Authentication on auth-broker 4: four authentications, destinations
@@ -279,32 +337,32 @@ After installing globally with `npm install -g`, you can run from any directory:
 # Show help
 mcp-abap-adt --help
 
-# Default stdio mode (for MCP clients; requires .env file or --mcp parameter)
-mcp-abap-adt
+# Default stdio mode (for MCP clients; the destination comes from --mcp, or from a .env file named with --env or --env-path: a .env in the working directory is read only when named)
+mcp-abap-adt --system-type=<onprem|cloud>
 
-# stdio mode (explicit; default when --transport is omitted)
-mcp-abap-adt --transport=stdio
-
-# HTTP mode on custom port (HTTP requires --transport=http)
-mcp-abap-adt --transport=http --port=8080
+# Streamable HTTP on a custom port (@mcp-abap-adt/http; credentials from x-sap-* headers)
+mcp-abap-adt-http --port=8080 --system-type=<onprem|cloud>
 
 # Use stdio mode with auth-broker (--mcp parameter)
-mcp-abap-adt --transport=stdio --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Use env destination from platform sessions store
-mcp-abap-adt --env=trial
+mcp-abap-adt --env=trial --system-type=cloud
 
 # Use explicit .env file path
-mcp-abap-adt --env-path=/path/to/my.env
+mcp-abap-adt --env-path=/path/to/my.env --system-type=<onprem|cloud>
 
-# SSE mode (requires .env file or --mcp parameter)
-mcp-abap-adt --transport=sse --port=3001
+# SSE (@mcp-abap-adt/sse; credentials from the opening GET's x-sap-* headers)
+mcp-abap-adt-sse --sse-port=3001 --system-type=<onprem|cloud>
 
-# SSE mode with auth-broker (--mcp parameter)
-mcp-abap-adt --transport=sse --mcp=TRIAL
+# The compact servers take their full counterpart's options; the binary fixes the tools
+mcp-abap-adt-compact --env-path=/path/to/my.env --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/compact
+mcp-abap-adt-compact-http --port=8080 --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/compact-http
+mcp-abap-adt-compact-sse --sse-port=3001 --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/compact-sse
 
-# The compact server takes the same options (npm install -g @mcp-abap-adt/compact)
-mcp-abap-adt-compact --env-path=/path/to/my.env
+# The read-only servers: the same options, the tools that change nothing
+mcp-abap-adt-ro --env-path=/path/to/my.env --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/core-ro
+mcp-abap-adt-compact-http-ro --port=8080 --system-type=<onprem|cloud> # npm install -g @mcp-abap-adt/compact-http-ro
 ```
 
 ### Development Mode
@@ -340,14 +398,9 @@ SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 ```
 
-For a JWT you already hold (SAP BTP):
-```bash
-SAP_URL=https://your-btp-system.example
-SAP_CLIENT=100
-SAP_AUTH_TYPE=jwt
-SAP_GRANT_TYPE=none
-SAP_JWT_TOKEN=your-jwt-token
-```
+A JWT you already hold is not served over stdio: send it in the `x-sap-jwt-token` header to
+`mcp-abap-adt-http` or `mcp-abap-adt-sse` (`@mcp-abap-adt/http`, `@mcp-abap-adt/sse`), or create
+the session with `mcp-auth`.
 
 For RFC connection:
 ```bash
@@ -360,6 +413,21 @@ SAP_CONNECTION_TYPE=rfc
 ```
 
 `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env` selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`); a port that follows no such rule needs `SAP_SYSNR` in the process environment. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK, a C++ toolchain, `SAPNWRFC_HOME` before the install).
+
+**Through a message server and a logon group** (load-balanced logon): add `SAP_MSHOST` with `SAP_MSSERV` or `SAP_SYSID` (one of the two is required; `SAP_MSHOST` with neither is refused by `@mcp-abap-adt/connection`, naming both), and optionally `SAP_GROUP` (the logon group; `PUBLIC` when absent — connection's default, not the server's) and `SAP_SAPROUTER` (works with either addressing). Each is also `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter`, or the YAML key of that name, with the same precedence as the connection type; in the `.env` they belong to the `--env` / `--env-path` file. With `SAP_MSHOST` the RFC wire takes no host and no system number from `SAP_URL`, and `SAP_SYSNR` is not read; `SAP_URL` is still the system's URL. The server passes the five fields as configured and adds nothing. Not yet run against a live message server (connection 18.0.0's note): if the SDK refuses `SAP_MSSERV` without `SAP_SYSID`, add `SAP_SYSID`.
+
+```bash
+SAP_URL=http://your-onprem-system.example:8000
+SAP_CLIENT=100
+SAP_AUTH_TYPE=basic
+SAP_USERNAME=your-username
+SAP_PASSWORD=your-password
+SAP_CONNECTION_TYPE=rfc
+SAP_MSHOST=your-message-server.example
+SAP_SYSID=ABC
+SAP_GROUP=PUBLIC
+# Optional: SAP_MSSERV=sapmsABC, SAP_SAPROUTER=/H/your-router.example/S/3299/H/
+```
 
 For SNC (passwordless logon over RFC, no user or password):
 ```bash
@@ -374,15 +442,16 @@ SAP_RESPONSIBLE=<your ABAP user>
 ```
 The credential of the installed SNC product (for example a Secure Login Client) is mapped to an ABAP user by its SNC name. `SAP_CONNECTION_TYPE=rfc` (or `--connection-type=rfc`) is required: SNC logs on over RFC only, and an SNC destination with HTTP is refused. SNC needs the SAP NW RFC SDK and `@mcp-abap-adt/sap-rfc-lite`, an optional dependency — see [RFC Setup](docs/installation/RFC_SETUP.md).
 
-> **Not supported since 16.0:** `SAP_AUTH_TYPE=certificate` and `kerberos`, `saml`, and a `jwt` grant other than `authorization_code` and `none`, in a `.env` or service key are refused at startup, naming the authentication (a `saml` destination with no grant: `lacks: grantType`). See the [migration note](docs/MIGRATION-16.0.md) for what to do instead.
+> **Not supported since 16.0:** `SAP_AUTH_TYPE=certificate` and `kerberos`, `saml`, and a `jwt` grant other than `authorization_code` and `none`, in a `.env` or service key are refused at startup, naming the authentication (a `saml` destination with no grant: `cannot be used: grantType`). See the [migration note](docs/MIGRATION-16.0.md) for what to do instead.
 
 **Generate a `.env` (JWT):**
 ```bash
-# Install the CLI globally (one-time setup) — it ships mcp-auth and mcp-sso
+# Install the CLI globally (one-time setup) — it ships mcp-auth
 npm install -g @mcp-abap-adt/auth-broker-cli
 
-# Write a .env that states its authentication and grant
-mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
+# Log in and write a .env that states its authentication and grant (--type xsuaa for an XSUAA key)
+mcp-auth --service-key ./service-key.json --output ./mcp.env --type abap
+# or a destination: mcp-auth --destination TRIAL --type abap   (`mcp-auth --help` lists the rest)
 ```
 
 The `.env` states `SAP_AUTH_TYPE` and `SAP_GRANT_TYPE`; a `jwt` `.env` without a grant is refused at startup.
@@ -397,10 +466,13 @@ Inline comments are not parsed, so keep comments on separate lines.
 **Authentication:**
 - `--mcp=<destination>` - Named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, field by field
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
-- `--browser=<name>` - Browser for a login: `chrome`, `edge`, `firefox`, `system` (default), `headless`, `none`
+- `--browser=<name>` - Browser for a login: `system` (default), `auto`, `chrome`, `edge`, `firefox`, `none`, `headless` — mapped by the platform; `none` / `headless`: the URL on stderr ([Authentication](docs/user-guide/AUTHENTICATION.md))
+- `--browser-program=<program>` - The program that opens the login URL instead (excludes `--browser`)
+- `--renewal=<mode>` - `refresh-then-login` (default) or `refresh-only` (never a login)
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
-- `--allow-destination-header` - Honour the `x-mcp-destination` header (HTTP/SSE only, off by default)
+- `--login-timeout=<seconds>` - Ends a browser login not finished after this many seconds, 1-86400; no default (a login ends on its answer, the IdP's refusal or the end of its session; a cancel ends nothing)
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`
+- `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … — see above)
 - `--unsafe` - Write named destinations' sessions to disk. By default they are kept in memory (one login per process). A `.env` you name is written back either way
 
 When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.
@@ -408,16 +480,16 @@ When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` 
 **Examples:**
 ```bash
 # Named destination, session kept in memory (default)
-mcp-abap-adt --mcp=TRIAL
+mcp-abap-adt --mcp=TRIAL --system-type=cloud
 
 # Named destination, session persisted to sessions/TRIAL.env
-mcp-abap-adt --mcp=TRIAL --unsafe
+mcp-abap-adt --mcp=TRIAL --unsafe --system-type=cloud
 
 # Custom base directory for service-keys/ and sessions/
-mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/ --unsafe
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/ --unsafe --system-type=cloud
 
 # Browser login on another callback port
-mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
+mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005 --system-type=cloud
 ```
 
 See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.

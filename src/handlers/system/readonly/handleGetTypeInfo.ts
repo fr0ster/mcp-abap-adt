@@ -5,15 +5,20 @@
  * - /sap/bc/adt/ddic/dataelements/{name}
  * - /sap/bc/adt/ddic/tabletypes/{name}
  * - /sap/bc/adt/repository/informationsystem/objectproperties/values
- * This handler uses makeAdtRequestWithTimeout directly and should be moved to adt-clients infrastructure module
+ * This handler uses makeAdtRequest directly and should be moved to adt-clients infrastructure module
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import {
+  answerCaught,
+  answerRequestThrown,
+  type McpResult,
+} from '../../../lib/answer';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   encodeSapObjectName,
-  makeAdtRequestWithTimeout,
+  makeAdtRequest,
   return_error,
 } from '../../../lib/utils';
 
@@ -133,36 +138,48 @@ function isNotFoundError(error: any): boolean {
 
 type LookupResult =
   | { status: 'ok'; payload: any }
-  | { status: 'not_found_or_empty' };
+  | { status: 'not_found_or_empty' }
+  /** SAP refused the lookup (not a 404), or the credential: the call's answer. */
+  | { status: 'failed'; answer: McpResult };
 
 async function tryLookup(
   connection: any,
   url: string,
   parseFn: (xml: string) => any,
+  step: string,
 ): Promise<LookupResult> {
+  let response: Awaited<ReturnType<typeof makeAdtRequest>>;
   try {
-    const response = await makeAdtRequestWithTimeout(
+    response = await makeAdtRequest(
       connection,
       url,
       'GET',
-      'default',
+      // No deadline of the server's: the request waits for SAP's answer.
+      0,
     );
-    if (!hasUsableResult(response?.data)) {
-      return { status: 'not_found_or_empty' };
-    }
-
-    const payload = parseFn(response.data);
-    if (!hasUsableResult(payload)) {
-      return { status: 'not_found_or_empty' };
-    }
-
-    return { status: 'ok', payload };
   } catch (error: any) {
     if (isNotFoundError(error)) {
       return { status: 'not_found_or_empty' };
     }
-    throw error;
+    // The request's error as SAP answered it, with the lookup as its step —
+    // a credential failure as the chain made it.
+    return {
+      status: 'failed',
+      answer: answerRequestThrown(error, { method: 'GET', url }, step),
+    };
   }
+  if (!hasUsableResult(response?.data)) {
+    return { status: 'not_found_or_empty' };
+  }
+
+  // Outside the request's catch: a document we cannot read is our failure,
+  // not SAP's answer.
+  const payload = parseFn(response.data);
+  if (!hasUsableResult(payload)) {
+    return { status: 'not_found_or_empty' };
+  }
+
+  return { status: 'ok', payload };
 }
 
 export async function handleGetTypeInfo(context: HandlerContext, args: any) {
@@ -186,26 +203,31 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
 
     const lookups: Array<{
       label: string;
+      step: string;
       url: string;
       parseFn: (xml: string) => any;
     }> = [
       {
         label: 'domain',
+        step: 'read domain',
         url: `/sap/bc/adt/ddic/domains/${encodedTypeName}/source/main`,
         parseFn: parseTypeInfoXml,
       },
       {
         label: 'data element',
+        step: 'read data element',
         url: `/sap/bc/adt/ddic/dataelements/${encodedTypeName}`,
         parseFn: parseTypeInfoXml,
       },
       {
         label: 'table type',
+        step: 'read table type',
         url: `/sap/bc/adt/ddic/tabletypes/${encodedTypeName}`,
         parseFn: parseTypeInfoXml,
       },
       {
         label: 'repository information system',
+        step: 'read repository information',
         url: `/sap/bc/adt/repository/informationsystem/objectproperties/values?uri=${uri}`,
         parseFn: parseTypeInfoXml,
       },
@@ -213,7 +235,13 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
 
     for (const lookup of lookups) {
       logger?.debug(`Trying ${lookup.label} lookup for ${typeName}`);
-      const result = await tryLookup(connection, lookup.url, lookup.parseFn);
+      const result = await tryLookup(
+        connection,
+        lookup.url,
+        lookup.parseFn,
+        lookup.step,
+      );
+      if (result.status === 'failed') return result.answer;
       if (result.status === 'ok') {
         const mcpResult = {
           isError: false,
@@ -232,7 +260,9 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
         connection,
         `/sap/bc/adt/ddic/structures/${encodedTypeName}`,
         parseStructureInfoXml,
+        'read structure',
       );
+      if (structureResult.status === 'failed') return structureResult.answer;
       if (structureResult.status === 'ok') {
         const mcpResult = {
           isError: false,
@@ -257,6 +287,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
       `Failed to resolve type info for ${args.type_name}`,
       error as any,
     );
-    return return_error(error);
+    // Not a request's failure (each lookup answers its own): ours.
+    return answerCaught(error, { tool: 'GetTypeInfo', detail: 'terse' });
   }
 }

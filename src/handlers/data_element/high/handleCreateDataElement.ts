@@ -34,7 +34,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { patchDataElementXml } from '../../../lib/strategies/dataElementPatch';
@@ -44,6 +44,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -210,7 +211,7 @@ export async function handleCreateDataElement(
       );
 
       const checked = await sequence(
-        () =>
+        atStep('validate', () =>
           obj.validate(
             {
               dataElementName,
@@ -219,7 +220,8 @@ export async function handleCreateDataElement(
             },
             { analyse: analyseException },
           ),
-        () =>
+        ),
+        atStep('create', () =>
           obj.create(
             {
               dataElementName,
@@ -230,6 +232,7 @@ export async function handleCreateDataElement(
             },
             { analyse: analyseException },
           ),
+        ),
         () =>
           withLock(
             () => obj.lock({ dataElementName }, { analyse: analyseLock }),
@@ -237,12 +240,13 @@ export async function handleCreateDataElement(
               lockHandle,
             ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
               sequence(
-                () =>
+                atStep('read metadata', () =>
                   obj.readMetadata(
                     { dataElementName },
                     { analyse: analyseException },
                   ),
-                (current) =>
+                ),
+                atStep('update metadata', (current) =>
                   obj.updateMetadata(
                     {
                       dataElementName,
@@ -274,34 +278,38 @@ export async function handleCreateDataElement(
                       analyse: analyseException,
                     },
                   ),
+                ),
               ),
             (lockHandle) =>
               obj.unlock({ dataElementName }, lockHandle, {
                 analyse: analyseException,
               }),
           ),
-        // Best-effort: wait for the write to be visible, right before the
+        // Best-effort (a credential failure ends the call): wait for the write to be visible, right before the
         // first call that reads it back — see `handleCreateDomain.ts` for
         // why the wait sits here rather than after `check`.
-        async () => {
+        atStep('check', async () => {
           await obj
             .readMetadata(
               { dataElementName },
               { withLongPolling: true, analyse: analyseException },
             )
-            .catch(() => undefined);
+            .catch(unlessCredentialFailure);
           return obj.check({ dataElementName }, undefined, {
             analyse: analyseException,
           });
-        },
+        }),
       );
 
       if (!checked.ok || !shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(checked, () =>
-        obj.activate({ dataElementName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        checked,
+        atStep('activate', () =>
+          obj.activate({ dataElementName }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

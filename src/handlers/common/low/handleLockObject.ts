@@ -23,22 +23,27 @@ import {
   metadataExtensionDocuments,
   packageDocuments,
   programDocuments,
+  serviceDefinitionDocuments,
+  serviceDocuments,
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { generateSessionId } from '../../../lib/sessionUtils';
-import { analyseLock } from '../../../lib/strategies/lockAnswer';
+import { connectionForPackageLock } from '../../../lib/packageSessions';
+import {
+  analyseLock,
+  analysePublicationLockAnswer,
+} from '../../../lib/strategies/lockAnswer';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'LockObjectLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Lock an ABAP object for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
+    '[low-level] Lock an ABAP object for modification. Returns the lock handle the update and the unlock take; the lock stays in the instance’s session until the unlock or the instance’s end.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -63,27 +68,15 @@ export const TOOL_DEFINITION = {
           'data_element',
           'package',
           'behavior_definition',
+          'behavior_implementation',
           'metadata_extension',
+          'service_definition',
+          'service_binding',
         ],
       },
       super_package: {
         type: 'string',
         description: 'Super package (required for package locking)',
-      },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
       },
     },
     required: ['object_name', 'object_type'],
@@ -94,12 +87,6 @@ interface LockObjectArgs {
   object_name: string;
   object_type: string;
   super_package?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
 }
 
 const VALID_TYPES = [
@@ -115,7 +102,10 @@ const VALID_TYPES = [
   'data_element',
   'package',
   'behavior_definition',
+  'behavior_implementation',
   'metadata_extension',
+  'service_definition',
+  'service_binding',
 ];
 
 export async function handleLockObject(
@@ -123,8 +113,7 @@ export async function handleLockObject(
   args: LockObjectArgs,
 ) {
   const { connection, logger } = context;
-  const { object_name, object_type, super_package, session_id, session_state } =
-    args as LockObjectArgs;
+  const { object_name, object_type, super_package } = args as LockObjectArgs;
 
   if (!object_name || !object_type) {
     return return_error(new Error('object_name and object_type are required'));
@@ -160,13 +149,32 @@ export async function handleLockObject(
     );
   }
 
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
-  }
-
-  const desiredSessionId = session_id || generateSessionId();
   const objectName = object_name.toUpperCase();
   const client = createAdtClient(connection, logger);
+
+  // A package lock is held in a session of its own over RFC (a package can be
+  // saved only once per ABAP session), kept under its handle until the
+  // unlock; over HTTP the caller's connection serves.
+  const lockPackage = async () => {
+    const lockOn = await connectionForPackageLock(connection, logger);
+    try {
+      const locked = await createAdtClient(lockOn.connection, logger)
+        .getPackage(resultsFor(packageDocuments))
+        .lock(
+          {
+            packageName: objectName,
+            superPackage: (super_package as string).toUpperCase(),
+          },
+          { analyse: analyseLock },
+        );
+      if (locked.ok) lockOn.keep(locked.getResult().value);
+      else await lockOn.drop();
+      return locked;
+    } catch (error) {
+      await lockOn.drop();
+      throw error;
+    }
+  };
 
   return answer(
     { tool: 'LockObjectLow', detail: 'terse' },
@@ -226,14 +234,30 @@ export async function handleLockObject(
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
             .lock({ name: objectName }, { analyse: analyseLock });
+        case 'behavior_implementation':
+          // The implementation class's own lock, as the low tool sent it.
+          return client
+            .getBehaviorImplementation()
+            .lock({ className: objectName }, { analyse: analyseLock });
+        case 'service_definition':
+          return client
+            .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+            .lock(
+              { serviceDefinitionName: objectName },
+              { analyse: analyseLock },
+            );
+        case 'service_binding':
+          // The binding's own LOCK, read as the publication reads it: a `403`
+          // (the binding open in an editing session) is a lock without a
+          // handle, and the publication runs without one.
+          return client
+            .getServiceBinding(resultsFor(serviceDocuments))
+            .lock(
+              { bindingName: objectName },
+              { analyse: analysePublicationLockAnswer },
+            );
         case 'package':
-          return client.getPackage(resultsFor(packageDocuments)).lock(
-            {
-              packageName: objectName,
-              superPackage: (super_package as string).toUpperCase(),
-            },
-            { analyse: analyseLock },
-          );
+          return lockPackage();
         default:
           // Unreachable: objectType was already checked against VALID_TYPES.
           throw new Error(`Unsupported object_type: ${object_type}`);
@@ -243,10 +267,8 @@ export async function handleLockObject(
       success: true,
       object_name: objectName,
       object_type: objectType,
-      session_id: desiredSessionId,
       lock_handle: lockHandle,
-      session_state: null, // Session state management is now handled by auth-broker
-      message: `Object ${objectName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
+      message: `Object ${objectName} locked successfully. Use this lock_handle for the update and the unlock.`,
     }),
   );
 }

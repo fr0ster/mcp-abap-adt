@@ -30,6 +30,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { isCloudConnection, return_error } from '../../../lib/utils';
 
@@ -107,7 +108,7 @@ export async function handleUpdateProgram(
       const written = await withLock(
         () => obj.lock({ programName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          const update = () =>
+          const update = atStep('update', () =>
             obj.update(
               { programName, transportRequest: args.transport_request },
               {
@@ -115,17 +116,19 @@ export async function handleUpdateProgram(
                 lockHandle,
                 analyse: analyseException,
               },
-            );
+            ),
+          );
           // A conditional phase of the sequence, not a hand-rolled
           // short-circuit: see UpdateClass for the reasoning.
           return shouldActivate
             ? sequence(
-                () =>
+                atStep('check', () =>
                   obj.check(
                     { programName, source: args.source_code },
                     'inactive',
                     { analyse: analyseException },
                   ),
+                ),
                 update,
               )
             : update();
@@ -140,8 +143,11 @@ export async function handleUpdateProgram(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ programName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate({ programName }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

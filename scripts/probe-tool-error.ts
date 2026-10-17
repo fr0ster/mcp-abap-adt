@@ -15,10 +15,10 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 /**
  * Self-contained stdio client. Deliberately does not reuse the integration
- * hard-mode helper: that one passes `--exposition=readonly,high,low`, which
- * validateExposition rejects (high and low are mutually exclusive).
+ * hard-mode helper (historically it passed an exposition beside `low`; since
+ * 19.0.0 the binary fixes its tool set and `--exposition` is refused).
  */
-async function connect(destination: string, exposition: string) {
+async function connect(destination: string) {
   const client = new Client(
     { name: 'probe-tool-error', version: '1.0.0' },
     { capabilities: {} },
@@ -28,8 +28,6 @@ async function connect(destination: string, exposition: string) {
       command: process.execPath,
       args: [
         path.resolve(process.cwd(), 'dist/server/launcher.js'),
-        '--transport=stdio',
-        `--exposition=${exposition}`,
         '--unsafe',
         `--mcp=${destination}`,
       ],
@@ -87,7 +85,6 @@ function parseArgs() {
     args: get('--args'),
     caseName: get('--case') ?? 'all',
     destination: get('--mcp') ?? 'trial',
-    exposition: get('--exposition') ?? 'readonly,high',
   };
 }
 
@@ -133,7 +130,7 @@ async function probe(
 }
 
 async function main() {
-  const { tool, args, caseName, destination, exposition } = parseArgs();
+  const { tool, args, caseName, destination } = parseArgs();
 
   let cases: ProbeCase[];
   if (tool) {
@@ -157,7 +154,7 @@ async function main() {
   }
 
   console.log(`Connecting to MCP server (stdio, --mcp=${destination})...`);
-  const { client, toolNames, close } = await connect(destination, exposition);
+  const { client, toolNames, close } = await connect(destination);
   console.log(`Connected. ${toolNames.size} tools registered.`);
 
   try {

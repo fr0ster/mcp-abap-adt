@@ -1,0 +1,57 @@
+{
+  "name": "@mcp-abap-adt/background-runs-memory",
+  "version": "19.0.0",
+  "description": "The in-memory store of the MCP ABAP ADT server's background runs: an IBackgroundRuns of @mcp-abap-adt/lib keeping each caller's runs and their answers in the process's memory, 16 per caller, until discarded or the process ends.",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
+  },
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "mcp",
+    "background-runs"
+  ],
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=9.0.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npx tsc -p tsconfig.json",
+    "test": "npm --prefix .. test -- --roots background-runs-memory/src",
+    "test:check": "npx tsc --noEmit -p tsconfig.test.json",
+    "lint:check": "npx biome check src",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/lib": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "*",
+    "@types/node": "*",
+    "typescript": "*"
+  }
+}

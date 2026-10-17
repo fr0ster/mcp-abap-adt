@@ -8,7 +8,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  * SAP users from one process enters the same scope around each request.
  *
  * stdio mode never enters a request scope, so consumers fall back to the
- * process-level system context there. See `getEffectiveSystemContext` for how
+ * process-level system context there. See `getStatedSystemContext` for how
  * the two combine.
  */
 export interface RequestContext {
@@ -25,9 +25,9 @@ export interface RequestContext {
   /**
    * The login of this request — the destination's `SAP_USERNAME`, or the
    * `x-sap-login` of an `x-sap-*` basic connection (the server enters it; a
-   * destination request's `x-sap-login` logs nobody on). The responsible when
-   * none is stated: after every `SAP_RESPONSIBLE` (the process one included),
-   * before the process `SAP_USERNAME`. Not on a cloud connection, where the
+   * destination request's `x-sap-login` logs nobody on). The responsible a
+   * create takes when none is stated, after every `SAP_RESPONSIBLE` (the
+   * process one included); the process `SAP_USERNAME` never stands in. Not on a cloud connection, where the
    * login is the system's user.
    */
   login?: string;
@@ -128,6 +128,9 @@ export function getRequestContext(): RequestContext | undefined {
 export {
   defaultSystemContextResolver,
   type ResolvedSystemContext,
+  type SystemCall,
   type SystemContextResolver,
+  type SystemContextRules,
+  type SystemLookup,
   withResolvedSystemContext,
 } from './requestSystemResolution';

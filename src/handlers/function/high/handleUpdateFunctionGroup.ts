@@ -33,6 +33,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -41,7 +42,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateFunctionGroup',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Uses stateful session with proper lock/unlock mechanism.",
+    "Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Locks the group, writes, and unlocks it.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -97,12 +98,13 @@ export async function handleUpdateFunctionGroup(
         () => obj.lock({ functionGroupName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
-            () =>
+            atStep('read metadata', () =>
               obj.readMetadata(
                 { functionGroupName },
                 { analyse: analyseException },
               ),
-            (current) =>
+            ),
+            atStep('update metadata', (current) =>
               obj.updateMetadata(
                 {
                   functionGroupName,
@@ -120,6 +122,7 @@ export async function handleUpdateFunctionGroup(
                   analyse: analyseException,
                 },
               ),
+            ),
           ),
         (lockHandle) =>
           obj.unlock({ functionGroupName }, lockHandle, {

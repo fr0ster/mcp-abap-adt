@@ -5,6 +5,7 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 import { succeededWith } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 /**
@@ -159,24 +160,30 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
       if (given) {
         checkVariant = given;
       } else {
-        const variant = await atc.resolveCheckVariant({
-          analyse: analyseException,
-        });
+        const variant = await atStep('resolve check variant', () =>
+          atc.resolveCheckVariant({
+            analyse: analyseException,
+          }),
+        )();
         if (!variant.ok) return variant as never;
         checkVariant = variant.getResult().value;
       }
 
-      const worklist = await atc.createWorklist(checkVariant, {
-        analyse: analyseException,
-      });
+      const worklist = await atStep('create worklist', () =>
+        atc.createWorklist(checkVariant, {
+          analyse: analyseException,
+        }),
+      )();
       if (!worklist.ok) return worklist as never;
       const worklistId = worklist.getResult().value;
 
-      const run = await atc.startRun(worklistId, target, {
-        analyse: analyseException,
-        wait,
-        maximumVerdicts,
-      });
+      const run = await atStep('start run', () =>
+        atc.startRun(worklistId, target, {
+          analyse: analyseException,
+          wait,
+          maximumVerdicts,
+        }),
+      )();
       if (!run.ok) return run as never;
 
       return succeededWith({

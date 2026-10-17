@@ -11,8 +11,8 @@
  */
 
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
+import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
-import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { updateSessionFromResponse } from '../../helpers/sessionHelpers';

@@ -29,6 +29,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -66,11 +67,14 @@ export async function handleListFunctionModules(
     { tool: 'ListFunctionModules', detail: 'terse' },
     () =>
       sequence(
-        () =>
+        atStep('read metadata', () =>
           client
             .getFunctionGroup()
             .readMetadata({ functionGroupName }, { analyse: analyseException }),
-        () => fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/FF'),
+        ),
+        atStep('read node structure', () =>
+          fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/FF'),
+        ),
       ),
     (objects) => ({
       success: true,

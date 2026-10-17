@@ -14,7 +14,9 @@ export type LowObjectType =
   | 'package'
   | 'behavior_definition'
   | 'behavior_implementation'
-  | 'metadata_extension';
+  | 'metadata_extension'
+  | 'service_definition'
+  | 'service_binding';
 
 const compactToLowMap: Partial<Record<CompactObjectType, LowObjectType>> = {
   CLASS: 'class',
@@ -37,4 +39,20 @@ export function toLowObjectType(
   objectType: CompactObjectType,
 ): LowObjectType | null {
   return compactToLowMap[objectType] || null;
+}
+
+/**
+ * The types `HandlerLock` and `HandlerUnlock` take: those of
+ * {@link toLowObjectType}, and the service definition and service binding.
+ */
+const compactToLockMap: Partial<Record<CompactObjectType, LowObjectType>> = {
+  ...compactToLowMap,
+  SERVICE_DEFINITION: 'service_definition',
+  SERVICE_BINDING: 'service_binding',
+};
+
+export function toLockObjectType(
+  objectType: CompactObjectType,
+): LowObjectType | null {
+  return compactToLockMap[objectType] || null;
 }

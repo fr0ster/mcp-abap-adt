@@ -1,0 +1,95 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.fr0ster/mcp-abap-adt-compact-ro",
+  "description": "Read-only compact MCP server for SAP ABAP ADT: the compact tools that change nothing",
+  "repository": {
+    "url": "https://github.com/fr0ster/mcp-abap-adt",
+    "source": "github"
+  },
+  "version": "19.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "@mcp-abap-adt/compact-ro",
+      "version": "19.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "MCP_ENV_PATH",
+          "description": "Path to the .env file that states the destination (the same as the --env-path argument). The file states SAP_URL and SAP_AUTH_TYPE (basic, snc or jwt); a jwt file also states SAP_GRANT_TYPE (authorization_code or none). Without this or --mcp, the server starts in tool-inspection-only mode: nothing is read from the working directory, and SAP_* variables in the process environment alone form no destination.",
+          "format": "string",
+          "placeholder": "/path/to/system.env"
+        },
+        {
+          "name": "AUTH_BROKER_PATH",
+          "description": "Base directory of service-keys/ and sessions/ for a named destination chosen with the --mcp argument (one directory; a list is not split). Default: ~/.config/mcp-abap-adt (Documents\\mcp-abap-adt on Windows).",
+          "format": "string",
+          "placeholder": "/path/to/mcp-abap-adt"
+        },
+        {
+          "name": "MCP_BROWSER",
+          "description": "Browser for a JWT login: chrome, edge, firefox, system, headless or none.",
+          "format": "string",
+          "choices": [
+            "chrome",
+            "edge",
+            "firefox",
+            "system",
+            "headless",
+            "none"
+          ],
+          "default": "system"
+        },
+        {
+          "name": "MCP_BROWSER_AUTH_PORT",
+          "description": "Callback port of the JWT browser login, 1-65535.",
+          "format": "number",
+          "default": "61001"
+        },
+        {
+          "name": "MCP_UNSAFE",
+          "description": "Write a named destination's session to disk (sessions/<name>.env) instead of keeping it in memory.",
+          "format": "boolean",
+          "default": "false"
+        },
+        {
+          "name": "SAP_CONNECTION_TYPE",
+          "description": "Connection type: http or rfc. SNC needs rfc (and the SAP NW RFC SDK).",
+          "format": "string",
+          "choices": [
+            "http",
+            "rfc"
+          ],
+          "default": "http"
+        },
+        {
+          "name": "SAP_SYSTEM_TYPE",
+          "description": "System type, required (here or as --system-type; no default, never guessed): the tools offered (e.g. Programs are onprem-only), the connector, and how the system's answers are read. Without it a destination does not start.",
+          "format": "string",
+          "isRequired": true,
+          "choices": [
+            "cloud",
+            "onprem",
+            "legacy"
+          ]
+        },
+        {
+          "name": "SAP_LANGUAGE",
+          "description": "Logon language (ISO code, e.g. 'en', 'de').",
+          "format": "string",
+          "default": "en"
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "named",
+          "name": "--mcp",
+          "description": "Named destination: service-keys/<name>.json and sessions/<name>.env under AUTH_BROKER_PATH or the platform directory, read field by field. The working directory's .env is not loaded.",
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

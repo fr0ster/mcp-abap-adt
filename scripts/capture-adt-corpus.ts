@@ -1,7 +1,6 @@
 /**
  * Capture raw ADT wire exchanges — normal answers AND refusals — into
- * tests/fixtures/adt/, so the result/error strategies (docs/superpowers/plans/
- * 2026-09-09-inventory-and-answer-adapter.md) can be written against real
+ * tests/fixtures/adt/, so the result/error strategies can be written against real
  * documents instead of imagined ones.
  *
  * This intentionally does NOT go through this repository's handlers (they

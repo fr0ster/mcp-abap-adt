@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetLocalTypes',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve local types source code from a class (implementations include). Supports reading active or inactive version.',
+    "Read the local types include of a class (its implementations include), active or inactive version. Returns { class_name, version, part: 'source', source }.",
   inputSchema: {
     type: 'object',
     properties: {
@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.',
+          'Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
         default: 'active',
       },
     },
@@ -58,7 +58,8 @@ export async function handleGetLocalTypes(
       success: true,
       class_name: className,
       version,
-      local_types_code: source.raw,
+      part: 'source',
+      source: source.raw,
     }),
   );
 }

@@ -14,8 +14,8 @@
  * `MEASURE <case> | <asked> | <answered>`, and each timed call one line
  * `TIMING <step> <ms>`, on stderr. Times are measured, never asserted.
  *
- * Hard mode (`integration_hard_mode.enabled: true`, exposition including
- * `debug`) runs the ABAP chain through the MCP server — stdio, or Streamable
+ * Hard mode (`integration_hard_mode.enabled: true`; core serves `debug`
+ * always) runs the ABAP chain through the MCP server — stdio, or Streamable
  * HTTP where every call is its own request carrying `state_handle`. The cases
  * that drive SAP or the instance directly skip there.
  *
@@ -32,6 +32,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as dotenv from 'dotenv';
+import { resolveEnvFilePath } from '../../../../server/src/config/envResolver';
 import { handleCreateClass } from '../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../handlers/class/high/handleDeleteClass';
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
@@ -58,7 +59,6 @@ import { handleDebugTakeOverListener } from '../../../handlers/debugger/debug/ha
 import { handleDebugWait } from '../../../handlers/debugger/debug/handleDebugWait';
 import { handleMemorySnapshotList } from '../../../handlers/debugger/debug/handleMemorySnapshotList';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { resolveEnvFilePath } from '../../../lib/config/envResolver';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
 import {
@@ -67,8 +67,16 @@ import {
 } from '../../../lib/debugger/DebuggerInstance';
 import type { Debugger } from '../../../lib/debugger/DebugSession';
 import { newDebuggerId } from '../../../lib/debugger/ids';
-import { requestUserOf } from '../../../lib/debugger/ports';
 import { openFreshConnection } from '../../../lib/packageSessions';
+import { readSystemInformation } from '../../../lib/systemInformation';
+
+/** The SAP user a connection's session belongs to, as the system names it. */
+async function requestUserOf(connection: IAbapConnection): Promise<string> {
+  const { user } = await readSystemInformation(connection);
+  if (user === undefined) throw new Error('the system named no user');
+  return user.trim().toUpperCase();
+}
+
 import {
   InstanceState,
   stderrStateLogger,
@@ -967,9 +975,13 @@ describe('Debugger handlers (integration)', () => {
           ms: Math.round(second.ms),
         });
         expect(second.isError).toBe(true);
-        // The refusal comes from the listener check before any change; the
-        // contract is the handler's own wording, not the system's sentence.
-        expect(second.text).toContain('another debugger holds this debugging');
+        // The refusal comes from the listener check before any change. The
+        // answer is the method's error as it came — SAP's conflict, whose
+        // document names the other debugger — plus the step where it arose.
+        const refused = JSON.parse(second.text);
+        expect(refused.step).toBe('check listener');
+        expect(refused.status).toBe(409);
+        expect(String(refused.raw_body)).toContain('conflictText');
         expect(b.state?.holdsState()).toBe(false);
         const stillA = await call(a, 'DebugWait', {
           state_handle: handleA,

@@ -39,7 +39,14 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import {
+  answer,
+  answerRequestThrown,
+  type FailureEntry,
+  isCredentialPayload,
+  requestFailureOf,
+  requestThrownEntry,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -52,14 +59,22 @@ import {
 } from '../../../lib/strategies/feapDescriptor';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { sequence, succeededWith } from '../../../lib/strategies/sequence';
+import {
+  failedWith,
+  sequence,
+  succeededWith,
+} from '../../../lib/strategies/sequence';
 import {
   associationsOf,
   categoryServiceUrlsOf,
   exposedEntitiesOf,
   serviceBindingFactsOf,
 } from '../../../lib/strategies/serviceBindingFacts';
+import { atStep, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+
+/** The resource `getSystemInformation` reads. */
+const SYSTEM_INFORMATION = '/sap/bc/adt/core/http/systeminformation';
 
 export const TOOL_DEFINITION = {
   name: 'GetServiceBindingPreviewUrl',
@@ -139,15 +154,29 @@ export async function handleGetServiceBindingPreviewUrl(
   // An explicit empty string suppresses the parameter.
   let systemClient: string | undefined;
   let systemLanguage: string | undefined;
-  let systemLookupFailed: string | undefined;
+  let systemLookupFailed: FailureEntry | undefined;
   if (args.client === undefined || args.language === undefined) {
     try {
       const info = await getSystemInformation(connection);
       systemClient = info?.client;
       systemLanguage = info?.language;
     } catch (error) {
-      systemLookupFailed =
-        error instanceof Error ? error.message : String(error);
+      // The lookup's error as SAP answered it, with its step — beside the
+      // URL, as it is, never folded into a sentence.
+      const failure = requestThrownEntry(
+        error,
+        { method: 'GET', url: SYSTEM_INFORMATION },
+        'read system information',
+      );
+      // A credential failure is not a lookup's: the call ends with it, as it
+      // came — the binding's read would only be refused again.
+      if (isCredentialPayload(failure))
+        return answerRequestThrown(
+          error,
+          { method: 'GET', url: SYSTEM_INFORMATION },
+          'read system information',
+        );
+      systemLookupFailed = failure;
     }
   }
   const client = args.client ?? systemClient;
@@ -164,10 +193,11 @@ export async function handleGetServiceBindingPreviewUrl(
     { tool: 'GetServiceBindingPreviewUrl', detail: 'terse' },
     () =>
       sequence(
-        () =>
+        atStep('read binding', () =>
           binding.read({ bindingName }, undefined, {
             analyse: analyseException,
           }),
+        ),
         async (
           bindingSource: AdtReading<string>,
         ): Promise<IAdtResponse<Found, IAdtError>> => {
@@ -183,11 +213,13 @@ export async function handleGetServiceBindingPreviewUrl(
             });
           }
 
-          const srvd = await definition.read(
-            { serviceDefinitionName: facts.serviceDefinition },
-            'active',
-            { analyse: analyseException },
-          );
+          const srvd = await atStep('read service definition', () =>
+            definition.read(
+              { serviceDefinitionName: facts.serviceDefinition },
+              'active',
+              { analyse: analyseException },
+            ),
+          )();
           if (!srvd.ok)
             return srvd as unknown as IAdtResponse<Found, IAdtError>;
           const exposed = exposedEntitiesOf(
@@ -221,23 +253,35 @@ export async function handleGetServiceBindingPreviewUrl(
           // composed URL remains the answer when it says nothing.
           let category: ReturnType<typeof categoryServiceUrlsOf> = {};
           if (facts.protocol !== undefined && facts.service !== undefined) {
+            const sent = {
+              method: 'GET',
+              url: `/sap/bc/adt/businessservices/${facts.protocol}/${bindingName}`,
+            };
             try {
               const answered = await connection.makeAdtRequest({
-                url:
-                  `/sap/bc/adt/businessservices/${facts.protocol}/` +
-                  `${bindingName}`,
+                url: sent.url,
                 method: 'GET',
-                // The contract requires one; this read is an enrichment, so it
-                // gets a short leash rather than the default.
-                timeout: 30_000,
+                // None of the server's (`0`): a deadline closes the socket
+                // under a running request, which kills it in SAP;
+                // HandlerGet's `timeout` ends only its wait.
+                timeout: 0,
                 params: {
                   servicename: facts.service,
                   serviceversion: facts.version ?? '0001',
                 },
               });
               category = categoryServiceUrlsOf(String(answered.data ?? ''));
-            } catch {
-              // Absent, refused or shaped otherwise: the composed URL answers.
+            } catch (error) {
+              // A credential failure ends the call as it came — a thrown
+              // refusal rethrown, a `401` SAP answered as the lookup's error
+              // with its step; absent, refused or shaped otherwise: the
+              // composed URL answers.
+              const step = 'read service URL';
+              if (isCredentialPayload(requestThrownEntry(error, sent, step))) {
+                const failed = requestFailureOf(error, sent);
+                if (failed === undefined) throw error;
+                return failedWith<Found>(withStep(failed, step));
+              }
             }
           }
 
@@ -359,7 +403,7 @@ export async function handleGetServiceBindingPreviewUrl(
 
         systemLookupFailed === undefined
           ? undefined
-          : `The client and language the system reports could not be read (${systemLookupFailed}), so the preview URL carries only what was passed in.`,
+          : 'The client and language the system reports could not be read (system_information_failure), so the preview URL carries only what was passed in.',
       ].filter((one): one is string => one !== undefined);
 
       return {
@@ -400,6 +444,8 @@ export async function handleGetServiceBindingPreviewUrl(
         // indistinguishable from one that works, until it opens nothing.
         missing: missing.length === 0 ? undefined : missing,
         note: notes.length === 0 ? undefined : notes.join(' '),
+        // The system lookup's failure as it is, beside the URL it shaped.
+        system_information_failure: systemLookupFailed,
       };
     },
   );

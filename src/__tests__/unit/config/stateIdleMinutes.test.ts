@@ -1,9 +1,24 @@
-import { ServerConfigManager } from '../../../lib/config/ServerConfigManager';
+import {
+  type ParameterTable,
+  parametersHelp,
+  STATE_IDLE_ROW,
+} from '../../../lib/config/authParameters';
 import { readStateIdleMinutes } from '../../../lib/config/stateIdleMinutes';
 import {
-  generateYamlConfigTemplate,
-  validateYamlConfig,
+  generateYamlConfigTemplate as templateOf,
+  validateYamlConfig as validateTable,
 } from '../../../lib/config/yamlConfig';
+
+/** lib's shared row alone: every binary's table holds it. */
+const IDLE: ParameterTable = {
+  program: 'any-binary',
+  rows: [STATE_IDLE_ROW],
+  removed: [],
+};
+const validateYamlConfig = (config: Record<string, unknown>) =>
+  validateTable(IDLE, config);
+const generateYamlConfigTemplate = () => templateOf(IDLE);
+const rowHelp = () => parametersHelp(IDLE);
 
 const ENV = 'MCP_STATE_IDLE_MINUTES';
 
@@ -65,7 +80,7 @@ describe('stateIdleMinutes — CLI, env, YAML', () => {
     expect(
       validateYamlConfig({ 'state-idle-minutes': 35792 } as never).valid,
     ).toBe(false);
-    expect(ServerConfigManager.generateHelp()).toContain('35791');
+    expect(rowHelp()).toContain('35791');
   });
 
   it('a bare --state-idle-minutes says how to give the value', () => {
@@ -89,59 +104,15 @@ describe('stateIdleMinutes — CLI, env, YAML', () => {
 
   it('the template and the help name the option', () => {
     expect(generateYamlConfigTemplate()).toContain('state-idle-minutes');
-    const help = ServerConfigManager.generateHelp();
+    const help = rowHelp();
     expect(help).toContain('--state-idle-minutes');
     expect(help).toContain(ENV);
   });
 });
 
-describe('ServerConfigManager carries stateIdleMinutes', () => {
-  const ORIG_ARGV = process.argv;
-  const ORIG = process.env[ENV];
-  afterEach(() => {
-    process.argv = ORIG_ARGV;
-    if (ORIG === undefined) delete process.env[ENV];
-    else process.env[ENV] = ORIG;
-  });
-
-  it('30 by default, the given value otherwise, and a refusal for 29', () => {
-    delete process.env[ENV];
-    process.argv = ['node', 'x'];
-    expect(new ServerConfigManager().getConfigSync().stateIdleMinutes).toBe(30);
-    process.argv = ['node', 'x', '--state-idle-minutes=45'];
-    expect(new ServerConfigManager().getConfigSync().stateIdleMinutes).toBe(45);
-    process.argv = ['node', 'x', '--state-idle-minutes=29'];
-    expect(() => new ServerConfigManager().getConfigSync()).toThrow(
-      /at least 30/,
-    );
-  });
-});
-
-describe('ArgumentsParser reads stateIdleMinutes like its neighbours', () => {
-  const ORIG_ARGV = process.argv;
-  const ORIG = process.env[ENV];
-  afterEach(() => {
-    process.argv = ORIG_ARGV;
-    if (ORIG === undefined) delete process.env[ENV];
-    else process.env[ENV] = ORIG;
-  });
-  it('CLI, env and YAML reach the parsed arguments', () => {
-    const { ArgumentsParser } = require('../../../lib/config/ArgumentsParser');
-    delete process.env[ENV];
-    process.argv = ['node', 'x', '--state-idle-minutes=50'];
-    expect(ArgumentsParser.parse().stateIdleMinutes).toBe(50);
-    process.argv = ['node', 'x'];
-    process.env[ENV] = '40';
-    expect(ArgumentsParser.parse().stateIdleMinutes).toBe(40);
-    delete process.env[ENV];
-    expect(
-      ArgumentsParser.parse({ 'state-idle-minutes': 35 } as never)
-        .stateIdleMinutes,
-    ).toBe(35);
-    expect(ArgumentsParser.parse().stateIdleMinutes).toBe(30);
-  });
+describe('the help of the row', () => {
   it('the help separates its sentences', () => {
-    const help = ServerConfigManager.generateHelp();
+    const help = rowHelp();
     const block = help.slice(help.indexOf('HELD STATE'));
     const text = block
       .slice(0, block.indexOf('env: MCP_STATE_IDLE_MINUTES'))

@@ -2,7 +2,7 @@
  * A read-only compact surface may not be able to write — enforced by imports,
  * across package boundaries now.
  *
- * **Why the module graph and not the tool list.** `@mcp-abap-adt/compact-readonly`
+ * **Why the module graph and not the tool list.** `@mcp-abap-adt/compact-readonly-entries`
  * lists thirteen tools and no write tool, which is easy to assert and proves little:
  * every compact tool once imported one shared router whose map held `create`,
  * `update` and `delete` beside `get`, so a consumer importing the read-only half
@@ -60,7 +60,7 @@ function graphFrom(entry: string): Graph {
 const packageEntry = (pkg: string) => join(REPO, pkg, 'src', 'index.ts');
 
 describe('the compact capability split holds across the packages', () => {
-  const readOnly = graphFrom(packageEntry('compact-readonly'));
+  const readOnly = graphFrom(packageEntry('compact-readonly-entries'));
   const modify = graphFrom(packageEntry('compact-modify'));
   const whole = graphFrom(packageEntry('compact'));
 
@@ -99,7 +99,7 @@ describe('the compact capability split holds across the packages', () => {
   });
 
   it('the command serves both halves', () => {
-    expect([...whole.bare]).toContain('@mcp-abap-adt/compact-readonly');
+    expect([...whole.bare]).toContain('@mcp-abap-adt/compact-readonly-entries');
     expect([...whole.bare]).toContain('@mcp-abap-adt/compact-modify');
   });
 
@@ -107,7 +107,10 @@ describe('the compact capability split holds across the packages', () => {
     // The manifest is the other half of the same promise: a package that cannot
     // import a write route must not be able to install one either.
     const manifest = JSON.parse(
-      readFileSync(join(REPO, 'compact-readonly', 'package.json'), 'utf8'),
+      readFileSync(
+        join(REPO, 'compact-readonly-entries', 'package.json'),
+        'utf8',
+      ),
     ) as { dependencies?: Record<string, string> };
     expect(Object.keys(manifest.dependencies ?? {})).toEqual([
       '@mcp-abap-adt/lib',
@@ -119,10 +122,10 @@ describe('the compact capability split holds across the packages', () => {
       readdirSync(join(REPO, pkg, 'src', 'handlers')).filter((name) =>
         name.startsWith('handleHandler'),
       );
-    const read = handlersOf('compact-readonly');
+    const read = handlersOf('compact-readonly-entries');
     const write = handlersOf('compact-modify');
-    expect(read).toHaveLength(16);
-    expect(write).toHaveLength(9);
+    expect(read).toHaveLength(17);
+    expect(write).toHaveLength(12);
     expect(read.filter((name) => write.includes(name))).toEqual([]);
   });
 });

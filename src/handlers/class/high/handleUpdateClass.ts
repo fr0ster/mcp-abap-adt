@@ -38,6 +38,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -106,7 +107,7 @@ export async function handleUpdateClass(
       const written = await withLock(
         () => obj.lock({ className }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          const update = () =>
+          const update = atStep('update', () =>
             obj.update(
               { className, transportRequest: args.transport_request },
               {
@@ -114,7 +115,8 @@ export async function handleUpdateClass(
                 lockHandle,
                 analyse: analyseException,
               },
-            );
+            ),
+          );
           // **A finding does not stop the write; a check that could not run
           // does.** Which is where the line sat before the migration, and the
           // only thing wrong with this step was the reading on it.
@@ -136,12 +138,13 @@ export async function handleUpdateClass(
           // always a reason not to write.
           return shouldActivate
             ? sequence(
-                () =>
+                atStep('check', () =>
                   obj.check(
                     { className, source: args.source_code },
                     'inactive',
                     { analyse: analyseException },
                   ),
+                ),
                 update,
               )
             : update();
@@ -153,8 +156,11 @@ export async function handleUpdateClass(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ className }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate({ className }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

@@ -3,6 +3,11 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  READ_PART_PROPERTY,
+  type ReadPart,
+  readPartOf,
+} from '../../../lib/handlers/readPart';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -11,7 +16,7 @@ export const TOOL_DEFINITION = {
   name: 'GetTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP table definition. Supports reading active or inactive version.',
+    'Read an ABAP table in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -19,11 +24,12 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Table name.',
       },
+      part: READ_PART_PROPERTY,
       version: {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.',
+          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
         default: 'active',
       },
     },
@@ -33,6 +39,7 @@ export const TOOL_DEFINITION = {
 
 interface GetTableArgs {
   table_name: string;
+  part?: ReadPart;
   version?: 'active' | 'inactive';
 }
 
@@ -43,14 +50,27 @@ export async function handleGetTable(
   const { connection, logger } = context;
   const { table_name, version = 'active' } = args;
   if (!table_name) return return_error(new Error('table_name is required'));
+  const part = readPartOf(args.part);
+  if (part instanceof Error) return return_error(part);
 
   const tableName = table_name.toUpperCase();
   const obj = createAdtClient(connection, logger).getTable(
     resultsFor(tableDocuments),
   );
 
-  // GetTable has only ever answered the source, not the metadata — one
-  // call, unlike ReadTable's pair.
+  // One request per call: the part asked for, and only it.
+  if (part === 'metadata') {
+    return answer(
+      { tool: 'GetTable', detail: 'terse' },
+      () => obj.readMetadata({ tableName }, { analyse: analyseException }),
+      (metadata: AdtReading<string>) => ({
+        success: true,
+        table_name: tableName,
+        part,
+        metadata: metadata.raw,
+      }),
+    );
+  }
   return answer(
     { tool: 'GetTable', detail: 'terse' },
     () => obj.read({ tableName }, version, { analyse: analyseException }),
@@ -58,7 +78,8 @@ export async function handleGetTable(
       success: true,
       table_name: tableName,
       version,
-      table_data: source.raw,
+      part,
+      source: source.raw,
     }),
   );
 }

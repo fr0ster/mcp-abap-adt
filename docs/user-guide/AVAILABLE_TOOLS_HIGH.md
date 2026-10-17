@@ -2,8 +2,10 @@
 
 Generated from code in `src/handlers/**` (not from docs).
 
+The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's description, as the server lists it, ends with one more sentence on batch mode — recorded, recorded only for some arguments (which ones), refused, or not served; the descriptions here are the handlers' own, without it ([BATCH_MODE.md](BATCH_MODE.md) lists every recordable call).
+
 - Level: High-Level
-- Total tools: 159
+- Total tools: 161
 
 ## Navigation
 
@@ -130,7 +132,9 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Package](#high-level-package)
     - [CheckPackage](#checkpackage-high-level-package)
     - [CreatePackage](#createpackage-high-level-package)
+    - [DeletePackage](#deletepackage-high-level-package)
     - [GetPackage](#getpackage-high-level-package)
+    - [UpdatePackage](#updatepackage-high-level-package)
   - [Program](#high-level-program)
     - [CheckProgram](#checkprogram-high-level-program)
     - [CreateProgram](#createprogram-high-level-program)
@@ -203,11 +207,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** Read what an ATC run found, by the worklist_id RunATC answered. Works whether or not the run waited. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority.
+**Description:** Read what an ATC run found, by the worklist_id RunATC answered. Works whether or not the run waited. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `worklist_id` (string, required) - Worklist identifier answered by RunATC.
 
 ---
@@ -284,13 +289,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Retrieve ABAP behavior definition definition. Supports reading active or inactive version.
+**Description:** Read an ABAP behavior definition in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -341,13 +347,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Retrieve ABAP behavior implementation definition. Supports reading active or inactive version.
+**Description:** Read an ABAP behavior implementation (its class) in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -467,61 +474,62 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** Retrieve ABAP class source code. Supports reading active or inactive version.
+**Description:** Read an ABAP class in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocaldefinitions-high-level-class"></a>
 #### GetLocalDefinitions (High-Level / Class)
-**Description:** Retrieve local definitions source code from a class (definitions include). Supports reading active or inactive version.
+**Description:** Read the local definitions include of a class (its definitions include), active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocalmacros-high-level-class"></a>
 #### GetLocalMacros (High-Level / Class)
-**Description:** Retrieve local macros source code from a class (macros include). Supports reading active or inactive version. Note: Macros are supported in older ABAP versions but not in newer ones.
+**Description:** Read the local macros include of a class, active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** Read the local test classes include of a class. Active or inactive version.
+**Description:** Read the local test classes include of a class, active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocaltypes-high-level-class"></a>
 #### GetLocalTypes (High-Level / Class)
-**Description:** Retrieve local types source code from a class (implementations include). Supports reading active or inactive version.
+**Description:** Read the local types include of a class (its implementations include), active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -973,7 +981,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getdataelement-high-level-data-element"></a>
 #### GetDataElement (High-Level / Data Element)
-**Description:** Retrieve ABAP data element definition. Supports reading active or inactive version.
+**Description:** Read an ABAP data element in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
@@ -1055,13 +1063,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** Retrieve ABAP DDL source definition. Supports reading active or inactive version.
+**Description:** Read an ABAP DDL source (CDS) in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1178,7 +1187,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getdomain-high-level-domain"></a>
 #### GetDomain (High-Level / Domain)
-**Description:** Retrieve ABAP domain definition. Supports reading active or inactive version.
+**Description:** Read an ABAP domain in one request: its ADT metadata document (definition, package, description). Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
@@ -1271,7 +1280,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Uses stateful session with proper lock/unlock mechanism.
+**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Locks the group, writes, and unlocks it.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
@@ -1314,7 +1323,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getfunctiongroup-high-level-function-group"></a>
 #### GetFunctionGroup (High-Level / Function Group)
-**Description:** Retrieve ABAP function group definition. Supports reading active or inactive version.
+**Description:** Read an ABAP function group in one request: its ADT metadata document (package, description, contents). Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
@@ -1387,14 +1396,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** Read an ABAP function module, BAPI or RFC-enabled ones included: its source code, which declares the parameter signature. Active or inactive version.
+**Description:** Read an ABAP function module, BAPI or RFC-enabled ones included, in one request at the function group given: its source code, which declares the parameter signature (part "source", the default; active or inactive version), or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name containing the function module.
-- `function_module_name` (string, required) - FunctionModule name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `function_group_name` (string, required) - Function group containing the function module.
+- `function_module_name` (string, required) - Function module name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1442,13 +1452,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
-**Description:** Retrieve ABAP interface definition. Supports reading active or inactive version.
+**Description:** Read an ABAP interface in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1527,7 +1538,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmessageclass-high-level-message-class"></a>
 #### GetMessageClass (High-Level / Message Class)
-**Description:** Retrieve an ABAP message class (MSAG/T100) as its ADT metadata document (XML), under the `message_class` field. adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
+**Description:** Read an ABAP message class (MSAG/T100) in one request: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -1538,7 +1549,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** Retrieve a single message (by number) from an ABAP message class (MSAG/T100). There is no per-message resource: ADT answers the ENTIRE parent class document (XML) under the `message` field, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
+**Description:** Read one message (by number) of an ABAP message class (MSAG/T100) in one request: the class's ADT document (XML) that holds it, under `metadata`, with `part: "metadata"`; a number absent from the class is refused as not found.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -1594,13 +1605,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
-**Description:** Retrieve ABAP metadata extension definition. Supports reading active or inactive version.
+**Description:** Read an ABAP metadata extension in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1630,15 +1642,41 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="deletepackage-high-level-package"></a>
+#### DeletePackage (High-Level / Package)
+**Description:** Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
+
+**Source:** `src/handlers/package/high/handleDeletePackage.ts`
+
+**Parameters:**
+- `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
+- `package_name` (string, required) - Package name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
+
+---
+
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
+**Description:** Read an ABAP package in one request: its ADT metadata document (description, super-package, sub-packages, ...), active or inactive version. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
 **Parameters:**
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+
+---
+
+<a id="updatepackage-high-level-package"></a>
+#### UpdatePackage (High-Level / Package)
+**Description:** Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.
+
+**Source:** `src/handlers/package/high/handleUpdatePackage.ts`
+
+**Parameters:**
+- `description` (string, required) - New description for the package.
+- `package_name` (string, required) - Package name. Package must already exist.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -1688,13 +1726,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** Retrieve ABAP program definition. Supports reading active or inactive version.
+**Description:** Read an ABAP program in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1751,11 +1790,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getservicebinding-high-level-service-binding"></a>
 #### GetServiceBinding (High-Level / Service Binding)
-**Description:** Retrieve ABAP service binding source/metadata by name via ADT Business Services endpoint.
+**Description:** Read an ABAP service binding in one request: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
@@ -1837,13 +1877,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
-**Description:** Retrieve ABAP service definition definition. Supports reading active or inactive version.
+**Description:** Read an ABAP service definition in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `service_definition_name` (string, required) - ServiceDefinition name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1909,13 +1950,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getstructure-high-level-structure"></a>
 #### GetStructure (High-Level / Structure)
-**Description:** Retrieve ABAP structure definition. Supports reading active or inactive version.
+**Description:** Read an ABAP structure in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `structure_name` (string, required) - Structure name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -1938,7 +1980,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions.
+**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
@@ -1947,7 +1989,9 @@ Generated from code in `src/handlers/**` (not from docs).
 - `include_descriptions` (boolean, optional (default: true)) - Include object descriptions in response. Default: true
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
-- `package_name` (string, required) - Package name
+- `package_name` (string, optional) - Package name (give this or package_names)
+- `package_names` (array, optional) - Several package names, read together (give this or package_name)
+- `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 ---
 
@@ -1996,13 +2040,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="gettable-high-level-table"></a>
 #### GetTable (High-Level / Table)
-**Description:** Retrieve ABAP table definition. Supports reading active or inactive version.
+**Description:** Read an ABAP table in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
@@ -2058,7 +2103,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
 **Parameters:**
-- `target_user` (string, required) - SAP user the task belongs to, e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
+- `target_user` (string, required) - The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
 - `task_type` (string, optional (default: S)) - S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).
 - `transport_number` (string, required) - The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.
 
@@ -2361,4 +2406,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-10-12*
+*Last updated: 2026-10-17*

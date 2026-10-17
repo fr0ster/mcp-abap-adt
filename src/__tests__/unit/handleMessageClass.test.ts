@@ -34,9 +34,8 @@ import { handleCreateMessageClass } from '../../handlers/message_class/high/hand
 import { handleCreateMessageClassMessage } from '../../handlers/message_class/high/handleCreateMessageClassMessage';
 import { handleDeleteMessageClass } from '../../handlers/message_class/high/handleDeleteMessageClass';
 import { handleGetMessageClass } from '../../handlers/message_class/high/handleGetMessageClass';
+import { handleGetMessageClassMessage } from '../../handlers/message_class/high/handleGetMessageClassMessage';
 import { handleUpdateMessageClassMessage } from '../../handlers/message_class/high/handleUpdateMessageClassMessage';
-import { handleReadMessageClass } from '../../handlers/message_class/readonly/handleReadMessageClass';
-import { handleReadMessageClassMessage } from '../../handlers/message_class/readonly/handleReadMessageClassMessage';
 import { parseStructure } from '../../lib/strategies/reading';
 import { okResponse, reading } from '../helpers/fakeClient';
 
@@ -57,14 +56,14 @@ describe('Message Class (MSAG) CRUD tools', () => {
 
   // adt-clients 19: a message class has no source resource of its own, so
   // `read` is gone and `readMetadata` answers the whole document verbatim
-  // (see `handleReadMessageClass.ts`) — there is no longer a parsed
+  // (see `handleGetMessageClass.ts`) — there is no longer a parsed
   // `messageClass.messages[]` to assert against, only the raw document.
-  it('ReadMessageClass answers the class document via readMetadata', async () => {
+  it('GetMessageClass answers the class document via readMetadata', async () => {
     const metadata =
       '<msag:messageClass adtcore:name="ZMY_MSGS">...</msag:messageClass>';
     mockMc.readMetadata.mockResolvedValue(okResponse(reading(metadata)));
 
-    const result = await handleReadMessageClass(ctx, {
+    const result = await handleGetMessageClass(ctx, {
       message_class_name: 'zmy_msgs',
     });
 
@@ -220,7 +219,7 @@ describe('Message Class (MSAG) CRUD tools', () => {
   // adt-clients 19: `AdtMessageClassMessage`'s factory contract only composes
   // `IAdtCreatable & IAdtReadable & IAdtUpdatable` — no `IAdtMetadataReadable`
   // — and `read`/`written`/`deleted` are fixed to answer plain `string` (see
-  // `handleReadMessageClassMessage.ts`'s own comment), so this now calls
+  // `handleGetMessageClassMessage.ts`'s own comment), so this now calls
   // `read()` and answers the parent class document verbatim rather than a
   // parsed single message.
   //
@@ -231,14 +230,14 @@ describe('Message Class (MSAG) CRUD tools', () => {
   // `OBJECT_NOT_FOUND` when it is not. Passing `{ analyse: analyseException }`
   // (this test's own original shape) REPLACED that check rather than
   // composing with it, since the member reads `options?.analyse ??
-  // defaultCheck` — see `handleReadMessageClassMessage.ts`'s own comment for
+  // defaultCheck` — see `handleGetMessageClassMessage.ts`'s own comment for
   // the full finding.
-  it('ReadMessageClassMessage answers the parent class document via read', async () => {
+  it('GetMessageClassMessage answers the parent class document via read', async () => {
     const classDocument =
       '<msag:messageClass><mc:messages><mc:message mc:msgno="001">Hello &amp;1</mc:message></mc:messages></msag:messageClass>';
     mockMsg.read.mockResolvedValue(okResponse(classDocument));
 
-    const result = await handleReadMessageClassMessage(ctx, {
+    const result = await handleGetMessageClassMessage(ctx, {
       message_class_name: 'ZMY_MSGS',
       msgno: '001',
     });

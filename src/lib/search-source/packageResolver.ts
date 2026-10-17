@@ -1,7 +1,9 @@
 import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
+import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
+import { carryingFailure } from '../strategies/step';
 
 export interface SearchObjectsArgs {
   query: string;
@@ -85,8 +87,60 @@ export function createPackagePatternResolver(
       { analyse: analyseException },
     );
     if (!response.ok) {
-      throw new Error(response.getError().message);
+      throw carryingFailure(
+        new Error(response.getError().message),
+        response.getError(),
+        'search packages',
+      );
     }
     return response.getResult().value.map((hit) => hit.name);
   };
+}
+
+/** The key of one package search: its arguments. */
+function searchKey(args: SearchObjectsArgs): string {
+  return `${args.objectType}|${args.maxResults}|${args.query}`;
+}
+
+/**
+ * A `SearchObjectsFn` answering from `answers`, for the batched version of
+ * `SearchSource` (spec §11): a search answered there gives its package names
+ * (or throws its failure, as it came); a search with no answer yet is
+ * recorded in `asked` and gives no names. `resolvePackagePatterns` run over it
+ * once names the searches of a phase; run again once the phase answered, it
+ * resolves the packages exactly as over the connection.
+ */
+export function answeredSearch(
+  answers: ReadonlyMap<string, PhaseResult<string[]>>,
+  asked: SearchObjectsArgs[],
+): SearchObjectsFn {
+  return async (args) => {
+    const answer = answers.get(searchKey(args));
+    if (answer === undefined) {
+      asked.push(args);
+      return [];
+    }
+    if (!answer.ok) throw answer.error;
+    return answer.value;
+  };
+}
+
+/**
+ * Every search of `asked` in one ADT batch envelope (`runPhase`), each
+ * through the package resolver over the phase's batch connection; the
+ * answers keyed for `answeredSearch`.
+ */
+export async function searchPackagesInPhase(
+  ctx: HandlerContext,
+  asked: readonly SearchObjectsArgs[],
+): Promise<Map<string, PhaseResult<string[]>>> {
+  const results = await runPhase(ctx, asked, (args, connection) =>
+    createPackagePatternResolver({ ...ctx, connection })(args),
+  );
+  return new Map(
+    asked.map((args, i) => [
+      searchKey(args),
+      results[i] as PhaseResult<string[]>,
+    ]),
+  );
 }

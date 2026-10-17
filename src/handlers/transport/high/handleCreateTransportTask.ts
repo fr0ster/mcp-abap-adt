@@ -31,12 +31,18 @@
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import { answer } from '../../../lib/answer';
+import {
+  answer,
+  type FailureEntry,
+  failureEntry,
+  isCredentialPayload,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
@@ -59,7 +65,7 @@ export const TOOL_DEFINITION = {
       target_user: {
         type: 'string',
         description:
-          'SAP user the task belongs to, e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.',
+          'The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.',
       },
       task_type: {
         type: 'string',
@@ -114,11 +120,14 @@ export async function handleCreateTransportTask(
   }
 
   const detail = detailOf(args);
+  // SAP stores user ids in upper case, and refuses a lower-case one as an
+  // unknown user: the id is sent upper-cased.
+  const targetUser = args.target_user.trim().toUpperCase();
 
   // What typing the task came to: the type it carries now, and the refusal
   // when there was one. The task exists either way, so a refused typing does
   // not fail the creation — it is said in the answer instead.
-  let typed: { type: TaskType; error?: string } = { type: 'X' };
+  let typed: { type: TaskType; error?: FailureEntry } = { type: 'X' };
 
   const terseTask: Terse<unknown> = (value) => {
     const number = taskNumberOf(value);
@@ -126,7 +135,7 @@ export async function handleCreateTransportTask(
       success: true,
       request: args.transport_number,
       task_number: number || null,
-      owner: args.target_user,
+      owner: targetUser,
       task_type: typed.type,
       ...(typed.error ? { task_type_error: typed.error } : {}),
       ...(number
@@ -147,10 +156,12 @@ export async function handleCreateTransportTask(
       const request = createAdtClient(connection, logger).getRequest(
         resultsFor(transportDocuments),
       );
-      const created = await request.createTask(args.transport_number, {
-        targetUser: args.target_user,
-        analyse: analyseException,
-      });
+      const created = await atStep('create task', () =>
+        request.createTask(args.transport_number, {
+          targetUser,
+          analyse: analyseException,
+        }),
+      )();
       // A reading, as `project` receives it: the parsed document is its value.
       const number = created.ok
         ? taskNumberOf(
@@ -162,9 +173,13 @@ export async function handleCreateTransportTask(
         const changed = await request.changeTaskType(number, taskType, {
           analyse: analyseException,
         });
+        // A refusal is the method's error as it is, with its step.
         typed = changed.ok
           ? { type: taskType }
-          : { type: 'X', error: changed.getError().message };
+          : {
+              type: 'X',
+              error: failureEntry(changed.getError(), 'change task type'),
+            };
         if (!changed.ok) {
           // **The refusal has to survive `detail`, and in the terse fields it
           // did not.** `project()` calls the terse projection for `terse` only:
@@ -177,14 +192,26 @@ export async function handleCreateTransportTask(
           // already uses for a release that failed after a write that landed:
           // the call succeeded, and something the caller must act on did not.
           const failure = changed.getError();
+          // A credential failure (a `401`) is the call's failure, as it came
+          // with its step — not a cleanup note beside a creation.
+          if (isCredentialPayload(failureEntry(failure, 'change task type'))) {
+            const stepped = withStep(failure, 'change task type');
+            return {
+              ok: false,
+              getResult: () => {
+                throw new Error('asked for the result of a failure');
+              },
+              getError: () => stepped,
+            } as unknown as typeof created;
+          }
           const result = created.ok ? created.getResult() : undefined;
           return {
             ok: created.ok,
             getResult: () => result,
             getError: () => failure,
             cleanup: {
-              message: `the task was created but changetasktype to ${taskType} was refused, so it is still Unclassified and AddTransportObject onto it will be refused (TK127): ${failure.message}`,
-              origin: failure.origin,
+              message: `the task was created but changetasktype to ${taskType} was refused, so it is still Unclassified and AddTransportObject onto it will be refused (TK127)`,
+              failures: [failureEntry(failure, 'change task type')],
             },
           } as unknown as typeof created;
         }

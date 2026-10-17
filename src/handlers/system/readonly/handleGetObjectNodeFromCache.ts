@@ -16,6 +16,7 @@ export const TOOL_DEFINITION = {
 
 // handleGetObjectNodeFromCache returns a cached node by OBJECT_TYPE, OBJECT_NAME, and TECH_NAME, expanding OBJECT_URI when available
 
+import { answerRequestThrown } from '../../../lib/answer';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { makeAdtRequest } from '../../../lib/utils';
@@ -71,29 +72,38 @@ export async function handleGetObjectNodeFromCache(
       }
       return uri;
     };
+    const endpoint = buildEndpoint(node.OBJECT_URI);
+    let resp: Awaited<ReturnType<typeof makeAdtRequest>>;
     try {
-      const endpoint = buildEndpoint(node.OBJECT_URI);
-      const resp = await makeAdtRequest(connection, endpoint, 'GET', 15000);
-      node.object_uri_response =
-        typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
-
-      // Persist the fetched OBJECT_URI payload back into the cache entry
-      const idx = cache.objects.findIndex(
-        (obj: any) =>
-          obj.OBJECT_TYPE === object_type &&
-          obj.OBJECT_NAME === object_name &&
-          obj.TECH_NAME === tech_name,
-      );
-      if (idx >= 0) {
-        cache.objects[idx] = {
-          ...cache.objects[idx],
-          object_uri_response: node.object_uri_response,
-        };
-        objectsListCache.setCache(cache);
-      }
+      // No deadline of the server's: the request waits for SAP's answer.
+      resp = await makeAdtRequest(connection, endpoint, 'GET', 0);
     } catch (e) {
       logger?.error('Failed to expand OBJECT_URI from cache', e as any);
-      node.object_uri_response = `ERROR: ${e instanceof Error ? e.message : String(e)}`;
+      // The read's error as SAP answered it, with its step — the call's
+      // failure, not content inside a success; a credential failure as the
+      // chain made it.
+      return answerRequestThrown(
+        e,
+        { method: 'GET', url: endpoint },
+        'read OBJECT_URI',
+      );
+    }
+    node.object_uri_response =
+      typeof resp.data === 'string' ? resp.data : JSON.stringify(resp.data);
+
+    // Persist the fetched OBJECT_URI payload back into the cache entry
+    const idx = cache.objects.findIndex(
+      (obj: any) =>
+        obj.OBJECT_TYPE === object_type &&
+        obj.OBJECT_NAME === object_name &&
+        obj.TECH_NAME === tech_name,
+    );
+    if (idx >= 0) {
+      cache.objects[idx] = {
+        ...cache.objects[idx],
+        object_uri_response: node.object_uri_response,
+      };
+      objectsListCache.setCache(cache);
     }
   }
   logger?.info(

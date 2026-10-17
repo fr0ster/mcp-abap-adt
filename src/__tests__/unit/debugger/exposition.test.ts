@@ -1,6 +1,6 @@
-import { ServerConfigManager } from '../../../lib/config/ServerConfigManager';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
+import { fullReadOnlyToolSet, fullToolSet } from '../../../lib/toolSet';
 
 describe('the debug set', () => {
   it('is a handler set of its own', () => {
@@ -11,7 +11,7 @@ describe('the debug set', () => {
 
   it('HandlerExporter leaves it out unless asked, and gives it when asked', () => {
     const names = (o: any) =>
-      new HandlerExporter(o)
+      new HandlerExporter({ systemType: 'onprem', ...o })
         .getHandlerEntries()
         .map((e) => e.toolDefinition.name);
     expect(
@@ -22,22 +22,26 @@ describe('the debug set', () => {
     expect(names({ includeDebug: true })).toContain('DebugStartListener');
   });
 
-  describe('--exposition', () => {
-    const saved = process.argv;
-    afterEach(() => {
-      process.argv = saved;
+  // The binary fixes its set: always in core, never in core-ro.
+  describe('the binaries', () => {
+    const groupsOf = (set: typeof fullToolSet) =>
+      set
+        .groups({ connection: undefined } as any, 'stdio')
+        .map((g) => g.getName());
+
+    it('mcp-abap-adt (and -http, -sse) serves it always', () => {
+      expect(groupsOf(fullToolSet)).toContain('DebugHandlers');
     });
 
-    it('accepts debug beside readonly', () => {
-      process.argv = [...saved.slice(0, 2), '--exposition=readonly,debug'];
-      const manager = Object.create(ServerConfigManager.prototype) as any;
-      expect(manager.parseExposition()).toEqual(['readonly', 'debug']);
+    it('mcp-abap-adt-ro (and -http-ro, -sse-ro) never', () => {
+      expect(groupsOf(fullReadOnlyToolSet)).not.toContain('DebugHandlers');
     });
 
-    it('lists debug in the help text', () => {
-      expect(ServerConfigManager.getHandlerSetsDescription()).toMatch(
-        /debug:\s+the debugger tools; opt-in/,
+    it('the help names it, with what a breakpoint catches', () => {
+      expect(fullToolSet.toolsHelp('stdio')).toMatch(
+        /debug: the debugger tools; a breakpoint or a listener catches every request of the connected SAP user/,
       );
+      expect(fullReadOnlyToolSet.toolsHelp('stdio')).not.toContain('debug:');
     });
   });
 });

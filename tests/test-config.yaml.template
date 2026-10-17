@@ -95,6 +95,14 @@ environment:
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
   connection_type: "http"                    # "http" | "rfc"
+  # RFC through a message server and a logon group (optional; rfc only).
+  # Each sets its SAP_* variable (SAP_MSHOST, ...) over the .env's. Leave "" to
+  # dial the application server of SAP_URL. With mshost, msserv or sysid is required.
+  mshost: ""                                 # message server host
+  msserv: ""                                 # message server service (name or port)
+  sysid: ""                                  # system id
+  group: ""                                  # logon group (connection default: PUBLIC)
+  saprouter: ""                              # SAProuter string
   # Test defaults
   default_package: "ZMCP_TEST"              # ← CHANGE: your dev package (Z*/Y*) or "$TMP" for local
   default_transport: ""                       # ← CHANGE: transport request (leave "" for $TMP/local packages)
@@ -104,12 +112,8 @@ environment:
     enabled: false
     transport: "stdio"
     mcp_destination: ""                      # MCP destination (optional, for hard mode)
-    exposition: "readonly,high"              # tool surface the spawned server serves.
-                                             # "high" and "low" are mutually exclusive —
-                                             # the launcher refuses the pair — so one run
-                                             # covers one tier: use "readonly,low" for low.
     launch_http: false                       # http only: launch the server binary on a free
-                                             # port with this destination and exposition,
+                                             # port with this destination,
                                              # instead of connecting to http_url.
 
 # ============================================================================
@@ -871,80 +875,6 @@ create_behavior_implementation:
 
 # Behavior Implementation (Behavior Implementation - Low-Level)
 # Used in combined BDEF+BIMPL test — BDEF (ZMCP_BLD_I_BDFL) is created first in the same test
-create_behavior_implementation_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Behavior Implementation low-level handler full workflow test (combined with BDEF)"
-      params:
-        class_name: "ZBP_MCP_BLD_I_BDFL"
-        description: "Behavior Implementation for ZMCP_BLD_I_BDFL"
-        behavior_definition: "ZMCP_BLD_I_BDFL"
-        source_code: |
-          CLASS lhc_ZMCP_BLD_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
-            PRIVATE SECTION.
-
-              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-          ENDCLASS.
-
-          CLASS lhc_ZMCP_BLD_I_BDFL IMPLEMENTATION.
-
-            METHOD get_instance_authorizations.
-            ENDMETHOD.
-
-            METHOD get_global_authorizations.
-            ENDMETHOD.
-
-          ENDCLASS.
-        implementation_code: |
-          CLASS lhc_ZMCP_BLD_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
-            PRIVATE SECTION.
-
-              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-          ENDCLASS.
-
-          CLASS lhc_ZMCP_BLD_I_BDFL IMPLEMENTATION.
-
-            METHOD get_instance_authorizations.
-            ENDMETHOD.
-
-            METHOD get_global_authorizations.
-            ENDMETHOD.
-
-          ENDCLASS.
-        update_source_code: |
-          CLASS lhc_ZMCP_BLD_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
-            PRIVATE SECTION.
-
-              METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-              METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
-
-          ENDCLASS.
-
-          CLASS lhc_ZMCP_BLD_I_BDFL IMPLEMENTATION.
-
-            METHOD get_instance_authorizations.
-            ENDMETHOD.
-
-            METHOD get_global_authorizations.
-            ENDMETHOD.
-
-          ENDCLASS.
-
 # Create Metadata Extension (Low-Level Handler)
 
 # Class (Class)
@@ -1200,40 +1130,6 @@ create_data_element:
 # Create Interface
 
 # Data Element (Data Element - Low-Level)
-create_data_element_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "DataElement low-level handler full workflow test"
-      params:
-        data_element_name: "ZMCP_BLD_DTEL_L1"
-        description: "DataElement low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        type_kind: "predefinedAbapType"
-        type_name: "CHAR"
-        data_type: "CHAR"
-        length: 50
-        decimals: 0
-        short_label: "TestLbl"
-        medium_label: "Test Field"
-        field_label_long: "Test Field Long Label"
-        field_label_heading: "Test Heading"
-        domain_name: ""
-        properties:
-          # package_name: "ZMCP_BLD_PKG01"
-          description: "DataElement low-level handler test (updated)"
-          type_kind: "predefinedAbapType"
-          type_name: "CHAR"
-          data_type: "CHAR"
-          length: 50
-          decimals: 0
-          field_label_short: "Upd Test"
-          field_label_medium: "Updated Test Field"
-          field_label_long: "Updated Test Field Long Label"
-          field_label_heading: "Updated Test Heading"
-
 # Create Table (Low-Level Handler)
 
 # Domain (Domain)
@@ -1261,27 +1157,6 @@ create_domain:
 # Create Data Element
 
 # Domain (Domain - Low-Level)
-create_domain_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Domain low-level handler full workflow test"
-      params:
-        domain_name: "ZMCP_BLD_DOM_L1"
-        description: "Domain low-level handler test domain"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        datatype: "CHAR"
-        length: 10
-        decimals: 0
-        lowercase: false
-        sign_exists: false
-        properties:
-          description: "Domain low-level handler test domain (updated)"
-          datatype: "CHAR"
-          length: 10
-
 # Create Data Element (Low-Level Handler)
 
 # Function Group & Function Module (High-Level Tests)
@@ -1380,22 +1255,6 @@ create_interface:
 # Create Program
 
 # Interface (Interface - Low-Level)
-create_interface_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
-      description: "Interface low-level handler full workflow test"
-      params:
-        interface_name: "ZMCP_BLD_IF_L1"
-        description: "Interface low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        source_code: |
-          INTERFACE zadt_bld_if03.
-            METHODS: test_method.
-          ENDINTERFACE.
-
 # Create Structure (Low-Level Handler)
 
 # Metadata Extension (Metadata Extension - High-Level)
@@ -1429,41 +1288,6 @@ create_metadata_extension:
           }
 
 # Metadata Extension (Metadata Extension - Low-Level)
-create_metadata_extension_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Metadata Extension low-level handler full workflow test"
-      params:
-        name: "ZMCP_SHR_C_ROOT_0002"
-        description: "Metadata Extension low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        source_code: |
-          @Metadata.layer: #CUSTOMER
-          annotate entity ZMCP_SHR_C_ROOT
-            with
-          {
-              @EndUserText.label: 'Field 1 Label'
-              @UI.identification: [{ position: 10 }]
-              Fld1;
-
-              @EndUserText.label: 'Field 2 Label'
-              @UI.lineItem: [{ position: 20 }]
-              Fld2;
-
-              @EndUserText.label: 'Field 3 Label'
-              @UI.lineItem: [{ position: 30 }]
-              Fld3;
-
-              @EndUserText.label: 'Child Items'
-              @UI.lineItem: [{ position: 40 }]
-              @UI.selectionField: [{ position: 1 }]
-              _association_name;
-          }
-
-
 # Package (Package)
 create_package:
   test_cases:
@@ -1488,26 +1312,6 @@ create_package:
 # Create Domain
 
 # Package (Package - Low-Level)
-create_package_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Package low-level handler full workflow test"
-      params:
-        # package_name: "ZMCP_BLD_PKG01"          # Parent package (existing)
-        test_package: "ZMCP_BLD_PKG_L1"    # Package created by the test
-        description: "PackageBuilder workflow package"
-        updated_description: "PackageBuilder workflow package (UPDATED)"
-        package_type: "development"
-        software_component: "ZLOCAL"              # "ZLOCAL" for cloud, "LOCAL"/"HOME" for onprem
-        operation_delays:
-          create: 5000
-          update: 3000
-          unlock: 5000
-          delete: 20000
-          delete_retry: 20000
-
 # Create Behavior Definition (Low-Level Handler)
 
 # Program (Program)
@@ -1530,23 +1334,6 @@ create_program:
 # Create Table
 
 # Program (Program - Low-Level)
-create_program_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "legacy"]
-      description: "Program low-level handler full workflow test"
-      params:
-        program_name: "ZMCP_BLD_PROG_L1"
-        description: "Program low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        program_type: "1"
-        application: "*"
-        source_code: |
-          * Test program
-          WRITE: / 'Hello World'.
-
 # Create Interface (Low-Level Handler)
 
 # Structure (Structure)
@@ -1586,32 +1373,6 @@ create_structure:
 # Create View
 
 # Structure (Structure - Low-Level)
-create_structure_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Structure low-level handler full workflow test"
-      params:
-        structure_name: "ZMCP_BLD_STRU_L1"
-        description: "Structure low-level handler test"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        ddl_code: |
-          @EndUserText.label: 'Structure low-level handler test'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure ZMCP_BLD_STRU_L1 {
-            field1 : abap.char(10);
-            field2 : abap.char(20);
-          }
-        updated_ddl_code: |
-          @EndUserText.label: 'Structure low-level handler test'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          define structure ZMCP_BLD_STRU_L1 {
-            field1 : abap.char(10);
-            field2 : abap.char(20);
-          }
-
 # Create Function Group (Low-Level Handler)
 
 # Table (Table)
@@ -1660,41 +1421,6 @@ create_table:
 # Create Structure
 
 # Table (Table - Low-Level)
-create_table_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "Table low-level handler full workflow test"
-      params:
-        table_name: "ZMCP_BLD_TAB_L1"
-        description: "Table low-level handler test table"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        ddl_code: |
-          @EndUserText.label: 'Table low-level handler test table'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory: #TRANSPARENT
-          @AbapCatalog.deliveryClass: #A
-          @AbapCatalog.dataMaintenance: #RESTRICTED
-          define table ZMCP_BLD_TAB_L1 {
-            key mandt          : abap.clnt not null;
-            key test_id        : abap.char(10) not null;
-            description        : abap.char(40);
-          }
-        updated_ddl_code: |
-          @EndUserText.label: 'Table low-level handler test table (updated)'
-          @AbapCatalog.enhancement.category: #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory: #TRANSPARENT
-          @AbapCatalog.deliveryClass: #A
-          @AbapCatalog.dataMaintenance: #RESTRICTED
-          define table ZMCP_BLD_TAB_L1 {
-            key mandt          : abap.clnt not null;
-            key test_id        : abap.char(10) not null;
-            description        : abap.char(40);
-            additional_field   : abap.char(20);
-          }
-
 # Create View (Low-Level Handler)
 
 # Transport (Transport)
@@ -1727,37 +1453,6 @@ create_transported_object:
 # Create Function Group
 
 # View (View - Low-Level)
-create_ddl_low:
-  test_cases:
-    - name: "full_workflow"
-      enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
-      description: "View low-level handler full workflow test"
-      params:
-        ddl_name: "ZMCP_BLD_VIEW_L1"
-        description: "View low-level handler test view"
-        # package_name: "ZMCP_BLD_PKG01"
-        # transport_request: ""
-        ddl_source: |
-          @AbapCatalog.viewEnhancementCategory: [#NONE]
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          @EndUserText.label: 'View low-level handler test view'
-          @Metadata.ignorePropagatedAnnotations: true
-          @Metadata.allowExtensions: true
-          define view entity ZMCP_BLD_VIEW_L1 as select from dummy {
-            key dummy.dummy as dummy_field
-          }
-        updated_ddl_source: |
-          @AbapCatalog.viewEnhancementCategory: [#NONE]
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          @EndUserText.label: 'View low-level handler test view (updated)'
-          @Metadata.ignorePropagatedAnnotations: true
-          @Metadata.allowExtensions: true
-          define view entity ZMCP_BLD_VIEW_L1 as select from dummy {
-            key dummy.dummy as dummy_field,
-            dummy.dummy as additional_field
-          }
-
 # Create Program (Low-Level Handler)
 
 # Service Definition (Service Definition - High-Level)
@@ -2083,7 +1778,7 @@ runtime_readonly_handlers:
         # Retries for trace files feed lookup (trace can appear with delay)
         trace_feed_retries: 6
         trace_feed_retry_delay_ms: 1000
-        # Executor-level trace polling (passed to RuntimeRunClassWithProfiling).
+        # Executor-level trace polling (passed to RuntimeRunClass with profile=true).
         # Increase for slow systems (e.g. SAP trial cloud) — default in client is 5×2000ms.
         profiled_run_max_trace_attempts: 15
         profiled_run_trace_retry_delay_ms: 2000
@@ -2413,7 +2108,7 @@ check_function_module_high:
         function_group_name: "ZMCP_SHR_FGRP"
         function_module_name: "Z_MCP_SHR_FM"
 
-# ReadFunctionInclude (read-only) — reads the generated TOP include of the shared FUGR
+# GetFunctionInclude (read-only) — reads the generated TOP include of the shared FUGR
 read_function_include_readonly:
   test_cases:
     - name: "read_top_include"

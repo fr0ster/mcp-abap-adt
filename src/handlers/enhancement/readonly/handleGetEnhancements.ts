@@ -1,14 +1,24 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  type FailureEntry,
+  failureEntry,
+  isCredentialFailure,
+  isCredentialPayload,
+  thrownEntry,
+} from '../../../lib/answer';
+import { failureOf } from '../../../lib/auth/failures';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import {
-  encodeSapObjectName,
-  logger,
-  makeAdtRequestWithTimeout,
-  return_error,
-} from '../../../lib/utils';
+  carryingFailure,
+  carryingPayload,
+  methodFailureOf,
+  payloadCarriedBy,
+} from '../../../lib/strategies/step';
+import { logger, return_error } from '../../../lib/utils';
 
 /**
  * Raised deliberately by the enhancement helpers. Distinguishes "I decided this
@@ -64,7 +74,7 @@ export interface EnhancementResponse {
    * a list nobody was allowed to read are different answers, and they used to
    * look the same.
    */
-  unreadable?: { url: string; message: string }[];
+  unreadable?: FailureEntry[];
 }
 
 /**
@@ -182,15 +192,21 @@ export function parseEnhancementsFromXml(
 }
 
 /**
- * Where the enhancements of an object live, and what kind of object it is.
+ * Whose enhancements to read, and what kind of object it is.
  *
  * **The caller's `object_type` decides; guessing is the fallback.** This
  * used to ignore it and probe class → program → include. A function group's
  * main program `SAPL<fg>` is none of those addressable things — on premise
  * (2026-09-25) all three URIs answered 404 — so the tool failed outright.
- * Its enhancements are the group's, at `/functions/groups/<fg>/source/main`,
- * which answers 200. Each probe that remains is its own try, and its Accept
- * header goes where headers go (the seventh argument), not into the body.
+ * Its enhancements are the group's, which answer 200. Each probe that remains
+ * is its own metadata read through adt-clients (`getClass()`, `getProgram()`,
+ * `getInclude()`) with `analyseException`, so a refusal arrives in the shape
+ * every other failure has.
+ *
+ * The elements themselves are read by the host's own adt-clients member,
+ * `readEnhancementElements` (`IAdtEnhancementHost`, and
+ * `IAdtIncludeEnhancementHost` for an include, whose read names its main
+ * program).
  */
 async function determineObjectTypeAndPath(
   connection: AbapConnection,
@@ -199,26 +215,35 @@ async function determineObjectTypeAndPath(
   requestedType?: string,
 ): Promise<{
   type: 'program' | 'include' | 'class' | 'function_group';
-  basePath: string;
+  /** The host's enhancement elements, read with `analyseException`. */
+  readElements: () => Promise<IAdtResponse<unknown, IAdtError>>;
   context?: string;
   /** Probes that were refused rather than answering "not this kind". */
-  unreadable?: { url: string; message: string }[];
+  unreadable?: FailureEntry[];
 }> {
   const name = objectName.toUpperCase();
-  const enc = encodeSapObjectName(name);
   const kind = (requestedType ?? '').trim().toUpperCase();
 
+  const client = createAdtClient(connection, logger);
+  const analyse = { analyse: analyseException };
   const classPath = {
     type: 'class' as const,
-    basePath: `/sap/bc/adt/oo/classes/${enc}/source/main/enhancements/elements`,
+    readElements: () =>
+      client.getClass().readEnhancementElements({ className: name }, analyse),
   };
   const programPath = {
     type: 'program' as const,
-    basePath: `/sap/bc/adt/programs/programs/${enc}/source/main/enhancements/elements`,
+    readElements: () =>
+      client
+        .getProgram()
+        .readEnhancementElements({ programName: name }, analyse),
   };
   const groupPath = (group: string) => ({
     type: 'function_group' as const,
-    basePath: `/sap/bc/adt/functions/groups/${encodeSapObjectName(group.toLowerCase())}/source/main/enhancements/elements`,
+    readElements: () =>
+      client
+        .getFunctionGroup()
+        .readEnhancementElements({ functionGroupName: group }, analyse),
   });
   // `SAPL<fg>` is the group's main program: address the group.
   const saplGroup =
@@ -231,68 +256,83 @@ async function determineObjectTypeAndPath(
    *
    * So a `404` — the object is not of that kind, or not there — keeps the probe
    * going and says nothing, and anything else is collected and travels in the
-   * answer beside the enhancements that were found. `ExceptionResourceNoAccess`
-   * is the case that mattered: an object this user may not read answered "no
-   * enhancements", which is a different statement from "could not look".
+   * answer beside the enhancements that were found: the method's error as it
+   * is, with the probe's step. `ExceptionResourceNoAccess` is the case that
+   * mattered: an object this user may not read answered "no enhancements",
+   * which is a different statement from "could not look".
    */
-  const unreadable: { url: string; message: string }[] = [];
+  const unreadable: FailureEntry[] = [];
   /** Carry the refusals out with whichever path was resolved. */
-  const withReport = <T extends { basePath: string }>(path: T) =>
+  const withReport = <T extends { type: string }>(path: T) =>
     unreadable.length > 0 ? { ...path, unreadable } : path;
-  const probe = async (url: string, accept: string) => {
+  /** A metadata read: its document when found, `undefined` otherwise. */
+  const probe = async (
+    step: string,
+    read: () => Promise<IAdtResponse<unknown, IAdtError>>,
+  ): Promise<string | undefined> => {
     try {
-      const response = await makeAdtRequestWithTimeout(
-        connection,
-        url,
-        'GET',
-        'csrf',
-        undefined,
-        undefined,
-        { Accept: accept },
-      );
-      if (response.status === 200) return response;
-      if (response.status !== 404) {
-        unreadable.push({ url, message: `answered ${response.status}` });
-      }
+      const answer = await read();
+      if (answer.ok) return String(answer.getResult().value ?? '');
+      const error = answer.getError();
+      // The credentials are the same for every probe: the call ends, as it came.
+      if (isCredentialPayload(failureEntry(error, step)))
+        throw carryingFailure(new Error(error.message), error, step);
+      if (error?.response?.status !== 404)
+        unreadable.push(failureEntry(error, step));
       return undefined;
-    } catch (error: any) {
-      const status = error?.response?.status;
-      if (status !== 404) {
-        unreadable.push({
-          url,
-          message: String(
-            error?.response?.data?.toString?.().slice(0, 200) ??
-              error?.message ??
-              error,
-          ),
-        });
-      }
+    } catch (error) {
+      if (isCredentialPayload(thrownEntry(error, step))) throw error;
+      unreadable.push(thrownEntry(error, step));
       return undefined;
     }
   };
 
+  /**
+   * The object's kind could not be resolved. When probes were refused, the
+   * answer is those refusals as they are, each with its step — not words that
+   * replace them; when every probe found nothing (404), the words.
+   */
+  const unresolved = (message: string): never => {
+    const words = new EnhancementInputError(message);
+    throw unreadable.length > 0
+      ? carryingPayload(words, { failures: unreadable })
+      : words;
+  };
+
   const asInclude = async () => {
-    const response = await probe(
-      `/sap/bc/adt/programs/includes/${enc}`,
-      'application/vnd.sap.adt.programs.includes.v2+xml',
+    const metadata = await probe('read include metadata', () =>
+      client
+        .getInclude()
+        .readMetadata({ includeName: name }, { analyse: analyseException }),
     );
-    if (!response) return undefined;
+    if (metadata === undefined) return undefined;
     let context: string | undefined;
+    let mainProgram: string | undefined;
     if (manualProgramContext) {
       context = `/sap/bc/adt/programs/programs/${manualProgramContext}`;
+      mainProgram = manualProgramContext;
     } else {
-      context = String(response.data ?? '').match(
+      context = metadata.match(
         /include:contextRef[^>]+adtcore:uri="([^"]+)"/,
       )?.[1];
+      mainProgram = context ? mainProgramOf(context) : undefined;
     }
-    if (!context) {
+    if (!context || !mainProgram) {
       throw new EnhancementInputError(
         `Could not determine parent program context for include: ${objectName}. No contextRef found in metadata. Consider providing the 'program' parameter manually.`,
       );
     }
+    // adt-clients takes the main program's name and builds its URI.
+    const program = mainProgram;
     return {
       type: 'include' as const,
-      basePath: `/sap/bc/adt/programs/includes/${enc}/source/main/enhancements/elements`,
+      readElements: () =>
+        client
+          .getInclude()
+          .readEnhancementElements(
+            { includeName: name },
+            { context: program, analyse: analyseException },
+          ),
       context,
     };
   };
@@ -315,32 +355,50 @@ async function determineObjectTypeAndPath(
   if (kind === 'INCLUDE' || kind === 'PROG/I') {
     const include = await asInclude();
     if (include) return withReport(include);
-    throw new EnhancementInputError(`Include ${objectName} could not be read.`);
+    return unresolved(`Include ${objectName} could not be read.`);
   }
 
   // No usable type: find out, one independent probe at a time.
   if (saplGroup) return withReport(groupPath(saplGroup));
   if (
-    await probe(
-      `/sap/bc/adt/oo/classes/${enc}`,
-      'application/vnd.sap.adt.oo.classes.v4+xml',
-    )
+    (await probe('read class metadata', () =>
+      client
+        .getClass()
+        .readMetadata({ className: name }, { analyse: analyseException }),
+    )) !== undefined
   ) {
     return withReport(classPath);
   }
   if (
-    await probe(
-      `/sap/bc/adt/programs/programs/${enc}`,
-      'application/vnd.sap.adt.programs.v3+xml',
-    )
+    (await probe('read program metadata', () =>
+      client
+        .getProgram()
+        .readMetadata({ programName: name }, { analyse: analyseException }),
+    )) !== undefined
   ) {
     return withReport(programPath);
   }
   const include = await asInclude();
   if (include) return withReport(include);
-  throw new EnhancementInputError(
+  return unresolved(
     `Could not determine object type for: ${objectName}. Object is neither a valid class, program, include, nor a function group's main program.`,
   );
+}
+
+/**
+ * The main program an include's `contextRef` URI names: a program's own name,
+ * or `SAPL<group>` for a function group. `undefined` for any other URI.
+ */
+function mainProgramOf(uri: string): string | undefined {
+  const last = (prefix: string) => {
+    if (!uri.toLowerCase().startsWith(prefix)) return undefined;
+    const segment = uri.slice(prefix.length).split(/[/?#]/)[0];
+    return segment ? decodeURIComponent(segment).toUpperCase() : undefined;
+  };
+  const program = last('/sap/bc/adt/programs/programs/');
+  if (program) return program;
+  const group = last('/sap/bc/adt/functions/groups/');
+  return group ? `SAPL${group}` : undefined;
 }
 
 /**
@@ -387,31 +445,25 @@ async function getIncludesListInternal(
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils(ourUtils);
 
-    // Step 1: Get root node structure to find the includes node (with timeout)
-    const rootResponse = await Promise.race([
-      utils.fetchNodeStructure(parentType, parentName, {
+    // Step 1: Get root node structure to find the includes node
+    const rootResponse = await utils.fetchNodeStructure(
+      parentType,
+      parentName,
+      {
         analyse: analyseException,
         nodeId: '000000', // Root node
         withShortDescriptions: true,
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Timeout: Failed to get root node structure for ${objectName} within 10000ms`,
-              ),
-            ),
-          10000,
-        ),
-      ),
-    ]);
+      },
+    );
 
     if (!rootResponse.ok) {
-      logger?.warn(
-        `Refused while fetching root node structure for ${objectName}`,
+      // SAP's refusal is the method's error as it is, with the step — not an
+      // empty list of includes.
+      throw carryingFailure(
+        new Error(rootResponse.getError().message),
+        rootResponse.getError(),
+        'read node structure',
       );
-      return [];
     }
 
     // Step 2: Find the includes (PROG/I) node id among the type folders.
@@ -426,29 +478,23 @@ async function getIncludesListInternal(
       return [];
     }
 
-    // Step 3: Get includes list using the found node ID (with timeout)
-    const includesResponse = await Promise.race([
-      utils.fetchNodeStructure(parentType, parentName, {
+    // Step 3: Get includes list using the found node ID
+    const includesResponse = await utils.fetchNodeStructure(
+      parentType,
+      parentName,
+      {
         analyse: analyseException,
         nodeId: includesNode.nodeId,
         withShortDescriptions: true,
-      }),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Timeout: Failed to get includes list for ${objectName} within 10000ms`,
-              ),
-            ),
-          10000,
-        ),
-      ),
-    ]);
+      },
+    );
 
     if (!includesResponse.ok) {
-      logger?.warn(`Refused while fetching includes list for ${objectName}`);
-      return [];
+      throw carryingFailure(
+        new Error(includesResponse.getError().message),
+        includesResponse.getError(),
+        'read includes node',
+      );
     }
 
     // Step 4: Names of the objects under that node — de-duplicated, matching
@@ -462,6 +508,10 @@ async function getIncludesListInternal(
     );
     return includeNames;
   } catch (error) {
+    // SAP's refusal carried with its step, or a credential failure as it
+    // came (adt-clients rejects with it): never an empty list of includes.
+    if (methodFailureOf(error) !== undefined || failureOf(error) !== undefined)
+      throw error;
     logger?.error(
       `Failed to get includes list for ${objectType} '${objectName}':`,
       error,
@@ -497,48 +547,60 @@ async function getEnhancementsForSingleObject(
     requestedType,
   );
 
-  // Build URL based on object type
-  let url = objectInfo.basePath;
-
-  // Add context parameter only for includes
   if (objectInfo.type === 'include' && objectInfo.context) {
-    url += `?context=${encodeURIComponent(objectInfo.context)}`;
     logger?.info(`Using context for include: ${objectInfo.context}`);
   }
 
-  logger?.info(`Final enhancement URL: ${url}`);
-
-  // Name the object in a failure: with the type taken from the caller there
-  // is no probe in front of this request to have said which object it was.
-  const response = await makeAdtRequestWithTimeout(
-    connection,
-    url,
-    'GET',
-    'default',
-  ).catch((error: unknown) => {
+  // The host's own adt-clients member, read with the strategy every other
+  // read uses: SAP's refusal is the method's error as it is, with the step.
+  const step = 'read enhancements';
+  let answer: IAdtResponse<unknown, IAdtError>;
+  try {
+    answer = await objectInfo.readElements();
+  } catch (thrown) {
+    // A credential failure or an error already carrying its answer: as it is.
+    if (
+      failureOf(thrown) !== undefined ||
+      methodFailureOf(thrown) !== undefined
+    )
+      throw thrown;
+    const message = thrown instanceof Error ? thrown.message : String(thrown);
     throw new EnhancementInputError(
-      `Failed to retrieve enhancements for ${objectName}: ${error instanceof Error ? error.message : String(error)}`,
-    );
-  });
-
-  if (response.status === 200 && response.data) {
-    // Parse the XML to extract enhancement implementations
-    const enhancements = parseEnhancementsFromXml(response.data);
-
-    const enhancementResponse: EnhancementResponse = {
-      object_name: objectName,
-      object_type: objectInfo.type,
-      context: objectInfo.context,
-      enhancements: enhancements,
-      ...(objectInfo.unreadable ? { unreadable: objectInfo.unreadable } : {}),
-    };
-
-    return enhancementResponse;
-  } else {
-    throw new EnhancementInputError(
-      `Failed to retrieve enhancements for ${objectName}. Status: ${response.status}`,
+      `Failed to retrieve enhancements for ${objectName}: ${message}`,
     );
   }
+  if (!answer.ok) {
+    const error = answer.getError();
+    throw carryingFailure(
+      new EnhancementInputError(error.message),
+      error,
+      step,
+    );
+  }
+
+  // Parse the XML to extract enhancement implementations
+  const enhancements = parseEnhancementsFromXml(
+    String(answer.getResult().value ?? ''),
+  );
+
+  return {
+    object_name: objectName,
+    object_type: objectInfo.type,
+    context: objectInfo.context,
+    enhancements: enhancements,
+    ...(objectInfo.unreadable ? { unreadable: objectInfo.unreadable } : {}),
+  };
+}
+
+/**
+ * A credential failure, however it travels: a chain failure or a `401` on the
+ * throw itself, or carried as the method's error of a read.
+ */
+function credentialFailure(thrown: unknown): boolean {
+  return (
+    isCredentialFailure(thrown) ||
+    isCredentialPayload(thrownEntry(thrown, 'read enhancements'))
+  );
 }
 
 /**
@@ -607,7 +669,6 @@ function filterMinimalEnhancements(response: any): any {
  *   - program: Optional manual program context for includes
  *   - include_nested: Optional boolean - if true, also searches enhancements in all nested includes
  *   - detailed: Optional boolean - if false (default), returns minimal info; if true, returns full details including raw XML
- *   - timeout: Optional timeout in milliseconds for each ADT request (default: 30000ms = 30s)
  *   - max_includes: Optional maximum number of includes to process (default: 50)
  * @returns Response with parsed enhancement data or error
  */
@@ -628,8 +689,6 @@ export async function handleGetEnhancements(
     const includeNested = args.include_nested === true; // Optional boolean for recursive include search
     const isDetailed = args.detailed === true; // Optional boolean for detailed output
 
-    // Simple timeout logic: one timeout for all ADT requests
-    const requestTimeout = args.timeout ? parseInt(args.timeout, 10) : 30000; // Timeout for each ADT request (default: 30s)
     const maxIncludes = args.max_includes
       ? parseInt(args.max_includes, 10)
       : 50; // Maximum number of includes to process
@@ -637,7 +696,6 @@ export async function handleGetEnhancements(
     logger?.info(`Getting enhancements for object: ${objectName}`, {
       manualProgram: manualProgram || '(not provided)',
       includeNested: includeNested,
-      requestTimeout: requestTimeout,
       maxIncludes: maxIncludes,
     });
 
@@ -690,60 +748,68 @@ export async function handleGetEnhancements(
         includesList,
       );
 
-      // Limit the number of includes to process to avoid timeout
+      // Limit the number of includes to process
       if (includesList.length > maxIncludes) {
         logger?.warn(
-          `Too many includes found (${includesList.length}). Limiting to first ${maxIncludes} includes to avoid timeout.`,
+          `Too many includes found (${includesList.length}). Limiting to first ${maxIncludes} includes.`,
         );
         includesList = includesList.slice(0, maxIncludes);
       }
+
+      // An include whose request SAP refused is listed, the method's error as
+      // it is with the step and the include's name, beside the others' results.
+      const includesUnread: Array<{
+        include: string;
+        step: 'read enhancements';
+        failures: FailureEntry[];
+      }> = [];
 
       // Collect all enhancement responses
       const allEnhancementResponses: EnhancementResponse[] = [
         mainEnhancementResponse,
       ];
 
-      // Simple sequential processing with individual timeouts
+      // Sequential processing. No deadline of the server's: each read waits
+      // for SAP's answer.
       for (const includeName of includesList) {
         try {
           logger?.info(`Getting enhancements for include: ${includeName}`);
 
-          // Create a promise with individual timeout for each include
-          const includeEnhancementsPromise = getEnhancementsForSingleObject(
+          const includeEnhancements = await getEnhancementsForSingleObject(
             connection,
             includeName,
             manualProgram,
             'include',
           );
 
-          const includeEnhancements = await createPromiseWithTimeout(
-            includeEnhancementsPromise,
-            requestTimeout,
-            `Timeout: Failed to get enhancements for include ${includeName} within ${requestTimeout}ms`,
-          );
-
           allEnhancementResponses.push(includeEnhancements);
         } catch (error) {
-          logger?.warn(
-            `Failed to get enhancements for include ${includeName}:`,
-            error,
-          );
-          // Continue with other includes even if one fails
+          // The credentials are the same for every include: the call ends.
+          if (credentialFailure(error)) throw error;
+          includesUnread.push({
+            include: includeName,
+            step: 'read enhancements',
+            failures: (payloadCarriedBy(error)?.failures as
+              | FailureEntry[]
+              | undefined) ?? [thrownEntry(error, 'read enhancements')],
+          });
+          // Continue with the other includes
         }
       }
 
-      return allEnhancementResponses;
+      return { allEnhancementResponses, includesUnread };
     };
 
-    // Execute nested processing without total timeout - each request has its own timeout
     let allEnhancementResponses: EnhancementResponse[];
+    let includesUnread: Awaited<
+      ReturnType<typeof processNestedIncludes>
+    >['includesUnread'];
     try {
-      allEnhancementResponses = await processNestedIncludes();
+      ({ allEnhancementResponses, includesUnread } =
+        await processNestedIncludes());
     } catch (error) {
-      logger?.error(
-        'Nested enhancement processing failed or timed out:',
-        error,
-      );
+      if (credentialFailure(error)) throw error; // as it came
+      logger?.error('Nested enhancement processing failed:', error);
       // Return partial results with just the main object
       const fallbackResult = {
         content: [
@@ -756,7 +822,9 @@ export async function handleGetEnhancements(
                   type: mainEnhancementResponse.object_type,
                 },
                 include_nested: true,
-                error: error instanceof Error ? error.message : String(error),
+                // A refusal: the method's error as it is, with its step; a
+                // throw of our own `client_threw` with the step.
+                error: thrownEntry(error, 'list includes'),
                 partial_result: true,
                 total_objects_analyzed: 1,
                 total_enhancements_found:
@@ -785,6 +853,7 @@ export async function handleGetEnhancements(
         0,
       ),
       objects: allEnhancementResponses,
+      ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
 
     // Apply filtering if not detailed
@@ -808,40 +877,4 @@ export async function handleGetEnhancements(
   } catch (error) {
     return return_error(error);
   }
-}
-
-/**
- * Creates a promise with timeout that properly cleans up the timeout when the promise resolves
- * @param promise - The promise to wrap with timeout
- * @param timeoutMs - Timeout in milliseconds
- * @param errorMessage - Error message to use when timeout occurs
- * @returns Promise that resolves with the original promise result or rejects with timeout error
- */
-function createPromiseWithTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  errorMessage: string,
-): Promise<T> {
-  let timeoutId: NodeJS.Timeout;
-
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timeoutId = setTimeout(() => {
-      reject(new Error(errorMessage));
-    }, timeoutMs);
-  });
-
-  return Promise.race([
-    promise
-      .then((result) => {
-        // Clear timeout when main promise resolves successfully
-        clearTimeout(timeoutId);
-        return result;
-      })
-      .catch((error) => {
-        // Clear timeout when main promise rejects
-        clearTimeout(timeoutId);
-        throw error;
-      }),
-    timeoutPromise,
-  ]);
 }

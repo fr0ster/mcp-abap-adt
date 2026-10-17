@@ -6,7 +6,7 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
-  handleActivateObject,
+  handleActivateObjectOnce,
   TYPE_TO_FAMILY,
 } from '@mcp-abap-adt/lib/handlers/write';
 
@@ -52,7 +52,7 @@ const ADT_TYPE_BY_COMPACT_TYPE: Partial<Record<CompactObjectType, string>> = {
  */
 const NEEDS_MORE_THAN_A_NAME: Partial<Record<CompactObjectType, string>> = {
   FUNCTION_MODULE:
-    'a function module is addressed under its function group, which this form does not take — use the batch form with objects[].parentName set to the group (name stays the module, type FUGR/FF), or ActivateFunctionModuleLow, which takes the group as its own argument',
+    'a function module is addressed under its function group, which this form does not take — use objects[] with objects[].parentName set to the group (name stays the module, type FUGR/FF)',
 };
 
 /** What `object_type` alone can be activated as, or undefined. */
@@ -72,7 +72,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerActivate',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). FUNCTION_MODULE needs the batch mode with objects[].parentName set to its function group, because a module is addressed under the group. Batch mode(objects[].name*, objects[].type*, objects[].parentName, objects[].uri).',
+    'Activates objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type takes object_adt_type (e.g. "CLAS/OC"). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); a function module is listed with objects[].parentName set to its function group, type FUGR/FF. One object of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION or METADATA_EXTENSION (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id.',
   inputSchema: compactActivateSchema,
 } as const;
 
@@ -89,7 +89,7 @@ export async function handleHandlerActivate(
   args: HandlerActivateArgs,
 ) {
   if (args.objects && args.objects.length > 0) {
-    return handleActivateObject(context, {
+    return handleActivateObjectOnce(context, {
       objects: args.objects,
       preaudit: args.preaudit,
     });
@@ -134,7 +134,7 @@ export async function handleHandlerActivate(
     );
   }
 
-  return handleActivateObject(context, {
+  return handleActivateObjectOnce(context, {
     objects: [{ name: args.object_name, type: singleType }],
     preaudit: args.preaudit,
   });

@@ -22,13 +22,13 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseCheck } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckTableLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -53,21 +53,6 @@ export const TOOL_DEFINITION = {
           "Accepted for compatibility; not sent to the server. The shipped check endpoint always runs 'abapCheckRun', regardless of this value.",
         enum: ['tableStatusCheck', 'abapCheckRun'],
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
       ...DETAIL_PROPERTY,
     },
     required: ['table_name'],
@@ -79,12 +64,6 @@ interface CheckTableArgs {
   ddl_code?: string;
   version?: string;
   reporter?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -93,14 +72,10 @@ export async function handleCheckTable(
   args: CheckTableArgs,
 ) {
   const { connection, logger } = context;
-  const { table_name, version, session_id, session_state } = args;
+  const { table_name, version } = args;
 
   if (!table_name) {
     return return_error(new Error('table_name is required'));
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const tableName = table_name.toUpperCase();

@@ -2,18 +2,6 @@ import {
   TOOL_DEFINITION as GetPackageTree_Tool,
   handleGetPackageTree,
 } from '../../../handlers/system/high/handleGetPackageTree';
-import {
-  TOOL_DEFINITION as GetNodeStructureLow_Tool,
-  handleGetNodeStructure,
-} from '../../../handlers/system/low/handleGetNodeStructure';
-import {
-  TOOL_DEFINITION as GetObjectStructureLow_Tool,
-  handleGetObjectStructure as handleGetObjectStructureLow,
-} from '../../../handlers/system/low/handleGetObjectStructure';
-import {
-  TOOL_DEFINITION as GetVirtualFoldersLow_Tool,
-  handleGetVirtualFolders,
-} from '../../../handlers/system/low/handleGetVirtualFolders';
 import { TOOL_DEFINITION as DescribeByList_Tool } from '../../../handlers/system/readonly/handleDescribeByList';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList.js';
 import {
@@ -48,10 +36,6 @@ import {
   TOOL_DEFINITION as GetServiceBindingPreviewUrl_Tool,
   handleGetServiceBindingPreviewUrl,
 } from '../../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
-import {
-  TOOL_DEFINITION as GetSession_Tool,
-  handleGetSession,
-} from '../../../handlers/system/readonly/handleGetSession';
 import {
   TOOL_DEFINITION as GetSqlQuery_Tool,
   handleGetSqlQuery,
@@ -107,19 +91,23 @@ import {
   TOOL_DEFINITION as RuntimeRunClass_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeRunClass';
 import {
-  handleRuntimeRunClassWithProfiling,
-  TOOL_DEFINITION as RuntimeRunClassWithProfiling_Tool,
-} from '../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
-import {
   handleRuntimeRunProgram,
   TOOL_DEFINITION as RuntimeRunProgram_Tool,
 } from '../../../handlers/system/readonly/handleRuntimeRunProgram';
-import {
-  handleRuntimeRunProgramWithProfiling,
-  TOOL_DEFINITION as RuntimeRunProgramWithProfiling_Tool,
-} from '../../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
+import { withoutBackgroundParameter } from '../../backgroundRuns/tools.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
-import type { HandlerEntry } from '../interfaces.js';
+import type { HandlerContext, HandlerEntry } from '../interfaces.js';
+
+/** Which form of the system tools a binary serves. */
+export interface SystemHandlersOptions {
+  /**
+   * Whether the run tools (`RuntimeRunClass`, `RuntimeRunProgram`) offer
+   * `background`. Default: offered. A read-only binary serves them without
+   * it: it keeps no background run, so the parameter does not exist
+   * there — not offered, not read, not refused.
+   */
+  background?: boolean;
+}
 
 /**
  * Handler group for all system-related handlers
@@ -128,10 +116,27 @@ import type { HandlerEntry } from '../interfaces.js';
 export class SystemHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'SystemHandlers';
 
+  constructor(
+    context: HandlerContext,
+    private readonly options: SystemHandlersOptions = {},
+  ) {
+    super(context);
+  }
+
   /**
    * Gets all system handler entries
    */
   getHandlers(): HandlerEntry[] {
+    const entries = this.entries();
+    return this.options.background === false
+      ? entries.map((entry) => ({
+          ...entry,
+          toolDefinition: withoutBackgroundParameter(entry.toolDefinition),
+        }))
+      : entries;
+  }
+
+  private entries(): HandlerEntry[] {
     return [
       {
         toolDefinition: GetServiceBindingPreviewUrl_Tool,
@@ -171,16 +176,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: RuntimeRunProgram_Tool,
         handler: (args: any) => handleRuntimeRunProgram(this.context, args),
-      },
-      {
-        toolDefinition: RuntimeRunClassWithProfiling_Tool,
-        handler: (args: any) =>
-          handleRuntimeRunClassWithProfiling(this.context, args),
-      },
-      {
-        toolDefinition: RuntimeRunProgramWithProfiling_Tool,
-        handler: (args: any) =>
-          handleRuntimeRunProgramWithProfiling(this.context, args),
       },
       {
         toolDefinition: RuntimeAnalyzeProfilerTrace_Tool,
@@ -235,10 +230,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) => handleGetAbapSystemSymbols(this.context, args),
       },
       {
-        toolDefinition: GetSession_Tool,
-        handler: (args: any) => handleGetSession(this.context, args),
-      },
-      {
         toolDefinition: GetInactiveObjects_Tool,
         handler: (args: any) => handleGetInactiveObjects(this.context, args),
       },
@@ -288,37 +279,6 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
                   object_name: string;
                   cache_type: string;
                 },
-          );
-        },
-      },
-      // Low-level handlers for virtual folders, node structure, and object structure
-      {
-        toolDefinition: GetVirtualFoldersLow_Tool,
-        handler: (args: any) => {
-          return handleGetVirtualFolders(this.context, args);
-        },
-      },
-      {
-        toolDefinition: GetNodeStructureLow_Tool,
-        handler: (args: any) => {
-          return handleGetNodeStructure(this.context, args);
-        },
-      },
-      {
-        toolDefinition: GetObjectStructureLow_Tool,
-        handler: (args: any) => {
-          return handleGetObjectStructureLow(
-            this.context,
-            args as {
-              object_type: string;
-              object_name: string;
-              session_id?: string;
-              session_state?: {
-                cookies?: string;
-                csrf_token?: string;
-                cookie_store?: Record<string, string>;
-              };
-            },
           );
         },
       },

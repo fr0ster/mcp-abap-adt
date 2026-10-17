@@ -274,6 +274,13 @@ export const READING_BY_SLOT = {
   // confirmation, a document like its neighbour `memory`. The debugger tools
   // read through their own.
   settings: structured,
+
+  // Arrived with adt-clients 32.0.0 on the class, program, function group and
+  // include sets: a host's enhancement elements and options. Each answers an
+  // XML document, read by the tool itself (`GetEnhancements`), so the
+  // document is the answer.
+  enhancementElements: verbatim,
+  enhancementOptions: verbatim,
 } satisfies Record<string, IResultStrategy<unknown>>;
 
 /**

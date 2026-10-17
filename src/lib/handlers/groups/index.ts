@@ -6,14 +6,28 @@
  * to use different sets of handlers.
  */
 
+export {
+  BackgroundRunHandlersGroup,
+  backgroundRunEntries,
+} from './BackgroundRunHandlersGroup.js';
+export {
+  BatchHandlersGroup,
+  batchToolEntries,
+} from './BatchHandlersGroup.js';
+export {
+  DebugBatchHandlersGroup,
+  debugBatchToolEntries,
+} from './DebugBatchHandlersGroup.js';
 export { DebugHandlersGroup } from './DebugHandlersGroup.js';
 export { HighLevelHandlersGroup } from './HighLevelHandlersGroup.js';
-export { LowLevelHandlersGroup } from './LowLevelHandlersGroup.js';
+export {
+  LeftoverSessionHandlersGroup,
+  leftoverSessionEntries,
+} from './LeftoverSessionHandlersGroup.js';
 export { ReadOnlyHandlersGroup } from './ReadOnlyHandlersGroup.js';
 export { SearchHandlersGroup } from './SearchHandlersGroup.js';
 export { SystemHandlersGroup } from './SystemHandlersGroup.js';
 export {
   type IReadOnlyDedupStrategy,
   NoDedupStrategy,
-  ReadVsGetDedupStrategy,
 } from './strategies/index.js';

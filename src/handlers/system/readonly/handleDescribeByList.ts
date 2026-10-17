@@ -1,11 +1,14 @@
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 export const TOOL_DEFINITION = {
   name: 'DescribeByList',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Batch description for a list of ABAP objects. Input: objects: Array<{ name: string, type?: string }>. Each object may be of type: PROG/P, FUGR, PROG/I, CLAS/OC, FUGR/FC, INTF/OI, TABLE, STRUCTURE, etc.',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       objects: {
         type: 'array',
         items: {
@@ -31,8 +34,17 @@ export const TOOL_DEFINITION = {
 
 // DescribeByList: Batch description for a list of ABAP objects
 
+import { failedPayloadOf, isCredentialPayload } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
+
+/** The text of a failed answer that is not a JSON payload, as it is. */
+function textOf(result: unknown): string {
+  const first = (result as { content?: Array<{ text?: unknown }> })
+    ?.content?.[0]?.text;
+  return typeof first === 'string' ? first : '';
+}
 
 /**
  * DescribeByListArray handler.
@@ -67,6 +79,14 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
         object_name: obj.name,
         object_type: type,
       });
+      // A credential failure is every object's: the call ends with it as it
+      // came, before any second search is sent.
+      const typedFailure = failedPayloadOf(
+        res as { isError?: boolean; content?: unknown },
+        'search',
+      );
+      if (typedFailure !== undefined && isCredentialPayload(typedFailure))
+        return res;
       let parsed: any;
       try {
         parsed = typeof res === 'string' ? JSON.parse(res) : res;
@@ -85,11 +105,27 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
 
         if (tryWithoutType) {
           res = await handleSearchObject(context, { object_name: obj.name });
+          // A refusal is the search's error as it is, with the step — this
+          // object's answer beside the others', not an object skipped as if
+          // nothing were found, and not the end of the call.
+          if ((res as { isError?: boolean })?.isError === true) {
+            const failure = failedPayloadOf(
+              res as { isError?: boolean; content?: unknown },
+              'search',
+            ) ?? { message: textOf(res), step: 'search' };
+            // A credential failure is every object's: the call ends with it
+            // as it came.
+            if (isCredentialPayload(failure)) return res;
+            results.push({
+              type: 'text',
+              text: JSON.stringify({ name: obj.name, error: failure }),
+            });
+            continue;
+          }
           parsed = typeof res === 'string' ? JSON.parse(res) : res;
-          // If it still fails or comes back empty, skip this object
+          // If it comes back empty, skip this object
           if (
             parsed == null ||
-            parsed.isError === true ||
             (parsed.content &&
               Array.isArray(parsed.content) &&
               parsed.content.length === 0)
@@ -144,6 +180,6 @@ export async function handleDescribeByList(context: HandlerContext, args: any) {
     };
   } catch (e) {
     logger?.error('Failed to describe objects list', e as any);
-    return { isError: true, content: [] };
+    return return_error(e);
   }
 }

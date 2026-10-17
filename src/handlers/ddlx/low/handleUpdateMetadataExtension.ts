@@ -24,7 +24,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateMetadataExtensionLow',
@@ -48,21 +48,6 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockObject. Required for update operation.',
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
       transport_request: {
         type: 'string',
         description:
@@ -78,12 +63,6 @@ interface UpdateMetadataExtensionArgs {
   name: string;
   source_code: string;
   lock_handle: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
   transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
@@ -93,16 +72,12 @@ export async function handleUpdateMetadataExtension(
   args: UpdateMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  const { name, source_code, lock_handle, session_id, session_state } = args;
+  const { name, source_code, lock_handle } = args;
 
   if (!name || !source_code || !lock_handle) {
     return return_error(
       new Error('name, source_code, and lock_handle are required'),
     );
-  }
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const ddlxName = name.toUpperCase();

@@ -1,4 +1,4 @@
-import { compactDebugEntries } from '../../../../compact/src/debug/group';
+import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 
 /** A tool's own text and every parameter description, at any depth. */
@@ -119,15 +119,15 @@ describe('the debugger descriptions', () => {
       );
   });
 
-  it('the compact start scopes the request user to abap and gives amdp its own', () => {
-    const start = compactDebugEntries().find(
-      (e) => e.toolDefinition.name === 'HandlerDebugStart',
-    )!.toolDefinition.description as string;
-    expect(start).toMatch(
-      /abap: in user mode it catches every request of the request user/,
+  it('the compact tools scope the request user to abap and give amdp the connected user', () => {
+    const description = (name: string) =>
+      compactDebugEntries().find((e) => e.toolDefinition.name === name)!
+        .toolDefinition.description as string;
+    expect(description('HandlerDebugBreakpoints')).toMatch(
+      /In user mode the breakpoints catch every request of the request user/,
     );
-    expect(start).toMatch(
-      /amdp: catches every request of the connected SAP user/,
+    expect(description('HandlerDebugSession')).toMatch(
+      /kind amdp: start opens an AMDP session for the connected SAP user/,
     );
   });
 

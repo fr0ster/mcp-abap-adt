@@ -1,5 +1,12 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import {
+  failureEntry,
+  isCredentialFailure,
+  isCredentialPayload,
+  thrownEntry,
+} from '../answer';
 import { type Cleanup, safeRequest } from './safeFields';
+import { atStep, stepOf, withStep } from './step';
 
 export interface CleanupCarrier {
   cleanup?: Cleanup;
@@ -39,6 +46,9 @@ async function runRelease<H>(
       carrier: {
         error: 'client_threw',
         message: error instanceof Error ? error.message : String(error),
+        // The throw as an entry, with its step: a credential failure as it
+        // came, a carried method error as it is.
+        failures: [thrownEntry(error, 'unlock')],
       },
     };
   }
@@ -54,6 +64,9 @@ async function runRelease<H>(
       message: error.message,
       origin: error.origin,
       request: safeRequest(error.request),
+      // The method's error as it is — status, code, adt_type, T100 messages,
+      // raw body — with the step it arose at; a credential failure as it came.
+      failures: [failureEntry(error, 'unlock')],
     },
   };
 }
@@ -75,7 +88,8 @@ export async function withLock<H, T>(
   body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>,
   release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
 ): Promise<IAdtResponse<T, IAdtError>> {
-  const acquired = await acquire();
+  // The lock is a step of its own: a refused or thrown lock says so.
+  const acquired = await atStep('lock', acquire)();
   if (!acquired.ok) return acquired as unknown as IAdtResponse<T, IAdtError>;
   const handle = acquired.getResult().value;
   // A backstop. Every lock here is given `analyseLock`, which refuses a 2xx
@@ -87,6 +101,7 @@ export async function withLock<H, T>(
     return failure<T>({
       message: 'SAP answered the lock request without a lock handle',
       origin: 'refusal',
+      step: 'lock',
     } as IAdtError);
   }
 
@@ -105,6 +120,20 @@ export async function withLock<H, T>(
   }
 
   const released = await runRelease(release, handle);
+
+  // A credential failure ends the call as it came, once the release was
+  // tried: the body's, else the release's — adt-clients rejects with it, and
+  // every further request (an activation, say) would only be refused again.
+  if (threw && isCredentialFailure(thrown)) throw thrown;
+  if (released.kind === 'threw' && isCredentialFailure(released.thrown))
+    throw released.thrown;
+  // A `401` SAP answered to the unlock is the same: the call's failure, the
+  // unlock's error as it is with its step — not a cleanup entry.
+  if (
+    released.kind === 'refused' &&
+    isCredentialPayload(failureEntry(released.error, 'unlock'))
+  )
+    return failure<T>(withStep(released.error, 'unlock'));
 
   if (threw) {
     if (released.kind === 'ok') throw thrown;
@@ -137,9 +166,7 @@ export async function withLock<H, T>(
   if (released.kind === 'refused') {
     return succeededWithCleanup(value, { cleanup: released.carrier });
   }
-  return succeededWithCleanup(value, {
-    cleanup: { error: 'client_threw', message: messageOf(released.thrown) },
-  });
+  return succeededWithCleanup(value, { cleanup: released.carrier });
 }
 
 /**
@@ -165,10 +192,6 @@ function succeededWithCleanup<T>(
   } as unknown as IAdtResponse<T, IAdtError>;
 }
 
-function messageOf(thrown: unknown): string {
-  return thrown instanceof Error ? thrown.message : String(thrown);
-}
-
 /**
  * A throw that left a lock behind, or a release that threw after the work was
  * already done.
@@ -181,6 +204,8 @@ function messageOf(thrown: unknown): string {
 export class LockNotReleased extends Error {
   readonly cleanup?: Cleanup;
   readonly operation?: 'succeeded';
+  /** The step the cause arose at (`atStep`), kept as it was. */
+  readonly step?: string;
   constructor(
     cause: unknown,
     extra: { cleanup?: Cleanup; operation?: 'succeeded' },
@@ -189,6 +214,8 @@ export class LockNotReleased extends Error {
     this.name = 'LockNotReleased';
     this.cleanup = extra.cleanup;
     this.operation = extra.operation;
+    const step = stepOf(cause);
+    if (step !== undefined) this.step = step;
   }
 }
 
@@ -226,7 +253,8 @@ export async function carryCleanup<T, U>(
   try {
     answered = await next();
   } catch (error) {
-    if (cleanup === undefined) throw error;
+    // A credential failure as it came: wrapped, its reader would not know it.
+    if (cleanup === undefined || isCredentialFailure(error)) throw error;
     throw new LockNotReleased(error, { cleanup });
   }
   return attachCleanup(from, answered);

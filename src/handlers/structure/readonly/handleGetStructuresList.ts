@@ -1,7 +1,16 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import {
+  type FailureEntry,
+  failureEntry,
+  isCredentialPayload,
+  thrownEntry,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { carryingFailure } from '../../../lib/strategies/step';
 import { fetchWhereUsedReferences } from '../../../lib/strategies/whereUsedList';
 import {
   type AxiosResponse,
@@ -12,13 +21,15 @@ import {
 export const TOOL_DEFINITION = {
   name: 'GetStructuresList',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. ' +
-    'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the ' +
-    'DDIC structure/table endpoints this needs are not present there (issue #207).',
+      'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the ' +
+      'DDIC structure/table endpoints this needs are not present there (issue #207).',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       structure_name: {
         type: 'string',
         description: 'Structure name.',
@@ -35,10 +46,6 @@ export const TOOL_DEFINITION = {
           '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
         default: true,
       },
-      timeout: {
-        type: 'number',
-        description: '[read-only] Timeout in ms for each ADT request.',
-      },
     },
     required: ['structure_name'],
   },
@@ -50,8 +57,19 @@ interface StructureNode {
   kind: 'root' | 'include' | 'append'; // how THIS node is embedded into its parent
   children: StructureNode[]; // embedded structures of this one
   cyclic?: boolean;
-  error?: string; // if this node's source could not be read
+  // This node's source could not be read: words when neither endpoint has
+  // it (404), else what each endpoint answered, with its step.
+  error?: string | FailureEntry[];
 }
+
+/**
+ * What reading a name's DDL came to: its source; absence — both endpoints
+ * answered 404; or each endpoint's failure as it is, with its step.
+ */
+type DdlRead =
+  | { source: string }
+  | { absent: true }
+  | { failures: FailureEntry[] };
 
 interface EmbeddedRef {
   name: string; // embedded structure name
@@ -164,7 +182,6 @@ export async function handleGetStructuresList(
     structure_name: string;
     version?: 'active' | 'inactive';
     include_extensions?: boolean;
-    timeout?: number;
   },
 ) {
   const { connection, logger } = context;
@@ -175,6 +192,15 @@ export async function handleGetStructuresList(
     // object_type, so the response can flag that appends could not be
     // determined (≠ "no appends"). #128
     let appendsUnavailable = false;
+    // Append candidates where-used named but SAP refused to read: each with
+    // its refusal as it is, the step `read append candidate` and its name —
+    // listed, not skipped as "not an append". A candidate both endpoints
+    // answer 404 for is absent and stays skipped.
+    const unreadCandidates: Array<{
+      candidate: string;
+      step: 'read append candidate';
+      failures: FailureEntry[];
+    }> = [];
     if (!structure_name)
       return return_error(new Error('structure_name is required'));
 
@@ -186,30 +212,56 @@ export async function handleGetStructuresList(
     /**
      * Read the DDL source of a structure OR table (the embed/extend syntax is
      * identical, and an extension's base is often a table). Try the structure
-     * endpoint first, fall back to the table endpoint.
+     * endpoint first, fall back to the table endpoint. When neither has it,
+     * a 404 from both is absence; anything else is each endpoint's failure
+     * as it is, with its step (`read structure`, `read table`).
      */
-    const readDdl = async (name: string): Promise<string | null> => {
-      try {
-        const sr = await obj.read(
-          { structureName: name },
-          version as 'active' | 'inactive',
-          { analyse: analyseException },
-        );
-        const s = extractSource(sr);
-        if (s != null) return s;
-      } catch {
-        // fall through to table
-      }
-      try {
-        const tr = await client
+    const readDdl = async (name: string): Promise<DdlRead> => {
+      const failures: FailureEntry[] = [];
+      let answered = 0; // endpoints that answered 404 (or nothing to read)
+      const attempt = async (
+        step: 'read structure' | 'read table',
+        read: () => Promise<unknown>,
+      ): Promise<string | null> => {
+        try {
+          const answer = await read();
+          const source = extractSource(answer);
+          if (source != null) return source;
+          const failed = answer as {
+            ok?: unknown;
+            getError?: () => IAdtError;
+          };
+          if (failed?.ok === false && typeof failed.getError === 'function') {
+            const error = failed.getError();
+            // The credentials are the same for every node: the whole call
+            // ends, as it came.
+            if (isCredentialPayload(failureEntry(error, step)))
+              throw carryingFailure(new Error(error.message), error, step);
+            failures.push(failureEntry(error, step));
+            if (error?.response?.status !== 404) return null;
+          }
+          answered++;
+        } catch (thrown) {
+          if (isCredentialPayload(thrownEntry(thrown, step))) throw thrown;
+          failures.push(thrownEntry(thrown, step));
+        }
+        return null;
+      };
+      const structure = await attempt('read structure', () =>
+        obj.read({ structureName: name }, version as 'active' | 'inactive', {
+          analyse: analyseException,
+        }),
+      );
+      if (structure != null) return { source: structure };
+      const table = await attempt('read table', () =>
+        client
           .getTable()
           .read({ tableName: name }, version as 'active' | 'inactive', {
             analyse: analyseException,
-          });
-        return extractSource(tr);
-      } catch {
-        return null;
-      }
+          }),
+      );
+      if (table != null) return { source: table };
+      return answered === 2 ? { absent: true } : { failures };
     };
 
     /**
@@ -245,6 +297,13 @@ export async function handleGetStructuresList(
             enableOnlyTypes: ['TABL/DS'],
           });
           if (!wu.ok) {
+            // The credentials are the same for every request: the call ends.
+            if (isCredentialPayload(failureEntry(wu.getError(), 'where-used')))
+              throw carryingFailure(
+                new Error(wu.getError().message),
+                wu.getError(),
+                'where-used',
+              );
             lastErr = new Error(wu.getError().message);
             continue;
           }
@@ -252,6 +311,7 @@ export async function handleGetStructuresList(
           resolved = true;
           break;
         } catch (e) {
+          if (isCredentialPayload(thrownEntry(e, 'where-used'))) throw e;
           lastErr = e;
         }
       }
@@ -282,7 +342,15 @@ export async function handleGetStructuresList(
       );
       const refs: EmbeddedRef[] = [];
       for (const cand of candidates) {
-        const csrc = await readDdl(cand);
+        const read = await readDdl(cand);
+        if ('failures' in read) {
+          unreadCandidates.push({
+            candidate: cand,
+            step: 'read append candidate',
+            failures: read.failures,
+          });
+        }
+        const csrc = 'source' in read ? read.source : null;
         if (csrc && extendRe.test(csrc)) {
           refs.push({ name: cand, attribute: null, kind: 'append' });
         }
@@ -291,12 +359,22 @@ export async function handleGetStructuresList(
     };
 
     // Read root source first (structure or table); failure here is fatal.
-    const rootSource = await readDdl(rootName);
-    if (rootSource == null) {
+    const root = await readDdl(rootName);
+    if ('failures' in root) {
+      // Both endpoints failed: each failure as it is, with its step.
+      return {
+        isError: true,
+        content: [
+          { type: 'text', text: JSON.stringify(root.failures, null, 2) },
+        ],
+      };
+    }
+    if ('absent' in root) {
       return return_error(
         new Error(`Could not read source for structure/table ${rootName}`),
       );
     }
+    const rootSource = root.source;
 
     const visited = new Set<string>([rootName]);
 
@@ -325,11 +403,13 @@ export async function handleGetStructuresList(
         }
         visited.add(ref.name);
 
-        const childSource = await readDdl(ref.name);
-        if (childSource == null) {
+        const child = await readDdl(ref.name);
+        if ('failures' in child) {
+          node.error = child.failures;
+        } else if ('absent' in child) {
           node.error = `Could not read source for ${ref.name}`;
         } else {
-          node.children = await buildChildren(ref.name, childSource);
+          node.children = await buildChildren(ref.name, child.source);
         }
 
         children.push(node);
@@ -353,6 +433,9 @@ export async function handleGetStructuresList(
           // determined and the tree may be missing them (≠ "no appends"). #128
           ...(includeExtensions && appendsUnavailable
             ? { appends_unavailable: true }
+            : {}),
+          ...(unreadCandidates.length > 0
+            ? { append_candidates_unread: unreadCandidates }
             : {}),
           tree,
         },

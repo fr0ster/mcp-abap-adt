@@ -1688,6 +1688,9 @@ describe('Admin: Setup shared dependencies', () => {
               started.getResult().value,
               analyseException,
             );
+            if (outcome.failure) {
+              throw new Error(outcome.failure.message);
+            }
             testsLogger?.info?.(
               `Activation run ${outcome.runId || '(no id)'} — runs:status ${outcome.status || 'unknown'}, ${outcome.messages.length} message(s)`,
             );
@@ -1788,6 +1791,9 @@ describe('Admin: Setup shared dependencies', () => {
                   resp.getResult().value,
                   analyseException,
                 );
+                if (chunkOutcome.failure) {
+                  throw new Error(chunkOutcome.failure.message);
+                }
                 const errs = chunkOutcome.messages.filter(isRefusal);
                 if (errs.length > 0) {
                   recordFailure(

@@ -6,7 +6,7 @@
  *
  * Scenario:
  *   1. Create a class in a transportable package (recorded to transport)
- *   2. Read the class (GetClass + ReadClass with metadata)
+ *   2. Read the class (GetClass part source, then part metadata)
  *   3. Update the class source code
  *   4. Delete the class
  *
@@ -22,7 +22,6 @@ import { handleCreateClass } from '../../../../handlers/class/high/handleCreateC
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
 import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
-import { handleReadClass } from '../../../../handlers/class/readonly/handleReadClass';
 import {
   getOperationDelay,
   getSystemType,
@@ -183,24 +182,24 @@ ENDCLASS.`;
       const getData = parseHandlerResponse(getResponse);
       expect(getData.success).toBe(true);
       // The source the update wrote, not the shell the create made.
-      expect(String(getData.source_code)).toContain(
+      expect(String(getData.source)).toContain(
         'Updated by MCP transport CRUD test',
       );
       logger?.success('Step 3: GetClass succeeded');
 
-      // Step 4: Read with metadata (readonly ReadClass)
-      logger?.info('Step 4: Reading class via ReadClass (source + metadata)');
+      // Step 4: Read the metadata (GetClass part metadata)
+      logger?.info('Step 4: Reading class metadata via GetClass part metadata');
       const readCtx = createHandlerContext({ connection, logger });
-      const readResponse = await handleReadClass(readCtx, {
+      const readResponse = await handleGetClass(readCtx, {
         class_name: className,
+        part: 'metadata',
       });
 
       expect(readResponse.isError).toBe(false);
       const readData = parseHandlerResponse(readResponse);
       expect(readData.success).toBe(true);
-      expect(readData.source_code).toBeDefined();
       expect(readData.metadata).toBeDefined();
-      logger?.success('Step 4: ReadClass with metadata succeeded');
+      logger?.success('Step 4: GetClass part metadata succeeded');
 
       // Step 5: Delete the class
       logger?.info(`Step 5: Deleting class ${className}`);

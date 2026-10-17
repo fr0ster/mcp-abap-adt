@@ -23,6 +23,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -60,11 +61,14 @@ export async function handleListFunctionGroupIncludes(
     { tool: 'ListFunctionGroupIncludes', detail: 'terse' },
     () =>
       sequence(
-        () =>
+        atStep('read metadata', () =>
           client
             .getFunctionGroup()
             .readMetadata({ functionGroupName }, { analyse: analyseException }),
-        () => fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/I'),
+        ),
+        atStep('read node structure', () =>
+          fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/I'),
+        ),
       ),
     (objects) => ({
       success: true,

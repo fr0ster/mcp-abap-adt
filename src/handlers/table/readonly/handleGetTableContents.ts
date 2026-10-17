@@ -3,6 +3,7 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
 import { detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -14,9 +15,11 @@ import type { SqlQueryResponse } from '../../system/readonly/handleGetSqlQuery';
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Retrieve contents (data preview) of an ABAP database table or CDS view. Returns rows of data like SE16/SE16N.',
+  ),
   inputSchema: {
+    timeout: timeoutField(),
     table_name: z.string().describe('Name of the ABAP table'),
     max_rows: z
       .number()

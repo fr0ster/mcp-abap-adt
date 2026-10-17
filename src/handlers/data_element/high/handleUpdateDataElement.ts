@@ -37,7 +37,7 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answer } from '../../../lib/answer';
+import { answer, unlessCredentialFailure } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -50,6 +50,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -222,12 +223,13 @@ export async function handleUpdateDataElement(
         () => obj.lock({ dataElementName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
-            () =>
+            atStep('read metadata', () =>
               obj.readMetadata(
                 { dataElementName },
                 { analyse: analyseException },
               ),
-            (current) =>
+            ),
+            atStep('update metadata', (current) =>
               obj.updateMetadata(
                 {
                   dataElementName,
@@ -245,10 +247,12 @@ export async function handleUpdateDataElement(
                   analyse: analyseException,
                 },
               ),
-            () =>
+            ),
+            atStep('check', () =>
               obj.check({ dataElementName }, undefined, {
                 analyse: analyseException,
               }),
+            ),
           ),
         (lockHandle) =>
           obj.unlock({ dataElementName }, lockHandle, {
@@ -260,20 +264,23 @@ export async function handleUpdateDataElement(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      // Best-effort: wait for the write to be visible before activating.
+      // Best-effort (a credential failure ends the call): wait for the write to be visible before activating.
       await obj
         .readMetadata(
           { dataElementName },
           { withLongPolling: true, analyse: analyseException },
         )
-        .catch(() => undefined);
+        .catch(unlessCredentialFailure);
 
       if (!shouldActivate) {
         return written;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ dataElementName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate({ dataElementName }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

@@ -1,0 +1,69 @@
+{
+  "name": "@mcp-abap-adt/compact-ro",
+  "mcpName": "io.github.fr0ster/mcp-abap-adt-compact-ro",
+  "version": "19.0.0",
+  "description": "The read-only compact MCP server for SAP ABAP ADT over stdio: the 17 compact tools that change nothing, one per operation with the object in the arguments, and the leftover-session list and logoff. Configured as @mcp-abap-adt/core; connects over HTTP, RFC or SNC (RFC and SNC need the SAP NW RFC SDK at install time).",
+  "license": "AGPL-3.0-only",
+  "publishConfig": {
+    "access": "public"
+  },
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
+  },
+  "keywords": [
+    "sap",
+    "abap",
+    "adt",
+    "mcp",
+    "mcp-server",
+    "compact",
+    "read-only"
+  ],
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./launcher": {
+      "types": "./dist/launcher.d.ts",
+      "import": "./dist/launcher.js",
+      "require": "./dist/launcher.js"
+    }
+  },
+  "bin": {
+    "mcp-abap-adt-compact-ro": "./bin/mcp-abap-adt-compact-ro.js"
+  },
+  "files": [
+    "dist/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npx tsc -p tsconfig.json",
+    "test": "npm --prefix .. test -- --roots compact-ro/src",
+    "lint:check": "npx biome check src",
+    "prepublishOnly": "npm run build",
+    "start": "node ./bin/mcp-abap-adt-compact-ro.js"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/compact-readonly-entries": "^19.0.0",
+    "@mcp-abap-adt/core": "^19.0.0",
+    "@mcp-abap-adt/lib": "^19.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2",
+    "@types/node": "^22.20.5"
+  }
+}

@@ -4,21 +4,29 @@ Technical documentation about the system architecture, design decisions, and int
 
 ## Packages
 
-The repository holds five npm packages (not npm workspaces; each is built and published by path):
+The repository holds seventeen npm packages (not npm workspaces; each is built and published by path):
 
 | Directory | Package | Role |
 |---|---|---|
 | `src/` (root) | `@mcp-abap-adt/lib` | Handlers, handler groups, configuration, auth, connection factory — everything an embedding server needs |
 | `server/` | `@mcp-abap-adt/core` | The `mcp-abap-adt` command: launcher and transports |
-| `compact-readonly/`, `compact-modify/` | `@mcp-abap-adt/compact-readonly`, `@mcp-abap-adt/compact-modify` | The two halves of the compact tool set |
-| `compact/` | `@mcp-abap-adt/compact` | The `mcp-abap-adt-compact` command: core's launcher with the compact tool list |
+| `background-runs-memory/` | `@mcp-abap-adt/background-runs-memory` | The in-memory store of background runs (`IBackgroundRuns` of lib); core, http and sse create it |
+| `responsible-rules/` | `@mcp-abap-adt/responsible-rules` | The rules that make a connection's responsible, user and system from its `systeminformation` (`SystemContextRules` of lib), and the system type the binaries require; core, http and sse pass them, lib applies none |
+| `compact-readonly-entries/`, `compact-modify/` | `@mcp-abap-adt/compact-readonly-entries`, `@mcp-abap-adt/compact-modify` | The two halves of the compact tool set |
+| `http/`, `sse/` | `@mcp-abap-adt/http`, `@mcp-abap-adt/sse` | The `mcp-abap-adt-http` and `mcp-abap-adt-sse` commands |
+| `compact/`, `compact-http/`, `compact-sse/` | `@mcp-abap-adt/compact`, `compact-http`, `compact-sse` | The compact commands: each transport's launcher with the compact tool list |
+| `core-ro/`, `http-ro/`, `sse-ro/` | `@mcp-abap-adt/core-ro`, `http-ro`, `sse-ro` | The read-only commands (`mcp-abap-adt-ro`, `-http-ro`, `-sse-ro`): each transport's launcher with the read-only tool set |
+| `compact-ro/`, `compact-http-ro/`, `compact-sse-ro/` | `@mcp-abap-adt/compact-ro`, `compact-http-ro`, `compact-sse-ro` | The read-only compact commands: each transport's launcher with the compact half that changes nothing |
+
+The binary fixes the tool set (19.0.0): there is no `--exposition`. See
+[Handlers Management](../user-guide/HANDLERS_MANAGEMENT.md).
 
 ### Standalone server
 
-`mcp-abap-adt` (`server/src/launcher.ts`) serves three transports:
-- **StdioServer** — standard input/output for MCP clients (default)
-- **StreamableHttpServer** — `--transport=http`
-- **SseServer** — `--transport=sse`
+A binary is its transport, each reading its own parameter table:
+- **StdioServer** — `mcp-abap-adt` (`server/src/launcher.ts`, `@mcp-abap-adt/core`), standard input/output for MCP clients
+- **StreamableHttpServer** — `mcp-abap-adt-http` (`http/src/launcher.ts`, `@mcp-abap-adt/http`)
+- **SseServer** — `mcp-abap-adt-sse` (`sse/src/launcher.ts`, `@mcp-abap-adt/sse`)
 
 ### Embedding the handlers
 
@@ -31,7 +39,6 @@ import { HandlerExporter } from '@mcp-abap-adt/lib/handlers';
 const exporter = new HandlerExporter({
   includeReadOnly: true,
   includeHighLevel: true,
-  includeLowLevel: false,
   includeSystem: true,
   includeSearch: true,
 });
@@ -48,7 +55,6 @@ const server = new EmbeddableMcpServer({
 
 - **ReadOnlyHandlersGroup** — read-only operations
 - **HighLevelHandlersGroup** — high-level operations (create, update)
-- **LowLevelHandlersGroup** — low-level ADT operations
 - **SystemHandlersGroup** — system operations
 - **SearchHandlersGroup** — search operations
 

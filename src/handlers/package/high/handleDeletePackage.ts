@@ -1,0 +1,130 @@
+/**
+ * DeletePackage Handler - Delete ABAP Package
+ *
+ * One tool of the high set (19.0.0), for what the low set's
+ * DeletePackageLow did. Like every other high delete it asks the deletion
+ * check first (`deleteIfDeletable`): a refusal is answered as it came and an
+ * object the check reports absent gets no delete. The low tool sent the
+ * delete alone, as compact's `HandlerDelete` PACKAGE does
+ * (`handleDeleteOnly`).
+ *
+ * Uses AdtClient.getPackage().delete from @mcp-abap-adt/adt-clients 19.
+ *
+ * `analyseDeletion` is passed explicitly rather than left to the shipped
+ * default. `AdtPackage.delete()`'s own default is `packageDeletionRefusal`,
+ * a package-specific reading of `del:deletionResult`/`del:isDeleted` — but
+ * `analyseDeletion` (`readDeletionRefusal` in `@mcp-abap-adt/adt-strategies`)
+ * reads that same attribute, on both `del:deletionResult` and
+ * `del:checkResponse`, generically. Passing it explicitly is what every
+ * sibling family in this cluster does for delete, and package's own document
+ * shape is not special enough to need its own strategy where the generic one
+ * already reads the right attribute.
+ */
+
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
+import { createAdtClient } from '../../../lib/clients';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  closeQuietly,
+  openFreshConnection,
+} from '../../../lib/packageSessions';
+import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
+
+export const TOOL_DEFINITION = {
+  name: 'DeletePackage',
+  available_in: ['onprem', 'cloud'] as const,
+  description:
+    'Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      package_name: {
+        type: 'string',
+        description: 'Package name.',
+      },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
+      },
+      force_new_connection: {
+        type: 'boolean',
+        description:
+          'Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.',
+      },
+      ...DETAIL_PROPERTY,
+    },
+    required: ['package_name'],
+  },
+} as const;
+
+interface DeletePackageArgs {
+  package_name: string;
+  transport_request?: string;
+  force_new_connection?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
+}
+
+export async function handleDeletePackage(
+  context: HandlerContext,
+  args: DeletePackageArgs,
+) {
+  const { connection, logger } = context;
+  const {
+    package_name,
+    transport_request,
+    force_new_connection = false,
+  } = args;
+
+  if (!package_name) {
+    return return_error(new Error('package_name is required'));
+  }
+
+  const packageName = package_name.toUpperCase();
+  const detail = detailOf(args);
+
+  // A package this session has created or updated cannot be deleted by this
+  // same session: PAK/058 "Package … is already locked", even after a clean
+  // UNLOCK. It is `CL_PACKAGE`'s static instance buffer, left `requested` by
+  // the save, which `CL_PAK_ADT_PERSIST~DELETE` meets in `set_changeable`
+  // (docs/installation/RFC_SETUP.md). A fresh connection is a fresh ABAP
+  // session and the one way around it; that choice belongs here, not inside
+  // the strategy call. The connection opened here is closed here: over RFC it
+  // is an ABAP session that would otherwise stay open. A fresh connection
+  // that cannot be had is the answer: never a delete on the session the
+  // caller asked to avoid.
+  let deleteConnection = connection;
+  if (force_new_connection) {
+    try {
+      deleteConnection = await openFreshConnection(connection, logger);
+    } catch (error) {
+      return return_error(error);
+    }
+    logger?.info(
+      `DeletePackage using fresh connection for ${packageName} (force_new_connection=true)`,
+    );
+  }
+
+  try {
+    return await answer(
+      { tool: 'DeletePackage', detail },
+      () =>
+        deleteIfDeletable(
+          createAdtClient(deleteConnection, logger).getPackage(
+            resultsFor(packageDocuments),
+          ),
+          { packageName, transportRequest: transport_request },
+        ),
+      project(detail, terseDeletion),
+    );
+  } finally {
+    if (deleteConnection !== connection) {
+      await closeQuietly(deleteConnection, logger, 'DeletePackage');
+    }
+  }
+}

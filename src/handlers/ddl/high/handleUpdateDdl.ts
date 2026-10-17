@@ -30,6 +30,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
+import { atStep } from '../../../lib/strategies/step';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -95,7 +96,7 @@ export async function handleUpdateDdl(
       const written = await withLock(
         () => obj.lock({ ddlName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          const update = () =>
+          const update = atStep('update', () =>
             obj.update(
               { ddlName, transportRequest: args.transport_request },
               {
@@ -103,15 +104,17 @@ export async function handleUpdateDdl(
                 lockHandle,
                 analyse: analyseException,
               },
-            );
+            ),
+          );
           // A conditional phase of the sequence, not a hand-rolled
           // short-circuit: see UpdateClass for the reasoning.
           return shouldActivate
             ? sequence(
-                () =>
+                atStep('check', () =>
                   obj.check({ ddlName, source: args.ddl_source }, 'inactive', {
                     analyse: analyseException,
                   }),
+                ),
                 update,
               )
             : update();
@@ -123,8 +126,11 @@ export async function handleUpdateDdl(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(written, () =>
-        obj.activate({ ddlName }, { analyse: analyseActivation }),
+      return carryCleanup(
+        written,
+        atStep('activate', () =>
+          obj.activate({ ddlName }, { analyse: analyseActivation }),
+        ),
       );
     },
     project(detail, terseWrite),

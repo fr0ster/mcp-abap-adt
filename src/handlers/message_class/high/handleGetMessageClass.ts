@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve an ABAP message class (MSAG/T100) as its ADT metadata document (XML), under the `message_class` field. adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.',
+    'Read an ABAP message class (MSAG/T100) in one request: its ADT metadata document (XML: name, description, package, master language, messages). Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -41,10 +41,10 @@ export async function handleGetMessageClass(
   const name = message_class_name.toUpperCase();
 
   // `IMessageClassContract` composes `IAdtMetadataReadable` and nothing
-  // else — there is no `.read()` in v19, same as `ReadMessageClass` found.
+  // else — there is no `.read()` in v19.
   // The pre-migration handler answered `state.messageClass`, a v18 parsed
   // convenience object adt-clients 19 no longer builds; the document itself
-  // is what is available now, same as `ReadMessageClass`'s own `metadata`.
+  // is what is available now.
   return answer(
     { tool: 'GetMessageClass', detail: 'terse' },
     () =>
@@ -54,7 +54,8 @@ export async function handleGetMessageClass(
     (metadata: AdtReading<string>) => ({
       success: true,
       message_class_name: name,
-      message_class: metadata.raw,
+      part: 'metadata',
+      metadata: metadata.raw,
     }),
   );
 }

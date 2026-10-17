@@ -64,6 +64,10 @@ describe('credentialFromHeaders', () => {
   });
 });
 
+/**
+ * A caller's SapConfig names its credential, or is refused: nothing is
+ * guessed, and a refusal names the field — never a value.
+ */
 describe('credentialFromSapConfig', () => {
   const base = { url: 'https://sap.example.invalid', client: '000' };
 
@@ -82,5 +86,58 @@ describe('credentialFromSapConfig', () => {
     expect(() =>
       credentialFromSapConfig({ ...base, authType: 'kerberos' } as any),
     ).toThrow('Kerberos authentication is not available');
+  });
+
+  it('refuses snc: it is served through a destination of mcp-abap-adt (stdio)', () => {
+    expect(() =>
+      credentialFromSapConfig({ ...base, authType: 'snc' } as any),
+    ).toThrow(
+      'The SapConfig `authType` snc is served through a destination of mcp-abap-adt (stdio)',
+    );
+  });
+
+  it.each([
+    ['an unknown authType', { authType: 'oauth-magic-secret' }],
+    ['no authType', {}],
+    ['an authType that is not a string', { authType: 42 }],
+  ])('refuses %s naming authType, never its value', (_label, extra) => {
+    let thrown: unknown;
+    try {
+      credentialFromSapConfig({
+        ...base,
+        username: 'u',
+        password: 'p',
+        ...extra,
+      } as any);
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as Error).message).toBe(
+      'The SapConfig `authType` must be basic, jwt, saml or certificate',
+    );
+    expect((thrown as Error).message).not.toContain('oauth-magic-secret');
+  });
+
+  it.each([
+    ['basic', { password: 'the-password' }, 'username'],
+    ['basic', { username: 'u', password: '' }, 'password'],
+    ['basic', { username: '', password: 'the-password' }, 'username'],
+    ['basic', { username: 'u' }, 'password'],
+    ['jwt', {}, 'jwtToken'],
+    ['jwt', { jwtToken: '' }, 'jwtToken'],
+    ['saml', {}, 'sessionCookies'],
+    ['saml', { sessionCookies: '' }, 'sessionCookies'],
+  ] as const)('refuses %s with %j naming %s', (authType, extra, field) => {
+    let thrown: unknown;
+    try {
+      credentialFromSapConfig({ ...base, authType, ...extra } as any);
+    } catch (error) {
+      thrown = error;
+    }
+    const message = (thrown as Error).message;
+    expect(message).toBe(
+      `The SapConfig for ${authType} authentication has no \`${field}\``,
+    );
+    expect(message).not.toContain('the-password');
   });
 });

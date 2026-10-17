@@ -1,5 +1,8 @@
 // src/handlers/debugger/debug/handleDebugGetVariables.ts
-import { requireDebugger } from '../../../lib/debugger/access';
+import {
+  debugBatchRecorder,
+  requireDebugger,
+} from '../../../lib/debugger/access';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { terseVariables } from '../../../lib/debugger/readings';
 import { STATE_HANDLE_PROPERTY } from '../../../lib/debugger/schemas';
@@ -45,6 +48,11 @@ export async function handleDebugGetVariables(
     args,
     async () => {
       const a = requireDebugger(context, args, 'use').abap;
+      const recorder = debugBatchRecorder(context);
+      if (recorder !== undefined)
+        return names
+          ? a.recordVariables(recorder, names)
+          : a.recordChildVariables(recorder, parents);
       return names ? a.getVariables(names) : a.getChildVariables(parents);
     },
     (v) => {

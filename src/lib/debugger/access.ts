@@ -1,3 +1,4 @@
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../handlers/interfaces';
 import type { DebuggerInstance } from './DebuggerInstance';
 
@@ -27,8 +28,10 @@ export function requireDebugger(
   }
   if (mode === 'use') context.state.check(args.state_handle);
   const instance = context.debugger();
-  instance.abap.bind(context);
-  instance.amdp.bind(context);
+  // A recorded call binds its own context, never its recorder.
+  const origin = context.recordedFrom ?? context;
+  instance.abap.bind(origin);
+  instance.amdp.bind(origin);
   return instance;
 }
 
@@ -58,4 +61,15 @@ export function startedExtra(context: HandlerContext): Record<string, unknown> {
       ? { request_user: identity.requestUser }
       : {}),
   };
+}
+
+/**
+ * The per-call recorder of the debugger batch, when this call is recorded in
+ * it: the dispatch hands a recorded call its recorder as the call's
+ * connection. `undefined` outside the debugger batch.
+ */
+export function debugBatchRecorder(
+  context: HandlerContext,
+): IAbapConnection | undefined {
+  return context.batch?.mode() === 'debugger' ? context.connection : undefined;
 }

@@ -73,15 +73,15 @@
  * adapter failure, and the type narrows `'published' | 'unpublished'` for
  * the call that follows.
  *
- * **An explicit timeout, well past the measured job.**
- * `IServiceBindingPublicationParams.timeout`'s own doc comment: "A
- * publication is the slowest request this library makes — ~135s measured on
- * a trial, and one unpublish still unsettled after eleven minutes — so the
- * 120s `SAP_TIMEOUT_LONG` default is a floor." Leaving `options.timeout`
- * unset would take that 120s floor into a job already measured to run
- * longer than it, on a system that this handler cannot know is the fast
- * case or the eleven-minute one. `PUBLISH_TIMEOUT_MS` below is the
- * documented worst case, not a guess at a middle ground.
+ * **No client-side deadline (19.0.0).** A publication is the slowest request
+ * this server sends — ~135 s measured on a trial, and one unpublish still
+ * unsettled after eleven minutes — and a deadline that fires while the job
+ * runs closes the socket under it, which ends the request in SAP (measured
+ * 2026-10-13: a logoff or a closed socket kills a running request). So the
+ * job is sent with `timeout: 0` — none, said explicitly. Since adt-clients
+ * 31.1 and connection 17 neither library adds a deadline of its own either,
+ * and inside the lock → write → unlock window's critical section the
+ * connection applies none at all: the job waits until SAP answers.
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
@@ -100,17 +100,10 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { analysePublicationLockAnswer } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils';
-
-/**
- * The documented worst case ("one unpublish still unsettled after eleven
- * minutes"), not the common one — a client-side timeout that fires while
- * the job is still genuinely running server-side is worse than a caller
- * waiting.
- */
-export const PUBLISH_TIMEOUT_MS = 11 * 60 * 1000;
 
 type DesiredPublicationStateInput = 'published' | 'unpublished' | 'unchanged';
 
@@ -232,13 +225,12 @@ export async function handleUpdateServiceBinding(
         // the forgiveness is what makes an empty handle here mean exactly one
         // thing. With plain `analyseLock` this handler refused the `403` instead,
         // and a binding anybody had open could not be published at all.
-        const acquired = await obj.lock(
-          { bindingName },
-          { analyse: analysePublicationLockAnswer },
-        );
+        const acquired = await atStep('lock', () =>
+          obj.lock({ bindingName }, { analyse: analysePublicationLockAnswer }),
+        )();
         if (!acquired.ok) return acquired;
 
-        const publish = (lockHandle: string) =>
+        const publish = atStep('publish', (lockHandle: string) =>
           obj.update(
             // **V2 resolves the service by name and version; V4 does not.** The
             // job's body names the target by type (`SCGR`) and name, and for V2
@@ -259,10 +251,12 @@ export async function handleUpdateServiceBinding(
             // own (MIGRATION-23 §3); `analysePublication` is that verdict.
             {
               lockHandle,
-              timeout: PUBLISH_TIMEOUT_MS,
+              // None of the server's: see the file header.
+              timeout: 0,
               analyse: analysePublication,
             },
-          );
+          ),
+        );
 
         // No handle, so there is nothing to give back: an UNLOCK without one
         // answers 200 and changes nothing. `withLock` exists to release what was

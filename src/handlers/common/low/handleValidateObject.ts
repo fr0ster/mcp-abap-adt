@@ -25,6 +25,7 @@ import {
   ddlDocuments,
   domainDocuments,
   functionGroupDocuments,
+  functionModuleDocuments,
   interfaceDocuments,
   metadataExtensionDocuments,
   packageDocuments,
@@ -39,13 +40,13 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseValidation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateObjectLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Validate an ABAP object name before creation. Checks if the name is valid and available. Returns validation result with success status and message.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -56,12 +57,13 @@ export const TOOL_DEFINITION = {
       object_type: {
         type: 'string',
         description:
-          "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'ddl', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'",
+          "Object type: 'class', 'program', 'interface', 'function_group', 'function_module' (object_name GROUP|MODULE), 'table', 'structure', 'ddl', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'",
         enum: [
           'class',
           'program',
           'interface',
           'function_group',
+          'function_module',
           'table',
           'structure',
           'ddl',
@@ -72,6 +74,14 @@ export const TOOL_DEFINITION = {
           'behavior_implementation',
           'metadata_extension',
         ],
+      },
+      super_package: {
+        type: 'string',
+        description: 'Super package (package validation).',
+      },
+      superclass: {
+        type: 'string',
+        description: 'Superclass name (class validation).',
       },
       behavior_definition: {
         type: 'string',
@@ -96,21 +106,6 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Optional description for validation',
       },
-      session_id: {
-        type: 'string',
-        description:
-          'Session ID from GetSession. If not provided, a new session will be created.',
-      },
-      session_state: {
-        type: 'object',
-        description:
-          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
-        properties: {
-          cookies: { type: 'string' },
-          csrf_token: { type: 'string' },
-          cookie_store: { type: 'object' },
-        },
-      },
       ...DETAIL_PROPERTY,
     },
     required: ['object_name', 'object_type'],
@@ -122,15 +117,11 @@ interface ValidateObjectArgs {
   object_type: string;
   package_name?: string;
   description?: string;
+  super_package?: string;
+  superclass?: string;
   behavior_definition?: string;
   root_entity?: string;
   implementation_type?: string;
-  session_id?: string;
-  session_state?: {
-    cookies?: string;
-    csrf_token?: string;
-    cookie_store?: Record<string, string>;
-  };
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -139,6 +130,7 @@ const VALID_TYPES = [
   'program',
   'interface',
   'function_group',
+  'function_module',
   'table',
   'structure',
   'ddl',
@@ -175,8 +167,8 @@ export async function handleValidateObject(
     behavior_definition,
     root_entity,
     implementation_type,
-    session_id,
-    session_state,
+    super_package,
+    superclass,
   } = args as ValidateObjectArgs;
 
   if (!object_name || !object_type) {
@@ -235,8 +227,19 @@ export async function handleValidateObject(
     );
   }
 
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
+  // A function module is addressed under its group: GROUP|MODULE, as the
+  // lock takes it.
+  let functionGroupName: string | undefined;
+  let functionModuleName: string | undefined;
+  if (normalizedType === 'function_module') {
+    const [group, module] = object_name.toUpperCase().split('|');
+    if (!group || !module) {
+      return return_error(
+        new Error('Function module name must be in format GROUP|FM_NAME'),
+      );
+    }
+    functionGroupName = group;
+    functionModuleName = module;
   }
 
   const objectName = object_name.toUpperCase();
@@ -268,6 +271,7 @@ export async function handleValidateObject(
               className: objectName,
               packageName,
               description: normalizedDescription,
+              superclass: superclass || undefined,
             },
             { analyse: analyseException },
           );
@@ -286,6 +290,18 @@ export async function handleValidateObject(
             .validate(
               {
                 functionGroupName: objectName,
+                packageName,
+                description: normalizedDescription,
+              },
+              { analyse: analyseException },
+            );
+        case 'function_module':
+          return client
+            .getFunctionModule(resultsFor(functionModuleDocuments))
+            .validate(
+              {
+                functionGroupName: functionGroupName as string,
+                functionModuleName: functionModuleName as string,
                 description: normalizedDescription,
               },
               { analyse: analyseException },
@@ -338,12 +354,16 @@ export async function handleValidateObject(
               { analyse: analyseException },
             );
         case 'package':
-          return client
-            .getPackage(resultsFor(packageDocuments))
-            .validate(
-              { packageName: objectName, description: normalizedDescription },
-              { analyse: analyseException },
-            );
+          return client.getPackage(resultsFor(packageDocuments)).validate(
+            {
+              packageName: objectName,
+              superPackage: super_package
+                ? super_package.toUpperCase()
+                : undefined,
+              description: normalizedDescription,
+            },
+            { analyse: analyseException },
+          );
         case 'behavior_definition':
           return client
             .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))

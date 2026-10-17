@@ -1,16 +1,27 @@
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import {
+  answerCaught,
+  failureEntry,
+  failurePayload,
+  isCredentialPayload,
+} from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { carryingFailure, withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud'] as const,
-  description:
+  description: withLongToolAdvice(
     '[read-only] Recursively discover and list ALL include files within an ABAP program or include.',
+  ),
   inputSchema: {
     type: 'object',
     properties: {
+      timeout: TIMEOUT_PROPERTY,
       object_name: {
         type: 'string',
         description: 'Name of the ABAP program or include',
@@ -26,10 +37,6 @@ export const TOOL_DEFINITION = {
         description:
           '[read-only] If true, returns structured JSON with metadata and raw XML.',
         default: false,
-      },
-      timeout: {
-        type: 'number',
-        description: '[read-only] Timeout in ms for each ADT request.',
       },
     },
     required: ['object_name', 'object_type'],
@@ -138,7 +145,7 @@ function textOf(response: any): string {
 type SourceRead =
   | { kind: 'text'; text: string }
   | { kind: 'absent' }
-  | { kind: 'refused'; message: string };
+  | { kind: 'refused'; error: IAdtError };
 
 function readSource(response: any): SourceRead {
   if (response?.ok) return { kind: 'text', text: textOf(response) };
@@ -146,9 +153,7 @@ function readSource(response: any): SourceRead {
   const absent =
     error?.response?.status === 404 ||
     error?.adtType === 'ExceptionResourceNotFound';
-  return absent
-    ? { kind: 'absent' }
-    : { kind: 'refused', message: String(error?.message ?? 'no answer') };
+  return absent ? { kind: 'absent' } : { kind: 'refused', error };
 }
 
 export async function handleGetIncludesList(
@@ -157,7 +162,7 @@ export async function handleGetIncludesList(
 ) {
   const { connection, logger } = context;
   try {
-    const { object_name, object_type, timeout } = args;
+    const { object_name, object_type } = args;
 
     if (
       !object_name ||
@@ -179,23 +184,9 @@ export async function handleGetIncludesList(
       );
     }
 
-    // Default timeout: 30 seconds per request
-    const requestTimeout =
-      timeout && typeof timeout === 'number' ? timeout : 30000;
-    const withTimeout = <T>(p: Promise<T>, what: string): Promise<T> =>
-      Promise.race([
-        p,
-        new Promise<never>((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(`Timeout after ${requestTimeout}ms while ${what}`),
-              ),
-            requestTimeout,
-          ),
-        ),
-      ]);
-
+    // No deadline of the server's on a request: the call's own
+    // `timeout`, when given, ends only the wait — a request abandoned here
+    // would run on in SAP while its session is logged off under it.
     logger?.info(
       `Starting includes tree discovery for ${parent.name} (${parent.kind})`,
     );
@@ -203,7 +194,7 @@ export async function handleGetIncludesList(
     const utils = createAdtClient(connection, logger).getUtils(ourUtils) as any;
 
     /** What could not be read, and why — reported beside the tree. */
-    const unreadable: { name: string; message: string }[] = [];
+    const unreadable: Record<string, unknown>[] = [];
     const sourceOf = async (
       what: string,
       read: Promise<unknown>,
@@ -211,13 +202,25 @@ export async function handleGetIncludesList(
       const answer = await readSource(await read);
       if (answer.kind === 'text') return answer.text;
       if (answer.kind === 'refused') {
-        logger?.warn?.(`could not read ${what}: ${answer.message}`);
-        unreadable.push({ name: what, message: answer.message });
+        // A credential SAP refused is every include's: the call ends with
+        // the method's error as it is — no further include is asked.
+        if (isCredentialPayload(failureEntry(answer.error, 'read source')))
+          throw carryingFailure(
+            new Error(answer.error.message),
+            answer.error,
+            'read source',
+          );
+        logger?.warn?.(`could not read ${what}: ${answer.error.message}`);
+        // The method's error as it is, with the step it arose at.
+        unreadable.push({
+          name: what,
+          ...failurePayload(withStep(answer.error, 'read source')),
+        });
       }
       return '';
     };
     const readInclude = async (name: string) =>
-      sourceOf(name, withTimeout(utils.getInclude(name), `reading ${name}`));
+      sourceOf(name, utils.getInclude(name));
 
     // Two different things, and one `visited` set was calling both a cycle.
     //
@@ -265,10 +268,7 @@ export async function handleGetIncludesList(
       // main), with no name of their own.
       const meta = await sourceOf(
         `class ${parent.name}`,
-        withTimeout(
-          utils.readObjectMetadata('class', parent.name),
-          `reading class ${parent.name}`,
-        ),
+        utils.readObjectMetadata('class', parent.name),
       );
       children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
         (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
@@ -277,11 +277,18 @@ export async function handleGetIncludesList(
       // The group's main program cannot be read, so which includes it names
       // directly is worked out from the rest: every include of the group,
       // less those another include of the group names.
-      const listed = await withTimeout(
-        fetchFunctionGroupChildren(utils, parent.name, 'FUGR/I'),
-        `listing the includes of ${parent.name}`,
+      const listed = await fetchFunctionGroupChildren(
+        utils,
+        parent.name,
+        'FUGR/I',
       );
-      if (!listed.ok) throw new Error(listed.getError().message);
+      if (!listed.ok) {
+        throw carryingFailure(
+          new Error(listed.getError().message),
+          listed.getError(),
+          'list function group includes',
+        );
+      }
       const all: string[] = listed
         .getResult()
         .value.map((o: { name: string }) => o.name.toUpperCase());
@@ -301,10 +308,7 @@ export async function handleGetIncludesList(
         parent.kind === 'PROG/P'
           ? await sourceOf(
               `program ${parent.name}`,
-              withTimeout(
-                utils.readObjectSource('program', parent.name),
-                `reading program ${parent.name}`,
-              ),
+              utils.readObjectSource('program', parent.name),
             )
           : await readInclude(parent.name);
       children = await expand(
@@ -340,8 +344,8 @@ export async function handleGetIncludesList(
     logger?.error(
       `Error getting includes list: ${error instanceof Error ? error.message : String(error)}`,
     );
-    return return_error(
-      error instanceof Error ? error : new Error(String(error)),
-    );
+    // A carried method error as it is, a chain failure as it came, a throw
+    // of our own `client_threw` — never the bare message.
+    return answerCaught(error, { tool: 'GetIncludesList', detail: 'terse' });
   }
 }

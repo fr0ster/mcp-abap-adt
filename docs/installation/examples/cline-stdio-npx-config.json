@@ -5,8 +5,8 @@
       "args": [
         "-y",
         "@mcp-abap-adt/core",
-        "--transport=stdio",
-        "--env-path=/path/to/<destination>.env"
+        "--env-path=/path/to/<destination>.env",
+        "--system-type=<onprem|cloud>"
       ],
       "disabled": false
     }

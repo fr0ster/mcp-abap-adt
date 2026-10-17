@@ -218,6 +218,32 @@ export const terseDeletion: Terse<any> = (value) => {
   };
 };
 
+/**
+ * `del:checkResponse` alone — the deletion check's verdict: `deletable`, the
+ * object, and SAP's message when it carries text (a permitted check may say
+ * the object does not exist; that is SAP's answer, as it came).
+ */
+export const terseDeletionCheck: Terse<any> = (value) => {
+  const object = first(value?.['del:checkResponse']?.['del:object']);
+  if (!object) return undefined;
+  const a = attrs(object);
+  const message = first(object['del:message']) as
+    | { 'del:text'?: unknown }
+    | undefined;
+  return {
+    deletable: a['del:isDeletable'] === 'true',
+    object: a['adtcore:name'],
+    ...(text(message?.['del:text'])
+      ? {
+          message: {
+            type: attrs(message)['del:type'],
+            text: text(message?.['del:text']),
+          },
+        }
+      : {}),
+  };
+};
+
 /** Validation: `CHECK_RESULT` means admissible, `SEVERITY` carries a verdict. */
 export const terseValidation: Terse<any> = (value) => {
   const data = value?.['asx:abap']?.['asx:values']?.DATA;

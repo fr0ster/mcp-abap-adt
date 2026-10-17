@@ -3,11 +3,10 @@
  * cleanup, a failing observer) are always on and go to stderr — never to the
  * transport logger, which the launcher silences unless DEBUG_AUTH_LOG.
  */
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import type { IDestinations } from '../auth/IAuthBrokerFactory.js';
 import { stateLoggerForTransport } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
-import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 const destinations = {} as IDestinations;
 const registry = () => new CompositeHandlersRegistry([]);
@@ -77,20 +76,6 @@ describe('the state logger', () => {
     expect(lines.join('')).toContain('observer broke');
   });
 
-  it("the HTTP pool's instances report to the server's state logger", () => {
-    const lines: string[] = [];
-    const server = new StreamableHttpServer(registry(), destinations, {
-      stateLogger: { info: () => {}, error: (m) => lines.push(m) },
-    });
-    const instance = (
-      server as unknown as {
-        createPerRequestServer(): { state: unknown };
-      }
-    ).createPerRequestServer();
-    provokeObserverFailure(instance.state as never);
-    expect(lines.join('')).toContain('observer broke');
-  });
-
   it('a stdio server given only a logger reports its state to that logger, not to a defaulted silent one', () => {
     const lines: string[] = [];
     const logger = {
@@ -102,16 +87,5 @@ describe('the state logger', () => {
     const server = new StdioServer(registry(), destinations, { logger });
     provokeObserverFailure(server.state as never);
     expect(lines.join('')).toContain('observer broke');
-  });
-
-  it('an HTTP server without any logger: its pool instances report on stderr', () => {
-    const server = new StreamableHttpServer(registry(), destinations, {});
-    const instance = (
-      server as unknown as {
-        createPerRequestServer(): { state: unknown };
-      }
-    ).createPerRequestServer();
-    provokeObserverFailure(instance.state as never);
-    expect(written.join('')).toContain('observer broke');
   });
 });

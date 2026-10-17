@@ -135,7 +135,7 @@ CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_E
 BEHAVIOR_DEFINITION or METADATA_EXTENSION (by `object_type` or its ADT code) is the per-object
 `POST /sap/bc/adt/activation`, answering the verdict. Every other call is the one
 `POST /sap/bc/adt/activation/runs`, answering `{ run_id }`: the run was accepted and has no verdict
-yet. `HandlerGet` reads it by that id, one request per part: `activation_status`
+yet (an answer without a run id is a failure with `step: start activation run`). `HandlerGet` reads it by that id, one request per part: `activation_status`
 (`GET /sap/bc/adt/activation/runs/{run_id}`, answered `{ run_id, part, status, document }`) and
 `activation_results` (`GET /sap/bc/adt/activation/results/{run_id}`, answered
 `{ run_id, part, messages, document }`), each with SAP's document as it came. Asking again until the

@@ -52,34 +52,37 @@ export function isLongTool(name: string): boolean {
 
 /**
  * The modes of a listed tool that are not reads: `HandlerGet` of a
- * `UNIT_TEST` / `CDS_UNIT_TEST` run polls a run in SAP. Such a call is an
- * ordinary one — the instance's connection — and a `timeout` on it is
- * refused (`TIMEOUT_NOT_FOR_RUN_WORDS`), before anything is sent.
+ * `UNIT_TEST` / `CDS_UNIT_TEST` run polls a run in SAP, and its parts
+ * `activation_status` / `activation_results` read an activation run by its
+ * id. Such a call is an ordinary one — the instance's connection — and a
+ * `timeout` on it is refused (`TIMEOUT_NOT_FOR_RUN_WORDS`), before anything
+ * is sent. A call is in a run mode when any one rule of its tool holds.
  */
 const NOT_A_READ: Readonly<
-  Record<string, { argument: string; equals: readonly string[] }>
+  Record<string, ReadonlyArray<{ argument: string; equals: readonly string[] }>>
 > = {
-  HandlerGet: {
-    argument: 'object_type',
-    equals: ['UNIT_TEST', 'CDS_UNIT_TEST'],
-  },
+  HandlerGet: [
+    { argument: 'object_type', equals: ['UNIT_TEST', 'CDS_UNIT_TEST'] },
+    { argument: 'part', equals: ['ACTIVATION_STATUS', 'ACTIVATION_RESULTS'] },
+  ],
 };
 
 /** Whether a call of the listed `tool` with `args` is a read (the long path). */
 export function isLongRead(tool: string, args: unknown): boolean {
-  const rule = NOT_A_READ[tool];
-  if (rule === undefined) return true;
-  const value = (args as Record<string, unknown> | null | undefined)?.[
-    rule.argument
-  ];
-  return !(
-    typeof value === 'string' && rule.equals.includes(value.toUpperCase())
-  );
+  const rules = NOT_A_READ[tool];
+  if (rules === undefined) return true;
+  const given = args as Record<string, unknown> | null | undefined;
+  return !rules.some((rule) => {
+    const value = given?.[rule.argument];
+    return (
+      typeof value === 'string' && rule.equals.includes(value.toUpperCase())
+    );
+  });
 }
 
 /** The fixed words of a `timeout` given to a listed tool's run mode. */
 export const TIMEOUT_NOT_FOR_RUN_WORDS =
-  'timeout applies to a read only: a unit test run (UNIT_TEST / CDS_UNIT_TEST) takes none.';
+  'timeout applies to a read only: a unit test run (UNIT_TEST / CDS_UNIT_TEST) and an activation run (activation_status / activation_results) take none.';
 
 /**
  * The largest `timeout` a timer can hold: Node fires a longer delay at once

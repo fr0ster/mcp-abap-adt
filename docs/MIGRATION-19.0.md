@@ -1184,9 +1184,11 @@ transport's options only:
   `object_adt_type` or a one-entry `objects[]`) is activated as in 18.x: one request, answering the
   verdict. Every other call — `objects[]` of several objects or of a function module, an
   `object_adt_type` such as `SRVB/SVB`, `object_type` PACKAGE, SERVICE_DEFINITION or
-  SERVICE_BINDING — sends the one `POST /sap/bc/adt/activation/runs` and answers `{ run_id }`. 18.x
-  waited for the run inside the call (status reads with long polling, a second apart, up to six)
-  and read its results, answering `accepted`, `run_id`, `run_status`, `activated`, `messages`,
+  SERVICE_BINDING — sends the one `POST /sap/bc/adt/activation/runs` and answers `{ run_id }`; a
+  start SAP answers without a run id (no `Location` header) is a failure with
+  `step: "start activation run"`, and nothing more is sent. 18.x waited for the run inside the call
+  (status reads with long polling, a second apart, up to six — as read from 18.x's code, not
+  measured) and read its results, answering `accepted`, `run_id`, `run_status`, `activated`, `messages`,
   `objects_count`, `objects` and `message`. A consumer of that answer now calls, in order:
   1. `HandlerActivate` — keep its `run_id`;
   2. `HandlerGet` with `part: "activation_status"` and that `run_id` — answered
@@ -1194,11 +1196,13 @@ transport's options only:
      progress while it runs. Call it again, at the pace you choose, until the status is one of the
      first three;
   3. `HandlerGet` with `part: "activation_results"` and the `run_id` — answered
-     `{ run_id, part, messages, document }`; a message of type `E`, `A` or `X` is a refusal, and a
+     `{ run_id, part, messages, document }`; a message of type `E`, `A`, `X` or `error` is a refusal, and a
      run whose status is not `failed` and that carries no such message activated what it was
      given (18.x's `activated`).
 
-  The two parts take no `object_type`. Each is one request and is recorded in batch mode, as is
+  The two parts take no `object_type` and no `timeout` (a `timeout` is refused before anything is
+  sent, as for `UNIT_TEST`); each runs on the instance's session. Each is one request and is
+  recorded in batch mode, as is
   `HandlerActivate`'s run start: activate in one batch, read the status in later ones.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it

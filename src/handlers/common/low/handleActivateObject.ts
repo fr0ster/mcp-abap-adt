@@ -76,7 +76,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -90,6 +90,7 @@ import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { failedWith, succeededWith } from '../../../lib/strategies/sequence';
+import { withStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -402,6 +403,13 @@ export async function handleActivateObject(
   );
 }
 
+/** The step a run start's failure arose at. */
+const START_ACTIVATION_RUN = 'start activation run';
+
+/** A run start SAP answered with no run id: the fixed words. */
+export const RUN_START_WITHOUT_ID =
+  'SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.';
+
 /**
  * The activation in one request (compact `HandlerActivate`; spec §4.6, one
  * ADT request per tool call).
@@ -448,10 +456,30 @@ export async function handleActivateObjectOnce(
   const utils = createAdtClient(connection, logger).getUtils(ourUtils);
   return answer(
     { tool: 'HandlerActivate', detail: 'terse' },
-    () =>
-      utils.activateObjectsGroup(activationObjects, preaudit, {
-        analyse: analyseException,
-      }),
+    async () => {
+      const started = await utils.activateObjectsGroup(
+        activationObjects,
+        preaudit,
+        { analyse: analyseException },
+      );
+      if (!started.ok) {
+        return failedWith<string>(
+          withStep(started.getError(), START_ACTIVATION_RUN),
+        );
+      }
+      // A run is read by its id alone, and the id travels only in `Location`:
+      // an answer without one started nothing the caller can read.
+      const runId = started.getResult().value;
+      if (runId === '') {
+        return failedWith<string>(
+          withStep(
+            { message: RUN_START_WITHOUT_ID, origin: 'refusal' } as IAdtError,
+            START_ACTIVATION_RUN,
+          ),
+        );
+      }
+      return succeededWith(runId);
+    },
     (runId: string) => ({ run_id: runId }),
   );
 }

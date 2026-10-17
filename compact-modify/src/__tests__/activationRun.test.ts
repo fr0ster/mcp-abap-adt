@@ -21,6 +21,7 @@ import {
   countingConnection,
   type Mode,
 } from '../../../src/__tests__/helpers/batchHarness';
+import { RUN_START_WITHOUT_ID } from '../../../src/handlers/common/low/handleActivateObject';
 import { corpusBody } from '../../../src/lib/adtCorpus';
 import { handleHandlerActivate } from '../handlers/handleHandlerActivate';
 
@@ -39,8 +40,9 @@ async function runWith(
   mode: Mode,
   args: Record<string, unknown>,
   body?: string,
+  headers?: Record<string, string>,
 ): Promise<Run> {
-  const counting = countingConnection(mode, body);
+  const counting = countingConnection(mode, body, headers);
   const context = {
     connection: counting.connection,
     logger: silent,
@@ -60,8 +62,12 @@ async function runWith(
   return { sent: counting.sent, answer };
 }
 
-const activate = (mode: Mode, args: Record<string, unknown>, body?: string) =>
-  runWith(handleHandlerActivate as never, mode, args, body);
+const activate = (
+  mode: Mode,
+  args: Record<string, unknown>,
+  body?: string,
+  headers?: Record<string, string>,
+) => runWith(handleHandlerActivate as never, mode, args, body, headers);
 const get = (mode: Mode, args: Record<string, unknown>, body?: string) =>
   runWith(handleHandlerGet as never, mode, args, body);
 
@@ -118,6 +124,20 @@ describe('compact HandlerActivate: an activation run is started in one request',
       expect(documented.answer?.isError).not.toBe(true);
       expect(jsonOf(documented.answer)).toEqual({ run_id: 'RUN_PLACEHOLDER' });
       expect(refused.answer?.isError).toBe(true);
+      expect(jsonOf(refused.answer).status).toBe(404);
+      expect(jsonOf(refused.answer).step).toBe('start activation run');
+    });
+
+    it('a 2xx without Location is a failure with its step, one request', async () => {
+      const { sent, answer } = await activate('document', args, undefined, {
+        location: '',
+      });
+      expect(sent).toHaveLength(1);
+      expect(answer?.isError).toBe(true);
+      const failed = jsonOf(answer);
+      expect(failed.message).toBe(RUN_START_WITHOUT_ID);
+      expect(failed.step).toBe('start activation run');
+      expect(failed).not.toHaveProperty('run_id');
     });
 
     it('no poll, no timer', async () => {

@@ -10,7 +10,8 @@
  * - without `timeout` the call waits until the stand-in answers, and its own
  *   session is logged off after the answer.
  *
- * `HandlerGet`'s run modes (`UNIT_TEST` / `CDS_UNIT_TEST`) are not reads: a
+ * `HandlerGet`'s run modes (`UNIT_TEST` / `CDS_UNIT_TEST`, and the activation
+ * run's parts `activation_status` / `activation_results`) are not reads: a
  * `timeout` there is refused before anything is sent, and without one the
  * call runs as an ordinary one, on the instance's connection.
  */
@@ -159,6 +160,45 @@ describe.each(['UNIT_TEST', 'CDS_UNIT_TEST'])(
     });
   },
 );
+
+describe.each([
+  ['activation_status', '/activation/runs/run-placeholder-1'],
+  ['activation_results', '/activation/results/run-placeholder-1'],
+])('HandlerGet part %s (an activation run, not a read)', (part, path) => {
+  it('a timeout is refused before anything is sent', async () => {
+    const stand = await longStand('HandlerGet');
+    try {
+      const answer = await stand.call('HandlerGet', {
+        part,
+        run_id: 'run-placeholder-1',
+        timeout: 1,
+      });
+      expect(answer.isError).toBe(true);
+      expect(answer.content?.[0]?.text ?? '').toContain(
+        TIMEOUT_NOT_FOR_RUN_WORDS,
+      );
+      expect(
+        stand.standIn.requests.filter((r) => r.url.includes('/activation/')),
+      ).toEqual([]);
+      expect(stand.standIn.loggedOff()).toEqual([]);
+    } finally {
+      await stand.close();
+    }
+  });
+
+  it('without one, is one request on the instance’s connection', async () => {
+    const stand = await longStand('HandlerGet');
+    try {
+      await stand.call('HandlerGet', { part, run_id: 'run-placeholder-1' });
+      const reads = stand.standIn.requests.filter((r) => r.url.includes(path));
+      expect(reads).toHaveLength(1);
+      expect(reads[0]?.session).toBe(stand.instanceSession);
+      expect(stand.standIn.loggedOff()).toEqual([]);
+    } finally {
+      await stand.close();
+    }
+  });
+});
 
 it('a timeout that is not a whole number of seconds from 1 is refused before anything is sent', async () => {
   const stand = await longStand('GetWhereUsed');

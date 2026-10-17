@@ -88,8 +88,12 @@ activates the group afterwards.
   are `HandlerGet` parts read once — the consumer polls. `HandlerActivate`
   starts an activation run and answers its id. The profiler's schedule and
   run are separate tools. `HandlerDumpList` reads one page and answers SAP's
-  next link. The debugger is one tool per action, one request each,
-  chained by the consumer, with no mode argument; no background listener.
+  next link. Compact keeps its tools few and each easy to explain (what it
+  does, its parameters, its results); "one tool per action" uses a coarse
+  action — a batch operation is one action, getting information is one
+  action. The debugger is four tools (breakpoints, session, step,
+  maintain variables), each covering ABAP and AMDP, each call one request,
+  chained by the consumer; no background listener.
   `HandlerWhereUsed` reads one object; several are the consumer's, through
   batch mode. The full chains stay in the full sets.
   This changes compact's behaviour for its consumers.

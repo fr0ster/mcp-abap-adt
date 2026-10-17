@@ -372,16 +372,33 @@ and its MEASURED lines); the plan lists each violator with file and line.
   it came; the consumer follows the link and dedups by `dump_id` (MEASURED 2026-10-17: `$top` capped
   at 100; the next link is `to=<timestamp of the last entry>`; the next page starts at that second,
   inclusive).
-- **The compact debugger** — **one tool per action**, one request each, no mode argument: `HandlerDebugSetBreakpoints`, `HandlerDebugDeleteBreakpoint`, `HandlerDebugListen`, `HandlerDebugAttach`, `HandlerDebugStepInto`, `HandlerDebugStepOver`, `HandlerDebugStepReturn`, `HandlerDebugStepContinue`, `HandlerDebugStepToLine`, `HandlerDebugJumpToLine`, `HandlerDebugStack`, `HandlerDebugVariables`, `HandlerDebugChildVariables`, `HandlerDebugSetVariable`, `HandlerDebugMemory`, `HandlerDebugTerminate`, `HandlerDebugDetach`, `HandlerDebugStopListener` (variables: by name; child variables: by parent; set value). The old four (`HandlerDebugStart`, `HandlerDebugStep`, `HandlerDebugView`, `HandlerDebugWait`) go, with a migration note. The consumer chains them: set breakpoints →
-  listen (with the caller's hold) → attach → step / stack / variables → continue / terminate debuggee
-  / detach → delete breakpoint / stop listener. No background listen loop; `HandlerDebugWait` goes.
-  `run_to_line` / `jump_to_line` need the address (the consumer reads the stack first). MEASURED
+- **The priority rule** (owner, binding): a tool is built so it is easy to explain what it does,
+  its parameters and its results, and compact keeps the number of tools minimal. "One tool per action"
+  uses the owner's coarse notion of an action: a batch operation is one action (`HandlerBatch` and
+  `HandlerDebugBatch` stay one tool each, `begin` / `end` / `answers`); getting information is one
+  action (run states stay `HandlerGet` parts).
+- **The compact debugger** — four tools, one per action, each covering ABAP and AMDP (AMDP is part
+  of the debugger); each call is **one request** — one `AbapDebugger` / `AmdpDebugger` method, chosen
+  by the tool's operation argument:
+  1. **`HandlerDebugBreakpoints`** (name proposed) — ABAP `setBreakpoints`, `syncBreakpoints`,
+     `deleteBreakpoint`, `createWatchpoint`, `listWatchpoints`, `deleteWatchpoint`; AMDP
+     `syncBreakpoints`.
+  2. **`HandlerDebugSession`** (name proposed) — ABAP `checkListener`, `listen` (the caller's hold),
+     `stopListener`, `attach`, `detachDebugger` (no id, on the attaching session), `terminateDebuggee`,
+     `terminateDebugger`, `setDebuggerSettings`; AMDP `start`, `getEvents`, `stop`, `deleteDebuggee`.
+  3. **`HandlerDebugStep`** — ABAP `step` (into / over / return / continue), `stepToLine` (with an
+     address), `setStackPosition`; AMDP `step`.
+  4. **`HandlerDebugVariables`** (name proposed; maintain variables) — ABAP `getStack`,
+     `getVariables`, `getChildVariables`, `getMemorySizes`, `createMemorySnapshot`,
+     `setVariableValue`; AMDP `getDataPreview`.
+  No background listen loop; the consumer chains the calls (breakpoints → listen → attach → step /
+  view → continue / terminate / detach → delete breakpoint / stop listener). `HandlerDebugWait` goes;
+  the old `HandlerDebugStart`, `HandlerDebugStep`, `HandlerDebugView`, `HandlerDebugWait` map onto the
+  four (migration rows; `HandlerDebugView` → `HandlerDebugVariables`). MEASURED facts stay in the descriptions
   (`.superpowers/sdd/2026-10-16-batch-mode/debugger-probe-report.md`): a step's answer carries no
-  position (the stack is its own call); `terminateDebuggee` / `terminateDebugger` answer `500` even
-  when they work (the descriptions say so); `detachDebugger` releases the debuggee only **without**
-  an id on the attaching session (with an id: `200`, nothing released) — compact's detach sends it
-  without an id on the debuggee connection. The AMDP debugger's compact actions are not part of this
-  decision and stay until the owner's word.
+  position (the stack is a `HandlerDebugVariables` call); `terminateDebuggee` / `terminateDebugger` answer
+  `500` even when they work; `detachDebugger` releases the debuggee only without an id on the
+  attaching session.
 - `HandlerLock`, `HandlerUnlock` and the single-object `HandlerActivate` already are one request.
 
 Every compact call is proven to issue exactly one request (§4.2's proof: held, answered with a
@@ -527,13 +544,13 @@ reach them:
 
 | Operation | Full set | Compact |
 |---|---|---|
-| step (into, over, return, continue) | `DebugStep` | `HandlerDebugStepInto`, `…StepOver`, `…StepReturn`, `…StepContinue` |
-| step to line | `DebugStepToLine` | `HandlerDebugStepToLine`, `HandlerDebugJumpToLine` (address required) |
-| stack | `DebugGetStack` | `HandlerDebugStack` |
-| variables | `DebugGetVariables` with names | `HandlerDebugVariables` |
-| child variables | `DebugGetVariables` with parents | `HandlerDebugChildVariables` |
-| stack position | `DebugSetStackPosition` | — |
-| set a variable | `DebugSetVariable` | `HandlerDebugSetVariable` |
+| step (into, over, return, continue) | `DebugStep` | `HandlerDebugStep` (step) |
+| step to line | `DebugStepToLine` | `HandlerDebugStep` (stepToLine, address required) |
+| stack | `DebugGetStack` | `HandlerDebugVariables` (getStack) |
+| variables | `DebugGetVariables` with names | `HandlerDebugVariables` (getVariables) |
+| child variables | `DebugGetVariables` with parents | `HandlerDebugVariables` (getChildVariables) |
+| stack position | `DebugSetStackPosition` | `HandlerDebugStep` (setStackPosition) |
+| set a variable | `DebugSetVariable` | `HandlerDebugVariables` (setVariableValue) |
 
 Every other tool is refused while the debugger batch is open (§4.1): breakpoints, watchpoints, the
 listener, start / wait / take-over / stop, attach, detach, `release_debugger`, terminate, memory

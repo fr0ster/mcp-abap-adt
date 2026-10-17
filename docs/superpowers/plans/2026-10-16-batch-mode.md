@@ -369,24 +369,24 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 - [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
 - [ ] **Step 7:** Commit `feat(compact)!: HandlerDumpList reads one page`.
 
-### Task 19: Compact debugger: one tool per action
+### Task 19: Compact debugger: four tools, one request per call
 
 **Files:**
-- Create: one handler per tool under `src/lib/compact/debug/` (`handleHandlerDebugSetBreakpoints.ts`, … one per tool below)
-- Delete: `src/lib/compact/debug/handleHandlerDebugStart.ts`, `handleHandlerDebugStep.ts`, `handleHandlerDebugView.ts`, `handleHandlerDebugWait.ts`
-- Modify: `src/lib/compact/debug/group.ts`, `src/lib/compact/debug/shared.ts`, `src/lib/debugger/DebugSession.ts` (a one-request path with no background listen loop), `src/lib/debugger/ownConnectionTools.ts`, `tools/batch-handlers.json`
-- Test: `src/__tests__/unit/debugger/compactOneToolPerAction.test.ts`
+- Create: `src/lib/compact/debug/handleHandlerDebugBreakpoints.ts`, `handleHandlerDebugSession.ts`, `handleHandlerDebugVariables.ts`
+- Modify: `src/lib/compact/debug/handleHandlerDebugStep.ts`, `group.ts`, `shared.ts`, `src/lib/debugger/DebugSession.ts` and `src/lib/debugger/AmdpSession.ts` (a one-request path, no background listen loop), `src/lib/debugger/ownConnectionTools.ts`, `tools/batch-handlers.json`
+- Delete: `src/lib/compact/debug/handleHandlerDebugStart.ts`, `handleHandlerDebugView.ts`, `handleHandlerDebugWait.ts`
+- Test: `src/__tests__/unit/debugger/compactFiveTools.test.ts`
 
 **Interfaces:**
-- Produces: tools, one request each, no mode argument — `HandlerDebugSetBreakpoints`, `HandlerDebugDeleteBreakpoint`, `HandlerDebugListen`, `HandlerDebugAttach`, `HandlerDebugStepInto`, `HandlerDebugStepOver`, `HandlerDebugStepReturn`, `HandlerDebugStepContinue`, `HandlerDebugStepToLine`, `HandlerDebugJumpToLine`, `HandlerDebugStack`, `HandlerDebugVariables`, `HandlerDebugChildVariables`, `HandlerDebugSetVariable`, `HandlerDebugMemory`, `HandlerDebugTerminate`, `HandlerDebugDetach`, `HandlerDebugStopListener`. `HandlerDebugListen` holds for the caller's `hold_seconds`; `HandlerDebugStepToLine` / `HandlerDebugJumpToLine` require the address; `HandlerDebugDetach` sends `detachDebugger()` without an id on the debuggee connection. The AMDP compact actions stay as they are (not part of this decision).
+- Produces (spec §4.6; each call one `AbapDebugger` / `AmdpDebugger` method, chosen by the tool's operation argument; the three new names are proposals): `HandlerDebugBreakpoints` (ABAP setBreakpoints, syncBreakpoints, deleteBreakpoint, createWatchpoint, listWatchpoints, deleteWatchpoint; AMDP syncBreakpoints); `HandlerDebugSession` (ABAP checkListener, listen with the caller's `hold_seconds`, stopListener, attach, detachDebugger without an id on the attaching session, terminateDebuggee, terminateDebugger, setDebuggerSettings; AMDP start, getEvents, stop, deleteDebuggee); `HandlerDebugStep` (ABAP step into/over/return/continue, stepToLine with an address, setStackPosition; AMDP step); `HandlerDebugVariables` — maintain variables (ABAP getStack, getVariables, getChildVariables, getMemorySizes, createMemorySnapshot, setVariableValue; AMDP getDataPreview).
 
-- [ ] **Step 1: Write the failing tests** — per tool: `exactly one request (held / document / 404)`; `no background listen loop: nothing is sent between calls`; `HandlerDebugListen holds exactly the caller's hold_seconds`; `HandlerDebugStepToLine without an address refused before any request`; `HandlerDebugDetach sends detachDebugger without an id on the debuggee connection`; `HandlerDebugTerminate's description says SAP answers 500 even when it works`; `a step tool's description sends the consumer to HandlerDebugStack for the position`; `HandlerDebugStart, HandlerDebugStep, HandlerDebugView and HandlerDebugWait are not served`.
+- [ ] **Step 1: Write the failing tests** — per tool and operation, ABAP and AMDP: `exactly one request, the named method (held / document / 404)`; `no background listen loop: nothing is sent between calls`; `listen holds exactly the caller's hold_seconds`; `stepToLine without an address refused before any request`; `detach sends detachDebugger without an id on the attaching session`; `descriptions: a step carries no position (use HandlerDebugVariables getStack); terminate answers 500 even when it works; detach releases only without an id`; `HandlerDebugStart, HandlerDebugView and HandlerDebugWait are not served`.
 - [ ] **Step 2:** Run — FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run, with Task 4's proof — PASS.
-- [ ] **Step 5: Break it:** send detach with the id; keep the listen loop; read the stack inside step-to-line — each red; revert.
-- [ ] **Step 6:** Docs: compact docs, `docs/user-guide/DEBUGGER.md` (the chain), surface fixture, `MIGRATION-19.0.md` (the old four → the new tools, one row each); CHANGELOG 19.0.0 (*Changed*, breaking for compact).
-- [ ] **Step 7:** Commit `feat(compact)!: the compact debugger is one tool per action`.
+- [ ] **Step 5: Break it:** send detach with the id; keep the listen loop; read the stack inside stepToLine — each red; revert.
+- [ ] **Step 6:** Docs: compact docs, `docs/user-guide/DEBUGGER.md` (the chain), surface fixture, `MIGRATION-19.0.md` (the old `HandlerDebugStart` / `Step` / `View` / `Wait` → the four, one row each); CHANGELOG 19.0.0 (*Changed*, breaking for compact).
+- [ ] **Step 7:** Commit `feat(compact)!: the compact debugger is four one-request tools`.
 
 ### Task 20: The debugger batch
 
@@ -396,7 +396,7 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 - Test: `src/__tests__/unit/debugger/debugBatch.test.ts`
 
 **Interfaces:**
-- Consumes: Tasks 3, 5, 6; the compact debugger's one-request actions (Task 19).
+- Consumes: Tasks 3, 5, 6; the compact debugger's four tools (Task 19).
 - Produces: `DebugBatchBegin` / `DebugBatchEnd` (full), `HandlerDebugBatch` (`action: 'begin' | 'end' | 'answers'`, compact); `DebugSession.openBatch(): AdtBatchConnection` over `Stop.connection` with `endpoint: 'debugger'`.
 
 - [ ] **Step 1: Write the failing tests** — `DebugBatchEnd and HandlerDebugBatch end send exactly one envelope`; `begin needs an ABAP stop`; `step + stack + variables recorded into one debugger envelope on the stop's connection`; `the second recorded call is recorded while the first waits` (no deadlock); `DebugBatchEnd keeps answers by number, mode off, leaves the stop as it was (no releaseStop, no view change), also when a step's answer says the program ended`; `step to line without object_type/object_name refused`; `AMDP stop refused debug_batch_amdp_unmeasured`; `begin of either batch refused while the other is open`; `breakpoint and listener tools refused while open`; `DebugBatch* only in full, HandlerDebugBatch only in compact`.

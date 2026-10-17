@@ -616,7 +616,7 @@ describe('descriptions, positive', () => {
 
   it('end logs off: an attached debuggee runs on, an AMDP debug session ends, the breakpoints stay set until removed', () => {
     expect(description('HandlerDebugSession')).toContain(
-      "end, for either kind, takes state_handle and logs off each connection the debug state opened, one logoff each: an attached debuggee runs on, an AMDP debug session ends, and the user's breakpoints stay set until removed (deleteBreakpoint, or stopListener);",
+      "end, for either kind, takes state_handle and logs off each connection the debug state opened, one logoff each: an attached debuggee runs on, an AMDP debug session ends, and the user's breakpoints stay set until removed (stopListener removes them);",
     );
   });
 

@@ -26,7 +26,11 @@
  *   8. ReadTransportActionLog — confirm the task's log recorded activity
  *   9. SortAndCompressTransportTask on the task — accepted, and a re-read
  *      still holds the entry once (an empty `200` is not proof either)
- *  10. CreateTransportTask — a second task under the same request
+ *  10. CreateTransport — a second request, made for this test, and
+ *      CreateTransportTask — a task under it, the target of the move. The
+ *      target is under a DIFFERENT request on purpose: a move between two
+ *      tasks of one request is refused by the system (TR 717, "Object can be
+ *      moved between different requests only").
  *  11. MoveTransportObjects — the entry from the first task to the second,
  *      by its position; re-read both: gone from the first, on the second
  *  12. MoveTransportObjects — back again, by its position on the second, so
@@ -96,9 +100,10 @@
  * CRUD-style integration test in this repository already does a create
  * followed by an update rather than a bare create.
  *
- * Cleanup: delete the test program, then delete the task itself (ADT accepts
- * deleting a request/task only while empty — adt-clients's AdtRequest.delete
- * doc) so nothing accumulates on the pinned request across runs.
+ * Cleanup: delete the test program, then empty and delete every task the
+ * test made (ADT accepts deleting a request/task only while empty —
+ * adt-clients's AdtRequest.delete doc), then the second request with every
+ * task it holds, so nothing accumulates across runs — also when a step failed.
  *
  * Prerequisites (test-config.yaml `environment`):
  *   - default_transport: an existing, unreleased request (pinned — see #221)
@@ -114,10 +119,12 @@ import { handleCreateProgram } from '../../../../handlers/program/high/handleCre
 import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
 import { handleAddTransportObject } from '../../../../handlers/transport/high/handleAddTransportObject';
+import { handleCreateTransport } from '../../../../handlers/transport/high/handleCreateTransport';
 import { handleCreateTransportTask } from '../../../../handlers/transport/high/handleCreateTransportTask';
 import { handleMoveTransportObjects } from '../../../../handlers/transport/high/handleMoveTransportObjects';
 import { handleRemoveTransportObject } from '../../../../handlers/transport/high/handleRemoveTransportObject';
 import { handleSortAndCompressTransportTask } from '../../../../handlers/transport/high/handleSortAndCompressTransportTask';
+import { handleGetTransport } from '../../../../handlers/transport/readonly/handleGetTransport';
 import { handleReadTransportActionLog } from '../../../../handlers/transport/readonly/handleReadTransportActionLog';
 import { handleReadTransportObjects } from '../../../../handlers/transport/readonly/handleReadTransportObjects';
 import { createAdtClient } from '../../../../lib/clients';
@@ -171,9 +178,16 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
   // colliding with that history instead of relying on cleanup being perfect.
   const programName = `ZMCP_BLD_TR${Date.now().toString(36).toUpperCase().slice(-6)}`;
   let taskNumber = '';
-  // The target of the move (steps 10–12). Emptied and deleted in `afterAll`
-  // like the first task.
+  // The request made for the move's target (step 10): a move between two
+  // tasks of one request is refused (TR 717). Deleted in `afterAll` with
+  // every task it holds.
+  let secondRequestNumber = '';
+  // The target of the move (steps 10–12), under `secondRequestNumber`.
+  // Emptied and deleted in `afterAll` like the first task.
   let secondTaskNumber = '';
+  // The task the program's entry is on now — the moves change it — so the
+  // cleanup's delete names where the entry is, also after a failed step.
+  let entryTask = '';
   let testEnabled = false;
   let skipReason = '';
 
@@ -266,7 +280,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         const ctx = createHandlerContext({ connection, logger });
         const deleteResponse = await handleDeleteProgram(ctx, {
           program_name: programName,
-          transport_request: taskNumber || parentTransport,
+          transport_request: entryTask || taskNumber || parentTransport,
         });
         // `handleDeleteProgram` answers `{isError, content}` on an ADT-level
         // refusal — it does not throw — so a bare `await` inside this
@@ -286,7 +300,34 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       }
     }
 
-    for (const task of [secondTaskNumber, taskNumber]) {
+    // Every task to empty and delete: the two the test made, and any other
+    // task the second request holds (the system may add one with the
+    // request).
+    const tasks = [secondTaskNumber, taskNumber];
+    if (secondRequestNumber) {
+      try {
+        const request = parseHandlerResponse(
+          await handleGetTransport(
+            createHandlerContext({ connection, logger }),
+            {
+              transport_number: secondRequestNumber,
+              include_objects: false,
+              include_tasks: true,
+            },
+          ),
+        );
+        for (const t of request?.tasks ?? []) {
+          const number = String(t?.number ?? '').trim();
+          if (number && !tasks.includes(number)) tasks.unshift(number);
+        }
+      } catch (e: any) {
+        logger?.warn(
+          `Cleanup: tasks of request ${secondRequestNumber} could not be read: ${e.message}`,
+        );
+      }
+    }
+
+    for (const task of tasks) {
       if (!task) continue;
       try {
         // **Detaching comes before deleting, and this suite of all suites
@@ -355,6 +396,25 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         }
       } catch (e: any) {
         logger?.warn(`Cleanup task delete failed: ${e.message}`);
+      }
+    }
+
+    if (secondRequestNumber) {
+      try {
+        const deleted = await createAdtClient(connection, logger)
+          .getRequest()
+          .delete({ transportNumber: secondRequestNumber } as any, {
+            analyse: analyseDeletion,
+          });
+        if (deleted.ok) {
+          logger?.success(`Cleanup: request ${secondRequestNumber} deleted`);
+        } else {
+          logger?.warn(
+            `Cleanup: request ${secondRequestNumber} was not deleted — ${deleted.getError().message}`,
+          );
+        }
+      } catch (e: any) {
+        logger?.warn(`Cleanup request delete failed: ${e.message}`);
       }
     }
   }, getTimeout('long'));
@@ -459,6 +519,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
           object_type: 'PROG',
         });
         expectOk(firstAddResponse, 'Step 2b AddTransportObject', logger);
+        entryTask = taskNumber;
         const firstAddData = parseHandlerResponse(firstAddResponse);
         expect(firstAddData.accepted).toBe(true);
         logger?.success('Step 2b: AddTransportObject accepted');
@@ -589,13 +650,36 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         expect(afterSort).toHaveLength(1);
         logger?.success('Step 9: entry still on the task, once');
 
-        // Step 10: a second task, the target of the move
+        // Step 10: a second request, and a task under it, the target of the
+        // move. Not a second task of the pinned request: the system refuses a
+        // move between two tasks of one request (TR 717, "Object can be moved
+        // between different requests only").
         logger?.info(
-          `Step 10: CreateTransportTask — a second task under ${parentTransport}`,
+          'Step 10: CreateTransport — a second request for the move',
+        );
+        const secondRequestResponse = await handleCreateTransport(
+          createHandlerContext({ connection, logger }),
+          {
+            transport_type: 'workbench',
+            description: 'MCP test: move target (transport-object-tools)',
+            owner: targetUser,
+          },
+        );
+        expectOk(secondRequestResponse, 'Step 10 CreateTransport', logger);
+        secondRequestNumber = parseHandlerResponse(
+          secondRequestResponse,
+        ).transport_number;
+        expect(secondRequestNumber).toBeTruthy();
+        logger?.success(`Step 10: request ${secondRequestNumber} created`);
+
+        await delay(getOperationDelay('create'));
+
+        logger?.info(
+          `Step 10: CreateTransportTask — a task under ${secondRequestNumber}`,
         );
         const secondTaskResponse = await handleCreateTransportTask(
           createHandlerContext({ connection, logger }),
-          { transport_number: parentTransport, target_user: targetUser },
+          { transport_number: secondRequestNumber, target_user: targetUser },
         );
         expectOk(secondTaskResponse, 'Step 10 CreateTransportTask', logger);
         secondTaskNumber = parseHandlerResponse(secondTaskResponse).task_number;
@@ -624,6 +708,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
           },
         );
         expectOk(moveResponse, 'Step 11 MoveTransportObjects', logger);
+        entryTask = secondTaskNumber;
         const moveData = parseHandlerResponse(moveResponse);
         expect(moveData.accepted).toBe(true);
         expect('success' in moveData).toBe(false);
@@ -666,6 +751,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
           },
         );
         expectOk(backResponse, 'Step 12 MoveTransportObjects', logger);
+        entryTask = taskNumber;
 
         await delay(getOperationDelay('update'));
 

@@ -975,9 +975,13 @@ describe('Debugger handlers (integration)', () => {
           ms: Math.round(second.ms),
         });
         expect(second.isError).toBe(true);
-        // The refusal comes from the listener check before any change; the
-        // contract is the handler's own wording, not the system's sentence.
-        expect(second.text).toContain('another debugger holds this debugging');
+        // The refusal comes from the listener check before any change. The
+        // answer is the method's error as it came — SAP's conflict, whose
+        // document names the other debugger — plus the step where it arose.
+        const refused = JSON.parse(second.text);
+        expect(refused.step).toBe('check listener');
+        expect(refused.status).toBe(409);
+        expect(String(refused.raw_body)).toContain('conflictText');
         expect(b.state?.holdsState()).toBe(false);
         const stillA = await call(a, 'DebugWait', {
           state_handle: handleA,

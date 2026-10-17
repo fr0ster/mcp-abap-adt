@@ -200,11 +200,19 @@ describe('the MCP tool surface', () => {
         'debug/DebugTakeOverListener': 'breakpoints',
       };
       const tightened = MAY_TIGHTEN_REQUIRED[tool];
+      // **19.0.0, internal batches (spec §11).** A parallelism knob the
+      // batched version makes meaningless is removed: `SearchSource`'s
+      // `concurrency`, and nothing else.
+      const REMOVED: Record<string, string[]> = {
+        'search/SearchSource': ['concurrency'],
+      };
+      const removed = REMOVED[tool] ?? [];
       expect({
         tool,
         lost: had.filter(
           (p) =>
             !has.includes(p) &&
+            !removed.includes(p) &&
             p !== `${relaxed ?? '\u0000'}*` &&
             p !== tightened &&
             !(listRelaxed(p) && has.includes(p.replace(/\*$/, ''))),

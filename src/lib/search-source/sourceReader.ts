@@ -2,6 +2,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { XMLParser } from 'fast-xml-parser';
 import { failureOf } from '../auth/failures';
+import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 import { carryingFailure, methodFailureOf } from '../strategies/step';
@@ -230,4 +231,101 @@ export function createSourceReaderDeps(
     },
     logger: ctx.logger,
   };
+}
+
+/** One read of the source reader: its method and its arguments. */
+export type SourceRead =
+  | { method: 'readProgram'; name: string; version: SourceVersion }
+  | { method: 'readClassMain'; name: string; version: SourceVersion }
+  | { method: 'readInclude'; name: string }
+  | { method: 'fetchFugrStructure'; name: string }
+  | { method: 'readFugrFm'; group: string; name: string };
+
+/** The key of one read: its method and its arguments. */
+export function sourceReadKey(read: SourceRead): string {
+  switch (read.method) {
+    case 'readProgram':
+    case 'readClassMain':
+      return `${read.method}|${read.name}|${read.version}`;
+    case 'readFugrFm':
+      return `${read.method}|${read.group}|${read.name}`;
+    default:
+      return `${read.method}|${read.name}`;
+  }
+}
+
+/**
+ * `ReadSourceUnitsDeps` answering from `answers`, for the batched version of
+ * `SearchSource` (spec §11): a read answered there gives its value (or throws
+ * its failure, as it came); a read with no answer is recorded in `asked` and
+ * gives nothing — no source, no function group child. `readSourceUnits` run
+ * over it names the reads of the next phase; run once every phase answered,
+ * it yields the units exactly as over the connection.
+ */
+export function answeredReaderDeps(
+  answers: ReadonlyMap<string, PhaseResult<unknown>>,
+  asked: SourceRead[],
+  logger?: ReadSourceUnitsDeps['logger'],
+): ReadSourceUnitsDeps {
+  const answer = async <T>(read: SourceRead, none: T): Promise<T> => {
+    const found = answers.get(sourceReadKey(read));
+    if (found === undefined) {
+      asked.push(read);
+      return none;
+    }
+    if (!found.ok) throw found.error;
+    return found.value as T;
+  };
+  return {
+    readProgram: (name, version) =>
+      answer<string | null>({ method: 'readProgram', name, version }, null),
+    readClassMain: (name, version) =>
+      answer<string | null>({ method: 'readClassMain', name, version }, null),
+    readInclude: (name) =>
+      answer<string | null>({ method: 'readInclude', name }, null),
+    fetchFugrStructure: (name) =>
+      answer<FugrChild[]>({ method: 'fetchFugrStructure', name }, []),
+    readFugrFm: (group, name) =>
+      answer<string | null>({ method: 'readFugrFm', group, name }, null),
+    ...(logger !== undefined ? { logger } : {}),
+  };
+}
+
+/** `read` on `deps`: one call of its method. */
+function perform(
+  deps: ReadSourceUnitsDeps,
+  read: SourceRead,
+): Promise<unknown> {
+  switch (read.method) {
+    case 'readProgram':
+      return deps.readProgram(read.name, read.version);
+    case 'readClassMain':
+      return deps.readClassMain(read.name, read.version);
+    case 'readInclude':
+      return deps.readInclude(read.name);
+    case 'fetchFugrStructure':
+      return deps.fetchFugrStructure(read.name);
+    case 'readFugrFm':
+      return deps.readFugrFm(read.group, read.name);
+  }
+}
+
+/**
+ * Every read of `reads` in one ADT batch envelope (`runPhase`), each through
+ * the source reader over the phase's batch connection; the answers keyed for
+ * `answeredReaderDeps`.
+ */
+export async function readSourcesInPhase(
+  ctx: HandlerContext,
+  reads: readonly SourceRead[],
+): Promise<Map<string, PhaseResult<unknown>>> {
+  const results = await runPhase(ctx, reads, (read, connection) =>
+    perform(createSourceReaderDeps({ ...ctx, connection }), read),
+  );
+  return new Map(
+    reads.map((read, i) => [
+      sourceReadKey(read),
+      results[i] as PhaseResult<unknown>,
+    ]),
+  );
 }

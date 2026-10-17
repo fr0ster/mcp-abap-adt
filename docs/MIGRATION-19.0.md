@@ -239,6 +239,15 @@ section but one): it cannot be cut, so it gets no `timeout`.
   does not answer now waits until the network fails; a bound on it is the client's own. The
   listed long reads' `timeout` above is the one deadline left, and it is the caller's.
 
+## Every transport: `SearchSource` loses `concurrency`
+
+- **`SearchSource` reads in ADT batch envelopes, one per phase** (the package mask searches, each
+  level of the package walk, then the sources of the scanned objects), so its `concurrency`
+  parameter (parallel source fetches, default 8, max 16) is removed from the schema. **Drop
+  `concurrency` from your calls**; the hits are the same. `time_budget_ms` keeps its meaning and is
+  checked between phases. Where the system has no communication batch the scan runs as in 18.x,
+  eight fetches at a time over HTTP and one at a time over RFC.
+
 ## stdio: leftover SAP sessions of a killed process
 
 A server process killed from outside (`SIGKILL`, out of memory, a host that kills its child)

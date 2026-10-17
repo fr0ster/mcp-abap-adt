@@ -12,20 +12,20 @@
  * in batch mode (spec §4.6); outside batch mode it is the same one request.
  *
  * Where the high create already sends that one request and nothing else
- * (PACKAGE, TRANSPORT, TABLE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE,
- * BEHAVIOR_IMPLEMENTATION), it is that handler, so the two cannot drift; the
- * others call the create step of their high create here.
+ * (PACKAGE, TRANSPORT, TABLE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE),
+ * it is that handler, so the two cannot drift; the others call the create step
+ * of their high create here — a behavior definition without its root entity
+ * and a behavior implementation without its behavior definition, which their
+ * creates do not send.
  *
  * **An argument the create does not send is refused, not dropped** (the
  * controller's ruling, the principle the owner set for `document` beside the
  * flat fields): present (`!== undefined`) beside `create_only`, before any
  * request — `activate` unless it is `false`, and every argument outside the
  * type's `CREATE_CARRIES` list. Each list is what that type's create request
- * was measured to carry and what its `create()` takes in its config (a
- * behavior definition's `rootEntity`, a behavior implementation's
- * `behaviorDefinition`, a class's `abstract` — taken, not on the wire), plus
- * `transport_request`, `package_name` and `description`, which every type
- * accepts. Each type is proven
+ * was measured to send ("accepted" means "sent by the create", the
+ * controller's ruling), plus `transport_request`, `package_name` and
+ * `description`, which every type accepts. Each type is proven
  * to send exactly one request (`compact-modify/src/__tests__/createOnly.test.ts`).
  *
  * UNIT_TEST and CDS_UNIT_TEST have no create of one request — their create is
@@ -35,6 +35,7 @@
 
 import {
   behaviorDefinitionDocuments,
+  classDocuments,
   dataElementDocuments,
   domainDocuments,
   functionGroupDocuments,
@@ -57,8 +58,8 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
+import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
 import { return_error } from '../../../lib/utils';
-import { handleCreateBehaviorImplementation } from '../../behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleCreateClass } from '../../class/high/handleCreateClass';
 import { handleCreateDdl } from '../../ddl/high/handleCreateDdl';
 import { handleCreateFunctionModule } from '../../function/high/handleCreateFunctionModule';
@@ -77,7 +78,7 @@ const COMMON = ['transport_request', 'package_name', 'description'] as const;
 /**
  * Per type, the arguments its create request carries — measured: each string
  * argument's value found in the request sent, each boolean or enum read off
- * the adt-clients create that builds it — and what its `create()` takes.
+ * the adt-clients create that builds it.
  */
 const CREATE_CARRIES: Readonly<Record<string, readonly string[]>> = {
   PACKAGE: [
@@ -109,7 +110,6 @@ const CREATE_CARRIES: Readonly<Record<string, readonly string[]>> = {
     'class_name',
     'superclass',
     'final',
-    'abstract',
     'create_protected',
     'master_language',
   ],
@@ -117,13 +117,8 @@ const CREATE_CARRIES: Readonly<Record<string, readonly string[]>> = {
   INTERFACE: ['interface_name', 'master_language'],
   FUNCTION_GROUP: ['function_group_name', 'master_language'],
   FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
-  BEHAVIOR_DEFINITION: [
-    'name',
-    'root_entity',
-    'implementation_type',
-    'master_language',
-  ],
-  BEHAVIOR_IMPLEMENTATION: ['class_name', 'behavior_definition'],
+  BEHAVIOR_DEFINITION: ['name', 'implementation_type', 'master_language'],
+  BEHAVIOR_IMPLEMENTATION: ['class_name'],
   METADATA_EXTENSION: ['name', 'master_language'],
 };
 
@@ -162,6 +157,16 @@ type Args = Record<string, unknown> & { object_type?: string };
 
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
+
+/** The types whose create sends more than one request: they refuse create_only. */
+const MORE_THAN_ONE_REQUEST = new Set(['UNIT_TEST', 'CDS_UNIT_TEST']);
+
+/** A type with no create: the words the create route answers it with. */
+function unsupportedCreate(objectType: string) {
+  return return_error(
+    new Error(`Unsupported create for object_type: ${objectType}`),
+  );
+}
 
 /** The refusal of a type whose create sends more than one request. */
 function createOnlyRefusal(objectType: string) {
@@ -210,8 +215,12 @@ export async function handleCreateOnly(
   const masterLanguage = text(args.master_language);
 
   const objectType = String(args.object_type);
-  if (CREATE_CARRIES[objectType] === undefined) {
+  if (MORE_THAN_ONE_REQUEST.has(objectType)) {
     return createOnlyRefusal(objectType);
+  }
+  if (CREATE_CARRIES[objectType] === undefined) {
+    // No create at all: the create route's own words.
+    return unsupportedCreate(objectType);
   }
   const ignored = notSent(objectType, args);
   if (ignored.length > 0) return notSentRefusal(ignored);
@@ -233,8 +242,6 @@ export async function handleCreateOnly(
       return handleCreateInterface(context, args as never);
     case 'FUNCTION_MODULE':
       return handleCreateFunctionModule(context, args as never);
-    case 'BEHAVIOR_IMPLEMENTATION':
-      return handleCreateBehaviorImplementation(context, args as never);
 
     case 'DOMAIN': {
       const refused = missing(args, ['domain_name', 'package_name']);
@@ -377,7 +384,6 @@ export async function handleCreateOnly(
       const refused = missing(args, [
         'name',
         'package_name',
-        'root_entity',
         'implementation_type',
       ]);
       if (refused) return refused;
@@ -391,13 +397,42 @@ export async function handleCreateOnly(
               description: text(args.description) || name,
               packageName,
               transportRequest,
-              rootEntity: args.root_entity as string,
               implementationType: args.implementation_type as never,
               masterLanguage,
             },
             { analyse: analyseException },
           ),
       );
+    }
+    case 'BEHAVIOR_IMPLEMENTATION': {
+      // The create is the class shell: the behavior definition is named in
+      // the implementation's source, written afterwards, never in this
+      // request — so create_only neither needs nor takes it.
+      const refused = missing(args, ['class_name', 'package_name']);
+      if (refused) return refused;
+      const className = String(args.class_name).toUpperCase();
+      return createAlone(args, 'CreateBehaviorImplementation', async () => {
+        // adt-clients builds the inner class with an empty system context:
+        // the responsible and the master system go in the config.
+        const { responsible, masterSystem } = requireSystemContextForCreate();
+        return client()
+          .getBehaviorImplementation(resultsFor(classDocuments))
+          .create(
+            // The config type declares `behaviorDefinition`, which this
+            // create never sends (AdtBehaviorImplementation.create passes
+            // className, packageName, transportRequest, description,
+            // masterSystem, responsible to the class create): left out.
+            {
+              className,
+              packageName: packageName.toUpperCase(),
+              description: text(args.description) || className,
+              transportRequest,
+              responsible,
+              masterSystem,
+            } as never,
+            { analyse: analyseException },
+          );
+      });
     }
     case 'METADATA_EXTENSION': {
       const refused = missing(args, ['name', 'package_name']);
@@ -419,6 +454,6 @@ export async function handleCreateOnly(
       );
     }
     default:
-      return createOnlyRefusal(String(args.object_type));
+      return unsupportedCreate(objectType);
   }
 }

@@ -70,9 +70,10 @@ they refuse it ("create_only is not available for <type>: its create sends more 
 request") before anything is sent. Beside `create_only` an argument the create does not send is
 refused before anything is sent, not dropped — `activate` (unless `false`), and anything the
 type's create request does not carry (`fields`, `source_code`, `fixed_values`,
-`test_class_source`, …): "create_only sends the create
-alone: <argument> is not sent — leave it out, or create without create_only". A `PACKAGE` is recorded over HTTP only: over RFC a package is
-created in an ABAP session of its own, outside the batch.
+`test_class_source`, a class's `abstract`, a behavior definition's `root_entity`, a behavior
+implementation's `behavior_definition`, …): "create_only sends the create alone: <argument> is
+not sent — leave it out, or create without create_only". A `PACKAGE` is recorded over HTTP only:
+over RFC a package is created in an ABAP session of its own, outside the batch.
 
 Only LOCK and UNLOCK go stateful, in their own envelopes, as adt-clients sends them; everything
 else is stateless.

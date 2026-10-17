@@ -21,6 +21,7 @@ import type {
 } from '@mcp-abap-adt/lib/compact-shared';
 import { compactCreateSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { handleCreateOnly } from '@mcp-abap-adt/lib/handlers/write';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
 import {
   resetSystemContextCache,
@@ -129,6 +130,8 @@ const BODY: Record<string, string> = { TRANSPORT: TRANSPORT_DOCUMENT };
  */
 const HIGH_ONLY: Record<string, Record<string, unknown>> = {
   STRUCTURE: { fields: [{ name: 'FIELD_A', data_type: 'CHAR', length: 10 }] },
+  BEHAVIOR_DEFINITION: { root_entity: 'ZBDEF_A' },
+  BEHAVIOR_IMPLEMENTATION: { behavior_definition: 'ZBDEF_A' },
 };
 
 /** The high create the create route runs for `objectType`, called directly. */
@@ -189,18 +192,10 @@ const OFFERED: Array<[string, Record<string, unknown>]> = [
     {
       name: 'ZBDEF_A',
       package_name: 'ZPKG_A',
-      root_entity: 'ZBDEF_A',
       implementation_type: 'Managed',
     },
   ],
-  [
-    'BEHAVIOR_IMPLEMENTATION',
-    {
-      class_name: 'ZBP_A',
-      behavior_definition: 'ZBDEF_A',
-      package_name: 'ZPKG_A',
-    },
-  ],
+  ['BEHAVIOR_IMPLEMENTATION', { class_name: 'ZBP_A', package_name: 'ZPKG_A' }],
   ['METADATA_EXTENSION', { name: 'ZDDLX_A', package_name: 'ZPKG_A' }],
 ];
 
@@ -371,7 +366,6 @@ const CARRIES: Record<string, string[]> = {
     'class_name',
     'superclass',
     'final',
-    'abstract',
     'create_protected',
     'master_language',
   ],
@@ -379,13 +373,8 @@ const CARRIES: Record<string, string[]> = {
   INTERFACE: ['interface_name', 'master_language'],
   FUNCTION_GROUP: ['function_group_name', 'master_language'],
   FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
-  BEHAVIOR_DEFINITION: [
-    'name',
-    'root_entity',
-    'implementation_type',
-    'master_language',
-  ],
-  BEHAVIOR_IMPLEMENTATION: ['class_name', 'behavior_definition'],
+  BEHAVIOR_DEFINITION: ['name', 'implementation_type', 'master_language'],
+  BEHAVIOR_IMPLEMENTATION: ['class_name'],
   METADATA_EXTENSION: ['name', 'master_language'],
 };
 
@@ -401,9 +390,8 @@ const ACCEPTED_EVERYWHERE = [
 
 /**
  * Accepted though the request was measured not to carry them — the ruling's
- * common three where adt-clients' create does not send them, and what a
- * create() takes in its config without sending it. Named so the probe below
- * does not expect them on the wire.
+ * common three where adt-clients' create does not send them. Named so the
+ * probe below does not expect them on the wire.
  */
 const ACCEPTED_NOT_SENT: Record<string, string[]> = {
   TRANSPORT: ['transport_request', 'package_name'],
@@ -411,9 +399,6 @@ const ACCEPTED_NOT_SENT: Record<string, string[]> = {
   SERVICE_BINDING: ['transport_request'],
   FUNCTION_MODULE: ['package_name'],
   METADATA_EXTENSION: ['transport_request'],
-  BEHAVIOR_DEFINITION: ['root_entity'],
-  BEHAVIOR_IMPLEMENTATION: ['behavior_definition'],
-  CLASS: ['abstract'],
 };
 
 /** A value an accepted argument may take, so the create still builds. */
@@ -425,7 +410,6 @@ const SAMPLE: Record<string, unknown> = {
   implementation_type: 'Managed',
   record_changes: true,
   final: true,
-  abstract: true,
   create_protected: true,
   master_language: 'EN',
 };
@@ -596,6 +580,79 @@ describe('HandlerCreate create_only beside an argument its create does not send'
           carried: true,
         });
       }
+    },
+  );
+});
+
+describe('create_only and what only the high create needs', () => {
+  beforeEach(() => {
+    setSystemContext({
+      masterSystem: 'SYSTEM_PLACEHOLDER',
+      responsible: 'USER_PLACEHOLDER',
+    });
+  });
+  afterEach(() => resetSystemContextCache());
+
+  it.each([
+    ['BEHAVIOR_DEFINITION', 'root_entity'],
+    ['BEHAVIOR_IMPLEMENTATION', 'behavior_definition'],
+    ['CLASS', 'abstract'],
+  ])(
+    '%s: create_only neither needs nor takes %s, which its create does not send',
+    async (objectType, name) => {
+      const fields = OFFERED_FIELDS.get(objectType) ?? {};
+      expect(fields[name]).toBeUndefined();
+      const without = await run('pending', createOnly(objectType, fields));
+      expect(without.sent).toHaveLength(1);
+      const value = name === 'abstract' ? true : 'ZBDEF_A';
+      const given = await run(
+        'answered',
+        createOnly(objectType, { ...fields, [name]: value }),
+      );
+      expect(given.sent).toEqual([]);
+      expect(given.answer?.content?.[0]?.text).toContain(
+        `create_only sends the create alone: ${name} is not sent`,
+      );
+    },
+  );
+
+  it.each([
+    ['BEHAVIOR_DEFINITION', 'root_entity'],
+    ['BEHAVIOR_IMPLEMENTATION', 'behavior_definition'],
+  ])('%s: the high create still requires %s', async (objectType, name) => {
+    const answered = await run('answered', (context) =>
+      handleHandlerCreate(context, {
+        object_type: objectType,
+        ...(OFFERED_FIELDS.get(objectType) ?? {}),
+      } as never),
+    );
+    expect(answered.sent).toEqual([]);
+    expect(answered.answer?.isError).toBe(true);
+    expect(name in (HIGH_ONLY[objectType] ?? {})).toBe(true);
+  });
+});
+
+describe('handleCreateOnly and a type with no create', () => {
+  it.each(['LOCAL_TYPES', 'RUNTIME_DUMP', 'NO_SUCH_TYPE'])(
+    "%s: the create route's own words, not the more-than-one-request refusal",
+    async (objectType) => {
+      const direct = await run(
+        'answered',
+        (context) =>
+          handleCreateOnly(context, {
+            object_type: objectType,
+            create_only: true,
+          }) as Promise<unknown>,
+      );
+      expect(direct.sent).toEqual([]);
+      expect(direct.answer?.content?.[0]?.text).toContain(
+        `Unsupported create for object_type: ${objectType}`,
+      );
+      expect(direct.answer?.content?.[0]?.text).not.toContain(
+        'more than one request',
+      );
+      const routed = await run('answered', createOnly(objectType, {}));
+      expect(routed.answer).toEqual(direct.answer);
     },
   );
 });

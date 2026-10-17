@@ -10,8 +10,8 @@ import {
   identityOf,
   KIND_PROPERTY,
   needed,
-  OPENING_STATE_HANDLE_PROPERTY,
   onceAnswer,
+  openingStateHandleProperty,
   refuseOperation,
 } from './shared';
 
@@ -36,11 +36,13 @@ export const TOOL_DEFINITION = {
   name: 'HandlerDebugSession',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Debugger listener and session: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: checkListener answers whether another debugger holds this identity's debugging (SAP's 409 names the holder); listen waits for a debuggee for exactly hold_seconds, SAP's hold, and answers the debuggee caught (debuggee_id, its server) or caught: false; a breakpoint stops a program while a listen is open; stopListener ends the listener and deletes the identity's breakpoints; attach attaches debuggee_id on a session of its own, which every later step and reading uses; detachDebugger sends detachDebugger on the attaching session with the debuggee id left out, which releases the debuggee, and the program runs on; terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger: both answer 500 when they succeed, and the success shows in the next answer; setDebuggerSettings sends the settings given at the attached debuggee. kind amdp: start opens an AMDP session for the connected SAP user and answers its main_id; getEvents answers the events SAP sends (breaks with their debuggee ids, breakpoint confirmations, ends); stop ends the AMDP session; deleteDebuggee cancels the execution of debuggee_id. The answer carries state_handle, and for abap the identity in force.",
+    "Debugger listener and session: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: checkListener answers whether another debugger holds this identity's debugging (SAP's 409 names the holder); listen waits for a debuggee for exactly hold_seconds, SAP's hold, and answers the debuggee caught (debuggee_id, its server) or caught: false; a breakpoint stops a program while a listen is open; stopListener ends the listener and deletes the identity's breakpoints; attach attaches debuggee_id on a session of its own, which every later step and reading uses; detachDebugger sends detachDebugger on the attaching session, which releases the debuggee, and the program runs on; terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger; each answers SAP's answer as it came, which is a 500 when it succeeded, and the next answer shows the success (noSessionAttached, or the program's end); setDebuggerSettings sends the settings given at the attached debuggee. kind amdp: start opens an AMDP session for the connected SAP user and answers its main_id; getEvents answers the events SAP sends (breaks with their debuggee ids, breakpoint confirmations, ends); stop ends the AMDP session; deleteDebuggee cancels the execution of debuggee_id. The answer carries state_handle, and for abap the identity in force.",
   inputSchema: {
     type: 'object',
     properties: {
-      ...OPENING_STATE_HANDLE_PROPERTY,
+      ...openingStateHandleProperty(
+        'abap checkListener, listen, stopListener and attach, and amdp start,',
+      ),
       ...KIND_PROPERTY,
       operation: {
         type: 'string',

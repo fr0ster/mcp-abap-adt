@@ -23,14 +23,16 @@ export const KIND_PROPERTY = {
   },
 } as const;
 
-/** The handle on the tools that may open the debug state. */
-export const OPENING_STATE_HANDLE_PROPERTY = {
-  state_handle: {
-    type: 'string',
-    description:
-      "The handle of this server's debug state. Omitted, the call opens the debug state and answers its handle.",
-  },
-} as const;
+/** The handle on a tool some of whose operations open the debug state: `opening` names them. */
+export function openingStateHandleProperty<const W extends string>(opening: W) {
+  return {
+    state_handle: {
+      type: 'string',
+      description:
+        `The handle of this server's debug state. ${opening} open the debug state when it is omitted and answer its handle; every other operation takes it.` as `The handle of this server's debug state. ${W} open the debug state when it is omitted and answer its handle; every other operation takes it.`,
+    },
+  } as const;
+}
 
 export const IDENTITY_PROPERTIES = {
   request_user: {

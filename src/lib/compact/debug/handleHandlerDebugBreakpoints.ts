@@ -11,8 +11,8 @@ import {
   identityOf,
   KIND_PROPERTY,
   needed,
-  OPENING_STATE_HANDLE_PROPERTY,
   onceAnswer,
+  openingStateHandleProperty,
   refuseOperation,
 } from './shared';
 
@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
   inputSchema: {
     type: 'object',
     properties: {
-      ...OPENING_STATE_HANDLE_PROPERTY,
+      ...openingStateHandleProperty('abap setBreakpoints and syncBreakpoints'),
       ...KIND_PROPERTY,
       operation: {
         type: 'string',

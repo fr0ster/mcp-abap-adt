@@ -19,6 +19,7 @@ import {
 import {
   analyseDebuggeeEnd,
   analyseDebuggerFreed,
+  analyseException,
   readExceptionSubType,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -1450,6 +1451,8 @@ export class DebugSession<O = unknown> {
   /** The listener connection of the one-request path, and its listen while one is open. */
   private onceListener?: {
     connection: IAbapConnection;
+    /** Set inside the serial when a listen is taken, cleared when its answer came. */
+    listening?: boolean;
     open?: Promise<IAdtResponse<string>>;
   };
   /** Connections the one-request path is done with: the cleanup closes (or drops) them. */
@@ -1616,13 +1619,14 @@ export class DebugSession<O = unknown> {
     conflict: IDebuggerListenerConflict,
   ): Promise<DebugView<DebuggeeReading | { caught: false }>> {
     const { identity, dbg, listener } = await this.mutate(async () => {
-      if (this.onceListener?.open)
+      if (this.onceListener?.listening)
         throw new DebugStateError(
           'a listen is open for this debug session: its answer comes first',
         );
       const identity = await this.onceIdentity(options);
       if (!this.onceListener)
         this.onceListener = { connection: await this.open() };
+      this.onceListener.listening = true;
       this.changed = true;
       return {
         identity,
@@ -1630,16 +1634,18 @@ export class DebugSession<O = unknown> {
         dbg: this.ports.abapDebugger(this.onceListener.connection, conflict),
       };
     });
-    const sent = dbg.listen(identity, { holdSeconds });
-    const open = sent.catch(asFailure);
-    listener.open = open;
+    let open: Promise<IAdtResponse<string>> | undefined;
     try {
+      const sent = dbg.listen(identity, { holdSeconds });
+      open = sent.catch(asFailure);
+      listener.open = open;
       const answer = await sent;
       if (!answer.ok) throw listenerError(answer, 'listen');
       const caught = readDebuggee(bodyOf(answer));
       return { value: caught ?? { caught: false }, raw: bodyOf(answer) };
     } finally {
       if (listener.open === open) listener.open = undefined;
+      listener.listening = false;
       this.notify();
     }
   }
@@ -1775,8 +1781,9 @@ export class DebugSession<O = unknown> {
   terminateDebuggeeOnce(): Promise<DebugView<{ terminated: true }>> {
     return this.mutate(async () => {
       const stop = this.requireStop();
+      // SAP's answer as it came: a 500 that SAP sends when it succeeded reaches the caller.
       const answer = await stop.debugger.terminateDebuggee({
-        analyse: analyseDebuggeeEnd,
+        analyse: analyseException,
       });
       if (!answer.ok)
         throw failedAt(
@@ -1793,8 +1800,9 @@ export class DebugSession<O = unknown> {
   terminateDebuggerOnce(): Promise<DebugView<{ freed: true }>> {
     return this.mutate(async () => {
       const stop = this.requireStop();
+      // SAP's answer as it came: a 500 that SAP sends when it succeeded reaches the caller.
       const answer = await stop.debugger.terminateDebugger({
-        analyse: analyseDebuggerFreed,
+        analyse: analyseException,
       });
       if (!answer.ok)
         throw failedAt(

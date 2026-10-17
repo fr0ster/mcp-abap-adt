@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
       position: {
         type: 'integer',
         description:
-          'abap setStackPosition: the frame position, as getStack answers it.',
+          "abap setStackPosition: the frame's position in the stack.",
       },
       debuggee_id: {
         type: 'string',

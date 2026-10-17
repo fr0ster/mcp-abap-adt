@@ -189,9 +189,10 @@ stack. You chain the calls:
    `detachDebugger` without a debuggee id on the attaching session — the debuggee is released and
    the program runs on (measured 2026-10-17; with an id SAP answers `200` and releases nothing);
    `terminateDebuggee`, which ends it; or `terminateDebugger`, which frees the debugger.
-   `terminateDebuggee` and `terminateDebugger` answer `500` when they succeed (measured
-   2026-10-17): the success shows in the next answer, which is `noSessionAttached`, or in the
-   program's end.
+   SAP answers `terminateDebuggee` and `terminateDebugger` with a `500` when they succeed (measured
+   2026-10-17), and the tool passes SAP's answer on as it came: a failure with its `status` and
+   step (`terminate debuggee`, `terminate debugger`). The success shows in the next answer, which
+   is `noSessionAttached`, or in the program's end.
 6. `HandlerDebugBreakpoints` `deleteBreakpoint`, or `HandlerDebugSession` `stopListener`, which
    ends the listener and deletes the identity's breakpoints.
 

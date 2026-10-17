@@ -45,6 +45,11 @@ interface Wire {
   headersOf: (method: string, url: string) => Record<string, string>;
   opened: number;
   closed: number;
+  /** An answering request SAP refuses: its status and body. */
+  refusalOf?: (
+    method: string,
+    url: string,
+  ) => { status: number; data: string } | undefined;
 }
 
 function fakeConnection(wire: Wire): IAbapConnection {
@@ -79,6 +84,19 @@ function fakeConnection(wire: Wire): IAbapConnection {
           statusText: 'Not Found',
           data: '',
           headers: {},
+        };
+        throw error;
+      }
+      const refusal = wire.refusalOf?.(method, url);
+      if (refusal) {
+        const error = new Error(
+          `Request failed with status code ${refusal.status}`,
+        ) as Error & { response?: unknown };
+        error.response = {
+          status: refusal.status,
+          statusText: 'Internal Server Error',
+          data: refusal.data,
+          headers: { 'content-type': 'application/xml' },
         };
         throw error;
       }
@@ -154,6 +172,13 @@ function install(
 type Answer = { isError?: boolean; content: Array<{ text: string }> };
 const jsonOf = (a?: Answer) =>
   JSON.parse(a?.content[0]?.text ?? '{}') as Record<string, any>;
+
+/** The call's answer once the queue has run, or a held marker when it is still open. */
+async function answeredOrHeld(call: Promise<Answer>): Promise<Answer> {
+  call.catch(() => undefined);
+  const held: Answer = { isError: false, content: [{ text: 'held open' }] };
+  return Promise.race([call, settle().then(() => held)]);
+}
 
 async function settle(): Promise<void> {
   for (let i = 0; i < 50; i += 1)
@@ -577,13 +602,13 @@ describe('descriptions, positive', () => {
 
   it('terminate answers 500 when it succeeds', () => {
     expect(description('HandlerDebugSession')).toContain(
-      'terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger: both answer 500 when they succeed, and the success shows in the next answer;',
+      "terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger; each answers SAP's answer as it came, which is a 500 when it succeeded, and the next answer shows the success (noSessionAttached, or the program's end);",
     );
   });
 
   it('detach releases the debuggee on the attaching session', () => {
     expect(description('HandlerDebugSession')).toContain(
-      'detachDebugger sends detachDebugger on the attaching session with the debuggee id left out, which releases the debuggee, and the program runs on;',
+      'detachDebugger sends detachDebugger on the attaching session, which releases the debuggee, and the program runs on;',
     );
   });
 
@@ -646,6 +671,11 @@ describe('each call is exactly one request (held / document / 404)', () => {
     const failed = jsonOf(refused.answer);
     expect(failed.status).toBe(404);
     expect(failed.step).toBe(c.step);
+    // The failure answers the handle beside the error: the state holds what the call fixed.
+    const handleBlock = refused.answer?.content
+      .map((block) => JSON.parse(block.text) as Record<string, unknown>)
+      .find((block) => 'state_handle' in block);
+    expect(handleBlock?.state_handle).toMatch(/^[0-9A-F]{32}$/);
   });
 });
 
@@ -875,6 +905,158 @@ describe("the chain is the consumer's", () => {
     expect(same.isError).not.toBe(true);
     expect(t.wire.sent).toHaveLength(1);
     expect(t.wire.sent[0]).toContain('requestUser=OTHER_USER');
+  });
+
+  // The two shapes a success has been answered in: an ADT exception with the
+  // subtype terminateDebuggee, and a plain ICF 500 with an empty body. Each
+  // reaches the caller as SAP sent it, a 500 failure with its step.
+  const TERMINATE_500 = (subType: string) =>
+    `<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="AdiFailed"/><message lang="EN">Debuggee terminated</message><localizedMessage lang="EN">Debuggee terminated</localizedMessage><properties><entry key="com.sap.adt.communicationFramework.subType">${subType}</entry></properties></exc:exception>`;
+  it.each([
+    [
+      'terminateDebuggee',
+      'terminate debuggee',
+      TERMINATE_500('terminateDebuggee'),
+    ],
+    ['terminateDebugger', 'terminate debugger', ''],
+  ])(
+    '%s: the 500 SAP answers when it succeeded reaches the caller as SAP sent it',
+    async (operation, step, data) => {
+      const t = install();
+      const handle = (await prepare(t, 'attached')).state_handle;
+      t.wire.mode = 'document';
+      t.wire.refusalOf = (_m, url) =>
+        url.includes(`method=${operation}`) ? { status: 500, data } : undefined;
+      const answer = await t.call('HandlerDebugSession', {
+        state_handle: handle,
+        kind: 'abap',
+        operation,
+      });
+      expect(t.wire.sent).toEqual([
+        `POST /sap/bc/adt/debugger?method=${operation}`,
+      ]);
+      expect(answer.isError).toBe(true);
+      const failed = jsonOf(answer);
+      expect(failed.status).toBe(500);
+      expect(failed.step).toBe(step);
+    },
+  );
+
+  it('a second attach becomes the one the calls work on; the first attaching session closes at the cleanup', async () => {
+    const t = install();
+    const handle = (await prepare(t, 'attached')).state_handle;
+    const abap = t.instance.abap as unknown as {
+      current?: { connection: IAbapConnection };
+    };
+    const first = abap.current!.connection;
+    const second = await t.call('HandlerDebugSession', {
+      state_handle: handle,
+      kind: 'abap',
+      operation: 'attach',
+      debuggee_id: 'DEBUGGEE2',
+    });
+    expect(second.isError).not.toBe(true);
+    const now = abap.current!.connection;
+    expect(now).not.toBe(first);
+    t.wire.mode = 'document';
+    await t.instance.stop();
+    expect(t.wire.sent).toEqual([]);
+    expect(t.wire.closed).toBe(t.wire.opened);
+  });
+
+  it('one listen at a time: a second listen while one holds is refused before any request', async () => {
+    const t = install();
+    t.wire.mode = 'pending';
+    const first = t.call('HandlerDebugSession', {
+      kind: 'abap',
+      operation: 'listen',
+      hold_seconds: 60,
+    });
+    first.catch(() => undefined);
+    await settle();
+    expect(t.wire.sent).toHaveLength(1);
+    // Held open by a wrong rule, the second call would never answer: it is raced, never awaited alone.
+    const second = await answeredOrHeld(
+      t.call('HandlerDebugSession', {
+        state_handle: t.state.handle,
+        kind: 'abap',
+        operation: 'listen',
+        hold_seconds: 60,
+      }),
+    );
+    await settle();
+    expect(t.wire.sent).toHaveLength(1);
+    expect(second.isError).toBe(true);
+    expect(second.content[0].text).toContain(
+      'a listen is open for this debug session',
+    );
+  });
+
+  it('one AMDP event read at a time: a second getEvents while one holds is refused before any request', async () => {
+    const t = install();
+    const started = await prepare(t, 'amdp');
+    t.wire.mode = 'pending';
+    const first = t.call('HandlerDebugSession', {
+      ...started,
+      kind: 'amdp',
+      operation: 'getEvents',
+    });
+    first.catch(() => undefined);
+    await settle();
+    expect(t.wire.sent).toHaveLength(1);
+    // Held open by a wrong rule, the second call would never answer: it is raced, never awaited alone.
+    const second = await answeredOrHeld(
+      t.call('HandlerDebugSession', {
+        ...started,
+        kind: 'amdp',
+        operation: 'getEvents',
+      }),
+    );
+    await settle();
+    expect(t.wire.sent).toHaveLength(1);
+    expect(second.isError).toBe(true);
+    expect(second.content[0].text).toContain(
+      'an event read is open for this AMDP session',
+    );
+  });
+
+  it('AMDP: no background event read, nothing is sent between calls', async () => {
+    jest.useFakeTimers({
+      doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
+    });
+    try {
+      const onBreak = corpusBody('amdp-debugger--05-events-on-break');
+      const t = install((method, url) =>
+        method === 'GET' && url === `${MAIN}/MAIN1` ? onBreak : '',
+      );
+      t.wire.mode = 'document';
+      const started = await t.call('HandlerDebugSession', {
+        kind: 'amdp',
+        operation: 'start',
+      });
+      const handle = jsonOf(started).state_handle;
+      await t.call('HandlerDebugBreakpoints', {
+        state_handle: handle,
+        kind: 'amdp',
+        operation: 'syncBreakpoints',
+        breakpoints: [{ object_name: 'class_a', line: 14 }],
+      });
+      await jest.advanceTimersByTimeAsync(120_000);
+      await settle();
+      expect(t.wire.sent).toHaveLength(2);
+      const events = await t.call('HandlerDebugSession', {
+        state_handle: handle,
+        kind: 'amdp',
+        operation: 'getEvents',
+      });
+      expect(jsonOf(events).events.length).toBeGreaterThan(0);
+      await jest.advanceTimersByTimeAsync(120_000);
+      await settle();
+      expect(t.wire.sent).toHaveLength(3);
+      expect(t.wire.sent[2]).toBe(`GET ${MAIN}/MAIN1`);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('the cleanup closes the connections the calls opened, and the handle ends', async () => {

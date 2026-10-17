@@ -579,7 +579,7 @@ per request.
 
 **Parameters:**
 
-- `state_handle` — The handle of this server's debug state. Omitted, the call opens the debug state and answers its handle.
+- `state_handle` — The handle of this server's debug state. abap setBreakpoints and syncBreakpoints open the debug state when it is omitted and answer its handle; every other operation takes it.
 - `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
 - `operation` (required) — The one request: abap setBreakpoints, syncBreakpoints, deleteBreakpoint, createWatchpoint, listWatchpoints or deleteWatchpoint; amdp syncBreakpoints.
 - `breakpoints` — setBreakpoints and syncBreakpoints: abap a line, an exception class, an ABAP statement or a message, a line breakpoint may carry a condition; amdp object_name (the class) and line of each, an empty list clears them.
@@ -597,13 +597,13 @@ per request.
 
 **Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** Debugger listener and session: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: checkListener answers whether another debugger holds this identity's debugging (SAP's 409 names the holder); listen waits for a debuggee for exactly hold_seconds, SAP's hold, and answers the debuggee caught (debuggee_id, its server) or caught: false; a breakpoint stops a program while a listen is open; stopListener ends the listener and deletes the identity's breakpoints; attach attaches debuggee_id on a session of its own, which every later step and reading uses; detachDebugger sends detachDebugger on the attaching session with the debuggee id left out, which releases the debuggee, and the program runs on; terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger: both answer 500 when they succeed, and the success shows in the next answer; setDebuggerSettings sends the settings given at the attached debuggee. kind amdp: start opens an AMDP session for the connected SAP user and answers its main_id; getEvents answers the events SAP sends (breaks with their debuggee ids, breakpoint confirmations, ends); stop ends the AMDP session; deleteDebuggee cancels the execution of debuggee_id. The answer carries state_handle, and for abap the identity in force.
+**Description:** Debugger listener and session: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: checkListener answers whether another debugger holds this identity's debugging (SAP's 409 names the holder); listen waits for a debuggee for exactly hold_seconds, SAP's hold, and answers the debuggee caught (debuggee_id, its server) or caught: false; a breakpoint stops a program while a listen is open; stopListener ends the listener and deletes the identity's breakpoints; attach attaches debuggee_id on a session of its own, which every later step and reading uses; detachDebugger sends detachDebugger on the attaching session, which releases the debuggee, and the program runs on; terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger; each answers SAP's answer as it came, which is a 500 when it succeeded, and the next answer shows the success (noSessionAttached, or the program's end); setDebuggerSettings sends the settings given at the attached debuggee. kind amdp: start opens an AMDP session for the connected SAP user and answers its main_id; getEvents answers the events SAP sends (breaks with their debuggee ids, breakpoint confirmations, ends); stop ends the AMDP session; deleteDebuggee cancels the execution of debuggee_id. The answer carries state_handle, and for abap the identity in force.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `state_handle` — The handle of this server's debug state. Omitted, the call opens the debug state and answers its handle.
+- `state_handle` — The handle of this server's debug state. abap checkListener, listen, stopListener and attach, and amdp start, open the debug state when it is omitted and answer its handle; every other operation takes it.
 - `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
 - `operation` (required) — The one request: abap checkListener, listen, stopListener, attach, detachDebugger, terminateDebuggee, terminateDebugger or setDebuggerSettings; amdp start, getEvents, stop or deleteDebuggee.
 - `hold_seconds` — abap listen: how long SAP holds the listen, in seconds; SAP answers at a catch or when the hold ends.
@@ -633,7 +633,7 @@ per request.
 - `line` — For a line: the line in the object source.
 - `include` — For a class: definitions, implementations, macros or testclasses; the main source when omitted.
 - `parent_name` — For a function module: its function group.
-- `position` — abap setStackPosition: the frame position, as getStack answers it.
+- `position` — abap setStackPosition: the frame's position in the stack.
 - `debuggee_id` — amdp: the debuggee id of the break event.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 

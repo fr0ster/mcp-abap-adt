@@ -18,6 +18,23 @@ import {
 type Sent = { method: string; url: string };
 
 const NUMBER = 'SIDK900101';
+const WITH_AGGREGATE = `<?xml version="1.0" encoding="UTF-8"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${NUMBER}">
+  <tm:request tm:number="${NUMBER}">
+    <tm:all_objects>
+      <tm:abap_object tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_A" tm:position="000001"/>
+      <tm:abap_object tm:pgmid="R3TR" tm:type="TABL" tm:name="ZTAB" tm:position="000002"/>
+      <tm:abap_object tm:pgmid="R3TR" tm:type="PROG" tm:name="ZPROG" tm:position="000003"/>
+    </tm:all_objects>
+    <tm:task tm:number="SIDK900102">
+      <tm:abap_object tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_A" tm:position="000001"/>
+      <tm:abap_object tm:pgmid="R3TR" tm:type="TABL" tm:name="ZTAB" tm:position="000002"/>
+    </tm:task>
+    <tm:task tm:number="SIDK900103">
+      <tm:abap_object tm:pgmid="R3TR" tm:type="PROG" tm:name="ZPROG" tm:position="000001"/>
+    </tm:task>
+  </tm:request>
+</tm:root>`;
 const DOCUMENT = `<?xml version="1.0" encoding="UTF-8"?>
 <tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="${NUMBER}">
   <tm:request tm:number="${NUMBER}">
@@ -28,7 +45,7 @@ const DOCUMENT = `<?xml version="1.0" encoding="UTF-8"?>
   </tm:request>
 </tm:root>`;
 
-function recording() {
+function recording(document: string = DOCUMENT) {
   const sent: Sent[] = [];
   const connection = {
     async connect() {},
@@ -41,7 +58,7 @@ function recording() {
     setSessionType() {},
     async makeAdtRequest(options: Sent) {
       sent.push({ method: options.method, url: options.url });
-      return { status: 200, statusText: 'OK', headers: {}, data: DOCUMENT };
+      return { status: 200, statusText: 'OK', headers: {}, data: document };
     },
   };
   return { context: { connection, logger: undefined } as never, sent };
@@ -91,6 +108,34 @@ describe('HandlerGet with object_type TRANSPORT', () => {
         name: 'ZTAB',
         position: '000002',
       }),
+    ]);
+  });
+
+  it('a request answers each task entry once, with its task, as the full read does', async () => {
+    const compact = recording(WITH_AGGREGATE);
+    const full = recording(WITH_AGGREGATE);
+
+    const compactAnswer = (await handleHandlerGet(compact.context, {
+      object_type: 'TRANSPORT',
+      transport_number: NUMBER,
+    })) as { isError: boolean; content: { text: string }[] };
+    const fullAnswer = await handleReadTransportObjects(full.context, {
+      transport_number: NUMBER,
+    });
+
+    expect(compact.sent).toHaveLength(1);
+    expect(compactAnswer).toEqual(fullAnswer);
+    const body = JSON.parse(compactAnswer.content[0]?.text ?? '{}');
+    expect(body.count).toBe(3);
+    expect(
+      body.objects.map(
+        (o: { task?: string; name: string; position: string }) =>
+          `${o.task}|${o.name}|${o.position}`,
+      ),
+    ).toEqual([
+      'SIDK900102|ZCL_A|000001',
+      'SIDK900102|ZTAB|000002',
+      'SIDK900103|ZPROG|000001',
     ]);
   });
 

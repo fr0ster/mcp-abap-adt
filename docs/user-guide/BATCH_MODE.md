@@ -184,6 +184,37 @@ anyway, the call answers `batch_other_kind` and records nothing more; if an earl
 already recorded, the words say so with its number — that part is sent at `BatchEnd`, and its
 number answers the same refusal.
 
+## A system without the communication batch
+
+The tools that read several independent things inside one call (the package walks,
+`GetObjectInfo`, `SearchSource`) send them in envelopes to `/sap/bc/adt/communication/batch`.
+Whether a destination has that endpoint is learned only from the outer status of its first
+envelope: `2xx` means served, for good; `404` means not served, and from then on that
+destination's reads run sequentially, one request after another. Any other status decides
+nothing, and an inner part's status is that item's answer, never a verdict.
+
+Measured 2026-10-18 on the system (`src/__tests__/integration/batch/noCommunicationBatch.test.ts`,
+one `GetObjectInfo` of a package, one tier, no enrichment): the first envelope's outer status was
+`202`; the destination was marked served, and a second call on it sent its reads in envelopes
+again. The system serves the communication batch, so the not-served branch (an outer `404`, the
+destination marked, the reads sequential) is shown by the unit tests only
+(`src/__tests__/unit/batch/availability.test.ts`), not measured.
+
+### Descriptions in the batched walks
+
+The package walks (`GetPackageContents`, compact `HandlerGet` part `contents`, `GetPackageTree`)
+and `GetObjectInfo` read the node structure levels in envelopes and then the metadata of every
+object found in one more envelope: one GET per object (a package's
+`/sap/bc/adt/packages/<name>`), whose `adtcore:description` is the description in the answer.
+The node structure parts' `DESCRIPTION` is not used: measured 2026-10-18, inside one envelope SAP
+can answer a node structure part after the first with another part's `DESCRIPTION` (everything
+else byte-identical to the request sent alone), while metadata reads in one envelope answer as
+they do alone. An object whose metadata read fails, or whose `OBJECT_URI` carries a `#` fragment
+(it names a part of another object, with no metadata of its own), has no description in the
+batched answer. `GetObjectsList` and `SearchSource` answer no descriptions and read no metadata.
+Where the destination has no communication batch, the sequential reads answer the descriptions
+of the node structure, as before.
+
 ## What is refused
 
 While a batch is open only the batch tools and the open batch's recordable calls are served.

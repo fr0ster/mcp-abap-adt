@@ -24,6 +24,14 @@ export interface ResolvedConnection {
    * Entered into each call's scope below the request's headers.
    */
   systemContext?: DestinationSystemContext;
+  /**
+   * Who the credential is, when the source can name it: the same value for
+   * the same settings and the same secret (http: a digest of the request's
+   * `x-sap-*` credential headers). A connection held for a credential serves
+   * a later credential object of the same identity; another identity
+   * retires it. Absent: only the same credential object is the same.
+   */
+  identity?: string;
 }
 
 /**

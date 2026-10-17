@@ -27,7 +27,11 @@ import {
   requestContextFromHeaders,
   runWithRequestContext,
 } from '@mcp-abap-adt/lib/request-context';
-import { type StateLogger, stateLoggerOf } from '@mcp-abap-adt/lib/state';
+import {
+  HeldLocks,
+  type StateLogger,
+  stateLoggerOf,
+} from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -477,6 +481,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
           batch?: InstanceBatch;
+          heldLocks?: HeldLocks;
         },
       ) {
         // A transport per request: the client's disconnect closes that
@@ -523,6 +528,10 @@ export class StreamableHttpServer extends BaseMcpServer {
         ...(this.batchSettings !== undefined && {
           batch: new InstanceBatch(this.batchSettings),
         }),
+        // An instance lasts one request unless it holds state: a lock taken
+        // here is kept as state, so the write and the unlock under it reach
+        // this instance (and its SAP session) by its state_handle.
+        heldLocks: new HeldLocks(),
       },
     );
   }

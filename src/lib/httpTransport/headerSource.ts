@@ -9,6 +9,7 @@
  * credential from the headers it is given.
  */
 
+import { createHash } from 'node:crypto';
 import type {
   ConnectionContext,
   ConnectionSource,
@@ -57,6 +58,22 @@ export function hasHeaderCredentials(headers: RequestHeaders): boolean {
 }
 
 /**
+ * The credential's identity: a SHA-256 digest of the connection's settings
+ * and secret headers — the same for the same credential, whichever request
+ * carries it. Kept in memory only, beside the connection it was built for.
+ */
+function identityOf(headers: RequestHeaders): string {
+  const parts = [
+    'x-sap-url',
+    'x-sap-client',
+    'x-sap-jwt-token',
+    'x-sap-login',
+    'x-sap-password',
+  ].map((name) => header(headers, name) ?? '');
+  return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
+}
+
+/**
  * The headers as a `ConnectionSource`: `credentialFromHeaders` once, here —
  * `TokenAuthProvider.fixed(token)` or `new BasicAuthProvider(user,
  * password)` — and the same answer to every `resolve`, so one SSE
@@ -78,6 +95,7 @@ export function headerSource(headers: RequestHeaders): ConnectionSource {
   const resolved: ResolvedConnection = {
     settings,
     credential,
+    identity: identityOf(headers),
     ...(login ? { systemContext: { login } } : {}),
   };
   return { resolve: async () => resolved };

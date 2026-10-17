@@ -43,8 +43,22 @@ afterEach(async () => {
   errorSpy.mockRestore();
 });
 
+/**
+ * Another credential than `basicHeaders`': a request carrying it on a pooled
+ * instance builds a connection of its own (one of the same credential would
+ * work on the held one).
+ */
+const otherCredential = () => ({
+  ...basicHeaders(s.standIn.url),
+  'x-sap-login': 'OTHER_USER',
+  'x-sap-password': 'other-password',
+});
+
 /** A POST of `body` the client drops with `drop()`. */
-function droppable(body: unknown) {
+function droppable(
+  body: unknown,
+  headers: Record<string, string> = basicHeaders(s.standIn.url),
+) {
   const controller = new AbortController();
   const sent = fetch(s.url, {
     method: 'POST',
@@ -52,7 +66,7 @@ function droppable(body: unknown) {
     headers: {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
-      ...basicHeaders(s.standIn.url),
+      ...headers,
     },
     body: JSON.stringify(body),
   }).catch(() => 'dropped');
@@ -79,8 +93,8 @@ const loggedOff = () =>
   s.standIn.requests.filter((r) => isLogoff(r.url)).map((r) => r.session);
 
 /**
- * A pooled instance holding state; the next request on its handle builds a
- * connection of its own (the request's credential) — its connect and, on
+ * A pooled instance holding state; the next request on its handle with
+ * another credential builds a connection of its own — its connect and, on
  * ABAP Cloud, its system lookup are that request's waits.
  */
 async function pooled(id: string): Promise<string> {
@@ -109,6 +123,7 @@ it('dropped while its call waits for the connection: the handler still runs exac
   const hold = s.standIn.hold(() => true);
   const call = droppable(
     toolCall(77, 'LockedUpdate', { id: 'C', state_handle: handle }),
+    otherCredential(),
   );
   await hold.arrived;
   expect(s.standIn.requests.length).toBe(before + 1);
@@ -138,6 +153,7 @@ it('dropped while its call waits for the system lookup: the handler still runs e
   const hold = s.standIn.hold((r) => isLookup(r.url));
   const call = droppable(
     toolCall(78, 'LockedUpdate', { id: 'L', state_handle: handle }),
+    otherCredential(),
   );
   await hold.arrived;
   expect(count(isLookup)).toBe(lookupsBefore + 1);

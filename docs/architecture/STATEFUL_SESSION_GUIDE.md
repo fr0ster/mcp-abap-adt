@@ -50,9 +50,15 @@ reach into the connection's session.
   stdio and SSE, where the connection lives across calls, the lock stays in the
   session between the calls — the consumer's choice. Every call between them is
   stateless; the `UNLOCK` reaches the lock's context. At the latest the instance's
-  logoff ends it (a logoff releases the session's locks). Over Streamable HTTP the
-  next request's credential retires the lock's connection and its logoff releases the
-  lock. Compact `HandlerUpdate` is the write alone and always takes the `lock_handle`.
+  logoff ends it (a logoff releases the session's locks). Over Streamable HTTP every
+  request is an MCP session of its own, so the `state_handle` carries the chain:
+  compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
+  `HandlerUpdate` and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
+  and reach the SAP session that holds the lock — without it they reach another instance and are
+  refused, sending nothing. A request with the same credential headers works on the held
+  connection; another credential retires it, and its logoff releases the lock. The hold ends at the
+  `UNLOCK`. Compact `HandlerUpdate` is the write alone and
+  always takes the `lock_handle`.
 - **A tool call cannot be cancelled**: a client's cancel aborts nothing — the call
   runs to its end; no logoff, no new session. The client's close (stdio, SSE) and the
   process shutdown log the instance's sessions off at once — the locks go with them —

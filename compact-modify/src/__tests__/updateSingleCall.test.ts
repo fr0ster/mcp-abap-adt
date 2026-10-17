@@ -38,7 +38,7 @@ import {
 } from '../handlers/handleHandlerUpdate';
 
 type Sent = { method: string; url: string; data?: unknown; params?: unknown };
-type Mode = 'pending' | 'answered' | 'not-found';
+type Mode = 'pending' | 'answered' | 'not-found' | 'forbidden';
 type Answer = { isError?: boolean; content?: Array<{ text?: string }> };
 
 const LOCK = 'LOCK_HANDLE_PLACEHOLDER';
@@ -66,6 +66,9 @@ function recording(mode: Mode) {
       if (mode === 'pending') return new Promise<never>(() => {});
       if (mode === 'not-found') {
         return { status: 404, statusText: 'Not Found', headers: {}, data: '' };
+      }
+      if (mode === 'forbidden') {
+        return { status: 403, statusText: 'Forbidden', headers: {}, data: '' };
       }
       return {
         status: 200,
@@ -309,7 +312,11 @@ describe('HandlerUpdate is one write under lock_handle', () => {
   it.each(TYPES)(
     '%s: without lock_handle refused before any request',
     async (objectType, fields) => {
-      for (const lock_handle of [undefined, '']) {
+      // A service binding's publication runs under the empty handle its
+      // lock may answer; every other type needs one.
+      const absent =
+        objectType === 'SERVICE_BINDING' ? [undefined] : [undefined, ''];
+      for (const lock_handle of absent) {
         const answered = await run(
           'answered',
           update(objectType, { ...fields, lock_handle }),
@@ -490,6 +497,36 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
       expect(unlocked.answer?.isError).not.toBe(true);
     },
   );
+
+  it('a service binding open in an editing session: its LOCK’s 403 is a lock with an empty handle, and the publication runs under it', async () => {
+    const locked = await run('forbidden', (context) =>
+      handleHandlerLock(context, {
+        object_type: 'SERVICE_BINDING' as never,
+        object_name: 'ZSRVB_A',
+      }),
+    );
+    expect(locked.sent).toHaveLength(1);
+    expect(locked.answer?.isError).not.toBe(true);
+    expect(JSON.parse(textOf(locked.answer)).lock_handle).toBe('');
+
+    const [, publish] = PUBLICATIONS[0];
+    const held = await run(
+      'pending',
+      update('SERVICE_BINDING', { ...publish, lock_handle: '' }),
+    );
+    expect(held.sent).toHaveLength(1);
+    expect(held.sent[0].method).toBe('POST');
+  });
+
+  it('a 403 LOCK of another type stays a refusal', async () => {
+    const refused = await run('forbidden', (context) =>
+      handleHandlerLock(context, {
+        object_type: 'SERVICE_DEFINITION' as never,
+        object_name: 'ZSRVD_A',
+      }),
+    );
+    expect(refused.answer?.isError).toBe(true);
+  });
 
   it('a refused LOCK of a service binding is answered as SAP sent it', async () => {
     const refused = await run('not-found', (context) =>

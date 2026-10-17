@@ -14,5 +14,6 @@ export {
   logOffAtOnce,
   type ShutdownProcess,
 } from '../shutdownSequence';
+export * from './heldLocks';
 export * from './InstanceState';
 export * from './idleBound';

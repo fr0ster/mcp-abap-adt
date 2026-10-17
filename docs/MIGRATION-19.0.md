@@ -552,9 +552,14 @@ design. Send a long run to the background where the tool offers it.
   them is not refused by the schema — the server reads nothing from them.
 - **Compact `HandlerLock` keeps the lock until `HandlerUnlock` — on stdio and SSE**, where the
   instance's connection lives across calls; the calls in between are stateless, and the instance's
-  end (its logoff) releases a lock you never unlocked. **Over Streamable HTTP it does not**: the
-  next request's credential retires the lock's connection, and that connection's logoff releases
-  the lock. Compact `HandlerUpdate` is the write alone under a `lock_handle` (see "compact users").
+  end (its logoff) releases a lock you never unlocked. **Over Streamable HTTP the `state_handle`
+  carries it**: compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
+  `HandlerUpdate` and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
+  and reach the SAP session that holds the lock — without it they reach another instance and are
+  refused, sending nothing. A request with the same credential headers works on the held
+  connection; another credential retires it, and its logoff releases the lock. The hold ends at the
+  `UNLOCK`. Compact `HandlerUpdate` is the write
+  alone under a `lock_handle` (see "compact users").
 - **The debugger's sessions are its own**, stateful for their life, and end with the debug session.
 - Every site that turns a session type is listed in `tools/stateful-sites.json`.
 
@@ -1096,6 +1101,14 @@ transport's options only:
   `service_name` (an OData V2 binding's publication); `desired_publication_state` takes `published`
   or `unpublished`. Every type is recorded in batch mode (a `PACKAGE` over HTTP only). The full
   sets' `Update<Type>` keep their chains.
+
+  **Over Streamable HTTP**, `HandlerLock`'s answer now carries a `state_handle`: send it in the
+  `x-mcp-state-handle` header with `HandlerUpdate` and `HandlerUnlock` under that lock — without
+  it they are refused, sending nothing ("lock_handle is not held by this instance …"). A request
+  of the pooled instance with the same credential headers works on its held SAP session; another
+  credential retires it. **A service binding open in an editing session**: its LOCK answers `403`,
+  read as a lock with an empty `lock_handle` (as the full set's publication reads it); `HandlerUpdate`
+  SERVICE_BINDING takes that empty `lock_handle` and sends the publication.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.

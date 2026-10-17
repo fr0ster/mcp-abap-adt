@@ -91,7 +91,9 @@ it('an instance emptied by its stop tool leaves the pool with its connections di
   expect(stopped).toMatchObject({ text: 'stopped', isError: false });
   await until(() => ownedConnections().length === 0);
   await until(() => s.standIn.logoffs() === connects());
-  expect(s.standIn.logoffs()).toBeGreaterThanOrEqual(3);
+  // The state's own connection and the instance's: the stop's request, of
+  // the same credential headers, works on the connection the first built.
+  expect(s.standIn.logoffs()).toBeGreaterThanOrEqual(2);
 });
 
 describe('the idle bound (fake time)', () => {

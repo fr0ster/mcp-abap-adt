@@ -36,6 +36,10 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
+import {
+  LOCK_NOT_HELD_WORDS,
+  lockHeldHere,
+} from '../../../lib/state/heldLocks';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -142,13 +146,20 @@ export async function handleUpdateUnderLock(
   context: HandlerContext,
   args: Args,
 ): Promise<unknown> {
-  const lockHandle = text(args.lock_handle);
-  if (!lockHandle) {
+  // A service binding's lock may answer no handle (the binding open in an
+  // editing session): its publication runs under the empty one.
+  const emptyBindingHandle =
+    args.object_type === 'SERVICE_BINDING' && args.lock_handle === '';
+  const lockHandle = emptyBindingHandle ? '' : text(args.lock_handle);
+  if (lockHandle === undefined) {
     return return_error(
       new Error(
         'lock_handle is required: lock the object with HandlerLock first and pass the handle it answered.',
       ),
     );
+  }
+  if (!emptyBindingHandle && !lockHeldHere(context.heldLocks, lockHandle)) {
+    return return_error(new Error(LOCK_NOT_HELD_WORDS));
   }
   const { connection, logger } = context;
   const transportRequest = text(args.transport_request);

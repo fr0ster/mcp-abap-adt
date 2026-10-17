@@ -32,7 +32,10 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionForPackageLock } from '../../../lib/packageSessions';
-import { analyseLock } from '../../../lib/strategies/lockAnswer';
+import {
+  analyseLock,
+  analysePublicationLockAnswer,
+} from '../../../lib/strategies/lockAnswer';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -244,10 +247,15 @@ export async function handleLockObject(
               { analyse: analyseLock },
             );
         case 'service_binding':
-          // The binding's own LOCK; SAP's answer as it came.
+          // The binding's own LOCK, read as the publication reads it: a `403`
+          // (the binding open in an editing session) is a lock without a
+          // handle, and the publication runs without one.
           return client
             .getServiceBinding(resultsFor(serviceDocuments))
-            .lock({ bindingName: objectName }, { analyse: analyseLock });
+            .lock(
+              { bindingName: objectName },
+              { analyse: analysePublicationLockAnswer },
+            );
         case 'package':
           return lockPackage();
         default:

@@ -117,6 +117,7 @@ import {
   withDestinationSystemContext,
   withKnownSystemContext,
 } from '../lib/requestSystemResolution.js';
+import type { HeldLocks } from '../lib/state/heldLocks.js';
 import {
   InstanceState,
   type StateLogger,
@@ -154,6 +155,8 @@ export type StartedConnection =
  */
 interface BuiltConnection {
   credential: IAuthProvider;
+  /** The source's identity of the credential (`ResolvedConnection.identity`). */
+  identity?: string;
   connection: Promise<AbapConnection>;
   /** The connection once its connect completed. */
   ready?: AbapConnection;
@@ -165,6 +168,22 @@ interface BuiltConnection {
   users: number;
   /** Replaced: it ends with its logoff once no call works on it. */
   retired: boolean;
+}
+
+/**
+ * Whether `resolved` is the credential `held` was built for: the same
+ * object, or the same identity the source names (a pooled HTTP instance's
+ * next request with the same credential headers). The calls of the
+ * credential in force work on its connection: another identity retires it.
+ */
+function sameCredential(
+  held: BuiltConnection,
+  resolved: ResolvedConnection,
+): boolean {
+  return (
+    held.credential === resolved.credential ||
+    (held.identity !== undefined && held.identity === resolved.identity)
+  );
 }
 
 /**
@@ -284,6 +303,9 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly batch: InstanceBatch | undefined;
 
+  /** The locks this instance holds between requests (`heldLocks` option). */
+  protected readonly heldLocks: HeldLocks | undefined;
+
   /**
    * Whose words the batch sentence of a tool's description uses: the full
    * sets' (`BatchBegin`) or the compact sets' (`HandlerBatch`), read from
@@ -333,6 +355,13 @@ export abstract class BaseMcpServer extends McpServer {
      */
     batch?: InstanceBatch;
     /**
+     * The locks this instance holds between requests, created by a host
+     * whose instances last one request each (Streamable HTTP) for this
+     * instance alone: held state, ended by the UNLOCK. Absent: the lock
+     * tools keep nothing (stdio, SSE: the instance keeps its session).
+     */
+    heldLocks?: HeldLocks;
+    /**
      * Whether the transport's close is the end of this instance's session
      * (default `true`): stdio's transport, an SSE stream, an embedder's
      * connected transport — its close is then the instance's close
@@ -361,6 +390,8 @@ export abstract class BaseMcpServer extends McpServer {
     });
     this.batch = options.batch;
     if (this.batch !== undefined) this.state.attach(this.batch);
+    this.heldLocks = options.heldLocks;
+    if (this.heldLocks !== undefined) this.state.attach(this.heldLocks);
     this.systemType = options.systemType;
     this.systemContextResolver = options.systemContextResolver ?? null;
     this.systemContextRules = options.systemContextRules ?? null;
@@ -504,7 +535,7 @@ export abstract class BaseMcpServer extends McpServer {
    * race it), and the connection is built and connected once per credential
    * object — kept while the source answers the same one, replaced
    * only when SAP already lost the session or the source answers another
-   * credential object (http: the request's; sse: fixed per connection). On stdio the source
+   * credential object (or the same identity: `sameCredential`) (http: the request's; sse: fixed per connection). On stdio the source
    * answers the same provider for the process's life: the user is fixed, and
    * a renewed token (refresh, or a new login when the refresh fails) lives
    * inside that provider. The credential renews itself (a 401 reaches its
@@ -540,7 +571,7 @@ export abstract class BaseMcpServer extends McpServer {
     let held = this.built;
     if (
       !held ||
-      held.credential !== resolved.credential ||
+      !sameCredential(held, resolved) ||
       (held.ready !== undefined && isSpent(held.ready))
     ) {
       // A new credential (http: the request's; sse: fixed per connection), or a session SAP
@@ -932,6 +963,9 @@ export abstract class BaseMcpServer extends McpServer {
     };
     const entry: BuiltConnection = {
       credential,
+      ...(resolved.identity !== undefined
+        ? { identity: resolved.identity }
+        : {}),
       connection: Promise.resolve() as unknown as Promise<AbapConnection>,
       users: 0,
       retired: false,
@@ -1306,6 +1340,9 @@ export abstract class BaseMcpServer extends McpServer {
                 debugger: () => this.debuggerFor(),
                 onMainConnection: (send) => this.onMainConnection(signal, send),
                 ...(this.batch !== undefined ? { batch: this.batch } : {}),
+                ...(this.heldLocks !== undefined
+                  ? { heldLocks: this.heldLocks }
+                  : {}),
                 ...(this.systemType !== undefined
                   ? { systemType: this.systemType }
                   : {}),
@@ -1775,6 +1812,7 @@ export abstract class BaseMcpServer extends McpServer {
         state: this.state,
         debugger: () => this.debuggerFor(),
         ...(this.batch !== undefined ? { batch: this.batch } : {}),
+        ...(this.heldLocks !== undefined ? { heldLocks: this.heldLocks } : {}),
         ...(this.systemType !== undefined
           ? { systemType: this.systemType }
           : {}),

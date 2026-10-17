@@ -1489,18 +1489,53 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
       `--port=${port}`,
       '--system-type=onprem',
     ]);
+    // Compact's write over HTTP runs under a lock the instance holds: the
+    // lock first, its state_handle in the header of the write.
+    let writeHeaders: Record<string, string> = basicHeaders();
+    let write = writeCall(set, className);
+    if (set === 'compact') {
+      const locked = await fetch(`http://127.0.0.1:${port}/mcp/stream/http`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+          ...basicHeaders(),
+        },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 0,
+          method: 'tools/call',
+          params: {
+            name: 'HandlerLock',
+            arguments: { object_type: 'CLASS', object_name: className },
+          },
+        }),
+      });
+      const answer = JSON.parse(
+        ((await locked.json()) as { result: { content: { text: string }[] } })
+          .result.content[0]?.text ?? '{}',
+      ) as { lock_handle: string; state_handle: string };
+      writeHeaders = {
+        ...writeHeaders,
+        'x-mcp-state-handle': answer.state_handle,
+      };
+      write = {
+        name: write.name,
+        arguments: { ...write.arguments, lock_handle: answer.lock_handle },
+      };
+    }
     void fetch(`http://127.0.0.1:${port}/mcp/stream/http`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
         accept: 'application/json, text/event-stream',
-        ...basicHeaders(),
+        ...writeHeaders,
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
         id: 1,
         method: 'tools/call',
-        params: writeCall(set, className),
+        params: write,
       }),
     }).catch(() => undefined);
     await hold.arrived;

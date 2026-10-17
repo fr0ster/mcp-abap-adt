@@ -59,7 +59,8 @@ writes it back patched, a `404` fallback, a poll. Run such work as phases, each 
 with the single-step tools:
 
 1. create — `HandlerCreate` (compact);
-2. lock — `HandlerLock`; read the lock handles with `BatchAnswers`;
+2. lock — `HandlerLock`; read the lock handles with `BatchAnswers` (over Streamable HTTP the
+   lock is the instance's held state: every later phase sends that instance's `state_handle`);
 3. write — `HandlerUpdate` with `lock_handle` (for PACKAGE, DOMAIN, DATA_ELEMENT and
    FUNCTION_GROUP the whole metadata document in `source_code`, read beforehand with `HandlerGet`
    part `metadata`);

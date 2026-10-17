@@ -87,6 +87,13 @@ by its stop tool, the idle bound (`--state-idle-minutes`, 30–35 791, default 3
 stop. See
 [the debugger guide](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 
+**Locks (compact).** compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
+`HandlerUpdate` and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
+and reach the SAP session that holds the lock — without it they reach another instance and are
+refused, sending nothing. A request with the same credential headers works on the held
+connection; another credential retires it, and its logoff releases the lock. The hold ends at the
+`UNLOCK`.
+
 **Batch mode.** `BatchBegin` (compact: `HandlerBatch` with `action: 'begin'`) holds state and
 answers the instance's `state_handle`: send it in `x-mcp-state-handle` on every call of the batch,
 `BatchEnd` and `BatchAnswers` included. A call without it reaches an instance where no batch is

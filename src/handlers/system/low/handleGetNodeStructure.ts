@@ -40,6 +40,12 @@
  * two package fixtures capture is real and is still handled above; it is not
  * a property of the blank body in general.
  *
+ * **Compact reads it once.** Compact is one ADT request per tool call (the
+ * owner's rule), so compact `HandlerGet` part `node_structure` calls
+ * `handleGetNodeStructureOnce`: a package's blank body is the empty listing
+ * with `blank` stating both readings, and the package's metadata is the
+ * consumer's next call when it needs to know which one holds.
+ *
  * **Where the throw lives, and why it agrees with `GetObjectStructureLow`'s.**
  * Both guards now run inside the `call()` passed to `answer()`, not inside a
  * projection — a document this handler cannot honestly read is a client-side
@@ -110,8 +116,13 @@ function rawNodeStructureXml(wire: unknown): string {
   return String((wire as { data?: unknown } | undefined)?.data ?? '');
 }
 
-/** A success carrying a `NodeLevel` — the shape `sequence()`'s steps answer with. */
-function succeededLevel(level: NodeLevel): IAdtResponse<NodeLevel, IAdtError> {
+/**
+ * A success carrying a `NodeLevel` — the shape `sequence()`'s steps answer
+ * with — and, for a package's blank body read once, `blank`.
+ */
+function succeededLevel(
+  level: NodeLevel & { blank?: string },
+): IAdtResponse<NodeLevel, IAdtError> {
   return {
     ok: true,
     getResult: () => ({ value: level }),
@@ -121,9 +132,43 @@ function succeededLevel(level: NodeLevel): IAdtResponse<NodeLevel, IAdtError> {
   } as unknown as IAdtResponse<NodeLevel, IAdtError>;
 }
 
+/**
+ * What a blank body for a package parent means: the package holds no objects,
+ * or no package of that name exists — SAP answers both alike.
+ */
+export const BLANK_PACKAGE_LISTING =
+  'SAP answered a blank body: the package holds no objects, or no package of this name exists.';
+
+/**
+ * How a blank body for a `DEVC/K` parent is answered: `read-package` pays one
+ * more request (the package's metadata) to tell the two readings apart;
+ * `state` answers the empty listing with both readings stated — one request
+ * per call, the compact rule.
+ */
+type BlankPackage = 'read-package' | 'state';
+
 export async function handleGetNodeStructure(
   context: HandlerContext,
   args: GetNodeStructureArgs,
+) {
+  return nodeStructure(context, args, 'read-package');
+}
+
+/**
+ * The node structure in one request: a blank body for a package parent is an
+ * empty listing carrying `blank`, both of its readings.
+ */
+export async function handleGetNodeStructureOnce(
+  context: HandlerContext,
+  args: GetNodeStructureArgs,
+) {
+  return nodeStructure(context, args, 'state');
+}
+
+async function nodeStructure(
+  context: HandlerContext,
+  args: GetNodeStructureArgs,
+  blankPackage: BlankPackage,
 ) {
   const { connection, logger } = context;
   const { parent_type, parent_name, node_id, with_short_descriptions } = args;
@@ -166,6 +211,14 @@ export async function handleGetNodeStructure(
             // Nothing below this node. See the header: measured on a class
             // that exists, so the blank body is the answer, not a refusal.
             return succeededLevel({ objects: [], childNodes: [] });
+          }
+
+          if (blankPackage === 'state') {
+            return succeededLevel({
+              objects: [],
+              childNodes: [],
+              blank: BLANK_PACKAGE_LISTING,
+            });
           }
 
           // The one existence check this tool can pay: the same one

@@ -40,6 +40,7 @@ import {
   handleGetTable,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
+import { compactReadRouterMap } from './compactReadRoutes';
 
 /**
  * `part: 'metadata'` — the ADT metadata document, for the types that have one:
@@ -147,6 +148,25 @@ async function packageContentsLines(
 }
 
 export type CompactReadPart = 'source' | 'metadata' | 'urls' | 'contents';
+
+/**
+ * The types with a metadata document and no source: their `Get<Type>` reads
+ * that document, so `part: 'source'` has nothing to answer.
+ */
+const SOURCELESS: ReadonlySet<CompactObjectType> = new Set([
+  'PACKAGE',
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'FUNCTION_GROUP',
+] as CompactObjectType[]);
+
+/** Whether `part: 'source'` reads something for this type. */
+export function hasSourcePart(objectType: CompactObjectType): boolean {
+  return (
+    compactReadRouterMap[objectType]?.get !== undefined &&
+    !SOURCELESS.has(objectType)
+  );
+}
 
 /** The parts a type can answer, for a refusal that tells the caller what to ask. */
 export function partsFor(

@@ -84,11 +84,23 @@ describe('eligible', () => {
   });
 
   it('HandlerGet part contents and UNIT_TEST/CDS_UNIT_TEST are not eligible; absent part reads as source', () => {
-    const pkg = { object_type: 'PACKAGE', package_name: 'PKG_A' };
-    expect(eligible('HandlerGet', pkg, 'http')).toEqual({ ok: true });
-    expect(eligible('HandlerGet', { ...pkg, part: 'source' }, 'http')).toEqual({
+    const cls = { object_type: 'CLASS', class_name: 'CLAS_A' };
+    expect(eligible('HandlerGet', cls, 'http')).toEqual({ ok: true });
+    expect(eligible('HandlerGet', { ...cls, part: 'source' }, 'http')).toEqual({
       ok: true,
     });
+    const pkg = { object_type: 'PACKAGE', package_name: 'PKG_A' };
+    expect(
+      eligible('HandlerGet', { ...pkg, part: 'metadata' }, 'http'),
+    ).toEqual({ ok: true });
+    // A package has no source: the call is refused and sends nothing, so
+    // nothing admits it — absent part included, read as source.
+    for (const args of [pkg, { ...pkg, part: 'source' }]) {
+      expect(eligible('HandlerGet', args, 'http')).toEqual({
+        ok: false,
+        reason: 'arguments',
+      });
+    }
     expect(
       eligible('HandlerGet', { ...pkg, part: 'contents' }, 'http'),
     ).toEqual({ ok: false, reason: 'arguments' });
@@ -119,14 +131,14 @@ describe('eligible', () => {
         ),
       ).toEqual({ ok: true });
     }
-    // A package node's blank answer is checked with a second read.
+    // A package node is one request too: its blank body is answered as it is.
     expect(
       eligible(
         'HandlerGet',
         { part: 'node_structure', object_adt_type: 'devc/k', object_name: 'P' },
         'http',
       ),
-    ).toEqual({ ok: false, reason: 'arguments' });
+    ).toEqual({ ok: true });
     expect(
       eligible(
         'HandlerGet',

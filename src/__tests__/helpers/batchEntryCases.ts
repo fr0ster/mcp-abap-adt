@@ -210,11 +210,11 @@ const FULL: BatchEntryCase[] = [
   },
 ];
 
-/** `HandlerGet` with part `source` (given or absent), per type. */
+/**
+ * `HandlerGet` with part `source` (given or absent), per type with a source;
+ * a function module by `GROUP|MODULE` and by `function_group_name`.
+ */
 const SOURCE_READS: Array<[string, Record<string, unknown>]> = [
-  ['PACKAGE', { package_name: 'PKG_A' }],
-  ['DOMAIN', { domain_name: 'DOM_A' }],
-  ['DATA_ELEMENT', { data_element_name: 'DTEL_A' }],
   ['TRANSPORT', { transport_number: TRANSPORT }],
   ['TABLE', { table_name: 'TAB_A' }],
   ['STRUCTURE', { structure_name: 'STRU_A' }],
@@ -228,11 +228,11 @@ const SOURCE_READS: Array<[string, Record<string, unknown>]> = [
   ['LOCAL_MACROS', { class_name: 'CLAS_A' }],
   ['PROGRAM', { program_name: 'PROG_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
-  ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }],
   [
     'FUNCTION_MODULE',
     { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
   ],
+  ['FUNCTION_MODULE', { function_module_name: 'FUGR_A|FM_A' }],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
@@ -256,6 +256,7 @@ const METADATA_READS: Array<[string, Record<string, unknown>]> = [
     'FUNCTION_MODULE',
     { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
   ],
+  ['FUNCTION_MODULE', { function_module_name: 'FUGR_A|FM_A' }],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
@@ -371,6 +372,25 @@ const COMPACT: BatchEntryCase[] = [
       part: 'node_structure',
       object_adt_type: 'PROG/P',
       object_name: 'PROG_A',
+    },
+    body: NODE_LEVEL,
+  },
+  // A package's blank body: the empty listing, both readings stated.
+  {
+    tool: 'HandlerGet',
+    args: {
+      part: 'node_structure',
+      object_adt_type: 'DEVC/K',
+      object_name: 'PKG_A',
+    },
+    body: '',
+  },
+  {
+    tool: 'HandlerGet',
+    args: {
+      part: 'node_structure',
+      object_adt_type: 'DEVC/K',
+      object_name: 'PKG_A',
     },
     body: NODE_LEVEL,
   },

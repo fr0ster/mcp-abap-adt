@@ -65,7 +65,7 @@ with the single-step tools:
    FUNCTION_GROUP the whole metadata document in `source_code`, read beforehand with `HandlerGet`
    part `metadata`);
 4. unlock — `HandlerUnlock`;
-5. read back, check — `HandlerGet`, `HandlerCheckRun`.
+5. read back, check — `HandlerGet` (one part per call: `source`, `metadata`), `HandlerCheckRun`.
 
 Deleting is two phases, each its own batch:
 
@@ -111,6 +111,18 @@ included), or SAP's refusal in its words.
 For `LOCAL_*` and `UNIT_TEST` (a `DELETE` on an include answers `405`), `HandlerDelete` is one
 `PUT` of empty content under the `lock_handle` given — the class's lock; no lock, unlock or
 activation of its own. `CDS_UNIT_TEST` deletes its test class.
+
+Compact `HandlerGet` is one request per part, in batch mode and outside it alike: `part: source`
+(the default) the source alone, `part: metadata` the metadata document alone, each answered
+`{ part: 'source', source }` or `{ part: 'metadata', metadata }` beside the object's name. PACKAGE,
+DOMAIN, DATA_ELEMENT and FUNCTION_GROUP have a metadata document and no source: `source` (and an
+absent `part`) is refused before anything is sent, naming the parts the type has. A function module
+is read at the group its arguments name — `function_module_name` as `GROUP|MODULE`, or with
+`function_group_name`. `node_structure` of a package (`DEVC/K`) is one request: SAP answers an
+empty package and a package that does not exist with the same blank body, and that answer is the
+empty listing with `blank` stating both readings — `part: metadata` of the package tells them
+apart. `urls` (up to five requests, each built from an earlier answer) and `contents` (the package
+walk) are refused in batch mode (`batch_not_recordable`).
 
 **Every batch end sends one envelope.** Only LOCK and UNLOCK go stateful, as adt-clients sends
 them, and adt-clients puts each kind — LOCK, UNLOCK, stateless — into an envelope of its own. So a
@@ -326,10 +338,10 @@ no raw part.
 | `HandlerDelete` | when lock_handle is given and object_type is one of LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST | PUT of empty content to the class include under the lock_handle given ({class uri}/includes/{include}?lockHandle=…[&corrNr=…]) |
 | `HandlerDeletionCheck` | every call | POST /sap/bc/adt/deletion/check for the one object |
 | `HandlerDumpView` | every call | GET /sap/bc/adt/runtime/dump/{id} (the view asked) |
-| `HandlerGet` | when part is source (absent reads as source) and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | GET the type's source, or its metadata document where it has no source (as the full set's Get<Type>) |
-| `HandlerGet` | when part is metadata and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | one request: GET the type's metadata document (as the full set's Get<Type>, part metadata) |
+| `HandlerGet` | when part is source (absent reads as source) and object_type is one of TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | one request: GET the type's source (as the full set's Get<Type>, part source); FUNCTION_MODULE at the group its arguments name |
+| `HandlerGet` | when part is metadata and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | one request: GET the type's metadata document (as the full set's Get<Type>, part metadata); FUNCTION_MODULE at the group its arguments name |
 | `HandlerGet` | when part is object_structure | GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=… |
-| `HandlerGet` | when part is node_structure and object_adt_type is given and object_adt_type is not DEVC/K | POST /sap/bc/adt/repository/nodestructure for the one node asked (a package's blank answer is checked with a second read, so DEVC/K is not listed) |
+| `HandlerGet` | when part is node_structure and object_adt_type is given | POST /sap/bc/adt/repository/nodestructure for the one node asked |
 | `HandlerGet` | when part is virtual_folders | POST /sap/bc/adt/repository/informationsystem/virtualfolders/contents |
 | `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle (sql_query) or /datapreview/ddic (object_name) |
 | `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |

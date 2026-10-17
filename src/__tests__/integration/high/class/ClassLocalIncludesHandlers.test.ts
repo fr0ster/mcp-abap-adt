@@ -477,7 +477,7 @@ END-OF-DEFINITION.`;
         if (!getTestClassResponse.isError) {
           expect(getTestClassResponse.isError).toBe(false);
           const getTestClassData = parseHandlerResponse(getTestClassResponse);
-          expect(getTestClassData.test_class_code).toBeDefined();
+          expect(getTestClassData.source).toBeDefined();
         }
 
         // Get LocalTypes - read after update
@@ -506,7 +506,7 @@ END-OF-DEFINITION.`;
         }
         expect(getLocalTypesResponse.isError).toBe(false);
         const getLocalTypesData = parseHandlerResponse(getLocalTypesResponse);
-        expect(getLocalTypesData.local_types_code).toBeDefined();
+        expect(getLocalTypesData.source).toBeDefined();
 
         // Get LocalDefinitions - read after update
         const getLocalDefsLogger = createTestLogger('local-defs-get');
@@ -534,7 +534,7 @@ END-OF-DEFINITION.`;
         }
         expect(getLocalDefsResponse.isError).toBe(false);
         const getLocalDefsData = parseHandlerResponse(getLocalDefsResponse);
-        expect(getLocalDefsData.definitions_code).toBeDefined();
+        expect(getLocalDefsData.source).toBeDefined();
 
         logger?.success(`✅ Get (read) operations completed`);
 

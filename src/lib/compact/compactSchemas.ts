@@ -183,7 +183,7 @@ const readPartSchema = {
   ],
   default: 'source',
   description:
-    'Which aspect to read: the source, the ADT metadata document, the service and preview URLs, or the objects a package contains. A part this object type does not offer is refused, naming the parts it does. Three parts read the repository by ADT address and take no object_type: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions).',
+    'The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address, in place of object_type: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions).',
 } as const;
 
 export const compactGetSchema = {
@@ -208,11 +208,13 @@ export const compactGetSchema = {
     ddl_name: { type: 'string', description: 'DDL source name.' },
     function_module_name: {
       type: 'string',
-      description: 'Function module name.',
+      description:
+        'Function module name: GROUP|MODULE, its function group first, or the module alone with function_group_name.',
     },
     function_group_name: {
       type: 'string',
-      description: 'Function group name.',
+      description:
+        'Function group name (FUNCTION_GROUP; FUNCTION_MODULE named without its group).',
     },
     behavior_definition_name: {
       type: 'string',

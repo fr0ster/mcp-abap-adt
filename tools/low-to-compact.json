@@ -3522,6 +3522,7 @@
       "tool": "GetNodeStructureLow",
       "group": "SystemHandlersGroup",
       "handler": "src/handlers/system/low/handleGetNodeStructure.ts",
+      "note": "A package's (DEVC/K) blank body: the low tool read the package's metadata to tell an empty package from an absent one; HandlerGet answers the empty listing with blank stating both readings, one request — read the package with HandlerGet part metadata to know which holds.",
       "low_call": {
         "parent_type": "CLAS/OC",
         "parent_name": "CLAS_A",

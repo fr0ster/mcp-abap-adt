@@ -42,7 +42,10 @@ export { handleGetStructure } from '../../handlers/structure/high/handleGetStruc
 // The metadata readers and the preview-URL tool: `part` on the compact read
 // routes to these, and a package that carries only read routes must be able to
 // import them without reaching a write handler.
-export { handleGetNodeStructure } from '../../handlers/system/low/handleGetNodeStructure.js';
+export {
+  handleGetNodeStructure,
+  handleGetNodeStructureOnce,
+} from '../../handlers/system/low/handleGetNodeStructure.js';
 export { handleGetVirtualFolders } from '../../handlers/system/low/handleGetVirtualFolders.js';
 export { handleGetObjectStructure } from '../../handlers/system/readonly/handleGetObjectStructure.js';
 export { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl.js';

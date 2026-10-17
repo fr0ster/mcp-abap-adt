@@ -5,19 +5,24 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
-  handleGetNodeStructure,
+  handleGetNodeStructureOnce,
   handleGetObjectStructure,
   handleGetVirtualFolders,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
-import { type CompactReadPart, routeCompactPart } from './compactPartRoutes';
-import { compactReadRouterMap, routeCompactRead } from './compactReadRoutes';
+import {
+  type CompactReadPart,
+  hasSourcePart,
+  partsFor,
+  routeCompactPart,
+} from './compactPartRoutes';
+import { routeCompactRead } from './compactReadRoutes';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerGet',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    'Read operation. part selects the aspect: source (default), metadata, urls, or contents (the objects of a PACKAGE); a part the type does not offer is refused, naming the ones it does. Three parts read the repository by ADT address and take no object_type: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Otherwise object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects the transport request or task holds, each with the position HandlerTransportMoveObjects takes. timeout applies to the reads only: UNIT_TEST and CDS_UNIT_TEST take none.',
+    "Reads one part of an object. part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds. Answers { part: 'source', source } or { part: 'metadata', metadata } beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address, in place of object_type: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or no package of that name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Otherwise object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects the transport request or task holds, each with the position HandlerTransportMoveObjects takes. timeout applies to the repository reads: every object_type but UNIT_TEST and CDS_UNIT_TEST.",
   ),
   inputSchema: compactGetSchema,
 } as const;
@@ -50,7 +55,7 @@ function routeAddressPart(
     );
   }
   if (part === 'node_structure') {
-    return handleGetNodeStructure(context, {
+    return handleGetNodeStructureOnce(context, {
       parent_type: args.object_adt_type,
       parent_name: args.object_name,
       node_id: args.node_id,
@@ -61,6 +66,48 @@ function routeAddressPart(
     object_type: args.object_adt_type,
     object_name: args.object_name,
   } as never);
+}
+
+/**
+ * A function module is read at its group, given in the arguments:
+ * `function_module_name` as `GROUP|MODULE`, or the module's name with
+ * `function_group_name`. Both may be given when they name the same group.
+ * Answers the arguments with the module and its group apart, or the refusal.
+ */
+function functionModuleArgs(
+  args: HandlerGetArgs,
+): HandlerGetArgs | ReturnType<typeof return_error> {
+  const given =
+    typeof args.function_module_name === 'string'
+      ? args.function_module_name.trim()
+      : '';
+  const separate =
+    typeof args.function_group_name === 'string'
+      ? args.function_group_name.trim().toUpperCase()
+      : '';
+  const named = given.includes('|');
+  const [first = '', second = ''] = named ? given.split('|') : ['', given];
+  const group = named ? first.trim().toUpperCase() : separate;
+  const module = second.trim();
+  if (!group || !module) {
+    return return_error(
+      new Error(
+        'FUNCTION_MODULE is named GROUP|MODULE, or with function_group_name: the function group and the module are both required',
+      ),
+    );
+  }
+  if (named && separate && separate !== group) {
+    return return_error(
+      new Error(
+        `function_module_name names group ${group}, function_group_name names ${separate}: give the group once`,
+      ),
+    );
+  }
+  return {
+    ...args,
+    function_module_name: module,
+    function_group_name: group,
+  };
 }
 
 export async function handleHandlerGet(
@@ -77,13 +124,32 @@ export async function handleHandlerGet(
   if (!args.object_type) {
     return routeCompactRead(context, args);
   }
-  const hasSource = compactReadRouterMap[args.object_type]?.get !== undefined;
+  const hasSource = hasSourcePart(args.object_type);
 
-  if (part === 'source') {
-    // A type with no source read is the router's refusal too, and it names the
-    // operation; adding a second voice here would only muddle it.
-    return routeCompactRead(context, args);
+  let read = args;
+  if (
+    args.object_type === 'FUNCTION_MODULE' &&
+    (part === 'source' || part === 'metadata')
+  ) {
+    const named = functionModuleArgs(args);
+    if ('isError' in named) return named;
+    read = named;
   }
 
-  return routeCompactPart(context, part, args, hasSource);
+  if (part === 'source') {
+    if (!hasSource && partsFor(args.object_type, false).length > 0) {
+      // A type with a metadata document and no source: what it has, named.
+      return return_error(
+        new Error(
+          `part=source is not available for object_type=${args.object_type}. ` +
+            `It offers: ${partsFor(args.object_type, false).join(', ')}.`,
+        ),
+      );
+    }
+    // The source read, one request; a type with no read at all is the
+    // router's refusal, naming the operation.
+    return routeCompactRead(context, read);
+  }
+
+  return routeCompactPart(context, part, read, hasSource);
 }

@@ -381,7 +381,7 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "GET the type's source, or its metadata document where it has no source (as the full set's Get<Type>)",
+    "sends": "one request: GET the type's source (as the full set's Get<Type>, part source); FUNCTION_MODULE at the group its arguments name",
     "when": [
       {
         "argument": "part",
@@ -392,9 +392,6 @@
       {
         "argument": "object_type",
         "equals": [
-          "PACKAGE",
-          "DOMAIN",
-          "DATA_ELEMENT",
           "TRANSPORT",
           "TABLE",
           "STRUCTURE",
@@ -408,7 +405,6 @@
           "LOCAL_MACROS",
           "PROGRAM",
           "INTERFACE",
-          "FUNCTION_GROUP",
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
@@ -421,7 +417,7 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "one request: GET the type's metadata document (as the full set's Get<Type>, part metadata)",
+    "sends": "one request: GET the type's metadata document (as the full set's Get<Type>, part metadata); FUNCTION_MODULE at the group its arguments name",
     "when": [
       {
         "argument": "part",
@@ -470,7 +466,7 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "POST /sap/bc/adt/repository/nodestructure for the one node asked (a package's blank answer is checked with a second read, so DEVC/K is not listed)",
+    "sends": "POST /sap/bc/adt/repository/nodestructure for the one node asked",
     "when": [
       {
         "argument": "part",
@@ -481,12 +477,6 @@
       {
         "argument": "object_adt_type",
         "present": true
-      },
-      {
-        "argument": "object_adt_type",
-        "notEquals": [
-          "DEVC/K"
-        ]
       }
     ]
   },

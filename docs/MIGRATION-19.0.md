@@ -783,7 +783,7 @@ alone, as each low create tool was — the same requests for every type.
 | `DeleteProgramLow` | `HandlerDelete` (object_type: PROGRAM, program_name, transport_request) | the same requests |
 | `DeleteStructureLow` | `HandlerDelete` (object_type: STRUCTURE, structure_name, transport_request) | the same requests |
 | `DeleteTableLow` | `HandlerDelete` (object_type: TABLE, table_name, transport_request) | the same requests |
-| `GetNodeStructureLow` | `HandlerGet` (part: node_structure, object_adt_type, object_name, node_id, with_short_descriptions) | the same requests |
+| `GetNodeStructureLow` | `HandlerGet` (part: node_structure, object_adt_type, object_name, node_id, with_short_descriptions) | A package's (DEVC/K) blank body: the low tool read the package's metadata to tell an empty package from an absent one; HandlerGet answers the empty listing with blank stating both readings, one request — read the package with HandlerGet part metadata to know which holds. |
 | `GetObjectStructureLow` | `HandlerGet` (part: object_structure, object_adt_type, object_name) | the same requests |
 | `GetVirtualFoldersLow` | `HandlerGet` (part: virtual_folders, object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions) | the same requests |
 | `LockBehaviorDefinitionLow` | `HandlerLock` (object_type: BEHAVIOR_DEFINITION, object_name) | the same requests |
@@ -872,6 +872,10 @@ make two calls, or one with the part you need.
   | `GetBehaviorImplementation` | `behavior_implementation_data` | `source` |
   | `GetMetadataExtension` | `metadata_extension_data` | `source` |
   | `GetFunctionModule` | `function_module_data` | `source` |
+  | `GetLocalTestClass` | `test_class_code` | `source` |
+  | `GetLocalTypes` | `local_types_code` | `source` |
+  | `GetLocalDefinitions` | `definitions_code` | `source` |
+  | `GetLocalMacros` | `macros_code` | `source` |
   | `GetFunctionInclude` (was `ReadFunctionInclude`) | `source_code`, `metadata` | `source` (part source), `metadata` (part metadata) |
   | `GetDomain` | `domain_data` | `metadata` |
   | `GetDataElement` | `data_element_data` | `metadata` |
@@ -1145,6 +1149,31 @@ transport's options only:
   `HandlerUpdate` does. Every type is recorded in batch mode (an include with its `lock_handle`),
   and so is `HandlerDeletionCheck`: a deletion check batch, then a delete batch. The full sets'
   `Delete<Type>` keep their chains.
+- **BREAKING — `HandlerGet` is one request per part.** `part: "source"` (the default) reads the
+  source alone and `part: "metadata"` the metadata document alone, each one request, answered
+  `{ part: "source", source }` / `{ part: "metadata", metadata }` beside the object's name — the
+  class includes (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`) included
+  (they answered `test_class_code`, `local_types_code`, `definitions_code`, `macros_code`). What
+  changes for a consumer of 18.x's `HandlerGet`:
+  - PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP have no source: `part: "source"`, and a call
+    with no `part`, is refused before anything is sent — "part=source is not available for
+    object_type=DOMAIN. It offers: metadata." (PACKAGE: `metadata, contents`). 18.x answered their
+    metadata document for the source part: call `HandlerGet` with `part: "metadata"`.
+  - FUNCTION_MODULE is read at the group its arguments name, in one request, with no metadata read
+    first: `function_module_name` as `GROUP|MODULE` (as `HandlerDeletionCheck`, `HandlerValidate` and
+    `HandlerCheckRun` name it), or the module's name with `function_group_name`. Both may be given
+    when they name the same group; two groups, or none, are refused before anything is sent.
+  - `node_structure` of a package (`object_adt_type: DEVC/K`) is one request. SAP answers an empty
+    package and a package that does not exist with the same blank body; 18.x then read the package
+    to tell them apart (and so did `GetNodeStructureLow`). Now that answer is
+    `{ objects: [], childNodes: [], blank: "…" }`, `blank` stating both readings. To know which
+    holds, call `HandlerGet` with `object_type: PACKAGE`, `part: "metadata"`: a package that does
+    not exist answers SAP's refusal.
+  - `urls` (a service binding's URLs, up to five requests) and `contents` (the package walk) answer
+    as before.
+
+  Batch mode records every part that is one request: `source` and `metadata` per type,
+  `object_structure`, `node_structure` (`DEVC/K` included now) and `virtual_folders`.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.

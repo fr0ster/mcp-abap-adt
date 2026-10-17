@@ -1628,49 +1628,49 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getlocaldefinitions-high-level-class"></a>
 #### GetLocalDefinitions (High-Level / Class)
-**Description:** Retrieve local definitions source code from a class (definitions include). Supports reading active or inactive version.
+**Description:** Read the local definitions include of a class (its definitions include), active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocalmacros-high-level-class"></a>
 #### GetLocalMacros (High-Level / Class)
-**Description:** Retrieve local macros source code from a class (macros include). Supports reading active or inactive version. Note: Macros are supported in older ABAP versions but not in newer ones.
+**Description:** Read the local macros include of a class, active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** Read the local test classes include of a class. Active or inactive version.
+**Description:** Read the local test classes include of a class, active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 
 <a id="getlocaltypes-high-level-class"></a>
 #### GetLocalTypes (High-Level / Class)
-**Description:** Retrieve local types source code from a class (implementations include). Supports reading active or inactive version.
+**Description:** Read the local types include of a class (its implementations include), active or inactive version. Returns { class_name, version, part: 'source', source }.
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.
 
 ---
 

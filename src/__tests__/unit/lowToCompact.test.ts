@@ -11,8 +11,6 @@
  * low tool's requests: the same, in the same order. A row marked `accepted`
  * differs as its kind says, and only so:
  *
- * - `extra-requests`: the low tool's requests are among compact's, in order
- *   (the high create also validates, locks, checks);
  * - `deletion-check`: compact sends the deletion check, then exactly the low
  *   tool's requests;
  * - `activation-run`: compact activates the same object through the
@@ -215,19 +213,6 @@ async function compactRequests(row: LowToCompactRow): Promise<ParityRequest[]> {
   return parityRequests(connection.requests);
 }
 
-/** Whether `part` occurs in `whole` in order, each request equal. */
-function inOrder(part: ParityRequest[], whole: ParityRequest[]): boolean {
-  let at = 0;
-  for (const request of whole) {
-    if (
-      at < part.length &&
-      JSON.stringify(request) === JSON.stringify(part[at])
-    )
-      at += 1;
-  }
-  return at === part.length;
-}
-
 const isDeletionCheck = (r: ParityRequest) =>
   r.method === 'POST' && r.url === '/sap/bc/adt/deletion/check';
 
@@ -259,16 +244,6 @@ describe('the low set → compact mapping table', () => {
     '%s: the compact call sends the same requests',
     async (_tool, row) => {
       expect(await compactRequests(row)).toEqual(row.low_requests);
-    },
-  );
-
-  const extra = TABLE.rows.filter((r) => r.accepted?.kind === 'extra-requests');
-  it.each(extra.map((r) => [r.tool, r] as const))(
-    '%s (accepted, extra requests): the low requests are among the compact ones, in order',
-    async (_tool, row) => {
-      const sent = await compactRequests(row);
-      expect(sent.length).toBeGreaterThan(row.low_requests?.length ?? 0);
-      expect(inOrder(row.low_requests ?? [], sent)).toBe(true);
     },
   );
 
@@ -307,14 +282,11 @@ describe('the low set → compact mapping table', () => {
   /**
    * The rows the owner accepted (2026-10-13), each with its kind — fixed
    * here, so a row cannot be marked accepted later, or change its kind,
-   * without this test going red.
+   * without this test going red. 19.0.0: compact HandlerCreate is the create
+   * request alone, so the five create rows accepted with extra requests send
+   * exactly the low requests now and are accepted no more.
    */
   const ACCEPTED: ReadonlyArray<[string, string]> = [
-    ['CreateDomainLow', 'extra-requests'],
-    ['CreateDataElementLow', 'extra-requests'],
-    ['CreateStructureLow', 'extra-requests'],
-    ['CreateBehaviorDefinitionLow', 'extra-requests'],
-    ['CreateMetadataExtensionLow', 'extra-requests'],
     ['DeleteDomainLow', 'deletion-check'],
     ['DeleteDataElementLow', 'deletion-check'],
     ['DeleteTableLow', 'deletion-check'],
@@ -333,12 +305,12 @@ describe('the low set → compact mapping table', () => {
     ['ActivateServiceBindingLow', 'activation-run'],
   ];
 
-  it('accepts exactly the 21 rows the owner accepted, each with its kind', () => {
+  it('accepts exactly the 16 rows the owner accepted, each with its kind', () => {
     const accepted = TABLE.rows
       .filter((r) => r.accepted)
       .map((r) => [r.tool, r.accepted?.kind] as [string, string | undefined])
       .sort((x, y) => x[0].localeCompare(y[0]));
-    expect(ACCEPTED).toHaveLength(21);
+    expect(ACCEPTED).toHaveLength(16);
     expect(accepted).toEqual(
       [...ACCEPTED].sort((x, y) => x[0].localeCompare(y[0])),
     );
@@ -348,11 +320,7 @@ describe('the low set → compact mapping table', () => {
     const kinds = new Set(
       TABLE.rows.flatMap((r) => (r.accepted ? [r.accepted.kind] : [])),
     );
-    expect([...kinds].sort()).toEqual([
-      'activation-run',
-      'deletion-check',
-      'extra-requests',
-    ]);
+    expect([...kinds].sort()).toEqual(['activation-run', 'deletion-check']);
   });
 });
 

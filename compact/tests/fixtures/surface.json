@@ -122,7 +122,7 @@
   {
     "group": "compact",
     "name": "HandlerCreate",
-    "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, description, transport_request, activate, create_only, program_type, application, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, name, root_entity, implementation_type, behavior_definition, cds_view_name, fields, test_class_source",
+    "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, description, transport_request, master_language, super_package, package_type, software_component, transport_layer, record_changes, application_component, transport_type, target_system, owner, superclass, final, create_protected, program_type, application, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, service_name, service_version, binding_variant, name, implementation_type",
     "available_in": "cloud, onprem"
   },
   {

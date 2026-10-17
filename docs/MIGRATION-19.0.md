@@ -687,11 +687,11 @@ of the full set's high or low tools; only read-only reads may be in both.
   `HandlerCheckRun` (now PACKAGE and FUNCTION_MODULE, and `source_code` to check source that is
   not saved for CLASS, STRUCTURE and DDL), `HandlerActivate`. A function module is named
   `GROUP|MODULE` in the lifecycle tools' `object_name`.
-- **A function group create reads the group back.** On SAP's 400 "Interface SAPL… has not been
-  created" — a refusal that can come with a create that landed — `HandlerCreate` FUNCTION_GROUP
-  **and the full set's `CreateFunctionGroup`** now read the group back; if it is there, the create
-  is answered as done (and activated when asked). 18.x's `CreateFunctionGroup` answered that 400
-  as a failure.
+- **A function group create and SAP's 400 "Interface SAPL… has not been created"** — a refusal
+  that can come with a create that landed. The full set's `CreateFunctionGroup` now reads the group
+  back; if it is there, the create is answered as done (and activated when asked); 18.x answered
+  that 400 as a failure. Compact `HandlerCreate` FUNCTION_GROUP sends the create alone and answers
+  the 400 as it came: read the group with `HandlerGet` part `metadata` to see whether it landed.
 - **Packages.** `HandlerCreate` PACKAGE takes `super_package` and the package settings (it could
   not create a package before: the parameter was not declared); `HandlerUpdate` PACKAGE writes the
   description — under your `lock_handle`, or without one locking, writing and unlocking itself;
@@ -703,8 +703,9 @@ of the full set's high or low tools; only read-only reads may be in both.
   check first, as every high delete — a refusal is answered as it came, and an absent package
   gets no delete). They send the same requests as compact's `HandlerUpdate` PACKAGE without `lock_handle` and `HandlerDelete`
   PACKAGE.
-- **Creation parameters.** `HandlerCreate` takes `superclass`, `final`, `abstract`,
-  `create_protected` for a class and `master_language`.
+- **Creation parameters.** `HandlerCreate` takes `superclass`, `final` and `create_protected` for
+  a class, and `master_language` — what the create request carries (`abstract` it does not, and
+  is refused).
 - **The repository by address.** `HandlerGet` with `part: object_structure` (`object_adt_type`,
   `object_name`), `part: node_structure` (`object_adt_type`, `object_name`, `node_id`,
   `with_short_descriptions`) and `part: virtual_folders` (`object_search_pattern`, `preselection`,
@@ -713,13 +714,10 @@ of the full set's high or low tools; only read-only reads may be in both.
 
 Each low tool and the compact call that replaces it — the same ADT requests, tested against a
 stand-in (`src/__tests__/unit/lowToCompact.test.ts`) with the low tool's requests captured before it
-was removed (`tools/low-to-compact.json`). Three differences are accepted and named in their rows: a
-create through `HandlerCreate` of a domain, data element, structure, behavior definition or metadata
-extension also validates, locks and checks; a delete through `HandlerDelete` asks the deletion check
-first; a function module, service definition or service binding activates through the activation run.
-For a low create tool's create request alone, `HandlerCreate` takes `create_only: true`: only the
-create is sent — no validation, lock, write, check or activation — for every type of the create
-route but `UNIT_TEST` and `CDS_UNIT_TEST`, which refuse it.
+was removed (`tools/low-to-compact.json`). Two differences are accepted and named in their rows: a
+delete through `HandlerDelete` asks the deletion check first; a function module, service definition
+or service binding activates through the activation run. `HandlerCreate` is the create request
+alone, as each low create tool was — the same requests for every type.
 
 <!-- low-to-compact table: rendered from tools/low-to-compact.json -->
 | Low tool | Compact call | Difference / note |
@@ -752,19 +750,19 @@ route but `UNIT_TEST` and `CDS_UNIT_TEST`, which refuse it.
 | `CheckProgramLow` | `HandlerCheckRun` (object_type: PROGRAM, object_name, version) | The low tool passed an omitted version on as undefined, which the client checks as inactive; HandlerCheckRun defaults to active, so state version. |
 | `CheckStructureLow` | `HandlerCheckRun` (object_type: STRUCTURE, object_name, version, source_code) | The low tool's ddl_code is HandlerCheckRun's source_code. |
 | `CheckTableLow` | `HandlerCheckRun` (object_type: TABLE, object_name, version) | CheckTableLow accepted ddl_code and reporter and sent neither. |
-| `CreateBehaviorDefinitionLow` | `HandlerCreate` (object_type: BEHAVIOR_DEFINITION, name, description, package_name, transport_request, root_entity, implementation_type, activate) | **accepted:** HandlerCreate runs the high create, which locks, checks, unlocks and reads back after the create; the low tool's create request is among them, unchanged. |
-| `CreateBehaviorImplementationLow` | `HandlerCreate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, behavior_definition, description, package_name, transport_request), then `HandlerUpdate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, behavior_definition, implementation_code, transport_request, activate) | With implementation_code, two compact calls: the create, then the update (lock, write the implementations include, unlock). |
-| `CreateClassLow` | `HandlerCreate` (object_type: CLASS, class_name, description, package_name, transport_request, superclass, final, abstract, create_protected) | the same requests |
-| `CreateDataElementLow` | `HandlerCreate` (object_type: DATA_ELEMENT, data_element_name, description, package_name, transport_request, activate) | **accepted:** HandlerCreate runs the high create, which validates, creates, locks, writes the properties with their defaults, unlocks and checks; the low tool's create request is among them, unchanged. |
+| `CreateBehaviorDefinitionLow` | `HandlerCreate` (object_type: BEHAVIOR_DEFINITION, name, description, package_name, transport_request, implementation_type) | the same requests |
+| `CreateBehaviorImplementationLow` | `HandlerCreate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, description, package_name, transport_request), then `HandlerUpdate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, behavior_definition, implementation_code, transport_request, activate) | With implementation_code, two compact calls: the create, then the update (lock, write the implementations include, unlock). |
+| `CreateClassLow` | `HandlerCreate` (object_type: CLASS, class_name, description, package_name, transport_request, superclass, final, create_protected) | the same requests |
+| `CreateDataElementLow` | `HandlerCreate` (object_type: DATA_ELEMENT, data_element_name, description, package_name, transport_request) | the same requests |
 | `CreateDdlLow` | `HandlerCreate` (object_type: DDL, ddl_name, description, package_name, transport_request) | the same requests |
-| `CreateDomainLow` | `HandlerCreate` (object_type: DOMAIN, domain_name, description, package_name, transport_request, activate) | **accepted:** HandlerCreate runs the high create, which validates, creates, locks, writes the properties with their defaults, unlocks and checks; the low tool's create request is among them, unchanged. |
-| `CreateFunctionGroupLow` | `HandlerCreate` (object_type: FUNCTION_GROUP, function_group_name, description, package_name, transport_request, activate) | On the 400 "Interface SAPL… has not been created" both read the group back. |
+| `CreateDomainLow` | `HandlerCreate` (object_type: DOMAIN, domain_name, description, package_name, transport_request) | the same requests |
+| `CreateFunctionGroupLow` | `HandlerCreate` (object_type: FUNCTION_GROUP, function_group_name, description, package_name, transport_request) | On the 400 "Interface SAPL… has not been created" the low tool read the group back; HandlerCreate answers the 400 as it came — read the group with HandlerGet part metadata to see whether it landed. |
 | `CreateFunctionModuleLow` | `HandlerCreate` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, description, transport_request) | the same requests |
 | `CreateInterfaceLow` | `HandlerCreate` (object_type: INTERFACE, interface_name, description, package_name, transport_request) | the same requests |
-| `CreateMetadataExtensionLow` | `HandlerCreate` (object_type: METADATA_EXTENSION, name, description, package_name, transport_request, master_language, activate) | **accepted:** HandlerCreate runs the high create, which locks, checks and unlocks after the create; the low tool's create request is among them, unchanged. |
+| `CreateMetadataExtensionLow` | `HandlerCreate` (object_type: METADATA_EXTENSION, name, description, package_name, transport_request, master_language) | the same requests |
 | `CreatePackageLow` | `HandlerCreate` (object_type: PACKAGE, package_name, super_package, description, package_type, software_component, transport_layer, transport_request, record_changes, application_component) | the same requests |
 | `CreateProgramLow` | `HandlerCreate` (object_type: PROGRAM, program_name, description, package_name, transport_request, program_type, application) | the same requests |
-| `CreateStructureLow` | `HandlerCreate` (object_type: STRUCTURE, structure_name, description, package_name, transport_request, fields, activate) | **accepted:** HandlerCreate runs the high create, which validates before and checks after the create; the low tool's create request is among them, unchanged. HandlerCreate STRUCTURE requires fields, which do not reach the create (set them with HandlerUpdate ddl_code). |
+| `CreateStructureLow` | `HandlerCreate` (object_type: STRUCTURE, structure_name, description, package_name, transport_request) | HandlerCreate STRUCTURE sends the create alone; the fields reach the structure through a later write (HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock). |
 | `CreateTableLow` | `HandlerCreate` (object_type: TABLE, table_name, package_name, transport_request) | the same requests |
 | `CreateTransportLow` | `HandlerTransportCreate` (description, transport_type) | the same requests |
 | `DeleteBehaviorDefinitionLow` | `HandlerDelete` (object_type: BEHAVIOR_DEFINITION, behavior_definition_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
@@ -950,6 +948,37 @@ transport's options only:
 - **Compact is the low set's analogue.** See "The low set leaves the full binaries" above: the
   write under your `lock_handle`, the package operations, the creation and validation parameters,
   the check of unsaved source, and `HandlerGet`'s three repository parts are new on `rw` / `ro`.
+- **BREAKING — `HandlerCreate` is one request.** It sends the `POST` of the type's create alone,
+  for every type, with no flag and no mode: no validation, lock, write, check or activation, no
+  service-group read for a service binding, no read-back after a function group's `400`. The object
+  is created inactive with what its create carries. In 18.x it ran the full chain of the type's
+  create (a domain: validate, create, lock, write the properties, unlock, check, activate). What a
+  consumer of 18.x's `HandlerCreate` now calls, in order, each its own call:
+  1. `HandlerCreate` — the object's name, package, description, transport request and what its
+     create carries (a package's settings, a class's `superclass` / `final` / `create_protected`,
+     a program's `program_type`, a behavior definition's `implementation_type`, a binding's service
+     definition and variant, `master_language`);
+  2. `HandlerLock` — it answers the `lock_handle`;
+  3. `HandlerUpdate` with that `lock_handle` — the content 18.x took at create: a source
+     (`source_code`), a structure's or table's DDL, a domain's or data element's properties, a
+     behavior definition with its root entity, a behavior implementation naming its behavior
+     definition;
+  4. `HandlerUnlock`;
+  5. `HandlerActivate` — 18.x activated unless `activate: false`.
+
+  Validate first with `HandlerValidate` if you want the name checked before the create. An argument
+  the create does not send is refused before anything is sent, by presence — `false`, `0` and `''`
+  included — naming it: "HandlerCreate sends the create request alone: <argument> is not sent —
+  leave it out; then HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock and
+  HandlerActivate". So `activate` (also `activate: false`), `fields`, `source_code`, `datatype`,
+  `length`, `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`,
+  `fixed_values`, `abstract`, `root_entity`, `behavior_definition`, `cds_view_name` and
+  `test_class_source` must be left out; they left the schema. `UNIT_TEST` and `CDS_UNIT_TEST`,
+  whose create is a chain (the test classes' lock, write, unlock and activation; a CDS unit test
+  also checks the view and creates the class first), are refused before anything is sent: "HandlerCreate
+  does not create <type>: its create is a chain of requests, not one — use CreateUnitTest /
+  CreateCdsUnitTest of the full set" — the full binaries serve those tools unchanged. The full sets'
+  `Create<Type>` keep their chains.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.

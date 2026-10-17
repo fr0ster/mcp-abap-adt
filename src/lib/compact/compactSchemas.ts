@@ -15,11 +15,19 @@ const commonObjectTypeSchema = {
   description: 'ABAP object type for routed compact operation.',
 } as const;
 
+/**
+ * `HandlerCreate`: one request, the type's create alone (spec §4.6). Only what
+ * some type's create sends is named; anything else a caller gives is refused
+ * by `handleCreateOnly`, naming it.
+ */
 export const compactCreateSchema = {
   type: 'object',
   properties: {
     object_type: commonObjectTypeSchema,
-    class_name: { type: 'string', description: 'ABAP class name.' },
+    class_name: {
+      type: 'string',
+      description: 'ABAP class name (CLASS, BEHAVIOR_IMPLEMENTATION).',
+    },
     program_name: { type: 'string', description: 'ABAP program name.' },
     domain_name: { type: 'string', description: 'ABAP domain name.' },
     function_module_name: {
@@ -28,7 +36,8 @@ export const compactCreateSchema = {
     },
     function_group_name: {
       type: 'string',
-      description: 'ABAP function group name.',
+      description:
+        'ABAP function group name (FUNCTION_GROUP; the group of a FUNCTION_MODULE).',
     },
     package_name: { type: 'string', description: 'ABAP package name.' },
     ddl_name: {
@@ -42,13 +51,6 @@ export const compactCreateSchema = {
     transport_request: {
       type: 'string',
       description: 'Transport request id (if required by system).',
-    },
-    activate: { type: 'boolean', description: 'Activate object after create.' },
-    create_only: {
-      type: 'boolean',
-      default: false,
-      description:
-        'send the create request alone: no validation, lock, write, check or activation; the object is created inactive with what the create carries',
     },
     master_language: {
       type: 'string',
@@ -79,6 +81,19 @@ export const compactCreateSchema = {
       type: 'string',
       description: 'Application component (PACKAGE create).',
     },
+    transport_type: {
+      type: 'string',
+      enum: ['workbench', 'customizing'],
+      description: 'Transport request type (TRANSPORT create).',
+    },
+    target_system: {
+      type: 'string',
+      description: 'Target system of the transport request (TRANSPORT create).',
+    },
+    owner: {
+      type: 'string',
+      description: 'Owner of the transport request (TRANSPORT create).',
+    },
     superclass: {
       type: 'string',
       description: 'Superclass name (CLASS create).',
@@ -87,40 +102,17 @@ export const compactCreateSchema = {
       type: 'boolean',
       description: 'Mark the class final (CLASS create).',
     },
-    abstract: {
-      type: 'boolean',
-      description: 'Mark the class abstract (CLASS create).',
-    },
     create_protected: {
       type: 'boolean',
       description: 'Protected constructor (CLASS create).',
     },
-    program_type: { type: 'string', description: 'ABAP program type.' },
-    application: { type: 'string', description: 'Domain application area.' },
-    datatype: { type: 'string', description: 'ABAP data type.' },
-    length: { type: 'number', description: 'Length for typed artifacts.' },
-    decimals: { type: 'number', description: 'Decimal places.' },
-    conversion_exit: { type: 'string', description: 'Conversion exit name.' },
-    lowercase: {
-      type: 'boolean',
-      description: 'Allow lowercase values (domain setting).',
+    program_type: {
+      type: 'string',
+      description: 'ABAP program type (PROGRAM create).',
     },
-    sign_exists: {
-      type: 'boolean',
-      description: 'Allow signed values (domain setting).',
-    },
-    value_table: { type: 'string', description: 'Foreign key value table.' },
-    fixed_values: {
-      type: 'array',
-      description: 'Domain fixed values list.',
-      items: {
-        type: 'object',
-        properties: {
-          low: { type: 'string', description: 'Fixed value key.' },
-          text: { type: 'string', description: 'Fixed value text.' },
-        },
-        required: ['low', 'text'],
-      },
+    application: {
+      type: 'string',
+      description: 'Application area (PROGRAM create).',
     },
     table_name: { type: 'string', description: 'Table name.' },
     structure_name: { type: 'string', description: 'Structure name.' },
@@ -128,64 +120,43 @@ export const compactCreateSchema = {
     interface_name: { type: 'string', description: 'Interface name.' },
     service_definition_name: {
       type: 'string',
-      description: 'Service definition name.',
+      description:
+        'Service definition name (SERVICE_DEFINITION; the definition a SERVICE_BINDING binds).',
     },
     service_binding_name: {
       type: 'string',
       description: 'Service binding name.',
+    },
+    service_name: {
+      type: 'string',
+      description:
+        'Service name of the binding (SERVICE_BINDING create); the binding name when absent.',
+    },
+    service_version: {
+      type: 'string',
+      description:
+        'Service version of the binding (SERVICE_BINDING create); 0001 when absent.',
+    },
+    binding_variant: {
+      type: 'string',
+      enum: [
+        'ODATA_V2_UI',
+        'ODATA_V2_WEB_API',
+        'ODATA_V4_UI',
+        'ODATA_V4_WEB_API',
+      ],
+      description:
+        'Binding variant (SERVICE_BINDING create); ODATA_V4_UI when absent.',
     },
     name: {
       type: 'string',
       description:
         'Object name for handlers that require a generic `name` (behavior definition, metadata extension).',
     },
-    root_entity: {
-      type: 'string',
-      description: 'Root CDS entity name (behavior definition create).',
-    },
     implementation_type: {
       type: 'string',
       enum: ['Managed', 'Unmanaged', 'Abstract', 'Projection'],
       description: 'Behavior definition implementation type.',
-    },
-    behavior_definition: {
-      type: 'string',
-      description:
-        'Referenced behavior definition name (behavior implementation create).',
-    },
-    cds_view_name: {
-      type: 'string',
-      description: 'CDS view name to validate for unit test doubles.',
-    },
-    fields: {
-      type: 'array',
-      description: 'Structure fields (for STRUCTURE create).',
-      items: {
-        type: 'object',
-        properties: {
-          name: { type: 'string', description: 'Field name.' },
-          data_type: { type: 'string', description: 'Field data type.' },
-          length: { type: 'number', description: 'Field length.' },
-          decimals: { type: 'number', description: 'Decimal places.' },
-          domain: { type: 'string', description: 'Domain reference.' },
-          data_element: {
-            type: 'string',
-            description: 'Data element reference.',
-          },
-          structure_ref: {
-            type: 'string',
-            description: 'Included structure reference.',
-          },
-          table_ref: { type: 'string', description: 'Table type reference.' },
-          description: { type: 'string', description: 'Field description.' },
-        },
-        required: ['name'],
-      },
-    },
-    test_class_source: {
-      type: 'string',
-      description:
-        'ABAP source of the local test classes (UNIT_TEST and CDS_UNIT_TEST create).',
     },
   },
   required: ['object_type'],

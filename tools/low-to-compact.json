@@ -256,15 +256,10 @@
             "domain_name": "DOM_A",
             "description": "Text",
             "package_name": "PKG_TARGET",
-            "transport_request": "XXXK900001",
-            "activate": false
+            "transport_request": "XXXK900001"
           }
         }
       ],
-      "accepted": {
-        "kind": "extra-requests",
-        "reason": "HandlerCreate runs the high create, which validates, creates, locks, writes the properties with their defaults, unlocks and checks; the low tool's create request is among them, unchanged."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -514,15 +509,10 @@
             "data_element_name": "DTEL_A",
             "description": "Text",
             "package_name": "PKG_TARGET",
-            "transport_request": "XXXK900001",
-            "activate": false
+            "transport_request": "XXXK900001"
           }
         }
       ],
-      "accepted": {
-        "kind": "extra-requests",
-        "reason": "HandlerCreate runs the high create, which validates, creates, locks, writes the properties with their defaults, unlocks and checks; the low tool's create request is among them, unchanged."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -1042,21 +1032,11 @@
             "structure_name": "STRU_A",
             "description": "Text",
             "package_name": "PKG_TARGET",
-            "transport_request": "XXXK900001",
-            "fields": [
-              {
-                "name": "FIELD_A"
-              }
-            ],
-            "activate": false
+            "transport_request": "XXXK900001"
           }
         }
       ],
-      "accepted": {
-        "kind": "extra-requests",
-        "reason": "HandlerCreate runs the high create, which validates before and checks after the create; the low tool's create request is among them, unchanged."
-      },
-      "note": "HandlerCreate STRUCTURE requires fields, which do not reach the create (set them with HandlerUpdate ddl_code).",
+      "note": "HandlerCreate STRUCTURE sends the create alone; the fields reach the structure through a later write (HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock).",
       "low_requests": [
         {
           "method": "POST",
@@ -1554,7 +1534,6 @@
             "transport_request": "XXXK900001",
             "superclass": "CLAS_SUPER",
             "final": true,
-            "abstract": false,
             "create_protected": true
           }
         }
@@ -2299,12 +2278,11 @@
             "function_group_name": "FUGR_A",
             "description": "Text",
             "package_name": "PKG_TARGET",
-            "transport_request": "XXXK900001",
-            "activate": false
+            "transport_request": "XXXK900001"
           }
         }
       ],
-      "note": "On the 400 \"Interface SAPL… has not been created\" both read the group back.",
+      "note": "On the 400 \"Interface SAPL… has not been created\" the low tool read the group back; HandlerCreate answers the 400 as it came — read the group with HandlerGet part metadata to see whether it landed.",
       "low_requests": [
         {
           "method": "POST",
@@ -2777,16 +2755,10 @@
             "description": "Text",
             "package_name": "PKG_TARGET",
             "transport_request": "XXXK900001",
-            "root_entity": "BDEF_A",
-            "implementation_type": "Managed",
-            "activate": false
+            "implementation_type": "Managed"
           }
         }
       ],
-      "accepted": {
-        "kind": "extra-requests",
-        "reason": "HandlerCreate runs the high create, which locks, checks, unlocks and reads back after the create; the low tool's create request is among them, unchanged."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -3033,7 +3005,6 @@
           "args": {
             "object_type": "BEHAVIOR_IMPLEMENTATION",
             "class_name": "BIMP_A",
-            "behavior_definition": "BDEF_A",
             "description": "Text",
             "package_name": "PKG_TARGET",
             "transport_request": "XXXK900001"
@@ -3166,15 +3137,10 @@
             "description": "Text",
             "package_name": "PKG_TARGET",
             "transport_request": "XXXK900001",
-            "master_language": "EN",
-            "activate": false
+            "master_language": "EN"
           }
         }
       ],
-      "accepted": {
-        "kind": "extra-requests",
-        "reason": "HandlerCreate runs the high create, which locks, checks and unlocks after the create; the low tool's create request is among them, unchanged."
-      },
       "low_requests": [
         {
           "method": "POST",

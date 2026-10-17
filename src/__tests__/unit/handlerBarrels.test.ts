@@ -79,8 +79,7 @@ describe("lib's read and write handler barrels", () => {
     // for compact's `HandlerUpdate` with lock_handle and `HandlerDelete` PACKAGE.
     // 19.0.0: the high UpdatePackage, for `HandlerUpdate`
     // PACKAGE without lock_handle (82).
-    // 19.0.0: the create request alone, for compact's `HandlerCreate` with
-    // create_only (83).
+    // 19.0.0: the create request alone, compact's `HandlerCreate` (83).
     expect(write).toHaveLength(83);
   });
 

@@ -1,36 +1,36 @@
 /**
- * A create that sends the create request alone: the compact create's
- * `create_only`.
+ * Compact `HandlerCreate`: the create request alone, one `POST`, for every
+ * type (spec §4.6; the owner's rule — compact is one ADT request per tool
+ * call, the consumer chains lock, update, unlock and activate as calls of
+ * their own). The full sets' `Create<Type>` keep their chains.
  *
- * `HandlerCreate` without it runs the high create — for most types validate,
- * create, lock, write, unlock, check and activate, each request built after
- * the previous one answered. With `create_only` only the create of the type's
- * adt-clients `create()` is sent, with the arguments the high create maps for
- * its own create step: nothing validated, locked, written, checked or
- * activated, and the object is created inactive with what the create carries.
- * One request, none of which waits for another's answer, so it can be recorded
- * in batch mode (spec §4.6); outside batch mode it is the same one request.
+ * Only the create of the type's adt-clients `create()` is sent, with the
+ * arguments the full create maps for its own create step: nothing validated,
+ * locked, written, checked or activated, no service-group read for a service
+ * binding, no read-back after a function group's `400` — the object is
+ * created inactive with what the create carries. One request, none of which
+ * waits for another's answer, so it can be recorded in batch mode.
  *
- * Where the high create already sends that one request and nothing else
+ * Where the full create already sends that one request and nothing else
  * (PACKAGE, TRANSPORT, TABLE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE),
  * it is that handler, so the two cannot drift; the others call the create step
- * of their high create here — a behavior definition without its root entity
+ * of their full create here — a behavior definition without its root entity
  * and a behavior implementation without its behavior definition, which their
  * creates do not send.
  *
- * **An argument the create does not send is refused, not dropped** (the
- * controller's ruling, the principle the owner set for `document` beside the
- * flat fields): present (`!== undefined`) beside `create_only`, before any
- * request — `activate` unless it is `false`, and every argument outside the
- * type's `CREATE_CARRIES` list. Each list is what that type's create request
- * was measured to send ("accepted" means "sent by the create", the
- * controller's ruling), plus `transport_request`, `package_name` and
- * `description`, which every type accepts. Each type is proven
- * to send exactly one request (`compact-modify/src/__tests__/createOnly.test.ts`).
+ * **An argument the create does not send is refused, not dropped**: present
+ * (`!== undefined`) — `false`, `0` and `''` included — before any request,
+ * naming it: every argument outside the type's `CREATE_CARRIES` list
+ * (`activate` among them). Each list is what that type's create request was
+ * measured to send, plus `transport_request`, `package_name` and
+ * `description`, which every type accepts. Each type is proven to send
+ * exactly one request (`compact-modify/src/__tests__/createSingleCall.test.ts`).
  *
  * UNIT_TEST and CDS_UNIT_TEST have no create of one request — their create is
- * the test classes' lock, write, unlock and activation — and refuse
- * `create_only` before anything is sent.
+ * the test classes' lock, write, unlock and activation (a CDS unit test also
+ * checks the view and creates the class first) — and are refused before
+ * anything is sent, pointing to the full set's `CreateUnitTest` /
+ * `CreateCdsUnitTest`.
  */
 
 import {
@@ -69,8 +69,8 @@ import { handleCreateProgram } from '../../program/high/handleCreateProgram';
 import { handleCreateTable } from '../../table/high/handleCreateTable';
 import { handleCreateTransport } from '../../transport/high/handleCreateTransport';
 
-/** Accepted beside `create_only` for every type: they take no part in the request. */
-const ALWAYS = ['object_type', 'create_only', 'detail'] as const;
+/** Accepted for every type: they take no part in the request. */
+const ALWAYS = ['object_type', 'detail'] as const;
 
 /** Accepted for every offered type (the controller's ruling). */
 const COMMON = ['transport_request', 'package_name', 'description'] as const;
@@ -123,9 +123,8 @@ const CREATE_CARRIES: Readonly<Record<string, readonly string[]>> = {
 };
 
 /**
- * The arguments given beside `create_only` that the type's create does not
- * send, in the order given: `activate` unless `false`, and every argument
- * outside the type's list.
+ * The arguments given that the type's create does not send, in the order
+ * given: every argument present (`!== undefined`) outside the type's list.
  */
 function notSent(objectType: string, args: Args): string[] {
   const carried = new Set<string>([
@@ -135,12 +134,11 @@ function notSent(objectType: string, args: Args): string[] {
   ]);
   return Object.keys(args).filter((key) => {
     if (args[key] === undefined) return false;
-    if (key === 'activate') return args[key] !== false;
     return !carried.has(key);
   });
 }
 
-/** The refusal of arguments the create alone does not send. */
+/** The refusal of arguments the create request does not send. */
 function notSentRefusal(names: string[]) {
   const named =
     names.length === 1
@@ -148,7 +146,7 @@ function notSentRefusal(names: string[]) {
       : `${names.join(', ')} are not sent`;
   return return_error(
     new Error(
-      `create_only sends the create alone: ${named} — leave it out, or create without create_only`,
+      `HandlerCreate sends the create request alone: ${named} — leave it out; then HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock and HandlerActivate`,
     ),
   );
 }
@@ -158,8 +156,11 @@ type Args = Record<string, unknown> & { object_type?: string };
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value.length > 0 ? value : undefined;
 
-/** The types whose create sends more than one request: they refuse create_only. */
-const MORE_THAN_ONE_REQUEST = new Set(['UNIT_TEST', 'CDS_UNIT_TEST']);
+/** The types whose create is a chain, each with the full set's tool that runs it. */
+const CHAIN_CREATES: Readonly<Record<string, string>> = {
+  UNIT_TEST: 'CreateUnitTest',
+  CDS_UNIT_TEST: 'CreateCdsUnitTest',
+};
 
 /** A type with no create: the words the create route answers it with. */
 function unsupportedCreate(objectType: string) {
@@ -168,18 +169,18 @@ function unsupportedCreate(objectType: string) {
   );
 }
 
-/** The refusal of a type whose create sends more than one request. */
-function createOnlyRefusal(objectType: string) {
+/** The refusal of a type whose create is a chain of requests. */
+function chainRefusal(objectType: string, fullTool: string) {
   return return_error(
     new Error(
-      `create_only is not available for ${objectType}: its create sends more than one request`,
+      `HandlerCreate does not create ${objectType}: its create is a chain of requests, not one — use ${fullTool} of the full set`,
     ),
   );
 }
 
 /**
- * The create step alone, answered as the high create answers it — under its
- * step, `create`, as the high create's failure of that step reads.
+ * The create step alone, answered as the full create answers it — under its
+ * step, `create`, as the full create's failure of that step reads.
  */
 function createAlone(
   args: Args,
@@ -215,10 +216,11 @@ export async function handleCreateOnly(
   const masterLanguage = text(args.master_language);
 
   const objectType = String(args.object_type);
-  if (MORE_THAN_ONE_REQUEST.has(objectType)) {
-    return createOnlyRefusal(objectType);
+  // Own keys only: an object_type such as `constructor` names no create.
+  if (Object.hasOwn(CHAIN_CREATES, objectType)) {
+    return chainRefusal(objectType, CHAIN_CREATES[objectType]);
   }
-  if (CREATE_CARRIES[objectType] === undefined) {
+  if (!Object.hasOwn(CREATE_CARRIES, objectType)) {
     // No create at all: the create route's own words.
     return unsupportedCreate(objectType);
   }
@@ -407,7 +409,7 @@ export async function handleCreateOnly(
     case 'BEHAVIOR_IMPLEMENTATION': {
       // The create is the class shell: the behavior definition is named in
       // the implementation's source, written afterwards, never in this
-      // request — so create_only neither needs nor takes it.
+      // request — so the create neither needs nor takes it.
       const refused = missing(args, ['class_name', 'package_name']);
       if (refused) return refused;
       const className = String(args.class_name).toUpperCase();

@@ -180,7 +180,7 @@ export const DEBUG_BATCH_AMDP_UNMEASURED_WORDS =
  * batch: a request of it depends on another's answer (or it sends none).
  */
 export function batchNotRecordableWords(tool: string): string {
-  return `${tool} builds a request from another's answer and cannot be recorded in batch mode; record its steps with the low-level tools — compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet — each phase its own batch`;
+  return `${tool} builds a request from another's answer and cannot be recorded in batch mode; record its steps with the low-level tools — compact: HandlerCreate, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet — each phase its own batch`;
 }
 
 /**

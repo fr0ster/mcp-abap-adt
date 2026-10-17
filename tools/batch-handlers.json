@@ -581,12 +581,6 @@
     "sends": "POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate",
     "when": [
       {
-        "argument": "create_only",
-        "equals": [
-          "true"
-        ]
-      },
-      {
         "argument": "object_type",
         "equals": [
           "DOMAIN",
@@ -615,12 +609,6 @@
     "handler": "compact-modify/src/handlers/handleHandlerCreate.ts#handleHandlerCreate",
     "sends": "POST /sap/bc/adt/packages[?corrNr=…], the package create alone; over RFC a package is created in an ABAP session of its own, outside the batch",
     "when": [
-      {
-        "argument": "create_only",
-        "equals": [
-          "true"
-        ]
-      },
       {
         "argument": "object_type",
         "equals": [

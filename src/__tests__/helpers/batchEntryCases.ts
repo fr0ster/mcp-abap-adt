@@ -375,8 +375,8 @@ const COMPACT: BatchEntryCase[] = [
   })),
 ];
 
-/** `HandlerCreate` with `create_only`: the create request alone, per type but PACKAGE. */
-const CREATES_ONLY: Array<[string, Record<string, unknown>]> = [
+/** `HandlerCreate`: the create request alone, per type but PACKAGE. */
+const CREATES: Array<[string, Record<string, unknown>]> = [
   ['DOMAIN', { domain_name: 'DOM_A', package_name: 'PKG_A' }],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A', package_name: 'PKG_A' }],
   ['TRANSPORT', { description: 'text' }],
@@ -415,10 +415,10 @@ const CREATES_ONLY: Array<[string, Record<string, unknown>]> = [
   ['METADATA_EXTENSION', { name: 'DDLX_A', package_name: 'PKG_A' }],
 ];
 
-const CREATE_ONLY: BatchEntryCase[] = [
-  ...CREATES_ONLY.map(([object_type, fields]) => ({
+const CREATE_CASES: BatchEntryCase[] = [
+  ...CREATES.map(([object_type, fields]) => ({
     tool: 'HandlerCreate',
-    args: { object_type, ...fields, create_only: true },
+    args: { object_type, ...fields },
     ...(object_type === 'TRANSPORT' ? { body: TRANSPORT_DOCUMENT } : {}),
   })),
   {
@@ -427,7 +427,6 @@ const CREATE_ONLY: BatchEntryCase[] = [
       object_type: 'PACKAGE',
       package_name: 'PKG_A',
       super_package: 'PKG_SUPER',
-      create_only: true,
     },
     connection: 'http',
   },
@@ -840,7 +839,7 @@ const TOGETHER: BatchEntryCase[] = [
 export const BATCH_ENTRY_CASES: readonly BatchEntryCase[] = [
   ...FULL,
   ...COMPACT,
-  ...CREATE_ONLY,
+  ...CREATE_CASES,
   ...WRITES,
   ...TOGETHER,
 ];

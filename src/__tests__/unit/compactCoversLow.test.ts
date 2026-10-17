@@ -147,7 +147,7 @@ describe('compact covers what the low set did', () => {
     }
   });
 
-  it('HandlerCreate FUNCTION_GROUP reads the group back after the interface 400, and a group that reads back was created', async () => {
+  it('HandlerCreate FUNCTION_GROUP sends no read-back after the interface 400 — the 400 is the answer', async () => {
     const refusal =
       '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
       '<namespace id="com.sap.adt"/><type id="ExceptionResourceCreationFailure"/>' +
@@ -163,15 +163,14 @@ describe('compact covers what the low set did', () => {
         package_name: 'PKG_TARGET',
         transport_request: 'XXXK900001',
         description: 'Text',
-        activate: false,
       },
       connection,
     );
-    expect(connection.requests.map((r) => r.method)).toEqual(['POST', 'GET']);
-    expect(connection.requests[1]?.url).toContain(
-      '/sap/bc/adt/functions/groups/fugr_a',
-    );
-    expect(answered.isError).toBeFalsy();
+    // One request per compact call: whether the group landed is the
+    // caller's next call (HandlerGet part metadata), not a read of ours.
+    expect(connection.requests.map((r) => r.method)).toEqual(['POST']);
+    expect(answered.isError).toBe(true);
+    expect(answered.text).toContain('has not been created');
   });
 
   it('another refusal of a function group create is answered as it came, with no read', async () => {
@@ -186,7 +185,6 @@ describe('compact covers what the low set did', () => {
         package_name: 'PKG_TARGET',
         transport_request: 'XXXK900001',
         description: 'Text',
-        activate: false,
       },
       connection,
     );

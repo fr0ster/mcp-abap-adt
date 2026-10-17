@@ -299,24 +299,22 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Create operation. object_type required: PACKAGE(package_name*, super_package*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(cds_view_name*, class_name*, package_name*, test_class_source*).
+**Description:** Create an object: one request, the create alone — nothing is validated, locked, written, checked or activated; the object is created inactive with what its create carries. Write its content with HandlerLock, HandlerUpdate with the lock_handle and HandlerUnlock, then HandlerActivate. An argument the create does not send is refused, naming it. object_type required: PACKAGE(package_name*, super_package*), DOMAIN(domain_name*, package_name*), DATA_ELEMENT(data_element_name*, package_name*), TRANSPORT(description*), TABLE(table_name*, package_name*), STRUCTURE(structure_name*, package_name*), DDL(ddl_name*, package_name*), SERVICE_DEFINITION(service_definition_name*, package_name*), SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*), CLASS(class_name*, package_name*), PROGRAM(program_name*, package_name*) [onprem only], INTERFACE(interface_name*, package_name*), FUNCTION_GROUP(function_group_name*, package_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, package_name*), METADATA_EXTENSION(name*, package_name*). UNIT_TEST and CDS_UNIT_TEST are refused: their create is a chain of requests — the full set serves CreateUnitTest and CreateCdsUnitTest.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `object_type` (required) — ABAP object type for routed compact operation.
-- `class_name` — ABAP class name.
+- `class_name` — ABAP class name (CLASS, BEHAVIOR_IMPLEMENTATION).
 - `program_name` — ABAP program name.
 - `domain_name` — ABAP domain name.
 - `function_module_name` — ABAP function module name.
-- `function_group_name` — ABAP function group name.
+- `function_group_name` — ABAP function group name (FUNCTION_GROUP; the group of a FUNCTION_MODULE).
 - `package_name` — ABAP package name.
 - `ddl_name` — DDL source name (CDS view, AMDP table function, etc.).
 - `description` — Human-readable object description.
 - `transport_request` — Transport request id (if required by system).
-- `activate` — Activate object after create.
-- `create_only` — send the create request alone: no validation, lock, write, check or activation; the object is created inactive with what the create carries
 - `master_language` — Original language of the created object; the session language when absent.
 - `super_package` — Super package (PACKAGE create).
 - `package_type` — Package type (PACKAGE create).
@@ -324,33 +322,25 @@ per request.
 - `transport_layer` — Transport layer (PACKAGE create).
 - `record_changes` — Record changes (PACKAGE create).
 - `application_component` — Application component (PACKAGE create).
+- `transport_type` — Transport request type (TRANSPORT create).
+- `target_system` — Target system of the transport request (TRANSPORT create).
+- `owner` — Owner of the transport request (TRANSPORT create).
 - `superclass` — Superclass name (CLASS create).
 - `final` — Mark the class final (CLASS create).
-- `abstract` — Mark the class abstract (CLASS create).
 - `create_protected` — Protected constructor (CLASS create).
-- `program_type` — ABAP program type.
-- `application` — Domain application area.
-- `datatype` — ABAP data type.
-- `length` — Length for typed artifacts.
-- `decimals` — Decimal places.
-- `conversion_exit` — Conversion exit name.
-- `lowercase` — Allow lowercase values (domain setting).
-- `sign_exists` — Allow signed values (domain setting).
-- `value_table` — Foreign key value table.
-- `fixed_values` — Domain fixed values list.
+- `program_type` — ABAP program type (PROGRAM create).
+- `application` — Application area (PROGRAM create).
 - `table_name` — Table name.
 - `structure_name` — Structure name.
 - `data_element_name` — Data element name.
 - `interface_name` — Interface name.
-- `service_definition_name` — Service definition name.
+- `service_definition_name` — Service definition name (SERVICE_DEFINITION; the definition a SERVICE_BINDING binds).
 - `service_binding_name` — Service binding name.
+- `service_name` — Service name of the binding (SERVICE_BINDING create); the binding name when absent.
+- `service_version` — Service version of the binding (SERVICE_BINDING create); 0001 when absent.
+- `binding_variant` — Binding variant (SERVICE_BINDING create); ODATA_V4_UI when absent.
 - `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `root_entity` — Root CDS entity name (behavior definition create).
 - `implementation_type` — Behavior definition implementation type.
-- `behavior_definition` — Referenced behavior definition name (behavior implementation create).
-- `cds_view_name` — CDS view name to validate for unit test doubles.
-- `fields` — Structure fields (for STRUCTURE create).
-- `test_class_source` — ABAP source of the local test classes (UNIT_TEST and CDS_UNIT_TEST create).
 
 ### HandlerUpdate
 
@@ -694,7 +684,7 @@ per request.
 
 **Half:** batch mode of `@mcp-abap-adt/lib`, in every compact binary
 
-**Description:** action 'begin': Switches this server into batch mode: from now on each call of a tool none of whose requests depends on another's answer is recorded instead of sent, and returns nothing. Every recorded call is numbered, in the order made, from 1. A tool that builds a request from an earlier answer is refused in batch mode; use the low-level tools (HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. action 'end' sends the recorded calls; read their answers by number with action 'answers'. Over HTTP, send the state_handle this answers in the request header on every call of the batch. action 'end': Sends every call recorded since action 'begin', in one envelope, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with action 'answers'. action 'answers' (with number or numbers): The answers of the last batch, by number: each is the answer the tool gives for that call, built when action 'end' sent it — SAP's answer or why it was not sent. A number the last batch does not have answers: no answer with that number.
+**Description:** action 'begin': Switches this server into batch mode: from now on each call of a tool none of whose requests depends on another's answer is recorded instead of sent, and returns nothing. Every recorded call is numbered, in the order made, from 1. A tool that builds a request from an earlier answer is refused in batch mode; use the low-level tools (HandlerCreate, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. action 'end' sends the recorded calls; read their answers by number with action 'answers'. Over HTTP, send the state_handle this answers in the request header on every call of the batch. action 'end': Sends every call recorded since action 'begin', in one envelope, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with action 'answers'. action 'answers' (with number or numbers): The answers of the last batch, by number: each is the answer the tool gives for that call, built when action 'end' sent it — SAP's answer or why it was not sent. A number the last batch does not have answers: no answer with that number.
 
 **Available in:** all
 

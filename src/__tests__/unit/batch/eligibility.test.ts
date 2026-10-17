@@ -72,45 +72,24 @@ describe('eligible', () => {
     expect(whenHolds('HandlerUpdate', present, {})).toBe(false);
   });
 
-  it('HandlerCreate needs create_only true', () => {
+  it('HandlerCreate is eligible per type, with no flag', () => {
     const domain = { object_type: 'DOMAIN', domain_name: 'DOM_A' };
-    expect(
-      eligible('HandlerCreate', { ...domain, create_only: true }, 'http'),
-    ).toEqual({ ok: true });
-    expect(
-      eligible('HandlerCreate', { ...domain, create_only: true }, 'rfc'),
-    ).toEqual({ ok: true });
-    expect(
-      eligible('HandlerCreate', { ...domain, create_only: false }, 'http'),
-    ).toEqual({ ok: false, reason: 'arguments' });
-    expect(eligible('HandlerCreate', domain, 'http')).toEqual({
-      ok: false,
-      reason: 'arguments',
-    });
-    // A type whose create sends more than one request is not listed for it.
-    expect(
-      eligible(
-        'HandlerCreate',
-        { object_type: 'UNIT_TEST', create_only: true },
-        'http',
-      ),
-    ).toEqual({ ok: false, reason: 'arguments' });
+    expect(eligible('HandlerCreate', domain, 'http')).toEqual({ ok: true });
+    expect(eligible('HandlerCreate', domain, 'rfc')).toEqual({ ok: true });
+    // A type whose create is a chain is refused by the tool and not listed.
+    for (const object_type of ['UNIT_TEST', 'CDS_UNIT_TEST']) {
+      expect(eligible('HandlerCreate', { object_type }, 'http')).toEqual({
+        ok: false,
+        reason: 'arguments',
+      });
+    }
     // A package over RFC is created in an ABAP session of its own.
-    const pkg = { object_type: 'PACKAGE', create_only: true };
+    const pkg = { object_type: 'PACKAGE' };
     expect(eligible('HandlerCreate', pkg, 'http')).toEqual({ ok: true });
     expect(eligible('HandlerCreate', pkg, 'rfc')).toEqual({
       ok: false,
       reason: 'connection',
     });
-    // `create_only` equal to true, the boolean read as its word.
-    const createOnly = [{ argument: 'create_only', equals: ['true'] }];
-    expect(whenHolds('HandlerCreate', createOnly, { create_only: true })).toBe(
-      true,
-    );
-    expect(whenHolds('HandlerCreate', createOnly, { create_only: false })).toBe(
-      false,
-    );
-    expect(whenHolds('HandlerCreate', createOnly, {})).toBe(false);
   });
 
   it('HandlerGet part contents and UNIT_TEST/CDS_UNIT_TEST are not eligible; absent part reads as source', () => {

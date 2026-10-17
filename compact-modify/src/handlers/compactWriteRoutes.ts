@@ -17,26 +17,7 @@ import {
   dispatchCompact,
 } from '@mcp-abap-adt/lib/compact-shared';
 import {
-  handleCreateBehaviorDefinition,
-  handleCreateBehaviorImplementation,
-  handleCreateCdsUnitTest,
-  handleCreateClass,
-  handleCreateDataElement,
-  handleCreateDdl,
-  handleCreateDomain,
-  handleCreateFunctionGroup,
-  handleCreateFunctionModule,
-  handleCreateInterface,
-  handleCreateMetadataExtension,
   handleCreateOnly,
-  handleCreatePackage,
-  handleCreateProgram,
-  handleCreateServiceBinding,
-  handleCreateServiceDefinition,
-  handleCreateStructure,
-  handleCreateTable,
-  handleCreateTransport,
-  handleCreateUnitTest,
   handleDeleteBehaviorDefinition,
   handleDeleteBehaviorImplementation,
   handleDeleteCdsUnitTest,
@@ -83,64 +64,71 @@ import {
   handleUpdateUnitTest,
 } from '@mcp-abap-adt/lib/handlers/write';
 
+/**
+ * The create of every type: its create request alone, one `POST`
+ * (`handleCreateOnly`, spec §4.6) — UNIT_TEST and CDS_UNIT_TEST, whose create
+ * is a chain, refused there before anything is sent.
+ */
+const create = handleCreateOnly as unknown as CompactHandler;
+
 export const compactWriteRouterMap: CompactRouterMap = {
   PACKAGE: {
-    create: handleCreatePackage as unknown as CompactHandler,
+    create,
     // Without lock_handle the high UpdatePackage: lock, write, unlock. With
     // one HandlerUpdate writes under the caller's lock before routing here.
     update: handleUpdatePackage as unknown as CompactHandler,
     delete: handleDeletePackage as unknown as CompactHandler,
   },
   DOMAIN: {
-    create: handleCreateDomain as unknown as CompactHandler,
+    create,
     update: handleUpdateDomain as unknown as CompactHandler,
     delete: handleDeleteDomain as unknown as CompactHandler,
   },
   DATA_ELEMENT: {
-    create: handleCreateDataElement as unknown as CompactHandler,
+    create,
     update: handleUpdateDataElement as unknown as CompactHandler,
     delete: handleDeleteDataElement as unknown as CompactHandler,
   },
   TRANSPORT: {
-    create: handleCreateTransport as unknown as CompactHandler,
+    create,
   },
   TABLE: {
-    create: handleCreateTable as unknown as CompactHandler,
+    create,
     update: handleUpdateTable as unknown as CompactHandler,
     delete: handleDeleteTable as unknown as CompactHandler,
   },
   STRUCTURE: {
-    create: handleCreateStructure as unknown as CompactHandler,
+    create,
     update: handleUpdateStructure as unknown as CompactHandler,
     delete: handleDeleteStructure as unknown as CompactHandler,
   },
   DDL: {
-    create: handleCreateDdl as unknown as CompactHandler,
+    create,
     update: handleUpdateDdl as unknown as CompactHandler,
     delete: handleDeleteDdl as unknown as CompactHandler,
   },
   SERVICE_DEFINITION: {
-    create: handleCreateServiceDefinition as unknown as CompactHandler,
+    create,
     update: handleUpdateServiceDefinition as unknown as CompactHandler,
     delete: handleDeleteServiceDefinition as unknown as CompactHandler,
   },
   SERVICE_BINDING: {
-    create: handleCreateServiceBinding as unknown as CompactHandler,
+    create,
     update: handleUpdateServiceBinding as unknown as CompactHandler,
     delete: handleDeleteServiceBinding as unknown as CompactHandler,
   },
   CLASS: {
-    create: handleCreateClass as unknown as CompactHandler,
+    create,
     update: handleUpdateClass as unknown as CompactHandler,
     delete: handleDeleteClass as unknown as CompactHandler,
   },
   UNIT_TEST: {
-    create: handleCreateUnitTest as unknown as CompactHandler,
+    create,
     update: handleUpdateUnitTest as unknown as CompactHandler,
     delete: handleDeleteUnitTest as unknown as CompactHandler,
   },
   CDS_UNIT_TEST: {
-    create: handleCreateCdsUnitTest as unknown as CompactHandler,
+    create,
     update: handleUpdateCdsUnitTest as unknown as CompactHandler,
     delete: handleDeleteCdsUnitTest as unknown as CompactHandler,
   },
@@ -161,37 +149,37 @@ export const compactWriteRouterMap: CompactRouterMap = {
     delete: handleDeleteLocalMacros as unknown as CompactHandler,
   },
   PROGRAM: {
-    create: handleCreateProgram as unknown as CompactHandler,
+    create,
     update: handleUpdateProgram as unknown as CompactHandler,
     delete: handleDeleteProgram as unknown as CompactHandler,
   },
   INTERFACE: {
-    create: handleCreateInterface as unknown as CompactHandler,
+    create,
     update: handleUpdateInterface as unknown as CompactHandler,
     delete: handleDeleteInterface as unknown as CompactHandler,
   },
   FUNCTION_GROUP: {
-    create: handleCreateFunctionGroup as unknown as CompactHandler,
+    create,
     update: handleUpdateFunctionGroup as unknown as CompactHandler,
     delete: handleDeleteFunctionGroup as unknown as CompactHandler,
   },
   FUNCTION_MODULE: {
-    create: handleCreateFunctionModule as unknown as CompactHandler,
+    create,
     update: handleUpdateFunctionModule as unknown as CompactHandler,
     delete: handleDeleteFunctionModule as unknown as CompactHandler,
   },
   BEHAVIOR_DEFINITION: {
-    create: handleCreateBehaviorDefinition as unknown as CompactHandler,
+    create,
     update: handleUpdateBehaviorDefinition as unknown as CompactHandler,
     delete: handleDeleteBehaviorDefinition as unknown as CompactHandler,
   },
   BEHAVIOR_IMPLEMENTATION: {
-    create: handleCreateBehaviorImplementation as unknown as CompactHandler,
+    create,
     update: handleUpdateBehaviorImplementation as unknown as CompactHandler,
     delete: handleDeleteBehaviorImplementation as unknown as CompactHandler,
   },
   METADATA_EXTENSION: {
-    create: handleCreateMetadataExtension as unknown as CompactHandler,
+    create,
     update: handleUpdateMetadataExtension as unknown as CompactHandler,
     delete: handleDeleteMetadataExtension as unknown as CompactHandler,
   },
@@ -207,20 +195,4 @@ export async function routeCompactWrite(
   args: { object_type: CompactObjectType } & Record<string, unknown>,
 ): Promise<unknown> {
   return dispatchCompact(context, compactWriteRouterMap, operation, args);
-}
-
-/**
- * Route a compact create with `create_only: true`: the create request alone
- * (`handleCreateOnly`). A type with no create answers as the create route
- * does; a type whose create sends more than one request refuses, before
- * anything is sent.
- */
-export async function routeCompactCreateOnly(
-  context: Parameters<typeof dispatchCompact>[0],
-  args: { object_type: CompactObjectType } & Record<string, unknown>,
-): Promise<unknown> {
-  if (!args?.object_type || !compactWriteRouterMap[args.object_type]?.create) {
-    return dispatchCompact(context, compactWriteRouterMap, 'create', args);
-  }
-  return handleCreateOnly(context, args);
 }

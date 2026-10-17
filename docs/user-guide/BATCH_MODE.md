@@ -58,24 +58,27 @@ A tool that builds a request from an earlier answer cannot be recorded — a hig
 writes it back patched, a `404` fallback, a poll. Run such work as phases, each its own batch,
 with the single-step tools:
 
-1. create — `HandlerCreate` with `create_only` (compact);
+1. create — `HandlerCreate` (compact);
 2. lock — `HandlerLock`; read the lock handles with `BatchAnswers`;
 3. write — `HandlerUpdate` with `lock_handle`;
 4. unlock — `HandlerUnlock`;
 5. read back, check — `HandlerGet`, `HandlerCheckRun`.
 
-`HandlerCreate` with `create_only: true` sends the create request of the type's create alone — no
-validation, lock, write, check or activation; the object is created inactive with what the create
-carries — and works outside batch mode too, as that one request. It is offered for every type of
-the create route but `UNIT_TEST` and `CDS_UNIT_TEST`, whose create sends more than one request:
-they refuse it ("create_only is not available for <type>: its create sends more than one
-request") before anything is sent. Beside `create_only` an argument the create does not send is
-refused before anything is sent, not dropped — `activate` (unless `false`), and anything the
-type's create request does not carry (`fields`, `source_code`, `fixed_values`,
+Compact `HandlerCreate` is one request for every type, in batch mode and outside it alike: the
+create request of the type's create alone — no validation, lock, write, check or activation, no
+service-group read for a service binding, no read-back after a function group's `400`; the object
+is created inactive with what the create carries. An argument the create does not send is refused
+before anything is sent, by presence (`false`, `0` and `''` included), not dropped — `activate`,
+and anything the type's create request does not carry (`fields`, `source_code`, `fixed_values`,
 `test_class_source`, a class's `abstract`, a behavior definition's `root_entity`, a behavior
-implementation's `behavior_definition`, …): "create_only sends the create alone: <argument> is
-not sent — leave it out, or create without create_only". A `PACKAGE` is recorded over HTTP only:
-over RFC a package is created in an ABAP session of its own, outside the batch.
+implementation's `behavior_definition`, …): "HandlerCreate sends the create request alone:
+<argument> is not sent — leave it out; then HandlerLock, HandlerUpdate with the lock_handle,
+HandlerUnlock and HandlerActivate". `UNIT_TEST` and `CDS_UNIT_TEST` are refused before anything is
+sent: their create is a chain (the test classes' lock, write, unlock and activation; a CDS unit
+test also checks the view and creates the class first) — "HandlerCreate does not create <type>:
+its create is a chain of requests, not one — use CreateUnitTest / CreateCdsUnitTest of the full
+set". A `PACKAGE` is recorded over HTTP only: over RFC a package is created in an ABAP session of
+its own, outside the batch.
 
 **Every batch end sends one envelope.** Only LOCK and UNLOCK go stateful, as adt-clients sends
 them, and adt-clients puts each kind — LOCK, UNLOCK, stateless — into an envelope of its own. So a
@@ -301,8 +304,8 @@ no raw part.
 | `HandlerActivate` | when objects is not given and object_adt_type is not given and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps; objects[] and object_adt_type go through an activation run and are not listed) |
 | `HandlerCdsUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
 | `HandlerCheckRun` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package) |
-| `HandlerCreate` | when create_only is true and object_type is one of DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate |
-| `HandlerCreate` | when create_only is true and object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages[?corrNr=…], the package create alone; over RFC a package is created in an ABAP session of its own, outside the batch |
+| `HandlerCreate` | when object_type is one of DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate |
+| `HandlerCreate` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages[?corrNr=…], the package create alone; over RFC a package is created in an ABAP session of its own, outside the batch |
 | `HandlerDumpView` | every call | GET /sap/bc/adt/runtime/dump/{id} (the view asked) |
 | `HandlerGet` | when part is source (absent reads as source) and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | GET the type's source, or its metadata document where it has no source (as the full set's Get<Type>) |
 | `HandlerGet` | when part is metadata and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | GET the metadata document (as ReadPackage, ReadDomain, ReadDataElement, ReadFunctionGroup); for a type with a source, the source GET and the metadata GET together, neither waiting for the other (as Read<Type>). Not FUNCTION_MODULE: its source read is built from the metadata's function group |

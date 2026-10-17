@@ -139,18 +139,20 @@ describe.each(['UNIT_TEST', 'CDS_UNIT_TEST'])(
       }
     });
 
-    it('without one, runs as an ordinary call on the instance’s connection', async () => {
+    it('without one, is one result read on the instance’s connection', async () => {
       const stand = await longStand('HandlerGet');
       try {
         await stand.call('HandlerGet', {
           object_type: objectType,
           run_id: 'run-placeholder-1',
         });
-        const polls = stand.standIn.requests.filter((r) =>
-          r.url.includes('/abapunit/runs/run-placeholder-1'),
+        const reads = stand.standIn.requests.filter((r) =>
+          r.url.includes('/abapunit/'),
         );
-        expect(polls.length).toBeGreaterThan(0);
-        expect(polls.every((r) => r.session === stand.instanceSession)).toBe(
+        expect(reads.map((r) => r.url)).toEqual([
+          '/sap/bc/adt/abapunit/results/run-placeholder-1',
+        ]);
+        expect(reads.every((r) => r.session === stand.instanceSession)).toBe(
           true,
         );
         expect(stand.standIn.loggedOff()).toEqual([]);

@@ -66,8 +66,14 @@ export { handleGetTable } from '../../handlers/table/high/handleGetTable.js';
 export { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';
 export { handleReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects.js';
 export { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest.js';
-export { handleGetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult.js';
+export {
+  handleGetCdsUnitTestResult,
+  handleGetCdsUnitTestResultOnce,
+} from '../../handlers/unit_test/high/handleGetCdsUnitTestResult.js';
 export { handleGetCdsUnitTestStatus } from '../../handlers/unit_test/high/handleGetCdsUnitTestStatus.js';
 export { handleGetUnitTest } from '../../handlers/unit_test/high/handleGetUnitTest.js';
-export { handleGetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult.js';
+export {
+  handleGetUnitTestResult,
+  handleGetUnitTestResultOnce,
+} from '../../handlers/unit_test/high/handleGetUnitTestResult.js';
 export { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus.js';

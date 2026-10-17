@@ -83,7 +83,7 @@ describe('eligible', () => {
     });
   });
 
-  it('HandlerGet part contents and UNIT_TEST/CDS_UNIT_TEST are not eligible; absent part reads as source', () => {
+  it('HandlerGet part contents is not eligible, UNIT_TEST/CDS_UNIT_TEST with run_id are; absent part reads as source', () => {
     const cls = { object_type: 'CLASS', class_name: 'CLAS_A' };
     expect(eligible('HandlerGet', cls, 'http')).toEqual({ ok: true });
     expect(eligible('HandlerGet', { ...cls, part: 'source' }, 'http')).toEqual({
@@ -104,10 +104,29 @@ describe('eligible', () => {
     expect(
       eligible('HandlerGet', { ...pkg, part: 'contents' }, 'http'),
     ).toEqual({ ok: false, reason: 'arguments' });
+    // A unit-test run's result: one request, with its run_id.
     for (const object_type of ['UNIT_TEST', 'CDS_UNIT_TEST']) {
       expect(
         eligible('HandlerGet', { object_type, run_id: 'RUN_A' }, 'http'),
+      ).toEqual({ ok: true });
+      expect(eligible('HandlerGet', { object_type }, 'http')).toEqual({
+        ok: false,
+        reason: 'arguments',
+      });
+      expect(
+        eligible(
+          'HandlerGet',
+          { object_type, part: 'metadata', run_id: 'RUN_A' },
+          'http',
+        ),
       ).toEqual({ ok: false, reason: 'arguments' });
+    }
+    for (const tool of ['HandlerUnitTestResult', 'HandlerCdsUnitTestResult']) {
+      expect(eligible(tool, { run_id: 'RUN_A' }, 'http')).toEqual({ ok: true });
+      expect(eligible(tool, {}, 'http')).toEqual({
+        ok: false,
+        reason: 'arguments',
+      });
     }
     // Each part one request, a function module's at the group given: eligible.
     for (const part of ['source', 'metadata']) {
@@ -195,7 +214,7 @@ describe('eligible', () => {
     for (const object_type of ['unit_test', 'UNIT_TEST']) {
       expect(
         eligible('HandlerGet', { object_type, run_id: 'RUN_A' }, 'http'),
-      ).toEqual({ ok: false, reason: 'arguments' });
+      ).toEqual({ ok: true });
     }
   });
 

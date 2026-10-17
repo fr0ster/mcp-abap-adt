@@ -531,6 +531,31 @@
     ]
   },
   {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET /sap/bc/adt/abapunit/results/{run_id}: the run's result, part source",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "source"
+        ]
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "UNIT_TEST",
+          "CDS_UNIT_TEST"
+        ]
+      },
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
+  },
+  {
     "tool": "HandlerSearch",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
@@ -577,6 +602,30 @@
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerCdsUnitTestStatus.ts#handleHandlerCdsUnitTestStatus",
     "sends": "GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true"
+  },
+  {
+    "tool": "HandlerUnitTestResult",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerUnitTestResult.ts#handleHandlerUnitTestResult",
+    "sends": "GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false]",
+    "when": [
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerCdsUnitTestResult",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerCdsUnitTestResult.ts#handleHandlerCdsUnitTestResult",
+    "sends": "GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false]",
+    "when": [
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
   },
   {
     "tool": "HandlerCreate",

@@ -38,6 +38,9 @@ const NODE_LEVEL = corpusBody(
 const ACTIVATED = corpusBody('activation-success-verdict--01-activation');
 const CHECKED = corpusBody('check-success-verdict--01-checkrun');
 const DELETED = corpusBody('delete-success--01-deletion-delete');
+const UNIT_RESULT = corpusBody(
+  'unittest-run-passing--03-results-fa53c505dd7b1fd1abb8599833a05d44',
+);
 const DELETABLE = corpusBody('deletion-check-allows--01-deletion-check');
 const NAME_FREE = corpusBody(
   'validation-name-free-class--01-validation-objectname',
@@ -421,6 +424,16 @@ const COMPACT: BatchEntryCase[] = [
   { tool: 'HandlerServiceBindingListTypes', args: {} },
   { tool: 'HandlerUnitTestStatus', args: { run_id: 'RUN_A' } },
   { tool: 'HandlerCdsUnitTestStatus', args: { run_id: 'RUN_A' } },
+  ...['HandlerUnitTestResult', 'HandlerCdsUnitTestResult'].map((tool) => ({
+    tool,
+    args: { run_id: 'RUN_A' },
+    body: UNIT_RESULT,
+  })),
+  ...['UNIT_TEST', 'CDS_UNIT_TEST'].map((object_type) => ({
+    tool: 'HandlerGet',
+    args: { object_type, run_id: 'RUN_A' },
+    body: UNIT_RESULT,
+  })),
   ...LOCKED_TYPES.map(([object_type, object_name]) => ({
     tool: 'HandlerLock',
     args: { object_type, object_name },

@@ -18,7 +18,7 @@ import {
 import {
   handleGetBehaviorDefinition,
   handleGetBehaviorImplementation,
-  handleGetCdsUnitTest,
+  handleGetCdsUnitTestResultOnce,
   handleGetClass,
   handleGetDataElement,
   handleGetDdl,
@@ -37,7 +37,7 @@ import {
   handleGetServiceDefinition,
   handleGetStructure,
   handleGetTable,
-  handleGetUnitTest,
+  handleGetUnitTestResultOnce,
   handleReadTransportObjects,
 } from '@mcp-abap-adt/lib/handlers/read';
 
@@ -72,11 +72,14 @@ export const compactReadRouterMap: CompactRouterMap = {
   CLASS: {
     get: handleGetClass as unknown as CompactHandler,
   },
+  // A unit-test run's result, read once: the status is the caller's to read.
   UNIT_TEST: {
-    get: handleGetUnitTest as unknown as CompactHandler,
+    get: (context, args) =>
+      handleGetUnitTestResultOnce(context, args, 'HandlerGet'),
   },
   CDS_UNIT_TEST: {
-    get: handleGetCdsUnitTest as unknown as CompactHandler,
+    get: (context, args) =>
+      handleGetCdsUnitTestResultOnce(context, args, 'HandlerGet'),
   },
   LOCAL_TEST_CLASS: {
     get: handleGetLocalTestClass as unknown as CompactHandler,

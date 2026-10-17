@@ -52,7 +52,8 @@ export function isLongTool(name: string): boolean {
 
 /**
  * The modes of a listed tool that are not reads: `HandlerGet` of a
- * `UNIT_TEST` / `CDS_UNIT_TEST` run polls a run in SAP, and its parts
+ * `UNIT_TEST` / `CDS_UNIT_TEST` run reads a unit-test run's result by its
+ * id, and its parts
  * `activation_status` / `activation_results` read an activation run by its
  * id. Such a call is an ordinary one — the instance's connection — and a
  * `timeout` on it is refused (`TIMEOUT_NOT_FOR_RUN_WORDS`), before anything

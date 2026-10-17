@@ -73,6 +73,14 @@ with the single-step tools:
    `run_id` (`finished`, `error`, `failed`, or its progress), then `part: activation_results`
    for the messages it produced.
 
+Running unit tests is three phases, each its own batch:
+
+1. start — `HandlerUnitTestRun`, answering the run's `run_id`;
+2. the run's status, as often as you choose — `HandlerUnitTestStatus` (a CDS unit test:
+   `HandlerCdsUnitTestStatus`) with that `run_id`, until it says `FINISHED`;
+3. the result — `HandlerUnitTestResult` (`HandlerCdsUnitTestResult`, or `HandlerGet` with
+   `object_type: UNIT_TEST` / `CDS_UNIT_TEST`) with the `run_id`.
+
 Deleting is two phases, each its own batch:
 
 1. deletion check — `HandlerDeletionCheck` per object; read each verdict with `BatchAnswers`;
@@ -140,6 +148,14 @@ yet (an answer without a run id is a failure with `step: start activation run`).
 `activation_results` (`GET /sap/bc/adt/activation/results/{run_id}`, answered
 `{ run_id, part, messages, document }`), each with SAP's document as it came. Asking again until the
 status settles is yours: the server sets no timer.
+
+Compact `HandlerUnitTestResult`, `HandlerCdsUnitTestResult` and `HandlerGet` with `object_type:
+UNIT_TEST` / `CDS_UNIT_TEST` are one request each, in batch mode and outside it alike: the
+`GET /sap/bc/adt/abapunit/results/{run_id}` alone, answered `{ success, run_id, run_result }` with
+the result document SAP answered, parsed. The run's status is its own call
+(`HandlerUnitTestStatus` / `HandlerCdsUnitTestStatus`, one status read with long polling). A result
+read before the status says `FINISHED` is whatever SAP answers for it; a finished run's result
+carries `executionTime` on each test method.
 
 **Every batch end sends one envelope.** Only LOCK and UNLOCK go stateful, as adt-clients sends
 them, and adt-clients puts each kind — LOCK, UNLOCK, stateless — into an envelope of its own. So a
@@ -209,7 +225,7 @@ no raw part.
 
 <!-- batch-handlers:start -->
 
-165 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+168 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -350,6 +366,7 @@ no raw part.
 | `HandlerActivate` | when objects is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
 | `HandlerActivate` | when objects is not given and object_adt_type is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
 | `HandlerActivate` | when objects is not given and object_adt_type is not given and object_type is one of PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING | POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id } |
+| `HandlerCdsUnitTestResult` | when run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false] |
 | `HandlerCdsUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
 | `HandlerCheckRun` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package) |
 | `HandlerCreate` | when object_type is one of DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate |
@@ -365,6 +382,7 @@ no raw part.
 | `HandlerGet` | when part is virtual_folders | POST /sap/bc/adt/repository/informationsystem/virtualfolders/contents |
 | `HandlerGet` | when part is activation_status and run_id is given | GET /sap/bc/adt/activation/runs/{run_id} |
 | `HandlerGet` | when part is activation_results and run_id is given | GET /sap/bc/adt/activation/results/{run_id} |
+| `HandlerGet` | when part is source (absent reads as source) and object_type is one of UNIT_TEST, CDS_UNIT_TEST and run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}: the run's result, part source |
 | `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle (sql_query) or /datapreview/ddic (object_name) |
 | `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
 | `HandlerLock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |
@@ -377,6 +395,7 @@ no raw part.
 | `HandlerTransportCreate` | every call | POST /sap/bc/adt/cts/transportrequests |
 | `HandlerTransportMoveObjects` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given |
 | `HandlerTransportSortAndCompress` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/sortandcompress |
+| `HandlerUnitTestResult` | when run_id is given | GET /sap/bc/adt/abapunit/results/{run_id}[?withNavigationUris=false] |
 | `HandlerUnitTestRun` | every call | POST /sap/bc/adt/abapunit/runs: starts the run and answers its id; the result is read with HandlerUnitTestStatus / HandlerUnitTestResult |
 | `HandlerUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
 | `HandlerUnlock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING | POST {object uri}?_action=UNLOCK&lockHandle=…, stateful |

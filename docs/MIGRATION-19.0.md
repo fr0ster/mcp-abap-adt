@@ -198,7 +198,7 @@ waiting for its answer), and no request is recalled, no session is logged off or
 
 A tool not on the list takes no `timeout` and runs to its end — above all the ones whose work
 goes on in SAP whoever waits: the ABAP Unit and ATC runs (`Run*UnitTest`, `RunATC`,
-`GetUnitTestResult`, compact `HandlerUnitTestResult` / `HandlerCdsUnitTestResult`), the class and
+`GetUnitTestResult`), the class and
 program runs (`RuntimeRunClass`, `RuntimeRunProgram`, compact `HandlerProfileRun`), activation and
 the debugger. Only `LOCK` and `UNLOCK` are sent stateful; writes under a lock and activation go
 stateless. A class or
@@ -536,7 +536,7 @@ the tool once more with the answer — a tool that had sent something before its
 `CreateCdsUnitTest` does, sent it twice.)
 
 **A long call on the main connection holds the flow; `background: true` or a tool on its own
-connection does not.** A unit-test run (and `HandlerGet`'s `UNIT_TEST` polling), `RunATC` with
+connection does not.** A unit-test run, `RunATC` with
 `wait`, a class or program run or a profiling run in the foreground, an activation — and the
 creates and updates that activate — hold every other call of that session until they end, by
 design. Send a long run to the background where the tool offers it.
@@ -1204,6 +1204,29 @@ transport's options only:
   sent, as for `UNIT_TEST`); each runs on the instance's session. Each is one request and is
   recorded in batch mode, as is
   `HandlerActivate`'s run start: activate in one batch, read the status in later ones.
+- **BREAKING — a unit-test run's result is read once.** `HandlerUnitTestResult`,
+  `HandlerCdsUnitTestResult` and `HandlerGet` with `object_type: UNIT_TEST` / `CDS_UNIT_TEST` send
+  the one `GET /sap/bc/adt/abapunit/results/{run_id}` and answer `{ success, run_id, run_result }`,
+  the result document SAP answered, parsed (`detail: "raw"`: the document itself). The status is
+  no longer read first: a result read before the run finished is whatever SAP answers for it,
+  answered as it came; a finished run's result carries `executionTime` on each test method. 18.x
+  read the status first inside the call — up to five status reads with long polling, back to back,
+  and the result only once one said `FINISHED` (as read from 18.x's code, not measured) — and
+  answered `finished: true` with `run_result` (`HandlerGet` also `run_status`), or
+  `finished: false` with `run_status` and a `message` when the run had not finished. A consumer of
+  that answer now calls, in order:
+  1. `HandlerUnitTestRun` — keep its `run_id`;
+  2. `HandlerUnitTestStatus` (a CDS unit test: `HandlerCdsUnitTestStatus`) with that `run_id` —
+     one status read, with long polling unless `with_long_polling: false`; call it again, at the
+     pace you choose, until the run's progress status is `FINISHED`;
+  3. `HandlerUnitTestResult` (`HandlerCdsUnitTestResult`, or `HandlerGet` with `object_type:
+     UNIT_TEST` / `CDS_UNIT_TEST`) with the `run_id` — the result.
+
+  `finished` and `message` are gone from the answer; `HandlerGet`'s `run_status` with them. Each of
+  the three is one request and is recorded in batch mode: start in one batch, read the status and
+  then the result in later ones. `HandlerGet` with `UNIT_TEST` / `CDS_UNIT_TEST` still takes no
+  `timeout` and runs on the instance's session. The full set's `GetUnitTestResult`,
+  `GetCdsUnitTestResult`, `GetUnitTest` and `GetCdsUnitTest` are unchanged.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.

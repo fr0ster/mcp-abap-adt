@@ -72,25 +72,33 @@ activates the group afterwards.
   only the batched version is kept; the sequential one runs only on a system
   without the communication batch. A dependent chain is a sequence of
   envelopes, so one call can serve several objects.
-- **Every compact tool makes one call.** This is compact's general
-  principle, not only for CRUD; an exception exists only by the owner's
-  explicit word. Each compact tool does its one operation, with no mode
-  parameter: `HandlerCreate` only creates the
-  initial object (one `POST`; an argument its create does not send is
-  refused, by presence, naming it); `HandlerUpdate` is only the `PUT` under
-  `lock_handle` (no lock or unlock of its own, no read-patch-write; for a
-  domain, a data element or a package the caller passes the whole document);
-  `HandlerDelete` only the deletion request (no lock, no check); the deletion check is
-  its own compact tool, `HandlerDeletionCheck`. Lock, unlock and activate
-  already are single. `HandlerGet` honours `part` and returns only what was
-  asked — code, metadata or another part: one part, one request. The
-  full chains stay in the full sets. This changes compact's behaviour for its
-  consumers.
+- **Compact: one ADT request per tool call.** This is compact's general
+  principle; the consumer chains the calls and repeats them; the server does
+  no polling, no internal retry and keeps no timer. An exception exists only
+  by the owner's explicit word (today: `HandlerGet` part `urls`). Each compact
+  tool does its one operation, with no mode parameter: `HandlerCreate` one
+  `POST` (an argument its create does not send is refused, by presence, naming
+  it); `HandlerUpdate` only the `PUT` under `lock_handle` (for a domain, a data
+  element or a package the caller passes the whole document in `source_code`);
+  `HandlerDelete` only the deletion request (no lock, no check) — a class's
+  local include, which ADT cannot delete, is removed by one `PUT` of empty
+  content under the caller's `lock_handle`; `HandlerDeletionCheck` is the
+  check. `HandlerGet` returns only what each `part` asks, one request per
+  part; run states (activation run status and results, unit test results)
+  are `HandlerGet` parts read once — the consumer polls. `HandlerActivate`
+  starts an activation run and answers its id. The profiler's schedule and
+  run are separate calls. `HandlerDumpList` reads one page and answers SAP's
+  next link. The debugger is one request per action, chained by the
+  consumer; no background listener. The full chains stay in the full sets.
+  This changes compact's behaviour for its consumers.
 - **Every package has batch mode.** The full, read-only and compact sets all
   serve `BatchBegin`, `BatchEnd` and the answer tool; what a set can do in batch
   mode is whatever of its tools send no request depending on another's answer
   — reads everywhere, and in
-  compact the create, lock, update, unlock and delete as well. LOCK and UNLOCK
+  compact the create, lock, update, unlock and delete as well. In compact a
+  batch is one envelope: the first recorded call decides its kind (LOCK,
+  UNLOCK or stateless), and a call of another kind is refused — the next
+  phase is its own batch. LOCK and UNLOCK
   go in stateful envelopes, everything else stateless, as adt-clients' batch
   connection sends them (measured there).
 - **The debugger has its own batch mode**, through its own pair of tools,

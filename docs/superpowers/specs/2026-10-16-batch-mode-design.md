@@ -233,6 +233,12 @@ Recording an eligible call:
   into an envelope: the call has **no number**, and it answers the handler's own answer at once, as
   outside batch mode.
 
+**`HandlerBatch` (compact): one envelope.** In the compact sets `end` sends exactly one envelope: a
+compact batch is homogeneous by session kind — the first recorded call decides it (LOCK, UNLOCK or
+stateless, as adt-clients partitions), and a call of another kind is refused in batch mode
+(`batch_other_kind`: "<tool> is a <kind> request; this batch holds <kind> requests — record it in
+the next batch"). The full sets' `BatchEnd` keeps adt-clients' several envelopes per `execute()`.
+
 **Numbering.** Every call that put a request into an envelope has its own number, from 1, in the
 order made — one number per call, covering all its parts — and only those: a refused call, or a handler that refused before sending, takes none.
 In batch mode there are no retries (§4.7): a part answered `406` or `415` is that call's answer,
@@ -309,52 +315,73 @@ not the tool's, and it has no number). While recording, `connect()` / `getBaseUr
 connection is a late-bound target (§5.1) pointing, during a recording call's turn, at the connection
 that call holds.
 
-### 4.6 Compact: one call per tool
+### 4.6 Compact: one ADT request per tool call
 
-**Every compact tool makes one call** — compact's general principle, not only for CRUD (the owner's
-architecture). An exception exists only by the owner's explicit word; a survey of all compact tools
-goes to the owner, and this design decides none of its findings. Each tool does its one operation;
-there is no mode parameter. The full chains (validate → create → lock → write → unlock → check →
-activate) stay in the full sets. This is a behaviour change for compact consumers (MIGRATION-19.0,
-CHANGELOG 19.0.0).
+**Compact's general principle** (the owner's architecture): one ADT request per tool call. The
+consumer chains the calls and repeats them; the server does no polling, no internal retry and keeps
+no timer. An exception exists only by the owner's explicit word. The full chains stay in the full
+sets. This is a behaviour change for compact consumers (MIGRATION-19.0, CHANGELOG 19.0.0). The owner
+went through every compact tool (`.superpowers/sdd/2026-10-16-batch-mode/progress.md`, the survey
+and its MEASURED lines); the plan lists each violator with file and line.
 
-- **`HandlerCreate`** only creates the initial object: the type's adt-clients `create()` — one
-  `POST`. An argument its create does not send is refused, by presence (`!== undefined`), naming
-  it, before anything is sent (the per-type carried lists of `src/handlers/common/low/handleCreateOnly.ts`
-  stay). `create_only` is gone.
-- **`HandlerUpdate`** is only the `PUT` under `lock_handle` (required): no lock or unlock of its own,
-  no check, no activation, no read-patch-write. For DOMAIN, DATA_ELEMENT and PACKAGE the caller
-  passes the whole metadata document in the update's content argument the source types already use,
-  `source_code` (`handleUpdateUnderLock`' `source(args, field)` reads it), sent as given:
-  `get<Type>().updateMetadata({ name, transportRequest }, { source: source_code, lockHandle, analyse })`.
-  `properties` and the flat metadata fields (`FLAT_PROPERTIES`) are no longer arguments of
-  `HandlerUpdate`; given, they are refused by presence, naming them. `document` is not added.
-- **`HandlerDelete`** sends only the deletion request, as adt-clients' `delete()` does today
-  (`src/lib/strategies/checkedDeletion.ts`: the bare deletion after the check) — no lock (deletion
-  takes none: a held lock is what makes ADT refuse, `src/handlers/class/high/handleDeleteClass.ts:4-7`)
-  and no check. The types whose delete today writes their section empty under a lock of its own
-  (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`, `UNIT_TEST`,
-  `CDS_UNIT_TEST`) send only that `PUT` under the caller's `lock_handle` — a write, not a deletion.
-- **`HandlerDeletionCheck`** — a new compact tool beside `HandlerValidate` and `HandlerCheckRun`,
-  parameters `object_type`*, `object_name`* as theirs: one call, the deletion check request the
-  deletion uses today (`checkDeletion` in `src/lib/strategies/checkedDeletion.ts:50-51`), answered as
-  `analyseDeletion` reads it. The consumer calls it before `HandlerDelete` when it wants the check.
-- **`HandlerGet`** honours `part` and returns only what was asked — code (`source`), `metadata`, or
-  another part: **one part, one request**, the same for every type. `part: 'metadata'` answers the
-  metadata alone for every type, `part: 'source'` the source alone; a type without source
-  (DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, PACKAGE) refuses `source`, naming the parts it offers.
-  FUNCTION_MODULE's `source` reads the source with the group the caller gives (`function_group_name`,
-  already required), with no metadata read first. Where types differ today (the plan's survey, with
-  file and line): `source` answers the metadata document for those four types; `metadata` answers
-  metadata and source (`both()`) for the source types; FUNCTION_MODULE chains metadata → source
-  (`handleGetFunctionModule.ts:81-93`); the field names differ by type. Parts that send several
-  requests today (`urls`, `contents`, `node_structure` of a package, `UNIT_TEST` / `CDS_UNIT_TEST`
-  polling) are among the survey's findings for the owner; until his word they are not changed here.
-- `HandlerLock`, `HandlerUnlock` and `HandlerActivate` already are single.
+- **`HandlerCreate`** — one `POST`, the type's adt-clients `create()`. An argument its create does
+  not send is refused, by presence (`!== undefined`), naming it (the per-type carried lists of
+  `src/handlers/common/low/handleCreateOnly.ts`). `create_only` is gone. Nothing else is sent around
+  it (no validation, lock, write, check, activation, no service-group read for a service binding).
+- **`HandlerUpdate`** — only the `PUT` under `lock_handle` (required): no lock or unlock, check,
+  activation, read-patch-write, or read after the write. DOMAIN, DATA_ELEMENT and PACKAGE take the
+  whole metadata document in `source_code`, sent as given; `properties` and the flat metadata fields
+  are refused by presence, naming them.
+- **`HandlerDelete`** — only the deletion request, as adt-clients' `delete()` sends it: no lock
+  (deletion takes none, `src/handlers/class/high/handleDeleteClass.ts:4-7`), no check. A class's
+  local includes (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`) cannot be
+  deleted (MEASURED 2026-10-17: `DELETE` on the include answers `405`): their removal is one `PUT` of
+  empty content under the caller's `lock_handle` — no lock or unlock of its own, no activation
+  (`activate_on_delete` goes). `UNIT_TEST` / `CDS_UNIT_TEST` the same `PUT` under the caller's lock.
+- **`HandlerDeletionCheck`** — new, beside `HandlerValidate` and `HandlerCheckRun`, `object_type`*,
+  `object_name`*: the one deletion-check request (`checkDeletion`,
+  `src/lib/strategies/checkedDeletion.ts:50-51`), read by `analyseDeletion`.
+- **`HandlerGet`** — every part returns only what was asked, one request:
+  - `metadata` the metadata alone, `source` the source alone; a type without source (DOMAIN,
+    DATA_ELEMENT, FUNCTION_GROUP, PACKAGE) refuses `source`, naming its parts;
+  - FUNCTION_MODULE takes its group as an argument (`GROUP|MODULE`), so its source is one request
+    with no metadata read first;
+  - `node_structure` of a package (`DEVC/K`) is one call: a blank body answers an empty listing,
+    stated as ambiguous (an empty package or no package); no package read — the consumer reads
+    `metadata` if it needs to know;
+  - `contents` runs on an internal batch (§11);
+  - **`urls` is the owner's explicit exception** and stays as it is (up to five requests);
+  - **run states are parts**, one request each: `activation_status` and `activation_results` by
+    `run_id`; `UNIT_TEST` / `CDS_UNIT_TEST` read the result once (`getResult`), SAP's answer as it
+    came; other states a tool used to poll become parts the same way.
+- **Unit test results** — `HandlerUnitTestResult`, `HandlerCdsUnitTestResult` and `HandlerGet`
+  `UNIT_TEST` / `CDS_UNIT_TEST`: one `getResult`, SAP's answer as it came; the consumer polls the
+  status itself and plans the time. Their descriptions say the result is valid only after the status
+  is `FINISHED` (MEASURED 2026-10-17: an unfinished run answers a clean-looking `runResult` without
+  `executionTime`).
+- **`HandlerActivate`** — the group/run path sends only `POST /activation/runs` and answers the
+  `run_id` ("accepted, no verdict yet"); status and results are `HandlerGet` parts. The single-object
+  path already is one request.
+- **`HandlerProfileRun`** splits into schedule (answers the `profilerId`) and run with a
+  `profilerId`, one request each; the consumer finds the new trace with `HandlerProfileList`.
+- **`HandlerDumpList`** — one page per call (`top` ≤ 100, `to`): the entries and SAP's next link as
+  it came; the consumer follows the link and dedups by `dump_id` (MEASURED 2026-10-17: `$top` capped
+  at 100; the next link is `to=<timestamp of the last entry>`; the next page starts at that second,
+  inclusive).
+- **The compact debugger** — one request per action; the consumer chains them: set breakpoints →
+  listen (with the caller's hold) → attach → step / stack / variables → continue / terminate debuggee
+  / detach → delete breakpoint / stop listener. No background listen loop; `HandlerDebugWait` goes.
+  `run_to_line` / `jump_to_line` need the address (the consumer reads the stack first). MEASURED
+  (`.superpowers/sdd/2026-10-16-batch-mode/debugger-probe-report.md`): a step's answer carries no
+  position (the stack is its own call); `terminateDebuggee` / `terminateDebugger` answer `500` even
+  when they work (the descriptions say so); `detachDebugger` releases the debuggee only **without**
+  an id on the attaching session (with an id: `200`, nothing released) — compact's detach sends it
+  without an id on the debuggee connection. The tools' names and the split of today's four
+  (`HandlerDebugStart`, `…Wait`, `…View`, `…Step`) into one-request actions are in the plan.
+- `HandlerLock`, `HandlerUnlock` and the single-object `HandlerActivate` already are one request.
 
-The handlers that chain today are listed in the plan (its compact tasks), with file and line. Every
-compact call is proven to issue exactly one request (§4.2's proof: held, answered with a document,
-answered `404`).
+Every compact call is proven to issue exactly one request (§4.2's proof: held, answered with a
+document, answered `404`), the `urls` exception and the internally batched `contents` excepted.
 
 ### 4.7 No retries in batch mode
 
@@ -497,7 +524,7 @@ reach them:
 | Operation | Full set | Compact |
 |---|---|---|
 | step (into, over, return, continue) | `DebugStep` | `HandlerDebugStep` `action` ∈ into/over/return/continue |
-| step to line | `DebugStepToLine` | `HandlerDebugStep` `run_to_line`/`jump_to_line` **with** `object_type` and `object_name` (without them it reads the stack first: two requests) |
+| step to line | `DebugStepToLine` | `HandlerDebugStep` `run_to_line`/`jump_to_line` with the address (required in compact, §4.6) |
 | stack | `DebugGetStack` | `HandlerDebugView` `what: 'stack'` |
 | variables | `DebugGetVariables` with names | `HandlerDebugView` `what: 'variables'` with names |
 | child variables | `DebugGetVariables` with parents | `HandlerDebugView` `what: 'variables'` without names (`@ROOT`) |
@@ -550,7 +577,7 @@ its own request only; the stack is in the batch when the model recorded `stack`.
   either is open, are refused `batch_mode_on` / `batch_mode_other`.
 - **Refusals** are the server's own (`ServerRefusal`, answered `{ error: <code>, message }` like the
   existing ones, no `kind`, nothing read from a server): `batch_mode_unavailable`, `batch_mode_on`,
-  `batch_mode_other`, `batch_mode_off`, `batch_not_recordable` ("<tool> builds a request from another's
+  `batch_mode_other`, `batch_mode_off`, `batch_other_kind`, `batch_not_recordable` ("<tool> builds a request from another's
   answer and cannot be recorded in batch mode; record its steps with the low-level tools —
   compact: HandlerCreate, HandlerLock, HandlerUpdate, HandlerUnlock, HandlerDelete, HandlerGet —
   each phase its own batch"), `batch_no_timeout`; for a tool refused only
@@ -822,7 +849,7 @@ kind:
 | `DescribeByList` | (1) the quickSearch of every object; (2) again without its type, for the objects whose first answer was empty |
 | `GetAbapSystemSymbols` | the reads of every symbol found, through the inner handlers (`handleGetClass`, `handleGetFunctionModule`, `handleGetInterface`, generic): each phase holds every symbol's request of that step that is independent of the others, by the rule; a request needing an earlier answer goes in the next phase. If the call fails, the consumer gets the error and remakes the call — nothing is retried |
 | `GetWhereUsed` (with a type filter), `HandlerWhereUsed` | (1) the where-used scope of **every** object asked; (2) every scoped where-used request — two envelopes for any number of objects |
-| `RuntimeListFeeds`, `HandlerDumpList` | (1) the feed (or variants) GET of every feed asked; then per round, the next page of every feed still paging, in one envelope (a page needs its own feed's previous next link) |
+| `RuntimeListFeeds` (full set; compact's `HandlerDumpList` is one page per call, §4.6) | (1) the feed (or variants) GET of every feed asked; then per round, the next page of every feed still paging, in one envelope (a page needs its own feed's previous next link) |
 | `GetEnhancements` | (1) the type probes of the object (class → program → include, each only when the earlier answered none — dependent, one per phase); (2) the object's enhancements and its root `nodestructure`; (3) the includes `nodestructure`; (4) with `include_nested`, the enhancements of every include, up to `max_includes`, in one envelope |
 
 Each row is to be confirmed against its handler when it is reimplemented; a dependency the table
@@ -837,7 +864,7 @@ list answers one entry per object, in the order asked):
 
 - `GetWhereUsed`: `objects: [{ object_type, object_name }]` beside `object_type` / `object_name`;
   `HandlerWhereUsed` the same.
-- `RuntimeListFeeds`: `feed_types: string[]` beside `feed_type`; `HandlerDumpList` the same.
+- `RuntimeListFeeds`: `feed_types: string[]` beside `feed_type`.
 - `GetPackageContents`: `package_names: string[]`; `HandlerGet` part `contents` the same.
 - `GetPackageTree`: `package_names: string[]`.
 - `GetObjectsList`: `objects: [{ parent_type, parent_name }]`.

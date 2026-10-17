@@ -105,7 +105,7 @@
 
 - [ ] **Step 1: Write the failing tests** — `eligibility.test.ts`: `a listed tool with no when is eligible`; `HandlerGet part contents and UNIT_TEST/CDS_UNIT_TEST are not eligible; absent part reads as source`; `HandlerLock PACKAGE over rfc is not eligible`; `object_type 'domain' and 'DOMAIN' read the same` (Review Focus 3); `an unlisted tool is not eligible`. `batchHandlers.test.ts` (source test): every entry names a tool its set serves and a handler that exists; every entry has a proof case. The per-entry proof: for each entry, its handler with the entry's sample arguments sends the same requests while they are held **pending** as when they are **answered** (an answer document, and a `404`), and at least one; a tool that sends none is not listed.
 - [ ] **Step 2:** Run them — FAIL.
-- [ ] **Step 3:** Write the table per spec §4.2/§4.4 (eligible: every tool none of whose requests depends on another's answer — `HandlerLock`, `HandlerUnlock`, `HandlerUpdate` source types with `lock_handle`, the reads of full and compact, the twelve `Read<Type>` tools and `GetObjectVersionDiff` sending source and metadata together via `both()`, `SearchObject`, `GetSqlQuery`, `GetTableContents`, `GetATCFindings`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`, `HandlerSearch`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` per part; the compact CRUD entries are settled in Tasks 10–12); implement `eligible` reading the file once.
+- [ ] **Step 3:** Write the table per spec §4.2/§4.4 (eligible: every tool none of whose requests depends on another's answer — `HandlerLock`, `HandlerUnlock`, `HandlerUpdate` source types with `lock_handle`, the reads of full and compact, the twelve `Read<Type>` tools and `GetObjectVersionDiff` sending source and metadata together via `both()`, `SearchObject`, `GetSqlQuery`, `GetTableContents`, `GetATCFindings`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`, `HandlerSearch`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` per part; the compact entries are settled in Tasks 10–19); implement `eligible` reading the file once.
 - [ ] **Step 4:** Run — PASS.
 - [ ] **Step 5: Break it:** make a listed handler send a request built from the first's answer (pending ≠ answered, red); list a tool that sends none (red); list `SearchSource` (red); revert.
 - [ ] **Step 6:** Commit `feat: batch eligibility table`.
@@ -197,64 +197,195 @@
 - [ ] **Step 6:** Docs: `http/README.md`, `docs/user-guide/CLIENT_CONFIGURATION.md` (the header on every call of a batch).
 - [ ] **Step 7:** Commit `feat(http): x-mcp-state-handle routes a batch`.
 
-### Task 10: Compact one call: `HandlerCreate`
+## Compact: one ADT request per tool call (spec §4.6)
 
-**What chains today** (survey of the compact routes; each line: the handler the compact route reaches, what it sends):
+The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mode/progress.md`, from "Survey of 32 compact tools", with its MEASURED lines) and what chains today:
+
 
 - `HandlerCreate` → the full creates (`compact-modify/src/handlers/compactWriteRoutes.ts`): BEHAVIOR_DEFINITION create → lock → check → unlock → read → activate (`src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts:135-177`); CDS_UNIT_TEST checkCdsTestDoubles → create (`src/handlers/unit_test/high/handleCreateCdsUnitTest.ts:95-104`); DATA_ELEMENT validate → create → lock → readMetadata → updateMetadata → unlock → readMetadata → check → activate (`src/handlers/data_element/high/handleCreateDataElement.ts:213-311`); DOMAIN the same (`src/handlers/domain/high/handleCreateDomain.ts:197-290`); FUNCTION_GROUP create → readMetadata → activate (`src/handlers/function/high/handleCreateFunctionGroup.ts:118-154`); METADATA_EXTENSION create → lock → check → unlock → read → activate (`src/handlers/ddlx/high/handleCreateMetadataExtension.ts:114-158`); SERVICE_BINDING create → activate (`src/handlers/service_binding/high/handleCreateServiceBinding.ts:184-205`); SERVICE_DEFINITION create → lock → update → unlock → activate (`src/handlers/service_definition/high/handleCreateServiceDefinition.ts:129-179`); STRUCTURE validate → create → check → activate (`src/handlers/structure/high/handleCreateStructure.ts:230-264`); UNIT_TEST lock → update → unlock → activate (`writeClassTests`, `src/handlers/unit_test/shared/writeTests.ts:76-97`). One `create()` each (to be proven per type): BEHAVIOR_IMPLEMENTATION, CLASS, DDL, FUNCTION_MODULE, INTERFACE, PACKAGE, PROGRAM, TABLE, TRANSPORT. `create_only` (`src/handlers/common/low/handleCreateOnly.ts`, Task 10 as first implemented) already sends the one `POST` per type.
 - `HandlerUpdate` without `lock_handle` → the full updates, each `withLock` lock → write → (check) → unlock → activate: BEHAVIOR_DEFINITION `:116`, BEHAVIOR_IMPLEMENTATION `:139`, CLASS `:107`, DATA_ELEMENT `:222`, DDL `:96`, DOMAIN `:185`, FUNCTION_GROUP `:97`, FUNCTION_MODULE `:124`, INTERFACE `:102`, LOCAL_DEFINITIONS / LOCAL_MACROS / LOCAL_TYPES `:100`, LOCAL_TEST_CLASS `:116`, METADATA_EXTENSION `:118`, PACKAGE `:94`, PROGRAM `:108`, SERVICE_BINDING `:267`, SERVICE_DEFINITION `:100`, STRUCTURE `:102`, TABLE `:103` (each `src/handlers/<type>/high/handleUpdate<Type>.ts`), UNIT_TEST / CDS_UNIT_TEST (`writeTests.ts:76-97`). With `lock_handle`: DOMAIN, DATA_ELEMENT, PACKAGE readMetadata → updateMetadata (`src/handlers/domain/low/handleUpdateDomain.ts:110-117`, `src/handlers/data_element/low/handleUpdateDataElement.ts:151-158`, `src/handlers/package/low/handleUpdatePackage.ts:130-137`); the source types one `PUT`.
 - `HandlerDelete` → checkDeletion → delete for 19 types (`deleteIfDeletable`, `src/lib/strategies/checkedDeletion.ts:50-64`); LOCAL_TEST_CLASS / LOCAL_TYPES / LOCAL_DEFINITIONS / LOCAL_MACROS lock → update → unlock → activate (`src/handlers/class/high/handleDeleteLocal*.ts:86-121`); UNIT_TEST, CDS_UNIT_TEST (`writeTests.ts:76-97`; `handleDeleteCdsUnitTest.ts:85`).
-- `HandlerGet`: part `metadata` sends source and metadata via `both()` for the source types (`src/handlers/<type>/readonly/handleRead<Type>.ts`), part `source` answers the metadata for DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, PACKAGE; FUNCTION_MODULE readMetadata → read with the group it names (`src/handlers/function_module/high/handleGetFunctionModule.ts:81-93`, `src/handlers/function_module/readonly/handleReadFunctionModule.ts:83-95`); `UNIT_TEST` / `CDS_UNIT_TEST` polling (`src/handlers/unit_test/high/handleGetUnitTest.ts:57-64`, `handleGetCdsUnitTest.ts:59-63`); part `urls` three reads in sequence (`src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts:195-236`); part `contents` the package walk; `node_structure` of a `DEVC/K` parent reads the package first (`src/handlers/system/low/handleGetNodeStructure.ts:22-27`). The multi-request parts (`urls`, `contents`, package `node_structure`, unit-test polling) go to the owner with the compact survey; none is changed without his word.
+- `HandlerGet`: part `metadata` sends source and metadata via `both()` for the source types (`src/handlers/<type>/readonly/handleRead<Type>.ts`), part `source` answers the metadata for DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, PACKAGE; FUNCTION_MODULE readMetadata → read with the group it names (`src/handlers/function_module/high/handleGetFunctionModule.ts:81-93`, `src/handlers/function_module/readonly/handleReadFunctionModule.ts:83-95`); `UNIT_TEST` / `CDS_UNIT_TEST` polling (`src/handlers/unit_test/high/handleGetUnitTest.ts:57-64`, `handleGetCdsUnitTest.ts:59-63`); part `urls` three reads in sequence (`src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts:195-236`); part `contents` the package walk; `node_structure` of a `DEVC/K` parent reads the package first (`src/handlers/system/low/handleGetNodeStructure.ts:22-27`).
 
+
+- `HandlerCreate` SERVICE_BINDING also reads the service group (`src/handlers/service_binding/high/handleCreateServiceBinding.ts:5-16`); FUNCTION_GROUP reads itself back after a `400` (`src/handlers/function/high/handleCreateFunctionGroup.ts:135`).
+- The full updates read the object again after the unlock with long polling (e.g. `src/handlers/domain/high/handleUpdateDomain.ts:238`, `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts:11`).
+- `HandlerActivate` group/run path polls the run (`compact-modify/src/handlers/handleHandlerActivate.ts`); `HandlerUnitTestResult`, `HandlerCdsUnitTestResult` poll the status before the result (`compact-readonly-entries/src/handlers/handleHandlerUnitTestResult.ts`, `handleHandlerCdsUnitTestResult.ts`); `HandlerProfileRun` chains schedule → run (CLASS: list → schedule → run → poll the trace list) (`compact-modify/src/handlers/handleHandlerProfileRun.ts`); `HandlerDumpList` walks pages for a large `top` (`compact-readonly-entries/src/handlers/handleHandlerDumpList.ts:42`); `HandlerDebugStart` / `HandlerDebugStep` / stop chain requests and run a background listen loop (`src/lib/compact/debug/*.ts`, `src/lib/debugger/DebugSession.ts`).
+- Owner's explicit exception: `HandlerGet` part `urls` stays as it is.
+
+### Task 10: `HandlerBatch`: one envelope, homogeneous by session kind
 
 **Files:**
-- Modify: `compact-modify/src/handlers/handleHandlerCreate.ts` (always the one-create route), `compact-modify/src/handlers/compactWriteRoutes.ts` (the create column → `handleCreateOnly`), `src/lib/compact/compactSchemas.ts` (`compactCreateSchema`: `create_only` removed; per type only what its create sends), `src/handlers/common/low/handleCreateOnly.ts`, `tools/batch-handlers.json` (the `HandlerCreate` entry without a `create_only` rule)
+- Modify: `src/lib/compact/batch/handleHandlerBatch.ts`, `src/lib/batch/InstanceBatch.ts` (the batch's kind), `src/embeddable/BaseMcpServer.ts` (the refusal)
+- Test: `src/__tests__/unit/batch/compactOneEnvelope.test.ts`
+
+**Interfaces:**
+- Consumes: Tasks 3, 5, 6 (`InstanceBatch`, the recorder, `executeBatch`).
+- Produces: `InstanceBatch.kind(): 'lock' | 'unlock' | 'stateless' | undefined` set by the first recorded call in a compact batch; refusal `batch_other_kind` (spec §4.1 words).
+
+- [ ] **Step 1: Write the failing tests** — `HandlerBatch end sends exactly one envelope`; `the first call decides the kind (LOCK / UNLOCK / stateless)`; `a call of another kind is refused batch_other_kind, nothing recorded, no number`; `the full sets' BatchEnd still sends several envelopes for mixed kinds`.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement the kind and the refusal for the compact sets.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** let a second kind in — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order) (each phase its own batch); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact): a compact batch is one envelope`.
+
+### Task 11: Compact one call: `HandlerCreate`
+
+**Files:**
+- Modify: `compact-modify/src/handlers/handleHandlerCreate.ts`, `compact-modify/src/handlers/compactWriteRoutes.ts` (the create column → `handleCreateOnly`), `src/handlers/common/low/handleCreateOnly.ts`, `src/lib/compact/compactSchemas.ts` (`create_only` removed; per type only what its create sends), `tools/batch-handlers.json`
 - Test: `compact-modify/src/__tests__/createSingleCall.test.ts`
 
 **Interfaces:**
-- Produces: `HandlerCreate` = one `POST` per type; the refusal of an unsent argument by presence, naming it (the per-type carried lists kept).
+- Produces: `HandlerCreate` = one `POST` per type; an unsent argument refused by presence, naming it.
 
-- [ ] **Step 1: Write the failing tests** — per type: `HandlerCreate issues exactly one request, the create's POST — held, answered with a document, answered 404`; `an argument its create does not send is refused before any request, naming it, for false / 0 / ''`; `create_only is not in the schema`.
+- [ ] **Step 1: Write the failing tests** — per type: `exactly one request, the create's POST`; `an argument its create does not send is refused before any request, naming it, for false / 0 / ''`; `SERVICE_BINDING sends no service-group read`; `FUNCTION_GROUP sends no read-back after a 400 — the 400 is the answer`; `create_only is not in the schema`.
 - [ ] **Step 2:** Run — FAIL.
-- [ ] **Step 3:** Implement: remove `create_only` and the routing to the full creates; a type whose create sends more than one request is reported in the step (and stays out until the owner decides).
-- [ ] **Step 4:** Run, with Task 4's proof — PASS.
-- [ ] **Step 5: Break it:** route one type to its full create — red; revert.
-- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases: create, lock, update, unlock, activate), README; `docs/MIGRATION-19.0.md` (compact `HandlerCreate` creates only; what to call after); CHANGELOG 19.0.0 *Changed* (breaking for compact).
-- [ ] **Step 7:** Commit `feat(compact)!: HandlerCreate creates only`.
+- [ ] **Step 3:** Implement: remove `create_only` and the routing to the full creates.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** route one type to its full create; read the service group — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerCreate is one POST`.
 
-### Task 11: Compact one call: `HandlerUpdate`, `HandlerDelete`, new `HandlerDeletionCheck`
+### Task 12: Compact one call: `HandlerUpdate`
 
 **Files:**
-- Modify: `compact-modify/src/handlers/handleHandlerUpdate.ts` (`lock_handle` required; always `handleUpdateUnderLock`), `src/handlers/common/low/handleUpdateUnderLock.ts` (DOMAIN, DATA_ELEMENT, PACKAGE: `source_code` sent as the whole document; `properties` and `FLAT_PROPERTIES` refused), `compact-modify/src/handlers/handleHandlerDelete.ts` and `compactWriteRoutes.ts` (the deletion request alone, as `delete()` sends it — no lock, no check; the section types the `PUT` under `lock_handle`), `src/lib/compact/compactSchemas.ts`, `tools/batch-handlers.json`
-- Create: `compact-readonly-entries/src/handlers/handleHandlerDeletionCheck.ts` (beside `handleHandlerValidate.ts` and `handleHandlerCheckRun.ts`), its registration in `compact-readonly-entries/src/group.ts`
-- Test: `compact-modify/src/__tests__/updateDeleteSingleCall.test.ts`, `compact-readonly-entries/src/__tests__/deletionCheck.test.ts`
+- Modify: `compact-modify/src/handlers/handleHandlerUpdate.ts` (`lock_handle` required; always `handleUpdateUnderLock`), `src/handlers/common/low/handleUpdateUnderLock.ts` (DOMAIN, DATA_ELEMENT, PACKAGE: `source_code` as the whole document; `properties` and `FLAT_PROPERTIES` refused), `src/lib/compact/compactSchemas.ts`, `tools/batch-handlers.json`
+- Test: `compact-modify/src/__tests__/updateSingleCall.test.ts`
 
 **Interfaces:**
-- Produces: `HandlerUpdate` = one `PUT` under `lock_handle`; for DOMAIN / DATA_ELEMENT / PACKAGE `get<Type>().updateMetadata({ name, transportRequest }, { source: source_code, lockHandle, analyse })`; `HandlerDelete` = one deletion request, no lock and no check (the section types one `PUT` under the caller's `lock_handle`); tool `HandlerDeletionCheck` (`object_type`*, `object_name`*) = one call, `checkDeletion` as `src/lib/strategies/checkedDeletion.ts:50-51` sends it, read by `analyseDeletion`. No `document` argument.
+- Produces: `HandlerUpdate` = one `PUT` under `lock_handle`; DOMAIN / DATA_ELEMENT / PACKAGE `get<Type>().updateMetadata({ name, transportRequest }, { source: source_code, lockHandle, analyse })`.
 
-- [ ] **Step 1: Write the failing tests** — per type: `HandlerUpdate issues exactly one PUT under the given lock_handle — held, answered, 404`; `no lock_handle refused before any request`; `DOMAIN/DATA_ELEMENT/PACKAGE: the body is source_code byte for byte, no read`; parameterised over `properties` and `FLAT_PROPERTIES` (`description`, `datatype`, `length`, `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`) × `false`, `0`, `''`: `refused by presence before any request, naming it`; `transport_request is accepted`; per type: `HandlerDelete issues exactly one request, the deletion — no lock, no deletion check`; `the section types send one PUT under the given lock_handle`; `HandlerDeletionCheck issues exactly one request, the deletion check, and answers what analyseDeletion reads (deletable / refused with SAP's words)`; `HandlerDeletionCheck is served by compact and compact-ro`.
+- [ ] **Step 1: Write the failing tests** — per type: `exactly one PUT under the given lock_handle`; `no lock_handle refused before any request`; `DOMAIN/DATA_ELEMENT/PACKAGE: body = source_code byte for byte, no read`; parameterised over `properties` and `FLAT_PROPERTIES` (`description`, `datatype`, `length`, `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`) × `false`, `0`, `''`: `refused by presence, naming it`; `transport_request accepted`; `no read after the write`.
 - [ ] **Step 2:** Run — FAIL.
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run, with Task 4's proof (and the new tool's entry in `tools/batch-handlers.json`) — PASS.
-- [ ] **Step 5: Break it:** read before writing; test the fields by truthiness; keep the deletion check inside `HandlerDelete`; take a lock before the delete — each red; revert.
-- [ ] **Step 6:** Docs as Task 10's (update, delete, `HandlerDeletionCheck`); `MIGRATION-19.0.md` (lock first, update under the handle, unlock, activate; delete is the deletion alone, its check `HandlerDeletionCheck`); CHANGELOG 19.0.0 *Added* `HandlerDeletionCheck`, *Changed* (breaking for compact).
-- [ ] **Step 7:** Commit `feat(compact)!: HandlerUpdate and HandlerDelete do one operation; HandlerDeletionCheck`.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** read before writing; test the fields by truthiness; read after the write — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerUpdate is one PUT under lock_handle`.
 
-### Task 12: `HandlerGet`: one part, one request
+### Task 13: Compact one call: `HandlerDelete`, local includes, new `HandlerDeletionCheck`
 
 **Files:**
-- Modify: `compact-readonly-entries/src/handlers/handleHandlerGet.ts`, `compact-readonly-entries/src/handlers/compactPartRoutes.ts` (`metadata` → the metadata read alone per type), `compact-readonly-entries/src/handlers/compactReadRoutes.ts` (`source` → the source read alone; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, PACKAGE refuse it naming their parts), the FUNCTION_MODULE source read (with the caller's `function_group_name`, no metadata first), `src/lib/compact/compactSchemas.ts` (`part`), `tools/batch-handlers.json`
+- Modify: `compact-modify/src/handlers/handleHandlerDelete.ts`, `compact-modify/src/handlers/compactWriteRoutes.ts` (the delete column → the deletion request alone; LOCAL_* / UNIT_TEST / CDS_UNIT_TEST → one empty `PUT` under `lock_handle`), `src/lib/compact/compactSchemas.ts` (`activate_on_delete` removed; `lock_handle` for the include types), `tools/batch-handlers.json`
+- Create: `compact-readonly-entries/src/handlers/handleHandlerDeletionCheck.ts`, its registration in `compact-readonly-entries/src/group.ts`
+- Test: `compact-modify/src/__tests__/deleteSingleCall.test.ts`, `compact-readonly-entries/src/__tests__/deletionCheck.test.ts`
+
+**Interfaces:**
+- Produces: `HandlerDelete` = one deletion request, no lock, no check; LOCAL_TEST_CLASS / LOCAL_TYPES / LOCAL_DEFINITIONS / LOCAL_MACROS / UNIT_TEST / CDS_UNIT_TEST = one `PUT` of empty content under the caller's `lock_handle`; tool `HandlerDeletionCheck` (`object_type`*, `object_name`*) = one `checkDeletion` request (`src/lib/strategies/checkedDeletion.ts:50-51`) read by `analyseDeletion`.
+
+- [ ] **Step 1: Write the failing tests** — per type: `exactly one request, the deletion — no lock, no check`; per include type: `exactly one PUT, empty body, the given lock_handle, no activation`; `include delete without lock_handle refused before any request`; `activate_on_delete is not in the schema`; `HandlerDeletionCheck exactly one request; answers deletable / refused with SAP's words`; `served by compact and compact-ro`.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** keep the check inside `HandlerDelete`; lock before the delete; activate after the include write — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order) (`HandlerDeletionCheck` under *Added*); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerDelete is the deletion alone; HandlerDeletionCheck`.
+
+### Task 14: `HandlerGet`: one part, one request
+
+**Files:**
+- Modify: `compact-readonly-entries/src/handlers/handleHandlerGet.ts`, `compactPartRoutes.ts`, `compactReadRoutes.ts`, the FUNCTION_MODULE reads, `src/handlers/system/low/handleGetNodeStructure.ts` (compact path: no package read), `src/lib/compact/compactSchemas.ts` (`part`; FUNCTION_MODULE `GROUP|MODULE`), `tools/batch-handlers.json`
 - Test: `compact-readonly-entries/src/__tests__/onePartOneRequest.test.ts`
 
 **Interfaces:**
-- Produces: for every type, `part: 'source'` = one source read, `part: 'metadata'` = one metadata read, each answering only what was asked; a type without source refuses `source` naming its parts. The multi-request parts (`urls`, `contents`, package `node_structure`, unit-test polling) stay as they are until the owner's word on the compact survey.
+- Produces: per type `part: 'metadata'` = the metadata read alone, `part: 'source'` = the source read alone (source-less types refuse `source`, naming their parts); FUNCTION_MODULE by `GROUP|MODULE`; `node_structure` of `DEVC/K` one call, a blank body answering an empty listing stated as ambiguous; `urls` unchanged (exception); `contents` → Task 22.
 
-- [ ] **Step 1: Write the failing tests** — per type: `part metadata issues exactly one request (held, answered, 404) and answers metadata only`; `part source issues exactly one request and answers source only`; `DOMAIN/DATA_ELEMENT/FUNCTION_GROUP/PACKAGE refuse source before any request, naming their parts`; `FUNCTION_MODULE source: one request with the given group, no metadata read`.
-- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run, with Task 4's proof — PASS.
-- [ ] **Step 5: Break it:** route `metadata` back to the `both()` read; read FUNCTION_MODULE's metadata first — each red; revert.
-- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md` (parts per type), `compact/README.md`, surface fixture, `docs/user-guide/BATCH_MODE.md`; `MIGRATION-19.0.md` (`metadata` no longer carries the source; ask `source` for it; source-less types refuse `source`); CHANGELOG 19.0.0 *Changed* (breaking for compact). Commit `feat(compact)!: HandlerGet one part, one request`.
+- [ ] **Step 1: Write the failing tests** — per type and part: `exactly one request`; `metadata answers metadata only; source answers source only`; `DOMAIN/DATA_ELEMENT/FUNCTION_GROUP/PACKAGE refuse source naming their parts`; `FUNCTION_MODULE source: one request with the group from GROUP|MODULE, no metadata read`; `node_structure DEVC/K: one request; a blank body answers an empty listing with the ambiguity stated`; `urls answers as before`.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** route `metadata` to the `both()` read; read the package before `node_structure`; read FUNCTION_MODULE's metadata first — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerGet one part, one request`.
 
-### Task 13: The debugger batch
+### Task 15: `HandlerGet` run-state parts and `HandlerActivate`'s run path
+
+**Files:**
+- Modify: `compact-modify/src/handlers/handleHandlerActivate.ts` (group/run path: `POST /activation/runs` only), `compact-readonly-entries/src/handlers/compactPartRoutes.ts` (parts `activation_status`, `activation_results`), `src/lib/compact/compactSchemas.ts` (`run_id`), `tools/batch-handlers.json`
+- Test: `compact-modify/src/__tests__/activationRun.test.ts`
+
+**Interfaces:**
+- Produces: `HandlerActivate` (group/run) = one request answering `{ run_id }` ("accepted, no verdict yet"); `HandlerGet` `part: 'activation_status' | 'activation_results'` with `run_id`, one request each.
+
+- [ ] **Step 1: Write the failing tests** — `HandlerActivate run path issues exactly one request and answers the run_id`; `the single-object path is unchanged (one request)`; `activation_status and activation_results: one request each, SAP's answer as it came`; `no poll, no timer`.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** poll the run inside `HandlerActivate` — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerActivate starts a run; its state is read by HandlerGet`.
+
+### Task 16: Unit-test results read once
+
+**Files:**
+- Modify: `compact-readonly-entries/src/handlers/handleHandlerUnitTestResult.ts`, `handleHandlerCdsUnitTestResult.ts`, `HandlerGet` `UNIT_TEST` / `CDS_UNIT_TEST` (`src/handlers/unit_test/high/handleGetUnitTest.ts`, `handleGetCdsUnitTest.ts`, compact path), their descriptions
+- Test: `compact-readonly-entries/src/__tests__/unitTestResultOnce.test.ts`
+
+**Interfaces:**
+- Produces: each = one `getResult`, SAP's answer as it came; description: "valid only after the status is FINISHED: an unfinished run answers a result without executionTime".
+
+- [ ] **Step 1: Write the failing tests** — `exactly one request, getResult — no status poll`; `an unfinished run's result is answered as it came`; `the description carries the FINISHED sentence`.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** poll the status first — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact)!: unit-test results are read once`.
+
+### Task 17: `HandlerProfileRun`: schedule and run
+
+**Files:**
+- Modify: `compact-modify/src/handlers/handleHandlerProfileRun.ts`, `src/lib/compact/compactSchemas.ts`, `tools/batch-handlers.json`
+- Test: `compact-modify/src/__tests__/profileRunSplit.test.ts`
+
+**Interfaces:**
+- Produces: `HandlerProfileRun` with `step: 'schedule'` answers the `profilerId` (one request); with `step: 'run'` and `profilerId` runs (one request); the trace is found with `HandlerProfileList`. (The argument's name is this plan's proposal.)
+
+- [ ] **Step 1: Write the failing tests** — `schedule: exactly one request, answers profilerId`; `run with profilerId: exactly one request`; `run without profilerId refused before any request`; `no trace-list poll`.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** chain schedule into run — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerProfileRun schedules and runs in separate calls`.
+
+### Task 18: `HandlerDumpList`: one page per call
+
+**Files:**
+- Modify: `compact-readonly-entries/src/handlers/handleHandlerDumpList.ts`, `src/lib/compact/compactSchemas.ts` (`top` ≤ 100, `to`)
+- Test: `compact-readonly-entries/src/__tests__/dumpListOnePage.test.ts`
+
+**Interfaces:**
+- Produces: one page per call: entries and SAP's next link as it came; `top` > 100 refused naming the cap (MEASURED cap 100).
+
+- [ ] **Step 1: Write the failing tests** — `exactly one request for any top ≤ 100`; `top 101 refused before any request`; `the next link answered as SAP sent it (to=<timestamp>)`; `the description says the next page starts at the boundary second, inclusive — dedup by dump_id`.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** walk a second page — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerDumpList reads one page`.
+
+### Task 19: Compact debugger: one request per action
+
+**Files:**
+- Modify: `src/lib/compact/debug/*.ts` (`handleHandlerDebugStart.ts`, `handleHandlerDebugStep.ts`, `handleHandlerDebugView.ts`; `handleHandlerDebugWait.ts` deleted), `src/lib/compact/debug/group.ts`, `src/lib/debugger/DebugSession.ts` (a one-request path with no background listen loop), `src/lib/debugger/ownConnectionTools.ts`
+- Test: `src/__tests__/unit/debugger/compactOneRequest.test.ts`
+
+**Interfaces:**
+- Produces: one compact action per request, chained by the consumer: set breakpoints; listen with the caller's `hold_seconds`; attach; step (into / over / return / continue / run_to_line / jump_to_line with the address required); stack / variables / child variables; terminate debuggee; detach (`detachDebugger()` without an id on the debuggee connection); delete breakpoint; stop listener. `HandlerDebugWait` removed. How the actions map onto tools (the existing four re-cut, or one tool per action) is this plan's proposal for the owner's review at the task's start.
+
+- [ ] **Step 1: Write the failing tests** — per action: `exactly one request`; `no background listen loop: nothing is sent between calls`; `listen holds exactly the caller's hold_seconds`; `run_to_line without an address refused before any request`; `detach sends detachDebugger without an id on the debuggee connection`; `terminate's description says SAP answers 500 even when it works`; `a step's answer carries no position (the description sends the consumer to the stack)`.
+- [ ] **Step 2:** Run — FAIL.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
+- [ ] **Step 5: Break it:** send detach with the id; keep the listen loop; read the stack inside run_to_line — each red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order), `docs/user-guide/DEBUGGER.md`; CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
+- [ ] **Step 7:** Commit `feat(compact)!: the compact debugger is one request per action`.
+
+### Task 20: The debugger batch
 
 **Files:**
 - Create: `src/lib/handlers/groups/DebugBatchHandlersGroup.ts`, `src/lib/compact/debug/handleHandlerDebugBatch.ts`
@@ -262,7 +393,7 @@
 - Test: `src/__tests__/unit/debugger/debugBatch.test.ts`
 
 **Interfaces:**
-- Consumes: Tasks 3, 5, 6.
+- Consumes: Tasks 3, 5, 6; the compact debugger's one-request actions (Task 19).
 - Produces: `DebugBatchBegin` / `DebugBatchEnd` (full), `HandlerDebugBatch` (`action: 'begin' | 'end' | 'answers'`, compact); `DebugSession.openBatch(): AdtBatchConnection` over `Stop.connection` with `endpoint: 'debugger'`.
 
 - [ ] **Step 1: Write the failing tests** — `begin needs an ABAP stop`; `step + stack + variables recorded into one debugger envelope on the stop's connection`; `the second recorded call is recorded while the first waits` (no deadlock); `DebugBatchEnd keeps answers by number, mode off, leaves the stop as it was (no releaseStop, no view change), also when a step's answer says the program ended`; `step to line without object_type/object_name refused`; `AMDP stop refused debug_batch_amdp_unmeasured`; `begin of either batch refused while the other is open`; `breakpoint and listener tools refused while open`; `DebugBatch* only in full, HandlerDebugBatch only in compact`.
@@ -273,7 +404,7 @@
 - [ ] **Step 6:** Docs: `docs/user-guide/DEBUGGER.md` (the debugger batch, AMDP not offered yet), CHANGELOG 19.0.0 *Added*.
 - [ ] **Step 7:** Commit `feat: debugger batch`.
 
-### Task 14: Internal batches — `runPhase` and batch availability
+### Task 21: Internal batches — `runPhase` and batch availability
 
 **Files:**
 - Create: `src/lib/batch/phases.ts`, `src/lib/batch/availability.ts`
@@ -293,14 +424,14 @@
 - [ ] **Step 5: Break it:** treat every envelope failure as "no batch"; read the parser's error instead of the outer status; key the availability by connection object (the second fresh connection then sends an envelope) — each red; revert.
 - [ ] **Step 6:** Commit `feat: internal batch phases and availability`.
 
-### Task 15: Package walks on batches
+### Task 22: Package walks on batches
 
 **Files:**
 - Modify: `src/lib/strategies/packageWalk.ts` (`walkPackage` by levels), `src/handlers/package/readonly/handleGetPackageContents.ts`, `src/handlers/system/high/handleGetPackageTree.ts`, `src/handlers/search/readonly/handleGetObjectsList.ts`, `src/handlers/system/readonly/handleGetObjectInfo.ts`, `compact-readonly-entries/src/handlers/handleHandlerGet.ts` (part `contents`), `tools/long-handlers.json` (`sends`)
 - Test: `src/__tests__/unit/batch/packageWalks.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 14).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 21).
 - Produces: schemas — `GetPackageContents.package_names: string[]`, `GetPackageTree.package_names: string[]`, `GetObjectsList.objects: [{ parent_type, parent_name }]` (names checked against the tool's current arguments), `GetObjectInfo.objects: [{ object_type, object_name }]`, `HandlerGet` part `contents` `package_names`; exactly one of single/list.
 
 - [ ] **Step 1: Write the failing tests** — per tool on fixtures: `same answer as the sequential version`; `envelopes per spec §11's row (per level: roots, then type nodes)`; `no envelope holds a request needing another of its parts`; `several roots: the envelope count does not grow with their number`; `a part failure is that item's`; `credential refusal ends the call as it came`; `no communication batch → the sequential path`.
@@ -311,28 +442,28 @@
 - [ ] **Step 6:** Docs: `AVAILABLE_TOOLS*.md` (the list arguments; reads in envelopes), compact docs, CHANGELOG 19.0.0 *Changed*.
 - [ ] **Step 7:** Commit `feat: package walks read in envelopes`.
 
-### Task 16: `SearchSource` on batches
+### Task 23: `SearchSource` on batches
 
 **Files:**
 - Modify: `src/handlers/system/readonly/handleSearchSource.ts` (schema: `concurrency` removed), `src/lib/search-source/orchestrator.ts`, `src/lib/search-source/packageResolver.ts`, `src/lib/search-source/sourceReader.ts`
 - Test: `src/__tests__/unit/batch/searchSource.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)` (Task 14); `walkPackage` by levels (Task 15).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)` (Task 21); `walkPackage` by levels (Task 22).
 
 - [ ] **Step 1: Write the failing tests** — `same hits as the sequential version`; `phases: masks, walk levels, sources up to max_objects`; `time_budget_ms checked between phases, truncated.by_timeout as today`; `no concurrency in the schema`; part failure; credential refusal.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.
 - [ ] **Step 5: Break it:** check the budget only at the end — red; revert.
 - [ ] **Step 6:** Docs and CHANGELOG 19.0.0 *Changed* (`concurrency` removed). Commit `feat: SearchSource reads in envelopes`.
 
-### Task 17: Include, structure and enhancement trees on batches
+### Task 24: Include, structure and enhancement trees on batches
 
 **Files:**
 - Modify: `src/handlers/include/readonly/handleGetIncludesList.ts`, `src/handlers/structure/readonly/handleGetStructuresList.ts`, `src/handlers/enhancement/readonly/handleGetEnhancements.ts`, `tools/long-handlers.json`
 - Test: `src/__tests__/unit/batch/includeTrees.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 14).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 21).
 - Produces: `GetIncludesList.objects`, `GetStructuresList.structure_names`, `GetEnhancements.objects` (exactly one of single/list).
 
 - [ ] **Step 1: Write the failing tests** — per tool: same answer; phases per spec §11 (includes per depth up to 20; structure-then-table; where-used pairs; candidates; enhancement probes one per phase, then enhancements + root, includes node, nested up to `max_includes`); several objects; part failure; credential refusal.
@@ -340,36 +471,36 @@
 - [ ] **Step 5: Break it:** join the table read into the structure phase — red; revert.
 - [ ] **Step 6:** Docs, CHANGELOG. Commit `feat: include and structure trees read in envelopes`.
 
-### Task 18: Lists of objects on batches — `ListTransports`, `DescribeByList`, `GetAbapSystemSymbols`
+### Task 25: Lists of objects on batches — `ListTransports`, `DescribeByList`, `GetAbapSystemSymbols`
 
 **Files:**
 - Modify: `src/handlers/transport/readonly/handleListTransports.ts`, `src/handlers/system/readonly/handleDescribeByList.ts`, `src/handlers/system/readonly/handleGetAbapSystemSymbols.ts`
 - Test: `src/__tests__/unit/batch/objectLists.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 14).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 21).
 
 - [ ] **Step 1: Write the failing tests** — `ListTransports: configurations, then every configuration's GET in one envelope`; `DescribeByList: all quickSearches, then the typeless ones for the empty answers`; `GetAbapSystemSymbols: each phase only independent requests; a failed call answers the error, nothing retried`; same answers; part failure; credential refusal.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.
 - [ ] **Step 5: Break it:** put a dependent request in the first envelope — red; revert.
 - [ ] **Step 6:** Docs, CHANGELOG. Commit `feat: object lists read in envelopes`.
 
-### Task 19: Where-used and feeds on batches, several objects per call
+### Task 26: Where-used and feeds on batches, several objects per call
 
 **Files:**
-- Modify: `src/handlers/system/readonly/handleGetWhereUsed.ts`, `compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts`, `src/handlers/system/readonly/handleRuntimeListFeeds.ts`, `compact-readonly-entries/src/handlers/handleHandlerDumpList.ts`
+- Modify: `src/handlers/system/readonly/handleGetWhereUsed.ts`, `compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts`, `src/handlers/system/readonly/handleRuntimeListFeeds.ts` (compact's `HandlerDumpList` is one page per call, Task 18)
 - Test: `src/__tests__/unit/batch/whereUsedAndFeeds.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 14).
-- Produces: `GetWhereUsed.objects: [{ object_type, object_name }]` (and `HandlerWhereUsed`), `RuntimeListFeeds.feed_types: string[]` (and `HandlerDumpList`).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 21).
+- Produces: `GetWhereUsed.objects: [{ object_type, object_name }]` (and `HandlerWhereUsed`), `RuntimeListFeeds.feed_types: string[]`.
 
 - [ ] **Step 1: Write the failing tests** — `where-used: one envelope of every object's scope, one of every scoped request — two for any number`; `feeds: every feed's first GET in one envelope, then per round the next page of every feed still paging`; single argument keeps today's answer shape; list answers one entry per object in order; part failure; credential refusal.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.
 - [ ] **Step 5: Break it:** read each object's chain on its own — the envelope count grows, red; revert.
 - [ ] **Step 6:** Docs, CHANGELOG. Commit `feat: where-used and feeds read several objects in envelopes`.
 
-### Task 20 (live, needs the owner's VPN/tunnel, run only on his word): communication batch
+### Task 27 (live, needs the owner's VPN/tunnel, run only on his word): communication batch
 
 **Files:**
 - Create: `src/__tests__/integration/batch/communicationBatch.test.ts`; `tests/test-config.yaml.template` (`batch.test_cases.communication`, disabled)
@@ -377,32 +508,32 @@
 - [ ] **Step 1:** Write the test: hard mode through the served tools; N reads; then compact `HandlerCreate` × N, `HandlerLock` × N, `HandlerUpdate` (sources; the whole document in `source_code` for DOMAIN) × N, `HandlerUnlock` × N, `HandlerActivate`, each phase a batch; answers per number; cleanup through `HandlerDeletionCheck` and `HandlerDelete`. States where it runs (on-premise HTTP, on-premise RFC, ABAP Cloud), skips elsewhere with the reason.
 - [ ] **Step 2:** On the owner's word, run on each; record the results with the date in `docs/user-guide/BATCH_MODE.md`. Commit.
 
-### Task 21 (live, owner's VPN/tunnel, on his word): debugger batch and AMDP
+### Task 28 (live, owner's VPN/tunnel, on his word): debugger batch and AMDP
 
 - [ ] **Step 1:** `src/__tests__/integration/batch/debuggerBatch.test.ts`: at a live stop, step + stack + variables in one `DebugBatchEnd` (on-premise, ABAP Cloud); and the AMDP gate (on-premise on HANA). States where it runs.
 - [ ] **Step 2:** On the owner's word, run; record in `DEBUGGER.md`. The AMDP refusal stays until the AMDP case passes; lifting it is its own commit then. Commit.
 
-### Task 22 (live, owner's VPN/tunnel, on his word): a system without the communication batch
+### Task 29 (live, owner's VPN/tunnel, on his word): a system without the communication batch
 
 - [ ] **Step 1:** `src/__tests__/integration/batch/noCommunicationBatch.test.ts`: the first envelope's outer status; the destination marked; reads run sequentially. States where it runs.
 - [ ] **Step 2:** On the owner's word, run; record the measured answer in `BATCH_MODE.md`. Commit.
 
-### Task 23 (live, owner's VPN/tunnel, on his word): before/after timing of the internally batched reads
+### Task 30 (live, owner's VPN/tunnel, on his word): before/after timing of the internally batched reads
 
-- [ ] **Step 1:** `src/__tests__/integration/batch/batchedReadsTiming.test.ts`: every tool of Tasks 15–19, sequential (the fallback path) and batched: answers equal, time measured; on-premise HTTP, on-premise RFC, ABAP Cloud. States where it runs.
+- [ ] **Step 1:** `src/__tests__/integration/batch/batchedReadsTiming.test.ts`: every tool of Tasks 22–26, sequential (the fallback path) and batched: answers equal, time measured; on-premise HTTP, on-premise RFC, ABAP Cloud. States where it runs.
 - [ ] **Step 2:** On the owner's word, run; record with the date in `BATCH_MODE.md`. Commit.
 
-### Task 24 (live, owner's VPN/tunnel, on his word): the two earlier checks
+### Task 31 (live, owner's VPN/tunnel, on his word): the two earlier checks
 
 - [ ] **Step 1:** `src/__tests__/integration/batch/refusalFollowUps.test.ts`: the logoff after a credential refusal asks no provider; the debugger stop's second `stopListener` after a refusal. States where each runs.
 - [ ] **Step 2:** On the owner's word, run; record. Commit.
 
-### Task 25 (live, owner's VPN/tunnel, on his word): RFC through a message server
+### Task 32 (live, owner's VPN/tunnel, on his word): RFC through a message server
 
 - [ ] **Step 1:** `src/__tests__/integration/rfc/messageServer.test.ts`: a logon through `mshost` + `sysid` (and `mshost` + `msserv`), `group`, and with `saprouter` where the system needs one; one read through the server. States where it runs (a system with a message server), skips elsewhere with the reason.
 - [ ] **Step 2:** On the owner's word, run; record the result with the date in the RFC docs (whether `mshost` + `msserv` without `sysid` is accepted). Commit.
 
-### Task 26: Final consistency
+### Task 33: Final consistency
 
 - [ ] **Step 1:** Re-read README, `docs/**`, compact docs and the CHANGELOG 19.0.0 entry against the code; fix what drifted. Nothing under `docs/superpowers/` is deleted here (that happens before the release, as a later step).
 - [ ] **Step 2:** All gates on the final tree. Commit `docs: batch mode docs consistent`.

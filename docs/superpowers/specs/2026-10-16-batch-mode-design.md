@@ -166,7 +166,7 @@ executed batch, communication or debugger.
   HandlerUnlock, HandlerDelete, HandlerGet) and run each phase as its own batch. BatchEnd sends the
   recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle
   this answers in the request header on every call of the batch."
-- `BatchEnd`: "Sends every call recorded since BatchBegin, in parallel envelopes, with the
+- `BatchEnd`: "Sends every call recorded since BatchBegin, in one envelope, with the
   credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers
   how many calls were recorded and which numbers failed; read each answer with BatchAnswers."
 - `BatchAnswers`: "The answers of the last batch, by number: each is the answer the tool gives for

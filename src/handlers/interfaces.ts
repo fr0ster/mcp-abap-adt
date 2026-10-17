@@ -87,4 +87,11 @@ export interface HandlerContext {
    */
   systemContextResolver?: SystemContextResolver;
   systemContextRules?: SystemContextRules;
+  /**
+   * A call recorded in the debugger batch: its own context, before the
+   * dispatch handed it the per-call recorder as its connection. The debug
+   * sessions are bound to it, so a connection they open later derives from
+   * the call's connection, never from a recorder of an ended batch.
+   */
+  recordedFrom?: HandlerContext;
 }

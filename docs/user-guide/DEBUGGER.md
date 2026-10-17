@@ -233,7 +233,7 @@ stack and the variables — go to SAP in one debugger batch envelope (`POST
 | end | `DebugBatchEnd` | `HandlerDebugBatch` `action: 'end'` |
 | answers | `BatchAnswers` (`number` or `numbers`) | `HandlerDebugBatch` `action: 'answers'` (`number` or `numbers`) |
 
-No `-ro` binary serves them. None takes a `state_handle`: the batch is the instance's (over
+No `-ro` binary serves them. The batch tools take no `state_handle`: the batch is the instance's (over
 Streamable HTTP the `x-mcp-state-handle` header reaches the instance, as for the communication
 batch, see [BATCH_MODE.md](BATCH_MODE.md)); begin answers `{ debug_batch: 'on', state_handle }`.
 

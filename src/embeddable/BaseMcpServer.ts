@@ -1764,6 +1764,9 @@ export abstract class BaseMcpServer extends McpServer {
     const recordedContext: HandlerContext = {
       ...call.context,
       connection: recorder as unknown as AbapConnection,
+      // The debug sessions are bound to the call's own context, whose
+      // connection outlives the batch (`requireDebugger`).
+      ...(owner.mode() === 'debugger' ? { recordedFrom: call.context } : {}),
     };
     open.target?.point(connection);
     try {

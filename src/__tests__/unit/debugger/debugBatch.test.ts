@@ -24,6 +24,7 @@ import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { corpusBody } from '../../../lib/adtCorpus';
 import {
+  BATCH_MODE_ON_WORDS,
   BATCH_MODE_OTHER_WORDS,
   batchNotServedWords,
   DEBUG_BATCH_AMDP_UNMEASURED_WORDS,
@@ -60,6 +61,9 @@ import {
 } from '../../helpers/batchEnvelope';
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
+/** What the fake port answers to an open from another connection than the instance's. */
+const OPENED_FROM_ELSEWHERE =
+  'opened from another connection than the instance';
 const IDS = { terminalId: 'T'.repeat(32), ideId: 'I'.repeat(32) };
 const MAIN = '/sap/bc/adt/amdp/debugger/main';
 const XML = { 'content-type': 'application/xml' };
@@ -155,7 +159,12 @@ interface Stand {
 async function stand(set: SetKind): Promise<Stand> {
   const part = { answer: debuggerPart };
   const opened: Fake[] = [];
-  const open = async () => {
+  // As `openFreshConnection` does: a connection opens from the origin's own
+  // connection — the instance's — and a recorder's is refused.
+  const open = async (origin: HandlerContext) => {
+    if (origin?.connection !== (main.connection as unknown)) {
+      throw new Error(OPENED_FROM_ELSEWHERE);
+    }
     const fake = envelopeConnection(
       partByPart((p) => part.answer(p)),
       direct,
@@ -213,6 +222,8 @@ async function stand(set: SetKind): Promise<Stand> {
   const client = new Client({ name: 'debug-batch', version: '1.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
   let stop: Fake | undefined;
+  const mainContext = () =>
+    ({ connection: main.connection }) as unknown as HandlerContext;
   return {
     owner,
     instance,
@@ -224,7 +235,7 @@ async function stand(set: SetKind): Promise<Stand> {
       client.callTool({ name, arguments: args }).then((a) => a as Answer),
     attach: async () => {
       // As a compact attach does: the attaching session holds the stop.
-      (debuggerOf(server) as DebuggerInstance).abap.bind({} as HandlerContext);
+      (debuggerOf(server) as DebuggerInstance).abap.bind(mainContext());
       await instance.abap.attachOnce({}, 'DEBUGGEE1');
       stop = opened[opened.length - 1];
     },
@@ -416,6 +427,48 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
     expect(s.stopConnection().connection.disconnect).not.toHaveBeenCalled();
   });
 
+  it("after the end the debug session opens from the call's own connection, and an ordinary debugger call that opens a connection succeeds", async () => {
+    await s.attach();
+    await s.call(NAMES.begin[set], beginArgs(set));
+    const [step] = stepStackVariables(set, s.handle());
+    expect(await within(s.call(step[0], step[1]))).toEqual({ content: [] });
+    await settled(s.call(NAMES.end[set], endArgs(set)));
+    // The sessions' origin is the recorded call's own context: an open
+    // before any other call binds them goes from the instance's connection.
+    const session = s.instance.abap as unknown as {
+      open(): Promise<unknown>;
+    };
+    await expect(session.open()).resolves.toBeDefined();
+    const openedBefore = s.opened.length;
+    const answer = await settled(
+      set === 'full'
+        ? s.call('DebugSetBreakpoints', {
+            state_handle: s.handle(),
+            breakpoints: [{ kind: 'statement', statement: 'WRITE' }],
+          })
+        : s.call('HandlerDebugSession', {
+            state_handle: s.handle(),
+            kind: 'abap',
+            operation: 'checkListener',
+          }),
+    );
+    expect(textOf(answer)).not.toContain(OPENED_FROM_ELSEWHERE);
+    expect(answer.isError).not.toBe(true);
+    expect(s.opened.length).toBe(openedBefore + 1);
+  });
+
+  it('begin while the debugger batch is open is refused batch_mode_on', async () => {
+    await s.attach();
+    await s.call(NAMES.begin[set], beginArgs(set));
+    const again = await s.call(NAMES.begin[set], beginArgs(set));
+    expect(again.isError).toBe(true);
+    expect(jsonOf(again)).toEqual({
+      error: 'batch_mode_on',
+      message: BATCH_MODE_ON_WORDS,
+    });
+    expect(s.owner.mode()).toBe('debugger');
+  });
+
   it('begin of either batch refused while the other is open', async () => {
     await s.attach();
     const communication =
@@ -530,7 +583,9 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
   });
 
   it(`AMDP stop refused ${'debug_batch_amdp_unmeasured'}`, async () => {
-    const amdp = s.instance.amdp.bind({} as HandlerContext);
+    const amdp = s.instance.amdp.bind({
+      connection: s.main.connection,
+    } as unknown as HandlerContext);
     await amdp.startOnce(false);
     const answer = await s.call(NAMES.begin[set], beginArgs(set));
     expect(answer.isError).toBe(true);
@@ -540,6 +595,118 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
     });
     expect(s.owner.mode()).toBe('off');
   });
+});
+
+/**
+ * The seven record paths, through each set's handler: the call's arguments
+ * and the one request it records.
+ */
+const LINE = { object_type: 'PROG', object_name: 'ZTEST', line: 3 };
+const RECORD_PATHS: Array<{
+  path: string;
+  full: [string, Record<string, unknown>];
+  compact: [string, Record<string, unknown>];
+  request: string | RegExp;
+}> = [
+  {
+    path: 'step',
+    full: ['DebugStep', { action: 'into' }],
+    compact: ['HandlerDebugStep', { kind: 'abap', operation: 'stepInto' }],
+    request: 'POST /sap/bc/adt/debugger?method=stepInto',
+  },
+  {
+    path: 'step to line',
+    full: ['DebugStepToLine', { mode: 'run', ...LINE }],
+    compact: [
+      'HandlerDebugStep',
+      { kind: 'abap', operation: 'stepRunToLine', ...LINE },
+    ],
+    request:
+      /^POST \/sap\/bc\/adt\/debugger\?method=stepRunToLine&uri=.*ztest.*start%3D3$/,
+  },
+  {
+    path: 'stack',
+    full: ['DebugGetStack', {}],
+    compact: ['HandlerDebugMaintain', { kind: 'abap', operation: 'getStack' }],
+    request: 'GET /sap/bc/adt/debugger/stack?emode=_&semanticURIs=true',
+  },
+  {
+    path: 'variables',
+    full: ['DebugGetVariables', { names: ['lv_a'] }],
+    compact: [
+      'HandlerDebugMaintain',
+      { kind: 'abap', operation: 'getVariables', names: ['lv_a'] },
+    ],
+    request: 'POST /sap/bc/adt/debugger?method=getVariables',
+  },
+  {
+    path: 'child variables',
+    full: ['DebugGetVariables', { parents: ['@ROOT'] }],
+    compact: [
+      'HandlerDebugMaintain',
+      { kind: 'abap', operation: 'getChildVariables', parents: ['@ROOT'] },
+    ],
+    request: 'POST /sap/bc/adt/debugger?method=getChildVariables',
+  },
+  {
+    path: 'stack position',
+    full: ['DebugSetStackPosition', { position: 2 }],
+    compact: [
+      'HandlerDebugStep',
+      { kind: 'abap', operation: 'setStackPosition', position: 2 },
+    ],
+    request: 'POST /sap/bc/adt/debugger?method=setStackPosition&position=2',
+  },
+  {
+    path: 'set a variable',
+    full: ['DebugSetVariable', { name: 'lv_a', value: '7' }],
+    compact: [
+      'HandlerDebugMaintain',
+      {
+        kind: 'abap',
+        operation: 'setVariableValue',
+        variable_name: 'lv_a',
+        value: '7',
+      },
+    ],
+    request:
+      'POST /sap/bc/adt/debugger?method=setVariableValue&variableName=LV_A',
+  },
+];
+
+describe.each(SETS)('every record path, %s set', (set) => {
+  it.each(RECORD_PATHS.map((p) => [p.path, p] as const))(
+    '%s records exactly its one request into the envelope',
+    async (_path, p) => {
+      const s = await stand(set);
+      try {
+        await s.attach();
+        await s.call(NAMES.begin[set], beginArgs(set));
+        const sentBefore = s.opened.map((fake) => fake.directs.length);
+        const [tool, args] = p[set];
+        expect(
+          await within(s.call(tool, { state_handle: s.handle(), ...args })),
+        ).toEqual({ content: [] });
+        // Recorded, never sent on its own.
+        expect(s.opened.map((fake) => fake.directs.length)).toEqual(sentBefore);
+        const summary = jsonOf(
+          await settled(s.call(NAMES.end[set], endArgs(set))),
+        );
+        expect(summary).toEqual({ recorded: 1, failed: [] });
+        const envelopes = s.opened.flatMap((fake) => fake.envelopes);
+        expect(envelopes).toHaveLength(1);
+        const parts = (envelopes[0]?.parts ?? []).map(
+          (part) => `${part.method} ${part.url}`,
+        );
+        expect(parts).toHaveLength(1);
+        if (typeof p.request === 'string') expect(parts[0]).toBe(p.request);
+        else expect(parts[0]).toMatch(p.request);
+        expect(s.opened.map((fake) => fake.directs.length)).toEqual(sentBefore);
+      } finally {
+        await s.close();
+      }
+    },
+  );
 });
 
 describe('the debugger batch, compact step to line', () => {

@@ -28,8 +28,10 @@ export function requireDebugger(
   }
   if (mode === 'use') context.state.check(args.state_handle);
   const instance = context.debugger();
-  instance.abap.bind(context);
-  instance.amdp.bind(context);
+  // A recorded call binds its own context, never its recorder.
+  const origin = context.recordedFrom ?? context;
+  instance.abap.bind(origin);
+  instance.amdp.bind(origin);
   return instance;
 }
 

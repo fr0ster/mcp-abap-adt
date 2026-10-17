@@ -8,10 +8,16 @@
  *
  * Real `AdtBatchConnection` (adt-clients 34.x); only the connection is a fake.
  */
+
+import { readFile } from 'node:fs/promises';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { runPhase } from '../../../lib/batch/phases';
+import {
+  LATE_RECORD_WORDS,
+  MORE_ENVELOPES_WORDS,
+  runPhase,
+} from '../../../lib/batch/phases';
 import {
   envelopeConnection,
   partByPart,
@@ -113,5 +119,116 @@ describe('runPhase', () => {
       withinTurns(runPhase(contextOn(fake.connection), ITEMS, read)),
     ).rejects.toBe(refusal);
     expect(fake.envelopes).toHaveLength(1);
+  });
+
+  describe('every read records before the envelope is sent', () => {
+    const answered = () =>
+      envelopeConnection(
+        partByPart((inner) => ({
+          status: 200,
+          statusText: 'OK',
+          body: inner.url,
+        })),
+      );
+    const turn = () => new Promise((resolve) => setImmediate(resolve));
+
+    it('a read that waits two event-loop turns before recording lands in the one envelope', async () => {
+      const fake = answered();
+      const results = await withinTurns(
+        runPhase(contextOn(fake.connection), ITEMS, async (item, batch) => {
+          if (item === 'ITEM_B') {
+            await turn();
+            await turn();
+          }
+          return read(item, batch);
+        }),
+      );
+      expect(fake.envelopes).toHaveLength(1);
+      expect(fake.envelopes[0]?.parts).toHaveLength(3);
+      expect(results.every((r) => r.ok)).toBe(true);
+    });
+
+    it('a read that awaits real I/O before recording lands in the one envelope', async () => {
+      const fake = answered();
+      const results = await withinTurns(
+        runPhase(contextOn(fake.connection), ITEMS, async (item, batch) => {
+          if (item === 'ITEM_C') await readFile(__filename);
+          return read(item, batch);
+        }),
+        5_000,
+      );
+      expect(fake.envelopes).toHaveLength(1);
+      expect(fake.envelopes[0]?.parts.map((p) => p.url)).toEqual([
+        '/sap/bc/adt/probe/item_a',
+        '/sap/bc/adt/probe/item_b',
+        '/sap/bc/adt/probe/item_c',
+      ]);
+      expect(results.every((r) => r.ok)).toBe(true);
+    });
+
+    it('a read that settles without recording is its own answer; the others go in the envelope', async () => {
+      const fake = answered();
+      const results = await withinTurns(
+        runPhase(contextOn(fake.connection), ITEMS, async (item, batch) =>
+          item === 'ITEM_A' ? 'nothing to read' : read(item, batch),
+        ),
+      );
+      expect(results[0]).toEqual({ ok: true, value: 'nothing to read' });
+      expect(fake.envelopes).toHaveLength(1);
+      expect(fake.envelopes[0]?.parts).toHaveLength(2);
+    });
+
+    it('no read records: nothing is sent', async () => {
+      const fake = answered();
+      const results = await withinTurns(
+        runPhase(contextOn(fake.connection), ITEMS, async () => 'none'),
+      );
+      expect(fake.envelopes).toHaveLength(0);
+      expect(results.every((r) => r.ok)).toBe(true);
+    });
+
+    it('a record made after the envelope was sent is rejected at once, not hung', async () => {
+      const fake = answered();
+      const results = await withinTurns(
+        runPhase(contextOn(fake.connection), ITEMS, async (item, batch) => {
+          const first = await read(item, batch);
+          if (item !== 'ITEM_B') return first;
+          // Needs the first answer: belongs in a later phase.
+          return read(`${item}_AGAIN`, batch);
+        }),
+      );
+      expect(fake.envelopes).toHaveLength(1);
+      expect(results[0]?.ok).toBe(true);
+      expect(results[2]?.ok).toBe(true);
+      const late = results[1] as { ok: false; error: Error };
+      expect(late.ok).toBe(false);
+      expect(late.error.message).toBe(LATE_RECORD_WORDS);
+    });
+
+    it('a phase that would send more than one envelope fails every item with the fixed error', async () => {
+      const fake = answered();
+      const results = await withinTurns(
+        runPhase(contextOn(fake.connection), ITEMS, async (item, batch) =>
+          item === 'ITEM_C'
+            ? (
+                await batch.makeAdtRequest<string>({
+                  url: '/sap/bc/adt/probe/item_c?_action=LOCK',
+                  method: 'POST',
+                  timeout: 0,
+                  headers: { 'X-sap-adt-sessiontype': 'stateful' },
+                })
+              ).data
+            : read(item, batch),
+        ),
+      );
+      expect(fake.envelopes).toHaveLength(1);
+      expect(results).toHaveLength(3);
+      for (const result of results) {
+        expect(result.ok).toBe(false);
+        expect((result as { error: Error }).error.message).toBe(
+          MORE_ENVELOPES_WORDS,
+        );
+      }
+    });
   });
 });

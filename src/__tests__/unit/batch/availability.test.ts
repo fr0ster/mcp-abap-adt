@@ -179,4 +179,73 @@ describe('batch availability', () => {
     }
     expect(s.fake.directs).toHaveLength(0);
   });
+
+  describe('the first outer status decides', () => {
+    it("2xx first: a later outer 404 is that phase's envelope failure, batching stays on", async () => {
+      let answered = 0;
+      const s = standOn((parts) => {
+        answered += 1;
+        if (answered === 1) {
+          return partByPart((inner) => ({
+            status: 200,
+            statusText: 'OK',
+            body: inner.url,
+          }))(parts, undefined as never);
+        }
+        throw statusError(404, 'Not Found');
+      });
+
+      expect((await withinTurns(toolRead(s.context))).ran).toBe('batched');
+      expect(s.availability.available()).toBe(true);
+
+      expect(await withinTurns(toolRead(s.context))).toEqual({
+        ran: 'batched',
+        values: ['failed', 'failed'],
+      });
+      expect(s.availability.available()).toBe(true);
+      expect(s.fake.directs).toHaveLength(0);
+
+      // Still batching: the next call sends its envelope.
+      await withinTurns(toolRead(s.context));
+      expect(s.fake.envelopes).toHaveLength(3);
+    });
+
+    it('404 first: a later 2xx envelope does not turn batching back on', async () => {
+      let answered = 0;
+      const s = standOn((parts) => {
+        answered += 1;
+        if (answered === 1) throw statusError(404, 'Not Found');
+        return partByPart((inner) => ({
+          status: 200,
+          statusText: 'OK',
+          body: inner.url,
+        }))(parts, undefined as never);
+      });
+
+      await expect(
+        withinTurns(runPhase(s.context, ITEMS, get)),
+      ).rejects.toMatchObject({ response: { status: 404 } });
+      expect(s.availability.available()).toBe(false);
+
+      const later = await withinTurns(runPhase(s.context, ITEMS, get));
+      expect(later.every((r) => r.ok)).toBe(true);
+      expect(s.availability.available()).toBe(false);
+      expect(await withinTurns(toolRead(s.context))).toEqual(SEQUENTIAL);
+      expect(s.fake.envelopes).toHaveLength(2);
+    });
+
+    it('a status that is neither decides nothing; the first 2xx or 404 after it does', () => {
+      const served = createBatchAvailability();
+      served.noteOuterStatus(500);
+      served.noteOuterStatus(200);
+      served.noteOuterStatus(404);
+      expect(served.available()).toBe(true);
+
+      const absent = createBatchAvailability();
+      absent.noteOuterStatus(503);
+      absent.noteOuterStatus(404);
+      absent.noteOuterStatus(204);
+      expect(absent.available()).toBe(false);
+    });
+  });
 });

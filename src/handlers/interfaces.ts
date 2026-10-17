@@ -50,8 +50,10 @@ export interface HandlerContext {
    * dispatch found for the call — one per destination, never per
    * connection — kept in every context derived from this one (a long
    * call's own connection, an inner handler's). Absent where the call has
-   * no destination record (a host's injected connection): every phase then
-   * sends its envelope, and only that call falls back.
+   * no destination record — a host's injected connection, and a host's own
+   * registration of a handler group (`BaseHandlerGroup.registerHandlers` on
+   * a plain McpServer, whose calls take the group's constructor context):
+   * every phase then sends its envelope, and only that call falls back.
    */
   batchAvailability?: BatchAvailability;
   /**

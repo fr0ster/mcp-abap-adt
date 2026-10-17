@@ -36,6 +36,15 @@
     "whose": "server"
   },
   {
+    "file": "src/lib/batch/phases.ts",
+    "function": "itemView",
+    "site": "setSessionType(type)",
+    "count": 1,
+    "window": "none on the wire: an item's view of an internal batch's AdtBatchConnection forwards a member's mode to the batch connection, which marks only its next recorded request; no connection is touched",
+    "stateless": "the batch connection's recorded mode falls back to its default (stateless for a communication batch) after that one request is recorded",
+    "whose": "server"
+  },
+  {
     "file": "src/lib/batch/recorder.ts",
     "function": "createRecorder",
     "site": "setSessionType(type)",

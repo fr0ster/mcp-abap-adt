@@ -14,17 +14,26 @@
  *   instance) ends the call: rethrown as it came, never a result. The batch
  *   connection is exempt from accept negotiation (adt-clients 34), and so is
  *   the forwarding connection under it: nothing is corrected or resent.
+ * - Each item records through its own view of the batch connection, which
+ *   signals its first request; the envelope is sent once every item has
+ *   recorded or settled without recording. A request recorded once the
+ *   envelope is under way is rejected at once (`LATE_RECORD_WORDS`), and a
+ *   phase that would need a second envelope fails every item
+ *   (`MORE_ENVELOPES_WORDS`): one phase, one envelope.
  * - The outer status of the envelope request is seen by a forwarding
  *   connection placed under the `AdtBatchConnection`: it sees the response
  *   before the batch parses it (a connection that resolves a `404` without a
  *   multipart body makes the parser throw an error with no status) and the
  *   transport's rejection (an outer `404` rejected with `response`). That
  *   status — never the parser's error — goes to the destination's port
- *   (`HandlerContext.batchAvailability`). An outer `404` also ends the phase:
- *   its error is thrown, as it came, marked as the endpoint's absence.
+ *   (`HandlerContext.batchAvailability`), whose first verdict decides. An
+ *   outer `404` that is the verdict (the destination's first, or the call's
+ *   own where it has no record) ends the phase: its error is thrown, as it
+ *   came, marked as the endpoint's absence. After a served verdict an outer
+ *   `404` is that phase's envelope failure, every item's.
  * - `withSequentialFallback` runs the sequential version when the destination
  *   is known to have no batch, or when an envelope of the batched version met
- *   the outer `404`; the batched version otherwise. Both versions only read,
+ *   the outer `404` that decided it; the batched version otherwise. Both versions only read,
  *   so a fallback changes nothing on the system.
  *
  * No timer and no retry: the phase waits for its envelope as long as SAP
@@ -72,18 +81,30 @@ function statusOf(response: unknown): number | undefined {
     : undefined;
 }
 
+/** The fixed words of a request a phase's read records after its envelope was sent. */
+export const LATE_RECORD_WORDS =
+  "an internal batch phase's read recorded a request after the phase's envelope was sent: a request that needs another's answer belongs in a later phase";
+
+/** The fixed words of a phase whose requests would need more than one envelope. */
+export const MORE_ENVELOPES_WORDS =
+  'an internal batch phase would send more than one envelope: every request of a phase is a stateless read sent in one envelope';
+
 /**
- * A forwarding connection over `connection` that keeps the status of each
- * request's own response — resolved, or carried by the rejection as its
- * `response` — before anyone reads the body. It sends through the
- * connection's base request, past any accept negotiation, and is itself
- * exempt from it.
+ * A forwarding connection over `connection` for one phase. It sends the
+ * phase's one envelope request through the connection's base request, past
+ * any accept negotiation, and is itself exempt from it; it keeps that
+ * request's outer status — resolved, or carried by the rejection as its
+ * `response` — before anyone reads the body. A second envelope request is
+ * not sent: it is refused with `MORE_ENVELOPES_WORDS`, and the phase fails.
  */
 function outerStatusWatch(connection: IAbapConnection): {
   forwarding: IAbapConnection;
   outer(): number | undefined;
+  refused(): Error | undefined;
 } {
   let outer: number | undefined;
+  let sent = 0;
+  let refused: Error | undefined;
   const typed = connection as {
     getSessionType?: () => Session;
     getSessionMode?: () => Session;
@@ -98,7 +119,11 @@ function outerStatusWatch(connection: IAbapConnection): {
     makeAdtRequest<T = unknown, D = unknown>(
       request: IAbapRequestOptions,
     ): Promise<IAdtWireResponse<T, D>> {
-      outer = undefined;
+      sent += 1;
+      if (sent > 1) {
+        refused ??= new Error(MORE_ENVELOPES_WORDS);
+        return Promise.reject(refused);
+      }
       return getBaseRequest(connection)<T, D>(request).then(
         (response) => {
           outer = statusOf(response);
@@ -112,7 +137,39 @@ function outerStatusWatch(connection: IAbapConnection): {
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
   exemptFromAcceptNegotiation(forwarding);
-  return { forwarding, outer: () => outer };
+  return { forwarding, outer: () => outer, refused: () => refused };
+}
+
+/**
+ * One item's view of the phase's batch connection: every member forwards to
+ * `batch`; its first request signals `recorded`. Once the phase's envelope
+ * is under way (`sealed()`), a request is not recorded — it is rejected at
+ * once with `LATE_RECORD_WORDS`, so it neither waits in a queue nobody sends
+ * nor goes out in a second envelope. Exempt from accept negotiation, as the
+ * batch connection is.
+ */
+function itemView(
+  batch: AdtBatchConnection,
+  sealed: () => boolean,
+  recorded: () => void,
+): IAbapConnection {
+  const view = {
+    connect: () => batch.connect(),
+    getBaseUrl: () => batch.getBaseUrl(),
+    getSessionId: () => batch.getSessionId(),
+    setSessionType: (type: Session) => batch.setSessionType(type),
+    getSessionType: (): Session => batch.getSessionType(),
+    makeAdtRequest<T = unknown, D = unknown>(
+      request: IAbapRequestOptions,
+    ): Promise<IAdtWireResponse<T, D>> {
+      if (sealed()) return Promise.reject(new Error(LATE_RECORD_WORDS));
+      const answer = batch.makeAdtRequest<T, D>(request);
+      recorded();
+      return answer;
+    },
+  } satisfies IAbapConnection & { getSessionType(): Session };
+  exemptFromAcceptNegotiation(view);
+  return view;
 }
 
 /**
@@ -120,6 +177,12 @@ function outerStatusWatch(connection: IAbapConnection): {
  * connection over `context.connection` and sent in one envelope; each item's
  * settlement, in item order (see the file header). The envelope request's
  * outer status is reported to `context.batchAvailability`.
+ *
+ * The envelope is sent once every item has recorded its first request or
+ * settled without one — however long a read waits before it records (I/O,
+ * a lookup elsewhere): no turn count, no timer. An item's independent parts
+ * are recorded together with its first (before the read awaits anything
+ * else); a request recorded after that is refused (`LATE_RECORD_WORDS`).
  */
 export async function runPhase<I, R>(
   context: HandlerContext,
@@ -131,15 +194,25 @@ export async function runPhase<I, R>(
     endpoint: 'communication',
     ...(context.logger !== undefined ? { logger: context.logger } : {}),
   });
-  const settled = items.map((item) =>
-    (async () => read(item, batch))().then(
+  let sealed = false;
+  const entries = items.map((item) => {
+    let signal!: () => void;
+    const recorded = new Promise<void>((resolve) => {
+      signal = resolve;
+    });
+    const view = itemView(batch, () => sealed, signal);
+    const settled = (async () => read(item, view))().then(
       (value): PhaseResult<R> => ({ ok: true, value }),
       (error: unknown): PhaseResult<R> => ({ ok: false, error }),
-    ),
-  );
-  // Every read records its request before the envelope is sent: the same
-  // turn adt-clients yields for follow-ups.
+    );
+    return { recorded, settled };
+  });
+  // Every item has recorded or settled.
+  await Promise.all(entries.map((e) => Promise.race([e.recorded, e.settled])));
+  // The parts an item records in the same stretch as its first: every
+  // pending continuation runs before the envelope is sealed.
   await new Promise((resolve) => setImmediate(resolve));
+  sealed = true;
   let failed = false;
   let error: unknown;
   try {
@@ -148,9 +221,24 @@ export async function runPhase<I, R>(
     failed = true;
     error = thrown;
   }
+  const settled = entries.map((e) => e.settled);
+  const refused = watch.refused();
+  if (refused !== undefined) {
+    // Nothing of the phase is kept: every item fails with the fixed words.
+    await Promise.all(settled);
+    return items.map(() => ({ ok: false, error: refused }));
+  }
   const outer = watch.outer();
-  if (outer !== undefined) context.batchAvailability?.noteOuterStatus(outer);
-  if (failed && outer === NO_BATCH_ENDPOINT_STATUS) {
+  const port = context.batchAvailability;
+  if (outer !== undefined) port?.noteOuterStatus(outer);
+  // An outer 404 is the endpoint's absence only when it is the verdict: the
+  // destination's first, or the call's own where it has no record. After a
+  // served verdict it is this phase's envelope failure.
+  if (
+    failed &&
+    outer === NO_BATCH_ENDPOINT_STATUS &&
+    (port === undefined || !port.available())
+  ) {
     if (
       error !== null &&
       (typeof error === 'object' || typeof error === 'function')
@@ -173,7 +261,7 @@ export async function runPhase<I, R>(
 /**
  * `sequential` where the destination has no communication batch — known
  * (`context.batchAvailability`), or learned now from an envelope of
- * `batched` answered with the outer `404`; `batched` otherwise. Any other
+ * `batched` answered with the outer `404` that is the verdict; `batched` otherwise. Any other
  * failure of `batched` is its own, as it came.
  */
 export async function withSequentialFallback<R>(

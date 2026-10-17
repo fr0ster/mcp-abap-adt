@@ -51,7 +51,6 @@ import { LeftoverSessionHandlersGroup } from './handlers/groups/LeftoverSessionH
 import { ReadOnlyHandlersGroup } from './handlers/groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from './handlers/groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from './handlers/groups/SystemHandlersGroup.js';
-import { ReadVsGetDedupStrategy } from './handlers/groups/strategies/index.js';
 import type { HandlerContext, IHandlerGroup } from './handlers/interfaces';
 import { CompositeHandlersRegistry } from './handlers/registry/CompositeHandlersRegistry';
 import {
@@ -142,7 +141,7 @@ ${elsewhere.map(([what, other]) => `  ${what}: ${install(transport, other)}`).jo
 }
 
 const READONLY_LINE =
-  'readonly: Get*, Read*, List* (read operations), with search and system';
+  'readonly: Get*, List*, ReadTransport* (read operations), with search and system';
 const BATCH_LINE =
   'batch mode: BatchBegin, BatchEnd, BatchAnswers — independent calls recorded, sent together in envelopes, answered by number';
 const COMPACT_BATCH_LINE =
@@ -224,11 +223,7 @@ export const fullReadOnlyToolSet: ToolSet = {
     ),
   expositionRemoved: (transport) => expositionRemoved('core', transport),
   groups: (context, transport) => [
-    new ReadOnlyHandlersGroup(
-      context,
-      new Set<string>(),
-      new ReadVsGetDedupStrategy(),
-    ),
+    new ReadOnlyHandlersGroup(context),
     // The run tools stay (running code changes no code, as in SAP), without
     // `background`: this set keeps no background run.
     new SystemHandlersGroup(context, { background: false }),

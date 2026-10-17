@@ -7,7 +7,7 @@
  * - From inside a call that holds the flow, a send (`onMainConnection`) runs
  *   directly: no wait behind itself.
  * - The debugger tools whose SAP work is on the debugger's own connections
- *   (here a `DebugWait` that holds) do not block a parallel `ReadClass`.
+ *   (here a `DebugWait` that holds) do not block a parallel `GetClass`.
  */
 
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
@@ -87,13 +87,13 @@ const text = (value: string) => ({
   content: [{ type: 'text', text: value }],
 });
 
-it('a holding DebugWait blocks no ReadClass; the request user sends nothing', async () => {
+it('a holding DebugWait blocks no GetClass; the request user sends nothing', async () => {
   onCloud();
   let releaseWait!: () => void;
   const waiting = new Promise<void>((resolve) => {
     releaseWait = resolve;
   });
-  const s = await statefulStand(['UpdateClass', 'ReadClass'], {
+  const s = await statefulStand(['UpdateClass', 'GetClass'], {
     systemType: 'cloud',
     groups: [
       testGroup({
@@ -115,10 +115,10 @@ it('a holding DebugWait blocks no ReadClass; the request user sends nothing', as
     ],
   });
   try {
-    // A DebugWait holding: a ReadClass beside it still runs.
+    // A DebugWait holding: a GetClass beside it still runs.
     const wait = s.call('DebugWait', {});
     await settleWhile();
-    const read = await s.call('ReadClass', { class_name: 'ZCL_READ' });
+    const read = await s.call('GetClass', { class_name: 'ZCL_READ' });
     expect(read.isError).not.toBe(true);
     expect(s.standIn.requests.some(of('ZCL_READ'))).toBe(true);
     releaseWait();

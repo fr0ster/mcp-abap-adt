@@ -39,8 +39,6 @@ import { handleGetFunctionModule } from '../../handlers/function_module/high/han
 import { handleGetInterface } from '../../handlers/interface/high/handleGetInterface';
 import { handleGetMessageClass } from '../../handlers/message_class/high/handleGetMessageClass';
 import { handleGetMessageClassMessage } from '../../handlers/message_class/high/handleGetMessageClassMessage';
-import { handleReadMessageClass } from '../../handlers/message_class/readonly/handleReadMessageClass';
-import { handleReadMessageClassMessage } from '../../handlers/message_class/readonly/handleReadMessageClassMessage';
 import { handleGetMetadataExtension } from '../../handlers/metadata_extension/high/handleGetMetadataExtension';
 import { handleGetPackage } from '../../handlers/package/high/handleGetPackage';
 import { handleGetProgram } from '../../handlers/program/high/handleGetProgram';
@@ -105,12 +103,6 @@ const SEARCH_CONFIGURATION = {
 
 describe('readonlySingleCall handlers answer through the adapter and surface a refusal', () => {
   it.each([
-    ['ReadMessageClass', handleReadMessageClass, { message_class_name: 'ZMC' }],
-    [
-      'ReadMessageClassMessage',
-      handleReadMessageClassMessage,
-      { message_class_name: 'ZMC', msgno: '001' },
-    ],
     [
       'GetObjectsByType',
       handleGetObjectsByType,
@@ -174,18 +166,18 @@ describe('readonlySingleCall handlers answer through the adapter and surface a r
  * two members that accept an analyse strategy" below).
  */
 describe('readonlySingleCall handlers call the member the brief names, with the arguments the caller gave', () => {
-  it('ReadMessageClass calls getMessageClass().readMetadata({name})', async () => {
+  it('GetMessageClass calls getMessageClass().readMetadata({name})', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
-    await handleReadMessageClass(context as any, { message_class_name: 'ZMC' });
+    await handleGetMessageClass(context as any, { message_class_name: 'ZMC' });
     const call = seen.calls.filter((c) => c.member === 'readMetadata').at(-1);
     expect(call?.args[0]).toEqual({ name: 'ZMC' });
   });
 
-  it('ReadMessageClassMessage calls getMessageClassMessage().read({className, msgno}, undefined, ...)', async () => {
+  it('GetMessageClassMessage calls getMessageClassMessage().read({className, msgno}, undefined, ...)', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
-    await handleReadMessageClassMessage(context as any, {
+    await handleGetMessageClassMessage(context as any, {
       message_class_name: 'ZMC',
       msgno: '001',
     });
@@ -513,12 +505,12 @@ describe('the members that accept an analyse strategy, which one is deliberately
   // internal of the messageClass module and not part of this package's
   // public surface, so it cannot be composed with `analyseException` from
   // here; passing nothing and letting the shipped default stand is the fix,
-  // in `ReadMessageClassMessage.ts` and `GetMessageClassMessage.ts` both.
-  it('ReadMessageClass hands getMessageClass().readMetadata its own analyse', async () => {
+  // in `GetMessageClassMessage.ts`.
+  it('GetMessageClass hands getMessageClass().readMetadata its own analyse', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
-    await handleReadMessageClass(context as any, {
+    await handleGetMessageClass(context as any, {
       message_class_name: 'zmc',
     });
 
@@ -527,11 +519,11 @@ describe('the members that accept an analyse strategy, which one is deliberately
     expect(seen.last?.analyse).toBe(analyseException);
   });
 
-  it('ReadMessageClassMessage carries its msgno check into getMessageClassMessage().read — adt-clients 23 applies none of its own', async () => {
+  it('GetMessageClassMessage carries its msgno check into getMessageClassMessage().read — adt-clients 23 applies none of its own', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
-    await handleReadMessageClassMessage(context as any, {
+    await handleGetMessageClassMessage(context as any, {
       message_class_name: 'zmc',
       msgno: '001',
     });
@@ -779,16 +771,11 @@ describe('ListTransports, mapped from a real captured transport list', () => {
 
 /**
  * The high-tier `Get*` handlers (task 18): twenty-nine handlers under each
- * object family's `high` directory that predate — and are semantically
- * thinner than —
- * their `readonly/Read*` siblings above. Historically each answered exactly
- * one field from a single `.read()` call; where v19 dropped `.read()`
- * entirely for a family (`Domain`, `DataElement`, `Package`, `FunctionGroup`
- * — the same four `ReadX` found has no source resource of its own) the
- * single call is `.readMetadata()` instead. `GetFunctionModule` is the one
- * exception that already made two calls before the migration (a metadata
- * read to verify the caller's group, then the source read) and keeps that
- * pair shape, mirroring `ReadFunctionModule`. The six unit-test readers
+ * object family's `high` directory. Each answers from one call: `.read()`
+ * (the source part), or `.readMetadata()` where v19 dropped `.read()` for a
+ * family (`Domain`, `DataElement`, `Package`, `FunctionGroup` have no source
+ * resource of their own); `part: 'metadata'` is in
+ * `readTools/getPartMapping.test.ts`. The six unit-test readers
  * (`GetUnitTest`/`GetCdsUnitTest` and their `Status`/`Result` halves) reach
  * `getStatus`/`getResult` on `AdtUnitTest`/`AdtCdsUnitTest`, not `read` —
  * the v18 convenience `.read({runId})` this family used no longer exists —
@@ -1157,36 +1144,23 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
 });
 
 /**
- * `GetFunctionModule` is the one high-tier Get* handler that already made
- * two calls before the migration, and it is the only one whose second call
- * depends on the first (the group-verification gate — see below). A bare
- * `recordAnalyse()` double cannot exercise it: its canned reading has no
- * `<adtcore:containerRef/>` to parse, so `assertFunctionGroupMatches` throws
- * before the second call is ever made. This uses the real captured metadata
- * fixture instead, which both proves the identity arguments of BOTH calls
- * and doubles as this handler's corpus-driven success mapping.
+ * `GetFunctionModule`, mapped from the real captured source: one `read`
+ * through getFunctionModule() at the group the caller gave, the source under
+ * function_module_data.
  */
-describe('GetFunctionModule, mapped from a real captured metadata+source pair', () => {
-  it('calls readMetadata then read, both through getFunctionModule(), and answers the real source under function_module_data', async () => {
-    const metadata = corpusBody(
-      'read-metadata-function-module--01-fmodules-zmcpshrfm',
-    );
+describe('GetFunctionModule, mapped from a real captured source', () => {
+  it('calls read alone, through getFunctionModule(), and answers the real source under function_module_data', async () => {
     const source = corpusBody(
       'read-function-module-source-text--01-read-source',
     );
     const calls: Array<{ member: string; args: unknown[] }> = [];
-    const record =
-      (member: string) =>
-      (...args: unknown[]) => {
-        calls.push({ member, args });
-      };
     const double = fakeClientOfWithFactory({
       readMetadata: async (...args: unknown[]) => {
-        record('readMetadata')(...args);
-        return okResponse(structured({ data: metadata, status: 200 } as any));
+        calls.push({ member: 'readMetadata', args });
+        return okResponse(structured({ data: '', status: 200 } as any));
       },
       read: async (...args: unknown[]) => {
-        record('read')(...args);
+        calls.push({ member: 'read', args });
         return okResponse(structured({ data: source, status: 200 } as any));
       },
     });
@@ -1204,24 +1178,12 @@ describe('GetFunctionModule, mapped from a real captured metadata+source pair', 
     expect(payload.function_module_data).toBe(source);
     expect(double.factory).toBe('getFunctionModule');
 
-    const readMetadataCall = calls
-      .filter((c) => c.member === 'readMetadata')
-      .at(-1);
-    expect(readMetadataCall?.args[0]).toEqual({
+    expect(calls.map((c) => c.member)).toEqual(['read']);
+    expect(calls[0]?.args[0]).toEqual({
       functionModuleName: 'Z_MCP_SHR_FM',
       functionGroupName: 'ZMCP_SHR_FGRP',
     });
-    const readMetadataOptions = readMetadataCall?.args.at(-1) as
-      | { analyse?: unknown }
-      | undefined;
-    expect(readMetadataOptions?.analyse).toBe(analyseException);
-
-    const readCall = calls.filter((c) => c.member === 'read').at(-1);
-    expect(readCall?.args[0]).toEqual({
-      functionModuleName: 'Z_MCP_SHR_FM',
-      functionGroupName: 'ZMCP_SHR_FGRP',
-    });
-    const readOptions = readCall?.args.at(-1) as
+    const readOptions = calls[0]?.args.at(-1) as
       | { analyse?: unknown }
       | undefined;
     expect(readOptions?.analyse).toBe(analyseException);
@@ -1234,9 +1196,7 @@ describe('GetFunctionModule, mapped from a real captured metadata+source pair', 
  * in any test that existed before this block.
  */
 describe('two behaviours unpinned before fix round 1', () => {
-  // Mirrors `ReadPackage passes the caller-requested version to readMetadata`
-  // in `readHandlersSuccessMapping.test.ts` — the same fix, on the sibling
-  // Get* tool. Reverting `handleGetPackage.ts` to drop `version` from the
+  // Reverting `handleGetPackage.ts` to drop `version` from the
   // call (while still echoing the caller's own `version` in the answer, the
   // way it did before this fix) fails this test with `Expected: "inactive",
   // Received: undefined` — checked before writing it down here.
@@ -1254,32 +1214,22 @@ describe('two behaviours unpinned before fix round 1', () => {
     expect(options?.version).toBe('inactive');
   });
 
-  // The group-match check itself, mirroring
-  // `ReadFunctionModule refuses when the caller-supplied group does not
-  // match the metadata containerRef` in `readHandlersSuccessMapping.test.ts`.
-  // The metadata's own containerRef names ZMCP_SHR_FGRP; the caller asks for
-  // a different group, and `read` must never be reached — if the gate were
-  // removed, `read`'s stub answer below would come back as a success
-  // instead, handing back source from a group the caller never verified.
-  it('GetFunctionModule refuses when the caller-supplied group does not match the metadata containerRef', async () => {
-    const metadata = corpusBody(
-      'read-metadata-function-module--01-fmodules-zmcpshrfm',
-    );
-    fakeClient = fakeClientOf({
-      readMetadata: async () =>
-        okResponse(structured({ data: metadata, status: 200 } as any)),
-      read: async () =>
-        okResponse(
-          structured({ data: 'SHOULD NOT BE READ', status: 200 } as any),
-        ),
-    });
+  // The group is the caller's: one `read` at the group given, no metadata
+  // read first to compare it with the module's own `containerRef`.
+  it('GetFunctionModule reads the source at the group given, in one call', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
 
-    const result: any = await handleGetFunctionModule(context as any, {
+    await handleGetFunctionModule(context as any, {
       function_module_name: 'z_mcp_shr_fm',
-      function_group_name: 'zwrong_group',
+      function_group_name: 'zmcp_shr_fgrp',
     });
 
-    expect(result.isError).toBe(true);
+    expect(seen.calls.map((c) => c.member)).toEqual(['read']);
+    expect(seen.calls[0]?.args[0]).toEqual({
+      functionModuleName: 'Z_MCP_SHR_FM',
+      functionGroupName: 'ZMCP_SHR_FGRP',
+    });
   });
 });
 

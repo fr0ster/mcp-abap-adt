@@ -48,7 +48,6 @@ import {
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../../lib/handlers';
-import { ReadVsGetDedupStrategy } from '../../lib/handlers/groups/strategies';
 import type {
   HandlerContext,
   IHandlerGroup,
@@ -107,11 +106,7 @@ describe('the four tool sets', () => {
     ];
     expect(shape(fullToolSet.groups(context, 'stdio'))).toEqual(
       shape([
-        new ReadOnlyHandlersGroup(
-          context,
-          new Set(namesOf(overriding)),
-          new ReadVsGetDedupStrategy(),
-        ),
+        new ReadOnlyHandlersGroup(context, new Set(namesOf(overriding))),
         new SystemHandlersGroup(context),
         new BackgroundRunHandlersGroup(context),
         ...overriding,
@@ -125,11 +120,7 @@ describe('the four tool sets', () => {
   it('core-ro: readonly (with system), search, the leftover-session list and logoff, batch mode', () => {
     expect(shape(fullReadOnlyToolSet.groups(context, 'stdio'))).toEqual(
       shape([
-        new ReadOnlyHandlersGroup(
-          context,
-          new Set(),
-          new ReadVsGetDedupStrategy(),
-        ),
+        new ReadOnlyHandlersGroup(context),
         new SystemHandlersGroup(context),
         new SearchHandlersGroup(context),
         new LeftoverSessionHandlersGroup(context),
@@ -305,11 +296,10 @@ describe('the leftover-session tools are served on stdio only', () => {
  * background (the background-run tools).
  */
 describe('a -ro set holds no write, debugger or background-run tool; a write set holds its -ro set', () => {
-  // A high tool the readonly group also defines reads (GetUnitTestResult):
-  // the high group's copy replaces it in core, and it is no write.
-  const readonlyNames = namesOf([
-    new ReadOnlyHandlersGroup(context, new Set(), new ReadVsGetDedupStrategy()),
-  ]);
+  // A high tool the readonly group also defines reads (GetUnitTestResult,
+  // the Get<Type> object reads): the high group's copy replaces it in core,
+  // and it is no write.
+  const readonlyNames = namesOf([new ReadOnlyHandlersGroup(context)]);
   const FORBIDDEN = {
     write: [
       ...namesOf([new HighLevelHandlersGroup(context)]).filter(
@@ -359,26 +349,19 @@ describe('a -ro set holds no write, debugger or background-run tool; a write set
     }
   });
 
-  // Writing needs reading. In core a `Read<X>` gives way to the high
-  // group's `Get<X>` of the same object (ReadVsGetDedupStrategy), so the
-  // read is there under that name.
+  // Writing needs reading: every tool of the -ro set is in the write set,
+  // under the same name.
   it.each([
     ['core', fullToolSet, fullReadOnlyToolSet],
     ['compact', compact, compactRo],
-  ] as const)(
-    '%s holds every tool of its -ro set, or its high Get<X> for a Read<X>',
-    (kind, write, readOnly) => {
-      const names = toolsOf(write);
-      const held = (n: string) =>
-        names.includes(n) ||
-        (n.startsWith('Read') &&
-          names.includes(`Get${n.slice('Read'.length)}`));
-      expect({
-        kind,
-        missing: toolsOf(readOnly).filter((n) => !held(n)),
-      }).toEqual({ kind, missing: [] });
-    },
-  );
+  ] as const)('%s holds every tool of its -ro set', (kind, write, readOnly) => {
+    const names = toolsOf(write);
+    const held = (n: string) => names.includes(n);
+    expect({
+      kind,
+      missing: toolsOf(readOnly).filter((n) => !held(n)),
+    }).toEqual({ kind, missing: [] });
+  });
 });
 
 /**

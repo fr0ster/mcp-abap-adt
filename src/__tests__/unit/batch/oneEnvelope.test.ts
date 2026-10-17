@@ -48,7 +48,7 @@ function sap(inner: InnerRequest): PartAnswer {
   };
 }
 
-const TOOLS = ['GetProgram', 'ReadClass', 'HandlerLock', 'HandlerUnlock'];
+const TOOLS = ['GetProgram', 'GetClass', 'HandlerLock', 'HandlerUnlock'];
 
 const lock = (name: string) => ({ object_type: 'CLASS', object_name: name });
 const unlock = (name: string) => ({
@@ -166,15 +166,15 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
       'UNLOCK',
       'stateless',
     );
-    // A call of two independent parts, both stateless: one number.
-    expect(await s.call('ReadClass', { class_name: 'CLAS_A' })).toEqual({
+    // A stateless read: one number.
+    expect(await s.call('GetClass', { class_name: 'CLAS_A' })).toEqual({
       content: [],
     });
     expect(await set.end(s)).toEqual({ recorded: 2, failed: [] });
     const sent = envelopes(s);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.session).toBe('stateless');
-    expect(sent[0]?.parts).toHaveLength(3);
+    expect(sent[0]?.parts).toHaveLength(2);
     // The refused calls left no session switch behind: no part is stateful.
     expect(sent[0]?.parts.some((p) => p.includes('_action='))).toBe(false);
     await s.close();
@@ -194,8 +194,8 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
       'UNLOCK',
     );
     refusedOtherKind(
-      await s.call('ReadClass', { class_name: 'CLAS_A' }),
-      'ReadClass',
+      await s.call('GetClass', { class_name: 'CLAS_A' }),
+      'GetClass',
       'stateless',
       'UNLOCK',
     );
@@ -297,12 +297,12 @@ function memberOf(steps: Step[]): IHandlerGroup {
 describe('a call with a part of another kind', () => {
   it('first part refused: the call answers batch_other_kind, its later part of the batch kind is not recorded, no number', async () => {
     const s = await batchStand({
-      tools: ['ReadClass'],
+      tools: ['GetClass'],
       part: sap,
       groups: [memberOf(['lock', 'read'])],
     });
     s.begin();
-    expect(await s.call('ReadClass', { class_name: 'CLAS_A' })).toEqual({
+    expect(await s.call('GetClass', { class_name: 'CLAS_A' })).toEqual({
       content: [],
     });
     refusedOtherKind(
@@ -312,7 +312,7 @@ describe('a call with a part of another kind', () => {
       'stateless',
     );
     // No number for it: the next call is 2.
-    expect(await s.call('ReadClass', { class_name: 'CLAS_B' })).toEqual({
+    expect(await s.call('GetClass', { class_name: 'CLAS_B' })).toEqual({
       content: [],
     });
     expect((await s.end()).summary).toEqual({ recorded: 2, failed: [] });
@@ -325,7 +325,7 @@ describe('a call with a part of another kind', () => {
 
   it('a later part refused: the call answers batch_other_kind naming its number, the earlier part is sent, its number answers the refusal', async () => {
     const s = await batchStand({
-      tools: ['ReadClass'],
+      tools: ['GetClass'],
       part: sap,
       groups: [memberOf(['read', 'lock', 'read'])],
     });
@@ -357,12 +357,12 @@ describe('a call with a part of another kind', () => {
 
   it("a refused part's stateful switch is undone: the next call's read goes stateless into the batch's one envelope", async () => {
     const s = await batchStand({
-      tools: ['ReadClass'],
+      tools: ['GetClass'],
       part: sap,
       groups: [memberOf(['stateful'])],
     });
     s.begin();
-    expect(await s.call('ReadClass', { class_name: 'CLAS_A' })).toEqual({
+    expect(await s.call('GetClass', { class_name: 'CLAS_A' })).toEqual({
       content: [],
     });
     refusedOtherKind(
@@ -371,14 +371,14 @@ describe('a call with a part of another kind', () => {
       'LOCK',
       'stateless',
     );
-    expect(await s.call('ReadClass', { class_name: 'CLAS_B' })).toEqual({
+    expect(await s.call('GetClass', { class_name: 'CLAS_B' })).toEqual({
       content: [],
     });
     expect((await s.end()).summary).toEqual({ recorded: 2, failed: [] });
     const sent = envelopes(s);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.session).toBe('stateless');
-    expect(sent[0]?.parts).toHaveLength(4);
+    expect(sent[0]?.parts).toHaveLength(2);
     await s.close();
   });
 });

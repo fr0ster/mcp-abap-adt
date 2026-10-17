@@ -60,11 +60,21 @@ function sap(inner: InnerRequest): PartAnswer {
 
 const TOOLS = [
   'GetProgram',
-  'ReadClass',
+  'GetClass',
   'HandlerLock',
   'HandlerUnlock',
   'GetInterface',
+  'GetObjectVersionDiff',
 ];
+
+const VERSION_FROM =
+  '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00001';
+const VERSION_TO = '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00002';
+const DIFF_ARGS = {
+  object_type: 'class',
+  content_uri_from: VERSION_FROM,
+  content_uri_to: VERSION_TO,
+};
 
 const asAnswer = (entry: unknown) => {
   const { content, isError } = entry as BatchAnswer;
@@ -216,9 +226,9 @@ describe('BatchEnd', () => {
 
   it("a call with two independent parts answers the handler's one answer built from both, under its one number", async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
-    const direct = await s.call('ReadClass', { class_name: 'CLAS_A' });
+    const direct = await s.call('GetObjectVersionDiff', DIFF_ARGS);
     s.begin();
-    await s.call('ReadClass', { class_name: 'CLAS_A' });
+    await s.call('GetObjectVersionDiff', DIFF_ARGS);
     await s.call('GetProgram', { program_name: 'PROG_A' });
     const { summary } = await s.end();
     expect(summary).toEqual({ recorded: 2, failed: [] });
@@ -226,9 +236,8 @@ describe('BatchEnd', () => {
     expect(envelope?.parts).toHaveLength(3);
     const [first] = await s.answers([1]);
     expect(asAnswer(first)).toEqual(direct);
-    const payload = payloadOf(first as Answer);
-    expect(payload.source_code).toContain('clas_a/source/main');
-    expect(payload.metadata).toBe('source of /sap/bc/adt/oo/classes/clas_a');
+    expect(JSON.stringify(first)).toContain(`source of ${VERSION_FROM}`);
+    expect(JSON.stringify(first)).toContain(`source of ${VERSION_TO}`);
     await s.close();
   });
 
@@ -394,7 +403,7 @@ describe('BatchEnd', () => {
     s.begin();
     await s.call('GetInterface', { interface_name: 'INTF_A' });
     await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('ReadClass', { class_name: 'CLAS_A' });
+    await s.call('GetClass', { class_name: 'CLAS_A' });
     const { answer } = await s.end();
     const read = failureOf(refused);
     expect(read?.error).toBe('authentication_failed');
@@ -459,7 +468,7 @@ describe('BatchEnd', () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     s.begin();
     await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('ReadClass', { class_name: 'CLAS_A' });
+    await s.call('GetClass', { class_name: 'CLAS_A' });
     s.failResolve(new AuthRefusedError(refusal(), 'logon'));
     const { answer } = await s.end();
     expect(answer.isError).toBe(true);
@@ -481,7 +490,7 @@ describe('BatchEnd', () => {
   it('keepRawParts off: no raw; on: raw is one entry per part, in the order sent, each { status, status_text, headers, body: "" for a bodyless 200 }', async () => {
     const off = await batchStand({ tools: TOOLS, part: sap });
     off.begin();
-    await off.call('ReadClass', { class_name: 'CLAS_A' });
+    await off.call('GetObjectVersionDiff', DIFF_ARGS);
     await off.end();
     expect((await off.answers([1]))[0]).not.toHaveProperty('raw');
     await off.close();
@@ -492,7 +501,7 @@ describe('BatchEnd', () => {
       keepRawParts: true,
     });
     on.begin();
-    await on.call('ReadClass', { class_name: 'CLAS_A' });
+    await on.call('GetObjectVersionDiff', DIFF_ARGS);
     await on.end();
     const [read] = await on.answers([1]);
     on.begin();
@@ -508,13 +517,13 @@ describe('BatchEnd', () => {
         status: 200,
         status_text: 'OK',
         headers: { 'content-type': 'text/plain' },
-        body: 'source of /sap/bc/adt/oo/classes/clas_a/source/main?version=active',
+        body: `source of ${VERSION_FROM}`,
       },
       {
         status: 200,
         status_text: 'OK',
         headers: { 'content-type': 'text/plain' },
-        body: 'source of /sap/bc/adt/oo/classes/clas_a',
+        body: `source of ${VERSION_TO}`,
       },
     ]);
     expect((unlock as BatchAnswer).raw).toEqual([
@@ -626,7 +635,7 @@ describe('BatchEnd', () => {
       registerHandlers: () => {},
     } as unknown as IHandlerGroup;
     const s = await batchStand({
-      tools: ['ReadClass'],
+      tools: ['GetClass'],
       part: sap,
       groups: [throwing],
     });
@@ -634,7 +643,7 @@ describe('BatchEnd', () => {
     expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
       content: [],
     });
-    expect(await s.call('ReadClass', { class_name: 'CL_A' })).toEqual({
+    expect(await s.call('GetClass', { class_name: 'CL_A' })).toEqual({
       content: [],
     });
     const { answer, summary } = await s.end();

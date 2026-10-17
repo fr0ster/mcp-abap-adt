@@ -52,10 +52,9 @@ export async function handleGetFunctionGroup(
 
   // A function group is a container: it has no source of its own —
   // `IFunctionGroupContract` composes `IAdtMetadataReadable` and nothing
-  // else, so unlike its siblings there is no `.read()` to call at all
-  // (same defect/fix as `ReadFunctionGroup`). `version` is not forwarded —
-  // the library ignores it at every level for this family, matching
-  // `ReadFunctionGroup`'s own deliberately unfixed echo (task 11 fix round
+  // else, so unlike its siblings there is no `.read()` to call at all.
+  // `version` is not forwarded — the library ignores it at every level for
+  // this family — and is echoed, deliberately unfixed (task 11 fix round
   // 1, deferred to the documentation task). One call, used for the one
   // field this tool has always answered.
   return answer(

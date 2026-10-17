@@ -26,5 +26,4 @@ export { SystemHandlersGroup } from './SystemHandlersGroup.js';
 export {
   type IReadOnlyDedupStrategy,
   NoDedupStrategy,
-  ReadVsGetDedupStrategy,
 } from './strategies/index.js';

@@ -836,6 +836,58 @@ alone, as each low create tool was — the same requests for every type.
 | `ValidateTableLow` | `HandlerValidate` (object_type: TABLE, object_name, package_name, description) | the same requests |
 <!-- end of the low-to-compact table -->
 
+## Full binaries: one `Get<Type>` per type, with `part`; `Read<Type>` is gone
+
+Every object type is read by one tool, `Get<Type>`, the same tool in `mcp-abap-adt` and in
+`mcp-abap-adt-ro` (and their `-http` / `-sse` binaries). A type with a source takes
+`part: "source" | "metadata"` (default `"source"`): each call sends **one** ADT request and answers
+only the document asked for. The `-ro` binaries, which served the `Read<Type>` tools, now serve the
+`Get<Type>` tools. A `Read<Type>` call answered the source and the metadata together (two requests):
+make two calls, or one with the part you need.
+
+- `part: "source"` answers as `Get<Type>` did before (`source_code`, `interface_data`,
+  `program_data`, … with `version`).
+- `part: "metadata"` answers `{ success, <name>, part: "metadata", metadata }`, the ADT metadata
+  document as SAP sent it (`GetServiceBinding`: in its `response_format`). `version` reads the
+  source only.
+- `GetFunctionModule` reads at the `function_group_name` given, in one request: it no longer reads
+  the metadata first to compare the group with the module's own (`containerRef`), and answers the
+  group it was given.
+- `GetProgram` reads any program by name: `ReadProgram`'s refusal of an object that is not a main
+  program (`invalid_object_type`, which read the metadata to learn the type) is gone. Read the type
+  with `part: "metadata"` (`adtcore:type`).
+- `ReadFunctionInclude` is `GetFunctionInclude`, with the same arguments and `part`.
+- For the metadata-only types `Get<Type>` takes no `part`: it reads the one metadata document, as
+  `Read<Type>` did, under its own keys.
+- Embedders: `ReadVsGetDedupStrategy` is gone (exported from `@mcp-abap-adt/lib/handlers` and
+  `EmbeddableMcpServer`'s default). `ReadOnlyHandlersGroup` serves the `Get<Type>` tools and withholds
+  each one a high group of the same registry serves under the same name, so a tool is listed once;
+  `EmbeddableMcpServer`'s `readOnlyDedupStrategy` now defaults to `NoDedupStrategy`.
+- Batch mode records every `Get<Type>` call, both parts (`tools/batch-handlers.json`): one request
+  each.
+
+| Removed | Use |
+|---|---|
+| `ReadClass` (class_name) | `GetClass` (class_name) `part: "source"` for the source, and `GetClass` `part: "metadata"` for the metadata |
+| `ReadInterface` (interface_name) | `GetInterface` (interface_name) `part: "source"` for the source, and `GetInterface` `part: "metadata"` for the metadata |
+| `ReadProgram` (program_name) | `GetProgram` (program_name) `part: "source"` for the source, and `GetProgram` `part: "metadata"` for the metadata |
+| `ReadTable` (table_name) | `GetTable` (table_name) `part: "source"` for the source, and `GetTable` `part: "metadata"` for the metadata |
+| `ReadStructure` (structure_name) | `GetStructure` (structure_name) `part: "source"` for the source, and `GetStructure` `part: "metadata"` for the metadata |
+| `ReadDdl` (ddl_name) | `GetDdl` (ddl_name) `part: "source"` for the source, and `GetDdl` `part: "metadata"` for the metadata |
+| `ReadServiceDefinition` (service_definition_name) | `GetServiceDefinition` (service_definition_name) `part: "source"` for the source, and `GetServiceDefinition` `part: "metadata"` for the metadata |
+| `ReadServiceBinding` (service_binding_name) | `GetServiceBinding` (service_binding_name) `part: "source"` for the source, and `GetServiceBinding` `part: "metadata"` for the metadata |
+| `ReadBehaviorDefinition` (behavior_definition_name) | `GetBehaviorDefinition` (behavior_definition_name) `part: "source"` for the source, and `GetBehaviorDefinition` `part: "metadata"` for the metadata |
+| `ReadBehaviorImplementation` (behavior_implementation_name) | `GetBehaviorImplementation` (behavior_implementation_name) `part: "source"` for the source, and `GetBehaviorImplementation` `part: "metadata"` for the metadata |
+| `ReadMetadataExtension` (metadata_extension_name) | `GetMetadataExtension` (metadata_extension_name) `part: "source"` for the source, and `GetMetadataExtension` `part: "metadata"` for the metadata |
+| `ReadFunctionModule` (function_module_name, function_group_name) | `GetFunctionModule` (function_module_name, function_group_name) `part: "source"` for the source, and `GetFunctionModule` `part: "metadata"` for the metadata |
+| `ReadFunctionInclude` (function_group_name, include_name) | `GetFunctionInclude` (function_group_name, include_name) `part: "source"` for the source, and `GetFunctionInclude` `part: "metadata"` for the metadata |
+| `ReadDomain` | `GetDomain` (the same arguments; one request, as before) |
+| `ReadDataElement` | `GetDataElement` (the same arguments; one request, as before) |
+| `ReadFunctionGroup` | `GetFunctionGroup` (the same arguments; one request, as before) |
+| `ReadPackage` | `GetPackage` (the same arguments; one request, as before) |
+| `ReadMessageClass` | `GetMessageClass` (the same arguments; one request, as before) |
+| `ReadMessageClassMessage` | `GetMessageClassMessage` (the same arguments; one request, as before) |
+
 ## HTTP users
 
 - **Install `@mcp-abap-adt/http` and run `mcp-abap-adt-http`**, without `--transport` (see

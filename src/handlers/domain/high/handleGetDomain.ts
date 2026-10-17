@@ -52,9 +52,9 @@ export async function handleGetDomain(
   // A domain has no source of its own — `IDomainContract` composes
   // `IAdtMetadataReadable` and nothing else, so unlike its siblings there
   // is no `.read()` to call at all: `read` and `readMetadata` fetched the
-  // identical document even before 19 (same defect/fix as `ReadDomain`).
+  // identical document even before 19.
   // `version` is not forwarded to the call — `AdtDomain` ignores it at
-  // every level — matching `ReadDomain`'s own, deliberately unfixed, echo
+  // every level — and is echoed, deliberately unfixed
   // (task 11 fix round 1: "the library ignores `version` at every level
   // and the pre-existing echo is inert ... deferred to the documentation
   // task"). One call, used for the one field this tool has always

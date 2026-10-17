@@ -38,7 +38,7 @@ const sap = (inner: InnerRequest): PartAnswer => ({
   body: `source of ${inner.url}`,
 });
 
-const TOOLS = ['GetProgram', 'ReadClass'];
+const TOOLS = ['GetProgram', 'GetClass'];
 
 const turns = async (n = 20) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
@@ -66,7 +66,7 @@ describe('the instance close with a batch open', () => {
     expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
       content: [],
     });
-    expect(await s.call('ReadClass', { class_name: 'CL_A' })).toEqual({
+    expect(await s.call('GetClass', { class_name: 'CL_A' })).toEqual({
       content: [],
     });
     const open = s.owner.opened();
@@ -149,7 +149,7 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
     // The next batch open, two calls recorded, then no call for the bound.
     s.begin();
     await s.call('GetProgram', { program_name: 'PROG_B' });
-    await s.call('ReadClass', { class_name: 'CL_B' });
+    await s.call('GetClass', { class_name: 'CL_B' });
     const recorded = [...(s.owner.opened()?.recorded ?? [])];
     expect(recorded.map((call) => call.number)).toEqual([1, 2]);
     const signal = s.owner.signal();

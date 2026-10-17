@@ -43,6 +43,29 @@ const NAME_FREE = corpusBody(
 const TRANSPORT_DOCUMENT =
   '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"/>';
 
+/** The `Get<Type>` reads with a `part`: each part one request. */
+const PART_READS: Array<[string, Record<string, unknown>]> = [
+  ['GetClass', { class_name: 'CLAS_A' }],
+  ['GetInterface', { interface_name: 'INTF_A' }],
+  ['GetProgram', { program_name: 'PROG_A' }],
+  ['GetTable', { table_name: 'TAB_A' }],
+  ['GetStructure', { structure_name: 'STRU_A' }],
+  ['GetDdl', { ddl_name: 'DDL_A' }],
+  ['GetServiceDefinition', { service_definition_name: 'SRVD_A' }],
+  ['GetServiceBinding', { service_binding_name: 'SRVB_A' }],
+  ['GetBehaviorDefinition', { behavior_definition_name: 'BDEF_A' }],
+  ['GetBehaviorImplementation', { behavior_implementation_name: 'BIMP_A' }],
+  ['GetMetadataExtension', { metadata_extension_name: 'DDLX_A' }],
+  [
+    'GetFunctionModule',
+    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
+  ],
+  [
+    'GetFunctionInclude',
+    { function_group_name: 'FUGR_A', include_name: 'INCL_A' },
+  ],
+];
+
 /** The full set's single-request reads. */
 const FULL: BatchEntryCase[] = [
   { tool: 'GetPackage', args: { package_name: 'PKG_A' } },
@@ -79,15 +102,9 @@ const FULL: BatchEntryCase[] = [
     tool: 'GetMessageClassMessage',
     args: { message_class_name: 'MSAG_A', msgno: '001' },
   },
-  { tool: 'ReadPackage', args: { package_name: 'PKG_A' } },
-  { tool: 'ReadDomain', args: { domain_name: 'DOM_A' } },
-  { tool: 'ReadDataElement', args: { data_element_name: 'DTEL_A' } },
-  { tool: 'ReadFunctionGroup', args: { function_group_name: 'FUGR_A' } },
-  { tool: 'ReadMessageClass', args: { message_class_name: 'MSAG_A' } },
-  {
-    tool: 'ReadMessageClassMessage',
-    args: { message_class_name: 'MSAG_A', msgno: '001' },
-  },
+  ...PART_READS.flatMap(([tool, names]) =>
+    ['source', 'metadata'].map((part) => ({ tool, args: { ...names, part } })),
+  ),
   { tool: 'GetInclude', args: { include_name: 'INCL_A' } },
   {
     tool: 'GetTransport',
@@ -210,16 +227,16 @@ const SOURCE_READS: Array<[string, Record<string, unknown>]> = [
   ['PROGRAM', { program_name: 'PROG_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
   ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }],
+  [
+    'FUNCTION_MODULE',
+    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
+  ],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
 ];
 
-/**
- * `HandlerGet` with part `metadata`: a metadata GET, or a source GET and a
- * metadata GET sent together. Not FUNCTION_MODULE (its source read is built
- * from the metadata's function group).
- */
+/** `HandlerGet` with part `metadata`: the one metadata GET. */
 const METADATA_READS: Array<[string, Record<string, unknown>]> = [
   ['PACKAGE', { package_name: 'PKG_A' }],
   ['DOMAIN', { domain_name: 'DOM_A' }],
@@ -233,6 +250,10 @@ const METADATA_READS: Array<[string, Record<string, unknown>]> = [
   ['CLASS', { class_name: 'CLAS_A' }],
   ['PROGRAM', { program_name: 'PROG_A' }],
   ['INTERFACE', { interface_name: 'INTF_A' }],
+  [
+    'FUNCTION_MODULE',
+    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
+  ],
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
@@ -770,33 +791,6 @@ const VERSION_FROM =
   '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00001';
 const VERSION_TO = '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00002';
 const TOGETHER: BatchEntryCase[] = [
-  { tool: 'ReadClass', args: { class_name: 'CLAS_A' } },
-  { tool: 'ReadInterface', args: { interface_name: 'INTF_A' } },
-  { tool: 'ReadProgram', args: { program_name: 'PROG_A' } },
-  { tool: 'ReadTable', args: { table_name: 'TAB_A' } },
-  { tool: 'ReadStructure', args: { structure_name: 'STRU_A' } },
-  { tool: 'ReadDdl', args: { ddl_name: 'DDL_A' } },
-  {
-    tool: 'ReadServiceDefinition',
-    args: { service_definition_name: 'SRVD_A' },
-  },
-  { tool: 'ReadServiceBinding', args: { service_binding_name: 'SRVB_A' } },
-  {
-    tool: 'ReadMetadataExtension',
-    args: { metadata_extension_name: 'DDLX_A' },
-  },
-  {
-    tool: 'ReadBehaviorDefinition',
-    args: { behavior_definition_name: 'BDEF_A' },
-  },
-  {
-    tool: 'ReadBehaviorImplementation',
-    args: { behavior_implementation_name: 'BIMP_A' },
-  },
-  {
-    tool: 'ReadFunctionInclude',
-    args: { function_group_name: 'FUGR_A', include_name: 'INCL_A' },
-  },
   {
     tool: 'GetObjectVersionDiff',
     args: {

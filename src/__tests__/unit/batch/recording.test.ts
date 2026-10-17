@@ -88,6 +88,10 @@ function groupOf(entries: HandlerEntry[]): IHandlerGroup {
 }
 
 /** The shipped entry of `name`, its handler reading its own group's context. */
+const VERSION_FROM =
+  '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00001';
+const VERSION_TO = '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00002';
+
 function shipped(name: string): IHandlerGroup {
   const placeholder = {
     connection: null,
@@ -231,12 +235,12 @@ describe('recording in batch mode', () => {
   it("the instance's connection receives no makeAdtRequest while recording", async () => {
     const s = await stand([
       groupOf([tool('GetProgram', oneGet('/program'))]),
-      shipped('ReadClass'),
+      shipped('GetClass'),
     ]);
     await s.call('GetProgram', { name: 'Z' });
-    await s.call('ReadClass', { class_name: 'ZCL_PLACEHOLDER' });
+    await s.call('GetClass', { class_name: 'ZCL_PLACEHOLDER' });
     expect(s.instance.connection.makeAdtRequest).not.toHaveBeenCalled();
-    expect(s.recorded).toHaveLength(3);
+    expect(s.recorded).toHaveLength(2);
     await s.close();
   });
 
@@ -258,18 +262,19 @@ describe('recording in batch mode', () => {
     await s.close();
   });
 
-  it('a call sending two independent parts (a Read<Type>) takes one number for both', async () => {
+  it('a call sending two independent parts (GetObjectVersionDiff) takes one number for both', async () => {
     const s = await stand([
-      shipped('ReadClass'),
+      shipped('GetObjectVersionDiff'),
       groupOf([tool('GetProgram', oneGet('/program'))]),
     ]);
     expect(
-      await s.call('ReadClass', { class_name: 'ZCL_PLACEHOLDER' }),
+      await s.call('GetObjectVersionDiff', {
+        object_type: 'class',
+        content_uri_from: VERSION_FROM,
+        content_uri_to: VERSION_TO,
+      }),
     ).toEqual({ content: [] });
-    expect(s.recorded).toHaveLength(2);
-    expect(s.recorded.every((url) => url.includes('zcl_placeholder'))).toBe(
-      true,
-    );
+    expect(s.recorded).toEqual([VERSION_FROM, VERSION_TO]);
     expect(recordedCalls(s)).toEqual([1]);
     await s.call('GetProgram', { name: 'Z' });
     expect(recordedCalls(s)).toEqual([1, 2]);
@@ -312,7 +317,7 @@ describe('recording in batch mode', () => {
     const s = await stand([
       groupOf([
         tool(
-          'ReadClass',
+          'GetClass',
           async (context, args) => {
             received = args;
             return oneGet('/class')(context, args);
@@ -328,10 +333,10 @@ describe('recording in batch mode', () => {
         ),
       ]),
     ]);
-    await s.call('ReadClass', { class_name: 'ZCL_PLACEHOLDER', unknown: 1 });
+    await s.call('GetClass', { class_name: 'ZCL_PLACEHOLDER', unknown: 1 });
     expect(asked).toHaveBeenCalledTimes(1);
     const [name, args, kind] = asked.mock.calls[0] ?? [];
-    expect(name).toBe('ReadClass');
+    expect(name).toBe('GetClass');
     expect(args).toEqual({ class_name: 'ZCL_PLACEHOLDER', version: 'active' });
     expect(kind).toBe('http');
     // The same object the handler received.

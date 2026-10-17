@@ -106,27 +106,28 @@ describe('eligible', () => {
         eligible('HandlerGet', { object_type, run_id: 'RUN_A' }, 'http'),
       ).toEqual({ ok: false, reason: 'arguments' });
     }
-    // Source and metadata sent together: eligible. A function module's source
-    // read is built from its metadata's group: not.
-    expect(
-      eligible(
-        'HandlerGet',
-        { object_type: 'CLASS', part: 'metadata', class_name: 'CLAS_A' },
-        'http',
-      ),
-    ).toEqual({ ok: true });
-    expect(
-      eligible(
-        'HandlerGet',
-        {
-          object_type: 'FUNCTION_MODULE',
-          part: 'metadata',
-          function_module_name: 'FM_A',
-          function_group_name: 'FUGR_A',
-        },
-        'http',
-      ),
-    ).toEqual({ ok: false, reason: 'arguments' });
+    // Each part one request, a function module's at the group given: eligible.
+    for (const part of ['source', 'metadata']) {
+      expect(
+        eligible(
+          'HandlerGet',
+          { object_type: 'CLASS', part, class_name: 'CLAS_A' },
+          'http',
+        ),
+      ).toEqual({ ok: true });
+      expect(
+        eligible(
+          'HandlerGet',
+          {
+            object_type: 'FUNCTION_MODULE',
+            part,
+            function_module_name: 'FM_A',
+            function_group_name: 'FUGR_A',
+          },
+          'http',
+        ),
+      ).toEqual({ ok: true });
+    }
     // A package node's blank answer is checked with a second read.
     expect(
       eligible(

@@ -41,10 +41,10 @@ export async function handleGetMessageClass(
   const name = message_class_name.toUpperCase();
 
   // `IMessageClassContract` composes `IAdtMetadataReadable` and nothing
-  // else — there is no `.read()` in v19, same as `ReadMessageClass` found.
+  // else — there is no `.read()` in v19.
   // The pre-migration handler answered `state.messageClass`, a v18 parsed
   // convenience object adt-clients 19 no longer builds; the document itself
-  // is what is available now, same as `ReadMessageClass`'s own `metadata`.
+  // is what is available now.
   return answer(
     { tool: 'GetMessageClass', detail: 'terse' },
     () =>

@@ -146,7 +146,7 @@ no raw part.
 
 <!-- batch-handlers:start -->
 
-172 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+156 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -198,29 +198,31 @@ no raw part.
 | `GetAdtTypes` | every call | GET /sap/bc/adt/repository/informationsystem/objecttypes?maxItemCount=999&name=*&data=usedByProvider |
 | `GetATCFindings` | every call | GET /sap/bc/adt/atc/worklists/{id}?includeExemptedFindings=false |
 | `GetATCRunStatus` | every call | GET /sap/bc/adt/atc/runs/{id} |
-| `GetBehaviorDefinition` | every call | GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main?version=active |
+| `GetBehaviorDefinition` | every call | one request: GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/bo/behaviordefinitions/{name} (part metadata) |
 | `GetBehaviorDefinitionVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetBehaviorDefinitionVersions` | every call | GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main/versions |
 | `GetBehaviorDefinitionVersionSource` | every call | GET the content_uri given |
-| `GetBehaviorImplementation` | every call | GET /sap/bc/adt/oo/classes/{name}/source/main?version=active |
-| `GetClass` | every call | GET /sap/bc/adt/oo/classes/{name}/source/main?version=active |
+| `GetBehaviorImplementation` | every call | one request: GET /sap/bc/adt/oo/classes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/classes/{name} (part metadata) |
+| `GetClass` | every call | one request: GET /sap/bc/adt/oo/classes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/classes/{name} (part metadata) |
 | `GetClassVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetClassVersions` | every call | GET /sap/bc/adt/oo/classes/{name}/includes/main/versions |
 | `GetClassVersionSource` | every call | GET the content_uri given |
 | `GetDataElement` | every call | GET /sap/bc/adt/ddic/dataelements/{name} |
-| `GetDdl` | every call | GET /sap/bc/adt/ddic/ddl/sources/{name}/source/main?version=active |
+| `GetDdl` | every call | one request: GET /sap/bc/adt/ddic/ddl/sources/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/ddl/sources/{name} (part metadata) |
 | `GetDdlVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetDdlVersions` | every call | GET /sap/bc/adt/ddic/ddl/sources/{name}/versions |
 | `GetDdlVersionSource` | every call | GET the content_uri given |
 | `GetDomain` | every call | GET /sap/bc/adt/ddic/domains/{name} |
 | `GetEnhancements` | when object_type is one of CLASS, CLAS, CLAS/OC, FUNCTION_GROUP, FUNCTIONGROUP, FUGR, FUGR/F, PROGRAM, PROG, PROG/P and include_nested is not true | GET {object uri}/source/main/enhancements/elements for a class, program or function group named by its type (any other type is resolved by probing metadata first, so it is not listed) |
 | `GetFunctionGroup` | every call | GET /sap/bc/adt/functions/groups/{name} |
+| `GetFunctionInclude` | every call | one request: GET /sap/bc/adt/functions/groups/{group}/includes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/includes/{name} (part metadata) |
+| `GetFunctionModule` | every call | one request at the group given: GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/fmodules/{name} (part metadata) |
 | `GetFunctionModuleVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetFunctionModuleVersions` | every call | GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main/versions |
 | `GetFunctionModuleVersionSource` | every call | GET the content_uri given |
 | `GetInactiveObjects` | every call | GET /sap/bc/adt/activation/inactiveobjects |
 | `GetInclude` | every call | GET /sap/bc/adt/programs/includes/{name}/source/main |
-| `GetInterface` | every call | GET /sap/bc/adt/oo/interfaces/{name}/source/main?version=active |
+| `GetInterface` | every call | one request: GET /sap/bc/adt/oo/interfaces/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/interfaces/{name} (part metadata) |
 | `GetInterfaceVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetInterfaceVersions` | every call | GET /sap/bc/adt/oo/interfaces/{name}/source/main/versions |
 | `GetInterfaceVersionSource` | every call | GET the content_uri given |
@@ -230,7 +232,7 @@ no raw part.
 | `GetLocalTypes` | every call | GET /sap/bc/adt/oo/classes/{name}/includes/implementations?version=active |
 | `GetMessageClass` | every call | GET /sap/bc/adt/messageclass/{name} |
 | `GetMessageClassMessage` | every call | GET /sap/bc/adt/messageclass/{name}, the message picked from it locally |
-| `GetMetadataExtension` | every call | GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main |
+| `GetMetadataExtension` | every call | one request: GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main (part source, the default), or GET /sap/bc/adt/ddic/ddlx/sources/{name} (part metadata) |
 | `GetMetadataExtensionVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetMetadataExtensionVersions` | every call | GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main/versions |
 | `GetMetadataExtensionVersionSource` | every call | GET the content_uri given |
@@ -240,18 +242,18 @@ no raw part.
 | `GetObjectVersions` | every call | GET the versions feed of the object (…/versions) |
 | `GetObjectVersionSource` | every call | GET the content_uri given |
 | `GetPackage` | every call | GET /sap/bc/adt/packages/{name}?version=active |
-| `GetProgram` | every call | GET /sap/bc/adt/programs/programs/{name}/source/main?version=active |
+| `GetProgram` | every call | one request: GET /sap/bc/adt/programs/programs/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/programs/programs/{name} (part metadata) |
 | `GetProgramVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetProgramVersions` | every call | GET /sap/bc/adt/programs/programs/{name}/source/main/versions |
 | `GetProgramVersionSource` | every call | GET the content_uri given |
-| `GetServiceBinding` | every call | GET /sap/bc/adt/businessservices/bindings/{name} |
-| `GetServiceDefinition` | every call | GET /sap/bc/adt/ddic/srvd/sources/{name}/source/main?version=active |
+| `GetServiceBinding` | every call | one request: GET /sap/bc/adt/businessservices/bindings/{name}, the binding document (part source, the default) or its metadata document (part metadata) |
+| `GetServiceDefinition` | every call | one request: GET /sap/bc/adt/ddic/srvd/sources/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/srvd/sources/{name} (part metadata) |
 | `GetSqlQuery` | every call | POST /sap/bc/adt/datapreview/freestyle?rowNumber=N with the SQL as the body |
-| `GetStructure` | every call | GET /sap/bc/adt/ddic/structures/{name}/source/main?version=active |
+| `GetStructure` | every call | one request: GET /sap/bc/adt/ddic/structures/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/structures/{name} (part metadata) |
 | `GetStructureVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetStructureVersions` | every call | GET /sap/bc/adt/ddic/structures/{name}/source/main/versions |
 | `GetStructureVersionSource` | every call | GET the content_uri given |
-| `GetTable` | every call | GET /sap/bc/adt/ddic/tables/{name}/source/main?version=active |
+| `GetTable` | every call | one request: GET /sap/bc/adt/ddic/tables/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/tables/{name} (part metadata) |
 | `GetTableContents` | every call | POST /sap/bc/adt/datapreview/ddic?rowNumber=N&ddicEntityName=… |
 | `GetTableVersionDiff` | every call | GET content_uri_from and GET content_uri_to, sent together, diffed locally |
 | `GetTableVersions` | every call | GET /sap/bc/adt/ddic/tables/{name}/source/main/versions |
@@ -260,24 +262,6 @@ no raw part.
 | `GetWhereUsed` | when enable_all_types is not true and enable_only_types is not given and disable_types is not given | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given) |
 | `ListServiceBindingTypes` | every call | GET /sap/bc/adt/businessservices/bindings/bindingtypes |
 | `MoveTransportObjects` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given |
-| `ReadBehaviorDefinition` | every call | GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main and GET /sap/bc/adt/bo/behaviordefinitions/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadBehaviorImplementation` | every call | GET /sap/bc/adt/oo/classes/{name}/source/main and GET /sap/bc/adt/oo/classes/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadClass` | every call | GET /sap/bc/adt/oo/classes/{name}/source/main and GET /sap/bc/adt/oo/classes/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadDataElement` | every call | GET /sap/bc/adt/ddic/dataelements/{name} |
-| `ReadDdl` | every call | GET /sap/bc/adt/ddic/ddl/sources/{name}/source/main and GET /sap/bc/adt/ddic/ddl/sources/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadDomain` | every call | GET /sap/bc/adt/ddic/domains/{name} |
-| `ReadFunctionGroup` | every call | GET /sap/bc/adt/functions/groups/{name} |
-| `ReadFunctionInclude` | every call | GET /sap/bc/adt/functions/groups/{group}/includes/{name}/source/main and GET /sap/bc/adt/functions/groups/{group}/includes/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadInterface` | every call | GET /sap/bc/adt/oo/interfaces/{name}/source/main and GET /sap/bc/adt/oo/interfaces/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadMessageClass` | every call | GET /sap/bc/adt/messageclass/{name} |
-| `ReadMessageClassMessage` | every call | GET /sap/bc/adt/messageclass/{name}, the message picked from it locally |
-| `ReadMetadataExtension` | every call | GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main and GET /sap/bc/adt/ddic/ddlx/sources/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadPackage` | every call | GET /sap/bc/adt/packages/{name}?version=active |
-| `ReadProgram` | every call | GET /sap/bc/adt/programs/programs/{name}/source/main and GET /sap/bc/adt/programs/programs/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadServiceBinding` | every call | GET /sap/bc/adt/businessservices/bindings/{name} twice (the binding and its metadata), sent together: neither needs the other's answer |
-| `ReadServiceDefinition` | every call | GET /sap/bc/adt/ddic/srvd/sources/{name}/source/main and GET /sap/bc/adt/ddic/srvd/sources/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadStructure` | every call | GET /sap/bc/adt/ddic/structures/{name}/source/main and GET /sap/bc/adt/ddic/structures/{name} (the metadata), sent together: neither needs the other's answer |
-| `ReadTable` | every call | GET /sap/bc/adt/ddic/tables/{name}/source/main and GET /sap/bc/adt/ddic/tables/{name} (the metadata), sent together: neither needs the other's answer |
 | `ReadTransportActionLog` | every call | GET /sap/bc/adt/cts/transportrequests/{number}/actionlogs |
 | `ReadTransportObjects` | every call | GET /sap/bc/adt/cts/transportrequests/{number} |
 | `RemoveTransportObject` | every call | PUT /sap/bc/adt/cts/transportrequests/{number} without the object |
@@ -305,8 +289,8 @@ no raw part.
 | `HandlerCreate` | when object_type is one of DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate |
 | `HandlerCreate` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages[?corrNr=…], the package create alone; over RFC a package is created in an ABAP session of its own, outside the batch |
 | `HandlerDumpView` | every call | GET /sap/bc/adt/runtime/dump/{id} (the view asked) |
-| `HandlerGet` | when part is source (absent reads as source) and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | GET the type's source, or its metadata document where it has no source (as the full set's Get<Type>) |
-| `HandlerGet` | when part is metadata and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | GET the metadata document (as ReadPackage, ReadDomain, ReadDataElement, ReadFunctionGroup); for a type with a source, the source GET and the metadata GET together, neither waiting for the other (as Read<Type>). Not FUNCTION_MODULE: its source read is built from the metadata's function group |
+| `HandlerGet` | when part is source (absent reads as source) and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | GET the type's source, or its metadata document where it has no source (as the full set's Get<Type>) |
+| `HandlerGet` | when part is metadata and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | one request: GET the type's metadata document (as the full set's Get<Type>, part metadata) |
 | `HandlerGet` | when part is object_structure | GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=… |
 | `HandlerGet` | when part is node_structure and object_adt_type is given and object_adt_type is not DEVC/K | POST /sap/bc/adt/repository/nodestructure for the one node asked (a package's blank answer is checked with a second read, so DEVC/K is not listed) |
 | `HandlerGet` | when part is virtual_folders | POST /sap/bc/adt/repository/informationsystem/virtualfolders/contents |

@@ -67,8 +67,9 @@ describe("lib's read and write handler barrels", () => {
     // the compact facade's read half. 19.0.0: ReadTransportObjects joined, for
     // `HandlerGet` with object_type TRANSPORT. 19.0.0: the node-structure,
     // virtual-folder and object-structure reads joined, for `HandlerGet`'s
-    // address parts, when the low set left the full binaries.
-    expect(read).toHaveLength(63);
+    // address parts, when the low set left the full binaries. 19.0.0: the 18
+    // Read<Type> handlers left, folded into Get<Type> with `part`.
+    expect(read).toHaveLength(45);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the

@@ -59,11 +59,10 @@ export async function handleGetPackage(
 
   // A package is a container: it has no source of its own —
   // `IPackageContract` composes `IAdtMetadataReadable` and nothing else, so
-  // unlike its siblings there is no `.read()` to call at all (same
-  // defect/fix as `ReadPackage`). Unlike Domain, DataElement and
+  // unlike its siblings there is no `.read()` to call at all. Unlike Domain, DataElement and
   // FunctionGroup, `AdtPackage` actually honours `version` — it forwards
-  // `options.version` into the query string — so it is passed through here,
-  // the same fix `ReadPackage` carries (task 11 fix round 1).
+  // `options.version` into the query string — so it is passed through here
+  // (task 11 fix round 1).
   return answer(
     { tool: 'GetPackage', detail },
     () =>

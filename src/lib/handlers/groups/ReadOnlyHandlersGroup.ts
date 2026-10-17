@@ -1,15 +1,15 @@
 import {
-  handleReadBehaviorDefinition,
-  TOOL_DEFINITION as ReadBehaviorDefinition_Tool,
-} from '../../../handlers/behavior_definition/readonly/handleReadBehaviorDefinition';
+  TOOL_DEFINITION as GetBehaviorDefinition_Tool,
+  handleGetBehaviorDefinition,
+} from '../../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
 import {
-  handleReadBehaviorImplementation,
-  TOOL_DEFINITION as ReadBehaviorImplementation_Tool,
-} from '../../../handlers/behavior_implementation/readonly/handleReadBehaviorImplementation';
+  TOOL_DEFINITION as GetBehaviorImplementation_Tool,
+  handleGetBehaviorImplementation,
+} from '../../../handlers/behavior_implementation/high/handleGetBehaviorImplementation';
 import {
-  handleReadClass,
-  TOOL_DEFINITION as ReadClass_Tool,
-} from '../../../handlers/class/readonly/handleReadClass';
+  TOOL_DEFINITION as GetClass_Tool,
+  handleGetClass,
+} from '../../../handlers/class/high/handleGetClass';
 import {
   TOOL_DEFINITION as GetObjectVersionDiff_Tool,
   handleGetObjectVersionDiff,
@@ -23,17 +23,17 @@ import {
   handleGetObjectVersions,
 } from '../../../handlers/common/readonly/handleGetObjectVersions';
 import {
-  handleReadDataElement,
-  TOOL_DEFINITION as ReadDataElement_Tool,
-} from '../../../handlers/data_element/readonly/handleReadDataElement';
+  TOOL_DEFINITION as GetDataElement_Tool,
+  handleGetDataElement,
+} from '../../../handlers/data_element/high/handleGetDataElement';
 import {
-  handleReadDdl,
-  TOOL_DEFINITION as ReadDdl_Tool,
-} from '../../../handlers/ddl/readonly/handleReadDdl';
+  TOOL_DEFINITION as GetDdl_Tool,
+  handleGetDdl,
+} from '../../../handlers/ddl/high/handleGetDdl';
 import {
-  handleReadDomain,
-  TOOL_DEFINITION as ReadDomain_Tool,
-} from '../../../handlers/domain/readonly/handleReadDomain';
+  TOOL_DEFINITION as GetDomain_Tool,
+  handleGetDomain,
+} from '../../../handlers/domain/high/handleGetDomain';
 import {
   TOOL_DEFINITION as GetEnhancementImpl_Tool,
   handleGetEnhancementImpl,
@@ -47,9 +47,13 @@ import {
   handleGetEnhancements,
 } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
 import {
-  handleReadFunctionGroup,
-  TOOL_DEFINITION as ReadFunctionGroup_Tool,
-} from '../../../handlers/function_group/readonly/handleReadFunctionGroup';
+  TOOL_DEFINITION as GetFunctionGroup_Tool,
+  handleGetFunctionGroup,
+} from '../../../handlers/function_group/high/handleGetFunctionGroup';
+import {
+  TOOL_DEFINITION as GetFunctionInclude_Tool,
+  handleGetFunctionInclude,
+} from '../../../handlers/function_include/readonly/handleGetFunctionInclude';
 import {
   handleListFunctionGroupIncludes,
   TOOL_DEFINITION as ListFunctionGroupIncludes_Tool,
@@ -59,13 +63,9 @@ import {
   TOOL_DEFINITION as ListFunctionModules_Tool,
 } from '../../../handlers/function_include/readonly/handleListFunctionModules';
 import {
-  handleReadFunctionInclude,
-  TOOL_DEFINITION as ReadFunctionInclude_Tool,
-} from '../../../handlers/function_include/readonly/handleReadFunctionInclude';
-import {
-  handleReadFunctionModule,
-  TOOL_DEFINITION as ReadFunctionModule_Tool,
-} from '../../../handlers/function_module/readonly/handleReadFunctionModule';
+  TOOL_DEFINITION as GetFunctionModule_Tool,
+  handleGetFunctionModule,
+} from '../../../handlers/function_module/high/handleGetFunctionModule';
 import {
   TOOL_DEFINITION as GetInclude_Tool,
   handleGetInclude,
@@ -75,57 +75,57 @@ import {
   handleGetIncludesList,
 } from '../../../handlers/include/readonly/handleGetIncludesList';
 import {
-  handleReadInterface,
-  TOOL_DEFINITION as ReadInterface_Tool,
-} from '../../../handlers/interface/readonly/handleReadInterface';
+  TOOL_DEFINITION as GetInterface_Tool,
+  handleGetInterface,
+} from '../../../handlers/interface/high/handleGetInterface';
 import {
-  handleReadMessageClass,
-  TOOL_DEFINITION as ReadMessageClass_Tool,
-} from '../../../handlers/message_class/readonly/handleReadMessageClass';
+  TOOL_DEFINITION as GetMessageClass_Tool,
+  handleGetMessageClass,
+} from '../../../handlers/message_class/high/handleGetMessageClass';
 import {
-  handleReadMessageClassMessage,
-  TOOL_DEFINITION as ReadMessageClassMessage_Tool,
-} from '../../../handlers/message_class/readonly/handleReadMessageClassMessage';
+  TOOL_DEFINITION as GetMessageClassMessage_Tool,
+  handleGetMessageClassMessage,
+} from '../../../handlers/message_class/high/handleGetMessageClassMessage';
 import {
-  handleReadMetadataExtension,
-  TOOL_DEFINITION as ReadMetadataExtension_Tool,
-} from '../../../handlers/metadata_extension/readonly/handleReadMetadataExtension';
+  TOOL_DEFINITION as GetMetadataExtension_Tool,
+  handleGetMetadataExtension,
+} from '../../../handlers/metadata_extension/high/handleGetMetadataExtension';
+import {
+  TOOL_DEFINITION as GetPackage_Tool,
+  handleGetPackage,
+} from '../../../handlers/package/high/handleGetPackage';
 import {
   TOOL_DEFINITION as GetPackageContents_Tool,
   handleGetPackageContents,
 } from '../../../handlers/package/readonly/handleGetPackageContents';
 import {
-  handleReadPackage,
-  TOOL_DEFINITION as ReadPackage_Tool,
-} from '../../../handlers/package/readonly/handleReadPackage';
+  TOOL_DEFINITION as GetProgram_Tool,
+  handleGetProgram,
+} from '../../../handlers/program/high/handleGetProgram';
 import {
-  handleReadProgram,
-  TOOL_DEFINITION as ReadProgram_Tool,
-} from '../../../handlers/program/readonly/handleReadProgram';
+  TOOL_DEFINITION as GetServiceBinding_Tool,
+  handleGetServiceBinding,
+} from '../../../handlers/service_binding/high/handleGetServiceBinding';
 import {
-  handleReadServiceBinding,
-  TOOL_DEFINITION as ReadServiceBinding_Tool,
-} from '../../../handlers/service_binding/readonly/handleReadServiceBinding';
+  TOOL_DEFINITION as GetServiceDefinition_Tool,
+  handleGetServiceDefinition,
+} from '../../../handlers/service_definition/high/handleGetServiceDefinition';
 import {
-  handleReadServiceDefinition,
-  TOOL_DEFINITION as ReadServiceDefinition_Tool,
-} from '../../../handlers/service_definition/readonly/handleReadServiceDefinition';
+  TOOL_DEFINITION as GetStructure_Tool,
+  handleGetStructure,
+} from '../../../handlers/structure/high/handleGetStructure';
 import {
   TOOL_DEFINITION as GetStructuresList_Tool,
   handleGetStructuresList,
 } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import {
-  handleReadStructure,
-  TOOL_DEFINITION as ReadStructure_Tool,
-} from '../../../handlers/structure/readonly/handleReadStructure';
+  TOOL_DEFINITION as GetTable_Tool,
+  handleGetTable,
+} from '../../../handlers/table/high/handleGetTable';
 import {
   TOOL_DEFINITION as GetTableContents_Tool,
   handleGetTableContents,
 } from '../../../handlers/table/readonly/handleGetTableContents';
-import {
-  handleReadTable,
-  TOOL_DEFINITION as ReadTable_Tool,
-} from '../../../handlers/table/readonly/handleReadTable';
 import {
   TOOL_DEFINITION as GetTransport_Tool,
   handleGetTransport,
@@ -157,18 +157,13 @@ import {
  * Handler group for all readonly (read-only) handlers.
  * Contains handlers that only read data without modifying the ABAP system.
  *
- * When other groups (HighLevel / LowLevel / Compact) are also exposed, some
- * readonly handlers semantically duplicate tools from those groups
- * (e.g. ReadFunctionModule vs GetFunctionModule). The group hides such
- * duplicates based on the injected override strategy and the set of tool
- * names contributed by the other groups.
- *
  * Some tools are a COPY of a high-level tool under the same name, handler and
- * schema (e.g. GetUnitTestResult — purely a read, so a read-only caller may
- * use it too). Two tools cannot share one name on one server, so a readonly
+ * schema (the object reads `Get<Type>`, GetUnitTestResult — purely reads, so
+ * a read-only caller may use them too). Two tools cannot share one name on one server, so a readonly
  * entry whose exact name another exposed group contributes is always
  * withheld, whatever the strategy: a caller granted both groups gets the tool
- * once, from that other group (high).
+ * once, from that other group (high). An injected strategy may withhold
+ * further entries by its own rule.
  */
 export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'ReadOnlyHandlers';
@@ -244,27 +239,6 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) =>
           handleReadTransportActionLog(this.context, args),
       },
-      // Read object source + metadata handlers
-      {
-        toolDefinition: ReadClass_Tool,
-        handler: (args: any) => handleReadClass(this.context, args),
-      },
-      {
-        toolDefinition: ReadInterface_Tool,
-        handler: (args: any) => handleReadInterface(this.context, args),
-      },
-      {
-        toolDefinition: ReadProgram_Tool,
-        handler: (args: any) => handleReadProgram(this.context, args),
-      },
-      {
-        toolDefinition: ReadTable_Tool,
-        handler: (args: any) => handleReadTable(this.context, args),
-      },
-      {
-        toolDefinition: ReadStructure_Tool,
-        handler: (args: any) => handleReadStructure(this.context, args),
-      },
       {
         toolDefinition: GetStructuresList_Tool,
         handler: (args: any) => handleGetStructuresList(this.context, args),
@@ -283,35 +257,6 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) => handleGetObjectVersionDiff(this.context, args),
       },
       {
-        toolDefinition: ReadDdl_Tool,
-        handler: (args: any) => handleReadDdl(this.context, args),
-      },
-      {
-        toolDefinition: ReadDomain_Tool,
-        handler: (args: any) => handleReadDomain(this.context, args),
-      },
-      {
-        toolDefinition: ReadMessageClass_Tool,
-        handler: (args: any) => handleReadMessageClass(this.context, args),
-      },
-      {
-        toolDefinition: ReadMessageClassMessage_Tool,
-        handler: (args: any) =>
-          handleReadMessageClassMessage(this.context, args),
-      },
-      {
-        toolDefinition: ReadDataElement_Tool,
-        handler: (args: any) => handleReadDataElement(this.context, args),
-      },
-      {
-        toolDefinition: ReadFunctionModule_Tool,
-        handler: (args: any) => handleReadFunctionModule(this.context, args),
-      },
-      {
-        toolDefinition: ReadFunctionInclude_Tool,
-        handler: (args: any) => handleReadFunctionInclude(this.context, args),
-      },
-      {
         toolDefinition: ListFunctionGroupIncludes_Tool,
         handler: (args: any) =>
           handleListFunctionGroupIncludes(this.context, args),
@@ -320,35 +265,86 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         toolDefinition: ListFunctionModules_Tool,
         handler: (args: any) => handleListFunctionModules(this.context, args),
       },
+      // The object reads, one Get<Type> per type. All but GetFunctionInclude
+      // are copies of high-level tools: same name, schema and handler,
+      // withheld by getHandlers() when the high group is exposed alongside.
       {
-        toolDefinition: ReadFunctionGroup_Tool,
-        handler: (args: any) => handleReadFunctionGroup(this.context, args),
+        toolDefinition: GetBehaviorDefinition_Tool,
+        handler: (args: any) => handleGetBehaviorDefinition(this.context, args),
       },
       {
-        toolDefinition: ReadPackage_Tool,
-        handler: (args: any) => handleReadPackage(this.context, args),
-      },
-      {
-        toolDefinition: ReadServiceDefinition_Tool,
-        handler: (args: any) => handleReadServiceDefinition(this.context, args),
-      },
-      {
-        toolDefinition: ReadMetadataExtension_Tool,
-        handler: (args: any) => handleReadMetadataExtension(this.context, args),
-      },
-      {
-        toolDefinition: ReadBehaviorDefinition_Tool,
+        toolDefinition: GetBehaviorImplementation_Tool,
         handler: (args: any) =>
-          handleReadBehaviorDefinition(this.context, args),
+          handleGetBehaviorImplementation(this.context, args),
       },
       {
-        toolDefinition: ReadBehaviorImplementation_Tool,
+        toolDefinition: GetClass_Tool,
+        handler: (args: any) => handleGetClass(this.context, args),
+      },
+      {
+        toolDefinition: GetDataElement_Tool,
+        handler: (args: any) => handleGetDataElement(this.context, args),
+      },
+      {
+        toolDefinition: GetDdl_Tool,
+        handler: (args: any) => handleGetDdl(this.context, args),
+      },
+      {
+        toolDefinition: GetDomain_Tool,
+        handler: (args: any) => handleGetDomain(this.context, args),
+      },
+      {
+        toolDefinition: GetFunctionGroup_Tool,
+        handler: (args: any) => handleGetFunctionGroup(this.context, args),
+      },
+      {
+        toolDefinition: GetFunctionInclude_Tool,
+        handler: (args: any) => handleGetFunctionInclude(this.context, args),
+      },
+      {
+        toolDefinition: GetFunctionModule_Tool,
+        handler: (args: any) => handleGetFunctionModule(this.context, args),
+      },
+      {
+        toolDefinition: GetInterface_Tool,
+        handler: (args: any) => handleGetInterface(this.context, args),
+      },
+      {
+        toolDefinition: GetMessageClass_Tool,
+        handler: (args: any) => handleGetMessageClass(this.context, args),
+      },
+      {
+        toolDefinition: GetMessageClassMessage_Tool,
         handler: (args: any) =>
-          handleReadBehaviorImplementation(this.context, args),
+          handleGetMessageClassMessage(this.context, args),
       },
       {
-        toolDefinition: ReadServiceBinding_Tool,
-        handler: (args: any) => handleReadServiceBinding(this.context, args),
+        toolDefinition: GetMetadataExtension_Tool,
+        handler: (args: any) => handleGetMetadataExtension(this.context, args),
+      },
+      {
+        toolDefinition: GetPackage_Tool,
+        handler: (args: any) => handleGetPackage(this.context, args),
+      },
+      {
+        toolDefinition: GetProgram_Tool,
+        handler: (args: any) => handleGetProgram(this.context, args),
+      },
+      {
+        toolDefinition: GetServiceBinding_Tool,
+        handler: (args: any) => handleGetServiceBinding(this.context, args),
+      },
+      {
+        toolDefinition: GetServiceDefinition_Tool,
+        handler: (args: any) => handleGetServiceDefinition(this.context, args),
+      },
+      {
+        toolDefinition: GetStructure_Tool,
+        handler: (args: any) => handleGetStructure(this.context, args),
+      },
+      {
+        toolDefinition: GetTable_Tool,
+        handler: (args: any) => handleGetTable(this.context, args),
       },
       // Copies of high-level tools: same name, schema and handler. Withheld
       // by getHandlers() when the high group is exposed alongside.

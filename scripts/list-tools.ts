@@ -13,7 +13,6 @@ import {
   DebugHandlersGroup,
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
-  ReadVsGetDedupStrategy,
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '../src/lib/handlers/groups/index.js';

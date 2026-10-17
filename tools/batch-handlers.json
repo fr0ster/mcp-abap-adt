@@ -21,31 +21,31 @@
     "tool": "GetTable",
     "set": "full",
     "handler": "src/handlers/table/high/handleGetTable.ts#handleGetTable",
-    "sends": "GET /sap/bc/adt/ddic/tables/{name}/source/main?version=active"
+    "sends": "one request: GET /sap/bc/adt/ddic/tables/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/tables/{name} (part metadata)"
   },
   {
     "tool": "GetStructure",
     "set": "full",
     "handler": "src/handlers/structure/high/handleGetStructure.ts#handleGetStructure",
-    "sends": "GET /sap/bc/adt/ddic/structures/{name}/source/main?version=active"
+    "sends": "one request: GET /sap/bc/adt/ddic/structures/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/structures/{name} (part metadata)"
   },
   {
     "tool": "GetDdl",
     "set": "full",
     "handler": "src/handlers/ddl/high/handleGetDdl.ts#handleGetDdl",
-    "sends": "GET /sap/bc/adt/ddic/ddl/sources/{name}/source/main?version=active"
+    "sends": "one request: GET /sap/bc/adt/ddic/ddl/sources/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/ddl/sources/{name} (part metadata)"
   },
   {
     "tool": "GetServiceDefinition",
     "set": "full",
     "handler": "src/handlers/service_definition/high/handleGetServiceDefinition.ts#handleGetServiceDefinition",
-    "sends": "GET /sap/bc/adt/ddic/srvd/sources/{name}/source/main?version=active"
+    "sends": "one request: GET /sap/bc/adt/ddic/srvd/sources/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/ddic/srvd/sources/{name} (part metadata)"
   },
   {
     "tool": "GetServiceBinding",
     "set": "full",
     "handler": "src/handlers/service_binding/high/handleGetServiceBinding.ts#handleGetServiceBinding",
-    "sends": "GET /sap/bc/adt/businessservices/bindings/{name}"
+    "sends": "one request: GET /sap/bc/adt/businessservices/bindings/{name}, the binding document (part source, the default) or its metadata document (part metadata)"
   },
   {
     "tool": "ListServiceBindingTypes",
@@ -57,7 +57,7 @@
     "tool": "GetClass",
     "set": "full",
     "handler": "src/handlers/class/high/handleGetClass.ts#handleGetClass",
-    "sends": "GET /sap/bc/adt/oo/classes/{name}/source/main?version=active"
+    "sends": "one request: GET /sap/bc/adt/oo/classes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/classes/{name} (part metadata)"
   },
   {
     "tool": "GetLocalTestClass",
@@ -87,13 +87,13 @@
     "tool": "GetProgram",
     "set": "full",
     "handler": "src/handlers/program/high/handleGetProgram.ts#handleGetProgram",
-    "sends": "GET /sap/bc/adt/programs/programs/{name}/source/main?version=active"
+    "sends": "one request: GET /sap/bc/adt/programs/programs/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/programs/programs/{name} (part metadata)"
   },
   {
     "tool": "GetInterface",
     "set": "full",
     "handler": "src/handlers/interface/high/handleGetInterface.ts#handleGetInterface",
-    "sends": "GET /sap/bc/adt/oo/interfaces/{name}/source/main?version=active"
+    "sends": "one request: GET /sap/bc/adt/oo/interfaces/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/interfaces/{name} (part metadata)"
   },
   {
     "tool": "GetFunctionGroup",
@@ -102,22 +102,34 @@
     "sends": "GET /sap/bc/adt/functions/groups/{name}"
   },
   {
+    "tool": "GetFunctionModule",
+    "set": "full",
+    "handler": "src/handlers/function_module/high/handleGetFunctionModule.ts#handleGetFunctionModule",
+    "sends": "one request at the group given: GET /sap/bc/adt/functions/groups/{group}/fmodules/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/fmodules/{name} (part metadata)"
+  },
+  {
+    "tool": "GetFunctionInclude",
+    "set": "full",
+    "handler": "src/handlers/function_include/readonly/handleGetFunctionInclude.ts#handleGetFunctionInclude",
+    "sends": "one request: GET /sap/bc/adt/functions/groups/{group}/includes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/functions/groups/{group}/includes/{name} (part metadata)"
+  },
+  {
     "tool": "GetBehaviorDefinition",
     "set": "full",
     "handler": "src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts#handleGetBehaviorDefinition",
-    "sends": "GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main?version=active"
+    "sends": "one request: GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/bo/behaviordefinitions/{name} (part metadata)"
   },
   {
     "tool": "GetBehaviorImplementation",
     "set": "full",
     "handler": "src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts#handleGetBehaviorImplementation",
-    "sends": "GET /sap/bc/adt/oo/classes/{name}/source/main?version=active"
+    "sends": "one request: GET /sap/bc/adt/oo/classes/{name}/source/main?version=active (part source, the default), or GET /sap/bc/adt/oo/classes/{name} (part metadata)"
   },
   {
     "tool": "GetMetadataExtension",
     "set": "full",
     "handler": "src/handlers/metadata_extension/high/handleGetMetadataExtension.ts#handleGetMetadataExtension",
-    "sends": "GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main"
+    "sends": "one request: GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main (part source, the default), or GET /sap/bc/adt/ddic/ddlx/sources/{name} (part metadata)"
   },
   {
     "tool": "GetMessageClass",
@@ -129,42 +141,6 @@
     "tool": "GetMessageClassMessage",
     "set": "full",
     "handler": "src/handlers/message_class/high/handleGetMessageClassMessage.ts#handleGetMessageClassMessage",
-    "sends": "GET /sap/bc/adt/messageclass/{name}, the message picked from it locally"
-  },
-  {
-    "tool": "ReadPackage",
-    "set": "full",
-    "handler": "src/handlers/package/readonly/handleReadPackage.ts#handleReadPackage",
-    "sends": "GET /sap/bc/adt/packages/{name}?version=active"
-  },
-  {
-    "tool": "ReadDomain",
-    "set": "full",
-    "handler": "src/handlers/domain/readonly/handleReadDomain.ts#handleReadDomain",
-    "sends": "GET /sap/bc/adt/ddic/domains/{name}"
-  },
-  {
-    "tool": "ReadDataElement",
-    "set": "full",
-    "handler": "src/handlers/data_element/readonly/handleReadDataElement.ts#handleReadDataElement",
-    "sends": "GET /sap/bc/adt/ddic/dataelements/{name}"
-  },
-  {
-    "tool": "ReadFunctionGroup",
-    "set": "full",
-    "handler": "src/handlers/function_group/readonly/handleReadFunctionGroup.ts#handleReadFunctionGroup",
-    "sends": "GET /sap/bc/adt/functions/groups/{name}"
-  },
-  {
-    "tool": "ReadMessageClass",
-    "set": "full",
-    "handler": "src/handlers/message_class/readonly/handleReadMessageClass.ts#handleReadMessageClass",
-    "sends": "GET /sap/bc/adt/messageclass/{name}"
-  },
-  {
-    "tool": "ReadMessageClassMessage",
-    "set": "full",
-    "handler": "src/handlers/message_class/readonly/handleReadMessageClassMessage.ts#handleReadMessageClassMessage",
     "sends": "GET /sap/bc/adt/messageclass/{name}, the message picked from it locally"
   },
   {
@@ -433,6 +409,7 @@
           "PROGRAM",
           "INTERFACE",
           "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION"
@@ -444,7 +421,7 @@
     "tool": "HandlerGet",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
-    "sends": "GET the metadata document (as ReadPackage, ReadDomain, ReadDataElement, ReadFunctionGroup); for a type with a source, the source GET and the metadata GET together, neither waiting for the other (as Read<Type>). Not FUNCTION_MODULE: its source read is built from the metadata's function group",
+    "sends": "one request: GET the type's metadata document (as the full set's Get<Type>, part metadata)",
     "when": [
       {
         "argument": "part",
@@ -467,6 +444,7 @@
           "CLASS",
           "PROGRAM",
           "INTERFACE",
+          "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION"
@@ -1201,78 +1179,6 @@
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts#handleHandlerWhereUsed",
     "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope"
-  },
-  {
-    "tool": "ReadClass",
-    "set": "full",
-    "handler": "src/handlers/class/readonly/handleReadClass.ts#handleReadClass",
-    "sends": "GET /sap/bc/adt/oo/classes/{name}/source/main and GET /sap/bc/adt/oo/classes/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadInterface",
-    "set": "full",
-    "handler": "src/handlers/interface/readonly/handleReadInterface.ts#handleReadInterface",
-    "sends": "GET /sap/bc/adt/oo/interfaces/{name}/source/main and GET /sap/bc/adt/oo/interfaces/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadProgram",
-    "set": "full",
-    "handler": "src/handlers/program/readonly/handleReadProgram.ts#handleReadProgram",
-    "sends": "GET /sap/bc/adt/programs/programs/{name}/source/main and GET /sap/bc/adt/programs/programs/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadTable",
-    "set": "full",
-    "handler": "src/handlers/table/readonly/handleReadTable.ts#handleReadTable",
-    "sends": "GET /sap/bc/adt/ddic/tables/{name}/source/main and GET /sap/bc/adt/ddic/tables/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadStructure",
-    "set": "full",
-    "handler": "src/handlers/structure/readonly/handleReadStructure.ts#handleReadStructure",
-    "sends": "GET /sap/bc/adt/ddic/structures/{name}/source/main and GET /sap/bc/adt/ddic/structures/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadDdl",
-    "set": "full",
-    "handler": "src/handlers/ddl/readonly/handleReadDdl.ts#handleReadDdl",
-    "sends": "GET /sap/bc/adt/ddic/ddl/sources/{name}/source/main and GET /sap/bc/adt/ddic/ddl/sources/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadServiceDefinition",
-    "set": "full",
-    "handler": "src/handlers/service_definition/readonly/handleReadServiceDefinition.ts#handleReadServiceDefinition",
-    "sends": "GET /sap/bc/adt/ddic/srvd/sources/{name}/source/main and GET /sap/bc/adt/ddic/srvd/sources/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadMetadataExtension",
-    "set": "full",
-    "handler": "src/handlers/metadata_extension/readonly/handleReadMetadataExtension.ts#handleReadMetadataExtension",
-    "sends": "GET /sap/bc/adt/ddic/ddlx/sources/{name}/source/main and GET /sap/bc/adt/ddic/ddlx/sources/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadBehaviorDefinition",
-    "set": "full",
-    "handler": "src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts#handleReadBehaviorDefinition",
-    "sends": "GET /sap/bc/adt/bo/behaviordefinitions/{name}/source/main and GET /sap/bc/adt/bo/behaviordefinitions/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadBehaviorImplementation",
-    "set": "full",
-    "handler": "src/handlers/behavior_implementation/readonly/handleReadBehaviorImplementation.ts#handleReadBehaviorImplementation",
-    "sends": "GET /sap/bc/adt/oo/classes/{name}/source/main and GET /sap/bc/adt/oo/classes/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadFunctionInclude",
-    "set": "full",
-    "handler": "src/handlers/function_include/readonly/handleReadFunctionInclude.ts#handleReadFunctionInclude",
-    "sends": "GET /sap/bc/adt/functions/groups/{group}/includes/{name}/source/main and GET /sap/bc/adt/functions/groups/{group}/includes/{name} (the metadata), sent together: neither needs the other's answer"
-  },
-  {
-    "tool": "ReadServiceBinding",
-    "set": "full",
-    "handler": "src/handlers/service_binding/readonly/handleReadServiceBinding.ts#handleReadServiceBinding",
-    "sends": "GET /sap/bc/adt/businessservices/bindings/{name} twice (the binding and its metadata), sent together: neither needs the other's answer"
   },
   {
     "tool": "GetObjectVersionDiff",

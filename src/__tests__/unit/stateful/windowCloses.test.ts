@@ -36,7 +36,7 @@ beforeEach(async () => {
   s = await statefulStand([
     'UpdateClass',
     'ActivateClass',
-    'ReadClass',
+    'GetClass',
     'HandlerLock',
     'HandlerUnlock',
     'HandlerCheckRun',
@@ -50,7 +50,7 @@ afterEach(async () => {
 /** The next read on the connection: stateless, outside any context. */
 async function expectTheNextReadStateless(): Promise<void> {
   const sent = toolRequests(
-    await s.during(() => s.call('ReadClass', { class_name: NAME })),
+    await s.during(() => s.call('GetClass', { class_name: NAME })),
   );
   expect(sent.length).toBeGreaterThan(0);
   expect(shown(sent.filter(isStateful))).toEqual([]);

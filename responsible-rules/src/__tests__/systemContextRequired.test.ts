@@ -25,7 +25,6 @@ jest.mock('../../../src/lib/systemInformation', () => ({
 import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationHigh } from '../../../src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleCreateClass } from '../../../src/handlers/class/high/handleCreateClass';
-import { handleReadClass } from '../../../src/handlers/class/readonly/handleReadClass';
 import {
   TOOL_DEFINITION as CreateMessageClassTool,
   handleCreateMessageClass,

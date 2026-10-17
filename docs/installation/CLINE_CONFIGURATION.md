@@ -239,7 +239,7 @@ Write paths with forward slashes (`C:/path/to/<destination>.env`) or escaped bac
 ## Testing Connection
 
 1. **Restart Cline** after updating the configuration.
-2. **Check the available tools** — for example `ReadClass`, `ReadProgram`, `SearchObject`.
+2. **Check the available tools** — for example `GetClass`, `GetProgram`, `SearchObject`.
 3. **Ask for a read**, for example the source of a class you know exists.
 
 ## Troubleshooting

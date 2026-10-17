@@ -55,7 +55,7 @@ afterEach(() => {
   else process.env.SAP_SYSTEM_TYPE = previousType;
 });
 
-/** A built ABAP Cloud instance on a token credential, serving ReadClass. */
+/** A built ABAP Cloud instance on a token credential, serving GetClass. */
 async function cloudStand(standIn: AdtStandIn) {
   process.env.SAP_SYSTEM_TYPE = 'cloud';
   standIn.body(
@@ -73,7 +73,7 @@ async function cloudStand(standIn: AdtStandIn) {
     credential: TokenAuthProvider.fixed('placeholder.token.sig'),
   });
   server.register(shippedGroups());
-  server.register(new CompositeHandlersRegistry([oneToolGroup('ReadClass')]));
+  server.register(new CompositeHandlersRegistry([oneToolGroup('GetClass')]));
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'no-call-cancel', version: '1.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
@@ -98,7 +98,7 @@ async function cloudStand(standIn: AdtStandIn) {
 }
 
 const live = () =>
-  activeTools().filter((tool) => tool.name === 'ReadClass').length;
+  activeTools().filter((tool) => tool.name === 'GetClass').length;
 
 it('a cancel sent while the call’s system lookup is on the wire aborts nothing: the tool runs once the lookup is answered', async () => {
   const standIn = await adtStandIn();
@@ -107,7 +107,7 @@ it('a cancel sent while the call’s system lookup is on the wire aborts nothing
     const held = standIn.hold(isLookup);
     const cancel = new AbortController();
     const first = s
-      .callWith('ReadClass', { class_name: 'ZCL_FIRST' }, cancel.signal)
+      .callWith('GetClass', { class_name: 'ZCL_FIRST' }, cancel.signal)
       .catch(() => 'the client stopped waiting');
     await held.arrived;
     // The SDK's client sends notifications/cancelled for this request.
@@ -130,7 +130,7 @@ it('a cancel sent while the call’s system lookup is on the wire aborts nothing
 });
 
 it('a cancel sent while the call waits in the main flow aborts nothing: it keeps its place and runs after the call ahead', async () => {
-  const s = await statefulStand(['UpdateClass', 'ReadClass']);
+  const s = await statefulStand(['UpdateClass', 'GetClass']);
   try {
     const held = s.standIn.hold((r) => isLock(r) && of('ZCL_HOLDER')(r));
     const holder = s.call('UpdateClass', {
@@ -140,7 +140,7 @@ it('a cancel sent while the call waits in the main flow aborts nothing: it keeps
     await held.arrived;
     const cancel = new AbortController();
     const queued = s
-      .callWith('ReadClass', { class_name: 'ZCL_QUEUED' }, cancel.signal)
+      .callWith('GetClass', { class_name: 'ZCL_QUEUED' }, cancel.signal)
       .catch(() => 'the client stopped waiting');
     await until(() => activeTools().length === 2);
     cancel.abort('the user cancelled');
@@ -170,7 +170,7 @@ it('the instance closes while a call’s system lookup is on the wire: the logof
   try {
     const held = standIn.hold(isLookup);
     const first = s
-      .callWith('ReadClass', { class_name: 'ZCL_FIRST' })
+      .callWith('GetClass', { class_name: 'ZCL_FIRST' })
       .catch(() => 'the session ended');
     await held.arrived;
     // The client closed: its transport closes, and the instance is closed —

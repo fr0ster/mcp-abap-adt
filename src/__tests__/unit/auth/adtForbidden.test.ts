@@ -58,7 +58,7 @@ async function readForbidden(
   await Promise.all([connect(serverSide), client.connect(clientSide)]);
   try {
     const result = (await client.callTool({
-      name: 'ReadClass',
+      name: 'GetClass',
       arguments: { class_name: 'ZCL_FORBIDDEN' },
     })) as Result;
     return {
@@ -84,8 +84,8 @@ function expectSapsWords(
   expect(payload.adt_type).toBe('ExceptionResourceNoAuthorization');
   expect(payload.raw_body).toBe(EXCEPTION);
   expect(JSON.stringify(payload.messages)).toContain(SAP_TEXT);
-  // Where it arose: ReadClass reads the source, then the metadata.
-  expect(payload.step).toBe('read');
+  // GetClass sends one request: the method's error as it is, no step.
+  expect(payload.step).toBeUndefined();
   // Not a credential refusal.
   expect(payload.error).toBeUndefined();
   expect(payload.kind).toBeUndefined();
@@ -112,7 +112,7 @@ describe('a 403 with an ADT exception body', () => {
       },
       credential: provider,
     });
-    server.register(new CompositeHandlersRegistry([oneToolGroup('ReadClass')]));
+    server.register(new CompositeHandlersRegistry([oneToolGroup('GetClass')]));
     standIn.answer(
       (r) => r.url.toLowerCase().includes('zcl_forbidden'),
       403,
@@ -149,7 +149,7 @@ describe('a 403 with an ADT exception body', () => {
     const server = new EmbeddableMcpServer({
       connection: connection as never,
       handlersRegistry: new CompositeHandlersRegistry([
-        oneToolGroup('ReadClass'),
+        oneToolGroup('GetClass'),
       ]),
       systemType: 'onprem',
       logger: silent,

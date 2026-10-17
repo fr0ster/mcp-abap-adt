@@ -1,13 +1,13 @@
 /**
- * Read a function module via handleReadFunctionModule and dump the raw
- * response (source + metadata XML). Useful for debugging cases where the
+ * Read a function module via handleGetFunctionModule (part source, then
+ * part metadata) and dump the raw responses (source + metadata XML). Useful for debugging cases where the
  * ADT backend is permissive about the function group in the URL.
  */
 import * as path from 'node:path';
 import { createAbapConnection } from '@mcp-abap-adt/connection';
 import * as dotenv from 'dotenv';
 import { getSapConfigFromEnv } from '../src/__tests__/integration/helpers/configHelpers';
-import { handleReadFunctionModule } from '../src/handlers/function_module/readonly/handleReadFunctionModule';
+import { handleGetFunctionModule } from '../src/handlers/function_module/high/handleGetFunctionModule';
 
 function printHelp() {
   console.log(`Usage:
@@ -65,27 +65,27 @@ async function main() {
     `\nReading FM="${fm}" via group="${group}" version="${version}"...\n`,
   );
 
-  const result = await handleReadFunctionModule(context, {
-    function_module_name: fm,
-    function_group_name: group,
-    version,
-  });
-
-  if (result.isError) {
-    console.error('Handler returned error:');
-    console.error(JSON.stringify(result, null, 2));
-    process.exit(2);
-  }
-
-  const text = result.content?.[0]?.text ?? '';
-  let parsed: any = null;
-  try {
-    const outer = JSON.parse(text);
-    parsed = outer?.data ? JSON.parse(outer.data) : outer;
-  } catch {
-    console.log(text);
-    return;
-  }
+  const read = async (part: 'source' | 'metadata') => {
+    const result = await handleGetFunctionModule(context, {
+      function_module_name: fm,
+      function_group_name: group,
+      part,
+      version,
+    });
+    if (result.isError) {
+      console.error(`Handler returned error (part ${part}):`);
+      console.error(JSON.stringify(result, null, 2));
+      process.exit(2);
+    }
+    return JSON.parse(result.content?.[0]?.text ?? '{}');
+  };
+  const source = await read('source');
+  const metadata = await read('metadata');
+  const parsed: any = {
+    ...source,
+    source_code: source.function_module_data,
+    metadata: metadata.metadata,
+  };
 
   console.log('=== Response shape ===');
   console.log({

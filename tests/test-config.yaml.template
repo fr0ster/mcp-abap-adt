@@ -2108,7 +2108,7 @@ check_function_module_high:
         function_group_name: "ZMCP_SHR_FGRP"
         function_module_name: "Z_MCP_SHR_FM"
 
-# ReadFunctionInclude (read-only) — reads the generated TOP include of the shared FUGR
+# GetFunctionInclude (read-only) — reads the generated TOP include of the shared FUGR
 read_function_include_readonly:
   test_cases:
     - name: "read_top_include"

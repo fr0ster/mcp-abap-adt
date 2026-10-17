@@ -21,7 +21,7 @@ jest.mock('../../lib/systemInformation', () => ({
 
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationHigh } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
-import { handleReadClass } from '../../handlers/class/readonly/handleReadClass';
+import { handleGetClass } from '../../handlers/class/high/handleGetClass';
 import {
   TOOL_DEFINITION as CreateMessageClassTool,
   handleCreateMessageClass,
@@ -378,7 +378,7 @@ describe('on-premise', () => {
 
   it('a read-only tool is not refused', async () => {
     const connection = recordingConnection();
-    const result = await handleReadClass(
+    const result = await handleGetClass(
       { connection, logger: undefined } as never,
       { class_name: 'ZCL_PLACEHOLDER' },
     );

@@ -17,8 +17,8 @@ No `-ro` binary carries a debugger or a background run, no binary a resume of a 
 (a stdio server takes up the one leftover session of its destination at its start), and no http or
 sse binary any leftover-session tool: one such server holds the sessions of many users,
 so it writes no runtime session file. A
-write binary keeps every readonly tool: writing needs reading (in core a `Read<X>` gives way to
-the high group's `Get<X>` of the same object, see the dedup below).
+write binary keeps every readonly tool: writing needs reading (a `Get<Type>` both groups serve is
+listed once, from the high group, see the dedup below).
 
 Batch mode is in every binary, on every transport: the full binaries, `-ro` ones included, serve
 `BatchBegin`, `BatchEnd` and `BatchAnswers`; the compact ones serve it as one tool, `HandlerBatch`
@@ -191,16 +191,12 @@ the compact ones none of the full set's high tools; only read-only reads may app
 
 #### Readonly / high-level dedup
 
-In the core binaries, where `readonly` and `high` are both served, `Read<X>` readonly handlers duplicate the corresponding `Get<X>` from the high-level group (e.g. `ReadFunctionModule` vs `GetFunctionModule`). The launcher hides the readonly `Read<X>` variants there so that only one tool per operation is visible to the client; the `-ro` binaries serve the `Read<X>` variants.
-
-`EmbeddableMcpServer` applies the same dedup by default, so embedders see one tool per operation just like the launcher. Consumers that need both variants can opt out by passing `new NoDedupStrategy()` as `readOnlyDedupStrategy`. See [EmbeddableMcpServer dedup strategies](#embeddablemcpserver-dedup-strategies) below.
-
-**The same tool in two groups.** A few tools are a copy in both `readonly` and `high` — the same name, schema and handler, because the operation only reads (today: `GetUnitTestResult`). The rule:
+**The same tool in two groups.** Some tools are a copy in both `readonly` and `high` — the same name, schema and handler, because the operation only reads: the object reads `Get<Type>` (one per type, `part: source | metadata` where the type has a source) and `GetUnitTestResult`. The rule:
 
 - `readonly` alone (the `-ro` binaries) → the tool comes from `readonly`.
 - `readonly` + `high` (the core binaries) → the tool appears **once**, from `high`.
 
-`ReadOnlyHandlersGroup` enforces this itself, whatever dedup strategy is passed — a strategy decides about differently named pairs, and one server cannot register two tools under one name. The launcher, `EmbeddableMcpServer` and `HandlerExporter` all hand the group the names of the exposed high tools.
+`ReadOnlyHandlersGroup` enforces this itself, whatever dedup strategy is passed — a strategy decides about differently named tools, and one server cannot register two tools under one name. The launcher, `EmbeddableMcpServer` and `HandlerExporter` all hand the group the names of the exposed high tools.
 
 ### Config File
 
@@ -367,27 +363,21 @@ To add handlers to a specific set:
 `EmbeddableMcpServer` exposes an optional `readOnlyDedupStrategy` option to let consumers decide how readonly handlers are deduped against other groups (e.g. HighLevel, LowLevel, Compact) when multiple are exposed at the same time.
 
 ```ts
-import {
-  EmbeddableMcpServer,
-  ReadVsGetDedupStrategy,
-} from '@mcp-abap-adt/lib/embeddable';
+import { EmbeddableMcpServer } from '@mcp-abap-adt/lib/embeddable';
 
 const server = new EmbeddableMcpServer({
   connection,
   exposition: ['readonly', 'high'],
-  // Default already applies ReadVsGetDedupStrategy — hides ReadFunctionModule
-  // when GetFunctionModule is exposed, etc. Pass it explicitly to be explicit,
-  // or pass `new NoDedupStrategy()` to expose both variants.
-  readOnlyDedupStrategy: new ReadVsGetDedupStrategy(),
+  // Default: NoDedupStrategy. A tool both groups serve under one name
+  // (Get<Type>, GetUnitTestResult) is listed once, from high, whatever the strategy.
 });
 ```
 
-**Shipped implementations** (importable from `@mcp-abap-adt/lib/handlers` or `@mcp-abap-adt/lib/embeddable`):
+**Shipped implementation** (importable from `@mcp-abap-adt/lib/handlers` or `@mcp-abap-adt/lib/embeddable`):
 
 | Strategy | Behavior |
 |---|---|
-| `NoDedupStrategy` | Never excludes anything — readonly group is exposed as-is (opt-out). A tool with the same *name* as one of an exposed group is still exposed once, from that group (see [Readonly / high-level dedup](#readonly--high-level-dedup)). |
-| `ReadVsGetDedupStrategy` (default) | Hides a `Read<X>` entry when a corresponding `Get<X>` is contributed by another group. |
+| `NoDedupStrategy` (default) | Excludes nothing further — the readonly group as it is. A tool with the same *name* as one of an exposed group is exposed once, from that group (see [Readonly / high-level dedup](#readonly--high-level-dedup)). |
 
 **Custom strategies**: implement `IReadOnlyDedupStrategy` for role-based or domain-specific rules:
 
@@ -401,11 +391,11 @@ class RoleAwareDedup implements IReadOnlyDedupStrategy {
   constructor(private readonly role: 'viewer' | 'editor') {}
   shouldExclude(entry: HandlerEntry, overriding: ReadonlySet<string>): boolean {
     if (this.role === 'viewer') return false; // expose readonly as-is
-    // editor: dedup against whatever other groups contribute
+    // editor: hide the readonly listings when the high group is exposed
     const n = entry.toolDefinition.name;
-    return n.startsWith('Read') && overriding.has('Get' + n.slice(4));
+    return n.startsWith('List') && overriding.size > 0;
   }
 }
 ```
 
-The default (`ReadVsGetDedupStrategy`) gives embedders the same single-tool-per-operation view as the launcher. Consumers that relied on both `Read<X>` and `Get<X>` being exposed must pass `new NoDedupStrategy()` to keep that behavior.
+The launcher passes no strategy: one tool per operation comes from the same-name rule alone.

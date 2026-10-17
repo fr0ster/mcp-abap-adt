@@ -46,7 +46,6 @@ beforeEach(async () => {
   s = await statefulStand([
     'UpdateClass',
     'ActivateClass',
-    'ReadClass',
     'GetClass',
     'SearchObject',
     'GetWhereUsed',
@@ -96,7 +95,6 @@ it('an activation: sent as adt-clients sends it, stateless, with no window of th
 });
 
 it.each([
-  ['a read (ReadClass)', 'ReadClass', { class_name: NAME }],
   ['a read (GetClass)', 'GetClass', { class_name: NAME }],
   ['a search', 'SearchObject', { object_name: 'ZCL*' }],
   ['a run', 'RuntimeRunClass', { class_name: NAME }],
@@ -120,7 +118,7 @@ it("compact's HandlerLock leaves the window open until HandlerUnlock: the calls 
 
   const between = toolRequests(
     await s.during(async () => {
-      await s.call('ReadClass', { class_name: NAME });
+      await s.call('GetClass', { class_name: NAME });
       await s.call('SearchObject', { object_name: 'ZCL*' });
     }),
   );

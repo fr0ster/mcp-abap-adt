@@ -12,7 +12,7 @@ import { SearchHandlersGroup } from '../lib/handlers/groups/SearchHandlersGroup.
 import { SystemHandlersGroup } from '../lib/handlers/groups/SystemHandlersGroup.js';
 import {
   type IReadOnlyDedupStrategy,
-  ReadVsGetDedupStrategy,
+  NoDedupStrategy,
 } from '../lib/handlers/groups/strategies/index.js';
 import type {
   IHandlerGroup,
@@ -127,19 +127,15 @@ export interface EmbeddableMcpServerOptions {
   systemType?: SapEnvironment;
 
   /**
-   * Optional strategy that decides which readonly handlers to dedup (hide)
-   * when overriding groups (high / compact) are also exposed.
+   * Optional strategy that decides which further readonly handlers to hide
+   * when overriding groups (high) are also exposed.
    *
-   * Default: `ReadVsGetDedupStrategy` — hides a readonly `Read<X>` handler
-   * when a corresponding `Get<X>` is contributed by another group, so a single
-   * deterministic tool is exposed per operation (matching the standalone
-   * launcher). Pass `new NoDedupStrategy()` (exported from this package) to
-   * expose readonly handlers verbatim, or supply a custom implementation for
-   * bespoke role-based rules.
+   * Default: `NoDedupStrategy` — the readonly handlers as they are. Supply a
+   * custom implementation for bespoke role-based rules.
    *
    * Whatever the strategy, a readonly tool with the same NAME as a tool of an
-   * exposed high group (e.g. GetUnitTestResult) is registered once, from
-   * that group.
+   * exposed high group (the object reads `Get<Type>`, GetUnitTestResult) is
+   * registered once, from that group.
    */
   readOnlyDedupStrategy?: IReadOnlyDedupStrategy;
 
@@ -271,7 +267,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
   private createDefaultRegistry(
     exposition: ('readonly' | 'high' | 'compact' | 'system' | 'search')[],
     logger?: Logger,
-    readOnlyDedupStrategy: IReadOnlyDedupStrategy = new ReadVsGetDedupStrategy(),
+    readOnlyDedupStrategy: IReadOnlyDedupStrategy = new NoDedupStrategy(),
   ): IHandlersRegistry {
     // Dummy context - not actually used because BaseMcpServer.registerHandlers()
     // creates wrapper lambdas that call getConnection() for fresh context
@@ -281,7 +277,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     };
 
     // Build non-readonly groups first so their tool names can feed the
-    // readonly dedup strategy (defaults to ReadVsGetDedupStrategy).
+    // readonly dedup.
     const overridingGroups: IHandlerGroup[] = [];
     if (exposition.includes('high')) {
       overridingGroups.push(new HighLevelHandlersGroup(dummyContext));

@@ -13,7 +13,6 @@ import { LeftoverSessionHandlersGroup } from '../groups/LeftoverSessionHandlersG
 import { ReadOnlyHandlersGroup } from '../groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from '../groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../groups/SystemHandlersGroup.js';
-import { ReadVsGetDedupStrategy } from '../groups/strategies/index.js';
 import type { HandlerContext, IHandlerGroup } from '../interfaces.js';
 import { CompositeHandlersRegistry } from './CompositeHandlersRegistry.js';
 
@@ -27,8 +26,8 @@ export function noConnectionContext(): HandlerContext {
 
 /**
  * The groups for `exposition`, built against `baseContext`: the non-readonly
- * groups first, so their tool names feed the readonly dedup
- * (`ReadVsGetDedupStrategy`), then the readonly and system groups (with the
+ * groups first, so their tool names feed the readonly dedup (a readonly
+ * copy of a tool they serve under the same name is withheld), then the readonly and system groups (with the
  * background-run tools beside the run tools), the others, search, and the
  * leftover-session tools — in registration order.
  */
@@ -54,11 +53,7 @@ export function expositionGroups(
   const handlerGroups: IHandlerGroup[] = [];
   if (exposition.includes('readonly')) {
     handlerGroups.push(
-      new ReadOnlyHandlersGroup(
-        baseContext,
-        overridingToolNames,
-        new ReadVsGetDedupStrategy(),
-      ),
+      new ReadOnlyHandlersGroup(baseContext, overridingToolNames),
     );
     handlerGroups.push(new SystemHandlersGroup(baseContext));
     // Beside the run tools (RuntimeRunClass, RuntimeRunProgram): their

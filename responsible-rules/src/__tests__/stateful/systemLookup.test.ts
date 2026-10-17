@@ -82,7 +82,7 @@ async function builtStand(standIn: AdtStandIn, kind: 'cloud' | 'onprem') {
     credential: new BasicAuthProvider('LOOKUP_USER', 'lookup-password'),
   });
   server.register(shippedGroups());
-  server.register(new CompositeHandlersRegistry([oneToolGroup('ReadClass')]));
+  server.register(new CompositeHandlersRegistry([oneToolGroup('GetClass')]));
   const client = await clientOf(server);
   return {
     call: client.call,
@@ -99,8 +99,8 @@ it('ABAP Cloud: the lookup is sent once per connection, before the first tool re
   const standIn = await adtStandIn();
   const s = await builtStand(standIn, 'cloud');
   try {
-    await s.call('ReadClass', { class_name: 'ZCL_FIRST' });
-    await s.call('ReadClass', { class_name: 'ZCL_SECOND' });
+    await s.call('GetClass', { class_name: 'ZCL_FIRST' });
+    await s.call('GetClass', { class_name: 'ZCL_SECOND' });
     const lookups = standIn.requests.filter(isLookup);
     expect(lookups).toHaveLength(1);
     const lookup = standIn.requests.findIndex(isLookup);
@@ -162,7 +162,7 @@ it('ABAP Cloud: a debugger wait sends no lookup; the injected connection is look
   // A factory-built connection follows its recorded settings and the
   // environment: cloud.
   process.env.SAP_SYSTEM_TYPE = 'cloud';
-  const s = await statefulStand(['ReadClass'], {
+  const s = await statefulStand(['GetClass'], {
     systemContextRules: responsibleRules,
     systemType: 'cloud',
     groups: [
@@ -176,7 +176,7 @@ it('ABAP Cloud: a debugger wait sends no lookup; the injected connection is look
   try {
     await s.call('DebugWait', {});
     await s.call('DebugWait', {});
-    await s.call('ReadClass', { class_name: 'ZCL_AFTER' });
+    await s.call('GetClass', { class_name: 'ZCL_AFTER' });
     const lookups = s.standIn.requests.filter(isLookup);
     expect(lookups).toHaveLength(1);
     expect(s.standIn.requests.findIndex(of('ZCL_AFTER'))).toBeGreaterThan(
@@ -191,8 +191,8 @@ it('on-premise: the lookup is sent once per connection, before the first tool re
   const standIn = await adtStandIn();
   const s = await builtStand(standIn, 'onprem');
   try {
-    await s.call('ReadClass', { class_name: 'ZCL_ONPREM' });
-    await s.call('ReadClass', { class_name: 'ZCL_ONPREM_TWO' });
+    await s.call('GetClass', { class_name: 'ZCL_ONPREM' });
+    await s.call('GetClass', { class_name: 'ZCL_ONPREM_TWO' });
     expect(standIn.requests.filter(isLookup)).toHaveLength(1);
     expect(standIn.requests.findIndex(of('ZCL_ONPREM'))).toBeGreaterThan(
       standIn.requests.findIndex(isLookup),
@@ -224,10 +224,10 @@ it.each([
     const s = await builtStand(standIn, 'onprem');
     try {
       expect(
-        (await s.call('ReadClass', { class_name: 'ZCL_ONPREM' })).isError,
+        (await s.call('GetClass', { class_name: 'ZCL_ONPREM' })).isError,
       ).toBe(false);
       expect(
-        (await s.call('ReadClass', { class_name: 'ZCL_ONPREM_TWO' })).isError,
+        (await s.call('GetClass', { class_name: 'ZCL_ONPREM_TWO' })).isError,
       ).toBe(false);
       expect(standIn.requests.filter(isLookup)).toHaveLength(lookups);
       expect(
@@ -250,7 +250,7 @@ it.each([
     standIn.answer(isLookup, 401);
     const s = await builtStand(standIn, kind);
     try {
-      const answer = await s.call('ReadClass', { class_name: 'ZCL_REFUSED' });
+      const answer = await s.call('GetClass', { class_name: 'ZCL_REFUSED' });
       expect(answer.isError).toBe(true);
       expect(answer.payload).toMatchObject({ error: 'authentication_failed' });
       expect(standIn.requests.some(of('ZCL_REFUSED'))).toBe(false);
@@ -356,11 +356,11 @@ describe('ABAP Cloud, the lookup refused', () => {
   it('a read is refused the same way, and works on the next call', async () => {
     const { standIn, s } = await refusedFirst();
     try {
-      const first = await s.call('ReadClass', { class_name: 'ZCL_READ' });
+      const first = await s.call('GetClass', { class_name: 'ZCL_READ' });
       expect(first.isError).toBe(true);
       expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
       expect(standIn.requests.some(of('ZCL_READ'))).toBe(false);
-      const second = await s.call('ReadClass', { class_name: 'ZCL_AGAIN' });
+      const second = await s.call('GetClass', { class_name: 'ZCL_AGAIN' });
       expect(second.isError).toBe(false);
       expect(standIn.requests.filter(of('ZCL_AGAIN')).length).toBeGreaterThan(
         0,
@@ -426,7 +426,7 @@ it('ABAP Cloud, the lookup refused: a tool outside the flow is refused before it
     }) as never,
   } as unknown as HandlerEntry;
   process.env.SAP_SYSTEM_TYPE = 'cloud';
-  const s = await statefulStand(['ReadClass'], {
+  const s = await statefulStand(['GetClass'], {
     systemContextRules: responsibleRules,
     systemType: 'cloud',
     groups: [

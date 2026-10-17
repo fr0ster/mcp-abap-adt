@@ -222,7 +222,6 @@ const JSON_ANSWERING: readonly string[] = [
   'MemorySnapshotGet',
   'MemorySnapshotList',
   'MoveTransportObjects',
-  'ReadPackage',
   'ReadTransportActionLog',
   'ReadTransportObjects',
   'RemoveTransportObject',

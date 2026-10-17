@@ -94,7 +94,7 @@ export async function handleGetPackageTree(
     // Verify package exists before building tree (fixes #38).
     // `IPackageContract` has no `.read()` — a package is a container with no
     // source of its own, so `readMetadata` is the one call (see
-    // `handleReadPackage.ts`, migrated the same way). Without an `analyse`
+    // `handleGetPackage.ts`, migrated the same way). Without an `analyse`
     // strategy the default error contract still answers `ok: false` for a
     // refusal, which is all a plain existence check needs — no message
     // enrichment is read here, only the boolean.

@@ -153,23 +153,19 @@ This needs `@mcp-abap-adt/lib` only — not the AGPL server:
 npm install @mcp-abap-adt/lib
 ```
 ```typescript
-import {
-  EmbeddableMcpServer,
-  NoDedupStrategy, // optional: expose both Read<X> and Get<X>
-} from '@mcp-abap-adt/lib/embeddable';
+import { EmbeddableMcpServer } from '@mcp-abap-adt/lib/embeddable';
 
 const server = new EmbeddableMcpServer({
   connection,              // Your AbapConnection instance
   logger,                  // Optional logger
   exposition: ['readonly', 'high'],  // Handler groups to expose
-  // Default hides Read<X> when Get<X> is exposed (ReadVsGetDedupStrategy).
-  // Pass NoDedupStrategy to expose both variants instead.
-  // readOnlyDedupStrategy: new NoDedupStrategy(),
+  // A tool both groups serve under one name (Get<Type>) is listed once.
+  // readOnlyDedupStrategy: a custom IReadOnlyDedupStrategy hides more.
 });
 await server.connect(transport);
 ```
 
-See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high, how to opt out with `NoDedupStrategy`, and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
+See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
 
 ## Quick Start
 

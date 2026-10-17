@@ -1,7 +1,7 @@
 /**
  * Integration tests for FunctionInclude read-only handlers
  *
- * - ReadFunctionInclude          — reads the generated TOP include of the shared FUGR
+ * - GetFunctionInclude          — reads the generated TOP include of the shared FUGR
  * - ListFunctionGroupIncludes    — lists the includes of the shared FUGR
  * - ListFunctionModules          — lists the function modules of the shared FUGR
  *
@@ -15,9 +15,9 @@
  */
 
 import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { handleGetFunctionInclude } from '../../../../handlers/function_include/readonly/handleGetFunctionInclude';
 import { handleListFunctionGroupIncludes } from '../../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../../../handlers/function_include/readonly/handleListFunctionModules';
-import { handleReadFunctionInclude } from '../../../../handlers/function_include/readonly/handleReadFunctionInclude';
 import {
   getEnabledTestCase,
   getSystemType,
@@ -137,14 +137,14 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       );
 
       const response = await invoke(
-        'ReadFunctionInclude',
+        'GetFunctionInclude',
         {
           function_group_name: functionGroupName,
           include_name: includeName,
           version: 'active',
         },
         () =>
-          handleReadFunctionInclude(
+          handleGetFunctionInclude(
             createHandlerContext({
               connection: connection!,
               logger: testLogger,
@@ -169,7 +169,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
           );
           return;
         }
-        throw new Error(`ReadFunctionInclude failed: ${errorMsg}`);
+        throw new Error(`GetFunctionInclude failed: ${errorMsg}`);
       }
 
       const data = parseHandlerResponse(response);
@@ -177,7 +177,7 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       expect(data.function_group_name).toBe(functionGroupName.toUpperCase());
       expect(data.include_name).toBe(includeName.toUpperCase());
 
-      testLogger?.info(`✅ ReadFunctionInclude completed: ${includeName}`);
+      testLogger?.info(`✅ GetFunctionInclude completed: ${includeName}`);
     },
     getTimeout('medium'),
   );

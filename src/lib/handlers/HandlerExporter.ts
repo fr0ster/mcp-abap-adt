@@ -145,8 +145,7 @@ export class HandlerExporter {
     // High is built first: a readonly tool that is a copy of one of
     // theirs under the same name is withheld from the readonly group, so a
     // tool appears once and comes from high. No other readonly tool is hidden
-    // here (NoDedupStrategy) — this exporter has always listed Read<X>
-    // beside Get<X>.
+    // here (NoDedupStrategy).
     const overridingGroups: IHandlerGroup[] = [];
     if (options?.includeHighLevel !== false) {
       overridingGroups.push(new HighLevelHandlersGroup(dummyContext));

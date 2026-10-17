@@ -3,6 +3,11 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  READ_PART_PROPERTY,
+  type ReadPart,
+  readPartOf,
+} from '../../../lib/handlers/readPart';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -15,7 +20,7 @@ export const TOOL_DEFINITION = {
   name: 'GetServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP service binding source/metadata by name via ADT Business Services endpoint.',
+    'Read an ABAP service binding in one request: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -23,6 +28,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Service binding name. Case-insensitive.',
       },
+      part: READ_PART_PROPERTY,
       response_format: {
         type: 'string',
         enum: ['xml', 'json', 'plain'],
@@ -37,6 +43,7 @@ export const TOOL_DEFINITION = {
 
 interface GetServiceBindingArgs {
   service_binding_name: string;
+  part?: ReadPart;
   response_format?: ServiceBindingResponseFormat;
 }
 
@@ -48,19 +55,32 @@ export async function handleGetServiceBinding(
   if (!args?.service_binding_name) {
     return return_error(new Error('service_binding_name is required'));
   }
+  const part = readPartOf(args.part);
+  if (part instanceof Error) return return_error(part);
 
   // The config field is `bindingName`, not `serviceBindingName` — confirmed
-  // against `IServiceBindingConfig` (same field `ReadServiceBinding` uses),
-  // and the pre-migration handler already called it that way.
+  // against `IServiceBindingConfig`, and the pre-migration handler already
+  // called it that way.
   const bindingName = args.service_binding_name.trim().toUpperCase();
   const responseFormat = args.response_format ?? 'xml';
   const obj = createAdtClient(connection, logger).getServiceBinding(
     resultsFor(serviceDocuments),
   );
 
-  // GetServiceBinding has only ever answered the source (via `.read()`),
-  // never the metadata — one call, unlike ReadServiceBinding's pair. No
-  // `version` in this tool's surface, same as `ReadServiceBinding`.
+  // One request per call: the part asked for, and only it.
+  if (part === 'metadata') {
+    return answer(
+      { tool: 'GetServiceBinding', detail: 'terse' },
+      () => obj.readMetadata({ bindingName }, { analyse: analyseException }),
+      (metadata: AdtReading<string>) => ({
+        success: true,
+        service_binding_name: bindingName,
+        part,
+        response_format: responseFormat,
+        metadata: parseServiceBindingPayload(metadata.raw, responseFormat),
+      }),
+    );
+  }
   return answer(
     { tool: 'GetServiceBinding', detail: 'terse' },
     () => obj.read({ bindingName }, undefined, { analyse: analyseException }),

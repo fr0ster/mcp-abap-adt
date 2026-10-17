@@ -55,7 +55,7 @@ async function cloudStand(standIn: AdtStandIn) {
     },
     credential: new BasicAuthProvider('LOOKUP_USER', 'lookup-password'),
   });
-  server.register(new CompositeHandlersRegistry([oneToolGroup('ReadClass')]));
+  server.register(new CompositeHandlersRegistry([oneToolGroup('GetClass')]));
   const client = await clientOf(server);
   return {
     call: client.call,
@@ -92,18 +92,18 @@ it.each(WITHOUT_USER)(
     );
     const s = await cloudStand(standIn);
     try {
-      const first = await s.call('ReadClass', { class_name: 'ZCL_FIRST' });
+      const first = await s.call('GetClass', { class_name: 'ZCL_FIRST' });
       expect(first.isError).toBe(true);
       expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
       expect(standIn.requests.some(of('ZCL_FIRST'))).toBe(false);
 
       // Nothing kept: still refused while the system names no user.
-      const again = await s.call('ReadClass', { class_name: 'ZCL_AGAIN' });
+      const again = await s.call('GetClass', { class_name: 'ZCL_AGAIN' });
       expect(again.payload).toMatchObject({ error: 'system_lookup_failed' });
       expect(standIn.requests.filter(isLookup)).toHaveLength(2);
 
       fixed = true;
-      const second = await s.call('ReadClass', { class_name: 'ZCL_SECOND' });
+      const second = await s.call('GetClass', { class_name: 'ZCL_SECOND' });
       expect(second.isError).toBe(false);
       expect(standIn.requests.filter(isLookup)).toHaveLength(3);
       expect(standIn.requests.filter(of('ZCL_SECOND')).length).toBeGreaterThan(

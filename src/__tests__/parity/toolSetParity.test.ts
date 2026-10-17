@@ -880,7 +880,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       expect(fullRo.tools).toHaveLength(onStdio ? 71 : 69);
       expect(fullRo.tools).toEqual(
         expect.arrayContaining([
-          'ReadClass',
+          'GetClass',
           'GetWhereUsed',
           'SearchObject',
           'BatchBegin',

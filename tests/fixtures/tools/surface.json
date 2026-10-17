@@ -67,36 +67,6 @@
   },
   {
     "group": "readonly",
-    "name": "ReadClass",
-    "inputs": "class_name*, version",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadInterface",
-    "inputs": "interface_name*, version",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadProgram",
-    "inputs": "program_name*, version",
-    "available_in": "onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadTable",
-    "inputs": "table_name*, version",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadStructure",
-    "inputs": "structure_name*, version",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
     "name": "GetStructuresList",
     "inputs": "structure_name*, version, include_extensions, timeout",
     "available_in": "cloud, onprem"
@@ -121,48 +91,6 @@
   },
   {
     "group": "readonly",
-    "name": "ReadDdl",
-    "inputs": "ddl_name*, version",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadDomain",
-    "inputs": "domain_name*, version",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadMessageClass",
-    "inputs": "message_class_name*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadMessageClassMessage",
-    "inputs": "message_class_name*, msgno*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadDataElement",
-    "inputs": "data_element_name*, version",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadFunctionModule",
-    "inputs": "function_module_name*, function_group_name*, version",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
-    "name": "ReadFunctionInclude",
-    "inputs": "function_group_name*, include_name*, version",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "readonly",
     "name": "ListFunctionGroupIncludes",
     "inputs": "function_group_name*",
     "available_in": "cloud, onprem"
@@ -175,50 +103,122 @@
   },
   {
     "group": "readonly",
-    "name": "ReadFunctionGroup",
+    "name": "GetUnitTestResult",
+    "inputs": "run_id*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetBehaviorDefinition",
+    "inputs": "behavior_definition_name*, part, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetBehaviorImplementation",
+    "inputs": "behavior_implementation_name*, part, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetClass",
+    "inputs": "class_name*, part, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetDataElement",
+    "inputs": "data_element_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetDdl",
+    "inputs": "ddl_name*, part, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetDomain",
+    "inputs": "domain_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetFunctionGroup",
     "inputs": "function_group_name*, version",
     "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
-    "name": "ReadPackage",
-    "inputs": "package_name*, version",
+    "name": "GetFunctionInclude",
+    "inputs": "function_group_name*, include_name*, part, version",
     "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
-    "name": "ReadServiceDefinition",
-    "inputs": "service_definition_name*, version",
+    "name": "GetFunctionModule",
+    "inputs": "function_module_name*, function_group_name*, part, version",
     "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
-    "name": "ReadMetadataExtension",
-    "inputs": "metadata_extension_name*, version",
+    "name": "GetInterface",
+    "inputs": "interface_name*, part, version",
     "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
-    "name": "ReadBehaviorDefinition",
-    "inputs": "behavior_definition_name*, version",
+    "name": "GetMessageClass",
+    "inputs": "message_class_name*",
     "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
-    "name": "ReadBehaviorImplementation",
-    "inputs": "behavior_implementation_name*, version",
+    "name": "GetMessageClassMessage",
+    "inputs": "message_class_name*, msgno*",
     "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
-    "name": "ReadServiceBinding",
-    "inputs": "service_binding_name*",
+    "name": "GetMetadataExtension",
+    "inputs": "metadata_extension_name*, part, version",
     "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
-    "name": "GetUnitTestResult",
-    "inputs": "run_id*, detail",
+    "name": "GetPackage",
+    "inputs": "package_name*, version, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetProgram",
+    "inputs": "program_name*, part, version",
+    "available_in": "onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetServiceBinding",
+    "inputs": "service_binding_name*, part, response_format",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetServiceDefinition",
+    "inputs": "service_definition_name*, part, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetStructure",
+    "inputs": "structure_name*, part, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetTable",
+    "inputs": "table_name*, part, version",
     "available_in": "cloud, onprem"
   },
   {

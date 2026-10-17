@@ -1,6 +1,6 @@
 /**
- * The reads that send a source and its metadata (or two versions) together
- * — `both()` in place of `pair()` — so a batch can record both requests: the
+ * The reads that send two versions together — `both()` in place of
+ * `pair()` — so a batch can record both requests: the
  * answer each tool gives is the one `pair()` gave, answered with a document
  * and with a `404`; held open, both requests are out, where `pair()` sent one.
  */
@@ -23,33 +23,6 @@ const VERSION_FROM =
 const VERSION_TO = '/sap/bc/adt/oo/classes/zcl_a/includes/main/versions/00002';
 
 const TOGETHER: BatchEntryCase[] = [
-  { tool: 'ReadClass', args: { class_name: 'CLAS_A' } },
-  { tool: 'ReadInterface', args: { interface_name: 'INTF_A' } },
-  { tool: 'ReadProgram', args: { program_name: 'PROG_A' } },
-  { tool: 'ReadTable', args: { table_name: 'TAB_A' } },
-  { tool: 'ReadStructure', args: { structure_name: 'STRU_A' } },
-  { tool: 'ReadDdl', args: { ddl_name: 'DDL_A' } },
-  {
-    tool: 'ReadServiceDefinition',
-    args: { service_definition_name: 'SRVD_A' },
-  },
-  { tool: 'ReadServiceBinding', args: { service_binding_name: 'SRVB_A' } },
-  {
-    tool: 'ReadMetadataExtension',
-    args: { metadata_extension_name: 'DDLX_A' },
-  },
-  {
-    tool: 'ReadBehaviorDefinition',
-    args: { behavior_definition_name: 'BDEF_A' },
-  },
-  {
-    tool: 'ReadBehaviorImplementation',
-    args: { behavior_implementation_name: 'BIMP_A' },
-  },
-  {
-    tool: 'ReadFunctionInclude',
-    args: { function_group_name: 'FUGR_A', include_name: 'INCL_A' },
-  },
   {
     tool: 'GetObjectVersionDiff',
     args: {

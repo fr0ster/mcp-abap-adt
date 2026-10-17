@@ -68,12 +68,12 @@ describe('an auth failure inside a handler reaches the client in the connectionâ
       },
       credential: new BasicAuthProvider('INSIDE_USER', PASSWORD),
     });
-    server.register(new CompositeHandlersRegistry([oneToolGroup('ReadClass')]));
+    server.register(new CompositeHandlersRegistry([oneToolGroup('GetClass')]));
     standIn.answer((r) => r.url.toLowerCase().includes('zcl_refused'), 401);
     const client = await clientOn((t) => server.connect(t));
     try {
       const result = (await client.callTool({
-        name: 'ReadClass',
+        name: 'GetClass',
         arguments: { class_name: 'ZCL_REFUSED' },
       })) as Result;
       expect(result.isError).toBe(true);
@@ -149,7 +149,7 @@ describe('an auth failure inside a handler reaches the client in the connectionâ
     const server = new EmbeddableMcpServer({
       connection,
       handlersRegistry: new CompositeHandlersRegistry([
-        oneToolGroup('ReadClass'),
+        oneToolGroup('GetClass'),
         capture,
       ]),
       systemType: 'onprem',
@@ -159,7 +159,7 @@ describe('an auth failure inside a handler reaches the client in the connectionâ
     const client = await clientOn((t) => server.connect(t));
     try {
       const result = (await client.callTool({
-        name: 'ReadClass',
+        name: 'GetClass',
         arguments: { class_name: 'ZCL_REFUSED' },
       })) as Result;
       expect(result.isError).toBe(true);

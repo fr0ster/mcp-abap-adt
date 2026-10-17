@@ -15,62 +15,62 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
     - [BatchEnd](#batchend-read-only-batch)
     - [BatchAnswers](#batchanswers-read-only-batch)
   - [Behavior Definition](#read-only-behavior-definition)
-    - [ReadBehaviorDefinition](#readbehaviordefinition-read-only-behavior-definition)
+    - [GetBehaviorDefinition](#getbehaviordefinition-read-only-behavior-definition)
   - [Behavior Implementation](#read-only-behavior-implementation)
-    - [ReadBehaviorImplementation](#readbehaviorimplementation-read-only-behavior-implementation)
+    - [GetBehaviorImplementation](#getbehaviorimplementation-read-only-behavior-implementation)
   - [Class](#read-only-class)
-    - [ReadClass](#readclass-read-only-class)
+    - [GetClass](#getclass-read-only-class)
   - [Common](#read-only-common)
     - [GetObjectVersions](#getobjectversions-read-only-common)
     - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
     - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
   - [Data Element](#read-only-data-element)
-    - [ReadDataElement](#readdataelement-read-only-data-element)
+    - [GetDataElement](#getdataelement-read-only-data-element)
   - [Ddl](#read-only-ddl)
-    - [ReadDdl](#readddl-read-only-ddl)
+    - [GetDdl](#getddl-read-only-ddl)
   - [Domain](#read-only-domain)
-    - [ReadDomain](#readdomain-read-only-domain)
+    - [GetDomain](#getdomain-read-only-domain)
   - [Enhancement](#read-only-enhancement)
     - [GetEnhancements](#getenhancements-read-only-enhancement)
     - [GetEnhancementSpot](#getenhancementspot-read-only-enhancement)
     - [GetEnhancementImpl](#getenhancementimpl-read-only-enhancement)
   - [Function Group](#read-only-function-group)
-    - [ReadFunctionGroup](#readfunctiongroup-read-only-function-group)
+    - [GetFunctionGroup](#getfunctiongroup-read-only-function-group)
   - [Function Include](#read-only-function-include)
-    - [ReadFunctionInclude](#readfunctioninclude-read-only-function-include)
     - [ListFunctionGroupIncludes](#listfunctiongroupincludes-read-only-function-include)
     - [ListFunctionModules](#listfunctionmodules-read-only-function-include)
+    - [GetFunctionInclude](#getfunctioninclude-read-only-function-include)
   - [Function Module](#read-only-function-module)
-    - [ReadFunctionModule](#readfunctionmodule-read-only-function-module)
+    - [GetFunctionModule](#getfunctionmodule-read-only-function-module)
   - [Include](#read-only-include)
     - [GetInclude](#getinclude-read-only-include)
     - [GetIncludesList](#getincludeslist-read-only-include)
   - [Interface](#read-only-interface)
-    - [ReadInterface](#readinterface-read-only-interface)
+    - [GetInterface](#getinterface-read-only-interface)
   - [Leftover Session](#read-only-leftover-session)
     - [ListLeftoverSessions](#listleftoversessions-read-only-leftover-session)
     - [LogoffLeftoverSession](#logoffleftoversession-read-only-leftover-session)
   - [Message Class](#read-only-message-class)
-    - [ReadMessageClass](#readmessageclass-read-only-message-class)
-    - [ReadMessageClassMessage](#readmessageclassmessage-read-only-message-class)
+    - [GetMessageClass](#getmessageclass-read-only-message-class)
+    - [GetMessageClassMessage](#getmessageclassmessage-read-only-message-class)
   - [Metadata Extension](#read-only-metadata-extension)
-    - [ReadMetadataExtension](#readmetadataextension-read-only-metadata-extension)
+    - [GetMetadataExtension](#getmetadataextension-read-only-metadata-extension)
   - [Package](#read-only-package)
     - [GetPackageContents](#getpackagecontents-read-only-package)
-    - [ReadPackage](#readpackage-read-only-package)
+    - [GetPackage](#getpackage-read-only-package)
   - [Program](#read-only-program)
-    - [ReadProgram](#readprogram-read-only-program)
+    - [GetProgram](#getprogram-read-only-program)
   - [Search](#read-only-search)
     - [SearchObject](#searchobject-read-only-search)
     - [GetObjectsList](#getobjectslist-read-only-search)
     - [GetObjectsByType](#getobjectsbytype-read-only-search)
   - [Service Binding](#read-only-service-binding)
-    - [ReadServiceBinding](#readservicebinding-read-only-service-binding)
+    - [GetServiceBinding](#getservicebinding-read-only-service-binding)
   - [Service Definition](#read-only-service-definition)
-    - [ReadServiceDefinition](#readservicedefinition-read-only-service-definition)
+    - [GetServiceDefinition](#getservicedefinition-read-only-service-definition)
   - [Structure](#read-only-structure)
-    - [ReadStructure](#readstructure-read-only-structure)
     - [GetStructuresList](#getstructureslist-read-only-structure)
+    - [GetStructure](#getstructure-read-only-structure)
   - [System](#read-only-system)
     - [GetServiceBindingPreviewUrl](#getservicebindingpreviewurl-read-only-system)
     - [GetTypeInfo](#gettypeinfo-read-only-system)
@@ -100,7 +100,7 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
     - [SearchSource](#searchsource-read-only-system)
   - [Table](#read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
-    - [ReadTable](#readtable-read-only-table)
+    - [GetTable](#gettable-read-only-table)
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
@@ -154,45 +154,48 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 <a id="read-only-behavior-definition"></a>
 ### Read-Only / Behavior Definition
 
-<a id="readbehaviordefinition-read-only-behavior-definition"></a>
-#### ReadBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: "show behavior definition", "display BDEF source", "view RAP behavior X", "get behavior definition code". Returns source code, package, responsible, description.
+<a id="getbehaviordefinition-read-only-behavior-definition"></a>
+#### GetBehaviorDefinition (Read-Only / Behavior Definition)
+**Description:** Read an ABAP behavior definition in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts`
+**Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
 **Parameters:**
-- `behavior_definition_name` (string, required) - Behavior definition name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `behavior_definition_name` (string, required) - BehaviorDefinition name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
 <a id="read-only-behavior-implementation"></a>
 ### Read-Only / Behavior Implementation
 
-<a id="readbehaviorimplementation-read-only-behavior-implementation"></a>
-#### ReadBehaviorImplementation (Read-Only / Behavior Implementation)
-**Description:** [read-only] Read ABAP RAP behavior implementation source code and metadata. Answers: "show behavior implementation", "display behavior pool code", "view RAP implementation X". Returns source code, package, responsible, description.
+<a id="getbehaviorimplementation-read-only-behavior-implementation"></a>
+#### GetBehaviorImplementation (Read-Only / Behavior Implementation)
+**Description:** Read an ABAP behavior implementation (its class) in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/behavior_implementation/readonly/handleReadBehaviorImplementation.ts`
+**Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_implementation_name` (string, required) - Behavior implementation name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `behavior_implementation_name` (string, required) - BehaviorImplementation name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
 <a id="read-only-class"></a>
 ### Read-Only / Class
 
-<a id="readclass-read-only-class"></a>
-#### ReadClass (Read-Only / Class)
-**Description:** [read-only] Read ABAP class source code and metadata. Answers: "show class code", "display class source", "view class definition/implementation", "get class X". Returns source code, package, responsible, description.
+<a id="getclass-read-only-class"></a>
+#### GetClass (Read-Only / Class)
+**Description:** Read an ABAP class in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/class/readonly/handleReadClass.ts`
+**Source:** `src/handlers/class/high/handleGetClass.ts`
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
@@ -240,45 +243,46 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 <a id="read-only-data-element"></a>
 ### Read-Only / Data Element
 
-<a id="readdataelement-read-only-data-element"></a>
-#### ReadDataElement (Read-Only / Data Element)
-**Description:** [read-only] Read ABAP data element definition and metadata. Answers: "show data element X", "display data element properties", "view DTEL definition", "get data element type". Returns definition, domain, package, responsible, description.
+<a id="getdataelement-read-only-data-element"></a>
+#### GetDataElement (Read-Only / Data Element)
+**Description:** Retrieve ABAP data element definition. Supports reading active or inactive version.
 
-**Source:** `src/handlers/data_element/readonly/handleReadDataElement.ts`
+**Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="read-only-ddl"></a>
 ### Read-Only / Ddl
 
-<a id="readddl-read-only-ddl"></a>
-#### ReadDdl (Read-Only / Ddl)
-**Description:** [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
+<a id="getddl-read-only-ddl"></a>
+#### GetDdl (Read-Only / Ddl)
+**Description:** Read an ABAP DDL source (CDS) in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/ddl/readonly/handleReadDdl.ts`
+**Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
 <a id="read-only-domain"></a>
 ### Read-Only / Domain
 
-<a id="readdomain-read-only-domain"></a>
-#### ReadDomain (Read-Only / Domain)
-**Description:** [read-only] Read ABAP domain definition and metadata. Answers: "show domain X", "display domain fixed values", "view domain definition", "get domain properties". Returns definition, fixed values, package, responsible, description.
+<a id="getdomain-read-only-domain"></a>
+#### GetDomain (Read-Only / Domain)
+**Description:** Retrieve ABAP domain definition. Supports reading active or inactive version.
 
-**Source:** `src/handlers/domain/readonly/handleReadDomain.ts`
+**Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -323,33 +327,20 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 <a id="read-only-function-group"></a>
 ### Read-Only / Function Group
 
-<a id="readfunctiongroup-read-only-function-group"></a>
-#### ReadFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Read ABAP function group source code and metadata. Answers: "show function group code", "display FUGR source", "view function group X", "get function group includes". Returns source code, package, responsible, description.
+<a id="getfunctiongroup-read-only-function-group"></a>
+#### GetFunctionGroup (Read-Only / Function Group)
+**Description:** Retrieve ABAP function group definition. Supports reading active or inactive version.
 
-**Source:** `src/handlers/function_group/readonly/handleReadFunctionGroup.ts`
+**Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `function_group_name` (string, required) - FunctionGroup name.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="read-only-function-include"></a>
 ### Read-Only / Function Include
-
-<a id="readfunctioninclude-read-only-function-include"></a>
-#### ReadFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Read ABAP function group include source code and metadata. Answers: "show function group include code", "display include source", "view include of function group". Returns source code and include metadata.
-
-**Source:** `src/handlers/function_include/readonly/handleReadFunctionInclude.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - Function group name containing the include.
-- `include_name` (string, required) - Include name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
-
----
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
@@ -373,19 +364,34 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 ---
 
+<a id="getfunctioninclude-read-only-function-include"></a>
+#### GetFunctionInclude (Read-Only / Function Include)
+**Description:** Read an include of an ABAP function group in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata"). Returns the part read.
+
+**Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group containing the include.
+- `include_name` (string, required) - Include name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
+
+---
+
 <a id="read-only-function-module"></a>
 ### Read-Only / Function Module
 
-<a id="readfunctionmodule-read-only-function-module"></a>
-#### ReadFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Read an ABAP function module, BAPI or RFC-enabled ones included: its source code, which declares the parameter signature, and its package, responsible and description.
+<a id="getfunctionmodule-read-only-function-module"></a>
+#### GetFunctionModule (Read-Only / Function Module)
+**Description:** Read an ABAP function module, BAPI or RFC-enabled ones included, in one request at the function group given: its source code, which declares the parameter signature (part "source", the default; active or inactive version), or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
+**Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name containing the function module.
+- `function_group_name` (string, required) - Function group containing the function module.
 - `function_module_name` (string, required) - Function module name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
@@ -394,7 +400,7 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). This is the correct tool for include names (PROG/I) — ReadProgram does not read includes.
+**Description:** [read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). Include names (PROG/I).
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
@@ -420,15 +426,16 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 <a id="read-only-interface"></a>
 ### Read-Only / Interface
 
-<a id="readinterface-read-only-interface"></a>
-#### ReadInterface (Read-Only / Interface)
-**Description:** [read-only] Read ABAP interface source code and metadata. Answers: "show interface code", "display interface definition", "view interface X", "get interface source". Returns source code, package, responsible, description.
+<a id="getinterface-read-only-interface"></a>
+#### GetInterface (Read-Only / Interface)
+**Description:** Read an ABAP interface in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
+**Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
@@ -460,22 +467,22 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 <a id="read-only-message-class"></a>
 ### Read-Only / Message Class
 
-<a id="readmessageclass-read-only-message-class"></a>
-#### ReadMessageClass (Read-Only / Message Class)
-**Description:** [read-only] Read an ABAP message class (T100) as its ADT metadata document (XML), under the `metadata` field. Answers: "show message class X", "list messages of message class", "display message text 001 of class". adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
+<a id="getmessageclass-read-only-message-class"></a>
+#### GetMessageClass (Read-Only / Message Class)
+**Description:** Retrieve an ABAP message class (MSAG/T100) as its ADT metadata document (XML), under the `message_class` field. adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
 
-**Source:** `src/handlers/message_class/readonly/handleReadMessageClass.ts`
+**Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
 **Parameters:**
 - `message_class_name` (string, required) - Message class name.
 
 ---
 
-<a id="readmessageclassmessage-read-only-message-class"></a>
-#### ReadMessageClassMessage (Read-Only / Message Class)
-**Description:** [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of a message class", "get text of message". There is no per-message resource: this returns the ENTIRE parent class document (XML) under `metadata`, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
+<a id="getmessageclassmessage-read-only-message-class"></a>
+#### GetMessageClassMessage (Read-Only / Message Class)
+**Description:** Retrieve a single message (by number) from an ABAP message class (MSAG/T100). There is no per-message resource: ADT answers the ENTIRE parent class document (XML) under the `message` field, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
 
-**Source:** `src/handlers/message_class/readonly/handleReadMessageClassMessage.ts`
+**Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
 - `message_class_name` (string, required) - Parent message class name.
@@ -486,15 +493,16 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 <a id="read-only-metadata-extension"></a>
 ### Read-Only / Metadata Extension
 
-<a id="readmetadataextension-read-only-metadata-extension"></a>
-#### ReadMetadataExtension (Read-Only / Metadata Extension)
-**Description:** [read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: "show metadata extension", "display DDLX source", "view UI annotations", "get metadata extension X". Returns source code, package, responsible, description.
+<a id="getmetadataextension-read-only-metadata-extension"></a>
+#### GetMetadataExtension (Read-Only / Metadata Extension)
+**Description:** Read an ABAP metadata extension in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/metadata_extension/readonly/handleReadMetadataExtension.ts`
+**Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
 **Parameters:**
-- `metadata_extension_name` (string, required) - Metadata extension name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `metadata_extension_name` (string, required) - MetadataExtension name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
@@ -512,30 +520,31 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 ---
 
-<a id="readpackage-read-only-package"></a>
-#### ReadPackage (Read-Only / Package)
-**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description.
+<a id="getpackage-read-only-package"></a>
+#### GetPackage (Read-Only / Package)
+**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
 
-**Source:** `src/handlers/package/readonly/handleReadPackage.ts`
+**Source:** `src/handlers/package/high/handleGetPackage.ts`
 
 **Parameters:**
 - `package_name` (string, required) - Package name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="read-only-program"></a>
 ### Read-Only / Program
 
-<a id="readprogram-read-only-program"></a>
-#### ReadProgram (Read-Only / Program)
-**Description:** [read-only] Read a MAIN ABAP program (report) source code and metadata by name. Works ONLY for main programs (adtcore type PROG/P); NOT for includes — use GetInclude for include source. Include names (PROG/I) and other object types are rejected with error "invalid_object_type". Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.
+<a id="getprogram-read-only-program"></a>
+#### GetProgram (Read-Only / Program)
+**Description:** Read an ABAP program in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/program/readonly/handleReadProgram.ts`
+**Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `program_name` (string, required) - Program name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
@@ -590,46 +599,37 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 <a id="read-only-service-binding"></a>
 ### Read-Only / Service Binding
 
-<a id="readservicebinding-read-only-service-binding"></a>
-#### ReadServiceBinding (Read-Only / Service Binding)
-**Description:** [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: "show service binding", "display SRVB config", "view service binding X", "get OData service binding". Returns payload, package, responsible, description.
+<a id="getservicebinding-read-only-service-binding"></a>
+#### GetServiceBinding (Read-Only / Service Binding)
+**Description:** Read an ABAP service binding in one request: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.
 
-**Source:** `src/handlers/service_binding/readonly/handleReadServiceBinding.ts`
+**Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
-- `service_binding_name` (string, required) - Service binding name.
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
+- `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
 ---
 
 <a id="read-only-service-definition"></a>
 ### Read-Only / Service Definition
 
-<a id="readservicedefinition-read-only-service-definition"></a>
-#### ReadServiceDefinition (Read-Only / Service Definition)
-**Description:** [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: "show service definition", "display SRVD source", "view service definition X", "get service exposure". Returns source code, package, responsible, description.
+<a id="getservicedefinition-read-only-service-definition"></a>
+#### GetServiceDefinition (Read-Only / Service Definition)
+**Description:** Read an ABAP service definition in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/service_definition/readonly/handleReadServiceDefinition.ts`
+**Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
-- `service_definition_name` (string, required) - Service definition name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `service_definition_name` (string, required) - ServiceDefinition name.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
 <a id="read-only-structure"></a>
 ### Read-Only / Structure
-
-<a id="readstructure-read-only-structure"></a>
-#### ReadStructure (Read-Only / Structure)
-**Description:** [read-only] Read ABAP structure definition and metadata. Answers: "show structure fields", "display structure X", "view structure definition", "get structure components". Returns field list, package, responsible, description.
-
-**Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
-
-**Parameters:**
-- `structure_name` (string, required) - Structure name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
-
----
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
@@ -642,6 +642,19 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 - `structure_name` (string, required) - Structure name.
 - `timeout` (any, optional) - Seconds to wait for the answer: a whole number, at least 1, no default — without it the call waits until SAP answers. When it passes, the read is cancelled (its ABAP session is logged off) and the call answers that nothing was changed. Set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="getstructure-read-only-structure"></a>
+#### GetStructure (Read-Only / Structure)
+**Description:** Read an ABAP structure in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
+
+**Source:** `src/handlers/structure/high/handleGetStructure.ts`
+
+**Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
+- `structure_name` (string, required) - Structure name.
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 
@@ -1050,15 +1063,16 @@ Exactly the tools `mcp-abap-adt-ro` serves (and `mcp-abap-adt-http-ro`, `mcp-aba
 
 ---
 
-<a id="readtable-read-only-table"></a>
-#### ReadTable (Read-Only / Table)
-**Description:** [read-only] Read ABAP table definition and metadata. Answers: "show table fields", "display table structure", "view table X", "get table definition". Returns field list, package, responsible, description.
+<a id="gettable-read-only-table"></a>
+#### GetTable (Read-Only / Table)
+**Description:** Read an ABAP table in one request: its source code (part "source", the default; active or inactive version) or its ADT metadata document (part "metadata": package, responsible, description). Returns the part read.
 
-**Source:** `src/handlers/table/readonly/handleReadTable.ts`
+**Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
+- `part` (any, optional) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `table_name` (string, required) - Table name.
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+- `version` (string, optional (default: active)) - Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.
 
 ---
 

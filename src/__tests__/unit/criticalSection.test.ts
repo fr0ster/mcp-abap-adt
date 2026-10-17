@@ -36,7 +36,7 @@ describe('isMutatingToolName', () => {
     }
   });
   it('does not match read/activate tools', () => {
-    for (const n of ['GetDomain', 'ReadTable', 'ActivateClass']) {
+    for (const n of ['GetDomain', 'GetTable', 'ActivateClass']) {
       expect(isMutatingToolName(n)).toBe(false);
     }
   });

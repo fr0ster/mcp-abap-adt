@@ -20,49 +20,53 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
+  handleGetBehaviorDefinition,
+  handleGetBehaviorImplementation,
+  handleGetClass,
+  handleGetDataElement,
+  handleGetDdl,
+  handleGetDomain,
+  handleGetFunctionGroup,
+  handleGetFunctionModule,
+  handleGetInterface,
+  handleGetMetadataExtension,
+  handleGetPackage,
   handleGetPackageContents,
+  handleGetProgram,
+  handleGetServiceBinding,
   handleGetServiceBindingPreviewUrl,
-  handleReadBehaviorDefinition,
-  handleReadBehaviorImplementation,
-  handleReadClass,
-  handleReadDataElement,
-  handleReadDdl,
-  handleReadDomain,
-  handleReadFunctionGroup,
-  handleReadFunctionModule,
-  handleReadInterface,
-  handleReadMetadataExtension,
-  handleReadPackage,
-  handleReadProgram,
-  handleReadServiceBinding,
-  handleReadServiceDefinition,
-  handleReadStructure,
-  handleReadTable,
+  handleGetServiceDefinition,
+  handleGetStructure,
+  handleGetTable,
 } from '@mcp-abap-adt/lib/handlers/read';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 
-/** `part: 'metadata'` — the ADT metadata document, for the types that have one. */
+/**
+ * `part: 'metadata'` — the ADT metadata document, for the types that have one:
+ * the type's `Get<Type>`, which reads it in one request (`part: 'metadata'`
+ * for a type with a source; a metadata-only type's read is that document).
+ */
 export const compactMetadataRoutes: Partial<
   Record<CompactObjectType, CompactHandler>
 > = {
-  PACKAGE: handleReadPackage as unknown as CompactHandler,
-  DOMAIN: handleReadDomain as unknown as CompactHandler,
-  DATA_ELEMENT: handleReadDataElement as unknown as CompactHandler,
-  TABLE: handleReadTable as unknown as CompactHandler,
-  STRUCTURE: handleReadStructure as unknown as CompactHandler,
-  DDL: handleReadDdl as unknown as CompactHandler,
-  SERVICE_DEFINITION: handleReadServiceDefinition as unknown as CompactHandler,
-  SERVICE_BINDING: handleReadServiceBinding as unknown as CompactHandler,
-  CLASS: handleReadClass as unknown as CompactHandler,
-  PROGRAM: handleReadProgram as unknown as CompactHandler,
-  INTERFACE: handleReadInterface as unknown as CompactHandler,
-  FUNCTION_GROUP: handleReadFunctionGroup as unknown as CompactHandler,
-  FUNCTION_MODULE: handleReadFunctionModule as unknown as CompactHandler,
+  PACKAGE: handleGetPackage as unknown as CompactHandler,
+  DOMAIN: handleGetDomain as unknown as CompactHandler,
+  DATA_ELEMENT: handleGetDataElement as unknown as CompactHandler,
+  TABLE: handleGetTable as unknown as CompactHandler,
+  STRUCTURE: handleGetStructure as unknown as CompactHandler,
+  DDL: handleGetDdl as unknown as CompactHandler,
+  SERVICE_DEFINITION: handleGetServiceDefinition as unknown as CompactHandler,
+  SERVICE_BINDING: handleGetServiceBinding as unknown as CompactHandler,
+  CLASS: handleGetClass as unknown as CompactHandler,
+  PROGRAM: handleGetProgram as unknown as CompactHandler,
+  INTERFACE: handleGetInterface as unknown as CompactHandler,
+  FUNCTION_GROUP: handleGetFunctionGroup as unknown as CompactHandler,
+  FUNCTION_MODULE: handleGetFunctionModule as unknown as CompactHandler,
   BEHAVIOR_DEFINITION:
-    handleReadBehaviorDefinition as unknown as CompactHandler,
+    handleGetBehaviorDefinition as unknown as CompactHandler,
   BEHAVIOR_IMPLEMENTATION:
-    handleReadBehaviorImplementation as unknown as CompactHandler,
-  METADATA_EXTENSION: handleReadMetadataExtension as unknown as CompactHandler,
+    handleGetBehaviorImplementation as unknown as CompactHandler,
+  METADATA_EXTENSION: handleGetMetadataExtension as unknown as CompactHandler,
 };
 
 /**

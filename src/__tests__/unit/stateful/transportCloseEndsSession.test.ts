@@ -62,17 +62,17 @@ async function stand(transportCloseEndsSession: boolean | undefined) {
     settings: { url: standIn.url, client: '100', authType: 'jwt' },
     credential: TokenAuthProvider.fixed('placeholder.token.sig'),
   });
-  server.register(new CompositeHandlersRegistry([oneToolGroup('ReadClass')]));
+  server.register(new CompositeHandlersRegistry([oneToolGroup('GetClass')]));
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'transport-close', version: '1.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
   const call = client
-    .callTool({ name: 'ReadClass', arguments: { class_name: 'ZCL_WAITS' } })
+    .callTool({ name: 'GetClass', arguments: { class_name: 'ZCL_WAITS' } })
     .catch(() => 'the transport closed');
   return { server, client, call };
 }
 
-const live = () => activeTools().filter((tool) => tool.name === 'ReadClass');
+const live = () => activeTools().filter((tool) => tool.name === 'GetClass');
 
 it.each([
   ['by default', undefined],

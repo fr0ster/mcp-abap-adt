@@ -325,14 +325,14 @@ sets. This is a behaviour change for compact consumers (MIGRATION-19.0, CHANGELO
 went through every compact tool (`.superpowers/sdd/2026-10-16-batch-mode/progress.md`, the survey
 and its MEASURED lines); the plan lists each violator with file and line.
 
-- **`HandlerCreate`** — one `POST`, the type's adt-clients `create()`. An argument its create does
-  not send is refused, by presence (`!== undefined`), naming it (the per-type carried lists of
+- **`HandlerCreate`** — one `POST`, the type's adt-clients `create()`. An argument of the schema that
+  the type's create does not send is refused, by presence (`!== undefined`), naming it (the per-type carried lists of
   `src/handlers/common/low/handleCreateOnly.ts`). `create_only` is gone. Nothing else is sent around
   it (no validation, lock, write, check, activation, no service-group read for a service binding).
 - **`HandlerUpdate`** — only the `PUT` under `lock_handle` (required): no lock or unlock, check,
   activation, read-patch-write, or read after the write. DOMAIN, DATA_ELEMENT and PACKAGE take the
   whole metadata document in `source_code`, sent as given; `properties` and the flat metadata fields
-  are refused by presence, naming them.
+  leave `HandlerUpdate`'s schema.
 - **`HandlerDelete`** — only the deletion request, as adt-clients' `delete()` sends it: no lock
   (deletion takes none, `src/handlers/class/high/handleDeleteClass.ts:4-7`), no check. A class's
   local includes (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`) cannot be
@@ -403,6 +403,31 @@ and its MEASURED lines); the plan lists each violator with file and line.
 
 Every compact call is proven to issue exactly one request (§4.2's proof: held, answered with a
 document, answered `404`), the `urls` exception and the internally batched `contents` excepted.
+
+**Undeclared names.** The MCP SDK strips every argument a tool's schema does not declare, for
+every tool, before the handler sees it (`z.object` strips unknown keys). A refusal can therefore only
+be about a declared argument; no description or document promises a refusal for an undeclared name.
+
+### 4.6a Full-set reads: one `Get<Type>` per type, one request per call
+
+The owner's decision: one tool per type, `Get<Type>`, with `part: 'source' | 'metadata'` (default
+`source`), one ADT request per call, returning only what was asked — the same tool in the full set
+and in `-ro` (the `-ro` set serves only `Read<Type>` today, so it gets `Get<Type>`).
+
+- **Today** (the survey): `Get<Type>` reads the source in one request and `Read<Type>` reads source
+  and metadata in two independent requests (`both()`) for CLASS, INTERFACE, PROGRAM, TABLE,
+  STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING (`GetServiceBinding` takes `response_format`,
+  no `version`), BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION; both send the same
+  single `readMetadata` for the metadata-only types; FUNCTION_MODULE chains two requests in both
+  (`handleGetFunctionModule.ts:81-93`, `handleReadFunctionModule.ts:83-95`).
+- **After:** `Get<Type>` `part: 'source'` = the source read alone, `part: 'metadata'` = the metadata
+  read alone. `Read<Type>` is folded into `Get<Type>` and removed, a migration row each (`ReadClass` →
+  `GetClass` `part: metadata` and `part: source`, …). Metadata-only types (DOMAIN, DATA_ELEMENT,
+  FUNCTION_GROUP, PACKAGE, MESSAGE_CLASS, MESSAGE_CLASS message) keep `Get<Type>` without `part`.
+  FUNCTION_MODULE takes the function group as an argument, so its source is one request with no
+  metadata read first. `ReadFunctionInclude` → `GetFunctionInclude` with the same `part`.
+  `ReadVsGetDedupStrategy` is no longer needed and goes.
+- Each is eligible in batch mode (one request); proven by §4.2's proof.
 
 ### 4.7 No retries in batch mode
 

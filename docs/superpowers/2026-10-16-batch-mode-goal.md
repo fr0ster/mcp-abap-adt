@@ -77,8 +77,9 @@ activates the group afterwards.
   no polling, no internal retry and keeps no timer. An exception exists only
   by the owner's explicit word (today: `HandlerGet` part `urls`). Each compact
   tool does its one operation, with no mode parameter: `HandlerCreate` one
-  `POST` (an argument its create does not send is refused, by presence, naming
-  it); `HandlerUpdate` only the `PUT` under `lock_handle` (for a domain, a data
+  `POST` (an argument of its schema that the type's create does not send is
+  refused, by presence, naming it; a name no schema declares is stripped by
+  the MCP SDK before any tool sees it, for every tool); `HandlerUpdate` only the `PUT` under `lock_handle` (for a domain, a data
   element or a package the caller passes the whole document in `source_code`);
   `HandlerDelete` only the deletion request (no lock, no check) — a class's
   local include, which ADT cannot delete, is removed by one `PUT` of empty
@@ -97,6 +98,12 @@ activates the group afterwards.
   `HandlerWhereUsed` reads one object; several are the consumer's, through
   batch mode. The full chains stay in the full sets.
   This changes compact's behaviour for its consumers.
+- **Full-set reads: one tool per type, one request per call.** `Get<Type>`
+  takes `part: source | metadata` (default `source`) and returns only what
+  was asked; the same tool in the full set and in `-ro`. The `Read<Type>`
+  tools fold into `Get<Type>` and go. Metadata-only types keep `Get<Type>`
+  without `part`; a function module takes its group as an argument so its
+  source is one request.
 - **Every package has batch mode.** The full, read-only and compact sets all
   serve `BatchBegin`, `BatchEnd` and the answer tool; what a set can do in batch
   mode is whatever of its tools send no request depending on another's answer

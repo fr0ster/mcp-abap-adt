@@ -598,7 +598,12 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
     const batch = new AdtBatchConnection(target, { endpoint: 'communication' });
     owner.begin('communication', { connection: batch, target, recorded: [] });
     const numbers: number[] = [];
-    const recorder = createRecorder(batch, owner, (n) => numbers.push(n));
+    const recorder = createRecorder(
+      batch,
+      owner,
+      (n) => numbers.push(n),
+      'GetProgram',
+    );
     const send = (url: string) => {
       void recorder.makeAdtRequest({ url, method: 'GET', timeout: 0 });
     };
@@ -653,7 +658,12 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
         },
       });
     }) as typeof batch.makeAdtRequest;
-    const recorder = createRecorder(batch, owner, () => undefined);
+    const recorder = createRecorder(
+      batch,
+      owner,
+      () => undefined,
+      'GetProgram',
+    );
     createAdtClient(recorder);
     await expect(
       recorder.makeAdtRequest({
@@ -678,7 +688,12 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
       if (refuse) throw new Error('the batch connection refused the request');
       return record(request);
     }) as typeof batch.makeAdtRequest;
-    const recorder = createRecorder(batch, owner, (n) => numbers.push(n));
+    const recorder = createRecorder(
+      batch,
+      owner,
+      (n) => numbers.push(n),
+      'GetProgram',
+    );
     expect(() =>
       recorder.makeAdtRequest({ url: '/refused', method: 'GET', timeout: 0 }),
     ).toThrow('the batch connection refused the request');

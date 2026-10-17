@@ -1652,8 +1652,12 @@ export abstract class BaseMcpServer extends McpServer {
         open.recorded.push({
           number,
           answer: handlerStarted.then(({ handler }) =>
-            this.recordedAnswer(number, handler, owner, () =>
-              recorder.rawParts(),
+            this.recordedAnswer(
+              number,
+              handler,
+              owner,
+              () => recorder.rawParts(),
+              () => recorder.otherKind(),
             ),
           ),
         });
@@ -1694,11 +1698,13 @@ export abstract class BaseMcpServer extends McpServer {
       handler.catch(() => undefined);
       started({ handler });
       await untilSent(handler, recorder);
-      if (recorder.number() !== undefined) return { content: [] };
       // A request of another session kind than the batch holds: refused
-      // before it was recorded, whatever the handler made of it — no number.
+      // before it was recorded, whatever the handler made of it. With no
+      // part recorded the call has no number; with an earlier part recorded
+      // the words name its number, and that number answers the refusal too.
       const otherKind = recorder.otherKind();
       if (otherKind !== undefined) throw otherKind;
+      if (recorder.number() !== undefined) return { content: [] };
       // Settled without recording: nothing went into an envelope.
       const result = await handler;
       const content = normalizeToolContent(result) as {
@@ -1717,23 +1723,28 @@ export abstract class BaseMcpServer extends McpServer {
    * A recorded call's answer under its number: the tool's answer its
    * handler built from all its parts, as this wrapper answers a tool — its
    * content, `isError` when it failed; a throw read by the failure reader,
-   * else `return_error`. Never rejects.
+   * else `return_error`. A call a part of which was refused for its session
+   * kind (`otherKind`) answers that refusal, whatever its handler built.
+   * Never rejects.
    */
   private async recordedAnswer(
     number: number,
     handler: Promise<unknown>,
     owner: InstanceBatch,
     rawParts: () => BatchAnswer['raw'],
+    otherKind: () => ServerRefusal | undefined,
   ): Promise<BatchAnswer> {
     let answer: Pick<BatchAnswer, 'content' | 'isError'>;
     try {
       const result = await handler;
+      const refused = otherKind();
+      if (refused !== undefined) throw refused;
       const content = normalizeToolContent(result) as BatchAnswer['content'];
       answer = (result as ToolResultLike | undefined)?.isError
         ? { content, isError: true }
         : { content };
     } catch (error) {
-      answer = this.refusalAnswer(error);
+      answer = this.refusalAnswer(otherKind() ?? error);
     }
     return {
       number,

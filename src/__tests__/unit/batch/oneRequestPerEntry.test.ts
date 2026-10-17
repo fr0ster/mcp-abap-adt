@@ -16,7 +16,10 @@
  *   only here;
  * - answered `404`: n requests too — a fallback after a refusal shows here.
  *
- * Eligible: the same requests in all three runs, at least one.
+ * Eligible: the same requests in all three runs, at least one — and all of
+ * one session kind (`requestKind`, as a batch reads it: LOCK, UNLOCK or
+ * stateless), so a recorded call never needs two kinds of batch: a batch
+ * holds one kind, and every batch end sends one envelope.
  */
 
 import { eligible } from '../../../lib/batch/eligibility';
@@ -55,12 +58,13 @@ describe('no request of a batch entry waits for another answer', () => {
   });
 
   it.each(cases)(
-    '%s: every request goes out before any answer, the same answered with a document or 404',
+    '%s: every request goes out before any answer, all of one session kind, the same answered with a document or 404',
     async (_name, c) => {
       const held = await runCase(tools, context, c, 'pending');
       const documented = await runCase(tools, context, c, 'document');
       const refused = await runCase(tools, context, c, 'not-found');
       expect({
+        oneKind: new Set(held.kinds).size,
         held: held.sent.length >= 1,
         document: documented.sent,
         notFound: refused.sent,
@@ -71,6 +75,7 @@ describe('no request of a batch entry waits for another answer', () => {
             ? documented.answer.content?.[0]?.text
             : false,
       }).toEqual({
+        oneKind: 1,
         held: true,
         document: held.sent,
         notFound: held.sent,

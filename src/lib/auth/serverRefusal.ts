@@ -196,14 +196,20 @@ export function batchNotServedWords(tool: string): string {
  * A call whose request is of another session kind than the open batch
  * holds: a batch is homogeneous — LOCK, UNLOCK or stateless, as the first
  * recorded call decided — so every batch end sends one envelope. `kind` and
- * `holds` are the labels of `sessionKindLabel`.
+ * `holds` are the labels of `sessionKindLabel`. `recorded`: the call's
+ * number, when an earlier part of it was recorded before this one was
+ * refused.
  */
 export function batchOtherKindWords(
   tool: string,
   kind: string,
   holds: string,
+  recorded?: number,
 ): string {
-  return `${tool} is a ${kind} request; this batch holds ${holds} requests — record it in the next batch`;
+  const words = `${tool} is a ${kind} request; this batch holds ${holds} requests — record it in the next batch`;
+  return recorded === undefined
+    ? words
+    : `${words}. An earlier part of this call was recorded, under number ${recorded}, and will be sent at the batch end; its answer under that number is this refusal`;
 }
 
 /** The refusals whose words are given at construction. */

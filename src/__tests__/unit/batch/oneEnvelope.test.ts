@@ -241,64 +241,144 @@ describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
   });
 });
 
-describe('a refused request leaves nothing of its kind behind', () => {
-  it("its member's stateful switch is undone: the call's next part, recorded at once, goes stateless into the batch's one envelope", async () => {
-    // A member that asks for stateful, records a LOCK, and records a read
-    // before its own restore could run (adt-clients restores after the
-    // deferred answer).
-    const both = {
-      getName: () => 'lock-then-read',
-      getHandlers: () => [
-        {
-          toolDefinition: {
-            name: 'GetProgram',
-            description: 'GetProgram',
-            inputSchema: {
-              type: 'object',
-              properties: { program_name: { type: 'string' } },
-            },
-          },
-          handler: async (context: HandlerContext, _args: unknown) => {
-            context.connection.setSessionType('stateful');
-            const locked = context.connection.makeAdtRequest({
-              url: '/sap/bc/adt/programs/programs/prog_a?_action=LOCK&accessMode=MODIFY',
-              method: 'POST',
-              timeout: 0,
-            });
-            const read = context.connection.makeAdtRequest({
-              url: '/sap/bc/adt/programs/programs/prog_a/source/main',
-              method: 'GET',
-              timeout: 0,
-            });
-            await Promise.allSettled([locked, read]);
-            return { isError: false, content: [{ type: 'text', text: 'a' }] };
+type Step = 'lock' | 'read' | 'stateful';
+
+/**
+ * `GetProgram` served by a member of the test's own: it records its parts
+ * in `steps` order, synchronously, before awaiting any answer — a `lock`
+ * asks for stateful and records a LOCK, a `read` records a GET, and
+ * `stateful` asks for stateful and records a LOCK without ever restoring.
+ */
+function memberOf(steps: Step[]): IHandlerGroup {
+  return {
+    getName: () => 'mixed-member',
+    getHandlers: () => [
+      {
+        toolDefinition: {
+          name: 'GetProgram',
+          description: 'GetProgram',
+          inputSchema: {
+            type: 'object',
+            properties: { program_name: { type: 'string' } },
           },
         },
-      ],
-      registerHandlers: () => {},
-    } as unknown as IHandlerGroup;
+        handler: async (context: HandlerContext, _args: unknown) => {
+          const parts: Promise<unknown>[] = [];
+          for (const step of steps) {
+            if (step === 'read') {
+              parts.push(
+                context.connection.makeAdtRequest({
+                  url: '/sap/bc/adt/programs/programs/prog_a/source/main',
+                  method: 'GET',
+                  timeout: 0,
+                }),
+              );
+              continue;
+            }
+            context.connection.setSessionType('stateful');
+            parts.push(
+              context.connection.makeAdtRequest({
+                url: '/sap/bc/adt/programs/programs/prog_a?_action=LOCK&accessMode=MODIFY',
+                method: 'POST',
+                timeout: 0,
+              }),
+            );
+            if (step === 'lock') context.connection.setSessionType('stateless');
+          }
+          await Promise.allSettled(parts);
+          return { isError: false, content: [{ type: 'text', text: 'a' }] };
+        },
+      },
+    ],
+    registerHandlers: () => {},
+  } as unknown as IHandlerGroup;
+}
+
+describe('a call with a part of another kind', () => {
+  it('first part refused: the call answers batch_other_kind, its later part of the batch kind is not recorded, no number', async () => {
     const s = await batchStand({
       tools: ['ReadClass'],
       part: sap,
-      groups: [both],
+      groups: [memberOf(['lock', 'read'])],
     });
     s.begin();
     expect(await s.call('ReadClass', { class_name: 'CLAS_A' })).toEqual({
       content: [],
     });
-    expect(await s.call('GetProgram', { program_name: 'PROG_A' })).toEqual({
+    refusedOtherKind(
+      await s.call('GetProgram', { program_name: 'PROG_A' }),
+      'GetProgram',
+      'LOCK',
+      'stateless',
+    );
+    // No number for it: the next call is 2.
+    expect(await s.call('ReadClass', { class_name: 'CLAS_B' })).toEqual({
       content: [],
     });
-    expect(s.owner.kind()).toBe('stateless');
     expect((await s.end()).summary).toEqual({ recorded: 2, failed: [] });
     const sent = envelopes(s);
     expect(sent).toHaveLength(1);
     expect(sent[0]?.session).toBe('stateless');
-    expect(sent[0]?.parts).toEqual([
-      expect.stringMatching(/^GET .*clas_a\/source\/main/),
-      expect.stringMatching(/^GET .*clas_a$/),
-      expect.stringMatching(/^GET .*prog_a\/source\/main$/),
+    expect(sent[0]?.parts.some((p) => p.includes('prog_a'))).toBe(false);
+    await s.close();
+  });
+
+  it('a later part refused: the call answers batch_other_kind naming its number, the earlier part is sent, its number answers the refusal', async () => {
+    const s = await batchStand({
+      tools: ['ReadClass'],
+      part: sap,
+      groups: [memberOf(['read', 'lock', 'read'])],
+    });
+    s.begin();
+    const answer = await s.call('GetProgram', { program_name: 'PROG_A' });
+    const words =
+      'GetProgram is a LOCK request; this batch holds stateless requests — record it in the next batch. An earlier part of this call was recorded, under number 1, and will be sent at the batch end; its answer under that number is this refusal';
+    expect(answer.isError).toBe(true);
+    expect(payloadOf(answer)).toEqual({
+      error: 'batch_other_kind',
+      message: words,
+    });
+    expect(s.owner.kind()).toBe('stateless');
+    expect((await s.end()).summary).toEqual({ recorded: 1, failed: [1] });
+    // The earlier part went; nothing after the refused one, nothing stateful.
+    expect(envelopes(s)).toEqual([
+      {
+        session: 'stateless',
+        parts: [expect.stringMatching(/^GET .*prog_a\/source\/main$/)],
+      },
     ]);
+    const [first] = await s.answers([1]);
+    expect(payloadOf(first as never)).toEqual({
+      error: 'batch_other_kind',
+      message: words,
+    });
+    await s.close();
+  });
+
+  it("a refused part's stateful switch is undone: the next call's read goes stateless into the batch's one envelope", async () => {
+    const s = await batchStand({
+      tools: ['ReadClass'],
+      part: sap,
+      groups: [memberOf(['stateful'])],
+    });
+    s.begin();
+    expect(await s.call('ReadClass', { class_name: 'CLAS_A' })).toEqual({
+      content: [],
+    });
+    refusedOtherKind(
+      await s.call('GetProgram', { program_name: 'PROG_A' }),
+      'GetProgram',
+      'LOCK',
+      'stateless',
+    );
+    expect(await s.call('ReadClass', { class_name: 'CLAS_B' })).toEqual({
+      content: [],
+    });
+    expect((await s.end()).summary).toEqual({ recorded: 2, failed: [] });
+    const sent = envelopes(s);
+    expect(sent).toHaveLength(1);
+    expect(sent[0]?.session).toBe('stateless');
+    expect(sent[0]?.parts).toHaveLength(4);
     await s.close();
   });
 });

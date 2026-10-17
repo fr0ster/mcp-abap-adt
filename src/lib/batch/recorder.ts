@@ -20,8 +20,10 @@
  * another kind is refused `batch_other_kind` before it is recorded — no
  * number taken by it, the batch connection's session switch undone — so
  * every batch end sends one envelope. A call whose every part is of the
- * batch's kind is recorded whole; its refusal is kept (`otherKind()`) for
- * the dispatch to answer.
+ * batch's kind is recorded whole. Once a part is refused, every later part
+ * of the call is refused too; the refusal is kept (`otherKind()`) and is
+ * the call's answer — also when an earlier part was recorded (its words
+ * then say that part is sent at the batch end, under the call's number).
  *
  * Every request the recorder hands back is raced against the batch's signal
  * (taken when the recorder is created): a drop (`drop()`, `dispose()`, the
@@ -64,7 +66,10 @@ export interface Recorder extends IAbapConnection {
   /**
    * The refusal of the call's first request of another session kind than
    * the batch holds (`batch_other_kind`), or `undefined`: nothing of that
-   * request was recorded.
+   * request, nor of any later one of the call, was recorded. When an
+   * earlier part was recorded, its words say so, with the call's number:
+   * that part is sent at the batch end, and the call's answer is this
+   * refusal.
    */
   otherKind(): ServerRefusal | undefined;
 }
@@ -110,7 +115,7 @@ export function createRecorder(
   batch: AdtBatchConnection,
   owner: InstanceBatch,
   onRecorded: (n: number) => void,
-  tool = 'this tool',
+  tool: string,
 ): Recorder {
   const dropped = owner.signal();
   const endpoint = owner.mode() === 'debugger' ? 'debugger' : 'communication';
@@ -134,21 +139,23 @@ export function createRecorder(
     ): Promise<IAdtWireResponse<T, D>> {
       // Of the batch's kind, or refused before anything is recorded: the
       // batch connection's session switch, scoped to this request, is
-      // undone as its own recording would undo it.
+      // undone as its own recording would undo it. Once a part of the call
+      // was refused, every later part is refused with it: the call records
+      // nothing more and takes no number.
       const kind = requestKind(request, batch.getSessionType(), endpoint);
       const holds = owner.kind();
-      if (holds !== undefined && holds !== kind) {
+      if (refused !== undefined || (holds !== undefined && holds !== kind)) {
         batch.setSessionType(unswitched);
-        const refusal = new ServerRefusal(
+        refused ??= new ServerRefusal(
           'batch_other_kind',
           batchOtherKindWords(
             tool,
             sessionKindLabel(kind),
-            sessionKindLabel(holds),
+            sessionKindLabel(holds ?? kind),
+            taken,
           ),
         );
-        refused ??= refusal;
-        const rejected = Promise.reject<IAdtWireResponse<T, D>>(refusal);
+        const rejected = Promise.reject<IAdtWireResponse<T, D>>(refused);
         // A handler that never reads it leaves no unhandled rejection: the
         // dispatch answers the refusal (`otherKind()`).
         rejected.catch(() => undefined);

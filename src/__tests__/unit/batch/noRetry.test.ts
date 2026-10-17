@@ -155,7 +155,12 @@ describe('no retry in batch mode', () => {
       endpoint: 'communication',
     });
     owner.begin('communication', { connection: batch, target, recorded: [] });
-    const recorder = modules.recorder.createRecorder(batch, owner, () => {});
+    const recorder = modules.recorder.createRecorder(
+      batch,
+      owner,
+      () => {},
+      'GetProgram',
+    );
     const read = new modules.adt.AdtClient(recorder as never)
       .getProgram()
       .read({ programName: 'PROG_A' });

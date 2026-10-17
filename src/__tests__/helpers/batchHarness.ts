@@ -8,10 +8,14 @@
  * k === n >= 1 means every request goes out without waiting for one.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { CompactModifyHandlersGroup } from '../../../compact-modify/src/group';
 import { CompactReadOnlyHandlersGroup } from '../../../compact-readonly-entries/src/group';
 import { corpusBody } from '../../lib/adtCorpus';
+import { requestKind, type SessionKind } from '../../lib/batch/sessionKind';
 import {
   HighLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -86,6 +90,8 @@ function runLocation(method: string, url: string): Record<string, string> {
 export interface Counting {
   connection: IAbapConnection;
   sent: string[];
+  /** Each sent request's session kind, as a batch reads it (`requestKind`). */
+  kinds: SessionKind[];
 }
 
 /**
@@ -99,6 +105,8 @@ export function countingConnection(
   headers: Record<string, string> = {},
 ): Counting {
   const sent: string[] = [];
+  const kinds: SessionKind[] = [];
+  let session: 'stateful' | 'stateless' = 'stateless';
   const documentFor = (method: string, url: string): string => {
     if (url.includes('_action=LOCK')) return LOCK_SUCCESS_XML;
     if (body !== undefined) return body;
@@ -121,9 +129,15 @@ export function countingConnection(
     getSessionId() {
       return null;
     },
-    setSessionType() {},
-    async makeAdtRequest(options: { method: string; url: string }) {
+    setSessionType(type: 'stateful' | 'stateless') {
+      session = type;
+    },
+    getSessionType() {
+      return session;
+    },
+    async makeAdtRequest(options: IAbapRequestOptions) {
       sent.push(`${options.method} ${options.url}`);
+      kinds.push(requestKind(options, session, 'communication'));
       if (mode === 'pending') return new Promise<never>(() => {});
       if (mode === 'not-found') {
         const error = new Error(
@@ -150,7 +164,7 @@ export function countingConnection(
       };
     },
   };
-  return { connection: connection as unknown as IAbapConnection, sent };
+  return { connection: connection as unknown as IAbapConnection, sent, kinds };
 }
 
 /** The served tools of the full and compact sets, each reading the context at call time. */
@@ -172,6 +186,7 @@ export type Answer = { isError?: boolean; content?: Array<{ text?: string }> };
 
 export interface Ran {
   sent: string[];
+  kinds: SessionKind[];
   answer?: Answer;
   threw?: unknown;
 }
@@ -203,11 +218,11 @@ export async function runCase(
   if (mode === 'pending') {
     call.catch(() => undefined);
     await settle();
-    return { sent: [...counting.sent] };
+    return { sent: [...counting.sent], kinds: [...counting.kinds] };
   }
   try {
-    return { sent: counting.sent, answer: await call };
+    return { sent: counting.sent, kinds: counting.kinds, answer: await call };
   } catch (threw) {
-    return { sent: counting.sent, threw };
+    return { sent: counting.sent, kinds: counting.kinds, threw };
   }
 }

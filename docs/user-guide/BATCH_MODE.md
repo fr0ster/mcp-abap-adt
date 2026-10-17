@@ -83,8 +83,11 @@ batch holds one kind: its first recorded call decides it, and a call of another 
 `batch_other_kind` before it records anything (no number): "<tool> is a <kind> request; this
 batch holds <kind> requests — record it in the next batch". The phases above are exactly these
 kinds: create, write, read back and check are stateless batches, lock a LOCK batch, unlock an
-UNLOCK batch — each phase its own batch, one envelope each. A call that puts several independent
-requests into the batch has every one of them of the batch's kind.
+UNLOCK batch — each phase its own batch, one envelope each. Every recordable call's requests are
+of one kind (the eligibility proof checks each listed call). Should a part of a call be refused
+anyway, the call answers `batch_other_kind` and records nothing more; if an earlier part of it was
+already recorded, the words say so with its number — that part is sent at `BatchEnd`, and its
+number answers the same refusal.
 
 ## What is refused
 

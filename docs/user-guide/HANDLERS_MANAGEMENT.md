@@ -58,8 +58,9 @@ Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 
 4. **compact** - Compact facade operations — served by their own commands, `mcp-abap-adt-compact`
    (`@mcp-abap-adt/compact`, every tool below and four debugger verbs: `HandlerDebugStart`,
    `HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`) and `mcp-abap-adt-compact-ro`
-   (`@mcp-abap-adt/compact-ro`, the 17 that change nothing: no create, update, delete,
-   activate, lock, unlock, unit-test run or profiler run, and no debugger verb).
+   (`@mcp-abap-adt/compact-ro`, the 17 that change nothing: the reads, searches, where-used,
+   checks and validations, the unit-test status and result reads, the profiler list and view,
+   the dump list and view and the service-binding type list).
    - `HandlerValidate`
    - `HandlerActivate`
    - `HandlerLock`

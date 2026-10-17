@@ -674,18 +674,18 @@ export const compactProfileRunSchema = {
     target_type: {
       type: 'string',
       enum: ['CLASS', 'PROGRAM'],
-      description: 'Profile execution target kind.',
+      description: 'Run target kind.',
     },
-    class_name: { type: 'string', description: 'Class name for profiling.' },
+    class_name: { type: 'string', description: 'Class to run.' },
     program_name: {
       type: 'string',
-      description: 'Program name for profiling.',
+      description: 'Program to run.',
     },
     profiler_id: {
       type: 'string',
       minLength: 1,
       description:
-        'The profiler id of a scheduled trace: the run goes under that trace. Without it the run is plain.',
+        'The profiler id of a scheduled trace. Given, the run goes under that trace; absent, the run is plain.',
     },
     background: COMPACT_BACKGROUND_PROPERTY,
   },

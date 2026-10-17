@@ -563,10 +563,10 @@ per request.
 
 **Parameters:**
 
-- `target_type` (required) — Profile execution target kind.
-- `class_name` — Class name for profiling.
-- `program_name` — Program name for profiling.
-- `profiler_id` — The profiler id of a scheduled trace: the run goes under that trace. Without it the run is plain.
+- `target_type` (required) — Run target kind.
+- `class_name` — Class to run.
+- `program_name` — Program to run.
+- `profiler_id` — The profiler id of a scheduled trace. Given, the run goes under that trace; absent, the run is plain.
 - `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
 
 ### HandlerDebugStart

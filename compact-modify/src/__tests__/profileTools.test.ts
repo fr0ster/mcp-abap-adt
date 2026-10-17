@@ -5,9 +5,9 @@
  * - `HandlerProfileSchedule` is the one `POST
  *   /sap/bc/adt/runtime/traces/abaptraces/parameters`, answered
  *   `{ success, profiler_id }`: the id SAP gave in `Location`.
- * - `HandlerProfileRun` is the one run of a class or a program with that
- *   `profiler_id` (required). No feed snapshot, no schedule, no trace search,
- *   no timer.
+ * - `HandlerProfileRun` is the one run of a class or a program: under that
+ *   `profiler_id` when given (optional), plain when absent. No feed snapshot,
+ *   no schedule, no trace search, no timer.
  *
  * Real adt-clients code runs over the batch proof's counting connection, held
  * open, answered with a document and answered `404` alike.

@@ -215,6 +215,57 @@ method, a program's include, …), has no description in the batched answer. `Ge
 Where the destination has no communication batch, the sequential reads answer the descriptions
 of the node structure, as before.
 
+### Batched against sequential: measured 2026-10-18 on the system
+
+`src/__tests__/integration/batch/batchedReadsTiming.test.ts`, on one on-premise system, over HTTP
+and over RFC (the same system through its gateway). Each tool read "the package" (the test
+config's default package) and "a larger package" (the config's super package, its subpackages
+included where the tool walks them); each path three times, alternating which goes first, after
+one untimed sequential read. The sequential path is a destination already marked not served (no
+envelope); the batched path is a fresh destination, which learned "served" from its first
+envelope. ms is the median wall time of the three; requests are the round trips (envelopes
+included); parts are the requests inside the envelopes. Arguments: `GetPackageContents` with
+`include_subpackages: true`; `GetPackageTree` defaults; `GetObjectsList` and `GetObjectInfo`
+(`maxDepth: 5`, enriched) on `DEVC/K`; `HandlerGet` part `contents`; `SearchSource` for `DATA`.
+
+| Tool | Package | Transport | Sequential ms | Sequential requests | Batched ms | Batched requests = envelopes | Batched parts |
+|---|---|---|---:|---:|---:|---:|---:|
+| GetPackageContents | the package | HTTP | 1005 | 8 | 830 | 5 | 10 |
+| GetPackageContents | a larger package | HTTP | 4920 | 38 | 2398 | 5 | 114 |
+| GetPackageTree | the package | HTTP | 1174 | 9 | 921 | 5 | 11 |
+| GetPackageTree | a larger package | HTTP | 4986 | 39 | 2502 | 5 | 115 |
+| GetObjectsList | the package | HTTP | 1240 | 10 | 531 | 3 | 10 |
+| GetObjectsList | a larger package | HTTP | 1242 | 10 | 506 | 3 | 10 |
+| GetObjectInfo | the package | HTTP | 1271 | 10 | 966 | 6 | 12 |
+| GetObjectInfo | a larger package | HTTP | 5525 | 43 | 2654 | 6 | 119 |
+| HandlerGet contents | the package | HTTP | 780 | 6 | 497 | 3 | 8 |
+| HandlerGet contents | a larger package | HTTP | 762 | 6 | 701 | 3 | 17 |
+| SearchSource | the package | HTTP | 1155 | 9 | 776 | 5 | 9 |
+| SearchSource | a larger package | HTTP | 5850 | 69 | 1466 | 6 | 68 |
+| GetPackageContents | the package | RFC | 1701 | 8 | 1172 | 5 | 10 |
+| GetPackageContents | a larger package | RFC | 8036 | 38 | 2913 | 5 | 114 |
+| GetPackageTree | the package | RFC | 1924 | 9 | 1157 | 5 | 11 |
+| GetPackageTree | a larger package | RFC | 8297 | 39 | 2876 | 5 | 115 |
+| GetObjectsList | the package | RFC | 2065 | 10 | 688 | 3 | 10 |
+| GetObjectsList | a larger package | RFC | 2055 | 10 | 669 | 3 | 10 |
+| GetObjectInfo | the package | RFC | 2136 | 10 | 1385 | 6 | 12 |
+| GetObjectInfo | a larger package | RFC | 9112 | 43 | 2938 | 6 | 119 |
+| HandlerGet contents | the package | RFC | 1278 | 6 | 721 | 3 | 8 |
+| HandlerGet contents | a larger package | RFC | 1556 | 6 | 956 | 3 | 17 |
+| SearchSource | the package | RFC | 1890 | 9 | 1101 | 5 | 9 |
+| SearchSource | a larger package | RFC | 14370 | 69 | 1942 | 6 | 68 |
+
+Every batched read was faster; its envelopes did not grow with the subtree (5 or 6 for the larger
+package), while the sequential requests did. The batched package walks and `GetObjectInfo` send
+more parts than the sequential path sends requests: the metadata read per object behind the
+descriptions (above). The answers were equal but for one difference on the larger package, in
+`GetPackageContents`, `GetPackageTree` and `GetObjectInfo` alike: an access control (`DCLS/DL`)
+has its description in the sequential answer and none in the batched one — the "type with no
+`Get<Type>` metadata read" case above. Those three cases fail the test's equality check on this
+system; their timings are written before the check.
+
+Not measured in this run: ABAP Cloud, and the tools of the internal batches not yet built.
+
 ## What is refused
 
 While a batch is open only the batch tools and the open batch's recordable calls are served.

@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.',
+          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
         default: 'active',
       },
     },
@@ -101,7 +101,8 @@ export async function handleGetFunctionModule(
       function_module_name: functionModuleName,
       function_group_name: functionGroupName,
       version,
-      function_module_data: source.raw,
+      part,
+      source: source.raw,
     }),
   );
 }

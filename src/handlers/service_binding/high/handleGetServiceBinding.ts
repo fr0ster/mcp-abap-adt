@@ -88,7 +88,8 @@ export async function handleGetServiceBinding(
       success: true,
       service_binding_name: bindingName,
       response_format: responseFormat,
-      payload: parseServiceBindingPayload(source.raw, responseFormat),
+      part,
+      source: parseServiceBindingPayload(source.raw, responseFormat),
     }),
   );
 }

@@ -72,7 +72,7 @@ describe('Message Class (MSAG) CRUD tools', () => {
       { name: 'ZMY_MSGS' },
       expect.objectContaining({ analyse: expect.any(Function) }),
     );
-    expect(payload(result).message_class).toBe(metadata);
+    expect(payload(result).metadata).toBe(metadata);
   });
 
   // GetMessageClass calls readMetadata, not read (task 18: `.read()` does
@@ -248,6 +248,6 @@ describe('Message Class (MSAG) CRUD tools', () => {
       undefined,
       expect.objectContaining({ analyse: expect.any(Function) }),
     );
-    expect(payload(result).message).toBe(classDocument);
+    expect(payload(result).metadata).toBe(classDocument);
   });
 });

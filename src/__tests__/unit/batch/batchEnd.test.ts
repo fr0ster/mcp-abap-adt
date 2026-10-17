@@ -213,7 +213,7 @@ describe('BatchEnd', () => {
     expect(payloadOf(entries[0] as Answer).lock_handle).toBe(
       LOCK_HANDLE_OF_XML,
     );
-    expect(payloadOf(entries[1] as Answer).program_data).toContain(
+    expect(payloadOf(entries[1] as Answer).source).toContain(
       'source of /sap/bc/adt/programs/programs/prog_a/source/main',
     );
     expect(payloadOf(entries[2] as Answer)).toMatchObject({

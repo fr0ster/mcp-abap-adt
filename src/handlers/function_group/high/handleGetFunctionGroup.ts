@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetFunctionGroup',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP function group definition. Supports reading active or inactive version.',
+    'Read an ABAP function group in one request: its ADT metadata document (package, description, contents). Returns it under `metadata`, with `part: "metadata"`.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -65,7 +65,8 @@ export async function handleGetFunctionGroup(
       success: true,
       function_group_name: functionGroupName,
       version,
-      function_group_data: metadata.raw,
+      part: 'metadata',
+      metadata: metadata.raw,
     }),
   );
 }

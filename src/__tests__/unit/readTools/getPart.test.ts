@@ -34,8 +34,6 @@ import { silentLogger } from '../../helpers/lowToCompact';
 interface SourceType {
   tool: string;
   args: Record<string, unknown>;
-  /** The answer's key that carries the source. */
-  sourceKey: string;
   /** The one source request's path fragment; absent when it is the object's own URI. */
   sourcePath?: string;
 }
@@ -44,78 +42,65 @@ const SOURCE_TYPES: SourceType[] = [
   {
     tool: 'GetClass',
     args: { class_name: 'CLAS_A' },
-    sourceKey: 'source_code',
     sourcePath: '/oo/classes/clas_a/source/main',
   },
   {
     tool: 'GetInterface',
     args: { interface_name: 'INTF_A' },
-    sourceKey: 'interface_data',
     sourcePath: '/oo/interfaces/intf_a/source/main',
   },
   {
     tool: 'GetProgram',
     args: { program_name: 'PROG_A' },
-    sourceKey: 'program_data',
     sourcePath: '/programs/programs/prog_a/source/main',
   },
   {
     tool: 'GetTable',
     args: { table_name: 'TAB_A' },
-    sourceKey: 'table_data',
     sourcePath: '/ddic/tables/tab_a/source/main',
   },
   {
     tool: 'GetStructure',
     args: { structure_name: 'STRU_A' },
-    sourceKey: 'structure_data',
     sourcePath: '/ddic/structures/stru_a/source/main',
   },
   {
     tool: 'GetDdl',
     args: { ddl_name: 'DDL_A' },
-    sourceKey: 'ddl_data',
     sourcePath: '/ddic/ddl/sources/ddl_a/source/main',
   },
   {
     tool: 'GetServiceDefinition',
     args: { service_definition_name: 'SRVD_A' },
-    sourceKey: 'service_definition_data',
     sourcePath: '/ddic/srvd/sources/srvd_a/source/main',
   },
   {
     tool: 'GetServiceBinding',
     args: { service_binding_name: 'SRVB_A' },
-    sourceKey: 'payload',
   },
   {
     tool: 'GetBehaviorDefinition',
     args: { behavior_definition_name: 'BDEF_A' },
-    sourceKey: 'behavior_definition_data',
     sourcePath: '/bo/behaviordefinitions/bdef_a/source/main',
   },
   {
     tool: 'GetBehaviorImplementation',
     args: { behavior_implementation_name: 'BIMP_A' },
-    sourceKey: 'behavior_implementation_data',
     sourcePath: '/oo/classes/bimp_a/source/main',
   },
   {
     tool: 'GetMetadataExtension',
     args: { metadata_extension_name: 'DDLX_A' },
-    sourceKey: 'metadata_extension_data',
     sourcePath: '/ddic/ddlx/sources/ddlx_a/source/main',
   },
   {
     tool: 'GetFunctionModule',
     args: { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
-    sourceKey: 'function_module_data',
     sourcePath: '/functions/groups/fugr_a/fmodules/fm_a/source/main',
   },
   {
     tool: 'GetFunctionInclude',
     args: { function_group_name: 'FUGR_A', include_name: 'INCL_A' },
-    sourceKey: 'source_code',
     sourcePath: '/functions/groups/fugr_a/includes/incl_a/source/main',
   },
 ];
@@ -176,7 +161,8 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
           if (mode === 'document') {
             expect(ran.answer?.isError).toBe(false);
             const payload = payloadOf(ran.answer?.content?.[0]?.text);
-            expect(payload).toHaveProperty(t.sourceKey);
+            expect(payload).toHaveProperty('source');
+            expect(payload.part).toBe('source');
             expect(payload).not.toHaveProperty('metadata');
           }
           if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
@@ -193,7 +179,7 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
             expect(ran.answer?.isError).toBe(false);
             const payload = payloadOf(ran.answer?.content?.[0]?.text);
             expect(payload).toHaveProperty('metadata');
-            expect(payload).not.toHaveProperty(t.sourceKey);
+            expect(payload).not.toHaveProperty('source');
           }
           if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
         },
@@ -206,7 +192,8 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
           expect(ran.sent[0]?.toLowerCase()).toContain(t.sourcePath);
         }
         const payload = payloadOf(ran.answer?.content?.[0]?.text);
-        expect(payload).toHaveProperty(t.sourceKey);
+        expect(payload).toHaveProperty('source');
+        expect(payload.part).toBe('source');
         expect(payload).not.toHaveProperty('metadata');
       });
     },
@@ -238,6 +225,20 @@ describe('Get<Type>: one request per call, only the part asked for', () => {
         const ran = await run(tool, args, mode);
         expect(ran.sent).toHaveLength(1);
       }
+    },
+  );
+
+  // One answer shape per part, whatever the type: `part` and `metadata`.
+  // (A message's read needs a class document holding it: its own test.)
+  it.each(METADATA_ONLY.filter(([tool]) => tool !== 'GetMessageClassMessage'))(
+    '%s answers { part: "metadata", metadata }',
+    async (tool, args) => {
+      const ran = await run(tool, args, 'document');
+      expect(ran.answer?.isError).toBe(false);
+      const payload = payloadOf(ran.answer?.content?.[0]?.text);
+      expect(payload.part).toBe('metadata');
+      expect(payload).toHaveProperty('metadata');
+      expect(payload).not.toHaveProperty('source');
     },
   );
 });

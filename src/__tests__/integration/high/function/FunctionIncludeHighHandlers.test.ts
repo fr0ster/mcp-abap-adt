@@ -312,8 +312,8 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
         expect(readData.success).toBe(true);
         expect(readData.include_name).toBe(includeName.toUpperCase());
         // Source should round-trip: assert a stable token from the snippet survives.
-        if (readData.source_code) {
-          expect(String(readData.source_code)).toContain(
+        if (readData.source) {
+          expect(String(readData.source)).toContain(
             'function-include-roundtrip',
           );
         }

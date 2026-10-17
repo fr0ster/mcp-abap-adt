@@ -116,7 +116,7 @@ describe('no retry in batch mode', () => {
     const s = await batchStand({ tools: ['GetProgram'], part: picky });
     const answer = await s.call('GetProgram', { program_name: 'PROG_A' });
     expect(answer.isError).toBeFalsy();
-    expect(payloadOf(answer).program_data).toBe('source text');
+    expect(payloadOf(answer).source).toBe('source text');
     const directs = s.built.flatMap((b) => b.directs);
     expect(directs).toHaveLength(2);
     const accept = (i: number) =>

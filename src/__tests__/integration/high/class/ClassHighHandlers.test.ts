@@ -284,8 +284,8 @@ describe('Class High-Level Handlers Integration', () => {
         const getData = parseHandlerResponse(getResponse);
         expect(getData.success).toBe(true);
         expect(getData.class_name).toBe(objectName);
-        expect(getData.source_code).toBeDefined();
-        expect(typeof getData.source_code).toBe('string');
+        expect(getData.source).toBeDefined();
+        expect(typeof getData.source).toBe('string');
 
         logger?.success(`✅ get: ${objectName} completed successfully`);
 

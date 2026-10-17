@@ -29,7 +29,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.',
+          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
         default: 'active',
       },
     },
@@ -78,7 +78,8 @@ export async function handleGetProgram(
       success: true,
       program_name: programName,
       version,
-      program_data: source.raw,
+      part,
+      source: source.raw,
     }),
   );
 }

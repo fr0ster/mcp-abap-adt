@@ -23,7 +23,7 @@ Every binary serves it, on stdio, Streamable HTTP and SSE:
 2. **Recording.** From now on, a call of a tool none of whose requests depends on another's
    answer is recorded and answers nothing (an empty content). Every recorded call is numbered,
    in the order made, from 1 — one number per call, covering every request it put into the
-   batch (a `Read<Type>` sends its source and its metadata together, under its one number).
+   batch (`GetObjectVersionDiff` sends its two version reads together, under its one number).
    A call refused, or one whose handler refused its arguments before sending anything, takes no
    number. A batch holds one kind of request — LOCK, UNLOCK or stateless — and its first recorded
    call decides which; a call of another kind is refused `batch_other_kind` (see Phases).

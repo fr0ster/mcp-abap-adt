@@ -29,7 +29,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['active', 'inactive'],
         description:
-          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified, not yet activated version.',
+          'Version of the source: "active" (default) for the deployed version, "inactive" for the modified version awaiting activation.',
         default: 'active',
       },
     },
@@ -79,7 +79,8 @@ export async function handleGetInterface(
       success: true,
       interface_name: interfaceName,
       version,
-      interface_data: source.raw,
+      part,
+      source: source.raw,
     }),
   );
 }

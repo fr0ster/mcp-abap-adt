@@ -23,7 +23,6 @@ import { handleGetServiceDefinition } from '../../../handlers/service_definition
 import { handleGetStructure } from '../../../handlers/structure/high/handleGetStructure';
 import { handleGetTable } from '../../../handlers/table/high/handleGetTable';
 import {
-  fakeClientOf,
   okResponse,
   reading,
   recordAnalyse,
@@ -43,7 +42,6 @@ interface Row {
   handler: (ctx: any, args: any) => Promise<any>;
   args: Record<string, unknown>;
   identity: Record<string, string>;
-  sourceKey: string;
 }
 
 const rows: Row[] = [
@@ -52,102 +50,83 @@ const rows: Row[] = [
     handler: handleGetClass,
     args: { class_name: 'zc' },
     identity: { class_name: 'ZC' },
-    sourceKey: 'source_code',
   },
   {
     name: 'GetInterface',
     handler: handleGetInterface,
     args: { interface_name: 'zif' },
     identity: { interface_name: 'ZIF' },
-    sourceKey: 'interface_data',
   },
   {
     name: 'GetProgram',
     handler: handleGetProgram,
     args: { program_name: 'zp' },
     identity: { program_name: 'ZP' },
-    sourceKey: 'program_data',
   },
   {
     name: 'GetTable',
     handler: handleGetTable,
     args: { table_name: 'zt' },
     identity: { table_name: 'ZT' },
-    sourceKey: 'table_data',
   },
   {
     name: 'GetStructure',
     handler: handleGetStructure,
     args: { structure_name: 'zs' },
     identity: { structure_name: 'ZS' },
-    sourceKey: 'structure_data',
   },
   {
     name: 'GetDdl',
     handler: handleGetDdl,
     args: { ddl_name: 'zddl' },
     identity: { ddl_name: 'ZDDL' },
-    sourceKey: 'ddl_data',
   },
   {
     name: 'GetServiceDefinition',
     handler: handleGetServiceDefinition,
     args: { service_definition_name: 'zsd' },
     identity: { service_definition_name: 'ZSD' },
-    sourceKey: 'service_definition_data',
   },
   {
     name: 'GetServiceBinding',
     handler: handleGetServiceBinding,
     args: { service_binding_name: 'zsb', response_format: 'plain' },
     identity: { service_binding_name: 'ZSB' },
-    sourceKey: 'payload',
   },
   {
     name: 'GetBehaviorDefinition',
     handler: handleGetBehaviorDefinition,
     args: { behavior_definition_name: 'zbd' },
     identity: { behavior_definition_name: 'ZBD' },
-    sourceKey: 'behavior_definition_data',
   },
   {
     name: 'GetBehaviorImplementation',
     handler: handleGetBehaviorImplementation,
     args: { behavior_implementation_name: 'zbi' },
     identity: { behavior_implementation_name: 'ZBI' },
-    sourceKey: 'behavior_implementation_data',
   },
   {
     name: 'GetMetadataExtension',
     handler: handleGetMetadataExtension,
     args: { metadata_extension_name: 'zme' },
     identity: { metadata_extension_name: 'ZME' },
-    sourceKey: 'metadata_extension_data',
   },
   {
     name: 'GetFunctionModule',
     handler: handleGetFunctionModule,
     args: { function_module_name: 'zfm', function_group_name: 'zfg' },
     identity: { function_module_name: 'ZFM', function_group_name: 'ZFG' },
-    sourceKey: 'function_module_data',
   },
   {
     name: 'GetFunctionInclude',
     handler: handleGetFunctionInclude,
     args: { function_group_name: 'zfg', include_name: 'zinc' },
     identity: { function_group_name: 'ZFG', include_name: 'ZINC' },
-    sourceKey: 'source_code',
   },
 ];
 
 const SOURCE = 'SOURCE MARKER';
 const METADATA = 'METADATA MARKER';
-const both = () =>
-  fakeClientOf({
-    read: async () => okResponse(reading(SOURCE)),
-    readMetadata: async () => okResponse(reading(METADATA)),
-  });
-
 describe.each(rows.map((r) => [r.name, r] as const))('%s', (_name, row) => {
   it('part source answers the source from read, and nothing of the metadata', async () => {
     const seen = recordAnalyse({
@@ -158,7 +137,8 @@ describe.each(rows.map((r) => [r.name, r] as const))('%s', (_name, row) => {
     const result = await row.handler(context, { ...row.args, part: 'source' });
     expect(result.isError).toBe(false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload[row.sourceKey]).toBe(SOURCE);
+    expect(payload.source).toBe(SOURCE);
+    expect(payload.part).toBe('source');
     expect(payload).not.toHaveProperty('metadata');
     for (const [field, value] of Object.entries(row.identity)) {
       expect(payload[field]).toBe(value);
@@ -183,7 +163,7 @@ describe.each(rows.map((r) => [r.name, r] as const))('%s', (_name, row) => {
     const payload = JSON.parse(result.content[0].text);
     expect(payload.metadata).toBe(METADATA);
     expect(payload.part).toBe('metadata');
-    expect(payload).not.toHaveProperty(row.sourceKey);
+    expect(payload).not.toHaveProperty('source');
     for (const [field, value] of Object.entries(row.identity)) {
       expect(payload[field]).toBe(value);
     }
@@ -194,8 +174,13 @@ describe.each(rows.map((r) => [r.name, r] as const))('%s', (_name, row) => {
   });
 
   it('a part other than source or metadata is refused before any call', async () => {
-    fakeClient = both();
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
     const result = await row.handler(context, { ...row.args, part: 'urls' });
+    expect([seen.countOf('read'), seen.countOf('readMetadata')]).toEqual([
+      0, 0,
+    ]);
+    expect(seen.calls).toEqual([]);
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain(
       'part must be "source" or "metadata"',

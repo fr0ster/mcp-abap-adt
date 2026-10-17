@@ -182,7 +182,7 @@ ENDCLASS.`;
       const getData = parseHandlerResponse(getResponse);
       expect(getData.success).toBe(true);
       // The source the update wrote, not the shell the create made.
-      expect(String(getData.source_code)).toContain(
+      expect(String(getData.source)).toContain(
         'Updated by MCP transport CRUD test',
       );
       logger?.success('Step 3: GetClass succeeded');

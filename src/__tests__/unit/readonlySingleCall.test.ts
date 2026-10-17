@@ -1146,10 +1146,10 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
 /**
  * `GetFunctionModule`, mapped from the real captured source: one `read`
  * through getFunctionModule() at the group the caller gave, the source under
- * function_module_data.
+ * source.
  */
 describe('GetFunctionModule, mapped from a real captured source', () => {
-  it('calls read alone, through getFunctionModule(), and answers the real source under function_module_data', async () => {
+  it('calls read alone, through getFunctionModule(), and answers the real source under source', async () => {
     const source = corpusBody(
       'read-function-module-source-text--01-read-source',
     );
@@ -1175,7 +1175,7 @@ describe('GetFunctionModule, mapped from a real captured source', () => {
     const payload = JSON.parse(result.content[0].text);
     expect(payload.function_module_name).toBe('Z_MCP_SHR_FM');
     expect(payload.function_group_name).toBe('ZMCP_SHR_FGRP');
-    expect(payload.function_module_data).toBe(source);
+    expect(payload.source).toBe(source);
     expect(double.factory).toBe('getFunctionModule');
 
     expect(calls.map((c) => c.member)).toEqual(['read']);

@@ -845,11 +845,41 @@ only the document asked for. The `-ro` binaries, which served the `Read<Type>` t
 `Get<Type>` tools. A `Read<Type>` call answered the source and the metadata together (two requests):
 make two calls, or one with the part you need.
 
-- `part: "source"` answers as `Get<Type>` did before (`source_code`, `interface_data`,
-  `program_data`, … with `version`).
-- `part: "metadata"` answers `{ success, <name>, part: "metadata", metadata }`, the ADT metadata
-  document as SAP sent it (`GetServiceBinding`: in its `response_format`). `version` reads the
-  source only.
+- **One answer shape per part, for every type.** `part: "source"` answers
+  `{ success, <name fields>, version, part: "source", source }`; `part: "metadata"` answers
+  `{ success, <name fields>, part: "metadata", metadata }` — the ADT metadata document as SAP sent
+  it (`GetServiceBinding`: both parts in its `response_format`, with `response_format`; `GetPackage`:
+  the summary, the details or the document, per `detail`). The metadata-only types answer the
+  metadata shape. `version` reads the source only. The type-specific keys are gone — read
+  `source` / `metadata` instead:
+
+  | Tool | Was | Now |
+  |---|---|---|
+  | `GetClass` | `source_code` | `source` |
+  | `GetInterface` | `interface_data` | `source` |
+  | `GetProgram` | `program_data` | `source` |
+  | `GetTable` | `table_data` | `source` |
+  | `GetStructure` | `structure_data` | `source` |
+  | `GetDdl` | `ddl_data` | `source` |
+  | `GetServiceDefinition` | `service_definition_data` | `source` |
+  | `GetServiceBinding` | `payload` | `source` |
+  | `GetBehaviorDefinition` | `behavior_definition_data` | `source` |
+  | `GetBehaviorImplementation` | `behavior_implementation_data` | `source` |
+  | `GetMetadataExtension` | `metadata_extension_data` | `source` |
+  | `GetFunctionModule` | `function_module_data` | `source` |
+  | `GetFunctionInclude` (was `ReadFunctionInclude`) | `source_code`, `metadata` | `source` (part source), `metadata` (part metadata) |
+  | `GetDomain` | `domain_data` | `metadata` |
+  | `GetDataElement` | `data_element_data` | `metadata` |
+  | `GetFunctionGroup` | `function_group_data` | `metadata` |
+  | `GetPackage` | `package` (terse, full), `package_data` (raw) | `metadata` |
+  | `GetMessageClass` | `message_class` | `metadata` |
+  | `GetMessageClassMessage` | `message` | `metadata` |
+
+  Compact `HandlerGet` answers what the `Get<Type>` it routes to answers: `part: "source"` of a type
+  with a source `{ part: "source", source }`, `part: "metadata"` `{ part: "metadata", metadata }`
+  for every type (it answered `domain_data`, `data_element_data`, `function_group_data`,
+  `package` / `package_data` for the metadata-only types, and `source_code` + `metadata` through
+  `Read<Type>` for the others; the source part answered the type keys above).
 - `GetFunctionModule` reads at the `function_group_name` given, in one request: it no longer reads
   the metadata first to compare the group with the module's own (`containerRef`), and answers the
   group it was given.
@@ -858,7 +888,7 @@ make two calls, or one with the part you need.
   with `part: "metadata"` (`adtcore:type`).
 - `ReadFunctionInclude` is `GetFunctionInclude`, with the same arguments and `part`.
 - For the metadata-only types `Get<Type>` takes no `part`: it reads the one metadata document, as
-  `Read<Type>` did, under its own keys.
+  `Read<Type>` did, and answers it under `metadata`.
 - Embedders: `ReadVsGetDedupStrategy` is gone (exported from `@mcp-abap-adt/lib/handlers` and
   `EmbeddableMcpServer`'s default). `ReadOnlyHandlersGroup` serves the `Get<Type>` tools and withholds
   each one a high group of the same registry serves under the same name, so a tool is listed once;
@@ -985,6 +1015,15 @@ transport's options only:
 | `mcp-abap-adt-compact --transport=http --exposition=ro` | `@mcp-abap-adt/compact-http-ro` | `mcp-abap-adt-compact-http-ro` |
 | `mcp-abap-adt-compact --transport=sse --exposition=ro` | `@mcp-abap-adt/compact-sse-ro` | `mcp-abap-adt-compact-sse-ro` |
 
+- **`HandlerGet` `part: "source"` / `"metadata"`: one request, one answer shape.** `part: "metadata"`
+  answers `{ part: "metadata", metadata }` for every type — one `GET` of the metadata document (a
+  type with a source sent its source read beside it, and answered `source_code` too; the
+  metadata-only types answered `domain_data`, `data_element_data`, `function_group_data`,
+  `package` / `package_data`). `part: "source"` of a type with a source answers
+  `{ part: "source", source }` (it answered `source_code`, `interface_data`, `program_data`, … per
+  type). `FUNCTION_MODULE` reads at the `function_group_name` given, in one request, and is now
+  recorded in batch mode for both parts. The per-type keys are in "Full binaries: one
+  `Get<Type>` per type" above.
 - Each binary is its full counterpart's launcher with the compact tool set, nothing else:
   `mcp-abap-adt-compact` takes `mcp-abap-adt`'s options (the destination, the login),
   `mcp-abap-adt-compact-http` `mcp-abap-adt-http`'s (credentials from each request's `x-sap-*`

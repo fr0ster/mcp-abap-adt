@@ -165,7 +165,7 @@ describe('GetFunctionModule Handler Integration (read-only)', () => {
       expect(data.success).toBe(true);
       expect(data.function_module_name).toBe(functionModuleName.toUpperCase());
       expect(data.function_group_name).toBe(functionGroupName.toUpperCase());
-      expect(data.function_module_data).toBeDefined();
+      expect(data.source).toBeDefined();
 
       testLogger?.info(`✅ GetFunctionModule completed: ${functionModuleName}`);
     },

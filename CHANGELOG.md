@@ -69,6 +69,7 @@ The server split by transport and tool set into packages of their own — sevent
 - Every ADT session the server opens ends with a logoff — a request's instance, a pooled one at its state's end, a debugger's, a long read's, a background run's, a lock session's.
 - **Every flag row of the YAML configuration refuses a list or a map**: `[true]` (or `{ … }`) was accepted for a boolean option and is now refused at start like any other bad value.
 - **The paired reads send their two requests at once**: `GetObjectVersionDiff` sends its two version reads together, neither waiting for the other — the second is sent even when the first fails. The answer is unchanged.
+- **An SAP user id a transport tool names is sent in upper case, trimmed**: `CreateTransport` `owner` (compact `HandlerCreate` `TRANSPORT` too) and `CreateTransportTask` `target_user`; `ListTransports` matches its `user` filter in upper case. SAP stores user ids in upper case: a lower-case owner was refused `400` "User … does not exist in the system (or locked)" (measured).
 
 ### Measured
 

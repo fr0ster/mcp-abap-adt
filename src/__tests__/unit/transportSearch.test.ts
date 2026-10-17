@@ -114,6 +114,21 @@ describe('ListTransports asks for the saved search rather than assuming one', ()
     expect(payload.count).toBe(1);
   });
 
+  it('matches a lower-case user against the upper-case owner SAP stores', async () => {
+    const owned =
+      '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:workbench><tm:modifiable><tm:request tm:number="TRLK900998" tm:desc="owned" tm:type="K" tm:status="D" tm:owner="SAPUSER01"/></tm:modifiable></tm:workbench></tm:root>';
+
+    fakeClient = fakeClientOf({
+      searchConfigurations: async () => okResponse([configuration(REAL_URI)]),
+      list: async () => okResponse(reading(parseStructure(owned), owned)),
+    });
+
+    const asked: any = await handleListTransports(context as any, {
+      user: ' sapuser01 ',
+    });
+    expect(JSON.parse(asked.content[0].text).count).toBe(1);
+  });
+
   it('does not hand an unowned request to whoever is asking', async () => {
     // `tm:owner` missing from the document: the parser answers `''`, and a
     // filter that treated that as "matches anybody" would report someone

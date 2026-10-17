@@ -65,7 +65,7 @@ export const TOOL_DEFINITION = {
       target_user: {
         type: 'string',
         description:
-          'SAP user the task belongs to, e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.',
+          'The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.',
       },
       task_type: {
         type: 'string',
@@ -120,6 +120,9 @@ export async function handleCreateTransportTask(
   }
 
   const detail = detailOf(args);
+  // SAP stores user ids in upper case, and refuses a lower-case one as an
+  // unknown user: the id is sent upper-cased.
+  const targetUser = args.target_user.trim().toUpperCase();
 
   // What typing the task came to: the type it carries now, and the refusal
   // when there was one. The task exists either way, so a refused typing does
@@ -132,7 +135,7 @@ export async function handleCreateTransportTask(
       success: true,
       request: args.transport_number,
       task_number: number || null,
-      owner: args.target_user,
+      owner: targetUser,
       task_type: typed.type,
       ...(typed.error ? { task_type_error: typed.error } : {}),
       ...(number
@@ -155,7 +158,7 @@ export async function handleCreateTransportTask(
       );
       const created = await atStep('create task', () =>
         request.createTask(args.transport_number, {
-          targetUser: args.target_user,
+          targetUser,
           analyse: analyseException,
         }),
       )();

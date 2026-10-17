@@ -38,7 +38,7 @@ export const TOOL_DEFINITION = {
       user: {
         type: 'string',
         description:
-          "SAP user name to filter to; applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.",
+          "The user to filter to: an SAP user id (matched in upper case); applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.",
       },
       modifiable_only: {
         type: 'boolean',
@@ -189,7 +189,15 @@ export async function handleListTransports(
   // open (#202, #206); the migrated body below is this branch's.
   // The stated context alone: the connection's parameters, where a host's
   // rules made them, are in it.
-  const user = args?.user || getStatedSystemContext().responsible || '';
+  // SAP stores user ids in upper case, and the owners a listing answers are
+  // upper case: the filter is upper-cased to match them.
+  const user = (
+    args?.user?.trim() ||
+    getStatedSystemContext().responsible ||
+    ''
+  )
+    .trim()
+    .toUpperCase();
 
   logger?.debug(
     `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,

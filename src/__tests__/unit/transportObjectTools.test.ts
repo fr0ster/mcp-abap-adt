@@ -1,4 +1,5 @@
 import { handleAddTransportObject } from '../../handlers/transport/high/handleAddTransportObject';
+import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { handleCreateTransportTask } from '../../handlers/transport/high/handleCreateTransportTask';
 import { handleRemoveTransportObject } from '../../handlers/transport/high/handleRemoveTransportObject';
 import { handleReadTransportActionLog } from '../../handlers/transport/readonly/handleReadTransportActionLog';
@@ -263,6 +264,33 @@ describe('CreateTransportTask', () => {
 
     expect(options.targetUser).toBe('DEVELOPER');
     expect(answered.task_number).toBe('SIDK907073');
+    expect(answered.owner).toBe('DEVELOPER');
+  });
+
+  /**
+   * SAP stores user ids in upper case and refuses a lower-case one as an
+   * unknown user (400, measured): the handler sends the id upper-cased.
+   */
+  it('sends target_user upper-cased and trimmed', async () => {
+    let options: any;
+    fakeClient = fakeClientOf({
+      createTask: (_number: unknown, given: unknown) => {
+        options = given;
+        return okResponse(
+          reading({ '@': { 'tm:number': 'SIDK907073' } } as never),
+        );
+      },
+    });
+
+    const answered = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'SIDK905941',
+        target_user: ' developer ',
+        task_type: 'X',
+      }),
+    );
+
+    expect(options.targetUser).toBe('DEVELOPER');
     expect(answered.owner).toBe('DEVELOPER');
   });
 
@@ -564,5 +592,43 @@ describe('ReadTransportActionLog', () => {
       '25.09.2026 10:52:18 task type changed to S',
     );
     expect(answered.entries[2]).toMatch(/deleted following object R3TR PROG/);
+  });
+});
+
+describe('CreateTransport', () => {
+  /**
+   * SAP stores user ids in upper case: a create with a lower-case owner is
+   * refused as an unknown user (400, measured), so the owner is sent
+   * upper-cased.
+   */
+  it('sends owner upper-cased and trimmed', async () => {
+    let given: any;
+    fakeClient = fakeClientOf({
+      create: (options: unknown) => {
+        given = options;
+        return okResponse(reading('', '', 200));
+      },
+    });
+
+    await handleCreateTransport(context as any, {
+      description: 'x',
+      owner: ' developer ',
+    });
+
+    expect(given.owner).toBe('DEVELOPER');
+  });
+
+  it('sends no owner when none is given', async () => {
+    let given: any;
+    fakeClient = fakeClientOf({
+      create: (options: unknown) => {
+        given = options;
+        return okResponse(reading('', '', 200));
+      },
+    });
+
+    await handleCreateTransport(context as any, { description: 'x' });
+
+    expect(given.owner).toBeUndefined();
   });
 });

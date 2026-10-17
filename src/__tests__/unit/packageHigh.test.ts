@@ -1,6 +1,6 @@
 /**
  * The high UpdatePackage and DeletePackage (19.0.0): one atomic tool each.
- * Compact HandlerDelete PACKAGE routes to DeletePackage; compact's update is
+ * Compact HandlerDelete PACKAGE sends DeletePackage's deletion alone; compact's update is
  * the consumer's chain, one request per call — HandlerGet part metadata, then
  * HandlerUpdate with the changed document under lock_handle.
  *
@@ -240,7 +240,7 @@ describe('DeletePackage (high)', () => {
     expect(connection.requests).toHaveLength(2);
   });
 
-  it('sends exactly what compact’s HandlerDelete PACKAGE sends', async () => {
+  it('sends the check, then exactly what compact’s HandlerDelete PACKAGE sends', async () => {
     const high = parityConnection();
     await handleDeletePackage(ctx(high), {
       package_name: 'PKG_A',
@@ -255,12 +255,13 @@ describe('DeletePackage (high)', () => {
       package_name: 'PKG_A',
       transport_request: 'XXXK900001',
     });
-    expect(parityRequests(compact.requests)).toEqual(
-      parityRequests(high.requests),
-    );
     expect(high.requests).toHaveLength(2);
-    // The delete itself is the low tool's request; the check comes first.
-    expect(parityRequests(high.requests.slice(1))).toEqual(
+    // Compact sends the deletion alone — the low tool's request; the high
+    // tool asks the check first.
+    expect(parityRequests(compact.requests)).toEqual(
+      parityRequests(high.requests.slice(1)),
+    );
+    expect(parityRequests(compact.requests)).toEqual(
       lowRequestsOf('DeletePackageLow'),
     );
   });

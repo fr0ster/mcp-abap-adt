@@ -1,6 +1,6 @@
 /**
  * The compact tools that change the system, or run code on it — eleven of the
- * twenty-seven.
+ * twenty-eight.
  *
  * The other half of the capability split described in
  * `CompactReadOnlyHandlersGroup`. Everything here either writes to the repository

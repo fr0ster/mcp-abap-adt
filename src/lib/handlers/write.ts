@@ -30,6 +30,7 @@ export {
   TYPE_TO_FAMILY,
 } from '../../handlers/common/low/handleActivateObject.js';
 export { handleCreateOnly } from '../../handlers/common/low/handleCreateOnly.js';
+export { handleDeleteOnly } from '../../handlers/common/low/handleDeleteOnly.js';
 export { handleLockObject } from '../../handlers/common/low/handleLockObject.js';
 export { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject.js';
 export { handleUpdateUnderLock } from '../../handlers/common/low/handleUpdateUnderLock.js';

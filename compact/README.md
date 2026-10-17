@@ -1,7 +1,7 @@
 # @mcp-abap-adt/compact
 
-The compact MCP server over **stdio** — the command that serves all 27, the four debugger verbs, the
-leftover sessions, background runs and batch mode (`HandlerBatch`). The 16 that change nothing alone are
+The compact MCP server over **stdio** — the command that serves all 28, the four debugger verbs, the
+leftover sessions, background runs and batch mode (`HandlerBatch`). The 17 that change nothing alone are
 [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro)
 (`mcp-abap-adt-compact-ro`): the binary fixes the tool set (19.0.0), there is no `--exposition`.
 Streamable HTTP is [`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)
@@ -20,7 +20,7 @@ context, no tool-RAG, no way to select tools per request — and must still driv
 through MCP reliably. A consumer that does select per request (cloud-llm-hub, for
 one) has no use for it and should take `@mcp-abap-adt/lib` instead.
 
-**The low set's analogue.** The low set left the full binaries in 19.0.0; its single-step operations are compact's: `HandlerCreate` (the create request alone — no validation, lock, write, check or activation; the object is created inactive with what the create carries; its schema lists only what the create sends; `UNIT_TEST` and `CDS_UNIT_TEST`, whose create is a chain, are refused — the full set serves `CreateUnitTest` and `CreateCdsUnitTest`), `HandlerLock`, `HandlerUpdate` with the `lock_handle` it answered (one request: the write alone, under your lock; `lock_handle` is required; for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP `source_code` is the whole metadata document, sent as given — read it with `HandlerGet` part `metadata`, change it, pass all of it back; for SERVICE_BINDING the write is its publication request), `HandlerUnlock`, `HandlerCheckRun`, `HandlerValidate`, `HandlerActivate`, and `HandlerGet` `part` `object_structure` / `node_structure` / `virtual_folders`. **Keeping a lock from `HandlerLock` short is your job:** the server releases nothing on its own clock — unlock as soon as the write is done. The tool-by-tool table: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
+**The low set's analogue.** The low set left the full binaries in 19.0.0; its single-step operations are compact's: `HandlerCreate` (the create request alone — no validation, lock, write, check or activation; the object is created inactive with what the create carries; its schema lists only what the create sends; `UNIT_TEST` and `CDS_UNIT_TEST`, whose create is a chain, are refused — the full set serves `CreateUnitTest` and `CreateCdsUnitTest`), `HandlerLock`, `HandlerUpdate` with the `lock_handle` it answered (one request: the write alone, under your lock; `lock_handle` is required; for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP `source_code` is the whole metadata document, sent as given — read it with `HandlerGet` part `metadata`, change it, pass all of it back; for SERVICE_BINDING the write is its publication request), `HandlerUnlock`, `HandlerDeletionCheck` (the one deletion check, SAP's verdict as it came), `HandlerDelete` (one request: the deletion request alone, with no lock held on the object; a class include and `UNIT_TEST` are written empty by one `PUT` under your class lock's `lock_handle`), `HandlerCheckRun`, `HandlerValidate`, `HandlerActivate`, and `HandlerGet` `part` `object_structure` / `node_structure` / `virtual_folders`. **Keeping a lock from `HandlerLock` short is your job:** the server releases nothing on its own clock — unlock as soon as the write is done. The tool-by-tool table: [MIGRATION-19.0](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/MIGRATION-19.0.md#the-low-set-leaves-the-full-binaries).
 
 **Batch mode: `HandlerBatch`.** Every compact binary, `-ro` ones included, on every transport,
 serves batch mode as one tool: `action: 'begin'` switches the server into batch mode, every call
@@ -54,18 +54,18 @@ smaller install, and it is not a sandbox — code that deliberately reaches into
 
 ```bash
 npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact --system-type=<onprem|cloud> # stdio: all 27, the debugger verbs, leftover sessions, background runs
+mcp-abap-adt-compact --system-type=<onprem|cloud> # stdio: all 28, the debugger verbs, leftover sessions, background runs
 mcp-abap-adt-compact --version
 
 npm install -g @mcp-abap-adt/compact-ro
-mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 16 that change nothing, the leftover-session list and logoff
+mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 17 that change nothing, the leftover-session list and logoff
 ```
 
-**The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 27 tools (every access, which
+**The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 28 tools (every access, which
 is what a local server gives), the four debugger verbs, the leftover-session list and logoff and the
-background-run tools — 36. `mcp-abap-adt-compact-ro` serves the 16 tools that change nothing (no
+background-run tools — 37. `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing (no
 create, update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool list at
-all, so a client cannot call one) and the leftover-session list and logoff — 18. `--exposition`
+all, so a client cannot call one) and the leftover-session list and logoff — 19. `--exposition`
 (`ro`, `rw`, `debug`, any word) and a config file's `exposition` stop the start with a sentence
 naming the binary to install instead, e.g. *--exposition is gone (19.0.0): the binary fixes its tool
 set, so remove it; the compact tools that change nothing are served by `mcp-abap-adt-compact-ro`

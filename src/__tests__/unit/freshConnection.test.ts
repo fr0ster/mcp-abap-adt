@@ -2,7 +2,7 @@
  * A fresh connection on a host's connection comes from the host.
  *
  * `CreatePackage` (high, and compact's `HandlerCreate` PACKAGE) and compact's
- * `HandlerLock` PACKAGE over RFC, and compact's `HandlerDelete` PACKAGE with
+ * `HandlerLock` PACKAGE over RFC, and the high `DeletePackage` with
  * `force_new_connection`, need an ABAP session of their own (19.0.0: the low
  * set's package tools left the full binaries; compact took their cases). On an injected connection — here one whose configuration names RFC and
  * holds no usable credential, so nothing could be built from it — that session
@@ -203,13 +203,9 @@ const OPERATIONS: Array<[string, string, Record<string, unknown>]> = [
     { object_type: 'PACKAGE', object_name: 'ZFRESH', super_package: 'ZROOT' },
   ],
   [
-    'HandlerDelete PACKAGE with force_new_connection',
-    'HandlerDelete',
-    {
-      object_type: 'PACKAGE',
-      package_name: 'ZFRESH',
-      force_new_connection: true,
-    },
+    'DeletePackage (high) with force_new_connection',
+    'DeletePackage',
+    { package_name: 'ZFRESH', force_new_connection: true },
   ],
 ];
 

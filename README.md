@@ -121,7 +121,7 @@ the obligations of a server that service never runs.
 | [`@mcp-abap-adt/background-runs-memory`](https://www.npmjs.com/package/@mcp-abap-adt/background-runs-memory) | Apache-2.0 | The in-memory store of background runs (`IBackgroundRuns` of the library): the servers' store, for an embedder that keeps runs in its process. `core`, `http` and `sse` depend on it. |
 | [`@mcp-abap-adt/responsible-rules`](https://www.npmjs.com/package/@mcp-abap-adt/responsible-rules) | Apache-2.0 | The rules that name a call's responsible, user and system from `systeminformation` (`SystemContextRules` of the library), and the system type the binaries require. `core`, `http` and `sse` pass them; the library applies none, so an embedder opts in. |
 | [`@mcp-abap-adt/core-ro`](https://www.npmjs.com/package/@mcp-abap-adt/core-ro), [`http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/http-ro), [`sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/sse-ro) | AGPL-3.0-only | The read-only servers, `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: `core`'s, `http`'s and `sse`'s launcher with the readonly tools (with system and search) and, on stdio, the leftover-session list and logoff — no high, debugger, background-run or resume tool. |
-| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 16 compact tools that change nothing and, on stdio, the leftover-session list and logoff. |
+| [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro), [`compact-http-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http-ro), [`compact-sse-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse-ro) | AGPL-3.0-only | The read-only compact servers, `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro`: the 17 compact tools that change nothing and, on stdio, the leftover-session list and logoff. |
 | [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes (`compact-readonly-entries` was `compact-readonly` before 19.0.0). |
 
 Seventeen packages, twelve binaries: four kinds of binary — core, core-ro, compact, compact-ro — on
@@ -232,7 +232,8 @@ create or update, a fallback after a `404`, a poll. Run such work as phases, eac
 with the single-step tools: create (compact `HandlerCreate`, one request), lock (`HandlerLock`;
 the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`, one request;
 the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP), unlock
-(`HandlerUnlock`). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
+(`HandlerUnlock`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
+the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
 `batch_other_kind`: record it in the next batch. Every tool's description ends with
 one sentence saying whether it is recorded, for which arguments, refused, or not served in batch

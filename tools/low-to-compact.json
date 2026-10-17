@@ -227,7 +227,7 @@
           }
         }
       ],
-      "note": "force_new_connection is taken as the low tool took it: the check and the delete are sent from a new connection, closed afterwards. The full set has it too: the high DeletePackage, the same requests.",
+      "note": "The deletion request alone, as the low tool sent it, on the call's connection. The low tool's force_new_connection has no compact counterpart: compact locks and writes a package in an ABAP session of its own, so the call's session never holds a saved package; the full set's DeletePackage keeps force_new_connection.",
       "low_requests": [
         {
           "method": "POST",
@@ -239,10 +239,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "unmeasured": "What SAP answers to the deletion check of a package is not measured; the stand-in answers it empty."
     },
     {
@@ -490,10 +486,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -749,10 +741,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -1021,10 +1009,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -1269,10 +1253,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -1516,10 +1496,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -1772,10 +1748,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -2021,10 +1993,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -2267,10 +2235,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -2476,10 +2440,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -2741,10 +2701,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -2994,10 +2950,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "POST",
@@ -3385,10 +3337,6 @@
           }
         }
       ],
-      "accepted": {
-        "kind": "deletion-check",
-        "reason": "HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request."
-      },
       "low_requests": [
         {
           "method": "DELETE",

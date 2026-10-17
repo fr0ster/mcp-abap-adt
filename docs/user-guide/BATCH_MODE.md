@@ -67,6 +67,17 @@ with the single-step tools:
 4. unlock — `HandlerUnlock`;
 5. read back, check — `HandlerGet`, `HandlerCheckRun`.
 
+Deleting is two phases, each its own batch:
+
+1. deletion check — `HandlerDeletionCheck` per object; read each verdict with `BatchAnswers`;
+2. delete — `HandlerDelete` for the objects whose check permitted it: the deletion request alone,
+   with no lock held on the object (a held lock is what makes ADT refuse a deletion).
+
+A class include (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`) and a
+class's unit tests (`UNIT_TEST`) are removed by writing them empty under the class lock: lock
+(`HandlerLock` `object_type: CLASS`), delete (`HandlerDelete` with that `lock_handle`), unlock,
+activate — each phase its own batch, as a write.
+
 Compact `HandlerCreate` is one request for every type, in batch mode and outside it alike: the
 create request of the type's create alone — no validation, lock, write, check or activation, no
 service-group read for a service binding, no read-back after a function group's `400`; the object
@@ -90,6 +101,15 @@ nothing is read before the write or after it. Locking, unlocking and activating 
 calls (`HandlerLock`, `HandlerUnlock`, `HandlerActivate`); for `LOCAL_*`, `UNIT_TEST` and
 `CDS_UNIT_TEST` the lock is the class's — `HandlerLock` with `object_type: CLASS`. A `PACKAGE` update is recorded over HTTP
 only: over RFC the package lock is held in an ABAP session of its own, outside the batch.
+
+Compact `HandlerDelete` is one request for every type, in batch mode and outside it alike: the
+deletion request alone, as adt-clients' `delete()` sends it — no lock, no deletion check; SAP's
+answer is the result, as it came. `HandlerDeletionCheck` sends the one deletion check
+(`POST /sap/bc/adt/deletion/check`) and answers SAP's verdict as it came: `deletable: true` (with
+SAP's message when it carries one — "does not exist" among them), or SAP's refusal in its words.
+For `LOCAL_*` and `UNIT_TEST` (a `DELETE` on an include answers `405`), `HandlerDelete` is one
+`PUT` of empty content under the `lock_handle` given — the class's lock; no lock, unlock or
+activation of its own. `CDS_UNIT_TEST` deletes its test class.
 
 **Every batch end sends one envelope.** Only LOCK and UNLOCK go stateful, as adt-clients sends
 them, and adt-clients puts each kind — LOCK, UNLOCK, stateless — into an envelope of its own. So a
@@ -159,7 +179,7 @@ no raw part.
 
 <!-- batch-handlers:start -->
 
-157 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+160 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -301,6 +321,9 @@ no raw part.
 | `HandlerCheckRun` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package) |
 | `HandlerCreate` | when object_type is one of DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate |
 | `HandlerCreate` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages[?corrNr=…], the package create alone; over RFC a package is created in an ABAP session of its own, outside the batch |
+| `HandlerDelete` | when object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | the deletion request alone: POST /sap/bc/adt/deletion/delete (a metadata extension: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}[?corrNr=…]) |
+| `HandlerDelete` | when lock_handle is given and object_type is one of LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST | PUT of empty content to the class include under the lock_handle given ({class uri}/includes/{include}?lockHandle=…[&corrNr=…]) |
+| `HandlerDeletionCheck` | every call | POST /sap/bc/adt/deletion/check for the one object |
 | `HandlerDumpView` | every call | GET /sap/bc/adt/runtime/dump/{id} (the view asked) |
 | `HandlerGet` | when part is source (absent reads as source) and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | GET the type's source, or its metadata document where it has no source (as the full set's Get<Type>) |
 | `HandlerGet` | when part is metadata and object_type is one of PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | one request: GET the type's metadata document (as the full set's Get<Type>, part metadata) |

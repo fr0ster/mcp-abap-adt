@@ -88,7 +88,7 @@ stop. See
 [the debugger guide](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).
 
 **Locks (compact).** compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
-`HandlerUpdate` and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
+`HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
 and reach the SAP session that holds the lock — without it they reach another instance and are
 refused, sending nothing. A request with the same credential headers works on the held
 connection; another credential retires it, and its logoff releases the lock. The hold ends at the

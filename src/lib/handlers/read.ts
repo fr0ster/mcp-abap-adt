@@ -21,6 +21,7 @@ export { handleGetLocalMacros } from '../../handlers/class/high/handleGetLocalMa
 export { handleGetLocalTestClass } from '../../handlers/class/high/handleGetLocalTestClass.js';
 export { handleGetLocalTypes } from '../../handlers/class/high/handleGetLocalTypes.js';
 export { handleCheckObject } from '../../handlers/common/low/handleCheckObject.js';
+export { handleDeletionCheck } from '../../handlers/common/low/handleDeletionCheck.js';
 export { handleValidateObject } from '../../handlers/common/low/handleValidateObject.js';
 export { handleGetDataElement } from '../../handlers/data_element/high/handleGetDataElement.js';
 export { handleGetDdl } from '../../handlers/ddl/high/handleGetDdl.js';

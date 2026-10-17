@@ -53,7 +53,7 @@ reach into the connection's session.
   logoff ends it (a logoff releases the session's locks). Over Streamable HTTP every
   request is an MCP session of its own, so the `state_handle` carries the chain:
   compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
-  `HandlerUpdate` and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
+  `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
   and reach the SAP session that holds the lock — without it they reach another instance and are
   refused, sending nothing. A request with the same credential headers works on the held
   connection; another credential retires it, and its logoff releases the lock — the instance then

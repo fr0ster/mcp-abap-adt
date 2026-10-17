@@ -1,5 +1,5 @@
 /**
- * The compact tools that change nothing — sixteen of the twenty-seven.
+ * The compact tools that change nothing — seventeen of the twenty-eight.
  *
  * **Why a group of its own, and why it matters what it imports.** Compact is a
  * different decomposition of the same surface: the operation is the tool and the
@@ -17,8 +17,9 @@
  * enqueue, so it is not here. `HandlerUnitTestRun` and `HandlerProfileRun` change
  * no repository object but they EXECUTE ABAP and leave traces, which is not
  * something a read-only surface may offer. `HandlerValidate` asks whether a name
- * would be admissible and `HandlerCheckRun` runs a syntax check; both answer
- * without writing, so both are here.
+ * would be admissible, `HandlerCheckRun` runs a syntax check and
+ * `HandlerDeletionCheck` asks whether an object can be deleted; they answer
+ * without writing, so they are here.
  */
 
 import type { HandlerContext, HandlerEntry } from '@mcp-abap-adt/lib/handlers';
@@ -35,6 +36,10 @@ import {
   TOOL_DEFINITION as HandlerCheckRun_Tool,
   handleHandlerCheckRun,
 } from './handlers/handleHandlerCheckRun';
+import {
+  TOOL_DEFINITION as HandlerDeletionCheck_Tool,
+  handleHandlerDeletionCheck,
+} from './handlers/handleHandlerDeletionCheck';
 import {
   TOOL_DEFINITION as HandlerDumpList_Tool,
   handleHandlerDumpList,
@@ -132,6 +137,10 @@ export function compactReadOnlyEntries(
     {
       toolDefinition: HandlerCheckRun_Tool,
       handler: withContext(handleHandlerCheckRun),
+    },
+    {
+      toolDefinition: HandlerDeletionCheck_Tool,
+      handler: withContext(handleHandlerDeletionCheck),
     },
     {
       toolDefinition: HandlerUnitTestStatus_Tool,

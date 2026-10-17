@@ -134,7 +134,7 @@ describe('the four tool sets', () => {
       new CompactReadOnlyHandlersGroup(context),
       new CompactModifyHandlersGroup(context),
     ]);
-    expect(both).toHaveLength(27);
+    expect(both).toHaveLength(28);
     expect(shape(compact.groups(context, 'stdio'))).toEqual([
       { group: 'CompactHandlers', tools: both },
       {
@@ -162,9 +162,9 @@ describe('the four tool sets', () => {
     ]);
   });
 
-  it('compact-ro: the 16 that change nothing, the leftover-session list and logoff, HandlerBatch', () => {
+  it('compact-ro: the 17 that change nothing, the leftover-session list and logoff, HandlerBatch', () => {
     const half = namesOf([new CompactReadOnlyHandlersGroup(context)]);
-    expect(half).toHaveLength(16);
+    expect(half).toHaveLength(17);
     expect(shape(compactRo.groups(context, 'stdio'))).toEqual([
       { group: 'CompactReadOnlyHandlers', tools: half },
       {

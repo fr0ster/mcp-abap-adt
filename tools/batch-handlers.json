@@ -740,6 +740,58 @@
     "connection": "http"
   },
   {
+    "tool": "HandlerDelete",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerDelete.ts#handleHandlerDelete",
+    "sends": "the deletion request alone: POST /sap/bc/adt/deletion/delete (a metadata extension: DELETE /sap/bc/adt/ddic/ddlx/sources/{name}[?corrNr=…])",
+    "when": [
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE",
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "TABLE",
+          "STRUCTURE",
+          "DDL",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING",
+          "CLASS",
+          "CDS_UNIT_TEST",
+          "PROGRAM",
+          "INTERFACE",
+          "FUNCTION_GROUP",
+          "FUNCTION_MODULE",
+          "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
+          "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerDelete",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerDelete.ts#handleHandlerDelete",
+    "sends": "PUT of empty content to the class include under the lock_handle given ({class uri}/includes/{include}?lockHandle=…[&corrNr=…])",
+    "when": [
+      {
+        "argument": "lock_handle",
+        "present": true
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "LOCAL_TEST_CLASS",
+          "LOCAL_TYPES",
+          "LOCAL_DEFINITIONS",
+          "LOCAL_MACROS",
+          "UNIT_TEST"
+        ]
+      }
+    ]
+  },
+  {
     "tool": "ActivateDomain",
     "set": "full",
     "handler": "src/handlers/domain/low/handleActivateDomain.ts#handleActivateDomain",
@@ -938,6 +990,12 @@
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerCheckRun.ts#handleHandlerCheckRun",
     "sends": "POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package)"
+  },
+  {
+    "tool": "HandlerDeletionCheck",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerDeletionCheck.ts#handleHandlerDeletionCheck",
+    "sends": "POST /sap/bc/adt/deletion/check for the one object"
   },
   {
     "tool": "HandlerValidate",

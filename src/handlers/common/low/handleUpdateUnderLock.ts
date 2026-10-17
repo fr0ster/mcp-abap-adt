@@ -100,7 +100,7 @@ const written = (call: () => Promise<never>) =>
   answer(ANSWER, call, project('terse', terseWrite));
 
 type AdtClient = ReturnType<typeof createAdtClient>;
-type IncludeWriter = {
+export type IncludeWriter = {
   update(config: object, options: object): Promise<unknown>;
 };
 
@@ -108,7 +108,7 @@ type IncludeWriter = {
  * The class includes: the source argument each takes (beside `source_code`)
  * and the accessor that writes it, under the class's lock.
  */
-const CLASS_INCLUDES: Record<
+export const CLASS_INCLUDES: Record<
   string,
   [string, (client: AdtClient) => IncludeWriter]
 > = {

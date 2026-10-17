@@ -899,10 +899,10 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           served: false,
         });
       }
-      // compact: the 27, the four debugger verbs, the three background-run
+      // compact: the 28, the four debugger verbs, the three background-run
       // tools beside the run tool, HandlerBatch, and on stdio the
       // leftover-session list and logoff (no set serves a resume).
-      expect(compact.tools).toHaveLength(27 + 4 + 3 + 1 + (onStdio ? 2 : 0));
+      expect(compact.tools).toHaveLength(28 + 4 + 3 + 1 + (onStdio ? 2 : 0));
       expect(compact.tools).toEqual(
         expect.arrayContaining([
           ...COMPACT_RW,
@@ -910,10 +910,11 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           'HandlerBatch',
         ]),
       );
-      // compact-ro: the 16 that change nothing, HandlerBatch, and on stdio
+      // compact-ro: the 17 that change nothing, HandlerBatch, and on stdio
       // the list and the logoff.
-      expect(compactRo.tools).toHaveLength(16 + 1 + (onStdio ? 2 : 0));
+      expect(compactRo.tools).toHaveLength(17 + 1 + (onStdio ? 2 : 0));
       expect(compactRo.tools).toContain('HandlerGet');
+      expect(compactRo.tools).toContain('HandlerDeletionCheck');
       expect(compactRo.tools).toContain('HandlerBatch');
       for (const tools of [full.tools, fullRo.tools]) {
         expect(tools).not.toContain('HandlerBatch');

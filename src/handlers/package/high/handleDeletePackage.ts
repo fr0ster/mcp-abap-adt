@@ -1,11 +1,12 @@
 /**
  * DeletePackage Handler - Delete ABAP Package
  *
- * One tool of the high set and the route of compact's `HandlerDelete`
- * PACKAGE (19.0.0; the low set's DeletePackageLow before it). Like every
- * other high delete it asks the deletion check first (`deleteIfDeletable`):
- * a refusal is answered as it came and an object the check reports absent
- * gets no delete. The low tool sent the delete alone.
+ * One tool of the high set (19.0.0), for what the low set's
+ * DeletePackageLow did. Like every other high delete it asks the deletion
+ * check first (`deleteIfDeletable`): a refusal is answered as it came and an
+ * object the check reports absent gets no delete. The low tool sent the
+ * delete alone, as compact's `HandlerDelete` PACKAGE does
+ * (`handleDeleteOnly`).
  *
  * Uses AdtClient.getPackage().delete from @mcp-abap-adt/adt-clients 19.
  *

@@ -4,7 +4,7 @@
  * names RFC and whose host gives a `freshConnection` factory:
  *
  * (a) `CreatePackage` (high) and compact's `HandlerCreate` PACKAGE over RFC,
- * (b) compact's `HandlerDelete` PACKAGE with `force_new_connection`:
+ * (b) the high `DeletePackage` with `force_new_connection`:
  *     the factory is called with no argument, no request on its connection
  *     carries a signal, and the connection is disconnected — once — when the
  *     tool fails because SAP refuses it, as when it succeeds;
@@ -196,13 +196,9 @@ const SITES: Array<[string, string, Record<string, unknown>]> = [
     },
   ],
   [
-    'HandlerDelete PACKAGE with force_new_connection',
-    'HandlerDelete',
-    {
-      object_type: 'PACKAGE',
-      package_name: 'ZFRESH',
-      force_new_connection: true,
-    },
+    'DeletePackage (high) with force_new_connection',
+    'DeletePackage',
+    { package_name: 'ZFRESH', force_new_connection: true },
   ],
 ];
 

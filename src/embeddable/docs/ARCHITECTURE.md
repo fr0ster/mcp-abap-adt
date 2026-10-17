@@ -515,7 +515,7 @@ Some operations need an ABAP session of their own:
 
 - `CreatePackage` (high, and compact's `HandlerCreate` PACKAGE) and compact's `HandlerLock`
   PACKAGE over RFC;
-- compact's `HandlerDelete` PACKAGE with `force_new_connection`;
+- the high `DeletePackage` with `force_new_connection`;
 - a debug session's own connections.
 
 A package can be saved only once per ABAP session (PAK/058), which is why these cannot share the

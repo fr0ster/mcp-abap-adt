@@ -3,7 +3,7 @@
 Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
-- Tools: 37
+- Tools: 38
 - Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
@@ -15,7 +15,7 @@ definitions a client receives.
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 37 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 38 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 
@@ -147,6 +147,19 @@ per request.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `version` — Version to syntax-check.
 - `source_code` — Source to check instead of the saved one; nothing is saved. CLASS, STRUCTURE and DDL only.
+
+### HandlerDeletionCheck
+
+**Half:** `@mcp-abap-adt/compact-readonly-entries`
+
+**Description:** Asks SAP whether the object can be deleted: sends the deletion check request for the given type, and answers SAP's verdict — deletable true with SAP's message when it carries one, or SAP's refusal with its words (the object is used, locked, or does not exist). object_type and object_name required: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST (its test class), PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE (object_name GROUP|MODULE), BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `object_type` (required) — Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 
 ### HandlerUnitTestStatus
 
@@ -387,22 +400,22 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Delete operation. object_type required: PACKAGE(package_name*; force_new_connection deletes from a new connection), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(class_name*), CDS_UNIT_TEST(class_name*).
+**Description:** Deletes the object: sends the deletion request for the given type, and answers SAP's result. object_type required: PACKAGE(package_name*, transport_request), DOMAIN(domain_name*, transport_request), DATA_ELEMENT(data_element_name*, transport_request), TABLE(table_name*, transport_request), STRUCTURE(structure_name*, transport_request), DDL(ddl_name*, transport_request), SERVICE_DEFINITION(service_definition_name*, transport_request), SERVICE_BINDING(service_binding_name*, transport_request), CLASS(class_name*, transport_request), CDS_UNIT_TEST(class_name*, transport_request), PROGRAM(program_name*, transport_request) [onprem only], INTERFACE(interface_name*, transport_request), FUNCTION_GROUP(function_group_name*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, transport_request), BEHAVIOR_DEFINITION(behavior_definition_name*, transport_request), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*, transport_request), METADATA_EXTENSION(metadata_extension_name*, transport_request), LOCAL_TEST_CLASS(class_name*, lock_handle*, transport_request), LOCAL_TYPES(class_name*, lock_handle*, transport_request), LOCAL_DEFINITIONS(class_name*, lock_handle*, transport_request), LOCAL_MACROS(class_name*, lock_handle*, transport_request), UNIT_TEST(class_name*, lock_handle*, transport_request). CDS_UNIT_TEST deletes its test class. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS and UNIT_TEST (the local test classes) the include is written empty under lock_handle, the class's lock handle. transport_request is sent with the request. Over Streamable HTTP an include write carries the lock's state_handle in the x-mcp-state-handle header: it is sent only under a lock the instance it reaches holds.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `object_type` (required) — ABAP object type for routed compact operation.
+- `lock_handle` — The lock handle of the class (LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST): the include is written empty under it.
 - `package_name` — ABAP package name.
-- `force_new_connection` — PACKAGE: delete from a new connection, closed afterwards — for a package saved earlier through this connection.
 - `class_name` — ABAP class name.
 - `program_name` — ABAP program name.
 - `domain_name` — ABAP domain name.
 - `function_module_name` — ABAP function module name.
 - `function_group_name` — ABAP function group name.
 - `ddl_name` — DDL source name (CDS view, AMDP table function, etc.).
-- `transport_request` — Transport request id (if required by system).
+- `transport_request` — Transport request id, sent with the deletion (or the include write).
 - `table_name` — Table name.
 - `structure_name` — Structure name.
 - `data_element_name` — Data element name.

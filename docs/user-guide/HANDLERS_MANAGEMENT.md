@@ -58,13 +58,14 @@ Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 
 4. **compact** - Compact facade operations — served by their own commands, `mcp-abap-adt-compact`
    (`@mcp-abap-adt/compact`, every tool below and four debugger verbs: `HandlerDebugStart`,
    `HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`) and `mcp-abap-adt-compact-ro`
-   (`@mcp-abap-adt/compact-ro`, the 16 that change nothing: no create, update, delete,
+   (`@mcp-abap-adt/compact-ro`, the 17 that change nothing: no create, update, delete,
    activate, lock, unlock, unit-test run or profiler run, and no debugger verb).
    - `HandlerValidate`
    - `HandlerActivate`
    - `HandlerLock`
    - `HandlerUnlock`
    - `HandlerCheckRun`
+   - `HandlerDeletionCheck`
    - `HandlerUnitTestRun`, `HandlerUnitTestStatus`, `HandlerUnitTestResult`
    - `HandlerCdsUnitTestStatus`, `HandlerCdsUnitTestResult`
    - `HandlerProfileRun`, `HandlerProfileList`, `HandlerProfileView`
@@ -84,7 +85,7 @@ Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 
        `$metadata` and browser preview URLs and exists for a service binding
        alone; `contents` lists a package's members, one line each. A part an object type does not offer is refused by name and the
        refusal says which parts it does offer — never substituted with another.
-     - Lifecycle via `HandlerValidate|Activate|Lock|Unlock|CheckRun`
+     - Lifecycle via `HandlerValidate|Activate|Lock|Unlock|CheckRun|DeletionCheck`
      - Runtime/tests/service-binding/transport via dedicated compact handlers
    - Source of truth for compact route coverage:
      - `src/handlers/compact/high/compactMatrix.ts`

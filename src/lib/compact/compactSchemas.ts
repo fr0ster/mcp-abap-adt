@@ -415,16 +415,21 @@ export const compactUpdateSchema = {
   required: ['object_type', 'lock_handle'],
 } as const;
 
+/**
+ * `HandlerDelete`: one request (spec §4.6) — the deletion request, or for a
+ * class include and the unit tests the include written empty under
+ * `lock_handle`. Only what that request sends is named.
+ */
 export const compactDeleteSchema = {
   type: 'object',
   properties: {
     object_type: commonObjectTypeSchema,
-    package_name: { type: 'string', description: 'ABAP package name.' },
-    force_new_connection: {
-      type: 'boolean',
+    lock_handle: {
+      type: 'string',
       description:
-        'PACKAGE: delete from a new connection, closed afterwards — for a package saved earlier through this connection.',
+        'The lock handle of the class (LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST): the include is written empty under it.',
     },
+    package_name: { type: 'string', description: 'ABAP package name.' },
     class_name: { type: 'string', description: 'ABAP class name.' },
     program_name: { type: 'string', description: 'ABAP program name.' },
     domain_name: { type: 'string', description: 'ABAP domain name.' },
@@ -442,7 +447,8 @@ export const compactDeleteSchema = {
     },
     transport_request: {
       type: 'string',
-      description: 'Transport request id (if required by system).',
+      description:
+        'Transport request id, sent with the deletion (or the include write).',
     },
     table_name: { type: 'string', description: 'Table name.' },
     structure_name: { type: 'string', description: 'Structure name.' },
@@ -984,6 +990,36 @@ export const compactValidateSchema = {
       type: 'string',
       description: 'Optional service binding version for SERVICE_BINDING.',
     },
+  },
+  required: ['object_type', 'object_name'],
+} as const;
+
+/** The types a deletion request removes, each with its deletion check. */
+const DELETION_CHECK_TYPES = [
+  'PACKAGE',
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'TABLE',
+  'STRUCTURE',
+  'DDL',
+  'SERVICE_DEFINITION',
+  'SERVICE_BINDING',
+  'CLASS',
+  'CDS_UNIT_TEST',
+  'PROGRAM',
+  'INTERFACE',
+  'FUNCTION_GROUP',
+  'FUNCTION_MODULE',
+  'BEHAVIOR_DEFINITION',
+  'BEHAVIOR_IMPLEMENTATION',
+  'METADATA_EXTENSION',
+] as const;
+
+/** `HandlerDeletionCheck`: the one deletion-check request. */
+export const compactDeletionCheckSchema = {
+  type: 'object',
+  properties: {
+    ...lifecycleObjectSchema(DELETION_CHECK_TYPES),
   },
   required: ['object_type', 'object_name'],
 } as const;

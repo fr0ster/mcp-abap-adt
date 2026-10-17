@@ -8,13 +8,13 @@ It is [`@mcp-abap-adt/http`](https://www.npmjs.com/package/@mcp-abap-adt/http)'s
 
 ## The tools
 
-- the **16 compact tools that change nothing**, one per operation with the object in
+- the **17 compact tools that change nothing**, one per operation with the object in
   `object_type`: `HandlerGet`, `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData`,
-  `HandlerValidate`, `HandlerCheckRun`, the unit-test and CDS unit-test status and result, the
+  `HandlerValidate`, `HandlerCheckRun`, `HandlerDeletionCheck`, the unit-test and CDS unit-test status and result, the
   profiler list and view, the dump list and view, the service-binding type list and validation
   (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries)).
 
-16 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
+17 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
 is in the tool list at all, so a client cannot call one; nor the four debugger verbs or the
 background-run tools — those are `mcp-abap-adt-compact-http`'s ([`@mcp-abap-adt/compact-http`](https://www.npmjs.com/package/@mcp-abap-adt/compact-http)).
 

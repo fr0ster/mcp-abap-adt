@@ -11,8 +11,6 @@
  * low tool's requests: the same, in the same order. A row marked `accepted`
  * differs as its kind says, and only so:
  *
- * - `deletion-check`: compact sends the deletion check, then exactly the low
- *   tool's requests;
  * - `activation-run`: compact activates the same object through the
  *   activation run instead of the inline activation the low tool sent.
  */
@@ -213,9 +211,6 @@ async function compactRequests(row: LowToCompactRow): Promise<ParityRequest[]> {
   return parityRequests(connection.requests);
 }
 
-const isDeletionCheck = (r: ParityRequest) =>
-  r.method === 'POST' && r.url === '/sap/bc/adt/deletion/check';
-
 describe('the low set → compact mapping table', () => {
   beforeEach(() => {
     setSystemContext({
@@ -247,18 +242,6 @@ describe('the low set → compact mapping table', () => {
     },
   );
 
-  const deletions = TABLE.rows.filter(
-    (r) => r.accepted?.kind === 'deletion-check',
-  );
-  it.each(deletions.map((r) => [r.tool, r] as const))(
-    '%s (accepted, deletion check): the check, then exactly the low requests',
-    async (_tool, row) => {
-      const [check, ...rest] = await compactRequests(row);
-      expect(check && isDeletionCheck(check)).toBe(true);
-      expect(rest).toEqual(row.low_requests);
-    },
-  );
-
   const runs = TABLE.rows.filter((r) => r.accepted?.kind === 'activation-run');
   it.each(runs.map((r) => [r.tool, r] as const))(
     '%s (accepted, activation run): the same object through the activation run',
@@ -284,33 +267,22 @@ describe('the low set → compact mapping table', () => {
    * here, so a row cannot be marked accepted later, or change its kind,
    * without this test going red. 19.0.0: compact HandlerCreate is the create
    * request alone, so the five create rows accepted with extra requests send
-   * exactly the low requests now and are accepted no more.
+   * exactly the low requests now and are accepted no more; compact
+   * HandlerDelete is the deletion request alone, so the thirteen delete rows
+   * accepted with the deletion check before it are accepted no more either.
    */
   const ACCEPTED: ReadonlyArray<[string, string]> = [
-    ['DeleteDomainLow', 'deletion-check'],
-    ['DeleteDataElementLow', 'deletion-check'],
-    ['DeleteTableLow', 'deletion-check'],
-    ['DeleteStructureLow', 'deletion-check'],
-    ['DeleteDdlLow', 'deletion-check'],
-    ['DeleteClassLow', 'deletion-check'],
-    ['DeleteProgramLow', 'deletion-check'],
-    ['DeleteInterfaceLow', 'deletion-check'],
-    ['DeleteFunctionGroupLow', 'deletion-check'],
-    ['DeleteFunctionModuleLow', 'deletion-check'],
-    ['DeleteBehaviorDefinitionLow', 'deletion-check'],
-    ['DeleteMetadataExtensionLow', 'deletion-check'],
-    ['DeletePackageLow', 'deletion-check'],
     ['ActivateFunctionModuleLow', 'activation-run'],
     ['ActivateServiceDefinitionLow', 'activation-run'],
     ['ActivateServiceBindingLow', 'activation-run'],
   ];
 
-  it('accepts exactly the 16 rows the owner accepted, each with its kind', () => {
+  it('accepts exactly the 3 rows the owner accepted, each with its kind', () => {
     const accepted = TABLE.rows
       .filter((r) => r.accepted)
       .map((r) => [r.tool, r.accepted?.kind] as [string, string | undefined])
       .sort((x, y) => x[0].localeCompare(y[0]));
-    expect(ACCEPTED).toHaveLength(16);
+    expect(ACCEPTED).toHaveLength(3);
     expect(accepted).toEqual(
       [...ACCEPTED].sort((x, y) => x[0].localeCompare(y[0])),
     );
@@ -320,7 +292,7 @@ describe('the low set → compact mapping table', () => {
     const kinds = new Set(
       TABLE.rows.flatMap((r) => (r.accepted ? [r.accepted.kind] : [])),
     );
-    expect([...kinds].sort()).toEqual(['activation-run', 'deletion-check']);
+    expect([...kinds].sort()).toEqual(['activation-run']);
   });
 });
 

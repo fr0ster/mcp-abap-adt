@@ -459,8 +459,8 @@ binary serves the tools you want:
 |---|---|---|
 | core | `mcp-abap-adt`, `mcp-abap-adt-http`, `mcp-abap-adt-sse` | readonly (with system and search), high, debug, background runs; on stdio the leftover-session list and logoff |
 | core-ro | `mcp-abap-adt-ro`, `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro` | readonly (with system and search); on stdio the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the 27 compact tools, the four debugger verbs, background runs; on stdio the leftover-session list and logoff |
-| compact-ro | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the 16 compact tools that change nothing; on stdio the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact`, `-compact-http`, `-compact-sse` | the 28 compact tools, the four debugger verbs, background runs; on stdio the leftover-session list and logoff |
+| compact-ro | `mcp-abap-adt-compact-ro`, `-compact-http-ro`, `-compact-sse-ro` | the 17 compact tools that change nothing; on stdio the leftover-session list and logoff |
 
 `--exposition` in either spelling, with any value or none, and the YAML key `exposition`, stop
 every binary before anything is read, with one sentence per word naming the binary of the same

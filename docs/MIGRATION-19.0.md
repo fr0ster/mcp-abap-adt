@@ -122,8 +122,8 @@ every binary. Four kinds of binary, each on stdio, Streamable HTTP and SSE:
 |---|---|---|
 | core | `mcp-abap-adt` (`@mcp-abap-adt/core`), `mcp-abap-adt-http` (`@mcp-abap-adt/http`), `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs; on stdio the leftover-session list and logoff |
 | core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`), `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`), `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search); on stdio the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`), `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the 27 compact tools, the four compact debugger verbs, background runs; on stdio the leftover-session list and logoff |
-| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`), `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`), `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the 16 compact tools that change nothing; on stdio the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`), `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the 28 compact tools, the four compact debugger verbs, background runs; on stdio the leftover-session list and logoff |
+| compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`), `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`), `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the 17 compact tools that change nothing; on stdio the leftover-session list and logoff |
 
 No `-ro` binary serves the debugger or a background run, no binary a resume of a leftover session
 (a stdio process takes up its one leftover session at its start), and no http or sse binary a
@@ -554,7 +554,7 @@ design. Send a long run to the background where the tool offers it.
   instance's connection lives across calls; the calls in between are stateless, and the instance's
   end (its logoff) releases a lock you never unlocked. **Over Streamable HTTP the `state_handle`
   carries it**: compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
-  `HandlerUpdate` and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
+  `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
   and reach the SAP session that holds the lock — without it they reach another instance and are
   refused, sending nothing. A request with the same credential headers works on the held
   connection; another credential retires it, and its logoff releases the lock. The hold ends at the
@@ -699,14 +699,14 @@ of the full set's high or low tools; only read-only reads may be in both.
 - **Packages.** `HandlerCreate` PACKAGE takes `super_package` and the package settings (it could
   not create a package before: the parameter was not declared); `HandlerUpdate` PACKAGE writes the
   description — under your `lock_handle`, or without one locking, writing and unlocking itself;
-  `HandlerDelete` PACKAGE, with `force_new_connection`; `HandlerCheckRun` PACKAGE.
+  `HandlerDelete` PACKAGE, the deletion request alone; `HandlerCheckRun` PACKAGE.
 - **The full binaries gain two package tools** for what `UpdatePackageLow` and `DeletePackageLow`
   did: the high **`UpdatePackage`** (`package_name`, `description`, `transport_request`: lock,
   write, unlock in one tool; over RFC in an ABAP session of its own, as `CreatePackage`) and
   **`DeletePackage`** (`package_name`, `transport_request`, `force_new_connection`: the deletion
   check first, as every high delete — a refusal is answered as it came, and an absent package
-  gets no delete). They send the same requests as compact's `HandlerUpdate` PACKAGE without `lock_handle` and `HandlerDelete`
-  PACKAGE.
+  gets no delete). `DeletePackage`'s delete is the request compact's `HandlerDelete` PACKAGE
+  sends alone; its check, compact's `HandlerDeletionCheck` PACKAGE.
 - **Creation parameters.** `HandlerCreate` takes `superclass`, `final` and `create_protected` for
   a class, and `master_language` — what the create request carries (`abstract` it does not, and
   is refused).
@@ -718,9 +718,10 @@ of the full set's high or low tools; only read-only reads may be in both.
 
 Each low tool and the compact call that replaces it — the same ADT requests, tested against a
 stand-in (`src/__tests__/unit/lowToCompact.test.ts`) with the low tool's requests captured before it
-was removed (`tools/low-to-compact.json`). Two differences are accepted and named in their rows: a
-delete through `HandlerDelete` asks the deletion check first; a function module, service definition
-or service binding activates through the activation run. `HandlerCreate` is the create request
+was removed (`tools/low-to-compact.json`). One difference is accepted and named in its rows: a
+function module, service definition or service binding activates through the activation run.
+`HandlerDelete` is the deletion request alone, as each low delete tool was — the same requests;
+the deletion check is `HandlerDeletionCheck`, a call of its own. `HandlerCreate` is the create request
 alone, as each low create tool was — the same requests for every type.
 
 <!-- low-to-compact table: rendered from tools/low-to-compact.json -->
@@ -769,19 +770,19 @@ alone, as each low create tool was — the same requests for every type.
 | `CreateStructureLow` | `HandlerCreate` (object_type: STRUCTURE, structure_name, description, package_name, transport_request) | HandlerCreate STRUCTURE sends the create alone; the fields reach the structure through a later write (HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock). |
 | `CreateTableLow` | `HandlerCreate` (object_type: TABLE, table_name, package_name, transport_request) | the same requests |
 | `CreateTransportLow` | `HandlerTransportCreate` (description, transport_type) | the same requests |
-| `DeleteBehaviorDefinitionLow` | `HandlerDelete` (object_type: BEHAVIOR_DEFINITION, behavior_definition_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteClassLow` | `HandlerDelete` (object_type: CLASS, class_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteDataElementLow` | `HandlerDelete` (object_type: DATA_ELEMENT, data_element_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteDdlLow` | `HandlerDelete` (object_type: DDL, ddl_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteDomainLow` | `HandlerDelete` (object_type: DOMAIN, domain_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteFunctionGroupLow` | `HandlerDelete` (object_type: FUNCTION_GROUP, function_group_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteFunctionModuleLow` | `HandlerDelete` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteInterfaceLow` | `HandlerDelete` (object_type: INTERFACE, interface_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteMetadataExtensionLow` | `HandlerDelete` (object_type: METADATA_EXTENSION, metadata_extension_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeletePackageLow` | `HandlerDelete` (object_type: PACKAGE, package_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. force_new_connection is taken as the low tool took it: the check and the delete are sent from a new connection, closed afterwards. The full set has it too: the high DeletePackage, the same requests. |
-| `DeleteProgramLow` | `HandlerDelete` (object_type: PROGRAM, program_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteStructureLow` | `HandlerDelete` (object_type: STRUCTURE, structure_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
-| `DeleteTableLow` | `HandlerDelete` (object_type: TABLE, table_name, transport_request) | **accepted:** HandlerDelete asks POST /sap/bc/adt/deletion/check first and sends no delete when the check reports the object absent; the delete itself is the low tool's request. |
+| `DeleteBehaviorDefinitionLow` | `HandlerDelete` (object_type: BEHAVIOR_DEFINITION, behavior_definition_name, transport_request) | the same requests |
+| `DeleteClassLow` | `HandlerDelete` (object_type: CLASS, class_name, transport_request) | the same requests |
+| `DeleteDataElementLow` | `HandlerDelete` (object_type: DATA_ELEMENT, data_element_name, transport_request) | the same requests |
+| `DeleteDdlLow` | `HandlerDelete` (object_type: DDL, ddl_name, transport_request) | the same requests |
+| `DeleteDomainLow` | `HandlerDelete` (object_type: DOMAIN, domain_name, transport_request) | the same requests |
+| `DeleteFunctionGroupLow` | `HandlerDelete` (object_type: FUNCTION_GROUP, function_group_name, transport_request) | the same requests |
+| `DeleteFunctionModuleLow` | `HandlerDelete` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, transport_request) | the same requests |
+| `DeleteInterfaceLow` | `HandlerDelete` (object_type: INTERFACE, interface_name, transport_request) | the same requests |
+| `DeleteMetadataExtensionLow` | `HandlerDelete` (object_type: METADATA_EXTENSION, metadata_extension_name, transport_request) | the same requests |
+| `DeletePackageLow` | `HandlerDelete` (object_type: PACKAGE, package_name, transport_request) | The deletion request alone, as the low tool sent it, on the call's connection. The low tool's force_new_connection has no compact counterpart: compact locks and writes a package in an ABAP session of its own, so the call's session never holds a saved package; the full set's DeletePackage keeps force_new_connection. |
+| `DeleteProgramLow` | `HandlerDelete` (object_type: PROGRAM, program_name, transport_request) | the same requests |
+| `DeleteStructureLow` | `HandlerDelete` (object_type: STRUCTURE, structure_name, transport_request) | the same requests |
+| `DeleteTableLow` | `HandlerDelete` (object_type: TABLE, table_name, transport_request) | the same requests |
 | `GetNodeStructureLow` | `HandlerGet` (part: node_structure, object_adt_type, object_name, node_id, with_short_descriptions) | the same requests |
 | `GetObjectStructureLow` | `HandlerGet` (part: object_structure, object_adt_type, object_name) | the same requests |
 | `GetVirtualFoldersLow` | `HandlerGet` (part: virtual_folders, object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions) | the same requests |
@@ -1034,11 +1035,11 @@ transport's options only:
   headers), `mcp-abap-adt-compact-sse` `mcp-abap-adt-sse`'s, and each `-ro` one the same as its
   write binary. The sections above apply to each as to its counterpart; only the tool list differs.
 - **The binary fixes the tool list** (see "`--exposition` is gone" above): `mcp-abap-adt-compact`
-  serves the 27 tools, the four debugger verbs (`HandlerDebugStart`, `…Wait`, `…View`, `…Step`),
-  the three background-run tools and the two leftover-session tools (list, logoff) — 36 (`-compact-http` and
-  `-compact-sse` the same without the leftover-session tools — 34); `mcp-abap-adt-compact-ro` the 16
-  that change nothing and the leftover-session list and logoff — 18 (`-compact-http-ro` and
-  `-compact-sse-ro` the 16 alone). `--exposition`, with `ro`, `rw`, `debug` or any word,
+  serves the 28 tools, the four debugger verbs (`HandlerDebugStart`, `…Wait`, `…View`, `…Step`),
+  the three background-run tools and the two leftover-session tools (list, logoff) — 37 (`-compact-http` and
+  `-compact-sse` the same without the leftover-session tools — 35); `mcp-abap-adt-compact-ro` the 17
+  that change nothing and the leftover-session list and logoff — 19 (`-compact-http-ro` and
+  `-compact-sse-ro` the 17 alone). `--exposition`, with `ro`, `rw`, `debug` or any word,
   stops the start.
 - **Compact is the low set's analogue.** See "The low set leaves the full binaries" above: the
   write under your `lock_handle`, the package operations, the creation and validation parameters,
@@ -1103,7 +1104,7 @@ transport's options only:
   sets' `Update<Type>` keep their chains.
 
   **Over Streamable HTTP**, `HandlerLock`'s answer now carries a `state_handle`: send it in the
-  `x-mcp-state-handle` header with `HandlerUpdate` and `HandlerUnlock` under that lock — without
+  `x-mcp-state-handle` header with `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock — without
   it they are refused, sending nothing ("lock_handle is not held by this instance …"). A request
   of the pooled instance with the same credential headers works on its held SAP session; another
   credential retires it, and the locks of the retired session — as of a session SAP lost — are held
@@ -1114,6 +1115,35 @@ transport's options only:
   a lock with an empty `lock_handle` (as the full set's publication reads it); `HandlerUpdate`
   SERVICE_BINDING takes that empty `lock_handle` and sends the publication; `HandlerUnlock` with it
   answers that there is nothing to unlock, sending nothing.
+- **BREAKING — `HandlerDelete` is one request.** For every type a deletion request removes it
+  sends that request alone, as adt-clients' `delete()` sends it, and answers SAP's result as it
+  came: no lock (a lock held on the object is what makes ADT refuse its deletion) and no deletion
+  check. In 18.x it asked the deletion check first and sent no delete when the check refused or
+  reported the object absent. What a consumer of 18.x's `HandlerDelete` now calls, in order, each
+  its own call:
+  1. `HandlerDeletionCheck` (new: `object_type`, `object_name`; a function module is named
+     `GROUP|MODULE`) — the one deletion check, SAP's verdict as it came: `deletable: true` (with
+     SAP's message when it carries one — "does not exist" among them), or SAP's refusal in its
+     words (still used, locked, not there);
+  2. `HandlerDelete` — when the check permitted it.
+
+  For `LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS` and `UNIT_TEST`
+  (a `DELETE` on an include answers `405`), `HandlerDelete` writes the include empty — one `PUT`
+  under the `lock_handle` you pass; 18.x locked the class, wrote, unlocked and, with
+  `activate_on_delete` (`UNIT_TEST`: always), activated. Now, in order:
+  1. `HandlerLock` with `object_type: CLASS` and the class name — it answers the `lock_handle`;
+  2. `HandlerDelete` with that `lock_handle`;
+  3. `HandlerUnlock`;
+  4. `HandlerActivate` of the class.
+
+  `CDS_UNIT_TEST` deletes its test class, the deletion request alone, as before but without the
+  check. `force_new_connection` is gone from `HandlerDelete`'s schema: compact locks and writes a
+  package in an ABAP session of its own, so the call's session never holds a saved package (the
+  full set's `DeletePackage` keeps it); `lock_handle` joins it. Over Streamable HTTP an include's
+  `HandlerDelete` sends the lock's `state_handle` in the `x-mcp-state-handle` header, as
+  `HandlerUpdate` does. Every type is recorded in batch mode (an include with its `lock_handle`),
+  and so is `HandlerDeletionCheck`: a deletion check batch, then a delete batch. The full sets'
+  `Delete<Type>` keep their chains.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.
@@ -1591,7 +1621,7 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `credentials_required` with fixed ones.
 - **`EmbeddableMcpServer` takes `freshConnection?: () => Promise<IAbapConnection>`.** Some operations need an ABAP session of their own: `CreatePackage`
   (high, and compact's `HandlerCreate` PACKAGE) and compact's `HandlerLock` PACKAGE over RFC,
-  compact's `HandlerDelete` PACKAGE with `force_new_connection`, a
+  the high `DeletePackage` with `force_new_connection`, a
   debug session's own connections, and every call of a listed long read (see "the long reads take a
   `timeout`" above). On an injected connection, these now take that session from
   your factory, and from nowhere else. 18.x rebuilt one from the injected connection's

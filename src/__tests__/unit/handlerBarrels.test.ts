@@ -68,8 +68,9 @@ describe("lib's read and write handler barrels", () => {
     // `HandlerGet` with object_type TRANSPORT. 19.0.0: the node-structure,
     // virtual-folder and object-structure reads joined, for `HandlerGet`'s
     // address parts, when the low set left the full binaries. 19.0.0: the 18
-    // Read<Type> handlers left, folded into Get<Type> with `part`.
-    expect(read).toHaveLength(45);
+    // Read<Type> handlers left, folded into Get<Type> with `part`. 19.0.0: the
+    // deletion check alone, for compact's `HandlerDeletionCheck` (46).
+    expect(read).toHaveLength(46);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the
@@ -81,7 +82,8 @@ describe("lib's read and write handler barrels", () => {
     // 19.0.0: the high UpdatePackage, for `HandlerUpdate`
     // PACKAGE without lock_handle (82).
     // 19.0.0: the create request alone, compact's `HandlerCreate` (83).
-    expect(write).toHaveLength(83);
+    // 19.0.0: the deletion request alone, compact's `HandlerDelete` (84).
+    expect(write).toHaveLength(84);
   });
 
   it('share not one symbol', () => {

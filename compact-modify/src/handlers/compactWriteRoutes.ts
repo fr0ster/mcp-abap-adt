@@ -18,28 +18,7 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import {
   handleCreateOnly,
-  handleDeleteBehaviorDefinition,
-  handleDeleteBehaviorImplementation,
-  handleDeleteCdsUnitTest,
-  handleDeleteClass,
-  handleDeleteDataElement,
-  handleDeleteDdl,
-  handleDeleteDomain,
-  handleDeleteFunctionGroup,
-  handleDeleteFunctionModule,
-  handleDeleteInterface,
-  handleDeleteLocalDefinitions,
-  handleDeleteLocalMacros,
-  handleDeleteLocalTestClass,
-  handleDeleteLocalTypes,
-  handleDeleteMetadataExtension,
-  handleDeletePackage,
-  handleDeleteProgram,
-  handleDeleteServiceBinding,
-  handleDeleteServiceDefinition,
-  handleDeleteStructure,
-  handleDeleteTable,
-  handleDeleteUnitTest,
+  handleDeleteOnly,
   handleUpdateUnderLock,
 } from '@mcp-abap-adt/lib/handlers/write';
 
@@ -56,21 +35,28 @@ const create = handleCreateOnly as unknown as CompactHandler;
  */
 const update = handleUpdateUnderLock as unknown as CompactHandler;
 
+/**
+ * The delete of every type: one request (`handleDeleteOnly`, spec §4.6) — the
+ * deletion request alone, or for a class include and the unit tests the
+ * include written empty under the caller's `lock_handle`.
+ */
+const remove = handleDeleteOnly as unknown as CompactHandler;
+
 export const compactWriteRouterMap: CompactRouterMap = {
   PACKAGE: {
     create,
     update,
-    delete: handleDeletePackage as unknown as CompactHandler,
+    delete: remove,
   },
   DOMAIN: {
     create,
     update,
-    delete: handleDeleteDomain as unknown as CompactHandler,
+    delete: remove,
   },
   DATA_ELEMENT: {
     create,
     update,
-    delete: handleDeleteDataElement as unknown as CompactHandler,
+    delete: remove,
   },
   TRANSPORT: {
     create,
@@ -78,93 +64,93 @@ export const compactWriteRouterMap: CompactRouterMap = {
   TABLE: {
     create,
     update,
-    delete: handleDeleteTable as unknown as CompactHandler,
+    delete: remove,
   },
   STRUCTURE: {
     create,
     update,
-    delete: handleDeleteStructure as unknown as CompactHandler,
+    delete: remove,
   },
   DDL: {
     create,
     update,
-    delete: handleDeleteDdl as unknown as CompactHandler,
+    delete: remove,
   },
   SERVICE_DEFINITION: {
     create,
     update,
-    delete: handleDeleteServiceDefinition as unknown as CompactHandler,
+    delete: remove,
   },
   SERVICE_BINDING: {
     create,
     update,
-    delete: handleDeleteServiceBinding as unknown as CompactHandler,
+    delete: remove,
   },
   CLASS: {
     create,
     update,
-    delete: handleDeleteClass as unknown as CompactHandler,
+    delete: remove,
   },
   UNIT_TEST: {
     create,
     update,
-    delete: handleDeleteUnitTest as unknown as CompactHandler,
+    delete: remove,
   },
   CDS_UNIT_TEST: {
     create,
     update,
-    delete: handleDeleteCdsUnitTest as unknown as CompactHandler,
+    delete: remove,
   },
   LOCAL_TEST_CLASS: {
     update,
-    delete: handleDeleteLocalTestClass as unknown as CompactHandler,
+    delete: remove,
   },
   LOCAL_TYPES: {
     update,
-    delete: handleDeleteLocalTypes as unknown as CompactHandler,
+    delete: remove,
   },
   LOCAL_DEFINITIONS: {
     update,
-    delete: handleDeleteLocalDefinitions as unknown as CompactHandler,
+    delete: remove,
   },
   LOCAL_MACROS: {
     update,
-    delete: handleDeleteLocalMacros as unknown as CompactHandler,
+    delete: remove,
   },
   PROGRAM: {
     create,
     update,
-    delete: handleDeleteProgram as unknown as CompactHandler,
+    delete: remove,
   },
   INTERFACE: {
     create,
     update,
-    delete: handleDeleteInterface as unknown as CompactHandler,
+    delete: remove,
   },
   FUNCTION_GROUP: {
     create,
     update,
-    delete: handleDeleteFunctionGroup as unknown as CompactHandler,
+    delete: remove,
   },
   FUNCTION_MODULE: {
     create,
     update,
-    delete: handleDeleteFunctionModule as unknown as CompactHandler,
+    delete: remove,
   },
   BEHAVIOR_DEFINITION: {
     create,
     update,
-    delete: handleDeleteBehaviorDefinition as unknown as CompactHandler,
+    delete: remove,
   },
   BEHAVIOR_IMPLEMENTATION: {
     create,
     update,
-    delete: handleDeleteBehaviorImplementation as unknown as CompactHandler,
+    delete: remove,
   },
   METADATA_EXTENSION: {
     create,
     update,
-    delete: handleDeleteMetadataExtension as unknown as CompactHandler,
+    delete: remove,
   },
   // No CRUD: a profiler run and a dump are read through their own tools.
   RUNTIME_PROFILE: {},

@@ -412,11 +412,13 @@ describe('no request of a started tool carries a signal', () => {
     const client = await inMemory((t) => server.connect(t));
     try {
       await client.callTool({
-        name: 'HandlerDelete',
+        // Over RFC a package is created in an ABAP session of its own.
+        name: 'HandlerCreate',
         arguments: {
           object_type: 'PACKAGE',
           package_name: 'ZFRESH',
-          force_new_connection: true,
+          super_package: 'ZROOT',
+          description: 'd',
         },
       });
       expect(calls).toEqual([[]]);

@@ -37,6 +37,8 @@ const NODE_LEVEL = corpusBody(
 );
 const ACTIVATED = corpusBody('activation-success-verdict--01-activation');
 const CHECKED = corpusBody('check-success-verdict--01-checkrun');
+const DELETED = corpusBody('delete-success--01-deletion-delete');
+const DELETABLE = corpusBody('deletion-check-allows--01-deletion-check');
 const NAME_FREE = corpusBody(
   'validation-name-free-class--01-validation-objectname',
 );
@@ -441,6 +443,70 @@ const COMPACT: BatchEntryCase[] = [
     },
     connection: 'http',
   },
+];
+
+/** `HandlerDelete`: the deletion request alone, per type it removes. */
+const DELETIONS: Array<[string, Record<string, unknown>]> = [
+  ['PACKAGE', { package_name: 'PKG_A' }],
+  ['DOMAIN', { domain_name: 'DOM_A' }],
+  ['DATA_ELEMENT', { data_element_name: 'DTEL_A' }],
+  ['TABLE', { table_name: 'TAB_A' }],
+  ['STRUCTURE', { structure_name: 'STRU_A' }],
+  ['DDL', { ddl_name: 'DDL_A' }],
+  ['SERVICE_DEFINITION', { service_definition_name: 'SRVD_A' }],
+  ['SERVICE_BINDING', { service_binding_name: 'SRVB_A' }],
+  ['CLASS', { class_name: 'CLAS_A' }],
+  ['CDS_UNIT_TEST', { class_name: 'CLAS_T' }],
+  ['PROGRAM', { program_name: 'PROG_A' }],
+  ['INTERFACE', { interface_name: 'INTF_A' }],
+  ['FUNCTION_GROUP', { function_group_name: 'FUGR_A' }],
+  [
+    'FUNCTION_MODULE',
+    { function_module_name: 'FM_A', function_group_name: 'FUGR_A' },
+  ],
+  ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
+  ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
+  ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
+];
+
+/** `HandlerDelete` of a class include: its empty write under `lock_handle`. */
+const EMPTIED_INCLUDES = [
+  'LOCAL_TEST_CLASS',
+  'LOCAL_TYPES',
+  'LOCAL_DEFINITIONS',
+  'LOCAL_MACROS',
+  'UNIT_TEST',
+];
+
+/** The deletion check of every type a deletion request removes. */
+const DELETION_CHECKS: Array<[string, string]> = DELETIONS.map(
+  ([object_type]) => [
+    object_type,
+    object_type === 'FUNCTION_MODULE' ? 'FUGR_A|FM_A' : 'OBJ_A',
+  ],
+);
+
+const DELETE_CASES: BatchEntryCase[] = [
+  ...DELETIONS.map(([object_type, fields]) => ({
+    tool: 'HandlerDelete',
+    args: { object_type, ...fields, transport_request: TRANSPORT },
+    // The metadata extension's DELETE answers an empty 2xx.
+    ...(object_type === 'METADATA_EXTENSION' ? {} : { body: DELETED }),
+  })),
+  ...EMPTIED_INCLUDES.map((object_type) => ({
+    tool: 'HandlerDelete',
+    args: {
+      object_type,
+      class_name: 'CLAS_A',
+      lock_handle: LOCK_HANDLE,
+      transport_request: TRANSPORT,
+    },
+  })),
+  ...DELETION_CHECKS.map(([object_type, object_name]) => ({
+    tool: 'HandlerDeletionCheck',
+    args: { object_type, object_name },
+    body: DELETABLE,
+  })),
 ];
 
 /** `HandlerCreate`: the create request alone, per type but PACKAGE. */
@@ -881,6 +947,7 @@ export const BATCH_ENTRY_CASES: readonly BatchEntryCase[] = [
   ...FULL,
   ...COMPACT,
   ...CREATE_CASES,
+  ...DELETE_CASES,
   ...WRITES,
   ...TOGETHER,
 ];

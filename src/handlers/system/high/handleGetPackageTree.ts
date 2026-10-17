@@ -23,6 +23,7 @@ import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
   assembleTree,
   batchReader,
+  describeFromMetadata,
   endsTheCall,
   type NodeRequest,
   readNode,
@@ -38,7 +39,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackageTree',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk.',
+    '[high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk, then the metadata of every object found, whose description the tree carries.',
   ),
   inputSchema: {
     type: 'object',
@@ -142,7 +143,8 @@ const metadataRead = (metadata: PhaseResult<Metadata>) =>
 /**
  * Every package's metadata and walk in ADT batch envelopes (spec §11): (1)
  * the metadata GET and the root node structure of every package, in one
- * phase; then the walk's levels for the packages whose metadata was read.
+ * phase; then the walk's levels for the packages whose metadata was read;
+ * then every walked object's description from its metadata, in one phase.
  * A metadata read refused with a credential failure ends the reads.
  */
 async function readTreesBatched(
@@ -180,8 +182,9 @@ async function readTreesBatched(
     options,
     kept.map((i) => first[packageNames.length + i] as PhaseResult<unknown>),
   );
+  const described = await describeFromMetadata(context, walked);
   kept.forEach((i, k) => {
-    (reads[i] as TreeRead).walked = walked[k];
+    (reads[i] as TreeRead).walked = described[k];
   });
   return reads;
 }

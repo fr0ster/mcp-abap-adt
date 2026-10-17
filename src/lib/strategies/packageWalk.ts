@@ -3,7 +3,7 @@ import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../handlers/interfaces';
-import { isCredentialFailure } from '../answer';
+import { isCredentialFailure, requestFailureOf } from '../answer';
 import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { carryingFailure } from './step';
@@ -422,6 +422,21 @@ interface PackageWalk {
   subs: PackageWalk[];
 }
 
+/**
+ * An object of a batched level, found in `packageName`, without the
+ * description its part carried: a node structure part after the first of an
+ * envelope can carry another part's `DESCRIPTION` (measured, 2026-10-18), so
+ * a batched walk takes the description from the object's metadata
+ * (`describeFromMetadata`).
+ */
+function undescribed(
+  object: NodeLevel['objects'][number],
+  packageName: string,
+): WalkedItem {
+  const { description: _part, ...rest } = object;
+  return { ...rest, packageName };
+}
+
 function flatten(walk: PackageWalk): WalkedItem[] {
   return [...walk.found, ...walk.subs.flatMap(flatten)];
 }
@@ -434,6 +449,8 @@ function flatten(walk: PackageWalk): WalkedItem[] {
  * never past `maxDepth`. `read` reads one level's requests in one envelope
  * (`batchReader`): no request of a level needs another's answer. Where the
  * destination has no communication batch the handler runs `walkPackage`.
+ * The objects carry no description: a caller that answers descriptions
+ * reads them with `describeFromMetadata`.
  *
  * One settlement per package asked, in the order asked: its objects — the
  * package's own, then those of each subpackage walked from it, depth first —
@@ -495,9 +512,7 @@ export async function walkPackages(
     level.forEach((walk, i) => {
       const root = settle(walk, rootAnswers[i]);
       if (root === undefined) return;
-      walk.found.push(
-        ...root.objects.map((o) => ({ ...o, packageName: walk.name })),
-      );
+      walk.found.push(...root.objects.map((o) => undescribed(o, walk.name)));
       for (const child of root.childNodes) {
         typeNodes.push({ walk, nodeId: child.nodeId });
       }
@@ -515,9 +530,7 @@ export async function walkPackages(
       typeNodes.forEach(({ walk }, i) => {
         const typed = settle(walk, typeAnswers[i]);
         if (typed === undefined) return;
-        walk.found.push(
-          ...typed.objects.map((o) => ({ ...o, packageName: walk.name })),
-        );
+        walk.found.push(...typed.objects.map((o) => undescribed(o, walk.name)));
       });
     }
 
@@ -613,7 +626,136 @@ export type WalkedItem = {
   type: string;
   description?: string;
   packageName?: string;
+  techName?: string;
+  uri?: string;
 };
+
+/** The step of a failed object metadata read. */
+export const METADATA_STEP = 'read object metadata';
+
+/**
+ * The address of an object's metadata: a package's `/sap/bc/adt/packages/
+ * <name>`; any other object's `OBJECT_URI`, when it addresses the object
+ * itself (no `#` fragment). `undefined` when neither applies.
+ */
+export function metadataUriOf(object: {
+  name: string;
+  type: string;
+  uri?: string;
+}): string | undefined {
+  if (kindOf(object.type) === 'package') {
+    return `/sap/bc/adt/packages/${encodeURIComponent(object.name.toLowerCase())}`;
+  }
+  const uri = object.uri;
+  if (uri === undefined || uri === '' || uri.includes('#')) return undefined;
+  return uri;
+}
+
+/** The `adtcore:description` of a metadata document's root element. */
+export function metadataDescriptionOf(answer: unknown): string | undefined {
+  const xml = String((answer as { data?: unknown })?.data ?? '');
+  let doc: unknown;
+  try {
+    doc = parser.parse(xml);
+  } catch {
+    return undefined;
+  }
+  if (doc === null || typeof doc !== 'object') return undefined;
+  for (const [name, root] of Object.entries(doc as Record<string, unknown>)) {
+    if (name.startsWith('?') || root === null || typeof root !== 'object') {
+      continue;
+    }
+    const description = (root as Record<string, unknown>)[
+      'adtcore:description'
+    ];
+    return typeof description === 'string'
+      ? description.trim() || undefined
+      : undefined;
+  }
+  return undefined;
+}
+
+/** The status SAP answered a part with, when it answered. */
+function partStatusOf(error: unknown): number | undefined {
+  const status = (error as { response?: { status?: unknown } } | undefined)
+    ?.response?.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
+/**
+ * The description of every object at `uris` (`metadataUriOf`), read in one
+ * ADT batch envelope (`runPhase`): one GET per distinct address. An address
+ * whose read failed has no entry. A credential failure ends the call: a
+ * failure the server's reader answers, as it came; a `401` SAP answered to
+ * a part, as the method's error with its step.
+ */
+export async function metadataDescriptions(
+  context: HandlerContext,
+  uris: readonly string[],
+): Promise<Map<string, string | undefined>> {
+  const distinct = [...new Set(uris)];
+  const described = new Map<string, string | undefined>();
+  if (distinct.length === 0) return described;
+  const results = await runPhase(context, distinct, (url, connection) =>
+    connection.makeAdtRequest({
+      url,
+      method: 'GET',
+      timeout: 0,
+      headers: { Accept: '*/*' },
+    }),
+  );
+  results.forEach((result, i) => {
+    const uri = distinct[i] as string;
+    if (result.ok) {
+      described.set(uri, metadataDescriptionOf(result.value));
+      return;
+    }
+    if (endsTheCall(result.error)) throw result.error;
+    if (partStatusOf(result.error) === 401) {
+      const error = requestFailureOf(result.error, { method: 'GET', url: uri });
+      if (error !== undefined) {
+        throw carryingFailure(new Error(error.message), error, METADATA_STEP);
+      }
+      throw result.error;
+    }
+  });
+  return described;
+}
+
+/**
+ * Every walked object's description from its metadata (spec §11, the batched
+ * walks): one phase over the objects of every walk that answered, each
+ * object's description its metadata's `adtcore:description`. An object
+ * whose metadata address is not known (`metadataUriOf`) or whose read failed
+ * has no description.
+ */
+export async function describeFromMetadata(
+  context: HandlerContext,
+  walked: readonly PhaseResult<WalkedItem[]>[],
+): Promise<PhaseResult<WalkedItem[]>[]> {
+  const uris = walked.flatMap((result) =>
+    result.ok
+      ? result.value.flatMap((item) => {
+          const uri = metadataUriOf(item);
+          return uri === undefined ? [] : [uri];
+        })
+      : [],
+  );
+  const described = await metadataDescriptions(context, uris);
+  return walked.map((result) =>
+    result.ok
+      ? {
+          ok: true,
+          value: result.value.map((item) => {
+            const uri = metadataUriOf(item);
+            const description =
+              uri === undefined ? undefined : described.get(uri);
+            return { ...item, description };
+          }),
+        }
+      : result,
+  );
+}
 
 /** The flat listing. */
 export function assembleList(

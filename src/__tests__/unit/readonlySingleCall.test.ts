@@ -65,6 +65,7 @@ import { handleGetUnitTest } from '../../handlers/unit_test/high/handleGetUnitTe
 import { handleGetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult';
 import { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus';
 import { corpusBody } from '../../lib/adtCorpus';
+import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
 import { parseStructure, structured } from '../../lib/strategies/reading';
@@ -684,11 +685,20 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
       },
     });
 
-    const result: any = await handleGetObjectInfo(context as any, {
-      parent_type: 'DEVC/K',
-      parent_name: 'ZMCP_SHR_PKG',
-      enrich: false, // isolate the tree walk from SearchObject enrichment
-    });
+    // The sequential reads, whose descriptions are the node structure's: a
+    // destination known to have no communication batch. (The batched walk
+    // takes its descriptions from each object's metadata:
+    // `unit/batch/packageWalks.test.ts`.)
+    const notServed = createBatchAvailability();
+    notServed.noteOuterStatus(404);
+    const result: any = await handleGetObjectInfo(
+      { ...context, batchAvailability: notServed } as any,
+      {
+        parent_type: 'DEVC/K',
+        parent_name: 'ZMCP_SHR_PKG',
+        enrich: false, // isolate the tree walk from SearchObject enrichment
+      },
+    );
 
     expect(result.isError).toBe(false);
     const tree = JSON.parse(result.content[0].text);

@@ -20,11 +20,14 @@ import {
   batchReader,
   endsTheCall,
   kindOf,
+  metadataDescriptions,
+  metadataUriOf,
   type NodeLevel,
   type NodeRequest,
   readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { methodFailureOf } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 
@@ -32,7 +35,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[read-only] Return ABAP object tree structure for packages (DEVC), classes (CLAS), programs (PROG), function groups (FUGR), and other objects. Shows root, group nodes, and terminal leaves up to maxDepth. Enrich each node with description and package via SearchObject if enrich=true. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last.',
+    '[read-only] Return ABAP object tree structure for packages (DEVC), classes (CLAS), programs (PROG), function groups (FUGR), and other objects. Shows root, group nodes, and terminal leaves up to maxDepth. Enrich each node with description and package via SearchObject if enrich=true. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; then the metadata of every leaf, whose description the leaf carries; with enrich, the search of every node last.',
   ),
   inputSchema: {
     type: 'object',
@@ -92,6 +95,14 @@ interface TreeNode {
   OBJECT_DESCRIPTION?: string;
   OBJECT_PACKAGE?: string;
   CHILDREN?: TreeNode[];
+}
+
+/** A failed answer carrying `error`. */
+function failedWith(error: IAdtError): IAdtFailure {
+  return {
+    ok: false,
+    getError: () => error,
+  } as unknown as IAdtFailure;
 }
 
 function ok<T>(value: T): IAdtResponse<T, IAdtError> {
@@ -195,14 +206,6 @@ function treeNodeOf(node: InfoNode): TreeNode {
       ? { OBJECT_PACKAGE: enrichment.packageName }
       : {}),
     ...(children.length > 0 ? { CHILDREN: children } : {}),
-  };
-}
-
-function leafOf(o: NodeLevel['objects'][number]): TreeNode {
-  return {
-    OBJECT_TYPE: o.type,
-    OBJECT_NAME: o.name,
-    ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
   };
 }
 
@@ -402,7 +405,9 @@ async function buildTree(
  * tier, (a) the root node structure of every node of the tier, read
  * together; (b) every type folder those roots list, read together; the next
  * tier is the packages found that are walked further, as `buildTree` walks
- * them. With `enrich`, a last phase: one search per node. A root's first
+ * them. Then one phase: the metadata of every leaf, whose
+ * `adtcore:description` is the leaf's description. With `enrich`, a last
+ * phase: one search per node. A root's first
  * refused read is its answer, and nothing more of it is read; a credential
  * failure SAP answered ends the reads.
  */
@@ -424,6 +429,23 @@ async function buildTrees(
     children: [],
   }));
   const nodes: InfoNode[] = [...roots];
+  /** Every leaf of every tree, with its root and its metadata address. */
+  const leaves: Array<{ root: number; leaf: TreeNode; uri?: string }> = [];
+  /**
+   * A leaf without the description its part carried: a node structure part
+   * after the first of an envelope can carry another part's `DESCRIPTION`
+   * (measured, 2026-10-18); the leaf's description is its metadata's.
+   */
+  const bareLeaf = (node: InfoNode, o: NodeLevel['objects'][number]) => {
+    const leaf: TreeNode = { OBJECT_TYPE: o.type, OBJECT_NAME: o.name };
+    const uri = metadataUriOf(o);
+    leaves.push({
+      root: node.root,
+      leaf,
+      ...(uri !== undefined ? { uri } : {}),
+    });
+    return leaf;
+  };
   const limit = (node: InfoNode) =>
     (objects[node.root] as (typeof objects)[number]).maxDepth;
   let ending: IAdtFailure | undefined;
@@ -464,7 +486,7 @@ async function buildTrees(
     tier.forEach((node, i) => {
       const level = settle(node, rootAnswers[i] as (typeof rootAnswers)[0]);
       if (level === undefined) return;
-      node.children.push(...level.objects.map(leafOf));
+      node.children.push(...level.objects.map((o) => bareLeaf(node, o)));
       for (const child of level.childNodes) {
         typeNodes.push({ node, nodeId: child.nodeId });
       }
@@ -500,12 +522,32 @@ async function buildTrees(
           nodes.push(sub);
           next.push(sub);
         } else {
-          node.children.push(leafOf(o));
+          node.children.push(bareLeaf(node, o));
         }
       }
     });
     if (ending !== undefined) return { roots, failures, ended: ending };
     tier = next.filter((node) => !failures.has(node.root));
+  }
+
+  // Every leaf's description from its metadata, in one phase.
+  const described = leaves.filter(({ root }) => !failures.has(root));
+  let descriptions: Map<string, string | undefined>;
+  try {
+    descriptions = await metadataDescriptions(
+      context,
+      described.flatMap(({ uri }) => (uri === undefined ? [] : [uri])),
+    );
+  } catch (thrown) {
+    // A 401 SAP answered to a metadata read: the method's error, with its
+    // step, ends the call as a refused node read does.
+    const refused = methodFailureOf(thrown);
+    if (refused === undefined) throw thrown;
+    return { roots, failures, ended: failedWith(refused) };
+  }
+  for (const { leaf, uri } of described) {
+    const description = uri === undefined ? undefined : descriptions.get(uri);
+    if (description) leaf.OBJECT_DESCRIPTION = description;
   }
 
   if (enrich) {

@@ -7,6 +7,7 @@ import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
 import {
   assembleList,
   batchReader,
+  describeFromMetadata,
   type NodeRequest,
   readNode,
   rootByRoot,
@@ -20,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes.',
+    '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; then the metadata of every object found, whose description the list carries, in one more.',
   ),
   inputSchema: {
     timeout: timeoutField(),
@@ -85,17 +86,21 @@ export async function handleGetPackageContents(
     // many requests cannot take an IResultStrategy, and a flat list and a tree
     // are two conveniences over one walk. This is the same walk that handler
     // uses, assembled the other way — level by level, each level's requests in
-    // one envelope (spec §11); one package after another where the system has
+    // one envelope (spec §11), then every object's description from its
+    // metadata in one more; one package after another where the system has
     // no communication batch.
     const walked = await withSequentialFallback(
       context,
-      () =>
-        walkPackages(
-          batchReader<NodeRequest, unknown>(context, (request, c) =>
-            readNode(createAdtClient(c, logger).getUtils(ourUtils), request),
+      async () =>
+        describeFromMetadata(
+          context,
+          await walkPackages(
+            batchReader<NodeRequest, unknown>(context, (request, c) =>
+              readNode(createAdtClient(c, logger).getUtils(ourUtils), request),
+            ),
+            packageNames,
+            options,
           ),
-          packageNames,
-          options,
         ),
       () => {
         const utils = createAdtClient(connection, logger).getUtils(ourUtils);

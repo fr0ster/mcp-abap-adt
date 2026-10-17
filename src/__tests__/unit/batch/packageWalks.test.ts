@@ -156,8 +156,51 @@ function corpusNodes(): Record<string, string> {
 }
 const CORPUS = corpusNodes();
 
+/**
+ * What each object's metadata says of it, read from the node structure
+ * documents the system answers to a request sent alone: the description of
+ * every object by its `OBJECT_URI`, and of every package by its name.
+ */
+function metadataIndex(): {
+  byUri: Map<string, string>;
+  byPackage: Map<string, string>;
+} {
+  const byUri = new Map<string, string>();
+  const byPackage = new Map<string, string>();
+  const bodies = [
+    ...Object.values(CORPUS),
+    ...Object.values(NODES).map(xmlNode),
+  ];
+  for (const body of bodies) {
+    for (const node of body.matchAll(
+      /<SEU_ADT_REPOSITORY_OBJ_NODE>([\s\S]*?)<\/SEU_ADT_REPOSITORY_OBJ_NODE>/g,
+    )) {
+      const field = (name: string) =>
+        new RegExp(`<${name}>([^<]*)</${name}>`).exec(node[1] ?? '')?.[1];
+      const description = field('DESCRIPTION');
+      if (description === undefined) continue;
+      const uri = field('OBJECT_URI');
+      if (uri !== undefined) byUri.set(uri, description);
+      if (field('OBJECT_TYPE') === 'DEVC/K') {
+        byPackage.set(field('OBJECT_NAME') ?? '', description);
+      }
+    }
+  }
+  return { byUri, byPackage };
+}
+const METADATA = metadataIndex();
+
+const described = (description: string | undefined) =>
+  description === undefined
+    ? ''
+    : ` adtcore:description="${description.replaceAll('"', '&quot;')}"`;
+
 const PACKAGE_XML = (name: string) =>
-  `<?xml version="1.0" encoding="utf-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${name}" adtcore:type="DEVC/K"/>`;
+  `<?xml version="1.0" encoding="utf-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${name}" adtcore:type="DEVC/K"${described(METADATA.byPackage.get(name))}/>`;
+
+/** An object's metadata document: its root element and its description. */
+const OBJECT_XML = (uri: string) =>
+  `<?xml version="1.0" encoding="utf-8"?><adtcore:mainObject xmlns:adtcore="http://www.sap.com/adt/core" adtcore:uri="${uri}"${described(METADATA.byUri.get(uri))}/>`;
 
 const SEARCH_XML = (name: string, type: string) =>
   `<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/x/${name.toLowerCase()}" adtcore:type="${type}" adtcore:name="${name}" adtcore:packageName="ZPARENT" adtcore:description="Found ${name}"/></adtcore:objectReferences>`;
@@ -217,6 +260,15 @@ function answerOf(
       statusText: 'OK',
       headers: xml,
       body: PACKAGE_XML(name),
+    };
+  }
+  const path = key.startsWith('GET ') ? key.slice('GET '.length) : '';
+  if (METADATA.byUri.has(path) || path.startsWith('/sap/bc/adt/x/')) {
+    return {
+      status: 200,
+      statusText: 'OK',
+      headers: xml,
+      body: OBJECT_XML(path),
     };
   }
   const corpus = CORPUS[key];
@@ -384,6 +436,11 @@ describe('GetPackageContents', () => {
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
+      [
+        'GET /sap/bc/adt/packages/zsub_a',
+        'GET /sap/bc/adt/x/zcl_a',
+        'GET /sap/bc/adt/x/zprog_a',
+      ],
     ]);
     expect(fake.directs).toHaveLength(0);
   });
@@ -418,7 +475,7 @@ describe('GetPackageContents', () => {
       }),
     );
     expect(two.envelopes).toHaveLength(one.envelopes.length);
-    expect(two.envelopes).toHaveLength(4);
+    expect(two.envelopes).toHaveLength(5);
     const entries = payloadOf(result);
     expect(
       entries.map((e: { package_name: string }) => e.package_name),
@@ -542,6 +599,7 @@ describe('HandlerGet part contents', () => {
     expect(fake.envelopes.map(partKeys)).toEqual([
       [nodeKey('DEVC/K', 'ZROOT_A')],
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
+      ['GET /sap/bc/adt/packages/zsub_a', 'GET /sap/bc/adt/x/zcl_a'],
     ]);
   });
 
@@ -567,7 +625,7 @@ describe('HandlerGet part contents', () => {
         contents({ package_names: ['ZROOT_A', 'ZROOT_B'] }),
       ) as Promise<unknown>,
     );
-    expect(fake.envelopes).toHaveLength(2);
+    expect(fake.envelopes).toHaveLength(3);
     const entries = payloadOf(result);
     expect(entries).toEqual([
       {
@@ -655,6 +713,11 @@ describe('GetPackageTree', () => {
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
+      [
+        'GET /sap/bc/adt/packages/zsub_a',
+        'GET /sap/bc/adt/x/zcl_a',
+        'GET /sap/bc/adt/x/zprog_a',
+      ],
     ]);
   });
 
@@ -678,7 +741,7 @@ describe('GetPackageTree', () => {
         package_names: ['ZROOT_A', 'ZROOT_B'],
       }),
     );
-    expect(fake.envelopes).toHaveLength(4);
+    expect(fake.envelopes).toHaveLength(5);
     const entries = payloadOf(result);
     expect(
       entries.map((e: { package_name: string }) => e.package_name),
@@ -879,6 +942,7 @@ describe('GetObjectInfo', () => {
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
+      ['GET /sap/bc/adt/x/zcl_a', 'GET /sap/bc/adt/x/zprog_a'],
       ['SEARCH|ZROOT_A', 'SEARCH|ZSUB_A'],
     ]);
   });
@@ -911,7 +975,7 @@ describe('GetObjectInfo', () => {
         maxDepth: 2,
       }),
     );
-    expect(fake.envelopes).toHaveLength(5);
+    expect(fake.envelopes).toHaveLength(6);
     const [a, b] = payloadOf(result);
     expect(a.OBJECT_NAME).toBe('ZROOT_A');
     expect(b.CHILDREN[0].CHILDREN[0].OBJECT_NAME).toBe('ZPROG_B');
@@ -1085,7 +1149,7 @@ describe('GetObjectInfo: a credential refusal of the searches', () => {
     );
     expect((result as { isError?: boolean }).isError).toBe(true);
     expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(5);
+    expect(fake.envelopes).toHaveLength(6);
   });
 });
 
@@ -1156,5 +1220,179 @@ describe('GetPackageTree: a metadata read SAP answered 401', () => {
       step: 'read package metadata',
     });
     expect(fake.directs).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Descriptions: a node structure part after the first of an envelope can
+// carry another part's DESCRIPTION (measured, 2026-10-18); the batched walks
+// take every description from the object's metadata.
+// ---------------------------------------------------------------------------
+
+const DESCRIPTION_TAG = /<DESCRIPTION>[^<]*<\/DESCRIPTION>|<DESCRIPTION\/>/g;
+
+/**
+ * The system as measured: in an envelope, every node structure part after
+ * one that carried a description carries that description on each of its
+ * nodes in place of its own. A part sent alone is answered as it is.
+ */
+function leakingSystem(model: Model = {}) {
+  const leaks = { count: 0 };
+  const fake = envelopeConnection(
+    (parts) => {
+      let leaked: string | undefined;
+      const answered = parts.map((p) => {
+        const answer = answerOf(model, p.method, p.url);
+        const body = answer.body ?? '';
+        if (!p.url.includes('/repository/nodestructure')) return answer;
+        const own = /<DESCRIPTION>([^<]+)<\/DESCRIPTION>/.exec(body)?.[1];
+        const changed =
+          leaked === undefined
+            ? body
+            : body
+                .replace(DESCRIPTION_TAG, '')
+                .replaceAll(
+                  '</SEU_ADT_REPOSITORY_OBJ_NODE>',
+                  `<DESCRIPTION>${leaked}</DESCRIPTION></SEU_ADT_REPOSITORY_OBJ_NODE>`,
+                );
+        leaked ??= own;
+        if (changed !== body) leaks.count += 1;
+        return { ...answer, body: changed };
+      });
+      return envelopeOf(answered);
+    },
+    async (request: IAbapRequestOptions): Promise<IAdtWireResponse> => {
+      const a = answerOf(model, request.method, request.url, request.params);
+      if (a.status >= 400) {
+        throw statusError(a.status, a.statusText ?? '', a.body ?? '');
+      }
+      return {
+        status: a.status,
+        statusText: a.statusText ?? 'OK',
+        headers: a.headers ?? {},
+        data: a.body ?? '',
+      } as IAdtWireResponse;
+    },
+  );
+  return { ...fake, leaks };
+}
+
+/** The four calls that answer descriptions, over two roots. */
+const DESCRIBING_CALLS: Array<{ tool: string; call: Call }> = [
+  {
+    tool: 'GetPackageContents',
+    call: (c) =>
+      handleGetPackageContents(c, {
+        package_names: ['ZROOT_A', 'ZROOT_B'],
+        include_subpackages: true,
+        max_depth: 2,
+      }),
+  },
+  {
+    tool: 'HandlerGet part contents',
+    call: (c) =>
+      handleHandlerGet(c, {
+        object_type: 'PACKAGE',
+        part: 'contents',
+        package_names: ['ZROOT_A', 'ZROOT_B'],
+      }) as Promise<unknown>,
+  },
+  {
+    tool: 'GetPackageTree',
+    call: (c) =>
+      handleGetPackageTree(c, { package_names: ['ZROOT_A', 'ZROOT_B'] }),
+  },
+  {
+    tool: 'GetObjectInfo',
+    call: (c) =>
+      handleGetObjectInfo(c, {
+        objects: [
+          { object_type: 'DEVC/K', object_name: 'ZROOT_A' },
+          { object_type: 'DEVC/K', object_name: 'ZROOT_B' },
+        ],
+        maxDepth: 2,
+      }),
+  },
+];
+
+describe.each(DESCRIBING_CALLS)('$tool: descriptions', ({ call }) => {
+  it("a part carrying another part's DESCRIPTION: the answer is the sequential one", async () => {
+    const leaking = leakingSystem();
+    const batched = await withinTurns(call(contextOn(leaking as Fake)));
+    const sequential = await withinTurns(
+      call(contextOn(leakingSystem() as Fake, 'absent')),
+    );
+    // The envelopes did carry another part's description.
+    expect(leaking.leaks.count).toBeGreaterThan(0);
+    expect((batched as { isError?: boolean }).isError).toBe(false);
+    expect(textOf(batched)).toBe(textOf(sequential));
+    expect(textOf(batched)).toContain('Class A');
+  });
+
+  it('the metadata phase: one envelope, one GET per object, after the walk', async () => {
+    const fake = system();
+    await withinTurns(call(contextOn(fake)));
+    const metadata = fake.envelopes.filter((e) =>
+      partKeys(e).some((k) => k.startsWith('GET /sap/bc/adt/x/')),
+    );
+    expect(metadata).toHaveLength(1);
+    const parts = (metadata[0] as SeenEnvelope).parts;
+    expect(parts.every((p) => p.method === 'GET')).toBe(true);
+    const keys = partKeys(metadata[0] as SeenEnvelope);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys).toEqual(expect.arrayContaining(['GET /sap/bc/adt/x/zcl_a']));
+    // No node structure is read after it.
+    const at = fake.envelopes.indexOf(metadata[0] as SeenEnvelope);
+    expect(
+      fake.envelopes
+        .slice(at + 1)
+        .flatMap(partKeys)
+        .some((k) => k.includes('|') && !k.startsWith('SEARCH|')),
+    ).toBe(false);
+  });
+
+  it("a metadata part's failure: that object has no description; the call answers", async () => {
+    const fake = system({ refuse: { 'GET /sap/bc/adt/x/zcl_a': 500 } });
+    const result = await withinTurns(call(contextOn(fake)));
+    expect((result as { isError?: boolean }).isError).toBe(false);
+    expect(textOf(result)).toContain('ZCL_A');
+    expect(textOf(result)).not.toContain('Class A');
+    expect(textOf(result)).toContain('Interface B');
+  });
+
+  it('a 401 SAP answered to a metadata part ends the call as it came', async () => {
+    const fake = system({ refuse: { 'GET /sap/bc/adt/x/zcl_a': 401 } });
+    const result = await withinTurns(call(contextOn(fake)));
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({
+      status: 401,
+      step: 'read object metadata',
+    });
+  });
+
+  it("the connection's credential refusal of the metadata envelope ends the call as it came", async () => {
+    const fake = envelopeConnection((parts) => {
+      if (
+        parts.some((p) =>
+          keyOf(p.method, p.url).startsWith('GET /sap/bc/adt/x/'),
+        )
+      ) {
+        throw credential();
+      }
+      return envelopeOf(parts.map((p) => answerOf({}, p.method, p.url)));
+    });
+    const result = await withinTurns(call(contextOn(fake as unknown as Fake)));
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(payloadOf(result).error).toBe('authentication_failed');
+  });
+
+  it('no communication batch: no metadata read, the descriptions of today', async () => {
+    const fake = system();
+    const result = await withinTurns(call(contextOn(fake, 'absent')));
+    expect(fake.envelopes).toHaveLength(0);
+    expect(fake.directs.some((r) => r.url.startsWith('/sap/bc/adt/x/'))).toBe(
+      false,
+    );
+    expect(textOf(result)).toContain('Class A');
   });
 });

@@ -1980,7 +1980,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
+**Description:** [high-level] Retrieve complete package tree structure including subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the package metadata with the root node structure, then each level of the walk, then the metadata of every object found, whose description the tree carries. Runs on an ABAP session of its own. Optional timeout (seconds) cancels the read when it passes — nothing is changed; set it below your MCP client's request limit — the TypeScript SDK's client cancels at 60 s; a cancel does nothing to SAP.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 

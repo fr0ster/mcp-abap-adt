@@ -1365,7 +1365,10 @@ describe.each<Exclude<TransportName, 'stdio'>>(['http', 'sse'])(
   },
 );
 
-/** A write of one class on each set: lock, update, unlock. */
+/**
+ * A write of one class on each set: the full set's lock, update, unlock; the
+ * compact one write under a lock handle.
+ */
 const writeCall = (
   set: SetName,
   className: string,
@@ -1375,7 +1378,12 @@ const writeCall = (
     ? { name: 'UpdateClass', arguments: { class_name: className, source_code } }
     : {
         name: 'HandlerUpdate',
-        arguments: { object_type: 'CLASS', class_name: className, source_code },
+        arguments: {
+          object_type: 'CLASS',
+          class_name: className,
+          source_code,
+          lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
+        },
       };
 };
 

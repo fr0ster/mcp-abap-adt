@@ -56,32 +56,18 @@ describe('compact covers what the low set did', () => {
   });
   afterEach(() => resetSystemContextCache());
 
-  it('a write under lock_handle activates nothing: activate: true is refused', async () => {
+  it('an update without lock_handle is refused before any request', async () => {
     const answered = await call('HandlerUpdate', {
       object_type: 'CLASS',
       class_name: 'CLAS_A',
       source_code: 'source text',
-      lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
-      activate: true,
     });
     expect(answered.isError).toBe(true);
-    expect(answered.text).toContain('activates nothing');
+    expect(answered.text).toContain('lock_handle is required');
     expect(answered.sent).toBe(0);
   });
 
-  it('lock_handle for a type with no write under lock is refused, naming those that have one', async () => {
-    const answered = await call('HandlerUpdate', {
-      object_type: 'SERVICE_BINDING',
-      service_binding_name: 'SRVB_A',
-      lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
-    });
-    expect(answered.isError).toBe(true);
-    expect(answered.text).toContain('lock_handle is not taken');
-    expect(answered.text).toContain('METADATA_EXTENSION');
-    expect(answered.sent).toBe(0);
-  });
-
-  it('without lock_handle an update still locks and unlocks itself', async () => {
+  it('an update under lock_handle is the one write: no lock, no unlock', async () => {
     const connection = recordingConnection();
     await call(
       'HandlerUpdate',
@@ -89,13 +75,11 @@ describe('compact covers what the low set did', () => {
         object_type: 'CLASS',
         class_name: 'CLAS_A',
         source_code: 'source text',
-        activate: false,
+        lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
       },
       connection,
     );
-    const urls = connection.requests.map((r) => r.url);
-    expect(urls.some((u) => u.includes('_action=LOCK'))).toBe(true);
-    expect(urls.some((u) => u.includes('_action=UNLOCK'))).toBe(true);
+    expect(connection.requests.map((r) => r.method)).toEqual(['PUT']);
   });
 
   it('source_code is checked only for CLASS, STRUCTURE and DDL', async () => {

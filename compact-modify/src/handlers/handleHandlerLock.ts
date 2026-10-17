@@ -1,7 +1,7 @@
 import type { CompactObjectType } from '@mcp-abap-adt/lib/compact-shared';
 import {
   compactLockSchema,
-  toLowObjectType,
+  toLockObjectType,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleLockObject } from '@mcp-abap-adt/lib/handlers/write';
@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerLock',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).',
+    'Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_DEFINITION(object_name*), SERVICE_BINDING(object_name*).',
   inputSchema: compactLockSchema,
 } as const;
 
@@ -24,7 +24,7 @@ export async function handleHandlerLock(
   context: HandlerContext,
   args: HandlerLockArgs,
 ) {
-  const lowType = toLowObjectType(args.object_type);
+  const lowType = toLockObjectType(args.object_type);
   if (!lowType) {
     throw new Error(
       `Lock is not supported for object_type: ${args.object_type}`,

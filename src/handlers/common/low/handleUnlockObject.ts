@@ -23,6 +23,8 @@ import {
   metadataExtensionDocuments,
   packageDocuments,
   programDocuments,
+  serviceDefinitionDocuments,
+  serviceDocuments,
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -69,6 +71,8 @@ export const TOOL_DEFINITION = {
           'behavior_definition',
           'behavior_implementation',
           'metadata_extension',
+          'service_definition',
+          'service_binding',
         ],
       },
       lock_handle: {
@@ -101,6 +105,8 @@ const VALID_TYPES = [
   'behavior_definition',
   'behavior_implementation',
   'metadata_extension',
+  'service_definition',
+  'service_binding',
 ];
 
 export async function handleUnlockObject(
@@ -242,6 +248,18 @@ export async function handleUnlockObject(
           return client
             .getBehaviorImplementation()
             .unlock({ className: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
+        case 'service_definition':
+          return client
+            .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+            .unlock({ serviceDefinitionName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
+        case 'service_binding':
+          return client
+            .getServiceBinding(resultsFor(serviceDocuments))
+            .unlock({ bindingName: objectName }, lock_handle, {
               analyse: analyseException,
             });
         default:

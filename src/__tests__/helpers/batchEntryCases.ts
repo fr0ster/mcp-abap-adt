@@ -261,6 +261,8 @@ const METADATA_READS: Array<[string, Record<string, unknown>]> = [
 
 /** The object types `HandlerLock` / `HandlerUnlock` take but `PACKAGE`. */
 const LOCKED_TYPES: Array<[string, string]> = [
+  ['SERVICE_DEFINITION', 'SRVD_A'],
+  ['SERVICE_BINDING', 'SRVB_A'],
   ['CLASS', 'CLAS_A'],
   ['PROGRAM', 'PROG_A'],
   ['INTERFACE', 'INTF_A'],
@@ -276,12 +278,42 @@ const LOCKED_TYPES: Array<[string, string]> = [
   ['METADATA_EXTENSION', 'DDLX_A'],
 ];
 
-/** `HandlerUpdate` under `lock_handle`: the source-written types, one PUT each. */
+/** A metadata document as `HandlerGet` part `metadata` answers it. */
+const DOCUMENT = '<?xml version="1.0" encoding="utf-8"?><document/>';
+
+/** `HandlerUpdate` under `lock_handle`: every type but PACKAGE, one write each. */
 const SOURCE_WRITES: Array<[string, Record<string, unknown>]> = [
+  ['DOMAIN', { domain_name: 'DOM_A', source_code: DOCUMENT }],
+  ['DATA_ELEMENT', { data_element_name: 'DTEL_A', source_code: DOCUMENT }],
+  ['FUNCTION_GROUP', { function_group_name: 'FUGR_A', source_code: DOCUMENT }],
   ['TABLE', { table_name: 'TAB_A', ddl_code: 'source text' }],
   ['STRUCTURE', { structure_name: 'STRU_A', ddl_code: 'source text' }],
   ['DDL', { ddl_name: 'DDL_A', ddl_source: 'source text' }],
+  [
+    'SERVICE_DEFINITION',
+    { service_definition_name: 'SRVD_A', source_code: 'source text' },
+  ],
+  [
+    'SERVICE_BINDING',
+    {
+      service_binding_name: 'SRVB_A',
+      desired_publication_state: 'published',
+      binding_variant: 'ODATA_V4_UI',
+    },
+  ],
   ['CLASS', { class_name: 'CLAS_A', source_code: 'source text' }],
+  [
+    'LOCAL_TEST_CLASS',
+    { class_name: 'CLAS_A', test_class_code: 'source text' },
+  ],
+  ['LOCAL_TYPES', { class_name: 'CLAS_A', local_types_code: 'source text' }],
+  [
+    'LOCAL_DEFINITIONS',
+    { class_name: 'CLAS_A', definitions_code: 'source text' },
+  ],
+  ['LOCAL_MACROS', { class_name: 'CLAS_A', macros_code: 'source text' }],
+  ['UNIT_TEST', { class_name: 'CLAS_A', test_class_source: 'source text' }],
+  ['CDS_UNIT_TEST', { class_name: 'CLAS_T', test_class_source: 'source text' }],
   ['PROGRAM', { program_name: 'PROG_A', source_code: 'source text' }],
   ['INTERFACE', { interface_name: 'INTF_A', source_code: 'source text' }],
   [
@@ -293,6 +325,10 @@ const SOURCE_WRITES: Array<[string, Record<string, unknown>]> = [
     },
   ],
   ['BEHAVIOR_DEFINITION', { name: 'BDEF_A', source_code: 'source text' }],
+  [
+    'BEHAVIOR_IMPLEMENTATION',
+    { class_name: 'BIMP_A', implementation_code: 'source text' },
+  ],
   ['METADATA_EXTENSION', { name: 'DDLX_A', source_code: 'source text' }],
 ];
 
@@ -394,6 +430,17 @@ const COMPACT: BatchEntryCase[] = [
       transport_request: TRANSPORT,
     },
   })),
+  {
+    tool: 'HandlerUpdate',
+    args: {
+      object_type: 'PACKAGE',
+      package_name: 'PKG_A',
+      source_code: DOCUMENT,
+      lock_handle: LOCK_HANDLE,
+      transport_request: TRANSPORT,
+    },
+    connection: 'http',
+  },
 ];
 
 /** `HandlerCreate`: the create request alone, per type but PACKAGE. */

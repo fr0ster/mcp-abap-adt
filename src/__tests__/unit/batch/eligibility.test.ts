@@ -20,7 +20,7 @@ describe('eligible', () => {
     });
   });
 
-  it('HandlerUpdate needs lock_handle; DOMAIN/DATA_ELEMENT/PACKAGE need document', () => {
+  it('HandlerUpdate needs lock_handle; every type then sends its one write', () => {
     const write = { class_name: 'CLAS_A', source_code: 'x' };
     expect(
       eligible(
@@ -32,42 +32,33 @@ describe('eligible', () => {
     expect(
       eligible('HandlerUpdate', { object_type: 'CLASS', ...write }, 'http'),
     ).toEqual({ ok: false, reason: 'arguments' });
-    // With properties under a lock they read, then write: two requests.
-    for (const object_type of ['DOMAIN', 'DATA_ELEMENT', 'PACKAGE']) {
-      expect(
-        eligible(
-          'HandlerUpdate',
-          { object_type, description: 'x', lock_handle: LOCK },
-          'http',
-        ),
-      ).toEqual({ ok: false, reason: 'arguments' });
+    // The metadata document is written as given: one PUT, no read first.
+    for (const object_type of ['DOMAIN', 'DATA_ELEMENT', 'FUNCTION_GROUP']) {
+      for (const connection of ['http', 'rfc'] as const) {
+        expect(
+          eligible(
+            'HandlerUpdate',
+            { object_type, source_code: '<doc/>', lock_handle: LOCK },
+            connection,
+          ),
+        ).toEqual({ ok: true });
+      }
     }
-    // The rule Task 11's entries take: `document` present beside the lock handle.
-    const documentRule = [
-      { argument: 'lock_handle', present: true },
-      { argument: 'document', present: true },
-      {
-        argument: 'object_type',
-        equals: ['DOMAIN', 'DATA_ELEMENT', 'PACKAGE'],
-      },
-    ];
-    expect(
-      whenHolds('HandlerUpdate', documentRule, {
-        object_type: 'DOMAIN',
-        lock_handle: LOCK,
-        document: '<doc/>',
-      }),
-    ).toBe(true);
-    expect(
-      whenHolds('HandlerUpdate', documentRule, {
-        object_type: 'DOMAIN',
-        lock_handle: LOCK,
-      }),
-    ).toBe(false);
-    // Presence, as handleHandlerUpdate routes it (`!== undefined`), not truthiness.
-    const present = [{ argument: 'document', present: true }];
-    for (const document of ['', 0, false]) {
-      expect(whenHolds('HandlerUpdate', present, { document })).toBe(true);
+    // A package's lock over RFC is held in an ABAP session of its own.
+    const pkg = {
+      object_type: 'PACKAGE',
+      source_code: '<doc/>',
+      lock_handle: LOCK,
+    };
+    expect(eligible('HandlerUpdate', pkg, 'http')).toEqual({ ok: true });
+    expect(eligible('HandlerUpdate', pkg, 'rfc')).toEqual({
+      ok: false,
+      reason: 'connection',
+    });
+    // Presence, as the rule reads it (`!== undefined`), not truthiness.
+    const present = [{ argument: 'lock_handle', present: true }];
+    for (const lock_handle of ['', 0, false]) {
+      expect(whenHolds('HandlerUpdate', present, { lock_handle })).toBe(true);
     }
     expect(whenHolds('HandlerUpdate', present, {})).toBe(false);
   });
@@ -184,10 +175,10 @@ describe('eligible', () => {
       expect(
         eligible(
           'HandlerUpdate',
-          { object_type, description: 'x', lock_handle: LOCK },
+          { object_type, source_code: '<doc/>', lock_handle: LOCK },
           'http',
         ),
-      ).toEqual({ ok: false, reason: 'arguments' });
+      ).toEqual({ ok: true });
     }
     for (const object_type of ['unit_test', 'UNIT_TEST']) {
       expect(

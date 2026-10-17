@@ -52,8 +52,9 @@ reach into the connection's session.
   stateless; the `UNLOCK` reaches the lock's context. At the latest the instance's
   logoff ends it (a logoff releases the session's locks). Over Streamable HTTP the
   next request's credential retires the lock's connection and its logoff releases the
-  lock: lock, write and unlock in one call there (`HandlerUpdate` without a
-  `lock_handle`).
+  lock before the write: there the full set's `Update<Type>` locks, writes and unlocks
+  in one call. Compact `HandlerUpdate` is the write alone and always takes the
+  `lock_handle`.
 - **A tool call cannot be cancelled**: a client's cancel aborts nothing — the call
   runs to its end; no logoff, no new session. The client's close (stdio, SSE) and the
   process shutdown log the instance's sessions off at once — the locks go with them —

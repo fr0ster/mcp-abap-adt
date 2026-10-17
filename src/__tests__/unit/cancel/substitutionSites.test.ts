@@ -272,8 +272,7 @@ describe('over RFC: HandlerLock → HandlerUpdate → HandlerUnlock PACKAGE', ()
       arguments: {
         object_type: 'PACKAGE',
         package_name: 'ZFRESH',
-        super_package: 'ZROOT',
-        description: 'after',
+        source_code: '<pak:package adtcore:description="after"/>',
         lock_handle: handle,
       },
     });

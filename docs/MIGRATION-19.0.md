@@ -554,8 +554,8 @@ design. Send a long run to the background where the tool offers it.
   instance's connection lives across calls; the calls in between are stateless, and the instance's
   end (its logoff) releases a lock you never unlocked. **Over Streamable HTTP it does not**: the
   next request's credential retires the lock's connection, and that connection's logoff releases
-  the lock. Over HTTP, update with `HandlerUpdate` without a `lock_handle` — lock, write and unlock
-  in one call.
+  the lock. Over HTTP, update with the full set's `Update<Type>` — lock, write and unlock in one
+  call; compact `HandlerUpdate` is the write alone under a `lock_handle` (see "compact users").
 - **The debugger's sessions are its own**, stateful for their life, and end with the debug session.
 - Every site that turns a session type is listed in `tools/stateful-sites.json`.
 
@@ -677,8 +677,8 @@ of the full set's high or low tools; only read-only reads may be in both.
 
 - **Lock, write, unlock.** `HandlerLock` answers a `lock_handle`;
   `HandlerUpdate` with that `lock_handle` sends the write alone under your lock — no lock, unlock,
-  check or activation of its own (`activate: true` beside it is refused); `HandlerUnlock`
-  releases it. Without `lock_handle`, `HandlerUpdate` locks and unlocks itself, as before.
+  check or activation of its own; `lock_handle` is required (see "compact users");
+  `HandlerUnlock` releases it.
   **Keeping the lock short is yours:** the server releases nothing on its own clock.
   `HandlerLock` / `HandlerUnlock` also take BEHAVIOR_IMPLEMENTATION: the implementation class's
   own lock and unlock (the same requests as CLASS).
@@ -751,7 +751,7 @@ alone, as each low create tool was — the same requests for every type.
 | `CheckStructureLow` | `HandlerCheckRun` (object_type: STRUCTURE, object_name, version, source_code) | The low tool's ddl_code is HandlerCheckRun's source_code. |
 | `CheckTableLow` | `HandlerCheckRun` (object_type: TABLE, object_name, version) | CheckTableLow accepted ddl_code and reporter and sent neither. |
 | `CreateBehaviorDefinitionLow` | `HandlerCreate` (object_type: BEHAVIOR_DEFINITION, name, description, package_name, transport_request, implementation_type) | the same requests |
-| `CreateBehaviorImplementationLow` | `HandlerCreate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, description, package_name, transport_request), then `HandlerUpdate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, behavior_definition, implementation_code, transport_request, activate) | With implementation_code, two compact calls: the create, then the update (lock, write the implementations include, unlock). |
+| `CreateBehaviorImplementationLow` | `HandlerCreate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, description, package_name, transport_request), then `HandlerLock` (object_type: BEHAVIOR_IMPLEMENTATION, object_name), then `HandlerUpdate` (object_type: BEHAVIOR_IMPLEMENTATION, class_name, implementation_code, transport_request, lock_handle), then `HandlerUnlock` (object_type: BEHAVIOR_IMPLEMENTATION, object_name, lock_handle) | With implementation_code, four compact calls, one request each: the create, the lock, the write of the implementations include under the lock_handle the lock answered, the unlock. |
 | `CreateClassLow` | `HandlerCreate` (object_type: CLASS, class_name, description, package_name, transport_request, superclass, final, create_protected) | the same requests |
 | `CreateDataElementLow` | `HandlerCreate` (object_type: DATA_ELEMENT, data_element_name, description, package_name, transport_request) | the same requests |
 | `CreateDdlLow` | `HandlerCreate` (object_type: DDL, ddl_name, description, package_name, transport_request) | the same requests |
@@ -810,13 +810,13 @@ alone, as each low create tool was — the same requests for every type.
 | `UnlockTableLow` | `HandlerUnlock` (object_type: TABLE, object_name, lock_handle) | the same requests |
 | `UpdateBehaviorDefinitionLow` | `HandlerUpdate` (object_type: BEHAVIOR_DEFINITION, name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateClassLow` | `HandlerUpdate` (object_type: CLASS, class_name, source_code, lock_handle, transport_request) | the same requests |
-| `UpdateDataElementLow` | `HandlerUpdate` (object_type: DATA_ELEMENT, data_element_name, description, lock_handle) | The properties go as the compact update names them (description, datatype, length, …) or in properties. |
+| `UpdateDataElementLow` | `HandlerGet` (object_type: DATA_ELEMENT, data_element_name, part: metadata), then `HandlerUpdate` (object_type: DATA_ELEMENT, data_element_name, source_code, lock_handle) | Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle. |
 | `UpdateDdlLow` | `HandlerUpdate` (object_type: DDL, ddl_name, ddl_source, lock_handle, transport_request) | the same requests |
-| `UpdateDomainLow` | `HandlerUpdate` (object_type: DOMAIN, domain_name, description, lock_handle) | The properties go as the compact update names them (description, datatype, length, …) or in properties. |
+| `UpdateDomainLow` | `HandlerGet` (object_type: DOMAIN, domain_name, part: metadata), then `HandlerUpdate` (object_type: DOMAIN, domain_name, source_code, lock_handle) | Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle. |
 | `UpdateFunctionModuleLow` | `HandlerUpdate` (object_type: FUNCTION_MODULE, function_module_name, function_group_name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateInterfaceLow` | `HandlerUpdate` (object_type: INTERFACE, interface_name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateMetadataExtensionLow` | `HandlerUpdate` (object_type: METADATA_EXTENSION, name, source_code, lock_handle, transport_request) | the same requests |
-| `UpdatePackageLow` | `HandlerUpdate` (object_type: PACKAGE, package_name, super_package, description, lock_handle, transport_request) | The full set has it too: the high UpdatePackage (lock, write, unlock in one tool) — compact's HandlerUpdate PACKAGE without lock_handle sends the same. |
+| `UpdatePackageLow` | `HandlerGet` (object_type: PACKAGE, package_name, part: metadata), then `HandlerUpdate` (object_type: PACKAGE, package_name, source_code, lock_handle, transport_request) | Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle. |
 | `UpdateProgramLow` | `HandlerUpdate` (object_type: PROGRAM, program_name, source_code, lock_handle, transport_request) | the same requests |
 | `UpdateStructureLow` | `HandlerUpdate` (object_type: STRUCTURE, structure_name, ddl_code, lock_handle, transport_request) | the same requests |
 | `UpdateTableLow` | `HandlerUpdate` (object_type: TABLE, table_name, ddl_code, lock_handle, transport_request) | the same requests |
@@ -1051,9 +1051,9 @@ transport's options only:
      definition and variant, `master_language`);
   2. `HandlerLock` — it answers the `lock_handle`;
   3. `HandlerUpdate` with that `lock_handle` — the content 18.x took at create: a source
-     (`source_code`), a structure's or table's DDL, a domain's or data element's properties, a
-     behavior definition with its root entity, a behavior implementation naming its behavior
-     definition;
+     (`source_code`), a structure's or table's DDL, a domain's or data element's metadata document
+     (read with `HandlerGet` part `metadata`, changed, passed whole in `source_code`), a behavior
+     definition with its root entity, a behavior implementation's implementations include;
   4. `HandlerUnlock`;
   5. `HandlerActivate` — 18.x activated unless `activate: false`.
 
@@ -1067,6 +1067,33 @@ transport's options only:
   does not create <type>: its create is a chain of requests, not one — use CreateUnitTest /
   CreateCdsUnitTest of the full set" — the full binaries serve those tools unchanged. The full sets'
   `Create<Type>` keep their chains.
+- **BREAKING — `HandlerUpdate` is one request, under your `lock_handle`.** `lock_handle` is
+  required: the tool sends the type's one write under it — the `PUT` of the source, of the class
+  include (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS`, `UNIT_TEST`,
+  `CDS_UNIT_TEST`, `BEHAVIOR_IMPLEMENTATION`) or of the metadata document, and for `SERVICE_BINDING`
+  its publication request — and nothing else: no lock or unlock, check, activation, no read before
+  the write or after it. In 18.x, without `lock_handle` it ran the type's whole update (lock, write,
+  check, unlock, activate), and with it PACKAGE, DOMAIN and DATA_ELEMENT read their metadata
+  document and wrote it back patched. What a consumer of 18.x's `HandlerUpdate` now calls, in
+  order, each its own call:
+  1. `HandlerLock` — it answers the `lock_handle` (SERVICE_DEFINITION and SERVICE_BINDING are
+     new on `HandlerLock` and `HandlerUnlock`; a binding's lock is SAP's answer as it came);
+  2. for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP: `HandlerGet` part `metadata` — the
+     metadata document; change in it what 18.x took as `description`, `datatype`, `length`,
+     `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`,
+     `properties` or `super_package`;
+  3. `HandlerUpdate` with the `lock_handle` — the source, or for those four types the whole changed
+     document in `source_code`, sent as given (a replace: what it leaves out is gone);
+  4. `HandlerUnlock`;
+  5. `HandlerActivate` — 18.x activated unless `activate: false` (`UNIT_TEST` and `CDS_UNIT_TEST`
+     always).
+
+  `activate`, `properties`, `super_package`, `description`, `datatype`, `length`, `decimals`,
+  `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values` and
+  `behavior_definition` are gone from `HandlerUpdate`'s schema; `service_version` joins it beside
+  `service_name` (an OData V2 binding's publication); `desired_publication_state` takes `published`
+  or `unpublished`. Every type is recorded in batch mode (a `PACKAGE` over HTTP only). The full
+  sets' `Update<Type>` keep their chains.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.

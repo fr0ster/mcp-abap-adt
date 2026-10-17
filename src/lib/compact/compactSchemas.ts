@@ -305,6 +305,14 @@ export const compactUpdateSchema = {
   type: 'object',
   properties: {
     object_type: commonObjectTypeSchema,
+    lock_handle: {
+      type: 'string',
+      description: 'Lock handle from HandlerLock: the write is sent under it.',
+    },
+    transport_request: {
+      type: 'string',
+      description: 'Transport request id (if required by system).',
+    },
     class_name: { type: 'string', description: 'ABAP class name.' },
     program_name: { type: 'string', description: 'ABAP program name.' },
     domain_name: { type: 'string', description: 'ABAP domain name.' },
@@ -321,58 +329,14 @@ export const compactUpdateSchema = {
       type: 'string',
       description: 'DDL source name (CDS view, AMDP table function, etc.).',
     },
-    source_code: { type: 'string', description: 'ABAP source code payload.' },
+    source_code: {
+      type: 'string',
+      description:
+        'The content written: the source, or for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP the whole metadata document.',
+    },
     ddl_source: {
       type: 'string',
       description: 'Complete DDL source code (for DDL update).',
-    },
-    transport_request: {
-      type: 'string',
-      description: 'Transport request id (if required by system).',
-    },
-    activate: { type: 'boolean', description: 'Activate object after update.' },
-    lock_handle: {
-      type: 'string',
-      description:
-        'Lock handle from HandlerLock: write under the lock already held, with no lock, unlock, check or activation of its own. Without it the update locks and unlocks itself.',
-    },
-    super_package: {
-      type: 'string',
-      description: 'Super package (PACKAGE update).',
-    },
-    properties: {
-      type: 'object',
-      description:
-        'DOMAIN or DATA_ELEMENT under lock_handle: further properties to change, by their property names — for a data element its own fields (type_kind, type_name, data_type, the labels, search_help) go only here.',
-    },
-    description: {
-      type: 'string',
-      description: 'Human-readable object description.',
-    },
-    datatype: { type: 'string', description: 'ABAP data type.' },
-    length: { type: 'number', description: 'Length for typed artifacts.' },
-    decimals: { type: 'number', description: 'Decimal places.' },
-    conversion_exit: { type: 'string', description: 'Conversion exit name.' },
-    lowercase: {
-      type: 'boolean',
-      description: 'Allow lowercase values (domain setting).',
-    },
-    sign_exists: {
-      type: 'boolean',
-      description: 'Allow signed values (domain setting).',
-    },
-    value_table: { type: 'string', description: 'Foreign key value table.' },
-    fixed_values: {
-      type: 'array',
-      description: 'Domain fixed values list.',
-      items: {
-        type: 'object',
-        properties: {
-          low: { type: 'string', description: 'Fixed value key.' },
-          text: { type: 'string', description: 'Fixed value text.' },
-        },
-        required: ['low', 'text'],
-      },
     },
     table_name: { type: 'string', description: 'Table name.' },
     structure_name: { type: 'string', description: 'Structure name.' },
@@ -388,17 +352,18 @@ export const compactUpdateSchema = {
     },
     service_name: {
       type: 'string',
-      description: 'Published service name (service binding update).',
+      description:
+        'Published service name (SERVICE_BINDING, an OData V2 binding).',
+    },
+    service_version: {
+      type: 'string',
+      description:
+        'Published service version (SERVICE_BINDING, an OData V2 binding). Default 0001.',
     },
     name: {
       type: 'string',
       description:
         'Object name for handlers that require a generic `name` (behavior definition, metadata extension).',
-    },
-    behavior_definition: {
-      type: 'string',
-      description:
-        'Referenced behavior definition name (behavior implementation update).',
     },
     ddl_code: {
       type: 'string',
@@ -441,11 +406,11 @@ export const compactUpdateSchema = {
     },
     desired_publication_state: {
       type: 'string',
-      enum: ['published', 'unpublished', 'unchanged'],
+      enum: ['published', 'unpublished'],
       description: 'Target publication state (service binding update).',
     },
   },
-  required: ['object_type'],
+  required: ['object_type', 'lock_handle'],
 } as const;
 
 export const compactDeleteSchema = {
@@ -910,6 +875,8 @@ const LOCKABLE_TYPES = [
   'BEHAVIOR_DEFINITION',
   'BEHAVIOR_IMPLEMENTATION',
   'METADATA_EXTENSION',
+  'SERVICE_DEFINITION',
+  'SERVICE_BINDING',
 ] as const;
 
 /** The types a syntax check is sent for. */

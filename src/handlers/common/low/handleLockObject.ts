@@ -23,6 +23,8 @@ import {
   metadataExtensionDocuments,
   packageDocuments,
   programDocuments,
+  serviceDefinitionDocuments,
+  serviceDocuments,
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -65,6 +67,8 @@ export const TOOL_DEFINITION = {
           'behavior_definition',
           'behavior_implementation',
           'metadata_extension',
+          'service_definition',
+          'service_binding',
         ],
       },
       super_package: {
@@ -97,6 +101,8 @@ const VALID_TYPES = [
   'behavior_definition',
   'behavior_implementation',
   'metadata_extension',
+  'service_definition',
+  'service_binding',
 ];
 
 export async function handleLockObject(
@@ -230,6 +236,18 @@ export async function handleLockObject(
           return client
             .getBehaviorImplementation()
             .lock({ className: objectName }, { analyse: analyseLock });
+        case 'service_definition':
+          return client
+            .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+            .lock(
+              { serviceDefinitionName: objectName },
+              { analyse: analyseLock },
+            );
+        case 'service_binding':
+          // The binding's own LOCK; SAP's answer as it came.
+          return client
+            .getServiceBinding(resultsFor(serviceDocuments))
+            .lock({ bindingName: objectName }, { analyse: analyseLock });
         case 'package':
           return lockPackage();
         default:

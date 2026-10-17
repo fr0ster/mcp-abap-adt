@@ -13,49 +13,27 @@
 
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { TOOL_DEFINITION as D_BEHAVIOR_DEFINITION } from '../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
-import { TOOL_DEFINITION as U_BEHAVIOR_DEFINITION } from '../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { TOOL_DEFINITION as D_BEHAVIOR_IMPLEMENTATION } from '../../handlers/behavior_implementation/high/handleDeleteBehaviorImplementation';
-import { TOOL_DEFINITION as U_BEHAVIOR_IMPLEMENTATION } from '../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { TOOL_DEFINITION as D_CLASS } from '../../handlers/class/high/handleDeleteClass';
 import { TOOL_DEFINITION as D_LOCAL_DEFINITIONS } from '../../handlers/class/high/handleDeleteLocalDefinitions';
 import { TOOL_DEFINITION as D_LOCAL_MACROS } from '../../handlers/class/high/handleDeleteLocalMacros';
 import { TOOL_DEFINITION as D_LOCAL_TEST_CLASS } from '../../handlers/class/high/handleDeleteLocalTestClass';
 import { TOOL_DEFINITION as D_LOCAL_TYPES } from '../../handlers/class/high/handleDeleteLocalTypes';
-import { TOOL_DEFINITION as U_CLASS } from '../../handlers/class/high/handleUpdateClass';
-import { TOOL_DEFINITION as U_LOCAL_DEFINITIONS } from '../../handlers/class/high/handleUpdateLocalDefinitions';
-import { TOOL_DEFINITION as U_LOCAL_MACROS } from '../../handlers/class/high/handleUpdateLocalMacros';
-import { TOOL_DEFINITION as U_LOCAL_TEST_CLASS } from '../../handlers/class/high/handleUpdateLocalTestClass';
-import { TOOL_DEFINITION as U_LOCAL_TYPES } from '../../handlers/class/high/handleUpdateLocalTypes';
 import { TOOL_DEFINITION as D_DATA_ELEMENT } from '../../handlers/data_element/high/handleDeleteDataElement';
-import { TOOL_DEFINITION as U_DATA_ELEMENT } from '../../handlers/data_element/high/handleUpdateDataElement';
 import { TOOL_DEFINITION as D_DDL } from '../../handlers/ddl/high/handleDeleteDdl';
-import { TOOL_DEFINITION as U_DDL } from '../../handlers/ddl/high/handleUpdateDdl';
-import { TOOL_DEFINITION as U_METADATA_EXTENSION } from '../../handlers/ddlx/high/handleUpdateMetadataExtension';
 // --- delete (mirror compactRouterMap delete entries) ---
 import { TOOL_DEFINITION as D_DOMAIN } from '../../handlers/domain/high/handleDeleteDomain';
-// --- update (mirror compactRouterMap update entries) ---
-import { TOOL_DEFINITION as U_DOMAIN } from '../../handlers/domain/high/handleUpdateDomain';
-import { TOOL_DEFINITION as U_FUNCTION_GROUP } from '../../handlers/function/high/handleUpdateFunctionGroup';
-import { TOOL_DEFINITION as U_FUNCTION_MODULE } from '../../handlers/function/high/handleUpdateFunctionModule';
 import { TOOL_DEFINITION as D_FUNCTION_GROUP } from '../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { TOOL_DEFINITION as D_FUNCTION_MODULE } from '../../handlers/function_module/high/handleDeleteFunctionModule';
 import { TOOL_DEFINITION as D_INTERFACE } from '../../handlers/interface/high/handleDeleteInterface';
-import { TOOL_DEFINITION as U_INTERFACE } from '../../handlers/interface/high/handleUpdateInterface';
 import { TOOL_DEFINITION as D_METADATA_EXTENSION } from '../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
 import { TOOL_DEFINITION as D_PROGRAM } from '../../handlers/program/high/handleDeleteProgram';
-import { TOOL_DEFINITION as U_PROGRAM } from '../../handlers/program/high/handleUpdateProgram';
 import { TOOL_DEFINITION as D_SERVICE_BINDING } from '../../handlers/service_binding/high/handleDeleteServiceBinding';
-import { TOOL_DEFINITION as U_SERVICE_BINDING } from '../../handlers/service_binding/high/handleUpdateServiceBinding';
 import { TOOL_DEFINITION as D_SERVICE_DEFINITION } from '../../handlers/service_definition/high/handleDeleteServiceDefinition';
-import { TOOL_DEFINITION as U_SERVICE_DEFINITION } from '../../handlers/service_definition/high/handleUpdateServiceDefinition';
 import { TOOL_DEFINITION as D_STRUCTURE } from '../../handlers/structure/high/handleDeleteStructure';
-import { TOOL_DEFINITION as U_STRUCTURE } from '../../handlers/structure/high/handleUpdateStructure';
 import { TOOL_DEFINITION as D_TABLE } from '../../handlers/table/high/handleDeleteTable';
-import { TOOL_DEFINITION as U_TABLE } from '../../handlers/table/high/handleUpdateTable';
 import { TOOL_DEFINITION as D_CDS_UNIT_TEST } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { TOOL_DEFINITION as D_UNIT_TEST } from '../../handlers/unit_test/high/handleDeleteUnitTest';
-import { TOOL_DEFINITION as U_CDS_UNIT_TEST } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
-import { TOOL_DEFINITION as U_UNIT_TEST } from '../../handlers/unit_test/high/handleUpdateUnitTest';
 import {
   compactCreateSchema,
   compactDeleteSchema,
@@ -76,36 +54,15 @@ function requiredOf(def: ToolDef): readonly string[] {
 }
 
 /**
- * The update and delete routes. The create route is not here: compact
- * `HandlerCreate` is the create request alone (`handleCreateOnly`), not the
- * full `Create<Type>`, so their required arguments are not its own —
- * `compact-modify/src/__tests__/createSingleCall.test.ts` pins what its schema
- * and description name against what each type's create sends.
+ * The delete routes. The create and update routes are not here: compact
+ * `HandlerCreate` is the create request alone (`handleCreateOnly`) and
+ * `HandlerUpdate` the one write under `lock_handle` (`handleUpdateUnderLock`),
+ * not the full `Create<Type>` / `Update<Type>`, so their required arguments are
+ * not their own — `createSingleCall.test.ts` and `updateSingleCall.test.ts`
+ * (`compact-modify/src/__tests__/`) pin what their schemas and descriptions
+ * name.
  */
-const ROUTED: Record<'update' | 'delete', Record<string, ToolDef>> = {
-  update: {
-    DOMAIN: U_DOMAIN,
-    DATA_ELEMENT: U_DATA_ELEMENT,
-    TABLE: U_TABLE,
-    STRUCTURE: U_STRUCTURE,
-    DDL: U_DDL,
-    SERVICE_DEFINITION: U_SERVICE_DEFINITION,
-    SERVICE_BINDING: U_SERVICE_BINDING,
-    CLASS: U_CLASS,
-    UNIT_TEST: U_UNIT_TEST,
-    CDS_UNIT_TEST: U_CDS_UNIT_TEST,
-    LOCAL_TEST_CLASS: U_LOCAL_TEST_CLASS,
-    LOCAL_TYPES: U_LOCAL_TYPES,
-    LOCAL_DEFINITIONS: U_LOCAL_DEFINITIONS,
-    LOCAL_MACROS: U_LOCAL_MACROS,
-    PROGRAM: U_PROGRAM,
-    INTERFACE: U_INTERFACE,
-    FUNCTION_GROUP: U_FUNCTION_GROUP,
-    FUNCTION_MODULE: U_FUNCTION_MODULE,
-    BEHAVIOR_DEFINITION: U_BEHAVIOR_DEFINITION,
-    BEHAVIOR_IMPLEMENTATION: U_BEHAVIOR_IMPLEMENTATION,
-    METADATA_EXTENSION: U_METADATA_EXTENSION,
-  },
+const ROUTED: Record<'delete', Record<string, ToolDef>> = {
   delete: {
     DOMAIN: D_DOMAIN,
     DATA_ELEMENT: D_DATA_ELEMENT,
@@ -137,7 +94,7 @@ const SCHEMA = {
   delete: compactDeleteSchema,
 } as const;
 
-for (const op of ['update', 'delete'] as const) {
+for (const op of ['delete'] as const) {
   describe(`compact ${op} schema exposes every routed handler required arg`, () => {
     const props = Object.keys(SCHEMA[op].properties);
     for (const [type, def] of Object.entries(ROUTED[op])) {
@@ -246,7 +203,7 @@ function parseDescriptionArgsByType(
   return map;
 }
 
-for (const op of ['update', 'delete'] as const) {
+for (const op of ['delete'] as const) {
   describe(`compact ${op} facade description per-type args match handler required`, () => {
     const typeArgsMap = parseDescriptionArgsByType(FACADE[op].description);
     if (typeArgsMap.size === 0) {

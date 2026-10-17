@@ -170,8 +170,8 @@ const properties = {
 Streamable HTTP each request has its own), or a session SAP lost meanwhile (its logoff released the
 lock).
 
-**Solution:** lock, update and unlock in one MCP session over stdio or SSE, or use the update tool
-without a `lock_handle` (it locks, writes and unlocks in one call).
+**Solution:** lock, update and unlock in one MCP session over stdio or SSE, or use the full set's
+`Update<Type>` (it locks, writes and unlocks in one call).
 
 ## Debugging Workflow
 

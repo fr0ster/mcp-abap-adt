@@ -230,7 +230,8 @@ transport.
 A tool that builds a request from an earlier answer is refused in batch mode — a high-level
 create or update, a fallback after a `404`, a poll. Run such work as phases, each its own batch,
 with the single-step tools: create (compact `HandlerCreate`, one request), lock (`HandlerLock`;
-the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`), unlock
+the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`, one request;
+the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP), unlock
 (`HandlerUnlock`). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
 `batch_other_kind`: record it in the next batch. Every tool's description ends with

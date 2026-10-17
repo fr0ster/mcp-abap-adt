@@ -171,12 +171,19 @@
       },
       "compact": [
         {
+          "tool": "HandlerGet",
+          "args": {
+            "object_type": "PACKAGE",
+            "package_name": "PKG_A",
+            "part": "metadata"
+          }
+        },
+        {
           "tool": "HandlerUpdate",
           "args": {
             "object_type": "PACKAGE",
             "package_name": "PKG_A",
-            "super_package": "PKG_SUPER",
-            "description": "New text",
+            "source_code": "<?xml version=\"1.0\" encoding=\"utf-8\"?><pak:package adtcore:responsible=\"SAPUSER01\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"TRL\" adtcore:name=\"ZMCP_SHR_PKG\" adtcore:type=\"DEVC/K\" adtcore:changedAt=\"2026-09-10T00:00:00Z\" adtcore:version=\"active\" adtcore:createdAt=\"2026-09-10T00:00:00Z\" adtcore:changedBy=\"SAPUSER01\" adtcore:createdBy=\"SAPUSER01\" adtcore:description=\"New text\" adtcore:descriptionTextLimit=\"60\" adtcore:language=\"EN\" xmlns:pak=\"http://www.sap.com/adt/packages\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><atom:link href=\"versions\" rel=\"http://www.sap.com/adt/relations/versions\" title=\"Historic versions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/vit/wb/object_type/devck/object_name/ZMCP_SHR_PKG\" rel=\"self\" type=\"application/vnd.sap.sapgui\" title=\"Representation in SAP Gui\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/applicationcomponents\" rel=\"applicationcomponents\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Application Components Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/softwarecomponents\" rel=\"softwarecomponents\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Software Components Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/softwarecomponents{?name,data}\" rel=\"allowedsoftwarecomponents\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Software Components Value Help based on Package Constrains\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/transportlayers\" rel=\"transportlayers\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"Transport Layers Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/packages/valuehelps/abaplanguageversions\" rel=\"abaplanguageversions\" type=\"application/vnd.sap.adt.nameditems.v1+xml\" title=\"ABAP Language Version Value Help\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/checkruns{?reporters}\" rel=\"supportsPackageCheckActions\" type=\"application/vnd.sap.adt.checkobjects+xml\" title=\"Supports Package Check actions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"./zmcp_shr_pkg\" rel=\"http://www.sap.com/adt/relations/source\" type=\"text/html\" title=\"Landing Page (HTML)\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><adtcore:packageRef adtcore:uri=\"/sap/bc/adt/packages/zmcp_shr_pkg\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZMCP_SHR_PKG\" adtcore:description=\"Shared test dependencies package\"/><pak:attributes pak:packageType=\"development\" pak:isPackageTypeEditable=\"false\" pak:isAddingObjectsAllowed=\"false\" pak:isAddingObjectsAllowedEditable=\"true\" pak:isEncapsulated=\"false\" pak:isEncapsulationEditable=\"true\" pak:isEncapsulationVisible=\"true\" pak:recordChanges=\"false\" pak:isRecordChangesEditable=\"false\" pak:isSwitchVisible=\"false\" pak:languageVersion=\"5\" pak:isLanguageVersionVisible=\"true\" pak:isLanguageVersionEditable=\"true\"/><pak:superPackage adtcore:uri=\"/sap/bc/adt/packages/zadt_bld_pkg03\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZADT_BLD_PKG03\" adtcore:description=\"baseline package probe\"/><pak:applicationComponent pak:name=\"\" pak:description=\"No application component assigned\" pak:isVisible=\"false\" pak:isEditable=\"false\"/><pak:transport><pak:softwareComponent pak:name=\"ZLOCAL\" pak:description=\"Software Component for local development\" pak:type=\"J\" pak:typeDescription=\"Local Developer Extensibility\" pak:isVisible=\"true\" pak:isEditable=\"false\"/><pak:transportLayer pak:name=\"\" pak:description=\"\" pak:isVisible=\"true\" pak:isEditable=\"false\"/></pak:transport><pak:useAccesses pak:isVisible=\"true\"/><pak:packageInterfaces pak:isVisible=\"true\"/><pak:subPackages/></pak:package>",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER",
             "transport_request": "XXXK900001"
           }
@@ -200,7 +207,7 @@
           }
         }
       ],
-      "note": "The full set has it too: the high UpdatePackage (lock, write, unlock in one tool) — compact's HandlerUpdate PACKAGE without lock_handle sends the same."
+      "note": "Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle."
     },
     {
       "tool": "DeletePackageLow",
@@ -428,16 +435,24 @@
       },
       "compact": [
         {
+          "tool": "HandlerGet",
+          "args": {
+            "object_type": "DOMAIN",
+            "domain_name": "DOM_A",
+            "part": "metadata"
+          }
+        },
+        {
           "tool": "HandlerUpdate",
           "args": {
             "object_type": "DOMAIN",
             "domain_name": "DOM_A",
-            "description": "New text",
+            "source_code": "<?xml version=\"1.0\" encoding=\"utf-8\"?><doma:domain adtcore:responsible=\"SAPUSER01\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"TRL\" adtcore:abapLanguageVersion=\"cloudDevelopment\" adtcore:name=\"ZMCP_BLD_CRT_DOM\" adtcore:type=\"DOMA/DD\" adtcore:changedAt=\"2026-09-11T08:57:16Z\" adtcore:version=\"inactive\" adtcore:createdAt=\"2026-09-11T08:57:16Z\" adtcore:changedBy=\"SAPUSER01\" adtcore:createdBy=\"SAPUSER01\" adtcore:description=\"New text\" adtcore:language=\"EN\" xmlns:doma=\"http://www.sap.com/dictionary/domain\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><atom:link href=\"versions\" rel=\"http://www.sap.com/adt/relations/versions\" title=\"Historic versions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/vit/wb/object_type/domadd/object_name/ZMCP_BLD_CRT_DOM\" rel=\"self\" type=\"application/vnd.sap.sapgui\" title=\"Representation in SAP Gui\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"./zmcp_bld_crt_dom\" rel=\"http://www.sap.com/adt/relations/source\" type=\"text/html\" title=\"Landing Page (HTML)\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><adtcore:packageRef adtcore:uri=\"/sap/bc/adt/packages/zadt_bld_pkg03\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZADT_BLD_PKG03\" adtcore:description=\"baseline package probe\"/><doma:content><doma:typeInformation><doma:datatype/><doma:length>000000</doma:length><doma:decimals>000000</doma:decimals></doma:typeInformation><doma:outputInformation><doma:length>000000</doma:length><doma:style>00</doma:style><doma:conversionExit/><doma:signExists>false</doma:signExists><doma:lowercase>false</doma:lowercase><doma:ampmFormat>false</doma:ampmFormat></doma:outputInformation><doma:valueInformation><doma:valueTableRef/><doma:appendExists>false</doma:appendExists><doma:fixValues/></doma:valueInformation></doma:content></doma:domain>",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
-      "note": "The properties go as the compact update names them (description, datatype, length, …) or in properties.",
+      "note": "Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle.",
       "low_requests": [
         {
           "method": "GET",
@@ -679,16 +694,24 @@
       },
       "compact": [
         {
+          "tool": "HandlerGet",
+          "args": {
+            "object_type": "DATA_ELEMENT",
+            "data_element_name": "DTEL_A",
+            "part": "metadata"
+          }
+        },
+        {
           "tool": "HandlerUpdate",
           "args": {
             "object_type": "DATA_ELEMENT",
             "data_element_name": "DTEL_A",
-            "description": "New text",
+            "source_code": "<?xml version=\"1.0\" encoding=\"utf-8\"?><blue:wbobj adtcore:responsible=\"SAPUSER01\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"TRL\" adtcore:abapLanguageVersion=\"cloudDevelopment\" adtcore:name=\"ZMCP_BLD_CRT_DTEL\" adtcore:type=\"DTEL/DE\" adtcore:changedAt=\"2026-09-11T08:59:37Z\" adtcore:version=\"inactive\" adtcore:createdAt=\"2026-09-11T08:59:37Z\" adtcore:changedBy=\"SAPUSER01\" adtcore:createdBy=\"SAPUSER01\" adtcore:description=\"New text\" adtcore:language=\"EN\" xmlns:blue=\"http://www.sap.com/wbobj/dictionary/dtel\" xmlns:adtcore=\"http://www.sap.com/adt/core\"><atom:link href=\"versions\" rel=\"http://www.sap.com/adt/relations/versions\" title=\"Historic versions\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"/sap/bc/adt/vit/wb/object_type/dtelde/object_name/ZMCP_BLD_CRT_DTEL\" rel=\"self\" type=\"application/vnd.sap.sapgui\" title=\"Representation in SAP Gui\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link xmlns:atom=\"http://www.w3.org/2005/Atom\"/><atom:link href=\"./zmcp_bld_crt_dtel\" rel=\"http://www.sap.com/adt/relations/source\" type=\"text/html\" title=\"Landing Page (HTML)\" xmlns:atom=\"http://www.w3.org/2005/Atom\"/><adtcore:packageRef adtcore:uri=\"/sap/bc/adt/packages/zadt_bld_pkg03\" adtcore:type=\"DEVC/K\" adtcore:name=\"ZADT_BLD_PKG03\" adtcore:description=\"baseline package probe\"/></blue:wbobj>",
             "lock_handle": "LOCK_HANDLE_PLACEHOLDER"
           }
         }
       ],
-      "note": "The properties go as the compact update names them (description, datatype, length, …) or in properties.",
+      "note": "Two compact calls, one request each: HandlerGet part metadata reads the document; HandlerUpdate writes the changed document, whole, under the lock_handle.",
       "low_requests": [
         {
           "method": "GET",
@@ -3011,18 +3034,32 @@
           }
         },
         {
+          "tool": "HandlerLock",
+          "args": {
+            "object_type": "BEHAVIOR_IMPLEMENTATION",
+            "object_name": "BIMP_A"
+          }
+        },
+        {
           "tool": "HandlerUpdate",
           "args": {
             "object_type": "BEHAVIOR_IMPLEMENTATION",
             "class_name": "BIMP_A",
-            "behavior_definition": "BDEF_A",
             "implementation_code": "source text",
             "transport_request": "XXXK900001",
-            "activate": false
+            "lock_handle": "B92E65858E83454C783181344F429D4BFD8E395D"
+          }
+        },
+        {
+          "tool": "HandlerUnlock",
+          "args": {
+            "object_type": "BEHAVIOR_IMPLEMENTATION",
+            "object_name": "BIMP_A",
+            "lock_handle": "B92E65858E83454C783181344F429D4BFD8E395D"
           }
         }
       ],
-      "note": "With implementation_code, two compact calls: the create, then the update (lock, write the implementations include, unlock).",
+      "note": "With implementation_code, four compact calls, one request each: the create, the lock, the write of the implementations include under the lock_handle the lock answered, the unlock.",
       "low_requests": [
         {
           "method": "POST",

@@ -16,6 +16,7 @@ export { LONG_TOOL_ADVICE, withLongToolAdvice } from '../longTools.js';
 export { DETAIL_PROPERTY } from '../strategies/detail.js';
 export {
   type LowObjectType,
+  toLockObjectType,
   toLowObjectType,
 } from './compactLifecycleUtils.js';
 export {

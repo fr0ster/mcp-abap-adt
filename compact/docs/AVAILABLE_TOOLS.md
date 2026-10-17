@@ -346,13 +346,15 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Update operation. With lock_handle (from HandlerLock) the write is sent under the lock already held — no lock, unlock, check or activation of its own — for PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE, BEHAVIOR_DEFINITION and METADATA_EXTENSION; without it the update locks and unlocks itself. object_type required: PACKAGE(package_name*, description*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(class_name*, test_class_source*).
+**Description:** Writes the object under the lock the caller holds: sends the one write request of the given type under lock_handle (the handle HandlerLock answered) and answers SAP's result. The write replaces the whole content with the one given. lock_handle and object_type required: PACKAGE(package_name*, source_code*), DOMAIN(domain_name*, source_code*), DATA_ELEMENT(data_element_name*, source_code*), FUNCTION_GROUP(function_group_name*, source_code*), TABLE(table_name*, ddl_code*), STRUCTURE(structure_name*, ddl_code*), DDL(ddl_name*, ddl_source*), SERVICE_DEFINITION(service_definition_name*, source_code*), SERVICE_BINDING(service_binding_name*, desired_publication_state*, binding_variant*, service_name, service_version), CLASS(class_name*, source_code*), LOCAL_TEST_CLASS(class_name*, test_class_code*), LOCAL_TYPES(class_name*, local_types_code*), LOCAL_DEFINITIONS(class_name*, definitions_code*), LOCAL_MACROS(class_name*, macros_code*), UNIT_TEST(class_name*, test_class_source*), CDS_UNIT_TEST(class_name*, test_class_source*), PROGRAM(program_name*, source_code*) [onprem only], INTERFACE(interface_name*, source_code*), FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, implementation_code*), METADATA_EXTENSION(name*, source_code*). For PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP, source_code is the whole metadata document, sent as given (HandlerGet part metadata answers it). For SERVICE_BINDING the write is its publication request; service_name and service_version (default 0001) name the service of an OData V2 binding. Optional for every type: transport_request.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `object_type` (required) — ABAP object type for routed compact operation.
+- `lock_handle` (required) — Lock handle from HandlerLock: the write is sent under it.
+- `transport_request` — Transport request id (if required by system).
 - `class_name` — ABAP class name.
 - `program_name` — ABAP program name.
 - `domain_name` — ABAP domain name.
@@ -360,31 +362,17 @@ per request.
 - `function_group_name` — ABAP function group name.
 - `package_name` — ABAP package name.
 - `ddl_name` — DDL source name (CDS view, AMDP table function, etc.).
-- `source_code` — ABAP source code payload.
+- `source_code` — The content written: the source, or for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP the whole metadata document.
 - `ddl_source` — Complete DDL source code (for DDL update).
-- `transport_request` — Transport request id (if required by system).
-- `activate` — Activate object after update.
-- `lock_handle` — Lock handle from HandlerLock: write under the lock already held, with no lock, unlock, check or activation of its own. Without it the update locks and unlocks itself.
-- `super_package` — Super package (PACKAGE update).
-- `properties` — DOMAIN or DATA_ELEMENT under lock_handle: further properties to change, by their property names — for a data element its own fields (type_kind, type_name, data_type, the labels, search_help) go only here.
-- `description` — Human-readable object description.
-- `datatype` — ABAP data type.
-- `length` — Length for typed artifacts.
-- `decimals` — Decimal places.
-- `conversion_exit` — Conversion exit name.
-- `lowercase` — Allow lowercase values (domain setting).
-- `sign_exists` — Allow signed values (domain setting).
-- `value_table` — Foreign key value table.
-- `fixed_values` — Domain fixed values list.
 - `table_name` — Table name.
 - `structure_name` — Structure name.
 - `data_element_name` — Data element name.
 - `interface_name` — Interface name.
 - `service_definition_name` — Service definition name.
 - `service_binding_name` — Service binding name.
-- `service_name` — Published service name (service binding update).
+- `service_name` — Published service name (SERVICE_BINDING, an OData V2 binding).
+- `service_version` — Published service version (SERVICE_BINDING, an OData V2 binding). Default 0001.
 - `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `behavior_definition` — Referenced behavior definition name (behavior implementation update).
 - `ddl_code` — Complete DDL source code (for TABLE/STRUCTURE update).
 - `implementation_code` — Behavior implementation methods source code.
 - `test_class_source` — ABAP source of the local test classes (UNIT_TEST and CDS_UNIT_TEST update).
@@ -486,13 +474,13 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
+**Description:** Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_DEFINITION(object_name*), SERVICE_BINDING(object_name*).
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
+- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `super_package` — Super package context when relevant.
 
@@ -500,13 +488,13 @@ per request.
 
 **Half:** `@mcp-abap-adt/compact-modify`
 
-**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*), PROGRAM(object_name*, lock_handle*) [onprem only], INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*).
+**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*), PROGRAM(object_name*, lock_handle*) [onprem only], INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*), SERVICE_DEFINITION(object_name*, lock_handle*), SERVICE_BINDING(object_name*, lock_handle*).
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION.
+- `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `lock_handle` (required) — Lock handle returned by lock.
 

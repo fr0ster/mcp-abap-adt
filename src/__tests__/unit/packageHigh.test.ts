@@ -1,7 +1,8 @@
 /**
- * The high UpdatePackage and DeletePackage (19.0.0): one atomic tool each,
- * and the route of compact's HandlerUpdate / HandlerDelete PACKAGE, so both
- * send the same requests.
+ * The high UpdatePackage and DeletePackage (19.0.0): one atomic tool each.
+ * Compact HandlerDelete PACKAGE routes to DeletePackage; compact's update is
+ * the consumer's chain, one request per call — HandlerGet part metadata, then
+ * HandlerUpdate with the changed document under lock_handle.
  *
  * - UpdatePackage locks, reads the package's metadata, writes it back with
  *   the description patched, and unlocks — the unlock sent whatever the
@@ -123,26 +124,13 @@ describe('UpdatePackage (high)', () => {
     ]);
   });
 
-  it('sends exactly what compact’s HandlerUpdate PACKAGE (no lock_handle) sends', async () => {
+  it('inside its lock, the read and the write the low tool sent', async () => {
     const high = parityConnection();
     await handleUpdatePackage(ctx(high), {
       package_name: 'PKG_A',
       description: 'New text',
       transport_request: 'XXXK900001',
     });
-    const compact = parityConnection();
-    await compactTool(
-      compact,
-      'HandlerUpdate',
-    )({
-      object_type: 'PACKAGE',
-      package_name: 'PKG_A',
-      description: 'New text',
-      transport_request: 'XXXK900001',
-    });
-    expect(parityRequests(compact.requests)).toEqual(
-      parityRequests(high.requests),
-    );
     expect(high.requests.length).toBe(4);
     // Inside the lock, the write the low tool sent under the caller's lock —
     // the same GET and PUT, with the lock handle the stand-in answered.
@@ -155,26 +143,35 @@ describe('UpdatePackage (high)', () => {
   });
 });
 
-describe('HandlerUpdate PACKAGE under lock_handle', () => {
-  it('takes no super_package: the write is the same without it', async () => {
-    const send = async (extra: Record<string, unknown>) => {
-      const connection = parityConnection();
-      const answered = (await compactTool(
-        connection,
-        'HandlerUpdate',
-      )({
-        object_type: 'PACKAGE',
-        package_name: 'PKG_A',
-        description: 'New text',
-        lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
-        ...extra,
-      })) as { isError?: boolean };
-      expect(answered.isError).toBeFalsy();
-      return parityRequests(connection.requests);
-    };
-    const without = await send({});
-    expect(without.map((r) => r.method)).toEqual(['GET', 'PUT']);
-    expect(without).toEqual(await send({ super_package: 'PKG_SUPER' }));
+describe('compact PACKAGE update: HandlerGet part metadata, then HandlerUpdate under lock_handle', () => {
+  it('sends the GET and the PUT the low tool sent, one per call', async () => {
+    const low = lowRequestsOf('UpdatePackageLow') as Array<{
+      data?: unknown;
+    }>;
+    const connection = parityConnection();
+    const read = (await compactTool(
+      connection,
+      'HandlerGet',
+    )({
+      object_type: 'PACKAGE',
+      package_name: 'PKG_A',
+      part: 'metadata',
+    })) as { isError?: boolean };
+    expect(read.isError).toBeFalsy();
+    expect(connection.requests).toHaveLength(1);
+    // The caller changes the document it read and passes all of it back.
+    const written = (await compactTool(
+      connection,
+      'HandlerUpdate',
+    )({
+      object_type: 'PACKAGE',
+      package_name: 'PKG_A',
+      source_code: low[1]?.data,
+      lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
+      transport_request: 'XXXK900001',
+    })) as { isError?: boolean };
+    expect(written.isError).toBeFalsy();
+    expect(parityRequests(connection.requests)).toEqual(low);
   });
 });
 

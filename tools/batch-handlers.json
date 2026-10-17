@@ -617,7 +617,9 @@
           "DATA_ELEMENT",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING"
         ]
       }
     ]
@@ -658,7 +660,9 @@
           "DATA_ELEMENT",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING"
         ]
       }
     ]
@@ -682,7 +686,7 @@
     "tool": "HandlerUpdate",
     "set": "compact",
     "handler": "compact-modify/src/handlers/handleHandlerUpdate.ts#handleHandlerUpdate",
-    "sends": "PUT the source under the lock_handle given ({object uri}/source/main?lockHandle=…[&corrNr=…])",
+    "sends": "one request under the lock_handle given: PUT of the source, the class include or the metadata document as given ({object uri}…?lockHandle=…[&corrNr=…]); for SERVICE_BINDING its publication request",
     "when": [
       {
         "argument": "lock_handle",
@@ -691,18 +695,49 @@
       {
         "argument": "object_type",
         "equals": [
+          "DOMAIN",
+          "DATA_ELEMENT",
+          "FUNCTION_GROUP",
           "TABLE",
           "STRUCTURE",
           "DDL",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING",
           "CLASS",
+          "LOCAL_TEST_CLASS",
+          "LOCAL_TYPES",
+          "LOCAL_DEFINITIONS",
+          "LOCAL_MACROS",
+          "UNIT_TEST",
+          "CDS_UNIT_TEST",
           "PROGRAM",
           "INTERFACE",
           "FUNCTION_MODULE",
           "BEHAVIOR_DEFINITION",
+          "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION"
         ]
       }
     ]
+  },
+  {
+    "tool": "HandlerUpdate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerUpdate.ts#handleHandlerUpdate",
+    "sends": "PUT /sap/bc/adt/packages/{name}?lockHandle=…[&corrNr=…], the metadata document as given; over RFC the package lock is held in an ABAP session of its own, outside the batch",
+    "when": [
+      {
+        "argument": "lock_handle",
+        "present": true
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE"
+        ]
+      }
+    ],
+    "connection": "http"
   },
   {
     "tool": "ActivateDomain",

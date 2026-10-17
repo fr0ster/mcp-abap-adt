@@ -1,14 +1,16 @@
 import * as z from 'zod';
 import { answerCaught, thrownEntry } from '../../../lib/answer';
+import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { timeoutField, withLongToolAdvice } from '../../../lib/longTools';
 import {
   assembleList,
-  byLevels,
-  levelReader,
+  batchReader,
   type NodeRequest,
   readNode,
+  rootByRoot,
+  walkPackage,
   walkPackages,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -59,53 +61,58 @@ export async function handleGetPackageContents(
   context: HandlerContext,
   args: GetPackageContentsArgs,
 ) {
-  const { logger } = context;
+  const { connection, logger } = context;
   try {
     const single = typeof args?.package_name === 'string' && args.package_name;
     const list = Array.isArray(args?.package_names) ? args.package_names : [];
-    if ((single ? 1 : 0) + (list.length > 0 ? 1 : 0) !== 1) {
-      return return_error(
-        'Give exactly one of package_name or package_names (a non-empty list)',
-      );
+    if (single && list.length > 0) {
+      return return_error('Give exactly one of package_name or package_names');
+    }
+    if (!single && list.length === 0) {
+      return return_error('Package name is required');
     }
     const packageNames = (single ? [single] : list).map((name) =>
       name.toUpperCase(),
     );
+    const options = {
+      includeSubpackages: args.include_subpackages,
+      maxDepth: args.max_depth,
+      includeDescriptions: args.include_descriptions,
+    };
 
     // Walked here rather than in the client, for the reason given in
     // handleGetPackageTree and in mcp-abap-adt-clients#141: a member that makes
     // many requests cannot take an IResultStrategy, and a flat list and a tree
     // are two conveniences over one walk. This is the same walk that handler
     // uses, assembled the other way — level by level, each level's requests in
-    // one envelope (spec §11).
-    const walked = await byLevels(context, (mode) =>
-      walkPackages(
-        levelReader<NodeRequest, unknown>(
-          context,
-          mode,
-          (request, connection) =>
-            readNode(
-              createAdtClient(connection, logger).getUtils(ourUtils),
-              request,
-            ),
+    // one envelope (spec §11); one package after another where the system has
+    // no communication batch.
+    const walked = await withSequentialFallback(
+      context,
+      () =>
+        walkPackages(
+          batchReader<NodeRequest, unknown>(context, (request, c) =>
+            readNode(createAdtClient(c, logger).getUtils(ourUtils), request),
+          ),
+          packageNames,
+          options,
         ),
-        packageNames,
-        {
-          includeSubpackages: args.include_subpackages,
-          maxDepth: args.max_depth,
-          includeDescriptions: args.include_descriptions,
-        },
-      ),
+      () => {
+        const utils = createAdtClient(connection, logger).getUtils(ourUtils);
+        return rootByRoot(packageNames, (name) =>
+          walkPackage(utils, name, options),
+        );
+      },
     );
 
     let answered: unknown;
     if (single) {
-      const [only] = walked;
-      if (only === undefined || !only.ok) throw only?.error;
-      answered = assembleList(packageNames[0] ?? '', only.value);
+      const only = walked[0] as (typeof walked)[number];
+      if (!only.ok) throw only.error;
+      answered = assembleList(single.toUpperCase(), only.value);
     } else {
       answered = walked.map((result, i) => {
-        const package_name = packageNames[i] ?? '';
+        const package_name = packageNames[i] as string;
         return result.ok
           ? { package_name, objects: assembleList(package_name, result.value) }
           : {

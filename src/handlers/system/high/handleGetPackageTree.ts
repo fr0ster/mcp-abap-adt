@@ -7,19 +7,27 @@
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { answerFailure, failureEntry, thrownEntry } from '../../../lib/answer';
-import type { PhaseResult } from '../../../lib/batch/phases';
+import {
+  answerFailure,
+  failureEntry,
+  isCredentialPayload,
+  thrownEntry,
+} from '../../../lib/answer';
+import {
+  type PhaseResult,
+  withSequentialFallback,
+} from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
   assembleTree,
-  byLevels,
-  levelReader,
+  batchReader,
+  endsTheCall,
   type NodeRequest,
-  type ReadMode,
   readNode,
   type WalkedItem,
+  walkPackage,
   walkPackages,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -83,46 +91,73 @@ interface GetPackageTreeArgs {
   debug?: boolean;
 }
 
+type Metadata = IAdtResponse<unknown, IAdtError>;
+
 /** One package's metadata read and its walk. */
 interface TreeRead {
-  metadata: PhaseResult<unknown>;
+  metadata: PhaseResult<Metadata>;
   walked?: PhaseResult<WalkedItem[]>;
+}
+
+interface TreeOptions {
+  includeSubpackages: boolean;
+  maxDepth: number;
+  includeDescriptions: boolean;
 }
 
 /** An item of the first phase: a package's metadata, or a root node structure. */
 type FirstItem = { metadata: string } | { node: NodeRequest };
 
-/**
- * Every package's metadata and walk, in `mode` (spec §11): (1) the metadata
- * GET and the root node structure of every package, in one phase; then the
- * walk's levels for the packages whose metadata was read.
- */
-async function readTrees(
+// Verify package exists before building tree (fixes #38).
+// `IPackageContract` has no `.read()` — a package is a container with no
+// source of its own, so `readMetadata` is the one call (see
+// `handleGetPackage.ts`, migrated the same way). Without an `analyse`
+// strategy the default error contract still answers `ok: false` for a
+// refusal, which is all a plain existence check needs.
+function readMetadata(
   context: HandlerContext,
-  mode: ReadMode,
+  connection: HandlerContext['connection'],
+  packageName: string,
+): Promise<Metadata> {
+  return createAdtClient(connection, context.logger)
+    .getPackage()
+    .readMetadata({ packageName }, { analyse: analyseException });
+}
+
+/** A metadata read SAP refused with a credential failure (a `401`). */
+function credentialRefused(metadata: PhaseResult<Metadata>): boolean {
+  return (
+    metadata.ok &&
+    !metadata.value.ok &&
+    isCredentialPayload(
+      failureEntry(metadata.value.getError(), 'read package metadata'),
+    )
+  );
+}
+
+/** Whether a metadata read answered the document. */
+const metadataRead = (metadata: PhaseResult<Metadata>) =>
+  metadata.ok && metadata.value.ok;
+
+/**
+ * Every package's metadata and walk in ADT batch envelopes (spec §11): (1)
+ * the metadata GET and the root node structure of every package, in one
+ * phase; then the walk's levels for the packages whose metadata was read.
+ * A metadata read refused with a credential failure ends the reads.
+ */
+async function readTreesBatched(
+  context: HandlerContext,
   packageNames: readonly string[],
-  options: {
-    includeSubpackages: boolean;
-    maxDepth: number;
-    includeDescriptions: boolean;
-  },
+  options: TreeOptions,
 ): Promise<TreeRead[]> {
-  const { logger } = context;
-  const read = levelReader<FirstItem, unknown>(context, mode, (item, c) => {
-    const client = createAdtClient(c, logger);
-    // Verify package exists before building tree (fixes #38).
-    // `IPackageContract` has no `.read()` — a package is a container with no
-    // source of its own, so `readMetadata` is the one call (see
-    // `handleGetPackage.ts`, migrated the same way).
-    return 'metadata' in item
-      ? client
-          .getPackage()
-          .readMetadata(
-            { packageName: item.metadata },
-            { analyse: analyseException },
-          )
-      : readNode(client.getUtils(ourUtils), item.node);
-  });
+  const read = batchReader<FirstItem, unknown>(context, (item, c) =>
+    'metadata' in item
+      ? readMetadata(context, c, item.metadata)
+      : readNode(
+          createAdtClient(c, context.logger).getUtils(ourUtils),
+          item.node,
+        ),
+  );
   const first = await read([
     ...packageNames.map((metadata) => ({ metadata })),
     ...packageNames.map((name) => ({
@@ -134,30 +169,63 @@ async function readTrees(
     })),
   ]);
   const reads: TreeRead[] = packageNames.map((_, i) => ({
-    metadata: first[i] ?? { ok: false, error: undefined },
+    metadata: first[i] as PhaseResult<Metadata>,
   }));
+  if (reads.some((r) => credentialRefused(r.metadata))) return reads;
   // Walked further: the packages whose metadata was read.
-  const kept = packageNames
-    .map((name, i) => ({ name, i }))
-    .filter(({ i }) => {
-      const metadata = reads[i]?.metadata;
-      return (
-        metadata?.ok === true &&
-        (metadata.value as { ok?: boolean } | undefined)?.ok !== false
-      );
-    });
+  const kept = reads.flatMap((r, i) => (metadataRead(r.metadata) ? [i] : []));
   const walked = await walkPackages(
     (requests) => read(requests.map((node) => ({ node }))),
-    kept.map(({ name }) => name),
+    kept.map((i) => packageNames[i] as string),
     options,
-    kept.map(
-      ({ i }) => first[packageNames.length + i] ?? { ok: false, error: i },
-    ),
+    kept.map((i) => first[packageNames.length + i] as PhaseResult<unknown>),
   );
-  kept.forEach(({ i }, k) => {
-    const tree = reads[i];
-    if (tree !== undefined) tree.walked = walked[k];
+  kept.forEach((i, k) => {
+    (reads[i] as TreeRead).walked = walked[k];
   });
+  return reads;
+}
+
+/**
+ * The sequential version — the code path this handler has always had — one
+ * package after another: its metadata, then, when read, its walk
+ * (`walkPackage`). A failure that ends the call is thrown as it came, and a
+ * metadata read refused with a credential failure ends the reads.
+ */
+async function readTreesSequential(
+  context: HandlerContext,
+  packageNames: readonly string[],
+  options: TreeOptions,
+): Promise<TreeRead[]> {
+  const utils = createAdtClient(context.connection, context.logger).getUtils(
+    ourUtils,
+  );
+  const reads: TreeRead[] = [];
+  for (const name of packageNames) {
+    let metadata: PhaseResult<Metadata>;
+    try {
+      metadata = {
+        ok: true,
+        value: await readMetadata(context, context.connection, name),
+      };
+    } catch (error) {
+      if (endsTheCall(error)) throw error;
+      metadata = { ok: false, error };
+    }
+    const tree: TreeRead = { metadata };
+    reads.push(tree);
+    if (credentialRefused(metadata)) break;
+    if (!metadataRead(metadata)) continue;
+    try {
+      tree.walked = {
+        ok: true,
+        value: await walkPackage(utils, name, options),
+      };
+    } catch (error) {
+      if (endsTheCall(error)) throw error;
+      tree.walked = { ok: false, error };
+    }
+  }
   return reads;
 }
 
@@ -165,11 +233,7 @@ async function readTrees(
 function treeOf(
   packageName: string,
   walked: WalkedItem[],
-  options: {
-    includeSubpackages: boolean;
-    maxDepth: number;
-    includeDescriptions: boolean;
-  },
+  options: TreeOptions,
 ) {
   return {
     package_name: packageName,
@@ -193,17 +257,19 @@ export async function handleGetPackageTree(
   try {
     const single = typeof args?.package_name === 'string' && args.package_name;
     const list = Array.isArray(args?.package_names) ? args.package_names : [];
-    if ((single ? 1 : 0) + (list.length > 0 ? 1 : 0) !== 1) {
+    if (single && list.length > 0) {
       return return_error(
-        new Error(
-          'Give exactly one of package_name or package_names (a non-empty list)',
-        ),
+        new Error('Give exactly one of package_name or package_names'),
       );
+    }
+    // Validate required parameters
+    if (!single && list.length === 0) {
+      return return_error(new Error('package_name is required'));
     }
     const packageNames = (single ? [single] : list).map((name) =>
       name.toUpperCase(),
     );
-    const options = {
+    const options: TreeOptions = {
       includeSubpackages: args.include_subpackages !== false,
       maxDepth: args.max_depth || 5,
       includeDescriptions: args.include_descriptions !== false,
@@ -220,28 +286,34 @@ export async function handleGetPackageTree(
     // `fetchNodeStructure` is one request and takes our reading, so the walk is
     // composed of steps we can read and the assembly is ours.
     // See mcp-abap-adt-clients#141.
-    const reads = await byLevels(context, (mode) =>
-      readTrees(context, mode, packageNames, options),
+    const reads = await withSequentialFallback(
+      context,
+      () => readTreesBatched(context, packageNames, options),
+      () => readTreesSequential(context, packageNames, options),
     );
 
-    if (single) {
-      const [only] = reads;
-      const metadata = only?.metadata;
-      if (metadata === undefined || !metadata.ok) throw metadata?.error;
-      const readResult = metadata.value as IAdtResponse<unknown, IAdtError>;
-      if (!readResult.ok) {
+    // A metadata read refused with a credential failure ends the call as it
+    // came; so does one package's own refusal when it was the only one asked.
+    const ended = reads.find((r) => credentialRefused(r.metadata));
+    const failedMetadata = (single ? reads[0] : ended)?.metadata;
+    if (failedMetadata !== undefined) {
+      if (!failedMetadata.ok) throw failedMetadata.error;
+      if (!failedMetadata.value.ok) {
         // The method's error as it is, with the step it arose at.
         return answerFailure(
-          withStep(readResult.getError(), 'read package metadata'),
+          withStep(failedMetadata.value.getError(), 'read package metadata'),
           { tool: 'GetPackageTree', detail: 'terse' },
         );
       }
-      const walked = only?.walked;
-      if (walked === undefined || !walked.ok) throw walked?.error;
+    }
+
+    if (single) {
+      const walked = reads[0]?.walked as PhaseResult<WalkedItem[]>;
+      if (!walked.ok) throw walked.error;
       logger?.debug(`Package tree fetched successfully for ${single}`);
       return return_response({
         data: JSON.stringify(
-          treeOf(packageNames[0] ?? '', walked.value, options),
+          treeOf(packageNames[0] as string, walked.value, options),
           null,
           2,
         ),
@@ -249,7 +321,7 @@ export async function handleGetPackageTree(
     }
 
     const entries = reads.map((read, i) => {
-      const package_name = packageNames[i] ?? '';
+      const package_name = packageNames[i] as string;
       const metadata = read.metadata;
       if (!metadata.ok) {
         return {
@@ -257,21 +329,22 @@ export async function handleGetPackageTree(
           error: thrownEntry(metadata.error, 'read package metadata'),
         };
       }
-      const readResult = metadata.value as IAdtResponse<unknown, IAdtError>;
-      if (!readResult.ok) {
+      if (!metadata.value.ok) {
         return {
           package_name,
-          error: failureEntry(readResult.getError(), 'read package metadata'),
+          error: failureEntry(
+            metadata.value.getError(),
+            'read package metadata',
+          ),
         };
       }
-      const walked = read.walked;
-      if (walked === undefined || !walked.ok) {
-        return {
-          package_name,
-          error: thrownEntry(walked?.error, 'read package node structure'),
-        };
-      }
-      return treeOf(package_name, walked.value, options);
+      const walked = read.walked as PhaseResult<WalkedItem[]>;
+      return walked.ok
+        ? treeOf(package_name, walked.value, options)
+        : {
+            package_name,
+            error: thrownEntry(walked.error, 'read package node structure'),
+          };
     });
     return return_response({
       data: JSON.stringify(entries, null, 2),

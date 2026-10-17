@@ -26,6 +26,7 @@ import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPac
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { corpusBody, corpusSidecar } from '../../../lib/adtCorpus';
 import { createBatchAvailability } from '../../../lib/batch/availability';
+import { objectsListCache } from '../../../lib/getObjectsListCache';
 import {
   envelopeConnection,
   envelopeResponse as envelopeOf,
@@ -491,14 +492,18 @@ describe('GetPackageContents', () => {
     expect(fake.directs).toHaveLength(1);
   });
 
-  it('exactly one of package_name and package_names', async () => {
+  it('a missing single argument keeps its words; both given is refused', async () => {
     const both = await handleGetPackageContents(contextOn(system()), {
       package_name: 'ZROOT_A',
       package_names: ['ZROOT_B'],
     });
     const none = await handleGetPackageContents(contextOn(system()), {});
     expect((both as { isError?: boolean }).isError).toBe(true);
+    expect(textOf(both)).toContain(
+      'Give exactly one of package_name or package_names',
+    );
     expect((none as { isError?: boolean }).isError).toBe(true);
+    expect(textOf(none)).toContain('Package name is required');
   });
 });
 
@@ -948,5 +953,208 @@ describe('GetObjectInfo', () => {
     await withinTurns(handleGetObjectInfo(contextOn(fake, 'absent'), single));
     expect(fake.envelopes).toHaveLength(0);
     expect(fake.directs).toHaveLength(7);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fix round 1: credential refusals in list calls, envelope failures, the
+// sequential path, the cache, the single arguments' words
+// ---------------------------------------------------------------------------
+
+type Call = (context: HandlerContext) => Promise<unknown>;
+
+/** Every list call of the four walks, over two roots. */
+const LIST_CALLS: Array<{ tool: string; call: Call; refused: string }> = [
+  {
+    tool: 'GetPackageContents',
+    call: (c) =>
+      handleGetPackageContents(c, {
+        package_names: ['ZROOT_A', 'ZROOT_B'],
+        include_subpackages: true,
+        max_depth: 2,
+      }),
+    refused: nodeKey('DEVC/K', 'ZROOT_B', '40'),
+  },
+  {
+    tool: 'GetPackageTree',
+    call: (c) =>
+      handleGetPackageTree(c, { package_names: ['ZROOT_A', 'ZROOT_B'] }),
+    refused: nodeKey('DEVC/K', 'ZROOT_B', '40'),
+  },
+  {
+    tool: 'GetObjectsList',
+    call: (c) =>
+      handleGetObjectsList(c, {
+        objects: [
+          { parent_type: 'PROG/P', parent_name: 'ZPROG_X' },
+          { parent_type: 'PROG/P', parent_name: 'ZPROG_Y' },
+        ],
+      }),
+    refused: nodeKey('PROG/P', 'ZPROG_Y', '103'),
+  },
+  {
+    tool: 'GetObjectInfo',
+    call: (c) =>
+      handleGetObjectInfo(c, {
+        objects: [
+          { object_type: 'DEVC/K', object_name: 'ZROOT_A' },
+          { object_type: 'DEVC/K', object_name: 'ZROOT_B' },
+        ],
+        maxDepth: 2,
+      }),
+    refused: nodeKey('DEVC/K', 'ZSUB_B'),
+  },
+];
+
+describe.each(LIST_CALLS)(
+  '$tool: a 401 SAP answered to one root of a list',
+  ({ call, refused }) => {
+    it('batched: ends the call as it came; no envelope after it', async () => {
+      const fake = system({ refuse: { [refused]: 401 } });
+      const result = await withinTurns(call(contextOn(fake)));
+      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(textOf(result)).toContain('401');
+      const at = fake.envelopes.findIndex((e) => partKeys(e).includes(refused));
+      expect(at).toBeGreaterThanOrEqual(0);
+      expect(fake.envelopes).toHaveLength(at + 1);
+    });
+
+    it('sequential: ends the call as it came; nothing is read after it', async () => {
+      const fake = system({ refuse: { [refused]: 401 } });
+      const result = await withinTurns(call(contextOn(fake, 'absent')));
+      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(textOf(result)).toContain('401');
+      const last = fake.directs[fake.directs.length - 1] as IAbapRequestOptions;
+      expect(keyOf(last.method, last.url, last.params)).toBe(refused);
+    });
+  },
+);
+
+describe.each(LIST_CALLS)('$tool: an envelope failure', ({ tool, call }) => {
+  it("is every item of that phase's failure, the envelope's error with its step", async () => {
+    const fake = system({}, () => {
+      throw statusError(500, 'Internal Server Error', 'placeholder');
+    });
+    const result = await withinTurns(call(contextOn(fake)));
+    expect(fake.envelopes).toHaveLength(1);
+    const entries = payloadOf(result) as Array<{ error?: unknown }>;
+    expect(entries).toHaveLength(2);
+    const step =
+      tool === 'GetPackageTree'
+        ? 'read package metadata'
+        : tool === 'GetPackageContents'
+          ? 'read package node structure'
+          : 'read node structure';
+    for (const entry of entries) {
+      expect(entry.error).toMatchObject({
+        message: 'Request failed with status code 500',
+        step,
+      });
+    }
+  });
+});
+
+describe('GetObjectInfo: a credential refusal of the searches', () => {
+  const two = {
+    objects: [
+      { object_type: 'DEVC/K', object_name: 'ZROOT_A' },
+      { object_type: 'DEVC/K', object_name: 'ZROOT_B' },
+    ],
+    maxDepth: 2,
+  };
+
+  it('sequential: the first refused search ends the call; nothing is read after it', async () => {
+    const fake = system({ refuse: { 'SEARCH|ZROOT_A': 401 } });
+    const result = await withinTurns(
+      handleGetObjectInfo(contextOn(fake, 'absent'), two),
+    );
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({ status: 401 });
+    expect(fake.directs).toHaveLength(1);
+  });
+
+  it('batched: a refused search envelope ends the call as it came', async () => {
+    const fake = envelopeConnection((parts) => {
+      if (parts.some((p) => keyOf(p.method, p.url).startsWith('SEARCH|'))) {
+        throw credential();
+      }
+      return envelopeOf(parts.map((p) => answerOf({}, p.method, p.url)));
+    });
+    const result = await withinTurns(
+      handleGetObjectInfo(contextOn(fake as unknown as Fake), two),
+    );
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(payloadOf(result).error).toBe('authentication_failed');
+    expect(fake.envelopes).toHaveLength(5);
+  });
+});
+
+describe('GetObjectsList: the cache', () => {
+  it('a list call leaves it as it was; a single call writes it', async () => {
+    const before = { objects: [{ OBJECT_NAME: 'BEFORE' }] };
+    objectsListCache.setCache(before);
+    await withinTurns(
+      handleGetObjectsList(contextOn(system()), {
+        objects: [{ parent_type: 'PROG/P', parent_name: 'ZPROG_X' }],
+      }),
+    );
+    expect(objectsListCache.getCache()).toBe(before);
+    await withinTurns(
+      handleGetObjectsList(contextOn(system()), {
+        parent_type: 'PROG/P',
+        parent_name: 'ZPROG_X',
+        parent_tech_name: 'ZPROG_X',
+      }),
+    );
+    expect(objectsListCache.getCache()).toMatchObject({
+      parent_name: 'ZPROG_X',
+      total_objects: 3,
+    });
+  });
+});
+
+describe('the single arguments keep their words', () => {
+  it('GetPackageTree without a package', async () => {
+    const result = await handleGetPackageTree(contextOn(system()), {
+      package_name: '',
+    });
+    expect(textOf(result)).toContain('package_name is required');
+  });
+
+  it('GetObjectsList: objects beside a single parent field is refused', async () => {
+    for (const field of ['parent_name', 'parent_type', 'parent_tech_name']) {
+      const result = await handleGetObjectsList(contextOn(system()), {
+        objects: [{ parent_type: 'PROG/P', parent_name: 'ZPROG_X' }],
+        [field]: 'ZPROG_X',
+      });
+      expect((result as { isError?: boolean }).isError).toBe(true);
+    }
+  });
+});
+
+describe('GetPackageTree: a metadata read SAP answered 401', () => {
+  const refused = { refuse: { 'GET /sap/bc/adt/packages/zroot_a': 401 } };
+  const call = (c: HandlerContext) =>
+    handleGetPackageTree(c, { package_names: ['ZROOT_A', 'ZROOT_B'] });
+
+  it('batched: ends the call as it came; nothing is walked', async () => {
+    const fake = system(refused);
+    const result = await withinTurns(call(contextOn(fake)));
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(payloadOf(result)).toMatchObject({
+      status: 401,
+      step: 'read package metadata',
+    });
+    expect(fake.envelopes).toHaveLength(1);
+  });
+
+  it('sequential: ends the call as it came; nothing is read after it', async () => {
+    const fake = system(refused);
+    const result = await withinTurns(call(contextOn(fake, 'absent')));
+    expect(payloadOf(result)).toMatchObject({
+      status: 401,
+      step: 'read package metadata',
+    });
+    expect(fake.directs).toHaveLength(1);
   });
 });

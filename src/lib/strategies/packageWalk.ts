@@ -3,12 +3,9 @@ import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../handlers/interfaces';
+import { isCredentialFailure } from '../answer';
 import { failureOf } from '../auth/failures';
-import {
-  type PhaseResult,
-  runPhase,
-  withSequentialFallback,
-} from '../batch/phases';
+import { type PhaseResult, runPhase } from '../batch/phases';
 import { carryingFailure } from './step';
 
 /**
@@ -31,71 +28,52 @@ export interface NodeStructureSource {
   ): Promise<unknown>;
 }
 
-/**
- * How a walk reads its levels (spec §11): `batched`, every request of a level
- * in one envelope (`runPhase`); `sequential`, one request after another on
- * the call's connection, where the destination has no communication batch.
- */
-export type ReadMode = 'batched' | 'sequential';
-
 /** Reads every item of one level; each item's settlement, in item order. */
 export type LevelReader<I, R> = (
   items: readonly I[],
 ) => Promise<PhaseResult<R>[]>;
 
 /**
- * One level's reads in `mode`: `read(item, connection)` for every item, on
- * the phase's batch connection (`batched`) or on the call's connection, one
- * after another (`sequential`). A failure is its item's; a credential refusal
- * (any failure the server's reader answers) ends the walk as it came, in both
- * modes.
+ * One level's reads in one ADT batch envelope (spec §11): `read(item,
+ * connection)` for every item, on the phase's batch connection (`runPhase`).
  */
-export function levelReader<I, R>(
+export function batchReader<I, R>(
   context: HandlerContext,
-  mode: ReadMode,
   read: (item: I, connection: IAbapConnection) => Promise<R>,
 ): LevelReader<I, R> {
-  if (mode === 'batched') {
-    return (items) => runPhase(context, items, read);
-  }
-  return sequentialReads((item) => read(item, context.connection));
+  return (items) => runPhase(context, items, read);
 }
 
 /**
- * A level read one request after another: each item's settlement, in item
- * order; a credential refusal (any failure the server's reader answers)
- * thrown as it came.
+ * Whether a root's failure ends a call that reads several roots: a failure
+ * the server's reader answers (a chain failure, the server's own refusal), or
+ * a credential failure — a `401` SAP answered included (`isCredentialFailure`).
  */
-function sequentialReads<I, R>(
-  read: (item: I) => Promise<R>,
-): LevelReader<I, R> {
-  return async (items) => {
-    const out: PhaseResult<R>[] = [];
-    for (const item of items) {
-      try {
-        out.push({ ok: true, value: await read(item) });
-      } catch (error) {
-        if (failureOf(error) !== undefined) throw error;
-        out.push({ ok: false, error });
-      }
+export function endsTheCall(thrown: unknown): boolean {
+  return failureOf(thrown) !== undefined || isCredentialFailure(thrown);
+}
+
+/**
+ * The sequential version of a call that reads several roots (spec §11: the
+ * handler's own code path, where the destination has no communication
+ * batch): `read(root)` for one root after another; each root's settlement,
+ * in order. A failure that ends the call (`endsTheCall`) is thrown as it
+ * came, and no root after it is read.
+ */
+export async function rootByRoot<I, R>(
+  roots: readonly I[],
+  read: (root: I) => Promise<R>,
+): Promise<PhaseResult<R>[]> {
+  const out: PhaseResult<R>[] = [];
+  for (const root of roots) {
+    try {
+      out.push({ ok: true, value: await read(root) });
+    } catch (error) {
+      if (endsTheCall(error)) throw error;
+      out.push({ ok: false, error });
     }
-    return out;
-  };
-}
-
-/**
- * A walk by levels: `walk('batched')`, or `walk('sequential')` where the
- * destination has no communication batch (`withSequentialFallback`).
- */
-export function byLevels<T>(
-  context: HandlerContext,
-  walk: (mode: ReadMode) => Promise<T>,
-): Promise<T> {
-  return withSequentialFallback(
-    context,
-    () => walk('batched'),
-    () => walk('sequential'),
-  );
+  }
+  return out;
 }
 
 /** One node structure request of a walk. */
@@ -453,13 +431,15 @@ function flatten(walk: PackageWalk): WalkedItem[] {
  * (spec §11): per level, (a) the root node structure of every package of the
  * level, read together; (b) every type node those roots list, read together;
  * the next level is the subpackages found — walked only when asked for, and
- * never past `maxDepth`. `read` reads one level's requests (`levelReader`):
- * no request of a level needs another's answer.
+ * never past `maxDepth`. `read` reads one level's requests in one envelope
+ * (`batchReader`): no request of a level needs another's answer. Where the
+ * destination has no communication batch the handler runs `walkPackage`.
  *
  * One settlement per package asked, in the order asked: its objects — the
  * package's own, then those of each subpackage walked from it, depth first —
  * or its failure: the first refused read of its walk (a level that is not
- * there, `404`, stays empty). `roots`: the first level's root answers, when
+ * there, `404`, stays empty); a credential failure (a `401` SAP answered
+ * included) ends the walk, thrown as it came. `roots`: the first level's root answers, when
  * the caller read them already in a phase of its own.
  */
 export async function walkPackages(
@@ -483,16 +463,15 @@ export async function walkPackages(
   /** The level an answer carries, or undefined once its package failed. */
   const settle = (
     walk: PackageWalk,
-    result: PhaseResult<unknown> | undefined,
+    result: PhaseResult<unknown>,
   ): NodeLevel | undefined => {
-    if (failures.has(walk.root) || result === undefined) return undefined;
-    if (!result.ok) {
-      failures.set(walk.root, result.error);
-      return undefined;
-    }
+    if (failures.has(walk.root)) return undefined;
     try {
+      if (!result.ok) throw result.error;
       return levelOf(result.value);
     } catch (error) {
+      // A credential failure is every root's: it ends the walk as it came.
+      if (endsTheCall(error)) throw error;
       failures.set(walk.root, error);
       return undefined;
     }
@@ -549,8 +528,8 @@ export async function walkPackages(
       for (const item of walk.found) {
         if (kindOf(item.type) !== 'package') continue;
         const name = item.name.toUpperCase();
-        const own = seen[walk.root];
-        if (own === undefined || own.has(name)) continue;
+        const own = seen[walk.root] as Set<string>;
+        if (own.has(name)) continue;
         own.add(name);
         const sub: PackageWalk = {
           root: walk.root,
@@ -574,21 +553,54 @@ export async function walkPackages(
 }
 
 /**
- * Every object in one package, walked one level at a time on `utils`, one
- * request after another (`walkPackages`); its failure thrown.
+ * Every object in a package, walked one level at a time.
+ *
+ * One request for the package's root, which lists its object types, then one
+ * per type. Subpackages are walked only when asked for, and never past
+ * `maxDepth`.
  */
 export async function walkPackage(
   utils: NodeStructureSource,
   packageName: string,
   options: WalkOptions = {},
+  depth = 1,
+  seen: Set<string> = new Set(),
 ): Promise<WalkedItem[]> {
-  const [walked] = await walkPackages(
-    sequentialReads((request: NodeRequest) => readNode(utils, request)),
-    [packageName],
-    options,
+  const pkg = packageName.toUpperCase();
+  if (seen.has(pkg)) return [];
+  seen.add(pkg);
+
+  const withShortDescriptions = options.includeDescriptions !== false;
+  const root = levelOf(
+    await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
   );
-  if (walked === undefined || !walked.ok) throw walked?.error;
-  return walked.value;
+
+  const found: WalkedItem[] = root.objects.map((o) => ({
+    ...o,
+    packageName: pkg,
+  }));
+  for (const child of root.childNodes) {
+    const level = levelOf(
+      await utils.fetchNodeStructure('DEVC/K', pkg, {
+        nodeId: child.nodeId,
+        withShortDescriptions,
+      }),
+    );
+    found.push(...level.objects.map((o) => ({ ...o, packageName: pkg })));
+  }
+
+  if (!options.includeSubpackages) return found;
+
+  const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
+  const out = [...found];
+  for (const item of found) {
+    if (kindOf(item.type) !== 'package') continue;
+    if (depth >= limit) continue;
+    out.push(
+      ...(await walkPackage(utils, item.name, options, depth + 1, seen)),
+    );
+  }
+  return out;
 }
 
 /**

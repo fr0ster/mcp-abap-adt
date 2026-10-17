@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtError,
   IAdtFailure,
@@ -11,16 +12,16 @@ import {
   type McpResult,
   thrownEntry,
 } from '../../../lib/answer';
+import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
-  byLevels,
+  batchReader,
+  endsTheCall,
   kindOf,
-  levelReader,
   type NodeLevel,
   type NodeRequest,
-  type ReadMode,
   readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -175,12 +176,6 @@ interface InfoNode {
   enrichment?: Enrichment;
 }
 
-/** A root's walk failed: its first refused read (`response`) or throw. */
-interface FailedTree {
-  response?: IAdtFailure;
-  thrown?: unknown;
-}
-
 function isInfoNode(node: TreeNode | InfoNode): node is InfoNode {
   return 'depth' in node;
 }
@@ -211,18 +206,59 @@ function leafOf(o: NodeLevel['objects'][number]): TreeNode {
   };
 }
 
-/** The trees of a call: one per root; the roots whose walk failed, with the failure. */
+/**
+ * The trees of a call: one per root; the roots whose walk failed, with their
+ * first refused read; and the refusal that ended the call when SAP answered
+ * a credential failure (a `401`).
+ */
+/** A root's read that threw: its throw, as it came. */
+interface Thrown {
+  ok: false;
+  thrown: unknown;
+}
+
 interface Trees {
   roots: InfoNode[];
-  failures: Map<number, FailedTree>;
+  failures: Map<number, IAdtFailure | Thrown>;
+  ended?: IAdtFailure;
+}
+
+/** A refused read SAP answered with a credential failure. */
+function credentialRefused(response: IAdtFailure): boolean {
+  return isCredentialPayload(
+    failureEntry(response.getError(), 'read node structure'),
+  );
 }
 
 /**
- * Every root's tree, tier by tier (spec §11): per tier, (a) the root node
- * structure of every node of the tier, read together; (b) every type folder
- * those roots list, read together; the next tier is the packages found that
- * are walked further. With `enrich`, a last phase: one search per node. Each
- * node is the object itself, enriched, plus its children.
+ * A node's enrichment, searched on its own (the sequential version): best
+ * effort — a search failure never fails the tree — and a credential failure
+ * kept in `ended`.
+ */
+async function enrichNodeWithSearchObject(
+  context: HandlerContext,
+  objectType: string,
+  objectName: string,
+  ended: Ended,
+): Promise<Enrichment> {
+  try {
+    const searchResult = (await handleSearchObject(context, {
+      object_name: objectName,
+      object_type: objectType,
+      maxResults: 1,
+    })) as McpResult;
+    return enrichmentOf(searchResult, objectType, objectName, ended);
+  } catch {
+    // Enrichment is best-effort; the tree still answers without it.
+    return { type: objectType };
+  }
+}
+
+type NodeSource = ReturnType<ReturnType<typeof createAdtClient>['getUtils']>;
+
+/**
+ * One tree node: the object itself, enriched, plus its children — the
+ * sequential version, where the destination has no communication batch.
  *
  * **Corpus-informed, not the pre-migration algorithm ported unchanged.** The
  * pre-migration handler read only `DATA.TREE_CONTENT.SEU_ADT_REPOSITORY_OBJ_NODE`
@@ -265,26 +301,121 @@ interface Trees {
  * rather than left to silently do nothing past two tiers.
  *
  * A refusal at ANY fetch — the root's, a type folder's, or a recursed
- * subpackage's — is its root's answer as-is (for one object, it bubbles to
- * `answer()` unchanged), and nothing more of that root is read.
+ * subpackage's — is returned as-is and bubbles to `answer()` unchanged, the
+ * same short-circuit `handleGetObjectsList.ts` uses.
+ */
+async function buildTree(
+  context: HandlerContext,
+  utils: NodeSource,
+  objectType: string,
+  objectName: string,
+  depth: number,
+  maxDepth: number,
+  enrich: boolean,
+  ended: Ended,
+): Promise<IAdtResponse<TreeNode, IAdtError>> {
+  const enrichment = enrich
+    ? await enrichNodeWithSearchObject(context, objectType, objectName, ended)
+    : { type: objectType, description: undefined, packageName: undefined };
+  // The credential failure ends the walk; the handler answers it as it came.
+  if (ended.answer !== undefined)
+    return ok({ OBJECT_TYPE: objectType, OBJECT_NAME: objectName });
+
+  const children: TreeNode[] = [];
+
+  if (depth < maxDepth) {
+    const rootResponse = await utils.fetchNodeStructure(
+      objectType,
+      objectName,
+      { analyse: analyseException, withShortDescriptions: true },
+    );
+    if (!rootResponse.ok) {
+      return rootResponse as IAdtResponse<TreeNode, IAdtError>;
+    }
+    const root = rootResponse.getResult().value as NodeLevel;
+
+    for (const o of root.objects) {
+      children.push({
+        OBJECT_TYPE: o.type,
+        OBJECT_NAME: o.name,
+        ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
+      });
+    }
+
+    for (const child of root.childNodes) {
+      const childResponse = await utils.fetchNodeStructure(
+        objectType,
+        objectName,
+        {
+          analyse: analyseException,
+          nodeId: child.nodeId,
+          withShortDescriptions: true,
+        },
+      );
+      if (!childResponse.ok) {
+        return childResponse as IAdtResponse<TreeNode, IAdtError>;
+      }
+      const childLevel = childResponse.getResult().value as NodeLevel;
+      for (const o of childLevel.objects) {
+        if (kindOf(o.type) === 'package' && depth + 1 < maxDepth) {
+          const subtree = await buildTree(
+            context,
+            utils,
+            o.type,
+            o.name,
+            depth + 1,
+            maxDepth,
+            enrich,
+            ended,
+          );
+          if (ended.answer !== undefined) return subtree;
+          if (!subtree.ok) {
+            return subtree as IAdtResponse<TreeNode, IAdtError>;
+          }
+          children.push(subtree.getResult().value);
+        } else {
+          children.push({
+            OBJECT_TYPE: o.type,
+            OBJECT_NAME: o.name,
+            ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
+          });
+        }
+      }
+    }
+  }
+
+  return ok({
+    OBJECT_TYPE: enrichment.type || objectType,
+    OBJECT_NAME: objectName,
+    ...(enrichment.description
+      ? { OBJECT_DESCRIPTION: enrichment.description }
+      : {}),
+    ...(enrichment.packageName
+      ? { OBJECT_PACKAGE: enrichment.packageName }
+      : {}),
+    ...(children.length > 0 ? { CHILDREN: children } : {}),
+  });
+}
+
+/**
+ * Every root's tree in ADT batch envelopes, tier by tier (spec §11): per
+ * tier, (a) the root node structure of every node of the tier, read
+ * together; (b) every type folder those roots list, read together; the next
+ * tier is the packages found that are walked further, as `buildTree` walks
+ * them. With `enrich`, a last phase: one search per node. A root's first
+ * refused read is its answer, and nothing more of it is read; a credential
+ * failure SAP answered ends the reads.
  */
 async function buildTrees(
   context: HandlerContext,
-  mode: ReadMode,
   objects: ReadonlyArray<{ type: string; name: string; maxDepth: number }>,
   enrich: boolean,
   ended: Ended,
 ): Promise<Trees> {
-  const read = levelReader<NodeRequest, unknown>(
-    context,
-    mode,
-    (request, connection) =>
-      readNode(
-        createAdtClient(connection, context.logger).getUtils(ourUtils),
-        request,
-      ),
+  const read = batchReader<NodeRequest, unknown>(context, (request, c) =>
+    readNode(createAdtClient(c, context.logger).getUtils(ourUtils), request),
   );
-  const failures = new Map<number, FailedTree>();
+  const failures = new Map<number, IAdtFailure | Thrown>();
   const roots: InfoNode[] = objects.map((o, root) => ({
     root,
     type: o.type,
@@ -293,23 +424,26 @@ async function buildTrees(
     children: [],
   }));
   const nodes: InfoNode[] = [...roots];
-  const limit = (node: InfoNode) => objects[node.root]?.maxDepth ?? 0;
+  const limit = (node: InfoNode) =>
+    (objects[node.root] as (typeof objects)[number]).maxDepth;
+  let ending: IAdtFailure | undefined;
   /** The level a read answered, or undefined once its root failed. */
   const settle = (
     node: InfoNode,
-    result:
-      | { ok: true; value: unknown }
-      | { ok: false; error: unknown }
-      | undefined,
+    result: Awaited<ReturnType<typeof read>>[number],
   ): NodeLevel | undefined => {
-    if (failures.has(node.root)) return undefined;
-    if (result === undefined || !result.ok) {
-      failures.set(node.root, { thrown: result?.error });
+    if (failures.has(node.root) || ending !== undefined) return undefined;
+    // A read that threw is its root's failure; one that ends the call (a
+    // credential failure) is thrown as it came.
+    if (!result.ok) {
+      if (endsTheCall(result.error)) throw result.error;
+      failures.set(node.root, { ok: false, thrown: result.error });
       return undefined;
     }
     const response = result.value as IAdtResponse<unknown, IAdtError>;
     if (!response.ok) {
-      failures.set(node.root, { response });
+      if (credentialRefused(response)) ending = response;
+      else failures.set(node.root, response);
       return undefined;
     }
     return response.getResult().value as NodeLevel;
@@ -328,13 +462,14 @@ async function buildTrees(
     );
     const typeNodes: Array<{ node: InfoNode; nodeId: string }> = [];
     tier.forEach((node, i) => {
-      const level = settle(node, rootAnswers[i]);
+      const level = settle(node, rootAnswers[i] as (typeof rootAnswers)[0]);
       if (level === undefined) return;
       node.children.push(...level.objects.map(leafOf));
       for (const child of level.childNodes) {
         typeNodes.push({ node, nodeId: child.nodeId });
       }
     });
+    if (ending !== undefined) return { roots, failures, ended: ending };
     // (b) Every type folder those roots list.
     const typeAnswers =
       typeNodes.length > 0
@@ -350,7 +485,7 @@ async function buildTrees(
         : [];
     const next: InfoNode[] = [];
     typeNodes.forEach(({ node }, i) => {
-      const level = settle(node, typeAnswers[i]);
+      const level = settle(node, typeAnswers[i] as (typeof typeAnswers)[0]);
       if (level === undefined) return;
       for (const o of level.objects) {
         if (kindOf(o.type) === 'package' && node.depth + 1 < limit(node)) {
@@ -369,26 +504,26 @@ async function buildTrees(
         }
       }
     });
+    if (ending !== undefined) return { roots, failures, ended: ending };
     tier = next.filter((node) => !failures.has(node.root));
   }
 
   if (enrich) {
     // The last phase: one search per node of every tree that answered.
     const searched = nodes.filter((node) => !failures.has(node.root));
-    const searches = await levelReader<InfoNode, McpResult>(
+    const searches = await batchReader<InfoNode, McpResult>(
       context,
-      mode,
-      async (node, connection) =>
+      async (node, c) =>
         (await handleSearchObject(
-          { ...context, connection },
+          { ...context, connection: c },
           { object_name: node.name, object_type: node.type, maxResults: 1 },
         )) as McpResult,
     )(searched);
     searched.forEach((node, i) => {
-      const search = searches[i];
+      const search = searches[i] as (typeof searches)[number];
       // Enrichment is best-effort; the tree still answers without it.
       node.enrichment = enrichmentOf(
-        search?.ok ? search.value : undefined,
+        search.ok ? search.value : undefined,
         node.type,
         node.name,
         ended,
@@ -397,6 +532,51 @@ async function buildTrees(
   }
 
   return { roots, failures };
+}
+
+/**
+ * The sequential version of a call for several objects — the code path this
+ * tool has always had — one object after another (`buildTree`). A credential
+ * failure, from a search or a node read SAP answered, ends the reads, and
+ * nothing after it is read.
+ */
+async function buildTreesSequential(
+  context: HandlerContext,
+  objects: ReadonlyArray<{ type: string; name: string; maxDepth: number }>,
+  enrich: boolean,
+  ended: Ended,
+): Promise<{
+  trees: Array<IAdtResponse<TreeNode, IAdtError> | Thrown>;
+  ended?: IAdtFailure;
+}> {
+  const utils = createAdtClient(context.connection, context.logger).getUtils(
+    ourUtils,
+  );
+  const trees: Array<IAdtResponse<TreeNode, IAdtError> | Thrown> = [];
+  for (const o of objects) {
+    let tree: IAdtResponse<TreeNode, IAdtError> | Thrown;
+    try {
+      tree = await buildTree(
+        context,
+        utils,
+        o.type,
+        o.name,
+        0,
+        o.maxDepth,
+        enrich,
+        ended,
+      );
+    } catch (thrown) {
+      if (endsTheCall(thrown)) throw thrown;
+      tree = { ok: false, thrown };
+    }
+    if (ended.answer !== undefined) break;
+    if (!tree.ok && !('thrown' in tree) && credentialRefused(tree)) {
+      return { trees, ended: tree };
+    }
+    trees.push(tree);
+  }
+  return { trees };
 }
 
 export async function handleGetObjectInfo(
@@ -464,38 +644,73 @@ export async function handleGetObjectInfo(
   // strategy. This tool's own answer besides is a composite tree assembled
   // from several such calls (`buildTrees`), not one reading.
   let ended: Ended = {};
+  const entryOf = (
+    o: { type: string; name: string },
+    failed: IAdtFailure | Thrown,
+  ) =>
+    ({
+      OBJECT_TYPE: o.type,
+      OBJECT_NAME: o.name,
+      error:
+        'thrown' in failed
+          ? thrownEntry(failed.thrown, 'read node structure')
+          : failureEntry(failed.getError(), 'read node structure'),
+    }) as unknown as TreeNode;
   const answered = await answer(
     { tool: 'GetObjectInfo', detail: 'terse' },
-    async () => {
-      const trees = await byLevels(context, (mode) => {
-        ended = {};
-        return buildTrees(context, mode, asked, enrich, ended);
-      });
-      if (listed === undefined) {
-        const failed = trees.failures.get(0);
-        if (failed?.response !== undefined) {
-          return failed.response as IAdtResponse<TreeNode[], IAdtError>;
-        }
-        if (failed !== undefined) throw failed.thrown;
-      }
-      return ok(
-        trees.roots.map((root) => {
-          const failed = trees.failures.get(root.root);
-          if (failed === undefined) return treeNodeOf(root);
-          return {
-            OBJECT_TYPE: root.type,
-            OBJECT_NAME: root.name,
-            error:
-              failed.response !== undefined
-                ? failureEntry(
-                    failed.response.getError(),
-                    'read node structure',
-                  )
-                : thrownEntry(failed.thrown, 'read node structure'),
-          } as unknown as TreeNode;
-        }),
-      );
-    },
+    () =>
+      withSequentialFallback<IAdtResponse<TreeNode[], IAdtError>>(
+        context,
+        async () => {
+          ended = {};
+          const trees = await buildTrees(context, asked, enrich, ended);
+          if (trees.ended !== undefined) return trees.ended;
+          const single = listed === undefined && trees.failures.get(0);
+          if (single) {
+            if ('thrown' in single) throw single.thrown;
+            return single;
+          }
+          return ok(
+            trees.roots.map((root) => {
+              const failed = trees.failures.get(root.root);
+              return failed === undefined
+                ? treeNodeOf(root)
+                : entryOf(asked[root.root] as (typeof asked)[number], failed);
+            }),
+          );
+        },
+        async () => {
+          ended = {};
+          if (listed === undefined) {
+            const only = asked[0] as (typeof asked)[number];
+            const tree = await buildTree(
+              context,
+              createAdtClient(context.connection, logger).getUtils(ourUtils),
+              only.type,
+              only.name,
+              0,
+              only.maxDepth,
+              enrich,
+              ended,
+            );
+            return tree.ok ? ok([tree.getResult().value]) : tree;
+          }
+          const read = await buildTreesSequential(
+            context,
+            asked,
+            enrich,
+            ended,
+          );
+          if (read.ended !== undefined) return read.ended;
+          return ok(
+            read.trees.map((tree, i) =>
+              tree.ok
+                ? tree.getResult().value
+                : entryOf(asked[i] as (typeof asked)[number], tree),
+            ),
+          );
+        },
+      ),
     (trees: TreeNode[]) => (listed === undefined ? trees[0] : trees),
   );
   // A credential failure the enrichment search answered ends the call as it came.

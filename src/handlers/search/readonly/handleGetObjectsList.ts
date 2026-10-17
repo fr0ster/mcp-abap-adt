@@ -47,6 +47,7 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtError,
   IAdtFailure,
@@ -56,21 +57,28 @@ import {
   answer,
   type FailureEntry,
   failureEntry,
+  isCredentialPayload,
   thrownEntry,
 } from '../../../lib/answer';
+import { withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  byLevels,
-  levelReader,
+  batchReader,
+  endsTheCall,
   type NodeLevel,
   type NodeRequest,
-  type ReadMode,
   readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+
+function utilsOf(context: HandlerContext) {
+  return createAdtClient(context.connection, context.logger).getUtils(ourUtils);
+}
+
+type NodeSource = ReturnType<typeof utilsOf>;
 
 /**
  * The cache row shape `handleGetObjectNodeFromCache.ts` (out of this task's
@@ -88,14 +96,74 @@ interface FlatObject {
   OBJECT_URI?: string;
 }
 
-function ok<T>(value: T): IAdtResponse<T, IAdtError> {
+function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
   return {
     ok: true,
-    getResult: () => ({ value }),
+    getResult: () => ({ value: objects }),
     getError: () => {
       throw new Error('asked for the error of a success');
     },
-  } as unknown as IAdtResponse<T, IAdtError>;
+  } as unknown as IAdtResponse<FlatObject[], IAdtError>;
+}
+
+function flatObjects(level: NodeLevel): FlatObject[] {
+  return level.objects.map((o) => ({
+    OBJECT_TYPE: o.type,
+    OBJECT_NAME: o.name,
+    ...(o.techName ? { TECH_NAME: o.techName } : {}),
+    ...(o.uri ? { OBJECT_URI: o.uri } : {}),
+  }));
+}
+
+/**
+ * Walk the node structure recursively, one `fetchNodeStructure` call per
+ * node — the same recursion this tool ran before the migration, over
+ * `ourUtils.node` (`nodeLevel`) instead of a hand-rolled XML regex. Every
+ * step keeps IAdtResponse's `ok`/`getResult`/`getError` shape rather than
+ * throwing, so the FIRST refusal anywhere in the tree — not just at the
+ * root — reaches `answer()` and is formatted the same way every other
+ * handler in this migration formats one.
+ */
+async function collectValidObjects(
+  utils: NodeSource,
+  parentType: string,
+  parentName: string,
+  nodeId: string,
+  withShortDescriptions: boolean,
+  visited: Set<string>,
+): Promise<IAdtResponse<FlatObject[], IAdtError>> {
+  if (visited.has(nodeId)) return ok([]);
+  visited.add(nodeId);
+
+  const response = await utils.fetchNodeStructure(parentType, parentName, {
+    analyse: analyseException,
+    nodeId,
+    withShortDescriptions,
+  });
+  if (!response.ok) return response as IAdtResponse<FlatObject[], IAdtError>;
+
+  const level = response.getResult().value as NodeLevel;
+  let objects: FlatObject[] = level.objects.map((o) => ({
+    OBJECT_TYPE: o.type,
+    OBJECT_NAME: o.name,
+    ...(o.techName ? { TECH_NAME: o.techName } : {}),
+    ...(o.uri ? { OBJECT_URI: o.uri } : {}),
+  }));
+
+  for (const child of level.childNodes) {
+    const childResult = await collectValidObjects(
+      utils,
+      parentType,
+      parentName,
+      child.nodeId,
+      withShortDescriptions,
+      visited,
+    );
+    if (!childResult.ok) return childResult;
+    objects = objects.concat(childResult.getResult().value);
+  }
+
+  return ok(objects);
 }
 
 /** A parent whose node tree is walked. */
@@ -112,44 +180,56 @@ interface ListNode {
   children: ListNode[];
 }
 
-/** A parent's walk failed: its first refused read (`response`) or throw. */
-interface FailedWalk {
+/** A parent's read that threw: its throw, as it came. */
+interface Thrown {
   ok: false;
-  response?: IAdtFailure;
-  thrown?: unknown;
+  thrown: unknown;
 }
 
-/** A parent's walk: its objects, or its failure. */
-type ParentWalk = { ok: true; objects: FlatObject[] } | FailedWalk;
+/**
+ * A parent's walk: its objects, its first refused read as the method
+ * answered it, or its throw.
+ */
+type ParentWalk = IAdtResponse<FlatObject[], IAdtError> | Thrown;
+
+/**
+ * Every parent's walk, and the refusal that ended the call when one did: a
+ * credential failure SAP answered (a `401`) ends it as it came.
+ */
+interface ParentWalks {
+  walks: ParentWalk[];
+  ended?: IAdtFailure;
+}
+
+/** A refused read SAP answered with a credential failure. */
+function credentialRefused(response: IAdtFailure): boolean {
+  return isCredentialPayload(
+    failureEntry(response.getError(), 'read node structure'),
+  );
+}
 
 function flatten(node: ListNode): FlatObject[] {
   return [...node.objects, ...node.children.flatMap(flatten)];
 }
 
 /**
- * Every parent's node tree, level by level (spec §11): per level, the node
- * structure of every node of the level, read together; every child node a
- * level lists is read in the next. Each parent's objects in the order the
- * recursion always gave them (a node's own, then each child node's subtree);
- * a parent's first refused read is its answer, and nothing more of it is
- * read.
+ * Every parent's node tree in ADT batch envelopes, level by level (spec
+ * §11): per level, the node structure of every node of the level, read
+ * together; every child node a level lists is read in the next. Each
+ * parent's objects in the order the recursion gives them (a node's own, then
+ * each child node's subtree); a parent's first refused read is its answer,
+ * and nothing more of it is read. A failure that ends the call is thrown as
+ * it came; a credential failure SAP answered ends the reads.
  */
-async function walkParents(
+async function walkParentsBatched(
   context: HandlerContext,
-  mode: ReadMode,
   parents: readonly Parent[],
   withShortDescriptions: boolean,
-): Promise<ParentWalk[]> {
-  const read = levelReader<NodeRequest, unknown>(
-    context,
-    mode,
-    (request, connection) =>
-      readNode(
-        createAdtClient(connection, context.logger).getUtils(ourUtils),
-        request,
-      ),
+): Promise<ParentWalks> {
+  const read = batchReader<NodeRequest, unknown>(context, (request, c) =>
+    readNode(createAdtClient(c, context.logger).getUtils(ourUtils), request),
   );
-  const failures = new Map<number, FailedWalk>();
+  const failures = new Map<number, IAdtFailure | Thrown>();
   const visited = parents.map(() => new Set<string>(['000000']));
   const roots: ListNode[] = parents.map((_, root) => ({
     root,
@@ -162,36 +242,37 @@ async function walkParents(
   while (level.length > 0) {
     const answers = await read(
       level.map((node) => ({
-        parentType: parents[node.root]?.type ?? '',
-        parentName: parents[node.root]?.name ?? '',
+        parentType: (parents[node.root] as Parent).type,
+        parentName: (parents[node.root] as Parent).name,
         nodeId: node.nodeId,
         withShortDescriptions,
         analysed: true,
       })),
     );
     const next: ListNode[] = [];
-    level.forEach((node, i) => {
-      if (failures.has(node.root)) return;
-      const result = answers[i];
-      if (result === undefined || !result.ok) {
-        failures.set(node.root, { ok: false, thrown: result?.error });
-        return;
+    for (const [i, node] of level.entries()) {
+      if (failures.has(node.root)) continue;
+      const result = answers[i] as (typeof answers)[number];
+      // A read that threw is its parent's failure; one that ends the call
+      // (a credential failure) is thrown as it came.
+      if (!result.ok) {
+        if (endsTheCall(result.error)) throw result.error;
+        failures.set(node.root, { ok: false, thrown: result.error });
+        continue;
       }
       const response = result.value as IAdtResponse<unknown, IAdtError>;
       if (!response.ok) {
-        failures.set(node.root, { ok: false, response });
-        return;
+        if (credentialRefused(response)) {
+          return { walks: [], ended: response };
+        }
+        failures.set(node.root, response);
+        continue;
       }
       const found = response.getResult().value as NodeLevel;
-      node.objects = found.objects.map((o) => ({
-        OBJECT_TYPE: o.type,
-        OBJECT_NAME: o.name,
-        ...(o.techName ? { TECH_NAME: o.techName } : {}),
-        ...(o.uri ? { OBJECT_URI: o.uri } : {}),
-      }));
-      const seen = visited[node.root];
+      node.objects = flatObjects(found);
+      const seen = visited[node.root] as Set<string>;
       for (const child of found.childNodes) {
-        if (seen === undefined || seen.has(child.nodeId)) continue;
+        if (seen.has(child.nodeId)) continue;
         seen.add(child.nodeId);
         const sub: ListNode = {
           root: node.root,
@@ -202,20 +283,59 @@ async function walkParents(
         node.children.push(sub);
         next.push(sub);
       }
-    });
+    }
     level = next.filter((node) => !failures.has(node.root));
   }
 
-  return roots.map(
-    (root) => failures.get(root.root) ?? { ok: true, objects: flatten(root) },
-  );
+  return {
+    walks: roots.map(
+      (root) =>
+        (failures.get(root.root) as ParentWalk | undefined) ??
+        ok(flatten(root)),
+    ),
+  };
+}
+
+/**
+ * The sequential version — the code path this tool has always had — one
+ * parent after another (`collectValidObjects`); a credential failure SAP
+ * answered ends the reads, and nothing after it is read.
+ */
+async function walkParentsSequential(
+  context: HandlerContext,
+  parents: readonly Parent[],
+  withShortDescriptions: boolean,
+): Promise<ParentWalks> {
+  const utils = utilsOf(context);
+  const walks: ParentWalk[] = [];
+  for (const parent of parents) {
+    let walk: ParentWalk;
+    try {
+      walk = await collectValidObjects(
+        utils,
+        parent.type,
+        parent.name,
+        '000000',
+        withShortDescriptions,
+        new Set(),
+      );
+    } catch (thrown) {
+      if (endsTheCall(thrown)) throw thrown;
+      walk = { ok: false, thrown };
+    }
+    if (!walk.ok && !('thrown' in walk) && credentialRefused(walk)) {
+      return { walks, ended: walk };
+    }
+    walks.push(walk);
+  }
+  return { walks };
 }
 
 /** A failed parent walk as an entry: the method's error as it is, with its step. */
-function failureOfWalk(walk: FailedWalk): FailureEntry {
-  return walk.response !== undefined
-    ? failureEntry(walk.response.getError(), 'read node structure')
-    : thrownEntry(walk.thrown, 'read node structure');
+function failureOfWalk(walk: IAdtFailure | Thrown): FailureEntry {
+  return 'thrown' in walk
+    ? thrownEntry(walk.thrown, 'read node structure')
+    : failureEntry(walk.getError(), 'read node structure');
 }
 
 export async function handleGetObjectsList(
@@ -241,14 +361,14 @@ export async function handleGetObjectsList(
       ? Boolean(with_short_descriptions)
       : true;
 
-  if (listed !== undefined) {
+  if (Array.isArray(listed) && listed.length > 0) {
     if (
       parent_name !== undefined ||
-      !Array.isArray(listed) ||
-      listed.length === 0
+      parent_tech_name !== undefined ||
+      parent_type !== undefined
     ) {
       return return_error(
-        'Give exactly one of parent_name or objects (a non-empty list of { parent_type, parent_name })',
+        'Give exactly one of parent_name, parent_tech_name and parent_type, or objects',
       );
     }
     for (const entry of listed) {
@@ -267,16 +387,23 @@ export async function handleGetObjectsList(
       type: String(entry.parent_type),
       name: String(entry.parent_name).toUpperCase(),
     }));
+    let read: ParentWalks = { walks: [] };
     return answer(
       { tool: 'GetObjectsList', detail: 'terse' },
-      async () =>
-        ok(
-          await byLevels(context, (mode) =>
-            walkParents(context, mode, parents, withDescriptions),
-          ),
-        ),
-      (walks: ParentWalk[]) => {
-        const entries = walks.map((walk, i) => {
+      async () => {
+        read = await withSequentialFallback(
+          context,
+          () => walkParentsBatched(context, parents, withDescriptions),
+          () => walkParentsSequential(context, parents, withDescriptions),
+        );
+        // A credential failure SAP answered ends the call as it came.
+        if (read.ended !== undefined) {
+          return read.ended as IAdtResponse<FlatObject[], IAdtError>;
+        }
+        return ok([]);
+      },
+      () =>
+        read.walks.map((walk, i) => {
           const asked = {
             parent_name: listed[i]?.parent_name,
             parent_type: listed[i]?.parent_type,
@@ -284,17 +411,11 @@ export async function handleGetObjectsList(
           return walk.ok
             ? {
                 ...asked,
-                total_objects: walk.objects.length,
-                objects: walk.objects,
+                total_objects: walk.getResult().value.length,
+                objects: walk.getResult().value,
               }
             : { ...asked, error: failureOfWalk(walk) };
-        });
-        // The node rows of every parent read, for the cache's reader.
-        objectsListCache.setCache({
-          objects: walks.flatMap((walk) => (walk.ok ? walk.objects : [])),
-        });
-        return entries;
-      },
+        }),
     );
   }
 
@@ -335,25 +456,32 @@ export async function handleGetObjectsList(
   // never keeping the wire text beside it. There is no `.raw` for
   // `detail: 'raw'` to answer without changing that shared strategy, and
   // this tool's own answer besides is a composite assembled from a
-  // walk over many such calls, not one reading.
+  // recursive walk over many such calls, not one reading.
   return answer(
     { tool: 'GetObjectsList', detail: 'terse' },
-    async () => {
-      const [walk] = await byLevels(context, (mode) =>
-        walkParents(
-          context,
-          mode,
-          [{ type: parent_type, name: parentName }],
-          withDescriptions,
-        ),
-      );
-      if (walk?.ok) return ok(walk.objects);
-      // The first refusal anywhere in the tree, as the method answered it.
-      if (walk?.response !== undefined) {
-        return walk.response as IAdtResponse<FlatObject[], IAdtError>;
-      }
-      throw walk?.thrown;
-    },
+    () =>
+      withSequentialFallback(
+        context,
+        async () => {
+          const read = await walkParentsBatched(
+            context,
+            [{ type: parent_type, name: parentName }],
+            withDescriptions,
+          );
+          const walk = (read.ended ?? read.walks[0]) as ParentWalk;
+          if ('thrown' in walk) throw walk.thrown;
+          return walk;
+        },
+        () =>
+          collectValidObjects(
+            utilsOf(context),
+            parent_type,
+            parentName,
+            '000000',
+            withDescriptions,
+            new Set(),
+          ),
+      ),
     (objects: FlatObject[]) => {
       const result = {
         parent_name,

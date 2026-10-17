@@ -653,7 +653,33 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         // Step 10: a second request, and a task under it, the target of the
         // move. Not a second task of the pinned request: the system refuses a
         // move between two tasks of one request (TR 717, "Object can be moved
-        // between different requests only").
+        // between different requests only"). It carries the source request's
+        // target: a move to a request with another target is refused ("Object
+        // can only be moved to a request with the same target", measured).
+        logger?.info("Step 10: GetTransport — the source request's target");
+        const sourceResponse = await handleGetTransport(
+          createHandlerContext({ connection, logger }),
+          {
+            transport_number: parentTransport,
+            include_objects: false,
+            include_tasks: false,
+          },
+        );
+        expectOk(sourceResponse, 'Step 10 GetTransport', logger);
+        // GetTransport answers a transport-layer target as SAP keeps it,
+        // `/<name>/`; CreateTransport's `target_system` takes the name, which
+        // the client wraps in the slashes again.
+        const keptTarget = String(
+          parseHandlerResponse(sourceResponse)?.transport?.target_system ?? '',
+        ).trim();
+        const sourceTarget =
+          keptTarget.length > 2 &&
+          keptTarget.startsWith('/') &&
+          keptTarget.endsWith('/')
+            ? keptTarget.slice(1, -1)
+            : keptTarget;
+        logger?.info(`Step 10: source target ${sourceTarget || '(none)'}`);
+
         logger?.info(
           'Step 10: CreateTransport — a second request for the move',
         );
@@ -663,6 +689,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
             transport_type: 'workbench',
             description: 'MCP test: move target (transport-object-tools)',
             owner: targetUser,
+            ...(sourceTarget ? { target_system: sourceTarget } : {}),
           },
         );
         expectOk(secondRequestResponse, 'Step 10 CreateTransport', logger);

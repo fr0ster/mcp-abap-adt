@@ -37,6 +37,10 @@ import {
   withoutBackground,
 } from '../lib/backgroundRuns/tools.js';
 import {
+  type BatchAvailability,
+  createBatchAvailability,
+} from '../lib/batch/availability.js';
+import {
   endsCommunicationBatch,
   isBatchTool,
 } from '../lib/batch/batchTools.js';
@@ -631,14 +635,15 @@ export abstract class BaseMcpServer extends McpServer {
   private readonly systems = new WeakMap<object, KnownParameters>();
 
   /**
-   * The parameters known per destination: the resolved credential object,
-   * then the target system (`targetOf`). The same credential on the same
-   * system has the same ones, whichever session made them: a new session of
-   * them is never asked again.
+   * The record of each destination: the resolved credential object, then
+   * the target system (`targetOf`). The same credential on the same system
+   * has the same parameters, whichever session made them: a new session of
+   * them is never asked again. Its batch availability is kept beside them,
+   * learned once per destination (`BatchAvailability`).
    */
   private readonly destinationSystems = new WeakMap<
     IAuthProvider,
-    Map<string, KnownParameters>
+    Map<string, DestinationRecord>
   >();
 
   /** The destination each built connection was born for (`buildConnection`). */
@@ -652,7 +657,36 @@ export abstract class BaseMcpServer extends McpServer {
     credential: IAuthProvider,
     target: string,
   ): KnownParameters | undefined {
-    return this.destinationSystems.get(credential)?.get(target);
+    return this.destinationSystems.get(credential)?.get(target)?.known;
+  }
+
+  /** A destination's record, made on first use. */
+  private destinationRecord(destination: Destination): DestinationRecord {
+    let targets = this.destinationSystems.get(destination.credential);
+    if (targets === undefined) {
+      targets = new Map();
+      this.destinationSystems.set(destination.credential, targets);
+    }
+    let record = targets.get(destination.target);
+    if (record === undefined) {
+      record = { batchAvailability: createBatchAvailability() };
+      targets.set(destination.target, record);
+    }
+    return record;
+  }
+
+  /**
+   * The batch availability of the destination `connection` was born for
+   * (`buildConnection`); `undefined` for a connection with no destination
+   * (a host's injected one).
+   */
+  private batchAvailabilityOf(
+    connection: object,
+  ): BatchAvailability | undefined {
+    const destination = this.destinationOf.get(connection);
+    return destination === undefined
+      ? undefined
+      : this.destinationRecord(destination).batchAvailability;
   }
 
   /**
@@ -666,12 +700,7 @@ export abstract class BaseMcpServer extends McpServer {
     this.systems.set(connection, known);
     const destination = this.destinationOf.get(connection);
     if (destination !== undefined) {
-      let targets = this.destinationSystems.get(destination.credential);
-      if (targets === undefined) {
-        targets = new Map();
-        this.destinationSystems.set(destination.credential, targets);
-      }
-      targets.set(destination.target, known);
+      this.destinationRecord(destination).known = known;
     }
     if (known.information !== undefined) {
       this.leftoverSessions?.describeSystem(connection, known.information);
@@ -1321,6 +1350,9 @@ export abstract class BaseMcpServer extends McpServer {
               );
               connection = before.connection;
               const system = before.system;
+              // The call's destination's port, whichever connection
+              // its reads go on (a long read's own one included).
+              const batchAvailability = this.batchAvailabilityOf(connection);
               const context: HandlerContext = {
                 connection,
                 logger: this.logger,
@@ -1328,6 +1360,9 @@ export abstract class BaseMcpServer extends McpServer {
                 debugger: () => this.debuggerFor(),
                 onMainConnection: (send) => this.onMainConnection(signal, send),
                 ...(this.batch !== undefined ? { batch: this.batch } : {}),
+                ...(batchAvailability !== undefined
+                  ? { batchAvailability }
+                  : {}),
                 ...(this.heldLocks !== undefined
                   ? { heldLocks: this.heldLocks }
                   : {}),
@@ -2474,6 +2509,15 @@ type KnownSystemContext = Exclude<ResolvedSystemContext, null>;
 interface KnownParameters {
   parameters: ResolvedSystemContext;
   information: KnownSystemContext | undefined;
+}
+
+/**
+ * What the instance keeps per destination: its parameters once known, and
+ * whether it has the communication batch.
+ */
+interface DestinationRecord {
+  known?: KnownParameters;
+  batchAvailability: BatchAvailability;
 }
 
 interface Destination {

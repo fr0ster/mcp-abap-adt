@@ -1,6 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type { BackgroundRunTools } from '../lib/backgroundRuns/port';
+import type { BatchAvailability } from '../lib/batch/availability';
 import type { InstanceBatch } from '../lib/batch/InstanceBatch';
 import type { DebuggerInstance } from '../lib/debugger/DebuggerInstance';
 import type { LeftoverSessions } from '../lib/leftoverSessions/LeftoverSessions';
@@ -42,6 +43,17 @@ export interface HandlerContext {
    * `batch_mode_unavailable` then.
    */
   batch?: InstanceBatch;
+  /**
+   * Whether the call's destination has the communication batch, for the
+   * internal batches of the multi-request reads (`runPhase`,
+   * `withSequentialFallback`): the port of the destination record the
+   * dispatch found for the call — one per destination, never per
+   * connection — kept in every context derived from this one (a long
+   * call's own connection, an inner handler's). Absent where the call has
+   * no destination record (a host's injected connection): every phase then
+   * sends its envelope, and only that call falls back.
+   */
+  batchAvailability?: BatchAvailability;
   /**
    * The locks this instance holds between requests (`HeldLocks`), given by a
    * host whose instances last one request each (Streamable HTTP); absent on

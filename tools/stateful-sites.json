@@ -27,6 +27,15 @@
     "whose": "server"
   },
   {
+    "file": "src/lib/batch/phases.ts",
+    "function": "outerStatusWatch",
+    "site": "setSessionType(type)",
+    "count": 1,
+    "window": "none of its own: the forwarding connection under an internal batch's AdtBatchConnection forwards the batch connection's envelope session type to the call's connection (stateless: an internal batch only reads, so its envelopes are stateless ones)",
+    "stateless": "execute()'s finally restores the session type the call's connection had before the batch, through this member",
+    "whose": "server"
+  },
+  {
     "file": "src/lib/batch/recorder.ts",
     "function": "createRecorder",
     "site": "setSessionType(type)",

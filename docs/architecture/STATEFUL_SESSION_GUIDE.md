@@ -56,7 +56,8 @@ reach into the connection's session.
   `HandlerUpdate` and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
   and reach the SAP session that holds the lock — without it they reach another instance and are
   refused, sending nothing. A request with the same credential headers works on the held
-  connection; another credential retires it, and its logoff releases the lock. The hold ends at the
+  connection; another credential retires it, and its logoff releases the lock — the instance then
+  holds that session's locks no more, as after a session SAP lost. The hold ends at the
   `UNLOCK`. Compact `HandlerUpdate` is the write alone and
   always takes the `lock_handle`.
 - **A tool call cannot be cancelled**: a client's cancel aborts nothing — the call

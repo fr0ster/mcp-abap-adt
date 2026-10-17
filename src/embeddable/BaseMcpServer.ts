@@ -926,6 +926,8 @@ export abstract class BaseMcpServer extends McpServer {
   private retire(entry: BuiltConnection): void {
     if (this.built === entry) this.built = undefined;
     entry.retired = true;
+    // The locks the instance held in that session end with it.
+    if (entry.ready !== undefined) this.heldLocks?.mainSessionEnded();
     entry.connection.then(
       (connection) => {
         if (entry.users === 0) void endConnection(connection);

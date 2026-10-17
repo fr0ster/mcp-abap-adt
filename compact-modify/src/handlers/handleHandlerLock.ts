@@ -36,7 +36,12 @@ export async function handleHandlerLock(
     object_type: lowType,
     super_package: args.super_package,
   })) as LockAnswer;
-  return keptLock(context, answered);
+  // A package lock over RFC lives in a session of its own.
+  return keptLock(
+    context,
+    answered,
+    args.object_type === 'PACKAGE' ? 'own' : 'main',
+  );
 }
 
 type LockAnswer = {
@@ -50,7 +55,11 @@ type LockAnswer = {
  * `state_handle`. An empty handle (a service binding open in an editing
  * session) holds nothing.
  */
-function keptLock(context: HandlerContext, answered: LockAnswer): LockAnswer {
+function keptLock(
+  context: HandlerContext,
+  answered: LockAnswer,
+  session: 'main' | 'own',
+): LockAnswer {
   const locks = context.heldLocks;
   const text = answered?.content?.[0]?.text;
   if (locks === undefined || answered?.isError || text === undefined) {
@@ -64,7 +73,7 @@ function keptLock(context: HandlerContext, answered: LockAnswer): LockAnswer {
   }
   const handle = body.lock_handle;
   if (typeof handle !== 'string' || handle === '') return answered;
-  locks.hold(handle);
+  locks.hold(handle, session);
   if (context.state !== undefined) body.state_handle = context.state.handle;
   return {
     ...answered,

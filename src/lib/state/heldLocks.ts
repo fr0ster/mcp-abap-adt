@@ -21,14 +21,37 @@ import type { StatePart } from './InstanceState';
 export const LOCK_NOT_HELD_WORDS =
   "lock_handle is not held by this instance: send the state_handle HandlerLock answered in the request's x-mcp-state-handle header";
 
+/**
+ * Where a lock lives: the instance's own SAP session (`main`), or a session
+ * of its own (a package lock over RFC), which the instance's connection
+ * changes do not end.
+ */
+export type LockSession = 'main' | 'own';
+
 export class HeldLocks implements StatePart {
-  private readonly handles = new Set<string>();
+  private readonly handles = new Map<string, LockSession>();
   private readonly listeners: Array<() => void> = [];
 
-  /** Keeps `handle` as held by this instance. */
-  hold(handle: string): void {
-    this.handles.add(handle);
+  /** Keeps `handle` as held by this instance, in `session`. */
+  hold(handle: string, session: LockSession = 'main'): void {
+    this.handles.set(handle, session);
     this.notify();
+  }
+
+  /**
+   * The instance's SAP session ended — its connection retired for another
+   * credential, or replaced after SAP lost the session: the locks it held
+   * went with it, and are held no more.
+   */
+  mainSessionEnded(): void {
+    let changed = false;
+    for (const [handle, session] of this.handles) {
+      if (session === 'main') {
+        this.handles.delete(handle);
+        changed = true;
+      }
+    }
+    if (changed) this.notify();
   }
 
   /** Whether `handle` is held by this instance. */

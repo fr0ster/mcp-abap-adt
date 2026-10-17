@@ -11,12 +11,43 @@
  */
 
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
-import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { basicHeaders, type HttpStand, httpStand, until } from './shutdown/harness';
+import type {
+  HandlerContext,
+  IHandlerGroup,
+} from '@mcp-abap-adt/lib/handlers';
+import {
+  basicHeaders,
+  type HttpStand,
+  httpStand,
+  turns,
+  until,
+} from './shutdown/harness';
 
 jest.setTimeout(30_000);
 
 const placeholder = { connection: undefined } as unknown as HandlerContext;
+
+/** `LoseSession`: marks its connection's session lost, as SAP's answer would. */
+const loseGroup: IHandlerGroup = {
+  getName: () => 'lose-session',
+  registerHandlers: () => {},
+  getHandlers: () => [
+    {
+      toolDefinition: {
+        name: 'LoseSession',
+        description: 'marks the session lost',
+        inputSchema: { type: 'object', properties: {} },
+      } as never,
+      handler: (async (
+        context: { connection: { isConnected?: () => boolean } },
+        _args: unknown,
+      ) => {
+        context.connection.isConnected = () => false;
+        return { content: [{ type: 'text', text: 'lost' }] };
+      }) as never,
+    },
+  ],
+} as unknown as IHandlerGroup;
 
 let s: HttpStand;
 
@@ -40,11 +71,13 @@ const UPDATE = {
 beforeEach(async () => {
   jest.spyOn(console, 'error').mockImplementation(() => {});
   s = await httpStand({
-    groups: [new CompactModifyHandlersGroup(placeholder)],
+    groups: [new CompactModifyHandlersGroup(placeholder), loseGroup],
   });
 });
 
 afterEach(async () => {
+  // The server logs a request's end after its answer went out.
+  await turns(20);
   await s.close();
   jest.restoreAllMocks();
 });
@@ -126,7 +159,7 @@ it('without the header the write and the unlock are refused, sending nothing', a
   expect(poolSize()).toBe(1);
 });
 
-it('another credential on the held instance retires its connection: the write goes on a new session', async () => {
+it('another credential retires the held connection, and the lock ends with its session: the write is refused, sending nothing', async () => {
   const { lockHandle, stateHandle } = await lock();
   const other = {
     ...basicHeaders(s.standIn.url),
@@ -138,7 +171,21 @@ it('another credential on the held instance retires its connection: the write go
     { ...UPDATE, lock_handle: lockHandle },
     withHeader(stateHandle, other),
   );
-  expect(updated.status).toBe(200);
-  expect(puts()).toHaveLength(1);
-  expect(puts()[0]?.session).not.toBe(lockRequests()[0]?.session);
+  expect(updated.isError).toBe(true);
+  expect(updated.text).toContain('lock_handle is not held by this instance');
+  expect(puts()).toEqual([]);
+});
+
+it('a session SAP lost takes its locks with it: the write on the replacement session is refused, sending nothing', async () => {
+  const { lockHandle, stateHandle } = await lock();
+  const lost = await s.call('LoseSession', {}, withHeader(stateHandle));
+  expect(lost.isError).toBe(false);
+  const updated = await s.call(
+    'HandlerUpdate',
+    { ...UPDATE, lock_handle: lockHandle },
+    withHeader(stateHandle),
+  );
+  expect(updated.isError).toBe(true);
+  expect(updated.text).toContain('lock_handle is not held by this instance');
+  expect(puts()).toEqual([]);
 });

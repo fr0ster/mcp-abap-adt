@@ -1106,9 +1106,14 @@ transport's options only:
   `x-mcp-state-handle` header with `HandlerUpdate` and `HandlerUnlock` under that lock — without
   it they are refused, sending nothing ("lock_handle is not held by this instance …"). A request
   of the pooled instance with the same credential headers works on its held SAP session; another
-  credential retires it. **A service binding open in an editing session**: its LOCK answers `403`,
-  read as a lock with an empty `lock_handle` (as the full set's publication reads it); `HandlerUpdate`
-  SERVICE_BINDING takes that empty `lock_handle` and sends the publication.
+  credential retires it, and the locks of the retired session — as of a session SAP lost — are held
+  no more: a later `HandlerUpdate` or `HandlerUnlock` under them is refused, sending nothing; lock
+  again. In batch mode the same chain holds across batches: the locks a lock batch recorded are held
+  once `BatchEnd` answered them, and the write and unlock batches send the instance's
+  `state_handle`. **A service binding open in an editing session**: its LOCK answers `403`, read as
+  a lock with an empty `lock_handle` (as the full set's publication reads it); `HandlerUpdate`
+  SERVICE_BINDING takes that empty `lock_handle` and sends the publication; `HandlerUnlock` with it
+  answers that there is nothing to unlock, sending nothing.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.

@@ -24,6 +24,7 @@ import {
   compactUpdateSchema,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { HeldLocks } from '@mcp-abap-adt/lib/state';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
 import {
   resetSystemContextCache,
@@ -517,6 +518,30 @@ describe('HandlerLock and HandlerUnlock take the service types', () => {
     expect(held.sent).toHaveLength(1);
     expect(held.sent[0].method).toBe('POST');
   });
+
+  it.each([
+    ['without held locks', undefined],
+    ['with held locks (Streamable HTTP)', new HeldLocks()],
+  ])(
+    'unlocking a service binding with an empty lock_handle, %s: nothing to unlock, nothing sent',
+    async (_where, heldLocks) => {
+      const answered = await run('answered', (context) =>
+        handleHandlerUnlock(
+          { ...context, ...(heldLocks ? { heldLocks } : {}) } as HandlerContext,
+          {
+            object_type: 'SERVICE_BINDING' as never,
+            object_name: 'ZSRVB_A',
+            lock_handle: '',
+          },
+        ),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).not.toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        'Nothing to unlock: the service binding holds no lock handle',
+      );
+    },
+  );
 
   it('a 403 LOCK of another type stays a refusal', async () => {
     const refused = await run('forbidden', (context) =>

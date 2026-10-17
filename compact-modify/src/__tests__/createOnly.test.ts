@@ -19,6 +19,7 @@ import type {
   CompactHandler,
   CompactObjectType,
 } from '@mcp-abap-adt/lib/compact-shared';
+import { compactCreateSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { LOCK_SUCCESS_XML } from '../../../src/__tests__/helpers/recordingConnection';
 import {
@@ -122,6 +123,14 @@ const TRANSPORT_DOCUMENT =
 /** The answer body per type, where an empty one is not an answer of a create. */
 const BODY: Record<string, string> = { TRANSPORT: TRANSPORT_DOCUMENT };
 
+/**
+ * What the high create requires beyond what its create request carries (its
+ * later steps' input): given to it alone, and refused beside create_only.
+ */
+const HIGH_ONLY: Record<string, Record<string, unknown>> = {
+  STRUCTURE: { fields: [{ name: 'FIELD_A', data_type: 'CHAR', length: 10 }] },
+};
+
 /** The high create the create route runs for `objectType`, called directly. */
 const highCreate =
   (objectType: string, fields: Record<string, unknown>) =>
@@ -129,7 +138,11 @@ const highCreate =
     (
       compactWriteRouterMap[objectType as CompactObjectType]
         .create as CompactHandler
-    )(context, { object_type: objectType, ...fields });
+    )(context, {
+      object_type: objectType,
+      ...fields,
+      ...HIGH_ONLY[objectType],
+    });
 
 /** The types `create_only` is offered for, each with arguments its create needs. */
 const OFFERED: Array<[string, Record<string, unknown>]> = [
@@ -145,16 +158,7 @@ const OFFERED: Array<[string, Record<string, unknown>]> = [
   ['DATA_ELEMENT', { data_element_name: 'ZDTEL_A', package_name: 'ZPKG_A' }],
   ['TRANSPORT', { description: 'A request' }],
   ['TABLE', { table_name: 'ZTAB_A', package_name: 'ZPKG_A' }],
-  [
-    'STRUCTURE',
-    {
-      structure_name: 'ZSTRU_A',
-      package_name: 'ZPKG_A',
-      // The high create refuses a structure with no field; the create
-      // request carries none, so create_only sends the same without them.
-      fields: [{ name: 'FIELD_A', data_type: 'CHAR', length: 10 }],
-    },
-  ],
+  ['STRUCTURE', { structure_name: 'ZSTRU_A', package_name: 'ZPKG_A' }],
   ['DDL', { ddl_name: 'ZDDL_A', package_name: 'ZPKG_A' }],
   [
     'SERVICE_DEFINITION',
@@ -294,12 +298,14 @@ describe('HandlerCreate create_only', () => {
         handleHandlerCreate(context, {
           object_type: objectType,
           ...fields,
+          ...HIGH_ONLY[objectType],
         } as never),
       );
       const off = await run('answered', (context) =>
         handleHandlerCreate(context, {
           object_type: objectType,
           ...fields,
+          ...HIGH_ONLY[objectType],
           create_only: false,
         } as never),
       );
@@ -325,4 +331,271 @@ describe('HandlerCreate create_only', () => {
     expect(only.sent).toEqual([]);
     expect(only.answer).toEqual(plain.answer);
   });
+});
+
+/**
+ * Beside `create_only`, an argument the create does not send is refused, not
+ * dropped (the controller's ruling). What each type's create request carries,
+ * as measured — kept here independently of the handler's own list, so a list
+ * widened there turns this red.
+ */
+const CARRIES: Record<string, string[]> = {
+  PACKAGE: [
+    'package_name',
+    'super_package',
+    'description',
+    'package_type',
+    'software_component',
+    'transport_layer',
+    'transport_request',
+    'record_changes',
+    'application_component',
+    'master_language',
+  ],
+  DOMAIN: ['domain_name', 'master_language'],
+  DATA_ELEMENT: ['data_element_name', 'master_language'],
+  TRANSPORT: ['transport_type', 'target_system', 'owner'],
+  TABLE: ['table_name', 'master_language'],
+  STRUCTURE: ['structure_name', 'master_language'],
+  DDL: ['ddl_name', 'master_language'],
+  SERVICE_DEFINITION: ['service_definition_name', 'master_language'],
+  SERVICE_BINDING: [
+    'service_binding_name',
+    'service_definition_name',
+    'service_name',
+    'service_version',
+    'binding_variant',
+    'master_language',
+  ],
+  CLASS: [
+    'class_name',
+    'superclass',
+    'final',
+    'abstract',
+    'create_protected',
+    'master_language',
+  ],
+  PROGRAM: ['program_name', 'program_type', 'application', 'master_language'],
+  INTERFACE: ['interface_name', 'master_language'],
+  FUNCTION_GROUP: ['function_group_name', 'master_language'],
+  FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
+  BEHAVIOR_DEFINITION: [
+    'name',
+    'root_entity',
+    'implementation_type',
+    'master_language',
+  ],
+  BEHAVIOR_IMPLEMENTATION: ['class_name', 'behavior_definition'],
+  METADATA_EXTENSION: ['name', 'master_language'],
+};
+
+/** Accepted for every type: the ruling's common three, and what is not a request argument. */
+const ACCEPTED_EVERYWHERE = [
+  'object_type',
+  'create_only',
+  'detail',
+  'transport_request',
+  'package_name',
+  'description',
+];
+
+/**
+ * Accepted though the request was measured not to carry them — the ruling's
+ * common three where adt-clients' create does not send them, and what a
+ * create() takes in its config without sending it. Named so the probe below
+ * does not expect them on the wire.
+ */
+const ACCEPTED_NOT_SENT: Record<string, string[]> = {
+  TRANSPORT: ['transport_request', 'package_name'],
+  TABLE: ['description'],
+  SERVICE_BINDING: ['transport_request'],
+  FUNCTION_MODULE: ['package_name'],
+  METADATA_EXTENSION: ['transport_request'],
+  BEHAVIOR_DEFINITION: ['root_entity'],
+  BEHAVIOR_IMPLEMENTATION: ['behavior_definition'],
+  CLASS: ['abstract'],
+};
+
+/** A value an accepted argument may take, so the create still builds. */
+const SAMPLE: Record<string, unknown> = {
+  transport_request: 'XXXK900001',
+  transport_type: 'workbench',
+  binding_variant: 'ODATA_V4_UI',
+  program_type: 'executable',
+  implementation_type: 'Managed',
+  record_changes: true,
+  final: true,
+  abstract: true,
+  create_protected: true,
+  master_language: 'EN',
+};
+
+const schemaProperties = compactCreateSchema.properties as Record<
+  string,
+  { type?: string }
+>;
+
+/** Arguments the compact create does not name, which a caller may still send. */
+const UNNAMED = ['source_code', 'response_format'];
+
+/** A value of `name`'s kind and its empty one (`false`, `0`, `''`, `[]`). */
+function valuesOf(name: string): Array<[string, unknown]> {
+  switch (schemaProperties[name]?.type) {
+    case 'boolean':
+      return [
+        ['true', true],
+        ['false', false],
+      ];
+    case 'number':
+      return [
+        ['1', 1],
+        ['0', 0],
+      ];
+    case 'array':
+      return [
+        ['[x]', [{}]],
+        ['[]', []],
+      ];
+    default:
+      return [
+        ["'X'", 'X'],
+        ["''", ''],
+      ];
+  }
+}
+
+type NotSentCase = [string, string, string, unknown];
+
+/** Per offered type, every argument the create does not send, with each value tried. */
+function notSentCases(objectType: string): NotSentCase[] {
+  const accepted = new Set([
+    ...ACCEPTED_EVERYWHERE,
+    ...CARRIES[objectType],
+    'activate',
+  ]);
+  const cases: NotSentCase[] = [];
+  for (const name of [...Object.keys(schemaProperties), ...UNNAMED]) {
+    if (accepted.has(name)) continue;
+    for (const [shown, value] of valuesOf(name)) {
+      cases.push([objectType, name, shown, value]);
+    }
+  }
+  return cases;
+}
+
+const NOT_SENT_CASES = OFFERED.flatMap(([objectType]) =>
+  notSentCases(objectType),
+);
+
+const OFFERED_FIELDS = new Map(OFFERED);
+
+describe('HandlerCreate create_only beside an argument its create does not send', () => {
+  beforeEach(() => {
+    setSystemContext({
+      masterSystem: 'SYSTEM_PLACEHOLDER',
+      responsible: 'USER_PLACEHOLDER',
+    });
+  });
+  afterEach(() => resetSystemContextCache());
+
+  const fieldsOf = (objectType: string) => OFFERED_FIELDS.get(objectType) ?? {};
+
+  it.each(NOT_SENT_CASES)(
+    '%s with %s = %s: refused before any request, naming it',
+    async (objectType, name, _shown, value) => {
+      const answered = await run(
+        'answered',
+        createOnly(objectType, { ...fieldsOf(objectType), [name]: value }),
+      );
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(answered.answer?.content?.[0]?.text).toContain(
+        `create_only sends the create alone: ${name} is not sent — leave it out, or create without create_only`,
+      );
+    },
+  );
+
+  it.each(OFFERED.map(([type]) => [type]))(
+    '%s with activate true: refused before any request; activate false is accepted',
+    async (objectType) => {
+      const on = await run(
+        'answered',
+        createOnly(objectType, { ...fieldsOf(objectType), activate: true }),
+      );
+      expect(on.sent).toEqual([]);
+      expect(on.answer?.content?.[0]?.text).toContain(
+        'create_only sends the create alone: activate is not sent — leave it out, or create without create_only',
+      );
+      const off = await run(
+        'pending',
+        createOnly(objectType, { ...fieldsOf(objectType), activate: false }),
+      );
+      expect(off.sent).toHaveLength(1);
+    },
+  );
+
+  it('names every argument it does not send', async () => {
+    const answered = await run(
+      'answered',
+      createOnly('STRUCTURE', {
+        ...fieldsOf('STRUCTURE'),
+        fields: [],
+        activate: true,
+      }),
+    );
+    expect(answered.sent).toEqual([]);
+    expect(answered.answer?.content?.[0]?.text).toContain(
+      'create_only sends the create alone: fields, activate are not sent',
+    );
+  });
+
+  it.each(OFFERED.map(([type]) => [type]))(
+    '%s: every argument it accepts, given at once, still sends the one create',
+    async (objectType) => {
+      const fields: Record<string, unknown> = { ...fieldsOf(objectType) };
+      for (const name of [
+        'transport_request',
+        'package_name',
+        'description',
+        'detail',
+        ...CARRIES[objectType],
+      ]) {
+        if (fields[name] === undefined) {
+          fields[name] =
+            name === 'detail' ? 'full' : (SAMPLE[name] ?? `ZACC_${name}`);
+        }
+      }
+      const held = await run('pending', createOnly(objectType, fields));
+      expect(held.sent).toHaveLength(1);
+      expect(held.sent[0].method).toBe('POST');
+    },
+  );
+
+  it.each(OFFERED.map(([type]) => [type]))(
+    '%s: each accepted string argument reaches the create request',
+    async (objectType) => {
+      const unsent = new Set(ACCEPTED_NOT_SENT[objectType] ?? []);
+      const probed = [
+        'transport_request',
+        'package_name',
+        'description',
+        ...CARRIES[objectType],
+      ].filter((name) => !unsent.has(name) && SAMPLE[name] === undefined);
+      for (const name of new Set(probed)) {
+        const marker = `QPROBE${name.replace(/_/g, '').toUpperCase()}`;
+        const held = await run(
+          'pending',
+          createOnly(objectType, { ...fieldsOf(objectType), [name]: marker }),
+        );
+        const wire = held.sent
+          .map((sent) => `${sent.url} ${String(sent.data)}`)
+          .join(' ')
+          .toUpperCase();
+        expect({ name, carried: wire.includes(marker) }).toEqual({
+          name,
+          carried: true,
+        });
+      }
+    },
+  );
 });

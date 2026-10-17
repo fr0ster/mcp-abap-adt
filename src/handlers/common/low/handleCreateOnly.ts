@@ -14,7 +14,18 @@
  * Where the high create already sends that one request and nothing else
  * (PACKAGE, TRANSPORT, TABLE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_MODULE,
  * BEHAVIOR_IMPLEMENTATION), it is that handler, so the two cannot drift; the
- * others call the create step of their high create here. Each type is proven
+ * others call the create step of their high create here.
+ *
+ * **An argument the create does not send is refused, not dropped** (the
+ * controller's ruling, the principle the owner set for `document` beside the
+ * flat fields): present (`!== undefined`) beside `create_only`, before any
+ * request — `activate` unless it is `false`, and every argument outside the
+ * type's `CREATE_CARRIES` list. Each list is what that type's create request
+ * was measured to carry and what its `create()` takes in its config (a
+ * behavior definition's `rootEntity`, a behavior implementation's
+ * `behaviorDefinition`, a class's `abstract` — taken, not on the wire), plus
+ * `transport_request`, `package_name` and `description`, which every type
+ * accepts. Each type is proven
  * to send exactly one request (`compact-modify/src/__tests__/createOnly.test.ts`).
  *
  * UNIT_TEST and CDS_UNIT_TEST have no create of one request — their create is
@@ -56,6 +67,96 @@ import { handleCreatePackage } from '../../package/high/handleCreatePackage';
 import { handleCreateProgram } from '../../program/high/handleCreateProgram';
 import { handleCreateTable } from '../../table/high/handleCreateTable';
 import { handleCreateTransport } from '../../transport/high/handleCreateTransport';
+
+/** Accepted beside `create_only` for every type: they take no part in the request. */
+const ALWAYS = ['object_type', 'create_only', 'detail'] as const;
+
+/** Accepted for every offered type (the controller's ruling). */
+const COMMON = ['transport_request', 'package_name', 'description'] as const;
+
+/**
+ * Per type, the arguments its create request carries — measured: each string
+ * argument's value found in the request sent, each boolean or enum read off
+ * the adt-clients create that builds it — and what its `create()` takes.
+ */
+const CREATE_CARRIES: Readonly<Record<string, readonly string[]>> = {
+  PACKAGE: [
+    'package_name',
+    'super_package',
+    'package_type',
+    'software_component',
+    'transport_layer',
+    'record_changes',
+    'application_component',
+    'master_language',
+  ],
+  DOMAIN: ['domain_name', 'master_language'],
+  DATA_ELEMENT: ['data_element_name', 'master_language'],
+  TRANSPORT: ['transport_type', 'target_system', 'owner'],
+  TABLE: ['table_name', 'master_language'],
+  STRUCTURE: ['structure_name', 'master_language'],
+  DDL: ['ddl_name', 'master_language'],
+  SERVICE_DEFINITION: ['service_definition_name', 'master_language'],
+  SERVICE_BINDING: [
+    'service_binding_name',
+    'service_definition_name',
+    'service_name',
+    'service_version',
+    'binding_variant',
+    'master_language',
+  ],
+  CLASS: [
+    'class_name',
+    'superclass',
+    'final',
+    'abstract',
+    'create_protected',
+    'master_language',
+  ],
+  PROGRAM: ['program_name', 'program_type', 'application', 'master_language'],
+  INTERFACE: ['interface_name', 'master_language'],
+  FUNCTION_GROUP: ['function_group_name', 'master_language'],
+  FUNCTION_MODULE: ['function_module_name', 'function_group_name'],
+  BEHAVIOR_DEFINITION: [
+    'name',
+    'root_entity',
+    'implementation_type',
+    'master_language',
+  ],
+  BEHAVIOR_IMPLEMENTATION: ['class_name', 'behavior_definition'],
+  METADATA_EXTENSION: ['name', 'master_language'],
+};
+
+/**
+ * The arguments given beside `create_only` that the type's create does not
+ * send, in the order given: `activate` unless `false`, and every argument
+ * outside the type's list.
+ */
+function notSent(objectType: string, args: Args): string[] {
+  const carried = new Set<string>([
+    ...ALWAYS,
+    ...COMMON,
+    ...(CREATE_CARRIES[objectType] ?? []),
+  ]);
+  return Object.keys(args).filter((key) => {
+    if (args[key] === undefined) return false;
+    if (key === 'activate') return args[key] !== false;
+    return !carried.has(key);
+  });
+}
+
+/** The refusal of arguments the create alone does not send. */
+function notSentRefusal(names: string[]) {
+  const named =
+    names.length === 1
+      ? `${names[0]} is not sent`
+      : `${names.join(', ')} are not sent`;
+  return return_error(
+    new Error(
+      `create_only sends the create alone: ${named} — leave it out, or create without create_only`,
+    ),
+  );
+}
 
 type Args = Record<string, unknown> & { object_type?: string };
 
@@ -107,6 +208,13 @@ export async function handleCreateOnly(
   const packageName = text(args.package_name) ?? '';
   const transportRequest = text(args.transport_request);
   const masterLanguage = text(args.master_language);
+
+  const objectType = String(args.object_type);
+  if (CREATE_CARRIES[objectType] === undefined) {
+    return createOnlyRefusal(objectType);
+  }
+  const ignored = notSent(objectType, args);
+  if (ignored.length > 0) return notSentRefusal(ignored);
 
   switch (args.object_type) {
     case 'PACKAGE':

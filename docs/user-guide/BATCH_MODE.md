@@ -67,7 +67,11 @@ validation, lock, write, check or activation; the object is created inactive wit
 carries — and works outside batch mode too, as that one request. It is offered for every type of
 the create route but `UNIT_TEST` and `CDS_UNIT_TEST`, whose create sends more than one request:
 they refuse it ("create_only is not available for <type>: its create sends more than one
-request") before anything is sent. A `PACKAGE` is recorded over HTTP only: over RFC a package is
+request") before anything is sent. Beside `create_only` an argument the create does not send is
+refused before anything is sent, not dropped — `activate` (unless `false`), and anything the
+type's create request does not carry (`fields`, `source_code`, `fixed_values`,
+`test_class_source`, …): "create_only sends the create
+alone: <argument> is not sent — leave it out, or create without create_only". A `PACKAGE` is recorded over HTTP only: over RFC a package is
 created in an ABAP session of its own, outside the batch.
 
 Only LOCK and UNLOCK go stateful, in their own envelopes, as adt-clients sends them; everything

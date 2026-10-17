@@ -105,5 +105,5 @@ export async function handleGetUnitTestResultOnce(
   args: ResultOnceArgs,
   tool = 'HandlerUnitTestResult',
 ) {
-  return readResultOnce(context, tool, args);
+  return readResultOnce(context, tool, 'read unit test result', args);
 }

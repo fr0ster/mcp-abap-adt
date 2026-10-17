@@ -1209,7 +1209,9 @@ transport's options only:
   the one `GET /sap/bc/adt/abapunit/results/{run_id}` and answer `{ success, run_id, run_result }`,
   the result document SAP answered, parsed (`detail: "raw"`: the document itself). The status is
   no longer read first: a result read before the run finished is whatever SAP answers for it,
-  answered as it came; a finished run's result carries `executionTime` on each test method. 18.x
+  answered as it came; a finished run's result carries `executionTime` on each test method. A
+  failure is the method's error with `step: "read unit test result"` (CDS:
+  `"read CDS unit test result"`). 18.x
   read the status first inside the call — up to five status reads with long polling, back to back,
   and the result only once one said `FINISHED` (as read from 18.x's code, not measured) — and
   answered `finished: true` with `run_result` (`HandlerGet` also `run_status`), or

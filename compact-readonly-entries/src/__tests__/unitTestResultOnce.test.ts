@@ -86,32 +86,38 @@ const RESULT_CALLS: Array<
     string,
     (context: HandlerContext, args: never) => unknown,
     Record<string, unknown>,
+    string,
   ]
 > = [
   [
     'HandlerUnitTestResult',
     handleHandlerUnitTestResult as never,
     { run_id: 'RUN_A' },
+    'read unit test result',
   ],
   [
     'HandlerCdsUnitTestResult',
     handleHandlerCdsUnitTestResult as never,
     { run_id: 'RUN_A' },
+    'read CDS unit test result',
   ],
   [
     'HandlerGet UNIT_TEST',
     handleHandlerGet as never,
     { object_type: 'UNIT_TEST', run_id: 'RUN_A' },
+    'read unit test result',
   ],
   [
     'HandlerGet CDS_UNIT_TEST',
     handleHandlerGet as never,
     { object_type: 'CDS_UNIT_TEST', run_id: 'RUN_A' },
+    'read CDS unit test result',
   ],
   [
     'HandlerGet UNIT_TEST part source',
     handleHandlerGet as never,
     { object_type: 'UNIT_TEST', part: 'source', run_id: 'RUN_A' },
+    'read unit test result',
   ],
 ];
 
@@ -119,7 +125,7 @@ const FINISHED_SENTENCE =
   "Valid once the status is FINISHED; a finished run's result carries executionTime.";
 
 describe('compact unit-test results are read once', () => {
-  describe.each(RESULT_CALLS)('%s', (_label, handler, args) => {
+  describe.each(RESULT_CALLS)('%s', (_label, handler, args, step) => {
     it('exactly one request, getResult — no status poll', async () => {
       const timer = jest.spyOn(global, 'setTimeout');
       try {
@@ -144,6 +150,7 @@ describe('compact unit-test results are read once', () => {
 
         expect(refused.answer?.isError).toBe(true);
         expect(jsonOf(refused.answer).status).toBe(404);
+        expect(jsonOf(refused.answer).step).toBe(step);
       } finally {
         timer.mockRestore();
       }

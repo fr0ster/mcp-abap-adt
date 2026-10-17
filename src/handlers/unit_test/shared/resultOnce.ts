@@ -14,6 +14,7 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { testRunner } from './runTests';
 
@@ -25,12 +26,13 @@ export interface ResultOnceArgs {
 }
 
 /**
- * `getResult` alone: `{ success, run_id, run_result }`, `run_result` the
+ * `getResult` alone, a failure carrying `step`: `{ success, run_id, run_result }`, `run_result` the
  * parse of SAP's document (`detail: 'raw'`: the document itself).
  */
 export async function readResultOnce(
   context: HandlerContext,
   tool: string,
+  step: string,
   args: ResultOnceArgs,
 ) {
   const runId = typeof args?.run_id === 'string' ? args.run_id.trim() : '';
@@ -41,12 +43,13 @@ export async function readResultOnce(
 
   return answer(
     { tool, detail },
-    () =>
+    atStep(step, () =>
       runner.getResult(runId, {
         analyse: analyseException,
         withNavigationUris: args.with_navigation_uris,
         format: args.format,
       }),
+    ),
     (result: AdtReading<unknown>) => ({
       success: true,
       run_id: runId,

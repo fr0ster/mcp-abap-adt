@@ -106,5 +106,5 @@ export async function handleGetCdsUnitTestResultOnce(
   args: ResultOnceArgs,
   tool = 'HandlerCdsUnitTestResult',
 ) {
-  return readResultOnce(context, tool, args);
+  return readResultOnce(context, tool, 'read CDS unit test result', args);
 }

@@ -1584,7 +1584,9 @@ export abstract class BaseMcpServer extends McpServer {
    * answers nothing (`{ content: [] }`) once it recorded; the handler goes on
    * and builds its answer when `BatchEnd` settles its parts — the answer of
    * its number. A handler that settled without recording answers its own
-   * answer, with no number. The late-bound target points at the call's
+   * answer, with no number — or, when its request was of another session
+   * kind than the batch holds, the refusal `batch_other_kind` (every batch
+   * end sends one envelope). The late-bound target points at the call's
    * connection for its turn.
    */
   private async recordCall(call: {
@@ -1643,16 +1645,21 @@ export abstract class BaseMcpServer extends McpServer {
         started = resolve;
       },
     );
-    const recorder = createRecorder(open.connection, owner, (number) => {
-      open.recorded.push({
-        number,
-        answer: handlerStarted.then(({ handler }) =>
-          this.recordedAnswer(number, handler, owner, () =>
-            recorder.rawParts(),
+    const recorder = createRecorder(
+      open.connection,
+      owner,
+      (number) => {
+        open.recorded.push({
+          number,
+          answer: handlerStarted.then(({ handler }) =>
+            this.recordedAnswer(number, handler, owner, () =>
+              recorder.rawParts(),
+            ),
           ),
-        ),
-      });
-    });
+        });
+      },
+      call.tool,
+    );
     const recordedContext: HandlerContext = {
       ...call.context,
       connection: recorder as unknown as AbapConnection,
@@ -1688,6 +1695,10 @@ export abstract class BaseMcpServer extends McpServer {
       started({ handler });
       await untilSent(handler, recorder);
       if (recorder.number() !== undefined) return { content: [] };
+      // A request of another session kind than the batch holds: refused
+      // before it was recorded, whatever the handler made of it — no number.
+      const otherKind = recorder.otherKind();
+      if (otherKind !== undefined) throw otherKind;
       // Settled without recording: nothing went into an envelope.
       const result = await handler;
       const content = normalizeToolContent(result) as {

@@ -1,11 +1,11 @@
 /**
  * Plain-node scenario (`plainNode.ts`): the instance close begins while
- * `BatchEnd` executes. Two calls are recorded — a LOCK (its own stateful
- * envelope) and a read (the next envelope) — and `BatchEnd` starts; the
- * first envelope is held at the instance's connection, the close begins
- * (the batch dropped), then the envelope is answered. Reports how many
- * envelopes reached the connection, the owner's state afterwards, and every
- * unhandled rejection the process saw.
+ * `BatchEnd` executes. Two reads are recorded — one stateless batch, one
+ * envelope — and `BatchEnd` starts; the envelope is held at the instance's
+ * connection, the close begins (the batch dropped), then the envelope is
+ * answered. Reports the envelopes that reached the connection (their part
+ * counts), the owner's state afterwards, and every unhandled rejection the
+ * process saw.
  */
 import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -87,15 +87,11 @@ const group = {
   getName: () => 'close-during-end',
   getHandlers: () => [
     tool('GetProgram', 'program_name', async (context, _args) => {
-      // A LOCK goes stateful, as adt-clients sends it: its own envelope.
-      context.connection.setSessionType('stateful');
-      const locked = context.connection.makeAdtRequest({
-        url: '/sap/bc/adt/programs/programs/prog_a?_action=LOCK&accessMode=MODIFY',
-        method: 'POST',
+      await context.connection.makeAdtRequest({
+        url: '/sap/bc/adt/programs/programs/prog_a/source/main',
+        method: 'GET',
         timeout: 0,
       });
-      context.connection.setSessionType('stateless');
-      await locked;
       return { isError: false, content: [{ type: 'text', text: 'a' }] };
     }),
     tool('GetInterface', 'interface_name', async (context, _args) => {

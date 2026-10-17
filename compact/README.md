@@ -25,11 +25,13 @@ one) has no use for it and should take `@mcp-abap-adt/lib` instead.
 **Batch mode: `HandlerBatch`.** Every compact binary, `-ro` ones included, on every transport,
 serves batch mode as one tool: `action: 'begin'` switches the server into batch mode, every call
 none of whose requests depends on another's answer is then recorded (it answers nothing and takes
-the next number, from 1), `action: 'end'` sends them all in ADT batch envelopes and leaves batch
+the next number, from 1), `action: 'end'` sends them all in one ADT batch envelope and leaves batch
 mode whatever happens, and `action: 'answers'` with `number` or `numbers` reads each call's answer
 by its number. A tool that builds a request from an earlier answer is refused; run such work as
 phases, each its own batch — create (`HandlerCreate` with `create_only`), lock (`HandlerLock`),
-write (`HandlerUpdate` with `lock_handle`), unlock (`HandlerUnlock`). Every tool's description ends with one sentence saying whether it is
+write (`HandlerUpdate` with `lock_handle`), unlock (`HandlerUnlock`). A batch holds one kind of
+request — LOCK, UNLOCK or stateless, as its first recorded call decides; a call of another kind is
+refused `batch_other_kind`: record it in the next batch. Every tool's description ends with one sentence saying whether it is
 recorded, for which arguments, refused, or not served in batch mode. Over Streamable HTTP send the
 `state_handle` `action: 'begin'` answers in the `x-mcp-state-handle` header on every call of the
 batch. See

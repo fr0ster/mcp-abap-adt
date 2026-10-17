@@ -223,7 +223,7 @@ goes on to its end.
 ### Batch mode
 
 Calls none of whose requests depends on another's answer can be recorded and sent together, in
-ADT batch envelopes, instead of one request each: `BatchBegin` switches the server into batch
+one ADT batch envelope, instead of one request each: `BatchBegin` switches the server into batch
 mode, every such call is then recorded, answers nothing and takes the next number (from 1, in the
 order made), `BatchEnd` sends them all and leaves batch mode whatever happens, and
 `BatchAnswers` reads each call's answer by its number — the answer the tool gives outside batch
@@ -235,7 +235,9 @@ A tool that builds a request from an earlier answer is refused in batch mode —
 create or update, a fallback after a `404`, a poll. Run such work as phases, each its own batch,
 with the single-step tools: create (`HandlerCreate` with `create_only`), lock (`HandlerLock`;
 the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`), unlock
-(`HandlerUnlock`). Every tool's description ends with
+(`HandlerUnlock`). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
+recorded call decides — so each batch end sends one envelope; a call of another kind is refused
+`batch_other_kind`: record it in the next batch. Every tool's description ends with
 one sentence saying whether it is recorded, for which arguments, refused, or not served in batch
 mode. Over Streamable HTTP, send the `state_handle` `BatchBegin` answers in the
 `x-mcp-state-handle` request header on every call of the batch. See

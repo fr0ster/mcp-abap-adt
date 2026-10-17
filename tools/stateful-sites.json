@@ -36,6 +36,24 @@
     "whose": "server"
   },
   {
+    "file": "src/lib/batch/recorder.ts",
+    "function": "createRecorder",
+    "site": "setSessionType(unswitched)",
+    "count": 1,
+    "window": "none on the wire: a request refused batch_other_kind is not recorded, so the batch connection's mode its member asked for (scoped to its next recorded request) is set back to the batch connection's default, as its own recording would; no connection is touched",
+    "stateless": "in the same call: the default is set at once (stateless for a communication batch)",
+    "whose": "server"
+  },
+  {
+    "file": "src/lib/batch/sessionKind.ts",
+    "function": "requestKind",
+    "site": "x-sap-adt-sessiontype",
+    "count": 1,
+    "window": "none: reads a request's session kind as adt-clients' envelopeKey does (the header a member set, or the batch connection's mode), so the recorder refuses a request of another kind than the batch holds; nothing is set",
+    "stateless": "nothing to end: it only reads",
+    "whose": "server"
+  },
+  {
     "file": "src/lib/debugger/ports.ts",
     "function": "openStateful",
     "site": "setSessionType('stateful')",

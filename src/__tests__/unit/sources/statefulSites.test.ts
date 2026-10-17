@@ -202,9 +202,13 @@ describe('every stateful site is listed with its window', () => {
   });
 
   it("the server's one stateful site is the debugger's own session", () => {
+    // The batch's session-kind reader names the header only to read it, as
+    // adt-clients' batch connection reads it: it makes nothing stateful.
+    const readsOnly = 'src/lib/batch/sessionKind.ts requestKind';
     const stateful = listed().filter(
       (r) =>
         r.whose === 'server' &&
+        `${r.file} ${r.function}` !== readsOnly &&
         (r.site.includes("'stateful'") ||
           r.site === 'restoreSessionInConnection' ||
           r.site === 'inStatefulSession' ||

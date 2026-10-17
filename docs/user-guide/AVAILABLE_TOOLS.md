@@ -3990,7 +3990,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="batchend-batch-batch"></a>
 #### BatchEnd (Batch / Batch)
-**Description:** Sends every call recorded since BatchBegin, in parallel envelopes, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with BatchAnswers.
+**Description:** Sends every call recorded since BatchBegin, in one envelope, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with BatchAnswers.
 
 **Source:** `src/handlers/batch/batch/handleBatchEnd.ts`
 
@@ -3999,4 +3999,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-10-16*
+*Last updated: 2026-10-17*

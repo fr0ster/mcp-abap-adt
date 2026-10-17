@@ -31,6 +31,7 @@ export type ServerRefusalCode =
   | 'batch_mode_other'
   | 'batch_mode_off'
   | 'batch_not_recordable'
+  | 'batch_other_kind'
   | 'batch_no_timeout'
   | 'debug_batch_amdp_unmeasured';
 
@@ -191,11 +192,26 @@ export function batchNotServedWords(tool: string): string {
   return `${tool} is not served while a batch is open`;
 }
 
+/**
+ * A call whose request is of another session kind than the open batch
+ * holds: a batch is homogeneous — LOCK, UNLOCK or stateless, as the first
+ * recorded call decided — so every batch end sends one envelope. `kind` and
+ * `holds` are the labels of `sessionKindLabel`.
+ */
+export function batchOtherKindWords(
+  tool: string,
+  kind: string,
+  holds: string,
+): string {
+  return `${tool} is a ${kind} request; this batch holds ${holds} requests — record it in the next batch`;
+}
+
 /** The refusals whose words are given at construction. */
 type WordedCode =
   | 'destination_refused'
   | 'background_run_limit'
-  | 'batch_not_recordable';
+  | 'batch_not_recordable'
+  | 'batch_other_kind';
 
 /** The refusals whose words are fixed. */
 type FixedCode = Exclude<ServerRefusalCode, WordedCode>;
@@ -239,14 +255,15 @@ export class ServerRefusal extends Error {
    * user's own input (a path they gave) — never a file's content.
    * `background_run_limit` in `backgroundRunLimitWords`.
    * `batch_not_recordable` in `batchNotRecordableWords` or
-   * `batchNotServedWords`.
+   * `batchNotServedWords`; `batch_other_kind` in `batchOtherKindWords`.
    */
   constructor(code: WordedCode, words: string);
   constructor(code: ServerRefusalCode, words?: string) {
     const text =
       code === 'destination_refused' ||
       code === 'background_run_limit' ||
-      code === 'batch_not_recordable'
+      code === 'batch_not_recordable' ||
+      code === 'batch_other_kind'
         ? (words ?? '')
         : WORDS[code];
     super(text);

@@ -20,6 +20,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { ServerRefusal } from '../auth/serverRefusal';
 import type { StatePart } from '../state/InstanceState';
 import type { LateBoundConnection } from './lateBound';
+import type { SessionKind } from './sessionKind';
 
 /** Which batch is open: none, the communication batch, or the debugger batch. */
 export type BatchMode = 'off' | 'communication' | 'debugger';
@@ -70,6 +71,8 @@ interface Opened {
   readonly controller: AbortController;
   /** The last number taken; the next is one more. */
   counter: number;
+  /** The session kind the batch holds: its first recorded request's. */
+  holds: SessionKind | undefined;
 }
 
 export class InstanceBatch implements StatePart {
@@ -105,6 +108,7 @@ export class InstanceBatch implements StatePart {
       batch: open,
       controller: new AbortController(),
       counter: 0,
+      holds: undefined,
     };
     this.changed();
   }
@@ -112,6 +116,26 @@ export class InstanceBatch implements StatePart {
   /** The open batch, or `undefined` when none is open. */
   opened(): OpenBatch | undefined {
     return this.opened_?.batch;
+  }
+
+  /**
+   * The session kind the open batch holds — LOCK, UNLOCK or stateless (a
+   * debugger batch: its one stateful kind) — decided by its first recorded
+   * request; `undefined` before it, or with no batch open. Every batch end
+   * sends one envelope: a request of another kind is refused before it is
+   * recorded (`batch_other_kind`).
+   */
+  kind(): SessionKind | undefined {
+    return this.opened_?.holds;
+  }
+
+  /**
+   * A request of `kind` was recorded: the first decides the batch's kind.
+   * Refused `batch_mode_off` with none open.
+   */
+  recorded(kind: SessionKind): void {
+    const current = this.requireOpen();
+    if (current.holds === undefined) current.holds = kind;
   }
 
   /** The next number of the open batch: 1, 2, … in the order taken. Refused `batch_mode_off` with none open. */

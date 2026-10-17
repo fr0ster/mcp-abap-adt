@@ -1,9 +1,10 @@
 # Batch Mode
 
-Batch mode records tool calls instead of sending them, then sends all of them at once, in ADT
-batch envelopes (`multipart/mixed`), and answers each call by its number. It is for work whose
+Batch mode records tool calls instead of sending them, then sends all of them at once, in one
+ADT batch envelope (`multipart/mixed`), and answers each call by its number. It is for work whose
 requests do not depend on each other: reading twenty objects, locking ten, writing ten sources
-under the locks already held, unlocking them. One envelope round trip replaces many.
+under the locks already held, unlocking them — each of these a batch of its own. One envelope
+round trip replaces many.
 
 Every binary serves it, on stdio, Streamable HTTP and SSE:
 
@@ -24,16 +25,17 @@ Every binary serves it, on stdio, Streamable HTTP and SSE:
    in the order made, from 1 — one number per call, covering every request it put into the
    batch (a `Read<Type>` sends its source and its metadata together, under its one number).
    A call refused, or one whose handler refused its arguments before sending anything, takes no
-   number.
-3. **`BatchEnd`** sends every recorded call, in envelopes, with the credentials in force now, and
+   number. A batch holds one kind of request — LOCK, UNLOCK or stateless — and its first recorded
+   call decides which; a call of another kind is refused `batch_other_kind` (see Phases).
+3. **`BatchEnd`** sends every recorded call, in one envelope, with the credentials in force now, and
    leaves batch mode whatever happens. Nothing is sent twice and nothing is retried. It answers
    `{ "recorded": <count>, "failed": [<numbers>] }` — a number fails when its answer is an error
-   — and, when the envelopes themselves failed, `came` beside it: what came for that failure (the
+   — and, when the envelope itself failed, `came` beside it: what came for that failure (the
    error as it is, with its `step`).
 4. **`BatchAnswers`** reads the answers by number: `number` (one) or `numbers` (a list, answered
    in the order given). Each answer is the answer the tool gives for that call outside batch
    mode, built from what SAP answered when `BatchEnd` sent it — its projection of a success, the
-   failure as the tool answers it, or why the request was not sent (an earlier envelope failed).
+   failure as the tool answers it, or, when the envelope failed, that failure.
    A number the last batch does not have answers `{ "number": n, "error": "no_answer", "message":
    "no answer with that number" }`.
 
@@ -75,8 +77,14 @@ implementation's `behavior_definition`, …): "create_only sends the create alon
 not sent — leave it out, or create without create_only". A `PACKAGE` is recorded over HTTP only:
 over RFC a package is created in an ABAP session of its own, outside the batch.
 
-Only LOCK and UNLOCK go stateful, in their own envelopes, as adt-clients sends them; everything
-else is stateless.
+**Every batch end sends one envelope.** Only LOCK and UNLOCK go stateful, as adt-clients sends
+them, and adt-clients puts each kind — LOCK, UNLOCK, stateless — into an envelope of its own. So a
+batch holds one kind: its first recorded call decides it, and a call of another kind is refused
+`batch_other_kind` before it records anything (no number): "<tool> is a <kind> request; this
+batch holds <kind> requests — record it in the next batch". The phases above are exactly these
+kinds: create, write, read back and check are stateless batches, lock a LOCK batch, unlock an
+UNLOCK batch — each phase its own batch, one envelope each. A call that puts several independent
+requests into the batch has every one of them of the batch's kind.
 
 ## What is refused
 
@@ -86,6 +94,7 @@ Every other call is answered at once with the server's refusal and takes no numb
 | Code | When |
 |---|---|
 | `batch_not_recordable` | the tool builds a request from another's answer, sends no request at all, or is not served while a batch is open (the debugger tools, the background-run tools, the leftover-session tools, a registry's own tools) |
+| `batch_other_kind` | the call's request is of another kind (LOCK, UNLOCK, stateless) than the open batch holds — its first recorded call decided it: record it in the next batch |
 | `batch_no_timeout` | a long read given `timeout` in batch mode: the batch is sent at `BatchEnd`, with no deadline |
 | `batch_mode_on` | `BatchBegin` while a batch is open |
 | `batch_mode_other` | the debugger batch is open |

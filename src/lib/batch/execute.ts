@@ -3,8 +3,11 @@
  *
  * The late-bound target is pointed at the connection `BatchEnd` took in its
  * turn — the instance's connection now, with the credential in force now —
- * and the batch connection's `execute()` sends every recorded request, in
- * envelopes, awaited to its end with no timeout. Every recorded handler then
+ * and the batch connection's `execute()` sends every recorded request in
+ * one envelope — the batch holds one session kind (LOCK, UNLOCK or
+ * stateless, its first recorded request's; the recorder refuses any other,
+ * `batch_other_kind`), and adt-clients starts a new envelope only where the
+ * kind changes — awaited to its end with no timeout. Every recorded handler then
  * builds its answer from all its parts. Whatever happens, batch mode ends:
  * the target is cleared and the owner ends the batch with the answers (the
  * batch connection is discarded with it, so nothing recorded can be sent

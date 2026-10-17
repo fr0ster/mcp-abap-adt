@@ -116,8 +116,9 @@ describe('the instance close while BatchEnd executes', () => {
     const report = await runPlainNode(DURING_END);
     expect(report).toEqual({
       numbers: [1, 2],
-      // The LOCK's envelope was on the wire at the drop; the read's never went.
-      envelopes: [1],
+      // The batch's one envelope, both parts, was on the wire at the drop;
+      // nothing went after it.
+      envelopes: [2],
       direct: [],
       modeAtDrop: 'off',
       mode: 'off',

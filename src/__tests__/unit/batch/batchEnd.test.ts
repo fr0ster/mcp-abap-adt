@@ -141,7 +141,10 @@ describe('BatchEnd', () => {
       object_type: 'CLASS',
       object_name: 'CLAS_A',
     });
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerLock', {
+      object_type: 'CLASS',
+      object_name: 'CLAS_B',
+    });
     const { answer, summary } = await s.end();
     expect(answer.isError).toBeFalsy();
     expect(summary).toMatchObject({ recorded: 2, failed: [1, 2] });
@@ -157,9 +160,9 @@ describe('BatchEnd', () => {
       error: 'batch_mode_off',
       message: BATCH_MODE_OFF_WORDS,
     });
-    // The lock envelope failed; the read's was never sent; nothing twice.
+    // The batch's one envelope failed; nothing twice.
     const [connection] = s.built;
-    expect(connection?.envelopes.map((e) => e.parts.length)).toEqual([1]);
+    expect(connection?.envelopes.map((e) => e.parts.length)).toEqual([2]);
     expect(s.executes).toHaveBeenCalledTimes(1);
     await s.close();
   });
@@ -175,21 +178,27 @@ describe('BatchEnd', () => {
       await s.call('GetProgram', { program_name: 'PROG_A' }),
       await s.call('GetProgram', { program_name: 'MISSING' }),
     ];
+    // The LOCK phase and the read phase, each its own batch.
     s.begin();
-    for (const answer of [
+    expect(
       await s.call('HandlerLock', {
         object_type: 'CLASS',
         object_name: 'CLAS_A',
       }),
+    ).toEqual({ content: [] });
+    expect((await s.end()).summary).toEqual({ recorded: 1, failed: [] });
+    const locked = await s.answers([1]);
+    s.begin();
+    for (const answer of [
       await s.call('GetProgram', { program_name: 'PROG_A' }),
       await s.call('GetProgram', { program_name: 'MISSING' }),
     ]) {
       expect(answer).toEqual({ content: [] });
     }
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 3, failed: [3] });
-    const entries = await s.answers([1, 2, 3]);
-    expect(entries.map((e) => e.number)).toEqual([1, 2, 3]);
+    expect(summary).toEqual({ recorded: 2, failed: [2] });
+    const entries = [...locked, ...(await s.answers([1, 2]))];
+    expect(entries.map((e) => e.number)).toEqual([1, 1, 2]);
     expect(entries.map(asAnswer)).toEqual(direct);
     expect(payloadOf(entries[0] as Answer).lock_handle).toBe(
       LOCK_HANDLE_OF_XML,
@@ -282,18 +291,14 @@ describe('BatchEnd', () => {
     await s.close();
   });
 
-  it('not-sent parts answer the not-sent error', async () => {
+  it('the one envelope failing with no answer: every part answers that failure, none "not sent"', async () => {
     const s = await batchStand({
       tools: TOOLS,
       part: sap,
-      // The lock envelope fails with no answer; the reads after it are never sent.
-      envelope: async (parts) => {
-        if (parts.some((p) => p.url.includes('_action=LOCK'))) {
-          throw Object.assign(new Error('socket hang up'), {
-            code: 'ECONNRESET',
-          });
-        }
-        return envelopeResponse(parts.map(sap));
+      envelope: async () => {
+        throw Object.assign(new Error('socket hang up'), {
+          code: 'ECONNRESET',
+        });
       },
     });
     s.begin();
@@ -301,16 +306,14 @@ describe('BatchEnd', () => {
       object_type: 'CLASS',
       object_name: 'CLAS_A',
     });
-    await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('GetInterface', { interface_name: 'INTF_A' });
+    await s.call('HandlerLock', {
+      object_type: 'CLASS',
+      object_name: 'CLAS_B',
+    });
     await s.end();
-    const [lock, read, other] = await s.answers([1, 2, 3]);
-    expect(payloadOf(lock as Answer).message).toBe('socket hang up');
-    for (const entry of [read, other]) {
+    for (const entry of await s.answers([1, 2])) {
       expect((entry as BatchAnswer).isError).toBe(true);
-      expect(payloadOf(entry as Answer).message).toBe(
-        'ADT batch request not sent because an earlier batch envelope failed',
-      );
+      expect(payloadOf(entry as Answer).message).toBe('socket hang up');
     }
     expect(s.built[0]?.envelopes).toHaveLength(1);
     await s.close();
@@ -389,10 +392,7 @@ describe('BatchEnd', () => {
       },
     });
     s.begin();
-    await s.call('HandlerLock', {
-      object_type: 'CLASS',
-      object_name: 'CLAS_A',
-    });
+    await s.call('GetInterface', { interface_name: 'INTF_A' });
     await s.call('GetProgram', { program_name: 'PROG_A' });
     await s.call('ReadClass', { class_name: 'CLAS_A' });
     const { answer } = await s.end();
@@ -411,12 +411,12 @@ describe('BatchEnd', () => {
         isError: true,
       });
     }
-    // One envelope (the lock's) went out; nothing after it.
+    // The batch's one envelope went out; nothing after it.
     expect(s.built[0]?.envelopes).toHaveLength(1);
     await s.close();
   });
 
-  it('answered refusal (cause.response.status === 401): BatchEnd answers it; the active envelope\'s part its handler\'s answer for it, later ones "not sent"', async () => {
+  it("answered refusal (cause.response.status === 401): BatchEnd answers it; every part of the one envelope its handler's answer for it", async () => {
     const refused = new AuthRefusedError(
       refusal(),
       'request',
@@ -434,22 +434,24 @@ describe('BatchEnd', () => {
       object_type: 'CLASS',
       object_name: 'CLAS_A',
     });
-    await s.call('GetProgram', { program_name: 'PROG_A' });
+    await s.call('HandlerLock', {
+      object_type: 'CLASS',
+      object_name: 'CLAS_B',
+    });
     const { answer } = await s.end();
     const expected = answerRead(failureOf(refused) as never);
     expect(answer).toEqual({ content: expected.content, isError: true });
     expect(s.owner.mode()).toBe('off');
-    const [lock, read] = await s.answers([1, 2]);
-    // SAP answered: the handler reads SAP's 401 as the method's error.
-    expect((lock as BatchAnswer).isError).toBe(true);
-    expect(payloadOf(lock as Answer)).toMatchObject({
-      origin: 'connection',
-      status: 401,
-      message: failureOf(refused)?.message,
-    });
-    expect(payloadOf(read as Answer).message).toBe(
-      'ADT batch request not sent because an earlier batch envelope failed',
-    );
+    // SAP answered: each handler reads SAP's 401 as the method's error.
+    for (const lock of await s.answers([1, 2])) {
+      expect((lock as BatchAnswer).isError).toBe(true);
+      expect(payloadOf(lock as Answer)).toMatchObject({
+        origin: 'connection',
+        status: 401,
+        message: failureOf(refused)?.message,
+      });
+    }
+    expect(s.built[0]?.envelopes).toHaveLength(1);
     await s.close();
   });
 
@@ -491,13 +493,16 @@ describe('BatchEnd', () => {
     });
     on.begin();
     await on.call('ReadClass', { class_name: 'CLAS_A' });
+    await on.end();
+    const [read] = await on.answers([1]);
+    on.begin();
     await on.call('HandlerUnlock', {
       object_type: 'CLASS',
       object_name: 'CLAS_A',
       lock_handle: LOCK_HANDLE_OF_XML,
     });
     await on.end();
-    const [read, unlock] = await on.answers([1, 2]);
+    const [unlock] = await on.answers([1]);
     expect((read as BatchAnswer).raw).toEqual([
       {
         status: 200,
@@ -518,7 +523,7 @@ describe('BatchEnd', () => {
     await on.close();
   });
 
-  it("LOCK, read, UNLOCK, read interleaved: several envelopes, each number its own call's answer", async () => {
+  it("LOCK, read, UNLOCK, read as four phases, each its own batch: one envelope each, each number its own call's answer", async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     const direct = [
       await s.call('HandlerLock', {
@@ -533,20 +538,25 @@ describe('BatchEnd', () => {
       }),
       await s.call('GetInterface', { interface_name: 'INTF_A' }),
     ];
-    s.begin();
-    await s.call('HandlerLock', {
-      object_type: 'CLASS',
-      object_name: 'CLAS_A',
-    });
-    await s.call('GetProgram', { program_name: 'PROG_A' });
-    await s.call('HandlerUnlock', {
-      object_type: 'CLASS',
-      object_name: 'CLAS_A',
-      lock_handle: LOCK_HANDLE_OF_XML,
-    });
-    await s.call('GetInterface', { interface_name: 'INTF_A' });
-    const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 4, failed: [] });
+    const entries: unknown[] = [];
+    for (const [name, args] of [
+      ['HandlerLock', { object_type: 'CLASS', object_name: 'CLAS_A' }],
+      ['GetProgram', { program_name: 'PROG_A' }],
+      [
+        'HandlerUnlock',
+        {
+          object_type: 'CLASS',
+          object_name: 'CLAS_A',
+          lock_handle: LOCK_HANDLE_OF_XML,
+        },
+      ],
+      ['GetInterface', { interface_name: 'INTF_A' }],
+    ] as const) {
+      s.begin();
+      await s.call(name, args);
+      expect((await s.end()).summary).toEqual({ recorded: 1, failed: [] });
+      entries.push(...(await s.answers([1])));
+    }
     expect(
       s.built[0]?.envelopes.map((e) => ({
         session: e.session,
@@ -558,7 +568,6 @@ describe('BatchEnd', () => {
       { session: 'stateful', parts: ['POST'] },
       { session: 'stateless', parts: ['GET'] },
     ]);
-    const entries = await s.answers([1, 2, 3, 4]);
     expect(entries.map(asAnswer)).toEqual(direct);
     await s.close();
   });

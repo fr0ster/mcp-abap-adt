@@ -48,6 +48,7 @@ export type FailureCode =
   | 'batch_mode_other'
   | 'batch_mode_off'
   | 'batch_not_recordable'
+  | 'batch_other_kind'
   | 'batch_no_timeout'
   | 'debug_batch_amdp_unmeasured';
 

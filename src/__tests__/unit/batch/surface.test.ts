@@ -54,7 +54,7 @@ const isCompact = (kind: ToolSetKind) =>
 const BEGIN_WORDS =
   "Switches this server into batch mode: from now on each call of a tool none of whose requests depends on another's answer is recorded instead of sent, and returns nothing. Every recorded call is numbered, in the order made, from 1. A tool that builds a request from an earlier answer is refused in batch mode; use the low-level tools (compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. BatchEnd sends the recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle this answers in the request header on every call of the batch.";
 const END_WORDS =
-  'Sends every call recorded since BatchBegin, in parallel envelopes, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with BatchAnswers.';
+  'Sends every call recorded since BatchBegin, in one envelope, with the credentials in force now, and leaves batch mode whatever happens; nothing is sent twice. Answers how many calls were recorded and which numbers failed; read each answer with BatchAnswers.';
 const ANSWERS_WORDS =
   "The answers of the last batch, by number: each is the answer the tool gives for that call, built when BatchEnd sent it — SAP's answer or why it was not sent. A number the last batch does not have answers: no answer with that number.";
 const ELIGIBLE_WORDS =

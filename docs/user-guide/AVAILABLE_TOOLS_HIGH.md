@@ -2393,4 +2393,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`. Each tool's descript
 
 ---
 
-*Last updated: 2026-10-16*
+*Last updated: 2026-10-17*

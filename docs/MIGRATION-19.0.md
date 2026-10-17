@@ -1371,7 +1371,10 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `MCP_BATCH_KEEP_RAW_PARTS` / YAML `batch.keepRawParts` (default `false`, read by
   `readBatchKeepRawParts`). `ServerRefusalCode` / `FailureCode` add `batch_mode_unavailable`,
   `batch_mode_on`, `batch_mode_other`, `batch_mode_off`, `batch_not_recordable`,
-  `batch_no_timeout` and `debug_batch_amdp_unmeasured`.
+  `batch_other_kind`, `batch_no_timeout` and `debug_batch_amdp_unmeasured`. A batch holds one
+  session kind — LOCK, UNLOCK or stateless, `InstanceBatch.kind()`, decided by its first recorded
+  request — so every batch end sends one envelope; a call whose request is of another kind is
+  refused `batch_other_kind` before it records anything.
   **The batch tools are a group of their own**: `BatchHandlersGroup` (`BatchBegin`, `BatchEnd`,
   `BatchAnswers`; `@mcp-abap-adt/lib/handlers`) is in every full tool set, `-ro` included, and the
   compact sets serve `HandlerBatch` (`CompactBatchHandlersGroup`). `EmbeddableMcpServer`'s default

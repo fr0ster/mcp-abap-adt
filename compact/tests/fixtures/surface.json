@@ -175,26 +175,26 @@
   },
   {
     "group": "compact",
-    "name": "HandlerDebugStart",
-    "inputs": "kind*, breakpoints*, take_over, request_user, debugging_mode, settings, run, detail",
+    "name": "HandlerDebugBreakpoints",
+    "inputs": "state_handle, kind*, operation*, breakpoints, sync_scope, sync_objects, breakpoint_id, variable_name, condition, watchpoint_id, request_user, debugging_mode, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
-    "name": "HandlerDebugWait",
-    "inputs": "state_handle*, hold_seconds, detail",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "compact",
-    "name": "HandlerDebugView",
-    "inputs": "state_handle*, what*, names, detail",
+    "name": "HandlerDebugSession",
+    "inputs": "state_handle, kind*, operation*, hold_seconds, take_over, debuggee_id, server, settings, request_user, debugging_mode, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerDebugStep",
-    "inputs": "state_handle*, action*, object_type, object_name, line, include, parent_name, detail",
+    "inputs": "state_handle*, kind*, operation*, object_type, object_name, line, include, parent_name, position, debuggee_id, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDebugMaintain",
+    "inputs": "state_handle*, kind*, operation*, names, parents, variable_name, value, debuggee_id, query, row_number, detail",
     "available_in": "cloud, onprem"
   },
   {

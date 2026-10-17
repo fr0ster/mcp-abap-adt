@@ -1,6 +1,6 @@
 # @mcp-abap-adt/compact
 
-The compact MCP server over **stdio** — the command that serves all 29, the four debugger verbs, the
+The compact MCP server over **stdio** — the command that serves all 29, the four debugger tools, the
 leftover sessions, background runs and batch mode (`HandlerBatch`). The 17 that change nothing alone are
 [`@mcp-abap-adt/compact-ro`](https://www.npmjs.com/package/@mcp-abap-adt/compact-ro)
 (`mcp-abap-adt-compact-ro`): the binary fixes the tool set (19.0.0), there is no `--exposition`.
@@ -54,7 +54,7 @@ smaller install, and it is not a sandbox — code that deliberately reaches into
 
 ```bash
 npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact --system-type=<onprem|cloud> # stdio: all 29, the debugger verbs, leftover sessions, background runs
+mcp-abap-adt-compact --system-type=<onprem|cloud> # stdio: all 29, the debugger tools, leftover sessions, background runs
 mcp-abap-adt-compact --version
 
 npm install -g @mcp-abap-adt/compact-ro
@@ -62,7 +62,7 @@ mcp-abap-adt-compact-ro --system-type=<onprem|cloud> # the 17 that change nothin
 ```
 
 **The binary fixes the tool set.** `mcp-abap-adt-compact` serves all 29 tools (every access, which
-is what a local server gives), the four debugger verbs, the leftover-session list and logoff, the
+is what a local server gives), the four debugger tools, the leftover-session list and logoff, the
 background-run tools and `HandlerBatch` — 39. `mcp-abap-adt-compact-ro` serves the 17 tools that change nothing — the reads, searches,
 where-used, checks and validations, the unit-test status and result reads, the profiler list and
 view, the dump list and view, the service-binding type list — with `HandlerBatch` and the
@@ -89,11 +89,14 @@ until SAP answers — it cannot be cut. `HandlerBackgroundRunGet`, `HandlerBackg
 server's memory until discarded or the process ends):
 [Background runs](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/README.md#background-runs-of-a-class-or-a-program).
 
-**The debugger, always in `mcp-abap-adt-compact`, never in `-ro`.** Four verbs: `HandlerDebugStart` (`kind: abap|amdp`, the breakpoints, `take_over`,
-an optional background `run`, and for `abap` `request_user`, `debugging_mode` and
-`settings`; answers a `state_handle`), `HandlerDebugWait`, `HandlerDebugView` (stack,
-variables, memory, an AMDP table) and `HandlerDebugStep` (the steps, `detach` and
-`release_debugger`, `terminate`, and `stop`, which ends the session). In user mode a
+**The debugger, always in `mcp-abap-adt-compact`, never in `-ro`.** Four tools, each for ABAP
+and AMDP (`kind: abap|amdp`); every call sends one SAP request, the one its `operation` names,
+and the consumer chains the calls: `HandlerDebugBreakpoints` (breakpoints and watchpoints),
+`HandlerDebugSession` (check, listen with the caller's `hold_seconds`, stop the listener, attach,
+detach, terminate, settings; AMDP start, events, stop, delete a debuggee), `HandlerDebugStep`
+(the steps, run or jump to a line, the stack position) and `HandlerDebugMaintain` (stack,
+variables, child variables, memory sizes, a snapshot, set a value; an AMDP data preview). The
+first call that opens the debug state answers its `state_handle`. In user mode a
 breakpoint catches every request of the request user (the connected SAP user unless another
 is named): where that must not be possible, install `mcp-abap-adt-compact-ro`. What a debug session is, what keeps it
 alive on each transport and what ends it: [Debugger](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/user-guide/DEBUGGER.md).

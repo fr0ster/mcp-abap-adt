@@ -392,7 +392,7 @@ main({ toolSet, program, version })
   ├── registryOf(toolSet)                             // full: ReadOnly, System, BackgroundRun, HighLevel,
   │                                                   //   Debug, Search, LeftoverSession; ro: ReadOnly,
   │                                                   //   System, Search, the list and logoff; compact:
-  │                                                   //   both halves, debug verbs, background runs, ...
+  │                                                   //   both halves, debug tools, background runs, ...
   ├── a background-run store only if toolSet.backgroundRuns
   ├── core only: AuthBrokerFactory                    // the destination, the startup check
   └── StdioServer | StreamableHttpServer | SseServer

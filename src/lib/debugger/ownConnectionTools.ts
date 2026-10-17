@@ -40,10 +40,10 @@ export const DEBUGGER_OWN_CONNECTION_TOOLS: readonly string[] = [
   'DebugTakeOverListener',
   'DebugTerminate',
   'DebugWait',
-  'HandlerDebugStart',
+  'HandlerDebugBreakpoints',
+  'HandlerDebugMaintain',
+  'HandlerDebugSession',
   'HandlerDebugStep',
-  'HandlerDebugView',
-  'HandlerDebugWait',
 ];
 
 const LISTED = new Set(DEBUGGER_OWN_CONNECTION_TOOLS);

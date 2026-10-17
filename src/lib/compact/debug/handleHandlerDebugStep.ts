@@ -1,160 +1,128 @@
 import {
-  addressOf,
-  type BreakpointTarget,
-  type DebuggerInstance,
-  debugAnswer,
-  debugStateAnswer,
   LINE_TARGET_PROPERTIES,
   lineUriOf,
+  type OnceStep,
   STATE_HANDLE_PROPERTY,
 } from '../../debugger/index';
 import type { ArgsOf, HandlerContext } from '../../handlers/index';
 import { DETAIL_PROPERTY } from '../index';
-import { branchByKind, failedAnswer } from './shared';
+import { KIND_PROPERTY, needed, onceAnswer, refuseOperation } from './shared';
+
+const ABAP_OPERATIONS = [
+  'stepInto',
+  'stepOver',
+  'stepReturn',
+  'stepContinue',
+  'stepRunToLine',
+  'stepJumpToLine',
+  'setStackPosition',
+] as const;
+const AMDP_OPERATIONS = ['stepOver', 'stepContinue'] as const;
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDebugStep',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Moves the stopped debuggee (into, over, return, continue, run or jump to a line), leaves it running (detach, release_debugger), ends it where it stands, or ends the debug session.',
+    "Moves the stopped debuggee: each call sends one SAP request, the operation's. kind abap, on the attached debuggee: stepInto, stepOver, stepReturn and stepContinue step from where it stands; stepRunToLine runs to the line object_type, object_name and line name, stepJumpToLine moves there and skips what lies between; a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack. setStackPosition makes frame position the one variables are read in. kind amdp: stepOver and stepContinue move debuggee_id and answer the request id; the next stop arrives as a break event.",
   inputSchema: {
     type: 'object',
     properties: {
       ...STATE_HANDLE_PROPERTY,
-      action: {
+      ...KIND_PROPERTY,
+      operation: {
         type: 'string',
-        enum: [
-          'into',
-          'over',
-          'return',
-          'continue',
-          'run_to_line',
-          'jump_to_line',
-          'detach',
-          'release_debugger',
-          'terminate',
-          'stop',
-        ],
+        enum: [...ABAP_OPERATIONS],
         description:
-          'into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.',
+          'The one request: abap stepInto, stepOver, stepReturn, stepContinue, stepRunToLine, stepJumpToLine or setStackPosition; amdp stepOver or stepContinue.',
       },
       ...LINE_TARGET_PROPERTIES,
+      position: {
+        type: 'integer',
+        description:
+          'abap setStackPosition: the frame position, as getStack answers it.',
+      },
+      debuggee_id: {
+        type: 'string',
+        description: 'amdp: the debuggee id of the break event.',
+      },
       ...DETAIL_PROPERTY,
     },
-    required: ['state_handle', 'action'],
+    required: ['state_handle', 'kind', 'operation'],
   },
 } as const;
 
+type Args = ArgsOf<typeof TOOL_DEFINITION.inputSchema>;
+
 const STEPS = {
-  into: 'stepInto',
-  over: 'stepOver',
-  return: 'stepReturn',
-  continue: 'stepContinue',
+  stepInto: 'stepInto',
+  stepOver: 'stepOver',
+  stepReturn: 'stepReturn',
+  stepContinue: 'stepContinue',
 } as const;
 
-const isStep = (action: string): action is keyof typeof STEPS =>
-  action in STEPS;
+const terseStep = (v: OnceStep) =>
+  'ended' in v ? { state: 'ended', reason: v.ended } : v.step;
 
 export async function handleHandlerDebugStep(
   context: HandlerContext,
-  args: ArgsOf<typeof TOOL_DEFINITION.inputSchema>,
+  args: Args,
 ) {
-  const action = args.action;
-  // The state ends once nothing is held; both kinds are stopped by the instance.
-  const stopped = (d: DebuggerInstance) =>
-    debugAnswer(
-      args,
-      async () => {
-        context.state!.endWhenEmpty();
-        // A note is no debt: SAP's final refusal, reaching the model as it is.
-        const notes = await d.stop();
-        return {
-          value: { state: 'stopped', ...(notes.length ? { notes } : {}) },
-          raw: JSON.stringify(notes, null, 2),
-        };
-      },
-      (v) => v,
-    );
-  const refused = (kind: string) =>
-    debugAnswer(
-      args,
-      async () => {
-        throw new Error(
-          `action: ${action} does not apply to an ${kind} debug session`,
-        );
-      },
-      (v) => v,
-    );
-  return branchByKind(
-    context,
-    args,
-    {
-      amdp: (d) => {
-        if (action === 'over' || action === 'continue') {
-          return debugAnswer(
-            args,
-            async () => d.amdp.step(action),
-            (v) => ({ state: v }),
-          );
-        }
-        if (action === 'terminate') {
-          return debugAnswer(
-            args,
-            async () => {
-              await d.amdp.cancel();
-              return { value: 'cancelled', raw: '' };
+  const op = args.operation;
+  if (args.kind === 'amdp') {
+    return onceAnswer(context, args, 'amdp', false, async (d) => {
+      if (op !== 'stepOver' && op !== 'stepContinue')
+        refuseOperation('amdp', op, AMDP_OPERATIONS);
+      return d.amdp.stepOnce(
+        needed(args.debuggee_id, `debuggee_id: needed for ${op}`),
+        op === 'stepOver' ? 'over' : 'continue',
+      );
+    });
+  }
+  switch (op) {
+    case 'stepInto':
+    case 'stepOver':
+    case 'stepReturn':
+    case 'stepContinue':
+      return onceAnswer(
+        context,
+        args,
+        'abap',
+        false,
+        async (d) => d.abap.stepOnce(STEPS[op]),
+        terseStep,
+      );
+    case 'stepRunToLine':
+    case 'stepJumpToLine':
+      return onceAnswer(
+        context,
+        args,
+        'abap',
+        false,
+        async (d) => {
+          // The line's address is the caller's: the schema cannot tie it to these two.
+          const what = `object_type, object_name and line: needed for ${op}`;
+          const uri = lineUriOf(
+            {
+              object_type: needed(args.object_type, what),
+              object_name: needed(args.object_name, what),
+              include: args.include,
+              parent_name: args.parent_name,
             },
-            (v) => v,
+            needed(args.line, what),
           );
-        }
-        if (action === 'stop') return stopped(d);
-        return refused('amdp');
-      },
-      abap: (d) => {
-        if (isStep(action)) {
-          return debugStateAnswer(args, async () => d.abap.step(STEPS[action]));
-        }
-        if (action === 'run_to_line' || action === 'jump_to_line') {
-          return debugStateAnswer(args, async () => {
-            // The schema cannot tie line to these two actions.
-            const line = args.line;
-            if (line === undefined)
-              throw new Error(`line: needed for ${action}`);
-            let target: BreakpointTarget;
-            if (args.object_type && args.object_name) {
-              target = {
-                object_type: args.object_type,
-                object_name: args.object_name,
-                include: args.include,
-                parent_name: args.parent_name,
-              };
-            } else {
-              // No object given: the line is in the object the debuggee stands in.
-              const top = (await d.abap.getStack()).value.stack.frames[0];
-              const here = top ? addressOf(top.uri) : undefined;
-              if (!here)
-                throw new Error(
-                  'object_type and object_name: needed, the stopped frame has no object address',
-                );
-              target = here;
-            }
-            return d.abap.stepToLine(
-              action === 'jump_to_line' ? 'stepJumpToLine' : 'stepRunToLine',
-              lineUriOf(target, line),
-            );
-          });
-        }
-        if (action === 'detach')
-          return debugStateAnswer(args, async () => d.abap.detach());
-        if (action === 'release_debugger')
-          return debugStateAnswer(args, async () => d.abap.releaseDebugger());
-        if (action === 'terminate') {
-          return debugStateAnswer(args, async () => d.abap.terminate());
-        }
-        if (action === 'stop') return stopped(d);
-        return refused('abap');
-      },
-    },
-    failedAnswer(args),
-  );
+          return d.abap.stepToLineOnce(op, uri);
+        },
+        terseStep,
+      );
+    case 'setStackPosition':
+      return onceAnswer(context, args, 'abap', false, async (d) =>
+        d.abap.setStackPositionOnce(
+          needed(args.position, 'position: needed for setStackPosition'),
+        ),
+      );
+    default:
+      return onceAnswer(context, args, 'abap', false, async () =>
+        refuseOperation('abap', op, ABAP_OPERATIONS),
+      );
+  }
 }

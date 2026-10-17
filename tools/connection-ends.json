@@ -119,6 +119,13 @@
     "why": "connections whose close failed, kept for the next stop"
   },
   {
+    "file": "src/lib/debugger/AmdpSession.ts",
+    "function": "AmdpSession.retiredOnce",
+    "site": "Set<IAbapConnection>",
+    "end": "AMDP's stop (closeConnection = endConnection), the idle bound's stop, the pool's undo (dispose()); the instance's terminal close for any left",
+    "why": "the one-request path's connections it is done with (an earlier session's, a start SAP refused), kept for the cleanup so no call sends a logoff"
+  },
+  {
     "file": "src/lib/debugger/DebuggerInstance.ts",
     "function": "createDebuggerInstance",
     "site": "liveAmdpPorts",
@@ -131,6 +138,13 @@
     "site": "liveDebugPorts",
     "end": "the debug session's stop (closeConnection / dropConnection = endConnection), the idle bound's stop, the pool's undo (dispose()); the terminal close for any left \u2014 at once, with no stop, when the client closes or the process ends",
     "why": "the debug session's own connections, opened by the port's openStateful (role state)"
+  },
+  {
+    "file": "src/lib/debugger/DebugSession.ts",
+    "function": "DebugSession.retired",
+    "site": "Map<IAbapConnection, 'close' | 'drop'>",
+    "end": "the debug session's stop (closeConnection / dropConnection = endConnection), the idle bound's stop, the pool's undo (dispose()); the instance's terminal close for any left",
+    "why": "the one-request path's attachments it is done with (detached, terminated, ended, refused), kept for the cleanup so no call sends a logoff"
   },
   {
     "file": "src/lib/debugger/DebugSession.ts",

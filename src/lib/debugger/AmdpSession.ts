@@ -99,6 +99,20 @@ interface Open {
   failureReported: boolean; // that failure was already thrown by a sync
 }
 
+/** The AMDP session of the one-request path: its two connections and the ids `start` answered. */
+interface OnceAmdp {
+  events: IAbapConnection;
+  commands: IAbapConnection;
+  onEvents: AmdpDebuggerT;
+  onCommands: AmdpDebuggerT;
+  mainId: string;
+  hanaSession: string;
+  /** The stop request was answered ok. */
+  stopped: boolean;
+  /** An event read is open. */
+  reading?: boolean;
+}
+
 const bodyOf = (a: IAdtResponse<unknown>): string =>
   a.ok ? String(a.getResult().value ?? '') : '';
 const messageOf = (a: IAdtResponse<unknown>): string =>
@@ -649,6 +663,238 @@ export class AmdpSession<O = unknown> {
     });
   }
 
+  // --- one request per call (the compact debugger) -----------------------------
+  /**
+   * Each method below sends exactly one `AmdpDebugger` request and answers what
+   * SAP answered, read; no event read runs in the background and no command
+   * waits for its confirmation event. The two connections are opened by
+   * `startOnce` (an open sends nothing) and closed by the cleanup.
+   */
+  private once?: OnceAmdp;
+  /** Connections of an earlier one-request session: the cleanup closes them. */
+  private readonly retiredOnce = new Set<IAbapConnection>();
+
+  private requireOnce(): OnceAmdp {
+    if (!this.once || this.once.stopped)
+      throw new DebugStateError('no AMDP debug session is running');
+    return this.once;
+  }
+
+  /** One request: the AMDP debugger started for the connected user; its session id and HANA session. */
+  startOnce(
+    stopExisting: boolean,
+  ): Promise<DebugView<{ mainId: string; hanaSession: string }>> {
+    return this.mutate(async () => {
+      if (this.open || this.closing || (this.once && !this.once.stopped))
+        throw new DebugStateError(
+          'an AMDP debug session is already running for this debug session',
+        );
+      const origin = this.requireOrigin();
+      const user = (await this.ports.requestUser(origin)).toUpperCase();
+      if (this.once) {
+        this.retiredOnce.add(this.once.events);
+        this.retiredOnce.add(this.once.commands);
+        this.once = undefined;
+      }
+      const events = await this.ports.openConnection(origin);
+      this.retiredOnce.add(events);
+      const commands = await this.ports.openConnection(origin);
+      this.retiredOnce.add(commands);
+      const onEvents = this.ports.amdpDebugger(events);
+      const answer = await onEvents.start(user, { stopExisting });
+      if (!answer.ok)
+        throw failedAt(
+          new DebugListenerError(messageOf(answer)),
+          answer,
+          'start',
+        );
+      const { mainId, hanaSession } = readAmdpStart(wireOf(answer));
+      if (!mainId)
+        throw new DebugListenerError(
+          'the AMDP debugger started without naming its session',
+        );
+      this.retiredOnce.delete(events);
+      this.retiredOnce.delete(commands);
+      this.once = {
+        events,
+        commands,
+        onEvents,
+        onCommands: this.ports.amdpDebugger(commands),
+        mainId,
+        hanaSession,
+        stopped: false,
+      };
+      return {
+        value: { mainId, hanaSession },
+        raw: JSON.stringify({ mainId, hanaSession }),
+      };
+    });
+  }
+
+  /**
+   * One request: the events SAP answers on the events connection. It runs
+   * outside the serial, so the commands go on while it holds; one read at a time.
+   */
+  async getEventsOnce(): Promise<DebugView<AmdpEvent[]>> {
+    const once = await this.mutate(async () => {
+      const once = this.requireOnce();
+      if (once.reading)
+        throw new DebugStateError(
+          'an event read is open for this AMDP session: its answer comes first',
+        );
+      once.reading = true;
+      return once;
+    });
+    try {
+      const answer = await once.onEvents.getEvents(once.mainId);
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'read events',
+        );
+      const raw = bodyOf(answer);
+      return { value: readAmdpEvents(raw), raw };
+    } finally {
+      once.reading = false;
+      this.notify();
+    }
+  }
+
+  /** One request: the breakpoints replaced; SAP answers the request id its SYNC_BREAKPOINTS event names. */
+  syncBreakpointsOnce(list: AmdpBreakpoint[]): Promise<
+    DebugView<{
+      requestId: string;
+      breakpoints: Array<{ clientId: string; uri: string }>;
+    }>
+  > {
+    return this.mutate(async () => {
+      const once = this.requireOnce();
+      const breakpoints = list.map((b) => ({
+        clientId: randomUUID(),
+        uri: lineUriOf(
+          { object_type: 'CLAS', object_name: b.class_name },
+          b.line,
+        ),
+      }));
+      const answer = await once.onCommands.syncBreakpoints(
+        once.mainId,
+        breakpoints,
+      );
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'sync breakpoints',
+        );
+      const value = { requestId: locationId(wireOf(answer)), breakpoints };
+      return { value, raw: JSON.stringify(value) };
+    });
+  }
+
+  /** One request: the stopped debuggee steps over or continues; SAP answers the request id. */
+  stepOnce(
+    debuggeeId: string,
+    step: 'over' | 'continue',
+  ): Promise<DebugView<{ requestId: string }>> {
+    return this.command('step', (once) =>
+      once.onCommands.step(once.mainId, debuggeeId, step),
+    );
+  }
+
+  /** One request: the debuggee deleted — its execution cancelled. */
+  deleteDebuggeeOnce(
+    debuggeeId: string,
+  ): Promise<DebugView<{ requestId: string }>> {
+    return this.command('delete debuggee', (once) =>
+      once.onCommands.deleteDebuggee(once.mainId, debuggeeId),
+    );
+  }
+
+  /** One request: the AMDP session stopped. */
+  stopOnce(): Promise<DebugView<{ requestId: string }>> {
+    return this.mutate(async () => {
+      const once = this.requireOnce();
+      const answer = await once.onCommands.stop(once.mainId);
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'stop',
+        );
+      once.stopped = true;
+      const value = { requestId: locationId(wireOf(answer)) };
+      return { value, raw: JSON.stringify(value) };
+    });
+  }
+
+  /** One request: the rows of a table variable of the stopped debuggee. */
+  getDataPreviewOnce(options: {
+    debuggeeId: string;
+    variable: string;
+    query?: string;
+    rowNumber?: number;
+  }): Promise<
+    DebugView<{ rows: Array<Record<string, string>>; columns: string[] }>
+  > {
+    return this.mutate(async () => {
+      const once = this.requireOnce();
+      const answer = await once.onCommands.getDataPreview({
+        sessionId: once.hanaSession,
+        debuggerId: once.mainId,
+        debuggeeId: options.debuggeeId,
+        variableName: options.variable.toUpperCase(),
+        ...(options.rowNumber !== undefined
+          ? { rowNumber: options.rowNumber }
+          : {}),
+        ...(options.query ? { query: options.query } : {}),
+      });
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'read table',
+        );
+      const raw = bodyOf(answer);
+      return { value: readAmdpPreview(raw), raw };
+    });
+  }
+
+  private command(
+    step: string,
+    send: (once: OnceAmdp) => Promise<IAdtResponse<unknown>>,
+  ): Promise<DebugView<{ requestId: string }>> {
+    return this.mutate(async () => {
+      const answer = await send(this.requireOnce());
+      if (!answer.ok)
+        throw failedAt(new DebugRequestError(messageOf(answer)), answer, step);
+      const value = { requestId: locationId(wireOf(answer)) };
+      return { value, raw: JSON.stringify(value) };
+    });
+  }
+
+  /** Inside stop: the one-request session stopped where it runs, its connections closed. */
+  private async finishOnce(failures: DebugFailure[]): Promise<void> {
+    const once = this.once;
+    if (once) {
+      if (!once.stopped) {
+        const stopped = await once.onCommands
+          .stop(once.mainId)
+          .catch(asFailure);
+        if (stopped.ok) once.stopped = true;
+        else failures.push(failedEntry(stopped, 'stop'));
+      }
+      this.once = undefined;
+      this.retiredOnce.add(once.events);
+      this.retiredOnce.add(once.commands);
+    }
+    for (const c of [...this.retiredOnce]) {
+      const before = failures.length;
+      await this.closeOrKeep(c, 'a connection', failures);
+      if (failures.length === before) this.retiredOnce.delete(c);
+    }
+  }
+
   // --- lifecycle -------------------------------------------------------------
   /**
    * Releases a suspended debuggee, empties the breakpoints, stops the session.
@@ -664,6 +910,7 @@ export class AmdpSession<O = unknown> {
       try {
         for (const c of [...this.unclosed])
           await this.closeOrKeep(c, 'a connection', failures);
+        await this.finishOnce(failures);
         if (this.open) this.retire(this.open);
         if (this.closing) {
           const open = this.closing;
@@ -766,7 +1013,9 @@ export class AmdpSession<O = unknown> {
       this.runs.size > 0 ||
       this.failure !== undefined ||
       this.cleanupFailures.length > 0 ||
-      this.unclosed.size > 0
+      this.unclosed.size > 0 ||
+      !!this.once ||
+      this.retiredOnce.size > 0
     );
   }
 

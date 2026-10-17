@@ -569,71 +569,94 @@ per request.
 - `profiler_id` — The profiler id of a scheduled trace. Given, the run goes under that trace; absent, the run is plain.
 - `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
 
-### HandlerDebugStart
+### HandlerDebugBreakpoints
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
+**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** Debugger start. kind: abap (line, exception, statement or message breakpoints) or amdp (lines in SQLScript methods). Arms the breakpoints, listens (abap) or opens an AMDP session, and optionally runs a class or report in the background. request_user, debugging_mode and settings apply to abap only. take_over: abap — Displaces another debugger listening for the same user; amdp — ends an AMDP session of this user left behind. Without take_over, abap is refused before anything is placed while another debugger listens for that user. abap: in user mode it catches every request of the request user (the connected SAP user unless another is named), not only programs run by this server. abap: the breakpoints are one set, shared by every IDE of the same SAP user (in user mode, debugging the same request user; in terminal mode, whatever its ids), and each change replaces that set as a whole. amdp: catches every request of the connected SAP user, not only programs run by this server.
+**Description:** Debugger breakpoints and watchpoints: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: setBreakpoints replaces the breakpoint set of this debugging identity with breakpoints and answers each row SAP placed or refused; syncBreakpoints replaces the full set (sync_scope full) or the part of the objects in sync_objects (sync_scope partial); deleteBreakpoint deletes breakpoint_id; createWatchpoint, listWatchpoints and deleteWatchpoint work on the attached debuggee. In user mode the breakpoints catch every request of the request user; the set is one per SAP user and request user, shared by every IDE of that user, and each change replaces it as a whole. kind amdp: syncBreakpoints replaces the breakpoints of the running AMDP session and answers the request id; SAP confirms them in a SYNC_BREAKPOINTS event. The answer carries state_handle, and for abap the identity in force.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `kind` (required) — abap debugs ABAP code; amdp debugs SQLScript methods of a class.
-- `breakpoints` (required) — abap: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition. amdp: object_name (the class) and line of each.
-- `take_over` — abap: takes over from another debugger listening for this user instead of refusing; the breakpoints of this SAP user (in user mode, for the same request user) are replaced. amdp: ends an AMDP session of this user left behind instead of refusing.
-- `request_user` — User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
-- `debugging_mode` — user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
-- `settings` — Debugger settings, applied after each attach; a field left out keeps its value.
-- `run` — A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
+- `state_handle` — The handle of this server's debug state. Omitted, the call opens the debug state and answers its handle.
+- `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
+- `operation` (required) — The one request: abap setBreakpoints, syncBreakpoints, deleteBreakpoint, createWatchpoint, listWatchpoints or deleteWatchpoint; amdp syncBreakpoints.
+- `breakpoints` — setBreakpoints and syncBreakpoints: abap a line, an exception class, an ABAP statement or a message, a line breakpoint may carry a condition; amdp object_name (the class) and line of each, an empty list clears them.
+- `sync_scope` — abap syncBreakpoints: full replaces every breakpoint of the set; partial replaces those of the objects in sync_objects and takes line breakpoints.
+- `sync_objects` — abap syncBreakpoints with sync_scope partial: the ADT URIs of the objects whose breakpoints are replaced.
+- `breakpoint_id` — abap deleteBreakpoint: the id SAP gave the breakpoint.
+- `variable_name` — abap createWatchpoint: the variable watched.
+- `condition` — abap createWatchpoint: the ABAP condition the watchpoint stops on.
+- `watchpoint_id` — abap deleteWatchpoint: the id SAP gave the watchpoint.
+- `request_user` — abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.
+- `debugging_mode` — abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 
-### HandlerDebugWait
+### HandlerDebugSession
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
+**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** State of a debug session after waiting up to hold_seconds; for AMDP, its events.
-
-**Available in:** cloud, onprem
-
-**Parameters:**
-
-- `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
-- `hold_seconds` — Longest wait for a change, at most 30 seconds.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
-
-### HandlerDebugView
-
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
-
-**Description:** The stopped debuggee: stack, variables (by name, or the scopes), memory, or an AMDP table variable's rows.
+**Description:** Debugger listener and session: each call sends one SAP request, the operation's, and answers what SAP answered. kind abap: checkListener answers whether another debugger holds this identity's debugging (SAP's 409 names the holder); listen waits for a debuggee for exactly hold_seconds, SAP's hold, and answers the debuggee caught (debuggee_id, its server) or caught: false; a breakpoint stops a program while a listen is open; stopListener ends the listener and deletes the identity's breakpoints; attach attaches debuggee_id on a session of its own, which every later step and reading uses; detachDebugger sends detachDebugger on the attaching session with the debuggee id left out, which releases the debuggee, and the program runs on; terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger: both answer 500 when they succeed, and the success shows in the next answer; setDebuggerSettings sends the settings given at the attached debuggee. kind amdp: start opens an AMDP session for the connected SAP user and answers its main_id; getEvents answers the events SAP sends (breaks with their debuggee ids, breakpoint confirmations, ends); stop ends the AMDP session; deleteDebuggee cancels the execution of debuggee_id. The answer carries state_handle, and for abap the identity in force.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
-- `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
-- `what` (required) — stack, variables and memory read an ABAP stop; table reads an AMDP stop.
-- `names` — variables: names to read, a path reads a component or a table row; the scopes when omitted. table: the table variable, first entry.
+- `state_handle` — The handle of this server's debug state. Omitted, the call opens the debug state and answers its handle.
+- `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
+- `operation` (required) — The one request: abap checkListener, listen, stopListener, attach, detachDebugger, terminateDebuggee, terminateDebugger or setDebuggerSettings; amdp start, getEvents, stop or deleteDebuggee.
+- `hold_seconds` — abap listen: how long SAP holds the listen, in seconds; SAP answers at a catch or when the hold ends.
+- `take_over` — abap listen: true displaces another debugger listening for the same user; false, or omitted, answers its 409. amdp start: true ends an AMDP session of this user left behind.
+- `debuggee_id` — abap attach: the debuggee_id listen answered. amdp deleteDebuggee: the debuggee id of a break event.
+- `server` — abap attach: the debuggee's application server, as listen answered it.
+- `settings` — abap setDebuggerSettings: the settings sent; a field left out keeps its value.
+- `request_user` — abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.
+- `debugging_mode` — abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerDebugStep
 
-**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
+**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
 
-**Description:** Moves the stopped debuggee (into, over, return, continue, run or jump to a line), leaves it running (detach, release_debugger), ends it where it stands, or ends the debug session.
+**Description:** Moves the stopped debuggee: each call sends one SAP request, the operation's. kind abap, on the attached debuggee: stepInto, stepOver, stepReturn and stepContinue step from where it stands; stepRunToLine runs to the line object_type, object_name and line name, stepJumpToLine moves there and skips what lies between; a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack. setStackPosition makes frame position the one variables are read in. kind amdp: stepOver and stepContinue move debuggee_id and answer the request id; the next stop arrives as a break event.
 
 **Available in:** cloud, onprem
 
 **Parameters:**
 
 - `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
-- `action` (required) — into enters the call, over runs it, return leaves the current one, continue runs to the next stop; run_to_line executes up to the line, jump_to_line moves there without executing what lies between; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on; terminate ends the debuggee where it stands; stop ends the debug session. For AMDP only over, continue, terminate and stop apply.
+- `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
+- `operation` (required) — The one request: abap stepInto, stepOver, stepReturn, stepContinue, stepRunToLine, stepJumpToLine or setStackPosition; amdp stepOver or stepContinue.
 - `object_type` — For a line: CLAS, PROG, INCL or FUNC.
 - `object_name` — For a line: the object holding it.
 - `line` — For a line: the line in the object source.
 - `include` — For a class: definitions, implementations, macros or testclasses; the main source when omitted.
 - `parent_name` — For a function module: its function group.
+- `position` — abap setStackPosition: the frame position, as getStack answers it.
+- `debuggee_id` — amdp: the debuggee id of the break event.
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+### HandlerDebugMaintain
+
+**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
+
+**Description:** Reads and changes the stopped debuggee: each call sends one SAP request, chosen by operation. kind abap, on the attached debuggee: getStack answers the frames, each with its program, include, line and ADT address, the stopped position on top; getVariables answers the variables in names (a path reads a component or a table row); getChildVariables answers the members of the ids in parents, the scopes (@ROOT) when parents is omitted; getMemorySizes answers the memory sizes; createMemorySnapshot creates a memory snapshot; setVariableValue sets variable_name to value and answers the variable. kind amdp: getDataPreview answers the rows of the table variable variable_name of debuggee_id.
+
+**Available in:** cloud, onprem
+
+**Parameters:**
+
+- `state_handle` (required) — Opaque handle identifying the server-held state this operation works on.
+- `kind` (required) — abap works with the ABAP debugger; amdp with the AMDP debugger of SQLScript methods.
+- `operation` (required) — What the call does: abap getStack (the stack), getVariables (variables by name), getChildVariables (child variables), getMemorySizes (memory sizes), createMemorySnapshot (a snapshot) or setVariableValue (set a value); amdp getDataPreview (the data preview of a table variable).
+- `names` — abap getVariables: the variables read.
+- `parents` — abap getChildVariables: the ids whose members are read; @ROOT, the scopes, when omitted.
+- `variable_name` — abap setVariableValue: the variable set. amdp getDataPreview: the table variable read.
+- `value` — abap setVariableValue: the new value.
+- `debuggee_id` — amdp getDataPreview: the debuggee id of the break event.
+- `query` — amdp getDataPreview: a SELECT over the table variable; every column when omitted.
+- `row_number` — amdp getDataPreview: how many rows SAP answers; SAP's own count when omitted.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerBackgroundRunGet

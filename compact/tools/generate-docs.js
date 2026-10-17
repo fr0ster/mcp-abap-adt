@@ -168,7 +168,7 @@ function page(entries) {
     md += `### ${tool.name}\n\n`;
     md +=
       half === 'debug'
-        ? '**Half:** debugger verbs of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)\n\n'
+        ? '**Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)\n\n'
         : half === 'background'
           ? '**Half:** background-run tools of `@mcp-abap-adt/lib` (the write binaries, where `HandlerProfileRun` is)\n\n'
           : half === 'session'
@@ -209,7 +209,7 @@ function main() {
     ...modify
       .compactModifyEntries(context)
       .map((entry) => ({ half: 'modify', entry })),
-    // The debugger verbs live in lib (`src/lib/compact/debug`), served by
+    // The debugger tools live in lib (`src/lib/compact/debug`), served by
     // the compact write binaries.
     ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
       .compactDebugEntries()

@@ -17,7 +17,7 @@ transport `@mcp-abap-adt/compact-sse`. It does not depend on
 
 ```bash
 npm install -g @mcp-abap-adt/compact-http
-mcp-abap-adt-compact-http --host=127.0.0.1 --port=3000 --system-type=onprem # all 29, the debugger verbs, background runs
+mcp-abap-adt-compact-http --host=127.0.0.1 --port=3000 --system-type=onprem # all 29, the debugger tools, background runs
 mcp-abap-adt-compact-http --help                     # every option, from this binary's table
 ```
 
@@ -28,8 +28,8 @@ There is no `--transport`: a binary is its transport.
 **Credentials** come only from each request's `x-sap-*` headers — `x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`; nothing is stored, shared or cached across requests. Held state (a debug session, a lock taken with `HandlerLock`) is reached again with its `state_handle` on the pooled instance that holds it: `HandlerLock` answers it, and `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header — without it they are refused, sending nothing. A request with the same credential headers works on the instance's held SAP session; another credential retires it. A request without them is answered `400`; so is one
 carrying `x-mcp-destination` (destinations are served only by `mcp-abap-adt`, stdio).
 
-**The tools are fixed by the binary**: all 29, the four debugger verbs (`HandlerDebugStart`,
-`HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`), the background-run tools and `HandlerBatch` — 37. `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
+**The tools are fixed by the binary**: all 29, the four debugger tools (`HandlerDebugBreakpoints`,
+`HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`), the background-run tools and `HandlerBatch` — 37. `--exposition` (`ro`, `rw`, `debug`, any word) and a config file's
 `exposition` stop the start, naming the binary to install instead
 (`mcp-abap-adt-compact-http-ro` for `ro`). No leftover-session tool and no runtime session file: one server holds the sessions of many
 users, so those are the stdio binaries' (`mcp-abap-adt-compact`, `mcp-abap-adt-compact-ro`); resuming

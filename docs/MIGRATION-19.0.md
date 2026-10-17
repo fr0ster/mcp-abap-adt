@@ -122,7 +122,7 @@ every binary. Four kinds of binary, each on stdio, Streamable HTTP and SSE:
 |---|---|---|
 | core | `mcp-abap-adt` (`@mcp-abap-adt/core`), `mcp-abap-adt-http` (`@mcp-abap-adt/http`), `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`) | readonly (with system and search), high, debug, background runs; on stdio the leftover-session list and logoff |
 | core-ro | `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`), `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`), `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`) | readonly (with system and search); on stdio the leftover-session list and logoff |
-| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`), `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the 29 compact tools, the four compact debugger verbs, background runs; on stdio the leftover-session list and logoff |
+| compact | `mcp-abap-adt-compact` (`@mcp-abap-adt/compact`), `mcp-abap-adt-compact-http` (`@mcp-abap-adt/compact-http`), `mcp-abap-adt-compact-sse` (`@mcp-abap-adt/compact-sse`) | the 29 compact tools, the four compact debugger tools, background runs; on stdio the leftover-session list and logoff |
 | compact-ro | `mcp-abap-adt-compact-ro` (`@mcp-abap-adt/compact-ro`), `mcp-abap-adt-compact-http-ro` (`@mcp-abap-adt/compact-http-ro`), `mcp-abap-adt-compact-sse-ro` (`@mcp-abap-adt/compact-sse-ro`) | the 17 compact tools that change nothing; on stdio the leftover-session list and logoff |
 
 No `-ro` binary serves the debugger or a background run, no binary a resume of a leftover session
@@ -139,7 +139,7 @@ the options, credentials and behaviour of its write counterpart (`mcp-abap-adt-r
 | `mcp-abap-adt` with no `--exposition`, or `--exposition=readonly,high` | `@mcp-abap-adt/core` | `mcp-abap-adt` (it now also serves the debugger) |
 | `mcp-abap-adt --exposition=readonly,high,debug` (or `readonly,debug`, `high,debug`, `high`) | `@mcp-abap-adt/core` | `mcp-abap-adt` |
 | `mcp-abap-adt --exposition=readonly` | `@mcp-abap-adt/core-ro` | `mcp-abap-adt-ro` |
-| `mcp-abap-adt-compact` with no `--exposition`, `rw` or `rw,debug` | `@mcp-abap-adt/compact` | `mcp-abap-adt-compact` (it now also serves the four debugger verbs) |
+| `mcp-abap-adt-compact` with no `--exposition`, `rw` or `rw,debug` | `@mcp-abap-adt/compact` | `mcp-abap-adt-compact` (it now also serves the four debugger tools) |
 | `mcp-abap-adt-compact --exposition=ro` (or `ro,debug`) | `@mcp-abap-adt/compact-ro` | `mcp-abap-adt-compact-ro` (no debugger: it is the write binary's) |
 
 **The debugger is no longer opt-in** in the write binaries: a breakpoint or a listener catches every
@@ -1042,7 +1042,7 @@ transport's options only:
   headers), `mcp-abap-adt-compact-sse` `mcp-abap-adt-sse`'s, and each `-ro` one the same as its
   write binary. The sections above apply to each as to its counterpart; only the tool list differs.
 - **The binary fixes the tool list** (see "`--exposition` is gone" above): `mcp-abap-adt-compact`
-  serves the 29 tools, the four debugger verbs (`HandlerDebugStart`, `…Wait`, `…View`, `…Step`),
+  serves the 29 tools, the four debugger tools (`HandlerDebugBreakpoints`, `…Session`, `…Step`, `…Maintain`),
   the three background-run tools, `HandlerBatch` and the two leftover-session tools (list, logoff) — 39
   (`-compact-http` and `-compact-sse` the same without the leftover-session tools — 37);
   `mcp-abap-adt-compact-ro` the 17 that change nothing, `HandlerBatch` and the leftover-session list
@@ -1275,6 +1275,29 @@ transport's options only:
   `trace_id` is gone from the run's answer. A consumer of `profiling: false` drops it and calls
   `HandlerProfileRun` without `profiler_id`. The schedule and the run are one request each and are
   recorded in batch mode: the schedule in one batch, the run in a later one with the id it answered.
+- **BREAKING — the compact debugger is four tools, one request per call.** `HandlerDebugStart`,
+  `HandlerDebugWait` and `HandlerDebugView` are gone; `HandlerDebugBreakpoints`,
+  `HandlerDebugSession` and `HandlerDebugMaintain` are new, and `HandlerDebugStep` takes `kind` and
+  `operation` where it took `action`. Each tool covers ABAP and AMDP (`kind: abap | amdp`) and each
+  call sends the one `AbapDebugger` / `AmdpDebugger` request its `operation` names, answering what
+  SAP answered; a failure is the method's error with the operation's step. No listener polls
+  between the calls, no catch is attached for you and no step reads the stack: you chain the calls
+  ([Debugger](user-guide/DEBUGGER.md#the-compact-debugger-one-request-per-call)). The calls are
+  not recorded in batch mode. 18.x, as read from 18.x's code, not measured: `HandlerDebugStart`
+  checked the listener (under refuse), armed the breakpoints, listened for 3 seconds, attached a
+  catch and read its stack, applied the settings, then listened again and again for 60 seconds in
+  the background and started the optional `run`; `HandlerDebugWait` sent nothing and waited, at
+  most 30 seconds, for what that loop had seen; a step read the stack after it; `stop` released,
+  stopped the listener and closed the connections in one call. Per old call, the new calls, in
+  order:
+
+  | 18.x | 19.0.0, in order |
+  |---|---|
+  | `HandlerDebugStart` | ABAP: 1. `HandlerDebugSession` `checkListener` (optional: SAP's `409` names another debugger listening); 2. `HandlerDebugBreakpoints` `setBreakpoints` with the breakpoints, `request_user` and `debugging_mode` — keep the `state_handle` it answers; 3. `HandlerDebugSession` `listen` with `hold_seconds` (`take_over: true` for 18.x's `take_over`) while the program runs — 18.x's `run` is yours to start, in user mode e.g. `HandlerProfileRun` with `background: true`; 4. `HandlerDebugSession` `attach` with the `debuggee_id` and `server` the listen answered; 5. `HandlerDebugSession` `setDebuggerSettings` with 18.x's `settings`. AMDP: 1. `HandlerDebugSession` `kind: amdp` `start` (`take_over`) — keep the `state_handle`; 2. `HandlerDebugBreakpoints` `kind: amdp` `syncBreakpoints`; 3. `HandlerDebugSession` `getEvents` until a `SYNC_BREAKPOINTS` event confirms them; 4. start the run |
+  | `HandlerDebugWait` | ABAP: `HandlerDebugSession` `listen` with `hold_seconds`, then `attach` on a catch. AMDP: `HandlerDebugSession` `getEvents` |
+  | `HandlerDebugView` | `HandlerDebugMaintain`: `what: stack` → `getStack`; `variables` → `getVariables` with `names`, or `getChildVariables` (the scopes) without them; `memory` → `getMemorySizes`; `table` → `kind: amdp` `getDataPreview` with `variable_name` and the break's `debuggee_id` |
+  | `HandlerDebugStep` | `HandlerDebugStep` with `kind` and `operation`: `into` / `over` / `return` / `continue` → `stepInto` / `stepOver` / `stepReturn` / `stepContinue`, then `HandlerDebugMaintain` `getStack` for where it stopped (AMDP: `stepOver` / `stepContinue` with `debuggee_id`, then `getEvents`); `run_to_line` / `jump_to_line` → `stepRunToLine` / `stepJumpToLine` with `object_type`, `object_name` and `line`, now required (18.x read the stack for them), then `getStack`; `detach` → `HandlerDebugSession` `detachDebugger`, then `listen` for the next run; `release_debugger` → `HandlerDebugSession` `terminateDebugger`; `terminate` → `HandlerDebugSession` `terminateDebuggee` (AMDP: `deleteDebuggee`) — `terminateDebugger` and `terminateDebuggee` answer `500` when they succeed, and the next answer shows it; `stop` → `HandlerDebugSession` `stopListener`, which deletes the breakpoints too (AMDP: `deleteDebuggee` for a suspended debuggee, then `stop`); the connections close when the debug state ends (the idle bound, the host's stop) |
+
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.
@@ -1814,7 +1837,7 @@ build argument `VARIANT` (the package's name without its scope), installing that
   system, background runs, on stdio every leftover-session tool; `low` is gone, see "The low set leaves the
   full binaries"), `fullReadOnlyToolSet` (readonly, search, system, on stdio the leftover-session
   list and logoff), `compactToolSetOf({ readOnly, modify })` (the compact halves' entry builders,
-  `compactReadOnlyEntries` and `compactModifyEntries`, with the compact debugger verbs, background
+  `compactReadOnlyEntries` and `compactModifyEntries`, with the compact debugger tools, background
   runs and, on stdio, every leftover-session tool) and `compactReadOnlyToolSetOf(readOnly)` (the
   read-only half, on stdio the leftover-session list and logoff). `registryOf(toolSet, transport)`
   builds the registry. core's, http's

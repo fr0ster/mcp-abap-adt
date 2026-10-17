@@ -1,5 +1,5 @@
 /**
- * The compact surface stays frozen — the same 34 tools — 29, plus the four debug verbs the compact write binaries serve and `HandlerBatch`, which every compact binary serves.
+ * The compact surface stays frozen — the same 34 tools — 29, plus the four debug tools the compact write binaries serve and `HandlerBatch`, which every compact binary serves.
  *
  * **Why it lives here now.** `tests/fixtures/tools/surface.json` in `lib` froze all
  * 370 tools, 22 of them compact. The facade moved into packages, so `lib`'s fixture

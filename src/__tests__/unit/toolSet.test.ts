@@ -140,10 +140,10 @@ describe('the four tool sets', () => {
       {
         group: 'CompactDebugHandlers',
         tools: [
-          'HandlerDebugStart',
-          'HandlerDebugWait',
-          'HandlerDebugView',
+          'HandlerDebugBreakpoints',
+          'HandlerDebugSession',
           'HandlerDebugStep',
+          'HandlerDebugMaintain',
         ],
       },
       {

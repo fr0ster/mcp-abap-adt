@@ -27,7 +27,7 @@ saying whether a call of it is recorded in batch mode, for which arguments, refu
 [Batch Mode](BATCH_MODE.md).
 
 Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 / 252; core-ro
-71 / 69 (each with the 3 batch tools); compact 37 / 35 (27 + 4 debugger verbs + 3 background-run +
+71 / 69 (each with the 3 batch tools); compact 37 / 35 (27 + 4 debugger tools + 3 background-run +
 `HandlerBatch`, + the 2 leftover-session tools, list and logoff, on stdio); compact-ro 19 / 17
 (16 + `HandlerBatch`, + the leftover-session list and logoff on stdio).
 
@@ -56,8 +56,8 @@ Tool counts (on-premise, measured by the tests), stdio / http and sse: core 254 
    for the tool-by-tool table.
 
 4. **compact** - Compact facade operations — served by their own commands, `mcp-abap-adt-compact`
-   (`@mcp-abap-adt/compact`, every tool below and four debugger verbs: `HandlerDebugStart`,
-   `HandlerDebugWait`, `HandlerDebugView`, `HandlerDebugStep`) and `mcp-abap-adt-compact-ro`
+   (`@mcp-abap-adt/compact`, every tool below and four debugger tools: `HandlerDebugBreakpoints`,
+   `HandlerDebugSession`, `HandlerDebugStep`, `HandlerDebugMaintain`) and `mcp-abap-adt-compact-ro`
    (`@mcp-abap-adt/compact-ro`, the 17 that change nothing: the reads, searches, where-used,
    checks and validations, the unit-test status and result reads, the profiler list and view,
    the dump list and view and the service-binding type list).
@@ -312,7 +312,7 @@ the one input of each binary's launcher (`main({ toolSet, program, version })`):
   search, and on stdio the leftover-session list and logoff.
 - `compactToolSetOf({ readOnly, modify })` — `mcp-abap-adt-compact`, `-compact-http`,
   `-compact-sse`, with the two halves' entry builders: both halves, the four `HandlerDebug*`
-  verbs, the background-run tools, on stdio every leftover-session tool; no search.
+  tools, the background-run tools, on stdio every leftover-session tool; no search.
 - `compactReadOnlyToolSetOf(readOnly)` — `mcp-abap-adt-compact-ro`, `-compact-http-ro`,
   `-compact-sse-ro`: the read-only half (`@mcp-abap-adt/compact-readonly-entries`), on stdio the
   leftover-session list and logoff.

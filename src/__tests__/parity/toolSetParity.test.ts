@@ -751,10 +751,10 @@ const COMPACT_RW = [
   'HandlerUpdate',
 ];
 const COMPACT_DEBUG = [
-  'HandlerDebugStart',
+  'HandlerDebugBreakpoints',
+  'HandlerDebugMaintain',
+  'HandlerDebugSession',
   'HandlerDebugStep',
-  'HandlerDebugView',
-  'HandlerDebugWait',
 ];
 
 describe.each<TransportName>(['stdio', 'http', 'sse'])(
@@ -899,7 +899,7 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
           served: false,
         });
       }
-      // compact: the 29, the four debugger verbs, the three background-run
+      // compact: the 29, the four debugger tools, the three background-run
       // tools beside the run tool, HandlerBatch, and on stdio the
       // leftover-session list and logoff (no set serves a resume).
       expect(compact.tools).toHaveLength(29 + 4 + 3 + 1 + (onStdio ? 2 : 0));

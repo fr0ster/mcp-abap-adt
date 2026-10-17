@@ -25,6 +25,7 @@ import type {
   IAdtResponse,
   IDebuggeeIds,
   IDebuggerBreakpoint,
+  IDebuggerBreakpointSync,
   IDebuggerIdentity,
   IDebuggerSettings,
   IDebuggerStepMethod,
@@ -177,6 +178,15 @@ export interface DebugStartOptions {
   /** Applied after each attach; see `setSettings`. */
   settings?: DebugSettings;
 }
+/** Whose requests a call of the one-request path debugs: the arguments it was given. */
+export interface OnceIdentity {
+  requestUser?: string;
+  debuggingMode?: DebuggingMode;
+}
+/** A step of the one-request path: SAP's step result, or the end it reports. */
+export type OnceStep =
+  | { step: AttachReading }
+  | { ended: 'debuggee_ended' | 'terminated' };
 export interface DebugSessionOptions {
   /** The host's choice; `replace` when omitted. */
   breakpointConflict?: BreakpointConflict;
@@ -252,6 +262,12 @@ interface Stop {
   view: StopView;
   /** Whether this attach has had its first setDebuggerSettings. */
   settingsSent?: boolean;
+  /**
+   * Attached by the one-request path (the compact debugger): the cleanup
+   * closes its connection — the logoff ends the attachment — and sends no
+   * release step on it.
+   */
+  once?: true;
 }
 /** An attached debuggee whose release failed: only its attaching session can release it. */
 interface OwedRelease {
@@ -281,6 +297,30 @@ const failedAt = <E extends Error>(
   a.ok || isFromThrow(a.getError())
     ? error
     : carryingFailure(error, a.getError(), step);
+
+/** The debuggee an attach of the one-request path names: its id and server, the rest unread. */
+function attachedDebuggee(
+  debuggeeId: string,
+  server?: string,
+): DebuggeeReading {
+  return {
+    debuggeeId,
+    user: '',
+    program: '',
+    include: '',
+    line: 0,
+    uri: '',
+    objectType: '',
+    objectName: '',
+    instance: server ?? '',
+    kind: '',
+    attachImpossible: false,
+    terminalId: '',
+    ideId: '',
+    isSameServer: true,
+    canAdtCrossServer: false,
+  };
+}
 
 /** A condition on a breakpoint other than a line is refused before the wire, naming it. */
 export function refuseConditionOffLine(
@@ -421,7 +461,7 @@ export class DebugSession<O = unknown> {
   }
   /** From a start's arguments; a mode they do not fit is refused before the wire. */
   protected async identityFor(
-    options: DebugStartOptions,
+    options: Pick<DebugStartOptions, 'requestUser' | 'debuggingMode'>,
   ): Promise<IDebuggerIdentity> {
     // Presence is checked before any normalisation: a supplied blank is refused in
     // every mode, never read as "not supplied".
@@ -1398,6 +1438,394 @@ export class DebugSession<O = unknown> {
     );
   }
 
+  // --- one request per call (the compact debugger) -----------------------------
+  /**
+   * Each method below sends exactly one `AbapDebugger` request and answers what
+   * SAP answered, read; nothing is sent around it and nothing runs after it in
+   * the background — no listen loop, no attach on a catch, no stack read after
+   * a step. Connections are opened when a role first needs one (an open sends
+   * nothing) and kept until the cleanup, which closes them: a call that ends an
+   * attachment retires its connection there, so the call itself sends no logoff.
+   */
+  /** The listener connection of the one-request path, and its listen while one is open. */
+  private onceListener?: {
+    connection: IAbapConnection;
+    open?: Promise<IAdtResponse<string>>;
+  };
+  /** Connections the one-request path is done with: the cleanup closes (or drops) them. */
+  private readonly retired = new Map<IAbapConnection, 'close' | 'drop'>();
+
+  /**
+   * The identity in force, or one fixed now from the call's arguments. A call
+   * that states another request user or mode than the fixed one is refused
+   * before the wire.
+   */
+  private async onceIdentity(
+    options: OnceIdentity,
+  ): Promise<IDebuggerIdentity> {
+    if (!this.fixed) {
+      this.fixed = await this.identityFor(options);
+      return this.fixed;
+    }
+    const fixed = this.fixed;
+    if (
+      options.debuggingMode !== undefined &&
+      options.debuggingMode !== fixed.debuggingMode
+    )
+      throw new DebugRefusedError(
+        `debugging_mode: this debug session is in ${fixed.debuggingMode} mode`,
+      );
+    if (options.requestUser !== undefined) {
+      const named = options.requestUser.trim().toUpperCase();
+      if (fixed.debuggingMode !== 'user' || named !== fixed.requestUser)
+        throw new DebugRefusedError(
+          fixed.debuggingMode === 'user'
+            ? `request_user: this debug session debugs ${fixed.requestUser}`
+            : 'request_user does not apply to terminal mode: the system reads no request user there',
+        );
+    }
+    return fixed;
+  }
+
+  /** The control connection's debugger, under the conflict behaviour asked for. */
+  private async onceControl(conflict: IDebuggerListenerConflict) {
+    await this.controlDebugger();
+    const control = this.control as Listener;
+    return this.ports.abapDebugger(control.connection, conflict);
+  }
+
+  /** Inside the serial: the attachment ended; its connection waits for the cleanup. */
+  private retireStop(stop: Stop, how: 'close' | 'drop'): void {
+    if (this.current === stop) this.current = undefined;
+    this.retired.set(stop.connection, how);
+  }
+
+  /** One request: whether another debugger holds this identity's debugging (409 is the conflict). */
+  checkListenerOnce(
+    options: OnceIdentity,
+  ): Promise<DebugView<{ conflict: false }>> {
+    return this.mutate(async () => {
+      const identity = await this.onceIdentity(options);
+      const answer = await (await this.onceControl('refuse')).checkListener(
+        identity,
+      );
+      if (!answer.ok) throw listenerError(answer, 'check listener');
+      return { value: { conflict: false }, raw: bodyOf(answer) };
+    });
+  }
+
+  /** One request: the identity's breakpoint set replaced by `list`; the rows SAP answered. */
+  setBreakpointsOnce(
+    options: OnceIdentity,
+    list: IDebuggerBreakpoint[],
+  ): Promise<DebugView<BreakpointReading[]>> {
+    return this.mutate(async () => {
+      refuseConditionOffLine(list);
+      const identity = await this.onceIdentity(options);
+      const dbg = await this.onceControl(this.mode);
+      this.changed = true;
+      const answer = await dbg.setBreakpoints(identity, list);
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'set breakpoints',
+        );
+      const rows = readBreakpoints(bodyOf(answer));
+      this.armed.clear();
+      for (const row of rows) if (row.id) this.armed.set(row.id, row);
+      return { value: rows, raw: bodyOf(answer) };
+    });
+  }
+
+  /** One request: the full set, or the named objects' part of it, replaced; the rows SAP answered. */
+  syncBreakpointsOnce(
+    options: OnceIdentity,
+    sync: IDebuggerBreakpointSync,
+  ): Promise<DebugView<BreakpointReading[]>> {
+    return this.mutate(async () => {
+      refuseConditionOffLine(sync.breakpoints);
+      const identity = await this.onceIdentity(options);
+      const dbg = await this.onceControl(this.mode);
+      this.changed = true;
+      const answer = await dbg.syncBreakpoints(identity, sync);
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'sync breakpoints',
+        );
+      const rows = readBreakpoints(bodyOf(answer));
+      if (sync.scope === 'full') this.armed.clear();
+      for (const row of rows) if (row.id) this.armed.set(row.id, row);
+      return { value: rows, raw: bodyOf(answer) };
+    });
+  }
+
+  /** One request: the breakpoint `id` deleted. */
+  deleteBreakpointOnce(
+    options: OnceIdentity,
+    id: string,
+  ): Promise<DebugView<{ deleted: string }>> {
+    return this.mutate(async () => {
+      const identity = await this.onceIdentity(options);
+      const answer = await (await this.onceControl(this.mode)).deleteBreakpoint(
+        identity,
+        id,
+      );
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'delete breakpoint',
+        );
+      this.forget(id);
+      return { value: { deleted: id }, raw: bodyOf(answer) };
+    });
+  }
+
+  /** One request: the identity's listener stopped, which deletes its breakpoints. */
+  stopListenerOnce(
+    options: OnceIdentity,
+  ): Promise<DebugView<{ stopped: true }>> {
+    return this.mutate(async () => {
+      const identity = await this.onceIdentity(options);
+      const answer = await (await this.onceControl(this.mode)).stopListener(
+        identity,
+      );
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'stop listener',
+        );
+      this.forgetAll();
+      this.changed = false;
+      return { value: { stopped: true }, raw: bodyOf(answer) };
+    });
+  }
+
+  /**
+   * One request: a listen SAP holds for exactly `holdSeconds`, answered with
+   * the debuggee it caught or empty. It runs outside the serial, so the other
+   * calls go on while it holds; one listen at a time.
+   */
+  async listenOnce(
+    options: OnceIdentity,
+    holdSeconds: number,
+    conflict: IDebuggerListenerConflict,
+  ): Promise<DebugView<DebuggeeReading | { caught: false }>> {
+    const { identity, dbg, listener } = await this.mutate(async () => {
+      if (this.onceListener?.open)
+        throw new DebugStateError(
+          'a listen is open for this debug session: its answer comes first',
+        );
+      const identity = await this.onceIdentity(options);
+      if (!this.onceListener)
+        this.onceListener = { connection: await this.open() };
+      this.changed = true;
+      return {
+        identity,
+        listener: this.onceListener,
+        dbg: this.ports.abapDebugger(this.onceListener.connection, conflict),
+      };
+    });
+    const sent = dbg.listen(identity, { holdSeconds });
+    const open = sent.catch(asFailure);
+    listener.open = open;
+    try {
+      const answer = await sent;
+      if (!answer.ok) throw listenerError(answer, 'listen');
+      const caught = readDebuggee(bodyOf(answer));
+      return { value: caught ?? { caught: false }, raw: bodyOf(answer) };
+    } finally {
+      if (listener.open === open) listener.open = undefined;
+      this.notify();
+    }
+  }
+
+  /**
+   * One request: the debuggee attached on a connection of its own, which serves
+   * every later step and reading. An earlier attachment's connection is retired.
+   */
+  attachOnce(
+    options: OnceIdentity,
+    debuggeeId: string,
+    server?: string,
+  ): Promise<DebugView<AttachReading>> {
+    return this.mutate(async () => {
+      const identity = await this.onceIdentity(options);
+      const connection = await this.open();
+      const dbg = this.ports.abapDebugger(connection, this.mode);
+      const answer = await dbg.attach(
+        identity,
+        debuggeeId,
+        server ? { server } : {},
+      );
+      if (!answer.ok) {
+        this.retired.set(connection, 'close');
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'attach',
+        );
+      }
+      if (this.current) this.retireStop(this.current, 'close');
+      const attach = readAttach(bodyOf(answer));
+      this.current = {
+        connection,
+        debugger: dbg,
+        once: true,
+        view: {
+          debuggee: attachedDebuggee(debuggeeId, server),
+          attach,
+          stack: { cursor: 0, frames: [] },
+          raw: { debuggee: '', attach: bodyOf(answer), stack: '' },
+        },
+      };
+      this.effective = undefined;
+      return { value: attach, raw: bodyOf(answer) };
+    });
+  }
+
+  /** One request: a step, answered with SAP's step result, or the end it reports. */
+  stepOnce(method: IDebuggerStepMethod): Promise<DebugView<OnceStep>> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      return this.afterStepOnce(
+        stop,
+        await stop.debugger.step(method, { analyse: analyseDebuggeeEnd }),
+        'step',
+      );
+    });
+  }
+
+  /** One request: run or jump to the line `uri` names. */
+  stepToLineOnce(
+    method: IDebuggerStepToLineMethod,
+    uri: string,
+  ): Promise<DebugView<OnceStep>> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      return this.afterStepOnce(
+        stop,
+        await stop.debugger.stepToLine(method, uri, {
+          analyse: analyseDebuggeeEnd,
+        }),
+        'step to line',
+      );
+    });
+  }
+
+  private afterStepOnce(
+    stop: Stop,
+    answer: IAdtResponse<unknown>,
+    step: string,
+  ): DebugView<OnceStep> {
+    if (!answer.ok)
+      throw failedAt(new DebugRequestError(messageOf(answer)), answer, step);
+    const raw = bodyOf(answer);
+    const end = readDebuggeeEnd(raw);
+    if (end) {
+      this.retireStop(stop, 'close');
+      return {
+        value: {
+          ended: end === 'terminateDebuggee' ? 'terminated' : 'debuggee_ended',
+        },
+        raw,
+      };
+    }
+    return { value: { step: readAttach(raw) }, raw };
+  }
+
+  /** One request: the frame variables are read in. */
+  setStackPositionOnce(
+    position: number,
+  ): Promise<DebugView<{ position: number }>> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      const answer = await stop.debugger.setStackPosition(position);
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'set stack position',
+        );
+      return { value: { position }, raw: bodyOf(answer) };
+    });
+  }
+
+  /** One request: `detachDebugger` without an id, on the attaching session — the debuggee runs on. */
+  detachOnce(): Promise<DebugView<{ detached: true }>> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      const answer = await stop.debugger.detachDebugger();
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'detach',
+        );
+      this.retireStop(stop, 'close');
+      return { value: { detached: true }, raw: bodyOf(answer) };
+    });
+  }
+
+  /** One request: the debuggee ended where it stands. */
+  terminateDebuggeeOnce(): Promise<DebugView<{ terminated: true }>> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      const answer = await stop.debugger.terminateDebuggee({
+        analyse: analyseDebuggeeEnd,
+      });
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'terminate debuggee',
+        );
+      this.retireStop(stop, 'close');
+      return { value: { terminated: true }, raw: bodyOf(answer) };
+    });
+  }
+
+  /** One request: the debugger freed; the program runs on and the attaching session ends. */
+  terminateDebuggerOnce(): Promise<DebugView<{ freed: true }>> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      const answer = await stop.debugger.terminateDebugger({
+        analyse: analyseDebuggerFreed,
+      });
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'terminate debugger',
+        );
+      this.retireStop(stop, 'drop');
+      return { value: { freed: true }, raw: bodyOf(answer) };
+    });
+  }
+
+  /** One request: the settings given, sent once; the settings SAP answered in force. */
+  setDebuggerSettingsOnce(
+    settings: DebugSettings,
+  ): Promise<DebugView<SettingsReading>> {
+    return this.mutate(async () => {
+      const stop = this.requireStop();
+      const answer = await stop.debugger.setDebuggerSettings(settings);
+      if (!answer.ok)
+        throw failedAt(
+          new DebugRequestError(messageOf(answer)),
+          answer,
+          'set settings',
+        );
+      const raw = bodyOf(answer);
+      this.effective = readSettings(raw);
+      return { value: this.effective, raw };
+    });
+  }
+
   // --- lifecycle -------------------------------------------------------------
   private run?: { generation: number; connection?: IAbapConnection };
   private reconciled = false;
@@ -1612,6 +2040,27 @@ export class DebugSession<O = unknown> {
           failures,
         );
       }
+      // The one-request path's connections it is done with.
+      for (const [connection, how] of [...this.retired]) {
+        if (how === 'drop') {
+          this.ports.dropConnection(connection);
+          this.retired.delete(connection);
+          continue;
+        }
+        const before = failures.length;
+        await this.closeOrKeep(connection, 'a connection', failures);
+        if (failures.length === before) this.retired.delete(connection);
+      }
+      // An attachment of the one-request path ends with its connection's logoff.
+      const held = this.current;
+      if (held?.once) {
+        this.current = undefined;
+        await this.closeOrKeep(
+          held.connection,
+          "the debuggee's connection",
+          failures,
+        );
+      }
       // 1. A held stop is released.
       const stop = this.current;
       if (stop && !skipped('release the debuggee')) {
@@ -1710,6 +2159,18 @@ export class DebugSession<O = unknown> {
           failures,
         );
       }
+      // The one-request path's listener: its open listen answers once the
+      // listener is stopped; then its connection closes.
+      const onceListener = this.onceListener;
+      if (onceListener) {
+        if (onceListener.open) await onceListener.open;
+        this.onceListener = undefined;
+        await this.closeOrKeep(
+          onceListener.connection,
+          "the listener's connection",
+          failures,
+        );
+      }
       if (!failures.length && this.control) {
         const control = this.control;
         this.control = undefined;
@@ -1759,7 +2220,9 @@ export class DebugSession<O = unknown> {
       !!this.run ||
       this.cleanupFailures.length > 0 ||
       this.unclosed.size > 0 ||
-      this.owed.size > 0
+      this.owed.size > 0 ||
+      !!this.onceListener ||
+      this.retired.size > 0
     );
   }
 
@@ -1797,7 +2260,9 @@ export class DebugSession<O = unknown> {
       this.failure !== undefined ||
       this.cleanupFailures.length > 0 ||
       this.unclosed.size > 0 ||
-      this.owed.size > 0
+      this.owed.size > 0 ||
+      !!this.onceListener ||
+      this.retired.size > 0
     );
   }
 

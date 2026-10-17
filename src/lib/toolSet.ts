@@ -246,7 +246,7 @@ export interface CompactHalves {
 /**
  * The compact tool set of `mcp-abap-adt-compact`, `-compact-http` and
  * `-compact-sse`, composed of the two halves' entry builders: both halves in
- * one group, the four debugger verbs, the background-run tools beside the
+ * one group, the four debugger tools, the background-run tools beside the
  * run tool and, on stdio, every leftover-session tool — and no search, so the list is
  * short by construction.
  *
@@ -267,7 +267,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
         'compact',
         [
           'the compact tools, one per operation with the object in object_type: HandlerGet, HandlerCreate, HandlerUpdate, HandlerDelete, HandlerActivate, HandlerLock, ...',
-          'the compact debugger: HandlerDebugStart, ...Wait, ...View, ...Step; they catch every request of the connected SAP user',
+          'the compact debugger, one request per call: HandlerDebugBreakpoints, ...Session, ...Step, ...Maintain; the breakpoints catch every request of the connected SAP user',
           ...leftoverLine(
             transport,
             'the leftover SAP sessions of an ended process: list, log off',

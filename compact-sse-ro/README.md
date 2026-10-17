@@ -15,7 +15,7 @@ It is [`@mcp-abap-adt/sse`](https://www.npmjs.com/package/@mcp-abap-adt/sse)'s l
   (from [`@mcp-abap-adt/compact-readonly-entries`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly-entries)).
 
 17 tools in all (listed against an on-premise system). No create, update, delete, activate, lock, unlock, unit-test run or profiler run
-is in the tool list at all, so a client cannot call one; nor the four debugger verbs or the
+is in the tool list at all, so a client cannot call one; nor the four debugger tools or the
 background-run tools — those are `mcp-abap-adt-compact-sse`'s ([`@mcp-abap-adt/compact-sse`](https://www.npmjs.com/package/@mcp-abap-adt/compact-sse)).
 
 **No leftover-session tools, no session files (19.0.0).** One server holds the sessions of many

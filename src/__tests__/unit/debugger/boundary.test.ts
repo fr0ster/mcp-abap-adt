@@ -15,7 +15,7 @@ import { TOOL_DEFINITION as TakeOverListener } from '../../../handlers/debugger/
 import { TOOL_DEFINITION as Wait } from '../../../handlers/debugger/debug/handleDebugWait';
 import { TOOL_DEFINITION as SnapshotGet } from '../../../handlers/debugger/debug/handleMemorySnapshotGet';
 import { TOOL_DEFINITION as VirtualFolders } from '../../../handlers/system/low/handleGetVirtualFolders';
-import { TOOL_DEFINITION as CompactStart } from '../../../lib/compact/debug/handleHandlerDebugStart';
+import { TOOL_DEFINITION as CompactSession } from '../../../lib/compact/debug/handleHandlerDebugSession';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { withSystemInformation } from '../../helpers/systemInformationStandIn';
@@ -43,7 +43,7 @@ class BoundaryServer extends BaseMcpServer {
       SetSettings,
       SnapshotGet,
       VirtualFolders,
-      CompactStart,
+      CompactSession,
     ].map((toolDefinition) => ({ toolDefinition, handler: this.handler }));
     this.registerHandlers(
       new CompositeHandlersRegistry([
@@ -183,11 +183,8 @@ describe('the MCP boundary validates debug tool arguments', () => {
     const server = new BoundaryServer();
     const client = await connected(server);
     const result = await client.callTool({
-      name: CompactStart.name,
-      arguments: {
-        kind: 'amdp',
-        breakpoints: [{ object_name: 'class_a', line: 14 }],
-      },
+      name: CompactSession.name,
+      arguments: { kind: 'amdp', operation: 'start' },
     });
     expect(result.isError).toBeFalsy();
     const received = server.handler.mock.calls[0][1] as Record<string, unknown>;

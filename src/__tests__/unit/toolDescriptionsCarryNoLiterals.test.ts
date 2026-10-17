@@ -143,7 +143,7 @@ describe('descriptions carry no incidental literals', () => {
     })
       .getHandlerEntries()
       .map((e) => e.toolDefinition),
-    // The compact debug verbs (their own package): their text joins the same rule.
+    // The compact debug tools (their own package): their text joins the same rule.
     ...compactDebugEntries().map((e) => e.toolDefinition),
   ];
 

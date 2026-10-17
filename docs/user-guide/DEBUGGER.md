@@ -6,8 +6,10 @@ program go. This page describes what a debug session is, what keeps it alive
 between tool calls, what ends it, and what the SAP system decides on its own.
 
 The tool reference is generated: the [Debug group](AVAILABLE_TOOLS.md#debug-group)
-of the full server, and the four debugger verbs of the
-[compact server](../../compact/docs/AVAILABLE_TOOLS.md).
+of the full server, and the four debugger tools of the
+[compact server](../../compact/docs/AVAILABLE_TOOLS.md). The sections from "Catching" on describe
+the full server's debug session; the compact debugger sends one request per call:
+[The compact debugger](#the-compact-debugger-one-request-per-call).
 
 ## Where it is served
 
@@ -18,7 +20,7 @@ every request of the request user — the connected SAP user unless another is n
 
 ```bash
 mcp-abap-adt            # the full server (and -http, -sse): 30 debugger tools beside the rest
-mcp-abap-adt-compact    # compact (and -compact-http, -compact-sse): four verbs beside the 27
+mcp-abap-adt-compact    # compact (and -compact-http, -compact-sse): four debugger tools beside the 29
 mcp-abap-adt-ro         # no debugger (nor -http-ro, -sse-ro, -compact-ro, -compact-http-ro, -compact-sse-ro)
 ```
 
@@ -39,8 +41,8 @@ attach to a process or a request that is already running (see
 
 ## The debug session and its handle
 
-A starting tool — `DebugStartListener`, `DebugTakeOverListener`, `AmdpDebugStart`,
-or compact `HandlerDebugStart` — takes its parameters when it creates the session
+A starting tool — `DebugStartListener`, `DebugTakeOverListener`, `AmdpDebugStart` —
+takes its parameters when it creates the session
 (the breakpoints, an optional background run; for ABAP also `request_user`,
 `debugging_mode` and `settings`) and answers a **`state_handle`**. Every other
 session tool requires that handle. A start needs **at least one breakpoint**: the
@@ -54,7 +56,7 @@ is sent. An ABAP start answers the ids and the identity in force beside the hand
   handle is how it finds its debug session again.
 - An unknown handle, and the handle of a session that has ended, get the same
   answer: `state is not available`.
-- After a complete stop (`DebugStop`, compact `stop`, the idle bound) the handle
+- After a complete stop (`DebugStop`, the idle bound) the handle
   is invalid for good; the next start answers a new one. A stop that could not
   undo everything keeps the handle valid, so the stop can be retried.
 - **The handle is a bearer secret.** Whoever holds it acts with the SAP session
@@ -148,11 +150,70 @@ could be addressed again by its session cookies, but over RFC nothing carries an
 ABAP session to another connection (measured on premise and on the cloud,
 2026-10-10). Keeping the whole instance works over both.
 
+## The compact debugger: one request per call
+
+The compact binaries serve four debugger tools, each for ABAP and AMDP (`kind: abap | amdp`).
+Every call sends exactly one SAP request — the one `AbapDebugger` / `AmdpDebugger` method its
+`operation` names — and answers what SAP answered. Nothing runs between the calls: no listener
+polls in the background, a catch is attached only when you call `attach`, and a step reads no
+stack. You chain the calls:
+
+| Tool | ABAP operations | AMDP operations |
+|---|---|---|
+| `HandlerDebugBreakpoints` | `setBreakpoints`, `syncBreakpoints` (`sync_scope` `full` / `partial`), `deleteBreakpoint`, `createWatchpoint`, `listWatchpoints`, `deleteWatchpoint` | `syncBreakpoints` |
+| `HandlerDebugSession` | `checkListener`, `listen` (`hold_seconds`, required), `stopListener`, `attach` (`debuggee_id`, `server`), `detachDebugger`, `terminateDebuggee`, `terminateDebugger`, `setDebuggerSettings` | `start`, `getEvents`, `stop`, `deleteDebuggee` |
+| `HandlerDebugStep` | `stepInto`, `stepOver`, `stepReturn`, `stepContinue`, `stepRunToLine` / `stepJumpToLine` (`object_type`, `object_name`, `line`, required), `setStackPosition` | `stepOver`, `stepContinue` (`debuggee_id`) |
+| `HandlerDebugMaintain` | `getStack`, `getVariables`, `getChildVariables`, `getMemorySizes`, `createMemorySnapshot`, `setVariableValue` | `getDataPreview` |
+
+**The ABAP chain:**
+
+1. `HandlerDebugBreakpoints` `setBreakpoints` — opens the debug state (no `state_handle`) and
+   answers its `state_handle` with the identity in force (`terminal_id`, `ide_id`,
+   `debugging_mode`, `request_user`); every later call takes the handle. The first ABAP call fixes
+   the identity: a later call stating another `request_user` or `debugging_mode` is refused before
+   any request.
+2. `HandlerDebugSession` `listen` with `hold_seconds` — SAP holds the listen for exactly that many
+   seconds (measured 2026-10-17) and answers the debuggee it caught (`debuggee_id`, `server`) or
+   `caught: false`. A breakpoint stops a program only while a listen is open, so start the
+   program while the listen holds; a caught program nobody attaches runs on by itself after about
+   30 seconds (measured 2026-10-10).
+   One listen at a time per debug state; the other calls go on while it holds.
+3. `HandlerDebugSession` `attach` with `debuggee_id` and `server` — on a session of its own, which
+   serves every later step and reading.
+4. `HandlerDebugStep` and `HandlerDebugMaintain` — a step answers SAP's step result, and the
+   stopped position is read from the stack (`getStack`): the step answer carries no position
+   (measured 2026-10-17). A step answers `ended` when SAP reports the program's end.
+   `stepRunToLine` / `stepJumpToLine` need the line's address; it is refused before any request
+   without `object_type`, `object_name` and `line`.
+5. To leave the program: `stepContinue`; `HandlerDebugSession` `detachDebugger`, which sends
+   `detachDebugger` without a debuggee id on the attaching session — the debuggee is released and
+   the program runs on (measured 2026-10-17; with an id SAP answers `200` and releases nothing);
+   `terminateDebuggee`, which ends it; or `terminateDebugger`, which frees the debugger.
+   `terminateDebuggee` and `terminateDebugger` answer `500` when they succeed (measured
+   2026-10-17): the success shows in the next answer, which is `noSessionAttached`, or in the
+   program's end.
+6. `HandlerDebugBreakpoints` `deleteBreakpoint`, or `HandlerDebugSession` `stopListener`, which
+   ends the listener and deletes the identity's breakpoints.
+
+**The AMDP chain:** `HandlerDebugSession` `start` (answers `main_id`; `take_over: true` ends an
+AMDP session of this user left behind) → `HandlerDebugBreakpoints` `syncBreakpoints` (answers the
+request id; SAP confirms it in a `SYNC_BREAKPOINTS` event) → run the method → `HandlerDebugSession`
+`getEvents` (a break names its debuggee id) → `HandlerDebugStep` `stepOver` / `stepContinue` and
+`HandlerDebugMaintain` `getDataPreview` with that `debuggee_id` → `deleteDebuggee` (a stop alone
+leaves a suspended debuggee held) → `stop`.
+
+A call of one kind is refused while the instance holds the other. A failure is the method's error
+as it is, with the operation's step (`set breakpoints`, `listen`, `attach`, `detach`, `step`,
+`step to line`, `read stack`, `read events`, …). The connections the calls opened close when the
+debug state ends — the idle bound, the host's stop, the instance's close — so no call sends a
+logoff; that cleanup stops the listener a listen or a breakpoint left, closes the attaching
+session, which ends its attachment, and stops an AMDP session still running.
+
 ## Catching, and one debuggee at a time
 
 The listener attaches the first program caught **automatically**: a caught program
 is attachable only while it waits, and the seconds between two model calls can
-lose it. `DebugWait` (compact `HandlerDebugWait`) then answers `stopped`, with where
+lose it. `DebugWait` then answers `stopped`, with where
 the program stands — the object address a breakpoint takes and the system's
 technical place — and the stack. Under `terse` the stack keeps up to 50 frames
 from the top, so an ordinary one (some 20–25 frames) comes whole; a deeper one
@@ -209,7 +270,7 @@ for an id the session does not hold; `DebugListBreakpoints` lists the placed set
 ## Another user
 
 `request_user` (on `DebugStartListener`, `DebugTakeOverListener`, compact
-`HandlerDebugStart` with `kind: abap`) names whose requests are caught; omitted,
+`HandlerDebugBreakpoints` and `HandlerDebugSession` with `kind: abap`) names whose requests are caught; omitted,
 it is the connected user. The catching user needs `S_DEVELOP` with `DEBUG` and
 activity `90` on the user named; without it the system answers `403`, and the
 answer reaches the model as the system gave it. A request user that does not exist
@@ -247,9 +308,8 @@ user there.
   refuse.** The system itself accepts a second terminal-mode listener once its
   breakpoints are armed, and both listen, each catching its own runs; but the
   start's listener check answers `409` while the other one listens (measured on
-  premise (2026-10-12), BASIS 816), so `DebugStartListener` (compact
-  `HandlerDebugStart` without `take_over`) is refused before anything is
-  changed. A take-over (`DebugTakeOverListener`, compact `take_over: true`) does
+  premise (2026-10-12), BASIS 816), so `DebugStartListener` is refused before anything is
+  changed. A take-over (`DebugTakeOverListener`) does
   not ask under the default `replace`, and its arming replaces the other
   session's breakpoints, since the set is the SAP user's; whether the other
   listener then keeps listening in terminal mode is not measured.
@@ -276,8 +336,7 @@ on premise (2026-10-12), BASIS 816). The server keeps the definitions the system
 placed and sends them all with every change, so a second `DebugSetBreakpoints`
 keeps the first; a refused or lost one is dropped and not sent again.
 
-Before it changes anything, a start under refuse (`DebugStartListener`, compact
-`HandlerDebugStart` without `take_over`) asks the system whether another debugger
+Before it changes anything, a start under refuse (`DebugStartListener`) asks the system whether another debugger
 listens for the user, and every later `DebugSetBreakpoints` of that session asks
 again — see [Conflicts are errors](#conflicts-are-errors). The host chooses
 whether a take-over asks too, `SAP_DEBUG_BREAKPOINT_CONFLICT` — the header
@@ -285,8 +344,7 @@ whether a take-over asks too, `SAP_DEBUG_BREAKPOINT_CONFLICT` — the header
 then an embedder's `breakpointConflict` passed to `createDebuggerInstance` (the
 fallback), in that order:
 
-- **`replace`** (the default): a take-over (`DebugTakeOverListener`, compact
-  `take_over: true`) asks nothing; it sends the set whole and replaces another
+- **`replace`** (the default): a take-over (`DebugTakeOverListener`) asks nothing; it sends the set whole and replaces another
   IDE's breakpoints under the key.
 - **`refuse-if-held`**: the same check runs in every mode, before a take-over and
   before every later `DebugSetBreakpoints`; it refuses if another debugger
@@ -299,7 +357,7 @@ used.
 
 ## Leaving a debuggee running
 
-At a stop, `DebugStep` (compact `HandlerDebugStep`) takes two more actions, ABAP
+At a stop, `DebugStep` takes two more actions, ABAP
 only:
 
 - **`detach`**: the debugger leaves and the program runs on. The listener and the
@@ -315,12 +373,12 @@ only:
   `DebugStop`. The freed ABAP session takes no further request, so the server sends
   it none, not even a logoff.
 
-Both answer the listening state, or the run's end when the program finished before the answer (measured on premise (2026-10-12) for `release_debugger`). `DebugTerminate` (compact `terminate`) ends the
+Both answer the listening state, or the run's end when the program finished before the answer (measured on premise (2026-10-12) for `release_debugger`). `DebugTerminate` ends the
 program where it stands.
 
 ## Debugger settings
 
-`settings` at a start (compact: at the start only) — `system_debugging`,
+`settings` at a start — `system_debugging`,
 `update_debugging`, `create_exception_object`, `background_rfc`,
 `shared_object_debugging`, each a boolean — are kept and applied after each
 attach; a field left out keeps its value. `DebugSetSettings` changes them at the
@@ -353,7 +411,7 @@ listener (server source, BASIS 816, read 2026-10-11); SAP GUI is the route there
 A listener of another IDE id of the same SAP user — an IDE, another server
 instance — is the system's to report and yours to resolve:
 
-- **refuse** (`DebugStartListener`; compact `take_over: false`, the default):
+- **refuse** (`DebugStartListener`; compact `HandlerDebugSession` `listen` with `take_over` false or omitted, which answers the `409` as it came):
   before anything is changed, the start asks the system whether another debugger
   listens for the user. If one does (`409`), the start is refused: nothing is
   placed, nothing is run, and the other listener keeps listening with its
@@ -363,7 +421,7 @@ instance — is the system's to report and yours to resolve:
   breakpoints replaced by our arming, and in user mode our rollback after the
   listen's `409` ends its listener. That race is accepted and documented, not
   handled.
-- **take over** (`DebugTakeOverListener`; compact `take_over: true`): the start
+- **take over** (`DebugTakeOverListener`; compact `listen` with `take_over: true`): the start
   displaces the other debugger (measured in user mode; in terminal mode whether
   the other listener keeps listening is not measured). The displaced listener's
   poll is answered with a conflict notification; if that listener is ours, its next `DebugWait` fails with
@@ -386,7 +444,7 @@ debugging. Close the IDE's debugger otherwise.
 Nothing ends on a timer of the server's, with one exception (below). A session
 ends by:
 
-- **`DebugStop`** (compact `stop`): releases a stopped debuggee, then stops the
+- **`DebugStop`**: releases a stopped debuggee, then stops the
   listener — which deletes the key's breakpoints, those of every IDE sharing the
   key included (measured in user mode; in terminal mode the session takes the
   set as gone after the stop, not measured) — and closes the connections, ABAP and AMDP alike. Only when the

@@ -180,10 +180,12 @@ const readPartSchema = {
     'object_structure',
     'node_structure',
     'virtual_folders',
+    'activation_status',
+    'activation_results',
   ],
   default: 'source',
   description:
-    'The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions).',
+    'The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced).',
 } as const;
 
 export const compactGetSchema = {
@@ -244,7 +246,11 @@ export const compactGetSchema = {
       description:
         'Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own.',
     },
-    run_id: { type: 'string', description: 'Unit test run id.' },
+    run_id: {
+      type: 'string',
+      description:
+        'Run id: a unit test run (UNIT_TEST, CDS_UNIT_TEST) or an activation run (parts activation_status, activation_results).',
+    },
     response_format: {
       type: 'string',
       enum: ['xml', 'json', 'plain'],
@@ -1099,20 +1105,20 @@ export const compactActivateSchema = {
   properties: {
     object_type: {
       ...commonObjectTypeSchema,
-      description: `${commonObjectTypeSchema.description} For single-object activation, this alone is enough — no ADT type code needed.`,
+      description: `${commonObjectTypeSchema.description} Names the object's type in the single form.`,
     },
     object_name: {
       type: 'string',
-      description: 'Object name for single-object activation form.',
+      description: 'Object name (single form).',
     },
     object_adt_type: {
       type: 'string',
       description:
-        'ADT object type code (e.g. CLAS/OC, PROG/P), for a type object_type does not cover. Only needed when object_type is not enough; prefer object_type otherwise.',
+        'ADT object type code (e.g. CLAS/OC, PROG/P) of the object (single form).',
     },
     objects: {
       type: 'array',
-      description: 'Explicit objects list for batch activation.',
+      description: 'The objects activated together (list form).',
       items: {
         type: 'object',
         properties: {
@@ -1122,7 +1128,7 @@ export const compactActivateSchema = {
           parentName: {
             type: 'string',
             description:
-              'Owning object, for a part of one — a function module needs its function group here, or the address is built under a group named after the module.',
+              "Owning object, for a part of one: a function module's function group.",
           },
         },
         required: ['name', 'type'],

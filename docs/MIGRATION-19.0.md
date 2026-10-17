@@ -1178,6 +1178,28 @@ transport's options only:
 
   Batch mode records every part that is one request: `source` and `metadata` per type,
   `object_structure`, `node_structure` (`DEVC/K` included now) and `virtual_folders`.
+- **BREAKING — `HandlerActivate` starts an activation run and answers its id.** One object of
+  CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT,
+  BEHAVIOR_DEFINITION or METADATA_EXTENSION (by `object_type`, or its ADT code in
+  `object_adt_type` or a one-entry `objects[]`) is activated as in 18.x: one request, answering the
+  verdict. Every other call — `objects[]` of several objects or of a function module, an
+  `object_adt_type` such as `SRVB/SVB`, `object_type` PACKAGE, SERVICE_DEFINITION or
+  SERVICE_BINDING — sends the one `POST /sap/bc/adt/activation/runs` and answers `{ run_id }`. 18.x
+  waited for the run inside the call (status reads with long polling, a second apart, up to six)
+  and read its results, answering `accepted`, `run_id`, `run_status`, `activated`, `messages`,
+  `objects_count`, `objects` and `message`. A consumer of that answer now calls, in order:
+  1. `HandlerActivate` — keep its `run_id`;
+  2. `HandlerGet` with `part: "activation_status"` and that `run_id` — answered
+     `{ run_id, part, status, document }`; `status` is `finished`, `error`, `failed`, or the run's
+     progress while it runs. Call it again, at the pace you choose, until the status is one of the
+     first three;
+  3. `HandlerGet` with `part: "activation_results"` and the `run_id` — answered
+     `{ run_id, part, messages, document }`; a message of type `E`, `A` or `X` is a refusal, and a
+     run whose status is not `failed` and that carries no such message activated what it was
+     given (18.x's `activated`).
+
+  The two parts take no `object_type`. Each is one request and is recorded in batch mode, as is
+  `HandlerActivate`'s run start: activate in one batch, read the status in later ones.
 - **A config file's `exposition` stops the start.** 18.x read compact's exposition from the command
   line only, and its `--conf` template wrote the full set's `exposition: readonly,high`, which it
   ignored. Remove the key: the template writes none, and the binary you install chooses the tools.

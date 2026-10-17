@@ -66,6 +66,12 @@ with the single-step tools:
    part `metadata`);
 4. unlock — `HandlerUnlock`;
 5. read back, check — `HandlerGet` (one part per call: `source`, `metadata`), `HandlerCheckRun`.
+6. activate — `HandlerActivate`: one object of a type the per-object activation maps answers its
+   verdict; a list (`objects[]`), an `object_adt_type`, PACKAGE, SERVICE_DEFINITION and
+   SERVICE_BINDING start an activation run and answer `{ run_id }`;
+7. the run's state, as often as you choose — `HandlerGet` `part: activation_status` with that
+   `run_id` (`finished`, `error`, `failed`, or its progress), then `part: activation_results`
+   for the messages it produced.
 
 Deleting is two phases, each its own batch:
 
@@ -123,6 +129,17 @@ empty package and a package that does not exist with the same blank body, and th
 empty listing with `blank` stating both readings — `part: metadata` of the package tells them
 apart. `urls` (up to five requests, each built from an earlier answer) and `contents` (the package
 walk) are refused in batch mode (`batch_not_recordable`).
+
+Compact `HandlerActivate` is one request, in batch mode and outside it alike. One object of
+CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT,
+BEHAVIOR_DEFINITION or METADATA_EXTENSION (by `object_type` or its ADT code) is the per-object
+`POST /sap/bc/adt/activation`, answering the verdict. Every other call is the one
+`POST /sap/bc/adt/activation/runs`, answering `{ run_id }`: the run was accepted and has no verdict
+yet. `HandlerGet` reads it by that id, one request per part: `activation_status`
+(`GET /sap/bc/adt/activation/runs/{run_id}`, answered `{ run_id, part, status, document }`) and
+`activation_results` (`GET /sap/bc/adt/activation/results/{run_id}`, answered
+`{ run_id, part, messages, document }`), each with SAP's document as it came. Asking again until the
+status settles is yours: the server sets no timer.
 
 **Every batch end sends one envelope.** Only LOCK and UNLOCK go stateful, as adt-clients sends
 them, and adt-clients puts each kind — LOCK, UNLOCK, stateless — into an envelope of its own. So a
@@ -192,7 +209,7 @@ no raw part.
 
 <!-- batch-handlers:start -->
 
-160 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
+165 entries, rendered from `tools/batch-handlers.json`. A tool that is not listed is refused in batch mode. A `-ro` binary serves an entry when it serves the tool.
 
 ### Full sets (`mcp-abap-adt`, `-http`, `-sse`, and their `-ro` binaries for the reads)
 
@@ -329,7 +346,10 @@ no raw part.
 
 | Tool | Recorded | Sends |
 |---|---|---|
-| `HandlerActivate` | when objects is not given and object_adt_type is not given and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps; objects[] and object_adt_type go through an activation run and are not listed) |
+| `HandlerActivate` | when objects is not given and object_adt_type is not given and object_type is one of DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, BEHAVIOR_DEFINITION, METADATA_EXTENSION | POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps) |
+| `HandlerActivate` | when objects is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
+| `HandlerActivate` | when objects is not given and object_adt_type is given | one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate) |
+| `HandlerActivate` | when objects is not given and object_adt_type is not given and object_type is one of PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING | POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id } |
 | `HandlerCdsUnitTestStatus` | every call | GET /sap/bc/adt/abapunit/runs/{id}?withLongPolling=true |
 | `HandlerCheckRun` | every call | POST /sap/bc/adt/checkruns?reporters=abapCheckRun for the one object (/checkruns for a package) |
 | `HandlerCreate` | when object_type is one of DOMAIN, DATA_ELEMENT, TRANSPORT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION | POST the create request of the type's create() alone ({collection uri}[?corrNr=…]) — no validate, lock, write, unlock, check or activate |
@@ -343,6 +363,8 @@ no raw part.
 | `HandlerGet` | when part is object_structure | GET /sap/bc/adt/repository/objectstructure?objecttype=…&objectname=… |
 | `HandlerGet` | when part is node_structure and object_adt_type is given | POST /sap/bc/adt/repository/nodestructure for the one node asked |
 | `HandlerGet` | when part is virtual_folders | POST /sap/bc/adt/repository/informationsystem/virtualfolders/contents |
+| `HandlerGet` | when part is activation_status and run_id is given | GET /sap/bc/adt/activation/runs/{run_id} |
+| `HandlerGet` | when part is activation_results and run_id is given | GET /sap/bc/adt/activation/results/{run_id} |
 | `HandlerGetData` | every call | POST /sap/bc/adt/datapreview/freestyle (sql_query) or /datapreview/ddic (object_name) |
 | `HandlerLock` | when object_type is one of CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING | POST {object uri}?_action=LOCK&accessMode=MODIFY, stateful |
 | `HandlerLock` | when object_type is PACKAGE and the connection is HTTP | POST /sap/bc/adt/packages/{name}?_action=LOCK&accessMode=MODIFY, stateful; over RFC the package lock is held in an ABAP session of its own, outside the batch |

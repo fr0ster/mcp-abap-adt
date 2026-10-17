@@ -220,28 +220,30 @@ describe('eligible', () => {
         'http',
       ),
     ).toEqual({ ok: true });
-    // An activation run polls its result; objects[] and object_adt_type take one.
+    // An activation run is its one POST, answered { run_id }; objects[],
+    // object_adt_type and the unmapped single types start one.
+    for (const args of [
+      { objects: [{ name: 'C', type: 'CLAS/OC' }] },
+      { object_type: 'CLASS', object_name: 'C', object_adt_type: 'CLAS/OC' },
+      { object_type: 'PACKAGE', object_name: 'P' },
+    ]) {
+      expect(eligible('HandlerActivate', args, 'http')).toEqual({ ok: true });
+    }
+    // A single object of a type neither activation addresses by name alone.
     expect(
       eligible(
         'HandlerActivate',
-        { objects: [{ name: 'C', type: 'CLAS/OC' }] },
+        { object_type: 'FUNCTION_MODULE', object_name: 'F' },
         'http',
       ),
     ).toEqual(no);
-    expect(
-      eligible(
-        'HandlerActivate',
-        { object_type: 'CLASS', object_name: 'C', object_adt_type: 'CLAS/OC' },
-        'http',
-      ),
-    ).toEqual(no);
-    expect(
-      eligible(
-        'HandlerActivate',
-        { object_type: 'PACKAGE', object_name: 'P' },
-        'http',
-      ),
-    ).toEqual(no);
+    // The activation run's reads, by run_id.
+    for (const part of ['activation_status', 'activation_results']) {
+      expect(eligible('HandlerGet', { part, run_id: 'R' }, 'http')).toEqual({
+        ok: true,
+      });
+      expect(eligible('HandlerGet', { part }, 'http')).toEqual(no);
+    }
     expect(eligible('RuntimeRunClass', { class_name: 'C' }, 'http')).toEqual({
       ok: true,
     });

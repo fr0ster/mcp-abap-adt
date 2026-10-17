@@ -398,6 +398,10 @@ const COMPACT: BatchEntryCase[] = [
     tool: 'HandlerGet',
     args: { part: 'virtual_folders', object_search_pattern: 'Z*' },
   },
+  ...['activation_status', 'activation_results'].map((part) => ({
+    tool: 'HandlerGet',
+    args: { part, run_id: 'RUN_A' },
+  })),
   { tool: 'HandlerSearch', args: { query: 'Z*' } },
   { tool: 'HandlerGetData', args: { sql_query: 'SELECT * FROM TAB_A' } },
   { tool: 'HandlerGetData', args: { object_name: 'TAB_A' } },
@@ -670,6 +674,32 @@ const WRITES: BatchEntryCase[] = [
     args: { object_type, object_name: 'OBJ_A' },
     body: ACTIVATED,
   })),
+  // An activation run started: the one POST, answered { run_id }.
+  ...['PACKAGE', 'SERVICE_DEFINITION', 'SERVICE_BINDING'].map(
+    (object_type) => ({
+      tool: 'HandlerActivate',
+      args: { object_type, object_name: 'OBJ_A' },
+    }),
+  ),
+  {
+    tool: 'HandlerActivate',
+    args: { object_name: 'SRVB_A', object_adt_type: 'SRVB/SVB' },
+  },
+  {
+    tool: 'HandlerActivate',
+    args: {
+      objects: [
+        { name: 'DDL_A', type: 'DDLS/DF' },
+        { name: 'BDEF_A', type: 'BDEF/BDO' },
+      ],
+    },
+  },
+  {
+    tool: 'HandlerActivate',
+    args: {
+      objects: [{ name: 'FM_A', type: 'FUGR/FF', parentName: 'FUGR_A' }],
+    },
+  },
   ...CHECKS.map(([tool, args]) => ({ tool, args, body: CHECKED })),
   ...COMPACT_TYPES.map((object_type) => ({
     tool: 'HandlerCheckRun',

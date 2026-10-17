@@ -495,6 +495,42 @@
     ]
   },
   {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET /sap/bc/adt/activation/runs/{run_id}",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "activation_status"
+        ]
+      },
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerGet",
+    "set": "compact",
+    "handler": "compact-readonly-entries/src/handlers/handleHandlerGet.ts#handleHandlerGet",
+    "sends": "GET /sap/bc/adt/activation/results/{run_id}",
+    "when": [
+      {
+        "argument": "part",
+        "equals": [
+          "activation_results"
+        ]
+      },
+      {
+        "argument": "run_id",
+        "present": true
+      }
+    ]
+  },
+  {
     "tool": "HandlerSearch",
     "set": "compact",
     "handler": "compact-readonly-entries/src/handlers/handleHandlerSearch.ts#handleHandlerSearch",
@@ -869,7 +905,7 @@
     "tool": "HandlerActivate",
     "set": "compact",
     "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
-    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps; objects[] and object_adt_type go through an activation run and are not listed)",
+    "sends": "POST /sap/bc/adt/activation?method=activate&preauditRequested=true for the one object (a type the per-object activation maps)",
     "when": [
       {
         "argument": "objects",
@@ -893,6 +929,58 @@
           "FUNCTION_GROUP",
           "BEHAVIOR_DEFINITION",
           "METADATA_EXTENSION"
+        ]
+      }
+    ]
+  },
+  {
+    "tool": "HandlerActivate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
+    "sends": "one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the objects listed, answering { run_id } (one object of a type the per-object activation maps: POST /sap/bc/adt/activation?method=activate)",
+    "when": [
+      {
+        "argument": "objects",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerActivate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
+    "sends": "one request: POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=… for the one object, answering { run_id } (a code the per-object activation maps: POST /sap/bc/adt/activation?method=activate)",
+    "when": [
+      {
+        "argument": "objects",
+        "present": false
+      },
+      {
+        "argument": "object_adt_type",
+        "present": true
+      }
+    ]
+  },
+  {
+    "tool": "HandlerActivate",
+    "set": "compact",
+    "handler": "compact-modify/src/handlers/handleHandlerActivate.ts#handleHandlerActivate",
+    "sends": "POST /sap/bc/adt/activation/runs?method=activate&preauditRequested=true for the one object, answering { run_id }",
+    "when": [
+      {
+        "argument": "objects",
+        "present": false
+      },
+      {
+        "argument": "object_adt_type",
+        "present": false
+      },
+      {
+        "argument": "object_type",
+        "equals": [
+          "PACKAGE",
+          "SERVICE_DEFINITION",
+          "SERVICE_BINDING"
         ]
       }
     ]

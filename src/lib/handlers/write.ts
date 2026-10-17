@@ -27,6 +27,7 @@ export { handleUpdateLocalTestClass } from '../../handlers/class/high/handleUpda
 export { handleUpdateLocalTypes } from '../../handlers/class/high/handleUpdateLocalTypes.js';
 export {
   handleActivateObject,
+  handleActivateObjectOnce,
   TYPE_TO_FAMILY,
 } from '../../handlers/common/low/handleActivateObject.js';
 export { handleCreateOnly } from '../../handlers/common/low/handleCreateOnly.js';

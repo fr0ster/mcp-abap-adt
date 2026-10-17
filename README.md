@@ -232,7 +232,7 @@ create or update, a fallback after a `404`, a poll. Run such work as phases, eac
 with the single-step tools: create (compact `HandlerCreate`, one request), lock (`HandlerLock`;
 the handles read with `BatchAnswers`), write (`HandlerUpdate` with `lock_handle`, one request;
 the whole metadata document in `source_code` for PACKAGE, DOMAIN, DATA_ELEMENT and FUNCTION_GROUP), unlock
-(`HandlerUnlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
+(`HandlerUnlock`), read back (`HandlerGet`, one request per part: `source` or `metadata`), activate (`HandlerActivate`, one request; a list, an `object_adt_type` and the types the per-object activation leaves to a run answer `{ run_id }`), and the run's state (`HandlerGet` `part: activation_status`, then `activation_results`, by `run_id`, as often as you choose); a deletion is a deletion check (`HandlerDeletionCheck`, one request) and then
 the delete (`HandlerDelete`, the deletion request alone). A batch holds one kind of request — LOCK, UNLOCK or stateless, as its first
 recorded call decides — so each batch end sends one envelope; a call of another kind is refused
 `batch_other_kind`: record it in the next batch. Every tool's description ends with

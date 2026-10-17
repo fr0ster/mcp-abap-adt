@@ -401,3 +401,57 @@ export async function handleActivateObject(
     },
   );
 }
+
+/**
+ * The activation in one request (compact `HandlerActivate`; spec §4.6, one
+ * ADT request per tool call).
+ *
+ * One object of a type the per-object activation maps is that activation —
+ * the same request and answer as `handleActivateObject`. Every other call is
+ * the one `POST /activation/runs`, answered `{ run_id }`: the run was
+ * accepted and has no verdict yet. Its status and its messages are separate
+ * reads by that id (`handleGetActivationStatus`,
+ * `handleGetActivationResults`); waiting between them is the caller's.
+ */
+export async function handleActivateObjectOnce(
+  context: HandlerContext,
+  params: ActivateObjectArgs,
+) {
+  const { connection, logger } = context;
+  const args = params;
+  if (
+    !args.objects ||
+    !Array.isArray(args.objects) ||
+    args.objects.length === 0
+  ) {
+    return return_error(
+      new Error(
+        'Missing required parameter: objects (must be non-empty array)',
+      ),
+    );
+  }
+  const activationObjects = args.objects.map((obj) => ({
+    type: obj.type,
+    name: obj.name.toUpperCase(),
+    ...(obj.uri ? { uri: obj.uri } : {}),
+    ...(obj.parentName ? { parentName: obj.parentName } : {}),
+  }));
+  const family =
+    activationObjects.length === 1
+      ? familyFor(activationObjects[0].type)
+      : undefined;
+  if (family !== undefined) {
+    return handleActivateObject(context, params);
+  }
+
+  const preaudit = args.preaudit !== false; // default true
+  const utils = createAdtClient(connection, logger).getUtils(ourUtils);
+  return answer(
+    { tool: 'HandlerActivate', detail: 'terse' },
+    () =>
+      utils.activateObjectsGroup(activationObjects, preaudit, {
+        analyse: analyseException,
+      }),
+    (runId: string) => ({ run_id: runId }),
+  );
+}

@@ -71,7 +71,11 @@ export interface ActivationRunSource {
 /** A status that ends the wait. Anything else is progress. */
 const SETTLED = new Set(['finished', 'error', 'failed']);
 
-function readingOf(value: unknown): { parsed: unknown; raw: string } {
+/** A reading's parse and its document as it came, from a reading or a bare value. */
+export function readingOf(value: unknown): {
+  parsed: unknown;
+  raw: string;
+} {
   const reading = value as { value?: unknown; raw?: unknown } | null;
   if (
     reading !== null &&

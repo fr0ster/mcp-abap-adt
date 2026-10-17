@@ -23,6 +23,12 @@ export { handleGetLocalTypes } from '../../handlers/class/high/handleGetLocalTyp
 export { handleCheckObject } from '../../handlers/common/low/handleCheckObject.js';
 export { handleDeletionCheck } from '../../handlers/common/low/handleDeletionCheck.js';
 export { handleValidateObject } from '../../handlers/common/low/handleValidateObject.js';
+// An activation run read by its id, for `HandlerGet` parts
+// `activation_status` and `activation_results`.
+export {
+  handleGetActivationResults,
+  handleGetActivationStatus,
+} from '../../handlers/common/readonly/handleGetActivationRun.js';
 export { handleGetDataElement } from '../../handlers/data_element/high/handleGetDataElement.js';
 export { handleGetDdl } from '../../handlers/ddl/high/handleGetDdl.js';
 export { handleGetDomain } from '../../handlers/domain/high/handleGetDomain.js';

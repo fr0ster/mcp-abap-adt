@@ -327,7 +327,7 @@ replacement. Outside the order,
 because they work on a connection of their own: a background run, a listed long read
 (its fresh connection) and the debugger tools, whose SAP work is on the debugger's own connections (every `Debug*`, `AmdpDebug*` and `HandlerDebug*` tool; the `MemorySnapshot*` tools read the instance's connection and stay in the flow) (`src/lib/debugger/ownConnectionTools.ts`). The flow
 is entered after the connection is ready, so concurrent callers still share one
-`connect()`; once in the flow, a queued call checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed). A connection retired because another credential's call took the instance (Streamable HTTP) stays the queued call's own. On stdio the instance's connection is born at the process's start, before the transport opens (`StdioServer.connectAtStart` → `bornAtStart` → `buildConnection`): the destination's one leftover session taken up (`resumedSession`; with none or several, a logon), so no call is in the flow then; there is no resume tool. The list and the logoff take no turn: neither touches the instance's connection. The connections that are shared this way are stdio's kept one and an
+`connect()`; once in the flow, a queued call checks its connection again (`isStaleBuilt`): when the call ahead found the session lost, it gives the spent connection back and takes the replacement before its tool runs, so only the call that met the loss fails (it is not replayed). Over Streamable HTTP the held connection takes each request's credential (`CurrentCredential`: a renewed token, a new basic pair — the same user) in the same SAP session; only a session SAP ended replaces it. On stdio the instance's connection is born at the process's start, before the transport opens (`StdioServer.connectAtStart` → `bornAtStart` → `buildConnection`): the destination's one leftover session taken up (`resumedSession`; with none or several, a logon), so no call is in the flow then; there is no resume tool. The list and the logoff take no turn: neither touches the instance's connection. The connections that are shared this way are stdio's kept one and an
 SSE connection's; Streamable HTTP builds one per request. A connection's **parameters** — the
 responsible and master system a create fills, which also name the debugger's request user and a
 background run's caller — are made once, together with the connection, per destination (the
@@ -347,8 +347,7 @@ the destination's), else the login (the destination's `SAP_USERNAME`, else its `
 else `system_user_unknown`; no kind `system_type_required`. lib applies none: an embedder gets a
 lookup only with a resolver, and the rules only when it passes them. A new session of the same
 destination — a replacement after a lost session, a new logon after a gone leftover (the file's) —
-keeps its parameters (`destinationSystems`); another credential (an HTTP request's headers) makes
-its own. The tool wrapper applies them (`withKnownSystemContext`) and sends nothing; a host's
+keeps its parameters (`destinationSystems`), known per credential object and target system. The tool wrapper applies them (`withKnownSystemContext`) and sends nothing; a host's
 injected connection has them made by its first call (`systemBeforeTool`), inside the main flow.
 
 - **Compact's `HandlerLock`** keeps the lock across calls until `HandlerUnlock` —
@@ -356,8 +355,9 @@ injected connection has them made by its first call (`systemBeforeTool`), inside
   lock's ABAP context stays in the session (its `sap-contextid` cookie is kept), the
   calls between run stateless and outside it, and the `UNLOCK` reaches it. At the
   latest the instance's logoff ends it: a logoff releases the session's locks. Over
-  Streamable HTTP the next request's credential retires the lock's connection, and
-  that connection's logoff releases the lock.
+  Streamable HTTP the lock is the pooled instance's state: a request on its
+  `state_handle` reaches the held connection — with that request's credential, in the
+  same SAP session — until the `UNLOCK` or until SAP ends the session.
 - **A tool call cannot be cancelled.** A client's cancel aborts nothing: the call
   runs to its end; nothing is logged off and no session is reopened. The client's
   close (stdio, SSE) and the process shutdown are what end a running tool: its

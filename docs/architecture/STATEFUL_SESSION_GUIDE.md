@@ -55,10 +55,12 @@ reach into the connection's session.
   compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
   `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
   and reach the SAP session that holds the lock — without it they reach another instance and are
-  refused, sending nothing. A request with the same credential headers works on the held
-  connection; another credential retires it, and its logoff releases the lock — the instance then
-  holds that session's locks no more, as after a session SAP lost. The hold ends at the
-  `UNLOCK`. Compact `HandlerUpdate` is the write alone and
+  refused, sending nothing. A request on the handle works on the held connection with its own
+  credential: a changed credential (a renewed token, a new basic pair) is the same user, its sends
+  carry the new credential in the same SAP session, and the locks stay held; a credential that is
+  not right is SAP's to answer, and its refusal reaches the caller as it came. The connection is
+  replaced only when SAP ended the session (a timeout, a logoff, an administrator), and the
+  instance then holds that session's locks no more. The hold ends at the `UNLOCK`. Compact `HandlerUpdate` is the write alone and
   always takes the `lock_handle`.
 - **A tool call cannot be cancelled**: a client's cancel aborts nothing — the call
   runs to its end; no logoff, no new session. The client's close (stdio, SSE) and the

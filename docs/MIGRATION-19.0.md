@@ -556,8 +556,10 @@ design. Send a long run to the background where the tool offers it.
   carries it**: compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
   `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it in the `x-mcp-state-handle` header
   and reach the SAP session that holds the lock — without it they reach another instance and are
-  refused, sending nothing. A request with the same credential headers works on the held
-  connection; another credential retires it, and its logoff releases the lock. The hold ends at the
+  refused, sending nothing. A request on the handle works on the held connection with its own
+  credential — a renewed token or a new basic pair is the same user: its sends carry it in the same
+  SAP session, and the lock stays held; a credential that is not right is SAP's to answer, as it
+  came. The connection is replaced only when SAP ended its session. The hold ends at the
   `UNLOCK`. Compact `HandlerUpdate` is the write
   alone under a `lock_handle` (see "compact users").
 - **The debugger's sessions are its own**, stateful for their life, and end with the debug session.
@@ -1110,10 +1112,11 @@ transport's options only:
   **Over Streamable HTTP**, `HandlerLock`'s answer now carries a `state_handle`: send it in the
   `x-mcp-state-handle` header with `HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock — without
   it they are refused, sending nothing ("lock_handle is not held by this instance …"). A request
-  of the pooled instance with the same credential headers works on its held SAP session; another
-  credential retires it, and the locks of the retired session — as of a session SAP lost — are held
-  no more: a later `HandlerUpdate` or `HandlerUnlock` under them is refused, sending nothing; lock
-  again. In batch mode the same chain holds across batches: the locks a lock batch recorded are held
+  on the handle works on the pooled instance's held SAP session with that request's credential: a
+  renewed token or a new basic pair is the same user, and the locks stay held; a credential that is
+  not right gets SAP's refusal as it came. When SAP ended that session (a timeout, a logoff, an
+  administrator) the connection is replaced and its locks are held no more: a later
+  `HandlerUpdate` or `HandlerUnlock` under them is refused, sending nothing; lock again. In batch mode the same chain holds across batches: the locks a lock batch recorded are held
   once `BatchEnd` answered them, and the write and unlock batches send the instance's
   `state_handle`. **A service binding open in an editing session**: its LOCK answers `403`, read as
   a lock with an empty `lock_handle` (as the full set's publication reads it); `HandlerUpdate`
@@ -1492,11 +1495,12 @@ build argument `VARIANT` (the package's name without its scope), installing that
 - **`connectionReleased(connection)`**: a subclass that calls `getConnection` itself calls it
   exactly once per `getConnection` when its work on the connection is done; a connection replaced
   meanwhile is logged off only then.
-- **The server replaces its connection only when SAP lost its session** (or, where the
-  credential is the request's — http, sse — a new credential arrives): the next call gets a new
+- **The server replaces its connection only when SAP lost its session**: the next call gets a new
   connection instance, the spent one is logged off; the call that met the loss gets the
-  connection's error as it is. A built source's connection is kept while `resolve` answers the
-  same credential object; stdio's answers the same provider for the process's life.
+  connection's error as it is. Where the credential is the request's (http, sse), the held
+  connection takes each request's credential (a renewed token, a new basic pair: the same user) in
+  the same SAP session; a credential that is not right is SAP's to answer, as it came. stdio's
+  source answers the same provider for the process's life.
 - **`restoreSessionInConnection` is gone from `@mcp-abap-adt/lib/utils`.** It switched the
   connection to stateful and never back, and overwrote the shared connection's
   `sap-adt-connection-id` with the caller's `session_id` (`setSessionId`) for every request after;
@@ -1688,8 +1692,9 @@ build argument `VARIANT` (the package's name without its scope), installing that
   credential, systemContext? }`. `BaseMcpServer.setConnectionContext(context)` takes it (18.x:
   `(destination, destinations)`); `setConnectionContextFromHeaders` is gone — pass
   `headerContext(headers)` from `@mcp-abap-adt/lib/http-transport`; `getConnection(signal)` takes
-  the request's signal. A built connection is kept while the source answers the same credential
-  object. `EmbeddableMcpServer`'s `connection` is an injected source, used as given.
+  the request's signal. A built connection is kept until SAP ended its session, and presents the
+  credential the source answered last (`CurrentCredential`, put in force at each `getConnection`);
+  `ResolvedConnection` has no `identity`. `EmbeddableMcpServer`'s `connection` is an injected source, used as given.
 - **`IDestinations`, `IAuthBrokerFactory` and `SettleReport` left `@mcp-abap-adt/lib/auth`** for
   `@mcp-abap-adt/core/auth`, beside core's `destinationSource(destination, destinations)`.
   `DestinationSystemContext` stays in `@mcp-abap-adt/lib/auth`.

@@ -74,14 +74,16 @@ connection again: when the call ahead found the session lost, it takes the repla
 tool runs, so only the call that met the loss fails (it is not replayed). Taking up a
 leftover session is the stdio connector's birth at the process's start, before the transport
 opens, not a change of a connector: there is no resume tool, so it takes no turn in the flow and
-replaces nothing. A connection retired because another credential's call took
-the instance (Streamable HTTP) stays the queued call's own: its session is its credential's.
+replaces nothing. Over Streamable HTTP the held connection takes each request's credential
+(a renewed token, a new basic pair: the same user) and keeps its SAP session; it is replaced only
+when SAP ended that session.
 
 - **Compact's `HandlerLock`** leaves the lock in the session until `HandlerUnlock`
   (the consumer's choice) where the connection lives across calls — stdio and SSE —
   with every call between them stateless; the instance's logoff ends it at the
-  latest. Over Streamable HTTP the next request's credential retires the lock's
-  connection, and its logoff releases the lock.
+  latest. Over Streamable HTTP the lock is the pooled instance's state: a request on
+  its `state_handle` reaches the held connection — with that request's credential, in the
+  same SAP session — and the lock with it, until the `UNLOCK` or until SAP ends the session.
 - **A tool call cannot be cancelled**: it ends with its result or with the session.
   A client's cancel aborts nothing — a queued call keeps its place, a running one
   runs to its end; no logoff, no new session. When the client closes its connection

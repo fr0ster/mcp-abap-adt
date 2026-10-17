@@ -7,7 +7,7 @@
  *   the handler's request whole: method, URL with its query, headers, body.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import type {
   IAbapRequestOptions,
   IAdtWireResponse,
@@ -246,7 +246,7 @@ describe('one metadata read per type, shared by handler and batch', () => {
         const code = codeOf(path);
         return code.includes('.readMetadata(') || SHARED_CALL.test(code);
       })
-      .map((path) => relative(HANDLERS_DIR, path))
+      .map((path) => relative(HANDLERS_DIR, path).split(sep).join('/'))
       .sort();
     expect(reading).toEqual(
       [

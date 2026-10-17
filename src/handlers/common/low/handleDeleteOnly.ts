@@ -21,6 +21,10 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  type DELETION_CHECK_TYPES,
+  EMPTIED_INCLUDE_TYPES,
+} from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LOCK_NOT_HELD_WORDS,
@@ -33,11 +37,13 @@ import {
 } from '../../../lib/strategies/projections';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
-import { DELETION_TARGETS } from './deletionTargets';
+import { deletionTargetOf } from './deletionTargets';
 import { CLASS_INCLUDES } from './handleUpdateUnderLock';
 
 /** The argument naming the object, per type a deletion request removes. */
-export const DELETION_NAME_FIELDS: Readonly<Record<string, string>> = {
+export const DELETION_NAME_FIELDS: Readonly<
+  Record<(typeof DELETION_CHECK_TYPES)[number], string>
+> = {
   PACKAGE: 'package_name',
   DOMAIN: 'domain_name',
   DATA_ELEMENT: 'data_element_name',
@@ -56,15 +62,6 @@ export const DELETION_NAME_FIELDS: Readonly<Record<string, string>> = {
   BEHAVIOR_IMPLEMENTATION: 'behavior_implementation_name',
   METADATA_EXTENSION: 'metadata_extension_name',
 };
-
-/** The class includes removed by writing them empty under the class lock. */
-export const EMPTIED_INCLUDE_TYPES = [
-  'LOCAL_TEST_CLASS',
-  'LOCAL_TYPES',
-  'LOCAL_DEFINITIONS',
-  'LOCAL_MACROS',
-  'UNIT_TEST',
-] as const;
 
 type Args = Record<string, unknown> & {
   object_type?: string;
@@ -119,8 +116,10 @@ export async function handleDeleteOnly(
     );
   }
 
-  const target = DELETION_TARGETS[objectType];
-  const nameField = DELETION_NAME_FIELDS[objectType];
+  const target = deletionTargetOf(objectType);
+  const nameField = (DELETION_NAME_FIELDS as Readonly<Record<string, string>>)[
+    objectType
+  ];
   if (target === undefined || nameField === undefined) {
     return return_error(
       new Error(`Unsupported delete for object_type: ${objectType}`),

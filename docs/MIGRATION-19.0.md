@@ -1122,9 +1122,10 @@ transport's options only:
   reported the object absent. What a consumer of 18.x's `HandlerDelete` now calls, in order, each
   its own call:
   1. `HandlerDeletionCheck` (new: `object_type`, `object_name`; a function module is named
-     `GROUP|MODULE`) — the one deletion check, SAP's verdict as it came: `deletable: true` (with
-     SAP's message when it carries one — "does not exist" among them), or SAP's refusal in its
-     words (still used, locked, not there);
+     `GROUP|MODULE`) — the one deletion check, SAP's verdict as it came: `deletable: true` with
+     SAP's message when it carries one, or SAP's refusal in its words. A check SAP permits while
+     its message says the object does not exist is answered so: `deletable: true` with that
+     message;
   2. `HandlerDelete` — when the check permitted it.
 
   For `LOCAL_TEST_CLASS`, `LOCAL_TYPES`, `LOCAL_DEFINITIONS`, `LOCAL_MACROS` and `UNIT_TEST`

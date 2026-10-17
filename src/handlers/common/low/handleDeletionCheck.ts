@@ -2,8 +2,8 @@
  * Compact `HandlerDeletionCheck`: the deletion check alone, one request
  * (`POST /sap/bc/adt/deletion/check`, adt-clients' `checkDeletion`), read by
  * `analyseDeletion` — SAP's verdict as it came: permitted (`deletable: true`,
- * with SAP's message when it carries one, "does not exist" among them), or
- * refused with SAP's words (still used, locked, not there).
+ * with SAP's message when it carries one — a permitted check whose message
+ * says the object does not exist included), or refused with SAP's words.
  *
  * The check asks about the object compact's delete removes, for every type a
  * deletion request removes (`deletionTargets.ts`). Nothing is changed.
@@ -19,7 +19,7 @@ import {
 } from '../../../lib/strategies/projections';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
-import { DELETION_TARGETS } from './deletionTargets';
+import { deletionTargetOf } from './deletionTargets';
 
 type Args = { object_type?: unknown; object_name?: unknown };
 
@@ -30,7 +30,7 @@ export async function handleDeletionCheck(
   args: Args,
 ): Promise<unknown> {
   const objectType = String(args?.object_type ?? '');
-  const target = DELETION_TARGETS[objectType];
+  const target = deletionTargetOf(objectType);
   if (target === undefined) {
     return return_error(
       new Error(`Unsupported deletion check for object_type: ${objectType}`),

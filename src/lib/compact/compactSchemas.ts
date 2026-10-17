@@ -415,6 +415,45 @@ export const compactUpdateSchema = {
   required: ['object_type', 'lock_handle'],
 } as const;
 
+/** The types a deletion request removes, each with its deletion check. */
+export const DELETION_CHECK_TYPES = [
+  'PACKAGE',
+  'DOMAIN',
+  'DATA_ELEMENT',
+  'TABLE',
+  'STRUCTURE',
+  'DDL',
+  'SERVICE_DEFINITION',
+  'SERVICE_BINDING',
+  'CLASS',
+  'CDS_UNIT_TEST',
+  'PROGRAM',
+  'INTERFACE',
+  'FUNCTION_GROUP',
+  'FUNCTION_MODULE',
+  'BEHAVIOR_DEFINITION',
+  'BEHAVIOR_IMPLEMENTATION',
+  'METADATA_EXTENSION',
+] as const;
+
+/**
+ * The class includes compact's delete writes empty under the class lock (a
+ * `DELETE` on an include answers `405`).
+ */
+export const EMPTIED_INCLUDE_TYPES = [
+  'LOCAL_TEST_CLASS',
+  'LOCAL_TYPES',
+  'LOCAL_DEFINITIONS',
+  'LOCAL_MACROS',
+  'UNIT_TEST',
+] as const;
+
+/** The types `HandlerDelete` removes: by the deletion request, or by an empty include write. */
+export const DELETABLE_TYPES = [
+  ...DELETION_CHECK_TYPES,
+  ...EMPTIED_INCLUDE_TYPES,
+] as const;
+
 /**
  * `HandlerDelete`: one request (spec §4.6) — the deletion request, or for a
  * class include and the unit tests the include written empty under
@@ -423,7 +462,11 @@ export const compactUpdateSchema = {
 export const compactDeleteSchema = {
   type: 'object',
   properties: {
-    object_type: commonObjectTypeSchema,
+    object_type: {
+      type: 'string',
+      enum: DELETABLE_TYPES,
+      description: `Object type. Supported: ${DELETABLE_TYPES.join(', ')}.`,
+    },
     lock_handle: {
       type: 'string',
       description:
@@ -993,27 +1036,6 @@ export const compactValidateSchema = {
   },
   required: ['object_type', 'object_name'],
 } as const;
-
-/** The types a deletion request removes, each with its deletion check. */
-const DELETION_CHECK_TYPES = [
-  'PACKAGE',
-  'DOMAIN',
-  'DATA_ELEMENT',
-  'TABLE',
-  'STRUCTURE',
-  'DDL',
-  'SERVICE_DEFINITION',
-  'SERVICE_BINDING',
-  'CLASS',
-  'CDS_UNIT_TEST',
-  'PROGRAM',
-  'INTERFACE',
-  'FUNCTION_GROUP',
-  'FUNCTION_MODULE',
-  'BEHAVIOR_DEFINITION',
-  'BEHAVIOR_IMPLEMENTATION',
-  'METADATA_EXTENSION',
-] as const;
 
 /** `HandlerDeletionCheck`: the one deletion-check request. */
 export const compactDeletionCheckSchema = {

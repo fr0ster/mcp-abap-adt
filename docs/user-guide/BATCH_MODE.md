@@ -105,8 +105,9 @@ only: over RFC the package lock is held in an ABAP session of its own, outside t
 Compact `HandlerDelete` is one request for every type, in batch mode and outside it alike: the
 deletion request alone, as adt-clients' `delete()` sends it — no lock, no deletion check; SAP's
 answer is the result, as it came. `HandlerDeletionCheck` sends the one deletion check
-(`POST /sap/bc/adt/deletion/check`) and answers SAP's verdict as it came: `deletable: true` (with
-SAP's message when it carries one — "does not exist" among them), or SAP's refusal in its words.
+(`POST /sap/bc/adt/deletion/check`) and answers SAP's verdict as it came: `deletable: true` with
+SAP's message when it carries one (a permitted check whose message says the object does not exist
+included), or SAP's refusal in its words.
 For `LOCAL_*` and `UNIT_TEST` (a `DELETE` on an include answers `405`), `HandlerDelete` is one
 `PUT` of empty content under the `lock_handle` given — the class's lock; no lock, unlock or
 activation of its own. `CDS_UNIT_TEST` deletes its test class.

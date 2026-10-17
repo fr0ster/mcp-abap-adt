@@ -299,6 +299,37 @@ describe('HandlerDelete is one request', () => {
     },
   );
 
+  it.each(INCLUDES)(
+    '%s: without class_name refused before any request',
+    async (objectType) => {
+      for (const class_name of [undefined, '', '  ']) {
+        const answered = await run('answered', {
+          object_type: objectType,
+          class_name,
+          lock_handle: LOCK,
+        });
+        expect(answered.sent).toEqual([]);
+        expect(answered.answer?.isError).toBe(true);
+        expect(textOf(answered.answer)).toContain('class_name is required');
+      }
+    },
+  );
+
+  it('FUNCTION_MODULE: without function_group_name refused before any request', async () => {
+    for (const function_group_name of [undefined, '', '  ']) {
+      const answered = await run('answered', {
+        object_type: 'FUNCTION_MODULE',
+        function_module_name: 'Z_FM_A',
+        function_group_name,
+      });
+      expect(answered.sent).toEqual([]);
+      expect(answered.answer?.isError).toBe(true);
+      expect(textOf(answered.answer)).toContain(
+        'function_group_name is required',
+      );
+    }
+  });
+
   it.each(DELETIONS)(
     '%s: without its name refused before any request',
     async (objectType, fields) => {
@@ -337,6 +368,18 @@ describe('the HandlerDelete schema and description', () => {
       expect(Object.keys(schemaProperties)).not.toContain(name);
     },
   );
+
+  it('object_type names exactly the types with a delete route', () => {
+    const withDelete = Object.entries(compactWriteRouterMap)
+      .filter(([, routes]) => routes.delete !== undefined)
+      .map(([type]) => type)
+      .sort();
+    expect(
+      [
+        ...(compactDeleteSchema.properties.object_type.enum as readonly string[]),
+      ].sort(),
+    ).toEqual(withDelete);
+  });
 
   it('lock_handle and transport_request are in the schema', () => {
     expect(Object.keys(schemaProperties)).toEqual(

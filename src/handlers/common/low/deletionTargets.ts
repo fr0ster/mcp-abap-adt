@@ -36,6 +36,7 @@ import {
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAnalyse } from '@mcp-abap-adt/interfaces-adt';
 import type { createAdtClient } from '../../../lib/clients';
+import type { DELETION_CHECK_TYPES } from '../../../lib/compact/compactSchemas';
 import type { CheckedDeletable } from '../../../lib/strategies/checkedDeletion';
 import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -72,7 +73,10 @@ const target = (
 
 const asClass = (c: AdtClient) => c.getClass(resultsFor(classDocuments));
 
-export const DELETION_TARGETS: Readonly<Record<string, DeletionTarget>> = {
+/** One target per type the deletion check takes: the compiler holds the two lists equal. */
+export const DELETION_TARGETS: Readonly<
+  Record<(typeof DELETION_CHECK_TYPES)[number], DeletionTarget>
+> = {
   PACKAGE: target(
     (c) => c.getPackage(resultsFor(packageDocuments)),
     ({ name }) => ({ packageName: name }),
@@ -143,3 +147,7 @@ export const DELETION_TARGETS: Readonly<Record<string, DeletionTarget>> = {
 
 /** The object types a deletion request removes. */
 export const DELETION_TYPES = Object.keys(DELETION_TARGETS);
+
+/** The target of a type, or `undefined` for a type no deletion request removes. */
+export const deletionTargetOf = (type: string): DeletionTarget | undefined =>
+  (DELETION_TARGETS as Readonly<Record<string, DeletionTarget>>)[type];

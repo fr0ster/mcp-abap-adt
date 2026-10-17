@@ -62,6 +62,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
@@ -225,12 +226,11 @@ async function nodeStructure(
           // GetPackageTree pays, over the same object, through the
           // already-migrated getPackage().readMetadata().
           const packageRead = await atStep('read package metadata', () =>
-            client
-              .getPackage()
-              .readMetadata(
-                { packageName: parent_name.toUpperCase() },
-                { analyse: analyseException },
-              ),
+            readPackageMetadata(
+              client,
+              { packageName: parent_name.toUpperCase() },
+              'active',
+            ),
           )();
 
           if (!packageRead.ok) {

@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readMetadataExtensionMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -58,7 +59,8 @@ export async function handleGetMetadataExtension(
   // against `IMetadataExtensionConfig`, and the pre-migration handler
   // already called it that way.
   const metadataExtensionName = metadata_extension_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getMetadataExtension(
+  const client = createAdtClient(connection, logger);
+  const obj = client.getMetadataExtension(
     resultsFor(metadataExtensionDocuments),
   );
 
@@ -67,10 +69,7 @@ export async function handleGetMetadataExtension(
     return answer(
       { tool: 'GetMetadataExtension', detail: 'terse' },
       () =>
-        obj.readMetadata(
-          { name: metadataExtensionName },
-          { analyse: analyseException },
-        ),
+        readMetadataExtensionMetadata(client, { name: metadataExtensionName }),
       (metadata: AdtReading<string>) => ({
         success: true,
         metadata_extension_name: metadataExtensionName,

@@ -1,15 +1,13 @@
-import { packageDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   packageDetails,
   packageSummary,
 } from '../../../lib/strategies/packageSummary';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -53,9 +51,7 @@ export async function handleGetPackage(
 
   const packageName = package_name.toUpperCase();
   const detail = detailOf(args);
-  const obj = createAdtClient(connection, logger).getPackage(
-    resultsFor(packageDocuments),
-  );
+  const client = createAdtClient(connection, logger);
 
   // A package is a container: it has no source of its own —
   // `IPackageContract` composes `IAdtMetadataReadable` and nothing else, so
@@ -65,8 +61,7 @@ export async function handleGetPackage(
   // (task 11 fix round 1).
   return answer(
     { tool: 'GetPackage', detail },
-    () =>
-      obj.readMetadata({ packageName }, { version, analyse: analyseException }),
+    () => readPackageMetadata(client, { packageName }, version),
     (metadata: AdtReading<string>) => ({
       success: true,
       package_name: packageName,

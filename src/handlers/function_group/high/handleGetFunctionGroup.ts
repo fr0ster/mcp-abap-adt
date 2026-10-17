@@ -1,10 +1,8 @@
-import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { readFunctionGroupMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -46,9 +44,7 @@ export async function handleGetFunctionGroup(
     return return_error(new Error('function_group_name is required'));
 
   const functionGroupName = function_group_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getFunctionGroup(
-    resultsFor(functionGroupDocuments),
-  );
+  const client = createAdtClient(connection, logger);
 
   // A function group is a container: it has no source of its own —
   // `IFunctionGroupContract` composes `IAdtMetadataReadable` and nothing
@@ -59,8 +55,7 @@ export async function handleGetFunctionGroup(
   // field this tool has always answered.
   return answer(
     { tool: 'GetFunctionGroup', detail: 'terse' },
-    () =>
-      obj.readMetadata({ functionGroupName }, { analyse: analyseException }),
+    () => readFunctionGroupMetadata(client, { functionGroupName }),
     (metadata: AdtReading<string>) => ({
       success: true,
       function_group_name: functionGroupName,

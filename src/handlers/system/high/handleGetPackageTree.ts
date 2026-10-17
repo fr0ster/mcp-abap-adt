@@ -5,7 +5,6 @@
  * walking the repository one node level at a time. See lib/strategies/packageWalk.
  */
 
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   answerFailure,
@@ -20,6 +19,7 @@ import {
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
+import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   assembleTree,
   batchReader,
@@ -120,9 +120,11 @@ function readMetadata(
   connection: HandlerContext['connection'],
   packageName: string,
 ): Promise<Metadata> {
-  return createAdtClient(connection, context.logger)
-    .getPackage()
-    .readMetadata({ packageName }, { analyse: analyseException });
+  return readPackageMetadata(
+    createAdtClient(connection, context.logger),
+    { packageName },
+    'active',
+  );
 }
 
 /** A metadata read SAP refused with a credential failure (a `401`). */

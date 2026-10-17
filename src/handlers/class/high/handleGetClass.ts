@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readClassMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -54,15 +55,14 @@ export async function handleGetClass(
   if (part instanceof Error) return return_error(part);
 
   const className = class_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getClass(
-    resultsFor(classDocuments),
-  );
+  const client = createAdtClient(connection, logger);
+  const obj = client.getClass(resultsFor(classDocuments));
 
   // One request per call: the part asked for, and only it.
   if (part === 'metadata') {
     return answer(
       { tool: 'GetClass', detail: 'terse' },
-      () => obj.readMetadata({ className }, { analyse: analyseException }),
+      () => readClassMetadata(client, { className }),
       (metadata: AdtReading<string>) => ({
         success: true,
         class_name: className,

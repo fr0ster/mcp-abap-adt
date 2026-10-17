@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readStructureMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -55,15 +56,14 @@ export async function handleGetStructure(
   if (part instanceof Error) return return_error(part);
 
   const structureName = structure_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getStructure(
-    resultsFor(structureDocuments),
-  );
+  const client = createAdtClient(connection, logger);
+  const obj = client.getStructure(resultsFor(structureDocuments));
 
   // One request per call: the part asked for, and only it.
   if (part === 'metadata') {
     return answer(
       { tool: 'GetStructure', detail: 'terse' },
-      () => obj.readMetadata({ structureName }, { analyse: analyseException }),
+      () => readStructureMetadata(client, { structureName }),
       (metadata: AdtReading<string>) => ({
         success: true,
         structure_name: structureName,

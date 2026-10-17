@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readProgramMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -54,15 +55,14 @@ export async function handleGetProgram(
   if (part instanceof Error) return return_error(part);
 
   const programName = program_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getProgram(
-    resultsFor(programDocuments),
-  );
+  const client = createAdtClient(connection, logger);
+  const obj = client.getProgram(resultsFor(programDocuments));
 
   // One request per call: the part asked for, and only it.
   if (part === 'metadata') {
     return answer(
       { tool: 'GetProgram', detail: 'terse' },
-      () => obj.readMetadata({ programName }, { analyse: analyseException }),
+      () => readProgramMetadata(client, { programName }),
       (metadata: AdtReading<string>) => ({
         success: true,
         program_name: programName,

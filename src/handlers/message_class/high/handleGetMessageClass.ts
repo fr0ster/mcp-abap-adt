@@ -1,10 +1,8 @@
-import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { readMessageClassMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -48,9 +46,7 @@ export async function handleGetMessageClass(
   return answer(
     { tool: 'GetMessageClass', detail: 'terse' },
     () =>
-      createAdtClient(connection, logger)
-        .getMessageClass(resultsFor(messageClassDocuments))
-        .readMetadata({ name }, { analyse: analyseException }),
+      readMessageClassMetadata(createAdtClient(connection, logger), { name }),
     (metadata: AdtReading<string>) => ({
       success: true,
       message_class_name: name,

@@ -30,7 +30,6 @@ import {
   readNode,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
-import { methodFailureOf } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 
@@ -98,14 +97,6 @@ interface TreeNode {
   OBJECT_DESCRIPTION?: string;
   OBJECT_PACKAGE?: string;
   CHILDREN?: TreeNode[];
-}
-
-/** A failed answer carrying `error`. */
-function failedWith(error: IAdtError): IAdtFailure {
-  return {
-    ok: false,
-    getError: () => error,
-  } as unknown as IAdtFailure;
 }
 
 function ok<T>(value: T): IAdtResponse<T, IAdtError> {
@@ -445,7 +436,8 @@ async function buildTrees(
    */
   const bareLeaf = (node: InfoNode, o: NodeLevel['objects'][number]) => {
     const leaf: TreeNode = { OBJECT_TYPE: o.type, OBJECT_NAME: o.name };
-    // A function module is read at its group: the node it was found under.
+    // A function module or include is read at its group: the node it was
+    // found under.
     const functionGroup = node.type.toUpperCase().startsWith('FUGR')
       ? node.name
       : undefined;
@@ -546,19 +538,13 @@ async function buildTrees(
 
   // Every leaf's description from its metadata, in one phase.
   const described = leaves.filter(({ root }) => !failures.has(root));
-  let descriptions: Map<string, string | undefined>;
-  try {
-    descriptions = await metadataDescriptions(
-      context,
-      described.map(({ target }) => target),
-    );
-  } catch (thrown) {
-    // A 401 SAP answered to a metadata read: the method's error, with its
-    // step, ends the call as a refused node read does.
-    const refused = methodFailureOf(thrown);
-    if (refused === undefined) throw thrown;
-    return { roots, failures, ended: failedWith(refused) };
-  }
+  const { descriptions, refused } = await metadataDescriptions(
+    context,
+    described.map(({ target }) => target),
+  );
+  // A metadata read SAP refused with a credential failure ends the call as a
+  // refused node read does: the method's error, with its step.
+  if (refused !== undefined) return { roots, failures, ended: refused };
   for (const { leaf, target } of described) {
     const key = metadataKeyOf(target);
     const description = key === undefined ? undefined : descriptions.get(key);

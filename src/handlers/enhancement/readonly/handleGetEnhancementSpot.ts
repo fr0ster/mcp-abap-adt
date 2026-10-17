@@ -1,7 +1,7 @@
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { failureEntry, isCredentialPayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { readEnhancementSpotMetadata } from '../../../lib/strategies/metadataReads';
 import { carryingFailure } from '../../../lib/strategies/step';
 import { logger, return_error } from '../../../lib/utils';
 import { enhancementTypeOf, notThroughAdt } from './enhancementAvailability';
@@ -141,12 +141,12 @@ export async function handleGetEnhancementSpot(
     // adt-clients' BAdI spot (`enhsxsb`), with its own media type, read with
     // the strategy every other read uses.
     const step = 'read enhancement spot';
-    const answer = await createAdtClient(connection, logger)
-      .getEnhancement()
-      .readMetadata(
-        { enhancementName: enhancementSpot, enhancementType: 'enhsxsb' },
-        { analyse: analyseException },
-      );
+    const answer = await readEnhancementSpotMetadata(
+      createAdtClient(connection, logger),
+      {
+        enhancementName: enhancementSpot,
+      },
+    );
 
     if (answer.ok) {
       const document = String(answer.getResult().value ?? '');

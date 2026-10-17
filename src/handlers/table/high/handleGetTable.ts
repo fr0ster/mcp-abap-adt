@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readTableMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -54,15 +55,14 @@ export async function handleGetTable(
   if (part instanceof Error) return return_error(part);
 
   const tableName = table_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getTable(
-    resultsFor(tableDocuments),
-  );
+  const client = createAdtClient(connection, logger);
+  const obj = client.getTable(resultsFor(tableDocuments));
 
   // One request per call: the part asked for, and only it.
   if (part === 'metadata') {
     return answer(
       { tool: 'GetTable', detail: 'terse' },
-      () => obj.readMetadata({ tableName }, { analyse: analyseException }),
+      () => readTableMetadata(client, { tableName }),
       (metadata: AdtReading<string>) => ({
         success: true,
         table_name: tableName,

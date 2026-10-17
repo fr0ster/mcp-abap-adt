@@ -1,9 +1,13 @@
 /**
- * The batched walks' metadata phase sends each object's read exactly as the
- * repository's `Get<Type>` handler sends its metadata read (`part:
- * 'metadata'`): the same URL and the same Accept header, per type (the
- * measured reads went through those members).
+ * One metadata read per type, shared by the type's `Get<Type>` handler and
+ * the batched walks' metadata phase (`lib/strategies/metadataReads.ts`):
+ * - every `handleGet*` handler that reads metadata does it through that
+ *   module, or is named here with why it does not;
+ * - every type the batch reads has its handler here, and the batch part is
+ *   the handler's request whole: method, URL with its query, headers, body.
  */
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
 import type {
   IAbapRequestOptions,
   IAdtWireResponse,
@@ -13,7 +17,9 @@ import { handleGetClass } from '../../../handlers/class/high/handleGetClass';
 import { handleGetDataElement } from '../../../handlers/data_element/high/handleGetDataElement';
 import { handleGetDdl } from '../../../handlers/ddl/high/handleGetDdl';
 import { handleGetDomain } from '../../../handlers/domain/high/handleGetDomain';
+import { handleGetEnhancementSpot } from '../../../handlers/enhancement/readonly/handleGetEnhancementSpot';
 import { handleGetFunctionGroup } from '../../../handlers/function_group/high/handleGetFunctionGroup';
+import { handleGetFunctionInclude } from '../../../handlers/function_include/readonly/handleGetFunctionInclude';
 import { handleGetFunctionModule } from '../../../handlers/function_module/high/handleGetFunctionModule';
 import { handleGetInterface } from '../../../handlers/interface/high/handleGetInterface';
 import type { HandlerContext } from '../../../handlers/interfaces';
@@ -40,71 +46,171 @@ import { withinTurns } from '../../helpers/withinTurns';
 const DOC =
   '<?xml version="1.0" encoding="utf-8"?><adtcore:mainObject xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="Placeholder"/>';
 
-const targetOf = (type: string): MetadataTarget => ({
-  type,
-  name: NAME,
-  ...(type === 'FUGR/FF' ? { functionGroup: 'ZGRP_X' } : {}),
-});
-
-const acceptOf = (headers: Record<string, string> | undefined) => {
-  for (const [key, value] of Object.entries(headers ?? {})) {
-    if (key.toLowerCase() === 'accept') return value;
-  }
-  return undefined;
-};
+const NAME = 'ZOBJ_X';
+const GROUP = 'ZGRP_X';
+const part = 'metadata';
 
 type Handler = (context: HandlerContext) => Promise<unknown>;
 
-const NAME = 'ZOBJ_X';
-const part = 'metadata';
-
-/** Each type's `Get<Type>` handler, asked for the metadata part. */
-const HANDLERS: Record<string, Handler> = {
-  'CLAS/OC': (c) => handleGetClass(c, { class_name: NAME, part } as never),
-  'INTF/OI': (c) =>
-    handleGetInterface(c, { interface_name: NAME, part } as never),
-  'PROG/P': (c) => handleGetProgram(c, { program_name: NAME, part } as never),
-  'DDLS/DF': (c) => handleGetDdl(c, { ddl_name: NAME, part } as never),
-  'DDLX/EX': (c) =>
-    handleGetMetadataExtension(c, {
-      metadata_extension_name: NAME,
-      part,
-    } as never),
-  'DOMA/DD': (c) => handleGetDomain(c, { domain_name: NAME } as never),
-  'DTEL/DE': (c) =>
-    handleGetDataElement(c, { data_element_name: NAME } as never),
-  'TABL/DT': (c) => handleGetTable(c, { table_name: NAME, part } as never),
-  'TABL/DS': (c) =>
-    handleGetStructure(c, { structure_name: NAME, part } as never),
-  'FUGR/F': (c) =>
-    handleGetFunctionGroup(c, { function_group_name: NAME } as never),
-  'FUGR/FF': (c) =>
-    handleGetFunctionModule(c, {
-      function_module_name: NAME,
-      function_group_name: 'ZGRP_X',
-      part,
-    } as never),
-  'SRVD/SRV': (c) =>
-    handleGetServiceDefinition(c, {
-      service_definition_name: NAME,
-      part,
-    } as never),
-  'SRVB/SVB': (c) =>
-    handleGetServiceBinding(c, { service_binding_name: NAME, part } as never),
-  'BDEF/BDO': (c) =>
-    handleGetBehaviorDefinition(c, {
-      behavior_definition_name: NAME,
-      part,
-    } as never),
-  'DEVC/K': (c) => handleGetPackage(c, { package_name: NAME } as never),
-  'MSAG/N': (c) =>
-    handleGetMessageClass(c, { message_class_name: NAME } as never),
+/** Each type the batch reads: its `Get<Type>` handler, and how it is asked. */
+const HANDLERS: Record<string, { file: string; call: Handler }> = {
+  'CLAS/OC': {
+    file: 'class/high/handleGetClass.ts',
+    call: (c) => handleGetClass(c, { class_name: NAME, part } as never),
+  },
+  'INTF/OI': {
+    file: 'interface/high/handleGetInterface.ts',
+    call: (c) => handleGetInterface(c, { interface_name: NAME, part } as never),
+  },
+  'PROG/P': {
+    file: 'program/high/handleGetProgram.ts',
+    call: (c) => handleGetProgram(c, { program_name: NAME, part } as never),
+  },
+  'DDLS/DF': {
+    file: 'ddl/high/handleGetDdl.ts',
+    call: (c) => handleGetDdl(c, { ddl_name: NAME, part } as never),
+  },
+  'DDLX/EX': {
+    file: 'metadata_extension/high/handleGetMetadataExtension.ts',
+    call: (c) =>
+      handleGetMetadataExtension(c, {
+        metadata_extension_name: NAME,
+        part,
+      } as never),
+  },
+  'DOMA/DD': {
+    file: 'domain/high/handleGetDomain.ts',
+    call: (c) => handleGetDomain(c, { domain_name: NAME } as never),
+  },
+  'DTEL/DE': {
+    file: 'data_element/high/handleGetDataElement.ts',
+    call: (c) => handleGetDataElement(c, { data_element_name: NAME } as never),
+  },
+  'TABL/DT': {
+    file: 'table/high/handleGetTable.ts',
+    call: (c) => handleGetTable(c, { table_name: NAME, part } as never),
+  },
+  'TABL/DS': {
+    file: 'structure/high/handleGetStructure.ts',
+    call: (c) => handleGetStructure(c, { structure_name: NAME, part } as never),
+  },
+  'FUGR/F': {
+    file: 'function_group/high/handleGetFunctionGroup.ts',
+    call: (c) =>
+      handleGetFunctionGroup(c, { function_group_name: NAME } as never),
+  },
+  'FUGR/FF': {
+    file: 'function_module/high/handleGetFunctionModule.ts',
+    call: (c) =>
+      handleGetFunctionModule(c, {
+        function_module_name: NAME,
+        function_group_name: GROUP,
+        part,
+      } as never),
+  },
+  'FUGR/I': {
+    file: 'function_include/readonly/handleGetFunctionInclude.ts',
+    call: (c) =>
+      handleGetFunctionInclude(c, {
+        function_group_name: GROUP,
+        include_name: NAME,
+        part,
+      } as never),
+  },
+  'SRVD/SRV': {
+    file: 'service_definition/high/handleGetServiceDefinition.ts',
+    call: (c) =>
+      handleGetServiceDefinition(c, {
+        service_definition_name: NAME,
+        part,
+      } as never),
+  },
+  'SRVB/SVB': {
+    file: 'service_binding/high/handleGetServiceBinding.ts',
+    call: (c) =>
+      handleGetServiceBinding(c, {
+        service_binding_name: NAME,
+        part,
+      } as never),
+  },
+  'BDEF/BDO': {
+    file: 'behavior_definition/high/handleGetBehaviorDefinition.ts',
+    call: (c) =>
+      handleGetBehaviorDefinition(c, {
+        behavior_definition_name: NAME,
+        part,
+      } as never),
+  },
+  'DEVC/K': {
+    file: 'package/high/handleGetPackage.ts',
+    call: (c) => handleGetPackage(c, { package_name: NAME } as never),
+  },
+  'MSAG/N': {
+    file: 'message_class/high/handleGetMessageClass.ts',
+    call: (c) =>
+      handleGetMessageClass(c, { message_class_name: NAME } as never),
+  },
+  'ENHS/XSB': {
+    file: 'enhancement/readonly/handleGetEnhancementSpot.ts',
+    call: (c) =>
+      handleGetEnhancementSpot(c, { enhancement_spot: NAME } as never),
+  },
 };
 
-/** The metadata request the type's `Get<Type>` handler sends, on a plain connection. */
-async function directRequest(
-  type: string,
-): Promise<{ url: string; accept: string | undefined }> {
+/** Handlers that read a type above through the shared read, besides its own. */
+const ALSO_SHARED: Record<string, string> = {
+  'system/high/handleGetPackageTree.ts': 'DEVC/K',
+  'system/low/handleGetNodeStructure.ts': 'DEVC/K',
+};
+
+/** `handleGet*` handlers with a metadata read the batch does not use, and why. */
+const EXCLUDED: Record<string, string> = {
+  'behavior_implementation/high/handleGetBehaviorImplementation.ts':
+    "the behavior pool's class metadata; the walks list it as its class",
+  'enhancement/readonly/handleGetEnhancements.ts':
+    "a probe of an include's metadata to tell an include from a program",
+  'include/readonly/handleGetIncludesList.ts':
+    "a class's metadata, read to find its includes",
+};
+
+const HANDLERS_DIR = join(__dirname, '../../../handlers');
+
+/** A call of one of the shared reads (`read<Type>Metadata(`). */
+const SHARED_CALL = /\bread[A-Z]\w*Metadata\(/;
+
+function getHandlerFiles(dir: string): string[] {
+  return readdirSync(dir).flatMap((entry) => {
+    const path = join(dir, entry);
+    if (statSync(path).isDirectory()) return getHandlerFiles(path);
+    return /^handleGet\w*\.ts$/.test(entry) ? [path] : [];
+  });
+}
+
+/** The code of a file without its comment lines. */
+const codeOf = (path: string) =>
+  readFileSync(path, 'utf8')
+    .split('\n')
+    .filter((line) => {
+      const t = line.trim();
+      return !t.startsWith('//') && !t.startsWith('*') && !t.startsWith('/*');
+    })
+    .join('\n');
+
+const lowerHeaders = (headers: Record<string, unknown> | undefined) =>
+  Object.fromEntries(
+    Object.entries(headers ?? {})
+      .filter(([key]) => key.toLowerCase() !== 'content-length')
+      .map(([key, value]) => [key.toLowerCase(), String(value)]),
+  );
+
+const targetOf = (type: string): MetadataTarget => ({
+  type,
+  name: NAME,
+  ...(type === 'FUGR/FF' || type === 'FUGR/I' ? { functionGroup: GROUP } : {}),
+});
+
+/** The request the type's `Get<Type>` handler sends, on a plain connection. */
+async function handlerRequest(type: string) {
   const fake = envelopeConnection(
     () => envelopeResponse([]),
     async (): Promise<IAdtWireResponse> =>
@@ -115,31 +221,60 @@ async function directRequest(
         data: DOC,
       }) as IAdtWireResponse,
   );
-  const handler = HANDLERS[type] as Handler;
+  const handler = HANDLERS[type];
+  if (handler === undefined) throw new Error(`no handler for ${type}`);
   await withinTurns(
-    handler({
+    handler.call({
       connection: fake.connection,
       logger: undefined,
     } as unknown as HandlerContext),
   );
   expect(fake.directs).toHaveLength(1);
   const request = fake.directs[0] as IAbapRequestOptions;
-  return { url: request.url, accept: acceptOf(request.headers) };
+  return {
+    method: request.method,
+    url: request.url,
+    headers: lowerHeaders(request.headers),
+    body: request.data === undefined ? '' : String(request.data),
+  };
 }
 
-describe('the batched metadata reads', () => {
-  it("every type with a metadata read has its Get<Type> handler's read here", () => {
+describe('one metadata read per type, shared by handler and batch', () => {
+  it('every handleGet* metadata read goes through the shared reads, or is named with its reason', () => {
+    const reading = getHandlerFiles(HANDLERS_DIR)
+      .filter((path) => {
+        const code = codeOf(path);
+        return code.includes('.readMetadata(') || SHARED_CALL.test(code);
+      })
+      .map((path) => relative(HANDLERS_DIR, path))
+      .sort();
+    expect(reading).toEqual(
+      [
+        ...Object.values(HANDLERS).map((h) => h.file),
+        ...Object.keys(ALSO_SHARED),
+        ...Object.keys(EXCLUDED),
+      ].sort(),
+    );
+    // Every other one reads through the shared reads, never a client's own
+    // metadata member.
+    const direct = reading.filter(
+      (file) =>
+        !(file in EXCLUDED) &&
+        /\.read(Object)?Metadata\(/.test(codeOf(join(HANDLERS_DIR, file))),
+    );
+    expect(direct).toEqual([]);
+  });
+
+  it('the batch reads exactly the types of those handlers', () => {
     expect([...METADATA_READ_TYPES].sort()).toEqual(
       Object.keys(HANDLERS).sort(),
     );
   });
 
   it.each(METADATA_READ_TYPES)(
-    '%s: the part is the readMetadata request — same URL, same Accept',
+    "%s: the batch part is the handler's request whole",
     async (type) => {
-      const target = targetOf(type);
-      const direct = await directRequest(type);
-      expect(direct.accept).toBeTruthy();
+      const direct = await handlerRequest(type);
       const fake = envelopeConnection((parts) =>
         envelopeResponse(
           parts.map(() => ({
@@ -155,19 +290,22 @@ describe('the batched metadata reads', () => {
         logger: undefined,
         batchAvailability: createBatchAvailability(),
       } as unknown as HandlerContext;
-      const described = await withinTurns(
-        metadataDescriptions(context, [target]),
+      const { descriptions } = await withinTurns(
+        metadataDescriptions(context, [targetOf(type)]),
       );
       expect(fake.envelopes).toHaveLength(1);
       const parts = fake.envelopes[0]?.parts ?? [];
       expect(parts).toHaveLength(1);
-      const part = parts[0];
+      const inner = parts[0];
       expect({
-        method: part?.method,
-        url: part?.url,
-        accept: part?.headers.accept,
-      }).toEqual({ method: 'GET', url: direct.url, accept: direct.accept });
-      expect([...described.values()]).toEqual(['Placeholder']);
+        method: inner?.method,
+        url: inner?.url,
+        headers: lowerHeaders(inner?.headers),
+        // The envelope frames an empty body with its line break.
+        body: (inner?.body ?? '').trim(),
+      }).toEqual(direct);
+      expect(direct.headers.accept).toBeTruthy();
+      expect([...descriptions.values()]).toEqual(['Placeholder']);
     },
   );
 });

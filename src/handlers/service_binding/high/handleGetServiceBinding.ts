@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readServiceBindingMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -63,15 +64,14 @@ export async function handleGetServiceBinding(
   // called it that way.
   const bindingName = args.service_binding_name.trim().toUpperCase();
   const responseFormat = args.response_format ?? 'xml';
-  const obj = createAdtClient(connection, logger).getServiceBinding(
-    resultsFor(serviceDocuments),
-  );
+  const client = createAdtClient(connection, logger);
+  const obj = client.getServiceBinding(resultsFor(serviceDocuments));
 
   // One request per call: the part asked for, and only it.
   if (part === 'metadata') {
     return answer(
       { tool: 'GetServiceBinding', detail: 'terse' },
-      () => obj.readMetadata({ bindingName }, { analyse: analyseException }),
+      () => readServiceBindingMetadata(client, { bindingName }),
       (metadata: AdtReading<string>) => ({
         success: true,
         service_binding_name: bindingName,

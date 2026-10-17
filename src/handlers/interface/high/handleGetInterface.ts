@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readInterfaceMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -55,15 +56,14 @@ export async function handleGetInterface(
   if (part instanceof Error) return return_error(part);
 
   const interfaceName = interface_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getInterface(
-    resultsFor(interfaceDocuments),
-  );
+  const client = createAdtClient(connection, logger);
+  const obj = client.getInterface(resultsFor(interfaceDocuments));
 
   // One request per call: the part asked for, and only it.
   if (part === 'metadata') {
     return answer(
       { tool: 'GetInterface', detail: 'terse' },
-      () => obj.readMetadata({ interfaceName }, { analyse: analyseException }),
+      () => readInterfaceMetadata(client, { interfaceName }),
       (metadata: AdtReading<string>) => ({
         success: true,
         interface_name: interfaceName,

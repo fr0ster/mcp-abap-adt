@@ -1,5 +1,5 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtFailure } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../handlers/interfaces';
@@ -12,11 +12,12 @@ import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
 import { createAdtClient } from '../clients';
 import {
+  type MetadataRead,
   type MetadataTarget,
   metadataKeyOf,
-  readObjectMetadata,
+  metadataReadOf,
 } from './metadataReads';
-import { carryingFailure } from './step';
+import { atStep, carryingFailure } from './step';
 
 /**
  * The one call this walk needs, named structurally.
@@ -666,59 +667,76 @@ export function metadataDescriptionOf(xml: string): string | undefined {
   return undefined;
 }
 
-/** The document a metadata reading answered (`AdtReading.raw`). */
+/**
+ * The document a metadata reading answered: `AdtReading.raw`, or the
+ * document itself where the type's read answers it whole.
+ */
 function rawOf(value: unknown): string {
+  if (typeof value === 'string') return value;
   const raw = (value as { raw?: unknown } | undefined)?.raw;
   return typeof raw === 'string' ? raw : '';
 }
 
+/** The descriptions a metadata phase read, and the refusal that ended it. */
+export interface MetadataDescriptions {
+  /** Each object's description, by `metadataKeyOf`. */
+  descriptions: Map<string, string | undefined>;
+  /** A metadata read SAP refused with a credential failure, with its step. */
+  refused?: IAdtFailure;
+}
+
 /**
  * The description of every object of `targets`, read in one ADT batch
- * envelope (`runPhase`): one metadata read per distinct object, as its type's
- * `Get<Type>` handler reads it (`readObjectMetadata`), keyed by
+ * envelope (`runPhase`): one metadata read per distinct object, the one its
+ * type's `Get<Type>` handler sends (`metadataReadOf`), keyed by
  * `metadataKeyOf`. An object of a type with no metadata read, or whose read
- * failed, has no entry. A credential failure ends the call: a failure the
- * server's reader answers, as it came; a `401` SAP answered to a part, as
- * the method's error with its step.
+ * failed, has no entry. A failure the server's reader answers ends the call,
+ * thrown as it came; a read SAP refused with a credential failure is
+ * answered as `refused`, the method's error with its step.
  */
 export async function metadataDescriptions(
   context: HandlerContext,
   targets: readonly MetadataTarget[],
-): Promise<Map<string, string | undefined>> {
-  const byKey = new Map<string, MetadataTarget>();
+): Promise<MetadataDescriptions> {
+  const reads = new Map<string, MetadataRead>();
   for (const target of targets) {
     const key = metadataKeyOf(target);
-    if (key !== undefined && !byKey.has(key)) byKey.set(key, target);
+    const read = metadataReadOf(target);
+    if (key !== undefined && read !== undefined && !reads.has(key)) {
+      reads.set(key, read);
+    }
   }
-  const keys = [...byKey.keys()];
-  const described = new Map<string, string | undefined>();
-  if (keys.length === 0) return described;
+  const keys = [...reads.keys()];
+  const descriptions = new Map<string, string | undefined>();
+  if (keys.length === 0) return { descriptions };
   const results = await runPhase(context, keys, (key, connection) =>
-    readObjectMetadata(
-      createAdtClient(connection, context.logger),
-      byKey.get(key) as MetadataTarget,
-    ),
+    atStep(
+      METADATA_STEP,
+      reads.get(key) as MetadataRead,
+    )(createAdtClient(connection, context.logger)),
   );
+  let refused: IAdtFailure | undefined;
   results.forEach((result, i) => {
-    const key = keys[i] as string;
     if (!result.ok) {
       if (endsTheCall(result.error)) throw result.error;
       return;
     }
     const response = result.value;
     if (response.ok) {
-      described.set(
-        key,
+      descriptions.set(
+        keys[i] as string,
         metadataDescriptionOf(rawOf(response.getResult().value)),
       );
       return;
     }
-    const error = response.getError();
-    if (isCredentialPayload(failureEntry(error, METADATA_STEP))) {
-      throw carryingFailure(new Error(error.message), error, METADATA_STEP);
+    if (
+      refused === undefined &&
+      isCredentialPayload(failureEntry(response.getError(), METADATA_STEP))
+    ) {
+      refused = response;
     }
   });
-  return described;
+  return refused === undefined ? { descriptions } : { descriptions, refused };
 }
 
 /**
@@ -726,16 +744,21 @@ export async function metadataDescriptions(
  * walks): one phase over the objects of every walk that answered, each
  * object's description its metadata's `adtcore:description`. An object of a
  * type with no metadata read (`metadataKeyOf`), or whose read failed, has no
- * description.
+ * description. A metadata read SAP refused with a credential failure ends
+ * the call: thrown, carrying the method's error with its step.
  */
 export async function describeFromMetadata(
   context: HandlerContext,
   walked: readonly PhaseResult<WalkedItem[]>[],
 ): Promise<PhaseResult<WalkedItem[]>[]> {
-  const described = await metadataDescriptions(
+  const { descriptions, refused } = await metadataDescriptions(
     context,
     walked.flatMap((result) => (result.ok ? result.value : [])),
   );
+  if (refused !== undefined) {
+    const error = refused.getError();
+    throw carryingFailure(new Error(error.message), error, METADATA_STEP);
+  }
   return walked.map((result) =>
     result.ok
       ? {
@@ -743,8 +766,8 @@ export async function describeFromMetadata(
           value: result.value.map((item) => {
             const key = metadataKeyOf(item);
             const description =
-              key === undefined ? undefined : described.get(key);
-            return { ...item, description };
+              key === undefined ? undefined : descriptions.get(key);
+            return description === undefined ? item : { ...item, description };
           }),
         }
       : result,

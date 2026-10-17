@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readServiceDefinitionMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -55,7 +56,8 @@ export async function handleGetServiceDefinition(
   if (part instanceof Error) return return_error(part);
 
   const serviceDefinitionName = service_definition_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getServiceDefinition(
+  const client = createAdtClient(connection, logger);
+  const obj = client.getServiceDefinition(
     resultsFor(serviceDefinitionDocuments),
   );
 
@@ -63,11 +65,7 @@ export async function handleGetServiceDefinition(
   if (part === 'metadata') {
     return answer(
       { tool: 'GetServiceDefinition', detail: 'terse' },
-      () =>
-        obj.readMetadata(
-          { serviceDefinitionName },
-          { analyse: analyseException },
-        ),
+      () => readServiceDefinitionMetadata(client, { serviceDefinitionName }),
       (metadata: AdtReading<string>) => ({
         success: true,
         service_definition_name: serviceDefinitionName,

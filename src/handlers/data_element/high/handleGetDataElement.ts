@@ -1,10 +1,8 @@
-import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { readDataElementMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -46,9 +44,7 @@ export async function handleGetDataElement(
     return return_error(new Error('data_element_name is required'));
 
   const dataElementName = data_element_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getDataElement(
-    resultsFor(dataElementDocuments),
-  );
+  const client = createAdtClient(connection, logger);
 
   // A data element has no source of its own — `IDataElementContract`
   // composes `IAdtMetadataReadable` and nothing else, so unlike its
@@ -59,7 +55,7 @@ export async function handleGetDataElement(
   // always answered.
   return answer(
     { tool: 'GetDataElement', detail: 'terse' },
-    () => obj.readMetadata({ dataElementName }, { analyse: analyseException }),
+    () => readDataElementMetadata(client, { dataElementName }),
     (metadata: AdtReading<string>) => ({
       success: true,
       data_element_name: dataElementName,

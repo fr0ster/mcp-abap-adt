@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readFunctionIncludeMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -63,19 +64,15 @@ export async function handleGetFunctionInclude(
 
   const functionGroupName = function_group_name.toUpperCase();
   const includeName = include_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getFunctionInclude(
-    resultsFor(functionIncludeDocuments),
-  );
+  const client = createAdtClient(connection, logger);
+  const obj = client.getFunctionInclude(resultsFor(functionIncludeDocuments));
 
   // One request per call: the part asked for, and only it.
   if (part === 'metadata') {
     return answer(
       { tool: 'GetFunctionInclude', detail: 'terse' },
       () =>
-        obj.readMetadata(
-          { functionGroupName, includeName },
-          { analyse: analyseException },
-        ),
+        readFunctionIncludeMetadata(client, { functionGroupName, includeName }),
       (metadata: AdtReading<string>) => ({
         success: true,
         function_group_name: functionGroupName,

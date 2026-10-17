@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readDdlMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -51,15 +52,14 @@ export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
   if (part instanceof Error) return return_error(part);
 
   const ddlName = ddl_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getDdl(
-    resultsFor(ddlDocuments),
-  );
+  const client = createAdtClient(connection, logger);
+  const obj = client.getDdl(resultsFor(ddlDocuments));
 
   // One request per call: the part asked for, and only it.
   if (part === 'metadata') {
     return answer(
       { tool: 'GetDdl', detail: 'terse' },
-      () => obj.readMetadata({ ddlName }, { analyse: analyseException }),
+      () => readDdlMetadata(client, { ddlName }),
       (metadata: AdtReading<string>) => ({
         success: true,
         ddl_name: ddlName,

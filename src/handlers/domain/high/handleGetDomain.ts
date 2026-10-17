@@ -1,10 +1,8 @@
-import { domainDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { readDomainMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -45,9 +43,7 @@ export async function handleGetDomain(
   if (!domain_name) return return_error(new Error('domain_name is required'));
 
   const domainName = domain_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getDomain(
-    resultsFor(domainDocuments),
-  );
+  const client = createAdtClient(connection, logger);
 
   // A domain has no source of its own — `IDomainContract` composes
   // `IAdtMetadataReadable` and nothing else, so unlike its siblings there
@@ -61,7 +57,7 @@ export async function handleGetDomain(
   // answered.
   return answer(
     { tool: 'GetDomain', detail: 'terse' },
-    () => obj.readMetadata({ domainName }, { analyse: analyseException }),
+    () => readDomainMetadata(client, { domainName }),
     (metadata: AdtReading<string>) => ({
       success: true,
       domain_name: domainName,

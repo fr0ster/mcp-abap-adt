@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readFunctionModuleMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -67,9 +68,8 @@ export async function handleGetFunctionModule(
 
   const functionModuleName = function_module_name.toUpperCase();
   const functionGroupName = function_group_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getFunctionModule(
-    resultsFor(functionModuleDocuments),
-  );
+  const client = createAdtClient(connection, logger);
+  const obj = client.getFunctionModule(resultsFor(functionModuleDocuments));
 
   // One request per call, at the group the caller gave: the part asked for,
   // and only it.
@@ -77,10 +77,10 @@ export async function handleGetFunctionModule(
     return answer(
       { tool: 'GetFunctionModule', detail: 'terse' },
       () =>
-        obj.readMetadata(
-          { functionModuleName, functionGroupName },
-          { analyse: analyseException },
-        ),
+        readFunctionModuleMetadata(client, {
+          functionModuleName,
+          functionGroupName,
+        }),
       (metadata: AdtReading<string>) => ({
         success: true,
         function_module_name: functionModuleName,

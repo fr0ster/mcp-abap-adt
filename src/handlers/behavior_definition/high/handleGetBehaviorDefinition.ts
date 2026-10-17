@@ -8,6 +8,7 @@ import {
   type ReadPart,
   readPartOf,
 } from '../../../lib/handlers/readPart';
+import { readBehaviorDefinitionMetadata } from '../../../lib/strategies/metadataReads';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -58,7 +59,8 @@ export async function handleGetBehaviorDefinition(
   // against `IBehaviorDefinitionConfig`, and the pre-migration handler
   // already called it that way.
   const behaviorDefinitionName = behavior_definition_name.toUpperCase();
-  const obj = createAdtClient(connection, logger).getBehaviorDefinition(
+  const client = createAdtClient(connection, logger);
+  const obj = client.getBehaviorDefinition(
     resultsFor(behaviorDefinitionDocuments),
   );
 
@@ -67,10 +69,9 @@ export async function handleGetBehaviorDefinition(
     return answer(
       { tool: 'GetBehaviorDefinition', detail: 'terse' },
       () =>
-        obj.readMetadata(
-          { name: behaviorDefinitionName },
-          { analyse: analyseException },
-        ),
+        readBehaviorDefinitionMetadata(client, {
+          name: behaviorDefinitionName,
+        }),
       (metadata: AdtReading<string>) => ({
         success: true,
         behavior_definition_name: behaviorDefinitionName,

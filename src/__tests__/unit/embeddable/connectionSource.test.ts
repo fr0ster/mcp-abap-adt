@@ -22,6 +22,7 @@ import type {
 } from '../../../embeddable/ConnectionContext';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { createAbapConnection } from '../../../lib/connectionFactory';
+import { presented } from '../../helpers/presented';
 import { stateSystemKind } from '../../helpers/systemKind';
 
 // The system kind is required: the stand-in's is stated for every case.
@@ -85,7 +86,9 @@ describe("'built': the source resolves, the connection is built from its answer"
 
     expect(resolve).toHaveBeenCalledTimes(1);
     expect(resolve.mock.calls[0][0]).toBe(signal);
-    expect(build).toHaveBeenCalledWith(SETTINGS, credential);
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(build.mock.calls[0][0]).toEqual(SETTINGS);
+    expect(presented(build.mock.calls[0][1])).toBe(credential);
     expect(connection).toBe(build.mock.results[0].value);
     expect(
       (connection as unknown as { connect: jest.Mock }).connect,

@@ -3,7 +3,7 @@
  * target whose every member forwards to the connection it is pointed at now.
  *
  * The instance's connection object may be replaced between recording and
- * `BatchEnd` (a new credential object, a lost session) and the replaced one
+ * `BatchEnd` (a session SAP ended) and the replaced one
  * ends with its logoff, so the batch never holds a connection of its own.
  * The owner points the target: during a recording call's turn at the
  * connection that call took (what `connect()` / `getBaseUrl()` /

@@ -53,8 +53,13 @@ Setting it reads nothing and sends nothing.
 - **Built:** the source resolves the settings and the credential with the request's `signal`.
   `createAbapConnection(settings, credential)` builds the connection — connection's
   `createConnection({ system, transport, … })`, with the system and the wire stated from the
-  settings — and it is connected once per
-  credential object. It is kept while the source answers the same credential object. The
+  settings — and it is connected once and kept; it is replaced only when SAP ended its session
+  (`isSpent`). It presents `CurrentCredential`: the credential the source answers is put in force
+  on the held connection at each `getConnection` (`take`) — Streamable HTTP: the request's; a
+  changed credential is the same user, its sends carry it in the same SAP session, its locks kept,
+  and a credential that is not right is SAP's to answer. Each of `CurrentCredential`'s four moments
+  runs inside auth-providers' `AuthProviderBase` boundary (a throw becomes a refusal), and a
+  credential put in force after the connect is prepared once before its first use. The
   credential renews itself, since a `401` reaches its `rejected()`.
 - **A shared connect:** every caller that asks while a connect runs shares it, and awaits it to
   its end whatever its signal says: the connect is a send on the instance's connection, so a call
@@ -211,8 +216,7 @@ the connection that call holds, else in turn, on the connection `getConnection` 
 flow (a session the call ahead lost already replaced), given back when the send is done; a holder
 that holds no mark sends on the connection taken inside its turn. A queued call re-checks the
 connection it took before it waited (`isStaleBuilt`): a spent one is given back and the current one
-taken; a connection retired because another credential's call took the instance stays the queued
-call's own. `send` is
+taken. `send` is
 handed that connection and must capture none of its own (`context.connection` may be the spent
 one). A caller is its destination's parameters, answered without entering the flow when known
 (else made with the instance's connection, through the flow). The leftover tools ask nothing of SAP: their caller is the instance's destination. The wait has no timeout; a call whose signal aborts while it waits leaves at once and never

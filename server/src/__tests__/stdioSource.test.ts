@@ -43,6 +43,7 @@ import {
 } from '@mcp-abap-adt/lib/handlers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { presented } from '../../../src/__tests__/helpers/presented';
 import { createAbapConnection } from '../../../src/lib/connectionFactory';
 import type { IDestinations } from '../auth/IAuthBrokerFactory.js';
 import { StdioServer } from '../StdioServer.js';
@@ -139,7 +140,7 @@ describe("stdio: the connection is kept while getProvider answers the session's 
       expect(await which()).toBe('connection-1');
 
       expect(build).toHaveBeenCalledTimes(1);
-      expect(build.mock.calls[0][1]).toBe(session);
+      expect(presented(build.mock.calls[0][1])).toBe(session);
       // Asked on every call, each with a signal.
       expect(getProvider).toHaveBeenCalledTimes(3);
       for (const [destination, options] of getProvider.mock.calls) {
@@ -172,8 +173,8 @@ describe("stdio: the connection is kept while getProvider answers the session's 
       expect(await which()).toBe('connection-2');
 
       expect(build).toHaveBeenCalledTimes(2);
-      expect(build.mock.calls[0][1]).toBe(session);
-      expect(build.mock.calls[1][1]).toBe(session);
+      expect(presented(build.mock.calls[0][1])).toBe(session);
+      expect(presented(build.mock.calls[1][1])).toBe(session);
       // The replacement's provider came from this call's getProvider.
       expect(getProvider).toHaveBeenCalledTimes(3);
     } finally {

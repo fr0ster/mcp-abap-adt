@@ -6,7 +6,8 @@
  * write and the unlock reach that instance — and its SAP session — by the
  * `x-mcp-state-handle` header, and are refused, sending nothing, under a
  * lock the instance they reached does not hold. A request of the same
- * credential works on the held connection; another credential retires it.
+ * user works on the held connection, its credential the request's: a
+ * renewed token keeps the session and its locks.
  * Every call goes over real HTTP to the ADT stand-in.
  */
 
@@ -159,21 +160,39 @@ it('without the header the write and the unlock are refused, sending nothing', a
   expect(poolSize()).toBe(1);
 });
 
-it('another credential retires the held connection, and the lock ends with its session: the write is refused, sending nothing', async () => {
+it('a request with another credential (a renewed token) works on the held connection: same SAP session, the lock kept, the write sent with the new credential', async () => {
   const { lockHandle, stateHandle } = await lock();
-  const other = {
-    ...basicHeaders(s.standIn.url),
-    'x-sap-login': 'OTHER_USER',
-    'x-sap-password': 'other-password',
+  const lockedWith = lockRequests()[0]?.authorization;
+  expect(lockedWith?.startsWith('Basic ')).toBe(true);
+  const renewed = {
+    'x-sap-url': s.standIn.url,
+    'x-sap-client': '100',
+    'x-sap-jwt-token': 'renewed-token',
   };
   const updated = await s.call(
     'HandlerUpdate',
     { ...UPDATE, lock_handle: lockHandle },
-    withHeader(stateHandle, other),
+    withHeader(stateHandle, renewed),
   );
-  expect(updated.isError).toBe(true);
-  expect(updated.text).toContain('lock_handle is not held by this instance');
-  expect(puts()).toEqual([]);
+  expect(updated.isError).toBe(false);
+  expect(puts()).toHaveLength(1);
+  const session = lockRequests()[0]?.session;
+  expect(puts()[0]?.session).toBe(session);
+  expect(puts()[0]?.authorization).toBe('Bearer renewed-token');
+  expect(puts()[0]?.url).toContain(`lockHandle=${lockHandle}`);
+  // Nothing logged off: the session lives on.
+  expect(s.standIn.loggedOff()).toEqual([]);
+
+  const unlocked = await s.call(
+    'HandlerUnlock',
+    { ...LOCK, lock_handle: lockHandle },
+    withHeader(stateHandle, renewed),
+  );
+  expect(unlocked.isError).toBe(false);
+  expect(unlocks()).toHaveLength(1);
+  expect(unlocks()[0]?.session).toBe(session);
+  expect(unlocks()[0]?.authorization).toBe('Bearer renewed-token');
+  await until(() => poolSize() === 0);
 });
 
 it('a session SAP lost takes its locks with it: the write on the replacement session is refused, sending nothing', async () => {

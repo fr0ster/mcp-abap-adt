@@ -9,6 +9,7 @@ import {
   shutdownRefusalAnswer,
 } from '../lib/activeTools.js';
 import { answerRead } from '../lib/auth/answerFailure.js';
+import { CurrentCredential } from '../lib/auth/currentCredential.js';
 import type { DestinationSystemContext } from '../lib/auth/destinationSystemContext.js';
 import {
   failureOf,
@@ -154,9 +155,11 @@ export type StartedConnection =
  * the instance's: kept, used by the next call.
  */
 interface BuiltConnection {
-  credential: IAuthProvider;
-  /** The source's identity of the credential (`ResolvedConnection.identity`). */
-  identity?: string;
+  /**
+   * The credential the connection presents: the latest one a call put in
+   * force (`CurrentCredential.take`).
+   */
+  credential: CurrentCredential;
   connection: Promise<AbapConnection>;
   /** The connection once its connect completed. */
   ready?: AbapConnection;
@@ -168,22 +171,6 @@ interface BuiltConnection {
   users: number;
   /** Replaced: it ends with its logoff once no call works on it. */
   retired: boolean;
-}
-
-/**
- * Whether `resolved` is the credential `held` was built for: the same
- * object, or the same identity the source names (a pooled HTTP instance's
- * next request with the same credential headers). The calls of the
- * credential in force work on its connection: another identity retires it.
- */
-function sameCredential(
-  held: BuiltConnection,
-  resolved: ResolvedConnection,
-): boolean {
-  return (
-    held.credential === resolved.credential ||
-    (held.identity !== undefined && held.identity === resolved.identity)
-  );
 }
 
 /**
@@ -237,10 +224,10 @@ export abstract class BaseMcpServer extends McpServer {
   protected connectionContext: ConnectionContext | null = null;
 
   /**
-   * The connection built from the source, kept while the source answers the
-   * same credential object: stdio's provider (the same one for the
-   * process's life), an SSE connection's headers. A new credential — a new
-   * HTTP request's headers — builds a new connection.
+   * The connection built from the source, kept until SAP ended its session.
+   * It presents the credential the source answered last: stdio's provider
+   * (the same one for the process's life), an SSE connection's headers, each
+   * Streamable HTTP request's headers (`CurrentCredential`).
    */
   private built: BuiltConnection | undefined;
 
@@ -532,14 +519,18 @@ export abstract class BaseMcpServer extends McpServer {
    * The connection a tool call works on. Injected: the connection as given —
    * no `resolve`, no `connect()`, no wrap. Built: the source resolves the
    * settings and the credential with the request's `signal` (its own waits
-   * race it), and the connection is built and connected once per credential
-   * object — kept while the source answers the same one, replaced
-   * only when SAP already lost the session or the source answers another
-   * credential object (or the same identity: `sameCredential`) (http: the request's; sse: fixed per connection). On stdio the source
-   * answers the same provider for the process's life: the user is fixed, and
-   * a renewed token (refresh, or a new login when the refresh fails) lives
-   * inside that provider. The credential renews itself (a 401 reaches its
-   * `rejected()`), so nothing is looked up here for refreshing.
+   * race it), and the connection is built and connected once and kept: it
+   * is replaced only when SAP ended its session (`isSpent`: a timeout, a
+   * logoff, an administrator). The credential the source answers is put in
+   * force on the held connection (`CurrentCredential.take`) — http: the
+   * request's; a changed credential (a renewed token, a new basic pair) is
+   * the same user, and its next sends carry it in the same SAP session, its
+   * locks kept; a credential that is not right is SAP's to answer, and its
+   * refusal reaches the caller as it came. On stdio the source answers the
+   * same provider for the process's life: a renewed token (refresh, or a
+   * new login when the refresh fails) lives inside that provider. The
+   * credential renews itself (a 401 reaches its `rejected()`), so nothing is
+   * looked up here for refreshing.
    *
    * The connect is shared by every call that asks while it runs, and each
    * caller awaits it to its end whatever its signal says: it is a send on
@@ -569,23 +560,20 @@ export abstract class BaseMcpServer extends McpServer {
     throwIfRequestAborted(signal);
     const resolved = await context.source.resolve(signal);
     let held = this.built;
-    if (
-      !held ||
-      !sameCredential(held, resolved) ||
-      (held.ready !== undefined && isSpent(held.ready))
-    ) {
-      // A new credential (http: the request's; sse: fixed per connection), or a session SAP
-      // already lost: the connection is replaced, and the replaced one
-      // ends with its logoff — once no call works on it any more.
-      // stdio's source answers the same provider for the process's life, so
-      // only a lost session replaces its connection.
+    if (!held || (held.ready !== undefined && isSpent(held.ready))) {
+      // None yet, or a session SAP already ended: the connection is
+      // replaced, and the replaced one ends with its logoff — once no call
+      // works on it any more. Its locks ended with the session.
       // The parameters are the destination's — the credential and the
       // target system they were made for — not the session's: a
       // replacement for the same ones has them at birth (`buildConnection`)
-      // and asks nothing; another credential (http: another request's
-      // headers) is another destination, made with its connection.
+      // and asks nothing.
       if (held) this.retire(held);
-      held = this.buildConnection(resolved, () => this.logOn(resolved));
+      held = this.buildConnection(resolved, (born) => this.logOn(born));
+    } else {
+      // The held connection takes the source's credential (http: the
+      // request's): the next sends carry it, in the same SAP session.
+      held.credential.take(resolved.credential);
     }
     // This call is the entry's user from now on — counted before the await,
     // so a replacement in between cannot end the connection under it.
@@ -822,10 +810,8 @@ export abstract class BaseMcpServer extends McpServer {
    * Whether `connection`, taken before its call waited in the main flow, is
    * no longer usable once the call's turn came: one this instance built (not
    * a host's) whose session SAP already lost — the next `getConnection`
-   * replaces it. On stdio nothing else replaces the instance's connection
-   * (its credential is fixed for the process); a host that hands an instance
-   * another credential builds a connection for it, and a call queued with
-   * its own credential's connection keeps that one.
+   * replaces it. Nothing else replaces the instance's connection: a
+   * changed credential is put in force on it (`getConnection`).
    */
   private isStaleBuilt(connection: AbapConnection): boolean {
     if (this.connectionContext?.kind !== 'built') return false;
@@ -952,7 +938,7 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private buildConnection(
     resolved: ResolvedConnection,
-    birth: () => Promise<AbapConnection>,
+    birth: (born: ResolvedConnection) => Promise<AbapConnection>,
     failed: (connection: AbapConnection) => Promise<void> = (connection) =>
       endConnection(connection),
   ): BuiltConnection {
@@ -963,17 +949,17 @@ export abstract class BaseMcpServer extends McpServer {
       user: resolved.settings.username ?? resolved.systemContext?.login,
       responsible: resolved.systemContext?.responsible,
     };
+    // The connection presents the credential in force: this one, until a
+    // call puts another in force (`getConnection`).
+    const current = new CurrentCredential(credential);
     const entry: BuiltConnection = {
-      credential,
-      ...(resolved.identity !== undefined
-        ? { identity: resolved.identity }
-        : {}),
+      credential: current,
       connection: Promise.resolve() as unknown as Promise<AbapConnection>,
       users: 0,
       retired: false,
     };
     entry.connection = (async () => {
-      const connection = await birth();
+      const connection = await birth({ ...resolved, credential: current });
       this.destinationOf.set(connection, destination);
       this.systemContexts.set(connection, resolved.systemContext);
       try {
@@ -1173,8 +1159,8 @@ export abstract class BaseMcpServer extends McpServer {
       claimed !== undefined && owner !== undefined && identity !== undefined
         ? this.buildConnection(
             resolved,
-            () =>
-              this.resumedSession(resolved, owner, claimed, identity, outcome),
+            (born) =>
+              this.resumedSession(born, owner, claimed, identity, outcome),
             // A picked-up session is left as it is: its file is a leftover
             // again once the process ended.
             async (connection) => {
@@ -1183,7 +1169,7 @@ export abstract class BaseMcpServer extends McpServer {
               }
             },
           )
-        : this.buildConnection(resolved, () => this.logOn(resolved));
+        : this.buildConnection(resolved, (born) => this.logOn(born));
     // Its parameters are made with it (`buildConnection`): a refusal of the
     // rules ends the start.
     const connection = await entry.connection;

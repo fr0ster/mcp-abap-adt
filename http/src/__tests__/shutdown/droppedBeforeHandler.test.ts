@@ -16,6 +16,7 @@ import {
   listenUrl,
 } from '../../../../src/__tests__/helpers/shutdownTools';
 import { activeTools } from '../../../../src/lib/activeTools';
+import type { IHandlerGroup } from '../../../../src/lib/handlers/interfaces';
 import {
   basicHeaders,
   type HttpStand,
@@ -32,7 +33,7 @@ let previousType: string | undefined;
 
 beforeEach(async () => {
   errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-  s = await httpStand();
+  s = await httpStand({ groups: [loseGroup] });
   previousType = process.env.SAP_SYSTEM_TYPE;
 });
 
@@ -43,16 +44,44 @@ afterEach(async () => {
   errorSpy.mockRestore();
 });
 
+/** `LoseSession`: marks its connection's session lost, as SAP's answer would. */
+const loseGroup: IHandlerGroup = {
+  getName: () => 'lose-session',
+  registerHandlers: () => {},
+  getHandlers: () => [
+    {
+      toolDefinition: {
+        name: 'LoseSession',
+        description: 'marks the session lost',
+        inputSchema: { type: 'object', properties: {} },
+      } as never,
+      handler: (async (
+        context: { connection: { isConnected?: () => boolean } },
+        _args: unknown,
+      ) => {
+        context.connection.isConnected = () => false;
+        return { content: [{ type: 'text', text: 'lost' }] };
+      }) as never,
+    },
+  ],
+} as unknown as IHandlerGroup;
+
 /**
- * Another credential than `basicHeaders`': a request carrying it on a pooled
- * instance builds a connection of its own (one of the same credential would
- * work on the held one).
+ * SAP ended the pooled instance's main session: the next request on its
+ * handle builds a replacement connection (the state's own connection is
+ * another session, untouched).
  */
-const otherCredential = () => ({
-  ...basicHeaders(s.standIn.url),
-  'x-sap-login': 'OTHER_USER',
-  'x-sap-password': 'other-password',
-});
+async function loseMainSession(handle: string): Promise<void> {
+  const lost = await s.call(
+    'LoseSession',
+    {},
+    { ...basicHeaders(s.standIn.url), 'x-mcp-state-handle': handle },
+  );
+  expect(lost.isError).toBe(false);
+}
+
+/** A request the stand-in received that is not a logoff. */
+const notLogoff = (r: { url: string }) => !isLogoff(r.url);
 
 /** A POST of `body` the client drops with `drop()`. */
 function droppable(
@@ -93,13 +122,14 @@ const loggedOff = () =>
   s.standIn.requests.filter((r) => isLogoff(r.url)).map((r) => r.session);
 
 /**
- * A pooled instance holding state; the next request on its handle with
- * another credential builds a connection of its own — its connect and, on
- * ABAP Cloud, its system lookup are that request's waits.
+ * A pooled instance holding state, its main session ended by SAP: the next
+ * request on its handle builds a replacement connection — its connect and,
+ * on ABAP Cloud, its system lookup are that request's waits.
  */
 async function pooled(id: string): Promise<string> {
   const held = await s.call('HoldState', { id });
   expect(held.isError).toBe(false);
+  await loseMainSession(held.text);
   return held.text;
 }
 
@@ -118,15 +148,15 @@ async function stillPooled(handle: string, stateId: string, nextId: string) {
 
 it('dropped while its call waits for the connection: the handler still runs exactly once, and the instance stays in the pool', async () => {
   const handle = await pooled('P');
-  const before = s.standIn.requests.length;
-  // The next request at the system is the new connection's connect.
-  const hold = s.standIn.hold(() => true);
+  const before = s.standIn.requests.filter(notLogoff).length;
+  // The next request at the system but the lost session's logoff is the
+  // replacement's connect.
+  const hold = s.standIn.hold(notLogoff);
   const call = droppable(
     toolCall(77, 'LockedUpdate', { id: 'C', state_handle: handle }),
-    otherCredential(),
   );
   await hold.arrived;
-  expect(s.standIn.requests.length).toBe(before + 1);
+  expect(s.standIn.requests.filter(notLogoff).length).toBe(before + 1);
   expect(count(isLockOf('C'))).toBe(0);
 
   call.drop();
@@ -153,7 +183,6 @@ it('dropped while its call waits for the system lookup: the handler still runs e
   const hold = s.standIn.hold((r) => isLookup(r.url));
   const call = droppable(
     toolCall(78, 'LockedUpdate', { id: 'L', state_handle: handle }),
-    otherCredential(),
   );
   await hold.arrived;
   expect(count(isLookup)).toBe(lookupsBefore + 1);

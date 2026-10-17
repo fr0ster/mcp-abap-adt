@@ -2,8 +2,9 @@
  * A server's connection context is its source: a destination's
  * settings and `getProvider` (core), or the request headers through
  * `headerSource` (http, sse). No token is read, no refresher is looked up,
- * and the settings carry no secret. A connection is kept while the source
- * answers the same credential object and built anew for a new one.
+ * and the settings carry no secret. A connection is built once and kept:
+ * it presents the credential the source answers (`CurrentCredential`), a
+ * new credential object put in force on it.
  */
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
@@ -47,6 +48,7 @@ import {
   setSystemContext,
 } from '../../../lib/systemContext';
 import { readSystemInformation } from '../../../lib/systemInformation';
+import { presented } from '../../helpers/presented';
 
 const build = createAbapConnection as jest.MockedFunction<
   typeof createAbapConnection
@@ -251,7 +253,7 @@ describe('getConnection(signal)', () => {
 
     expect(build).toHaveBeenCalledTimes(1);
     const [settings, credential] = build.mock.calls[0];
-    expect(credential).toBe(provider);
+    expect(presented(credential)).toBe(provider);
     expect(settings).toEqual(SETTINGS);
     for (const field of SECRET_FIELDS) {
       expect(settings).not.toHaveProperty(field);
@@ -272,19 +274,19 @@ describe('getConnection(signal)', () => {
     expect(source.resolve).toHaveBeenCalledTimes(2);
   });
 
-  it('a new credential object: a new connection, built with it', async () => {
+  it('a new credential object: the same connection, presenting it', async () => {
     const one = fakeProvider();
     const two = fakeProvider();
     const server = new TestServer();
     server.fromSource(sourceAnswering(one, two));
 
     const a = await server.connection();
+    expect(presented(build.mock.calls[0][1])).toBe(one);
     const b = await server.connection();
 
-    expect(b).not.toBe(a);
-    expect(build).toHaveBeenCalledTimes(2);
-    expect(build.mock.calls[0][1]).toBe(one);
-    expect(build.mock.calls[1][1]).toBe(two);
+    expect(b).toBe(a);
+    expect(build).toHaveBeenCalledTimes(1);
+    expect(presented(build.mock.calls[0][1])).toBe(two);
   });
 
   it('a failed connect is not kept: the next call connects again', async () => {
@@ -394,7 +396,7 @@ describe('headerContext(headers): the x-sap-* headers as the source', () => {
 
     await server.connection();
     const [settings, credential] = build.mock.calls[0];
-    expect(credential).toBe(answered.credential);
+    expect(presented(credential)).toBe(answered.credential);
     expect(settings).toEqual(answered.settings);
     expect(settings.authType).toBe('jwt');
     for (const field of SECRET_FIELDS) {
@@ -414,7 +416,9 @@ describe('headerContext(headers): the x-sap-* headers as the source', () => {
     const [settings, credential] = build.mock.calls[0];
     expect(settings.authType).toBe('basic');
     expect(JSON.stringify(settings)).not.toContain('password-placeholder');
-    expect(credential).toBe(fromHeaders.mock.results[0].value.credential);
+    expect(presented(credential)).toBe(
+      fromHeaders.mock.results[0].value.credential,
+    );
   });
 
   it('neither: refused credentials_required, before any credential is built', () => {

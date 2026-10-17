@@ -1,7 +1,7 @@
 /**
  * A server instance with batch mode, for the BatchEnd / BatchAnswers / no-retry
  * tests: a `BaseMcpServer` whose connection is built from a source (so a test
- * can change the credential, or make the source fail), the shipped handlers of
+ * can end a connection's session, or make the source fail), the shipped handlers of
  * the tools a test names, and the real batch tools (`BatchHandlersGroup`,
  * and the compact `HandlerBatch`).
  * `begin()` opens the batch directly, so a test can count `execute()`.
@@ -71,7 +71,7 @@ export interface Answer {
 
 type Fake = ReturnType<typeof envelopeConnection>;
 
-/** A credential object: what the source answers; a new one replaces the connection. */
+/** A credential object: what the source answers. */
 export function credential(): IAuthProvider {
   return {
     kind: 'test',
@@ -182,8 +182,8 @@ export interface Stand {
   executes: jest.Mock;
   /** Opens a communication batch, as BatchBegin does, counting its `execute()`. */
   begin(): void;
-  /** The source answers a new credential object from the next call on. */
-  newCredential(): void;
+  /** SAP ended the session of the connection built last: the next call replaces it. */
+  loseSession(): void;
   /** The source's next `resolve` fails with `error`. */
   failResolve(error: unknown): void;
   call(name: string, args?: Record<string, unknown>): Promise<Answer>;
@@ -223,7 +223,7 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
     built.push(fake);
     return fake.connection;
   });
-  let current = credential();
+  const current = credential();
   let failure: { error: unknown } | undefined;
   const source: ConnectionSource = {
     resolve: async () => {
@@ -277,8 +277,10 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
       last = batch;
       owner.begin('communication', { connection: batch, target, recorded: [] });
     },
-    newCredential: () => {
-      current = credential();
+    loseSession: () => {
+      const last = built[built.length - 1];
+      if (last === undefined) throw new Error('no connection built');
+      Object.assign(last.connection, { isConnected: () => false });
     },
     failResolve: (error) => {
       failure = { error };

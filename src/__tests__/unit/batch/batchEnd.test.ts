@@ -88,7 +88,7 @@ const refusal = () =>
 afterEach(() => jest.restoreAllMocks());
 
 describe('BatchEnd', () => {
-  it('envelopes go on the connection BatchEnd took; none on the retired one; the retired one is not logged off under BatchEnd', async () => {
+  it('envelopes go on the connection BatchEnd took; none on the replaced one; the replaced one is not logged off under BatchEnd', async () => {
     let release!: () => void;
     const gate = new Promise<void>((r) => {
       release = r;
@@ -111,17 +111,18 @@ describe('BatchEnd', () => {
       content: [],
     });
     const [recording] = s.built;
-    // A new credential object between recording and BatchEnd: BatchEnd
-    // takes a new connection; the recording call's is retired.
-    s.newCredential();
+    // SAP ended the session between recording and BatchEnd: BatchEnd
+    // takes a new connection; the recording call's is replaced.
+    s.loseSession();
     const ending = s.end();
     await sent;
     const [, taken] = s.built;
     expect(s.built).toHaveLength(2);
     expect(recording?.connection.disconnect).toHaveBeenCalledTimes(1);
-    // While the envelope runs, another credential retires BatchEnd's
-    // connection too: BatchEnd holds its use, so no logoff comes under it.
-    s.newCredential();
+    // While the envelope runs, SAP ends BatchEnd's session too: the next
+    // call replaces it, and BatchEnd holds its use, so no logoff comes
+    // under it.
+    s.loseSession();
     const later = s.call('GetProgram', { program_name: 'PROG_B' });
     await new Promise((r) => setImmediate(r));
     expect(s.built).toHaveLength(3);

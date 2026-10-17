@@ -19,14 +19,17 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 /** The connections the factory built, each recorded. */
 const built: Closable[] = [];
-const records = new WeakMap<object, { settings: SapConfig }>();
+const records = new WeakMap<
+  object,
+  { settings: SapConfig; credential?: IAuthProvider }
+>();
 jest.mock('../../lib/connectionFactory', () => {
   const actual = jest.requireActual('../../lib/connectionFactory');
   return {
     ...actual,
-    createAbapConnection: (settings: SapConfig) => {
+    createAbapConnection: (settings: SapConfig, credential?: IAuthProvider) => {
       const connection = closable(settings.connectionType === 'rfc');
-      records.set(connection, { settings });
+      records.set(connection, { settings, credential });
       built.push(connection);
       return connection;
     },
@@ -120,15 +123,32 @@ const SETTINGS: SapConfig = {
   connectionType: 'rfc',
 };
 
-function provider(): IAuthProvider {
+/** A credential; `authorized` counts the requests it wrote. */
+function provider(): IAuthProvider & { authorized: number } {
   const ok = async () => ({ ok: true as const });
-  return {
+  const credential = {
     kind: 'test',
+    authorized: 0,
     prepare: ok,
     establish: ok,
-    authorize: ok,
+    authorize: async () => {
+      credential.authorized += 1;
+      return { ok: true as const };
+    },
     rejected: ok,
   };
+  return credential;
+}
+
+/** One request written by the credential `connection` presents. */
+async function authorizeOn(connection: unknown): Promise<void> {
+  const credential = records.get(connection as object)?.credential;
+  if (credential === undefined) throw new Error('no credential recorded');
+  const outcome = await credential.authorize({
+    header: () => ({ ok: true }),
+    cookies: () => ({ ok: true }),
+  } as never);
+  expect(outcome.ok).toBe(true);
 }
 
 class Server extends BaseMcpServer {
@@ -216,60 +236,73 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     expect(built[1]?.disconnects).toBe(1);
   });
 
-  it('a new credential after the last call on the old connection was released: the old one is logged off at the replacement, once', async () => {
-    const server = serve([provider(), provider()]);
+  it('a new credential after the last call was released: the same connection, presenting the new credential; nothing logged off before the terminal close', async () => {
+    const before = provider();
+    const renewed = provider();
+    const server = serve([before, renewed]);
     const first = await server.connection();
+    await authorizeOn(first);
     server.done(first);
     const second = await server.connection();
-    expect(second).not.toBe(first);
-    expect(built[0]?.disconnects).toBe(1);
-    expect(built[1]?.disconnects).toBe(0);
+    expect(second).toBe(first);
+    expect(built).toHaveLength(1);
+    expect(built[0]?.disconnects).toBe(0);
+    await authorizeOn(second);
+    expect(before.authorized).toBe(1);
+    expect(renewed.authorized).toBe(1);
     server.done(second);
     await server.terminalClose();
-    expect(built.map((c) => c.disconnects)).toEqual([1, 1]);
+    expect(built.map((c) => c.disconnects)).toEqual([1]);
   });
 
-  it('a new credential while a call works on the old connection: its logoff waits until that call is done', async () => {
+  it('a new credential while a call works on the connection: the same connection for both, nothing logged off under either', async () => {
     const server = serve([provider(), provider()]);
     const first = await server.connection(); // a call in flight on it
-    const second = await server.connection(); // another credential: replaced
-    expect(second).not.toBe(first);
+    const second = await server.connection(); // another credential
+    expect(second).toBe(first);
     await turns();
     expect(built[0]?.disconnects).toBe(0);
     server.done(first);
     await turns();
-    expect(built[0]?.disconnects).toBe(1);
+    expect(built[0]?.disconnects).toBe(0);
     server.done(second);
     await server.terminalClose();
-    expect(built.map((c) => c.disconnects)).toEqual([1, 1]);
+    expect(built.map((c) => c.disconnects)).toEqual([1]);
   });
 
-  it('replaced while its connect is still running: the call waiting for it is not handed a disconnected connection', async () => {
+  it('a new credential while the connect is still running: the call waits for the same connect, nothing logged off', async () => {
     const connecting = gate();
     const real = jest.requireMock('../../lib/connectionFactory') as {
-      createAbapConnection: (s: SapConfig) => Closable;
+      createAbapConnection: (s: SapConfig, c?: IAuthProvider) => Closable;
     };
     const held = closable(true);
     held.connectGate = connecting.promise;
-    jest.spyOn(real, 'createAbapConnection').mockImplementationOnce(() => {
-      built.push(held);
-      return held;
-    });
-    const server = serve([provider(), provider()]);
+    jest
+      .spyOn(real, 'createAbapConnection')
+      .mockImplementationOnce((settings, credential) => {
+        records.set(held, { settings, credential });
+        built.push(held);
+        return held;
+      });
+    const before = provider();
+    const renewed = provider();
+    const server = serve([before, renewed]);
     const a = server.connection(); // waits in the held connect
     await turns();
-    const b = await server.connection(); // a new credential replaces it
+    const b = server.connection(); // another credential: the same connect
     connecting.open();
-    const handedToA = (await a) as unknown as Closable;
-    expect(handedToA).toBe(held);
+    expect(await a).toBe(held);
+    expect(await b).toBe(held);
+    expect(built).toHaveLength(1);
+    await authorizeOn(held);
+    expect(before.authorized).toBe(0);
+    expect(renewed.authorized).toBe(1);
     await turns();
-    expect(handedToA.disconnects).toBe(0);
-    server.done(handedToA);
-    await turns();
-    expect(handedToA.disconnects).toBe(1);
-    server.done(b);
+    expect(held.disconnects).toBe(0);
+    server.done(held);
+    server.done(held);
     await server.terminalClose();
-    expect(handedToA.disconnects).toBe(1);
+    expect(held.disconnects).toBe(1);
   });
 
   it('a session SAP lost: a new connection instance for the next call; the spent one ends once, after the call on it', async () => {

@@ -8,7 +8,9 @@
  * (`getProvider`), lib's `headerSource` (`credentialFromHeaders`). A fresh
  * sibling (`openFreshConnection`) holds the credential of the factory's
  * record of the connection it is opened from — never one built from that
- * connection's configuration.
+ * connection's configuration. A held connection's `CurrentCredential`
+ * (`new CurrentCredential(<source>)`, and a name bound to one) presents the
+ * source's credentials it is given, and builds none.
  *
  * Read from the source tree with the TypeScript parser: every call of
  * `createAbapConnection` outside `connectionFactory.ts` is checked for where
@@ -116,12 +118,59 @@ function resolvedAnswers(file: ts.SourceFile): Set<string> {
   return names;
 }
 
+/** Whether `expr` is `new CurrentCredential(<arg>)`: its one argument. */
+function currentCredentialArgument(
+  expr: ts.Expression,
+): ts.Expression | undefined {
+  if (
+    ts.isNewExpression(expr) &&
+    ts.isIdentifier(expr.expression) &&
+    expr.expression.text === 'CurrentCredential' &&
+    expr.arguments?.length === 1
+  ) {
+    return expr.arguments[0];
+  }
+  return undefined;
+}
+
+/**
+ * The names bound to `new CurrentCredential(<arg>)` in a file whose `<arg>`
+ * is a source, or the file's `credential` binding (checked on its own).
+ */
+function currentCredentials(
+  file: ts.SourceFile,
+  resolved: ReadonlySet<string>,
+): Set<string> {
+  const names = new Set<string>();
+  walk(file, (node) => {
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.initializer
+    ) {
+      const arg = currentCredentialArgument(strip(node.initializer));
+      if (arg === undefined) return;
+      const inner = strip(arg);
+      if (
+        (ts.isIdentifier(inner) && inner.text === 'credential') ||
+        isSource(inner, resolved)
+      ) {
+        names.add(node.name.text);
+      }
+    }
+  });
+  return names;
+}
+
 /** A credential straight from one of the three sources, or a connection source's answer. */
 function isSource(
   raw: ts.Expression,
   resolved: ReadonlySet<string> = new Set(),
+  wrapped: ReadonlySet<string> = new Set(),
 ): boolean {
   const expr = strip(raw);
+  // 5. a held connection's CurrentCredential over a source's credential
+  if (ts.isIdentifier(expr) && wrapped.has(expr.text)) return true;
   // 4. a connection source's answer: <resolved>.credential
   if (
     ts.isPropertyAccessExpression(expr) &&
@@ -196,6 +245,7 @@ function credentialBindingOffences(
 ): string[] {
   const offences: string[] = [];
   const resolved = resolvedAnswers(file);
+  const wrapped = currentCredentials(file, resolved);
   let bindings = 0;
   const where = (node: ts.Node) =>
     `${rel(file.fileName)}:${
@@ -241,7 +291,7 @@ function credentialBindingOffences(
       ts.isObjectLiteralExpression(node.parent)
     ) {
       bindings += 1;
-      if (!isSource(node.initializer, resolved)) {
+      if (!isSource(node.initializer, resolved, wrapped)) {
         offences.push(
           `${where(node)} credential: ${node.initializer.getText()}`,
         );

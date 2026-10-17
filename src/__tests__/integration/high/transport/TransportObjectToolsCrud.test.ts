@@ -31,6 +31,9 @@
  *      target is under a DIFFERENT request on purpose: a move between two
  *      tasks of one request is refused by the system (TR 717, "Object can be
  *      moved between different requests only").
+ *  10a. RemoveTransportObject — the program's entry off every other task of
+ *      the pinned request (SAP's own at creation): an object on two tasks of
+ *      a request cannot be moved (TR721)
  *  11. MoveTransportObjects — the entry from the first task to the second,
  *      by its position; re-read both: gone from the first, on the second
  *  12. MoveTransportObjects — back again, by its position on the second, so
@@ -100,8 +103,9 @@
  * CRUD-style integration test in this repository already does a create
  * followed by an update rather than a bare create.
  *
- * Cleanup: delete the test program, then empty and delete every task the
- * test made (ADT accepts deleting a request/task only while empty —
+ * Cleanup: delete the test program, detach its entries from every other
+ * task of the pinned request (its entries only), then empty and delete every
+ * task the test made (ADT accepts deleting a request/task only while empty —
  * adt-clients's AdtRequest.delete doc), then the second request with every
  * task it holds, so nothing accumulates across runs — also when a step failed.
  *
@@ -190,6 +194,59 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
   let entryTask = '';
   let testEnabled = false;
   let skipReason = '';
+
+  /** The tasks a request holds, by number, as GetTransport answers them. */
+  const tasksOf = async (request: string): Promise<string[]> => {
+    const read = parseHandlerResponse(
+      await handleGetTransport(createHandlerContext({ connection, logger }), {
+        transport_number: request,
+        include_objects: false,
+        include_tasks: true,
+      }),
+    );
+    return (read?.tasks ?? [])
+      .map((t: any) => String(t?.number ?? '').trim())
+      .filter((n: string) => n !== '');
+  };
+
+  /** The test program's entries on one task. */
+  const programEntriesOn = async (task: string): Promise<any[]> =>
+    (
+      parseHandlerResponse(
+        await handleReadTransportObjects(
+          createHandlerContext({ connection, logger }),
+          { transport_number: task },
+        ),
+      )?.objects ?? []
+    ).filter((o: any) => o.name === programName && o.type === 'PROG');
+
+  /**
+   * Detach the test program's entries from one task — only the program's:
+   * the pinned request is shared, and the rest of what its tasks hold is not
+   * this test's. Answers how many entries the re-read still finds.
+   */
+  const detachProgramFrom = async (task: string): Promise<number> => {
+    for (const entry of await programEntriesOn(task)) {
+      if (!entry?.position) {
+        logger?.warn(
+          `${programName} is listed on ${task} without a position — cannot detach it`,
+        );
+        continue;
+      }
+      await handleRemoveTransportObject(
+        createHandlerContext({ connection, logger }),
+        {
+          transport_number: task,
+          object_name: entry.name,
+          object_type: entry.type,
+          position: entry.position,
+          ...(entry.pgmid ? { pgmid: entry.pgmid } : {}),
+        },
+      );
+      logger?.info(`detached ${entry.type} ${entry.name} from ${task}`);
+    }
+    return (await programEntriesOn(task)).length;
+  };
 
   beforeAll(async () => {
     await loadTestEnv();
@@ -298,6 +355,31 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       } catch (e: any) {
         logger?.warn(`Cleanup program delete failed: ${e.message}`);
       }
+    }
+
+    // The pinned request keeps nothing of the test: SAP records the program
+    // on a task of its own there at creation (and its deletion may land on
+    // one too), so every task of the pinned request but the test's own is
+    // swept for the program's entries — those alone. The test's own task is
+    // emptied and deleted below.
+    try {
+      for (const task of await tasksOf(parentTransport)) {
+        if (task === taskNumber) continue;
+        const left = await detachProgramFrom(task);
+        if (left > 0) {
+          logger?.warn(
+            `Cleanup: ${programName} still on task ${task} of the pinned request (${left})`,
+          );
+        } else {
+          logger?.success(
+            `Cleanup: ${programName} on no other task of the pinned request (checked ${task})`,
+          );
+        }
+      }
+    } catch (e: any) {
+      logger?.warn(
+        `Cleanup: tasks of the pinned request could not be swept: ${e.message}`,
+      );
     }
 
     // Every task to empty and delete: the two the test made, and any other
@@ -714,6 +796,22 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
         logger?.success(`Step 10: task ${secondTaskNumber} created`);
 
         await delay(getOperationDelay('create'));
+
+        // Step 10a: the program sits on one task only. SAP put it on a task of
+        // its own in the pinned request at creation (step 2), and step 2b
+        // added it to the test's task: an object on two tasks of a request
+        // cannot be moved (TR721, "locked more than once in request",
+        // measured). Its entry comes off every other task of the request.
+        logger?.info(
+          `Step 10a: detaching ${programName} from the other tasks of ${parentTransport}`,
+        );
+        for (const task of await tasksOf(parentTransport)) {
+          if (task === taskNumber) continue;
+          if ((await programEntriesOn(task)).length === 0) continue;
+          expect(await detachProgramFrom(task)).toBe(0);
+          logger?.success(`Step 10a: entry detached from task ${task}`);
+        }
+        expect(await programEntriesOn(taskNumber)).toHaveLength(1);
 
         // Step 11: move the entry to the second task, by its position
         const moving = afterSort[0];

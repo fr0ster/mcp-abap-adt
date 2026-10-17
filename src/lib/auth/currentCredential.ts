@@ -39,8 +39,12 @@ export class CurrentCredential extends AuthProviderBase {
 
   /** The kind of the credential in force (what the connection logs). */
   get kind(): string {
-    const kind = (this.#current as { kind?: unknown }).kind;
-    return typeof kind === 'string' ? kind : 'credential';
+    try {
+      const kind = (this.#current as { kind?: unknown }).kind;
+      return typeof kind === 'string' ? kind : 'credential';
+    } catch {
+      return 'credential';
+    }
   }
 
   /** The credential in force from now on. */
@@ -71,6 +75,10 @@ export class CurrentCredential extends AuthProviderBase {
     return credential.authorize(request);
   }
 
+  /**
+   * The rejection goes to the credential in force when it arrives — the
+   * newest the instance was given, which the next send presents.
+   */
   protected onRejected(rejection: IAuthRejection): Promise<AuthOutcome> {
     return this.#current.rejected(rejection);
   }

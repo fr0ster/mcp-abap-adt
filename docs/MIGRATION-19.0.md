@@ -1693,8 +1693,8 @@ build argument `VARIANT` (the package's name without its scope), installing that
   `(destination, destinations)`); `setConnectionContextFromHeaders` is gone — pass
   `headerContext(headers)` from `@mcp-abap-adt/lib/http-transport`; `getConnection(signal)` takes
   the request's signal. A built connection is kept until SAP ended its session, and presents the
-  credential the source answered last (`CurrentCredential`, put in force at each `getConnection`);
-  `ResolvedConnection` has no `identity`. `EmbeddableMcpServer`'s `connection` is an injected source, used as given.
+  credential the source answered last (`CurrentCredential`, put in force at each `getConnection`).
+  `EmbeddableMcpServer`'s `connection` is an injected source, used as given.
 - **`IDestinations`, `IAuthBrokerFactory` and `SettleReport` left `@mcp-abap-adt/lib/auth`** for
   `@mcp-abap-adt/core/auth`, beside core's `destinationSource(destination, destinations)`.
   `DestinationSystemContext` stays in `@mcp-abap-adt/lib/auth`.

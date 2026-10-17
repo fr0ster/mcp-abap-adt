@@ -216,6 +216,17 @@ describe('compact HandlerGet: one part, one request', () => {
       }
     });
 
+    it("a caller's own isError argument is sent on as an argument, the read answered", async () => {
+      const { sent, answer } = await run('document', {
+        object_type: 'FUNCTION_MODULE',
+        function_module_name: 'FUGR_A|FM_A',
+        isError: true,
+      });
+      expect(sent).toEqual([MODULE_SOURCE]);
+      expect(answer?.isError).not.toBe(true);
+      expect(jsonOf(answer)).toMatchObject({ part: 'source' });
+    });
+
     it('answers the module and its group', async () => {
       const { answer } = await run('document', {
         object_type: 'FUNCTION_MODULE',
@@ -242,6 +253,11 @@ describe('compact HandlerGet: one part, one request', () => {
       [
         'an empty half',
         { function_module_name: '|FM_A' },
+        'FUNCTION_MODULE is named GROUP|MODULE, or with function_group_name',
+      ],
+      [
+        'more than one |',
+        { function_module_name: 'FUGR_A|FM_A|EXTRA' },
         'FUNCTION_MODULE is named GROUP|MODULE, or with function_group_name',
       ],
     ])('%s: refused before any request', async (_label, names, words) => {

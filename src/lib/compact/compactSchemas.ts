@@ -183,13 +183,16 @@ const readPartSchema = {
   ],
   default: 'source',
   description:
-    'The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address, in place of object_type: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions).',
+    'The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions).',
 } as const;
 
 export const compactGetSchema = {
   type: 'object',
   properties: {
-    timeout: TIMEOUT_PROPERTY,
+    timeout: {
+      ...TIMEOUT_PROPERTY,
+      description: `${TIMEOUT_PROPERTY.description} Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, and the parts object_structure, node_structure, virtual_folders.`,
+    },
     object_type: commonObjectTypeSchema,
     part: readPartSchema,
     package_name: { type: 'string', description: 'Package name.' },
@@ -214,7 +217,7 @@ export const compactGetSchema = {
     function_group_name: {
       type: 'string',
       description:
-        'Function group name (FUNCTION_GROUP; FUNCTION_MODULE named without its group).',
+        "Function group name (FUNCTION_GROUP; FUNCTION_MODULE given as the module's name).",
     },
     behavior_definition_name: {
       type: 'string',

@@ -22,7 +22,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerGet',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    "Reads one part of an object. part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds. Answers { part: 'source', source } or { part: 'metadata', metadata } beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address, in place of object_type: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or no package of that name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Otherwise object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects the transport request or task holds, each with the position HandlerTransportMoveObjects takes. timeout applies to the repository reads: every object_type but UNIT_TEST and CDS_UNIT_TEST.",
+    "Reads one part of an object. part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, TRANSPORT, UNIT_TEST, CDS_UNIT_TEST source; SERVICE_BINDING source, metadata, urls; every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or no package of that name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Otherwise object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*). TRANSPORT answers the objects the transport request or task holds, each with its position in the task's object list. UNIT_TEST and CDS_UNIT_TEST answer the run's result.",
   ),
   inputSchema: compactGetSchema,
 } as const;
@@ -72,11 +72,14 @@ function routeAddressPart(
  * A function module is read at its group, given in the arguments:
  * `function_module_name` as `GROUP|MODULE`, or the module's name with
  * `function_group_name`. Both may be given when they name the same group.
- * Answers the arguments with the module and its group apart, or the refusal.
+ * Answers the arguments with the module and its group apart, or the
+ * refusal — tagged, so nothing of the caller's arguments reads as an answer.
  */
 function functionModuleArgs(
   args: HandlerGetArgs,
-): HandlerGetArgs | ReturnType<typeof return_error> {
+):
+  | { ok: true; args: HandlerGetArgs }
+  | { ok: false; refusal: ReturnType<typeof return_error> } {
   const given =
     typeof args.function_module_name === 'string'
       ? args.function_module_name.trim()
@@ -85,28 +88,38 @@ function functionModuleArgs(
     typeof args.function_group_name === 'string'
       ? args.function_group_name.trim().toUpperCase()
       : '';
-  const named = given.includes('|');
-  const [first = '', second = ''] = named ? given.split('|') : ['', given];
+  const segments = given.split('|');
+  const named = segments.length > 1;
+  const [first = '', second = ''] = named ? segments : ['', given];
   const group = named ? first.trim().toUpperCase() : separate;
   const module = second.trim();
-  if (!group || !module) {
-    return return_error(
-      new Error(
-        'FUNCTION_MODULE is named GROUP|MODULE, or with function_group_name: the function group and the module are both required',
+  if (segments.length > 2 || !group || !module) {
+    return {
+      ok: false,
+      refusal: return_error(
+        new Error(
+          'FUNCTION_MODULE is named GROUP|MODULE, or with function_group_name: the function group and the module are both required',
+        ),
       ),
-    );
+    };
   }
   if (named && separate && separate !== group) {
-    return return_error(
-      new Error(
-        `function_module_name names group ${group}, function_group_name names ${separate}: give the group once`,
+    return {
+      ok: false,
+      refusal: return_error(
+        new Error(
+          `function_module_name names group ${group}, function_group_name names ${separate}: give the group once`,
+        ),
       ),
-    );
+    };
   }
   return {
-    ...args,
-    function_module_name: module,
-    function_group_name: group,
+    ok: true,
+    args: {
+      ...args,
+      function_module_name: module,
+      function_group_name: group,
+    },
   };
 }
 
@@ -132,8 +145,8 @@ export async function handleHandlerGet(
     (part === 'source' || part === 'metadata')
   ) {
     const named = functionModuleArgs(args);
-    if ('isError' in named) return named;
-    read = named;
+    if (!named.ok) return named.refusal;
+    read = named.args;
   }
 
   if (part === 'source') {

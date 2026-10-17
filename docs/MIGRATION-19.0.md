@@ -1162,7 +1162,8 @@ transport's options only:
   - FUNCTION_MODULE is read at the group its arguments name, in one request, with no metadata read
     first: `function_module_name` as `GROUP|MODULE` (as `HandlerDeletionCheck`, `HandlerValidate` and
     `HandlerCheckRun` name it), or the module's name with `function_group_name`. Both may be given
-    when they name the same group; two groups, or none, are refused before anything is sent.
+    when they name the same group; two groups, none, or a name with more than one `|` are refused
+    before anything is sent.
   - `node_structure` of a package (`object_adt_type: DEVC/K`) is one request. SAP answers an empty
     package and a package that does not exist with the same blank body; 18.x then read the package
     to tell them apart (and so did `GetNodeStructureLow`). Now that answer is

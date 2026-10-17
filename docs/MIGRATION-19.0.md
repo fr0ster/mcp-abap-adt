@@ -966,14 +966,11 @@ transport's options only:
   4. `HandlerUnlock`;
   5. `HandlerActivate` — 18.x activated unless `activate: false`.
 
-  Validate first with `HandlerValidate` if you want the name checked before the create. An argument
-  the create does not send is refused before anything is sent, by presence — `false`, `0` and `''`
-  included — naming it: "HandlerCreate sends the create request alone: <argument> is not sent —
-  leave it out; then HandlerLock, HandlerUpdate with the lock_handle, HandlerUnlock and
-  HandlerActivate". So `activate` (also `activate: false`), `fields`, `source_code`, `datatype`,
-  `length`, `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`,
-  `fixed_values`, `abstract`, `root_entity`, `behavior_definition`, `cds_view_name` and
-  `test_class_source` must be left out; they left the schema. `UNIT_TEST` and `CDS_UNIT_TEST`,
+  Validate first with `HandlerValidate` if you want the name checked before the create. The schema
+  lists only what a create sends: `activate`, `fields`, `source_code`, `datatype`, `length`,
+  `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`,
+  `abstract`, `root_entity`, `behavior_definition`, `cds_view_name` and `test_class_source` are gone
+  from `HandlerCreate` — what they carried goes in through steps 3 and 5. `UNIT_TEST` and `CDS_UNIT_TEST`,
   whose create is a chain (the test classes' lock, write, unlock and activation; a CDS unit test
   also checks the view and creates the class first), are refused before anything is sent: "HandlerCreate
   does not create <type>: its create is a chain of requests, not one — use CreateUnitTest /

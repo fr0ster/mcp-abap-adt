@@ -23,7 +23,10 @@
  * naming it: every argument outside the type's `CREATE_CARRIES` list
  * (`activate` among them). Each list is what that type's create request was
  * measured to send, plus `transport_request`, `package_name` and
- * `description`, which every type accepts. Each type is proven to send
+ * `description`, which every type accepts. Over MCP the SDK drops an
+ * argument the schema does not declare before the handler runs, as for every
+ * tool; this refusal guards a direct caller (an embedder calling the handler).
+ * Each type is proven to send
  * exactly one request (`compact-modify/src/__tests__/createSingleCall.test.ts`).
  *
  * UNIT_TEST and CDS_UNIT_TEST have no create of one request — their create is
@@ -72,7 +75,7 @@ import { handleCreateTransport } from '../../transport/high/handleCreateTranspor
 /** Accepted for every type: they take no part in the request. */
 const ALWAYS = ['object_type', 'detail'] as const;
 
-/** Accepted for every offered type (the controller's ruling). */
+/** Accepted for every type (the controller's ruling). */
 const COMMON = ['transport_request', 'package_name', 'description'] as const;
 
 /**

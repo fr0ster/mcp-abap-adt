@@ -658,15 +658,21 @@ describe('the HandlerCreate schema and description', () => {
   });
 
   it('advertises per type only what that type’s create sends', () => {
-    const advertised = [
-      ...TOOL_DEFINITION.description.matchAll(/([A-Z_]+)\(([^)]*)\)/g),
-    ].map(([, type, args]) => [
-      type,
-      args
-        .split(',')
-        .map((arg) => arg.trim().replace(/\*$/, ''))
-        .filter((arg) => arg.length > 0),
-    ]) as Array<[string, string[]]>;
+    // Only the per-type list: from `object_type required:` to its end.
+    const description: string = TOOL_DEFINITION.description;
+    const start = description.indexOf('object_type required:');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const tail = description.slice(start);
+    const segment = tail.slice(0, tail.indexOf('. '));
+    const advertised = [...segment.matchAll(/([A-Z_]+)\(([^)]*)\)/g)].map(
+      ([, type, args]) => [
+        type,
+        args
+          .split(',')
+          .map((arg) => arg.trim().replace(/\*$/, ''))
+          .filter((arg) => arg.length > 0),
+      ],
+    ) as Array<[string, string[]]>;
     expect(advertised.map(([type]) => type).sort()).toEqual(
       TYPES.map(([type]) => type).sort(),
     );

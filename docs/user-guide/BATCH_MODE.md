@@ -67,13 +67,11 @@ with the single-step tools:
 Compact `HandlerCreate` is one request for every type, in batch mode and outside it alike: the
 create request of the type's create alone — no validation, lock, write, check or activation, no
 service-group read for a service binding, no read-back after a function group's `400`; the object
-is created inactive with what the create carries. An argument the create does not send is refused
-before anything is sent, by presence (`false`, `0` and `''` included), not dropped — `activate`,
-and anything the type's create request does not carry (`fields`, `source_code`, `fixed_values`,
-`test_class_source`, a class's `abstract`, a behavior definition's `root_entity`, a behavior
-implementation's `behavior_definition`, …): "HandlerCreate sends the create request alone:
-<argument> is not sent — leave it out; then HandlerLock, HandlerUpdate with the lock_handle,
-HandlerUnlock and HandlerActivate". `UNIT_TEST` and `CDS_UNIT_TEST` are refused before anything is
+is created inactive with what the create carries. Its schema lists only what a create sends —
+`activate`, `fields`, `source_code`, `fixed_values`, `test_class_source`, a class's `abstract`, a
+behavior definition's `root_entity`, a behavior implementation's `behavior_definition` are gone
+from it: the content goes in through the write phase, the activation through `HandlerActivate`.
+`UNIT_TEST` and `CDS_UNIT_TEST` are refused before anything is
 sent: their create is a chain (the test classes' lock, write, unlock and activation; a CDS unit
 test also checks the view and creates the class first) — "HandlerCreate does not create <type>:
 its create is a chain of requests, not one — use CreateUnitTest / CreateCdsUnitTest of the full

@@ -204,14 +204,14 @@ destination marked, the reads sequential) is shown by the unit tests only
 
 The package walks (`GetPackageContents`, compact `HandlerGet` part `contents`, `GetPackageTree`)
 and `GetObjectInfo` read the node structure levels in envelopes and then the metadata of every
-object found in one more envelope: one GET per object (a package's
+object found in one more envelope: one read per object, sent as that type's `Get<Type>` handler
+sends its metadata read (the same URL and Accept header; a package's
 `/sap/bc/adt/packages/<name>`), whose `adtcore:description` is the description in the answer.
 The node structure parts' `DESCRIPTION` is not used: measured 2026-10-18, inside one envelope SAP
 can answer a node structure part after the first with another part's `DESCRIPTION` (everything
 else byte-identical to the request sent alone), while metadata reads in one envelope answer as
-they do alone. An object whose metadata read fails, or whose `OBJECT_URI` carries a `#` fragment
-(it names a part of another object, with no metadata of its own), has no description in the
-batched answer. `GetObjectsList` and `SearchSource` answer no descriptions and read no metadata.
+they do alone. An object whose metadata read fails, or of a type with no `Get<Type>` metadata read (a class's
+method, a program's include, …), has no description in the batched answer. `GetObjectsList` and `SearchSource` answer no descriptions and read no metadata.
 Where the destination has no communication batch, the sequential reads answer the descriptions
 of the node structure, as before.
 

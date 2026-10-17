@@ -17,11 +17,14 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
+  type MetadataTarget,
+  metadataKeyOf,
+} from '../../../lib/strategies/metadataReads';
+import {
   batchReader,
   endsTheCall,
   kindOf,
   metadataDescriptions,
-  metadataUriOf,
   type NodeLevel,
   type NodeRequest,
   readNode,
@@ -35,7 +38,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[read-only] Return ABAP object tree structure for packages (DEVC), classes (CLAS), programs (PROG), function groups (FUGR), and other objects. Shows root, group nodes, and terminal leaves up to maxDepth. Enrich each node with description and package via SearchObject if enrich=true. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; then the metadata of every leaf, whose description the leaf carries; with enrich, the search of every node last.',
+    '[read-only] Return ABAP object tree structure for packages (DEVC), classes (CLAS), programs (PROG), function groups (FUGR), and other objects. Shows root, group nodes, and terminal leaves up to maxDepth. Enrich each node with description and package via SearchObject if enrich=true. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last.',
   ),
   inputSchema: {
     type: 'object',
@@ -429,8 +432,12 @@ async function buildTrees(
     children: [],
   }));
   const nodes: InfoNode[] = [...roots];
-  /** Every leaf of every tree, with its root and its metadata address. */
-  const leaves: Array<{ root: number; leaf: TreeNode; uri?: string }> = [];
+  /** Every leaf of every tree, with its root and the object it reads. */
+  const leaves: Array<{
+    root: number;
+    leaf: TreeNode;
+    target: MetadataTarget;
+  }> = [];
   /**
    * A leaf without the description its part carried: a node structure part
    * after the first of an envelope can carry another part's `DESCRIPTION`
@@ -438,11 +445,18 @@ async function buildTrees(
    */
   const bareLeaf = (node: InfoNode, o: NodeLevel['objects'][number]) => {
     const leaf: TreeNode = { OBJECT_TYPE: o.type, OBJECT_NAME: o.name };
-    const uri = metadataUriOf(o);
+    // A function module is read at its group: the node it was found under.
+    const functionGroup = node.type.toUpperCase().startsWith('FUGR')
+      ? node.name
+      : undefined;
     leaves.push({
       root: node.root,
       leaf,
-      ...(uri !== undefined ? { uri } : {}),
+      target: {
+        type: o.type,
+        name: o.name,
+        ...(functionGroup !== undefined ? { functionGroup } : {}),
+      },
     });
     return leaf;
   };
@@ -536,7 +550,7 @@ async function buildTrees(
   try {
     descriptions = await metadataDescriptions(
       context,
-      described.flatMap(({ uri }) => (uri === undefined ? [] : [uri])),
+      described.map(({ target }) => target),
     );
   } catch (thrown) {
     // A 401 SAP answered to a metadata read: the method's error, with its
@@ -545,8 +559,9 @@ async function buildTrees(
     if (refused === undefined) throw thrown;
     return { roots, failures, ended: failedWith(refused) };
   }
-  for (const { leaf, uri } of described) {
-    const description = uri === undefined ? undefined : descriptions.get(uri);
+  for (const { leaf, target } of described) {
+    const key = metadataKeyOf(target);
+    const description = key === undefined ? undefined : descriptions.get(key);
     if (description) leaf.OBJECT_DESCRIPTION = description;
   }
 

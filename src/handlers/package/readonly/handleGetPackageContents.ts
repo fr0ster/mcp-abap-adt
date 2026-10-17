@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; then the metadata of every object found, whose description the list carries, in one more.',
+    '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes.',
   ),
   inputSchema: {
     timeout: timeoutField(),

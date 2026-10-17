@@ -3,9 +3,19 @@ import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../handlers/interfaces';
-import { isCredentialFailure, requestFailureOf } from '../answer';
+import {
+  failureEntry,
+  isCredentialFailure,
+  isCredentialPayload,
+} from '../answer';
 import { failureOf } from '../auth/failures';
 import { type PhaseResult, runPhase } from '../batch/phases';
+import { createAdtClient } from '../clients';
+import {
+  type MetadataTarget,
+  metadataKeyOf,
+  readObjectMetadata,
+} from './metadataReads';
 import { carryingFailure } from './step';
 
 /**
@@ -633,27 +643,8 @@ export type WalkedItem = {
 /** The step of a failed object metadata read. */
 export const METADATA_STEP = 'read object metadata';
 
-/**
- * The address of an object's metadata: a package's `/sap/bc/adt/packages/
- * <name>`; any other object's `OBJECT_URI`, when it addresses the object
- * itself (no `#` fragment). `undefined` when neither applies.
- */
-export function metadataUriOf(object: {
-  name: string;
-  type: string;
-  uri?: string;
-}): string | undefined {
-  if (kindOf(object.type) === 'package') {
-    return `/sap/bc/adt/packages/${encodeURIComponent(object.name.toLowerCase())}`;
-  }
-  const uri = object.uri;
-  if (uri === undefined || uri === '' || uri.includes('#')) return undefined;
-  return uri;
-}
-
 /** The `adtcore:description` of a metadata document's root element. */
-export function metadataDescriptionOf(answer: unknown): string | undefined {
-  const xml = String((answer as { data?: unknown })?.data ?? '');
+export function metadataDescriptionOf(xml: string): string | undefined {
   let doc: unknown;
   try {
     doc = parser.parse(xml);
@@ -675,48 +666,56 @@ export function metadataDescriptionOf(answer: unknown): string | undefined {
   return undefined;
 }
 
-/** The status SAP answered a part with, when it answered. */
-function partStatusOf(error: unknown): number | undefined {
-  const status = (error as { response?: { status?: unknown } } | undefined)
-    ?.response?.status;
-  return typeof status === 'number' ? status : undefined;
+/** The document a metadata reading answered (`AdtReading.raw`). */
+function rawOf(value: unknown): string {
+  const raw = (value as { raw?: unknown } | undefined)?.raw;
+  return typeof raw === 'string' ? raw : '';
 }
 
 /**
- * The description of every object at `uris` (`metadataUriOf`), read in one
- * ADT batch envelope (`runPhase`): one GET per distinct address. An address
- * whose read failed has no entry. A credential failure ends the call: a
- * failure the server's reader answers, as it came; a `401` SAP answered to
- * a part, as the method's error with its step.
+ * The description of every object of `targets`, read in one ADT batch
+ * envelope (`runPhase`): one metadata read per distinct object, as its type's
+ * `Get<Type>` handler reads it (`readObjectMetadata`), keyed by
+ * `metadataKeyOf`. An object of a type with no metadata read, or whose read
+ * failed, has no entry. A credential failure ends the call: a failure the
+ * server's reader answers, as it came; a `401` SAP answered to a part, as
+ * the method's error with its step.
  */
 export async function metadataDescriptions(
   context: HandlerContext,
-  uris: readonly string[],
+  targets: readonly MetadataTarget[],
 ): Promise<Map<string, string | undefined>> {
-  const distinct = [...new Set(uris)];
+  const byKey = new Map<string, MetadataTarget>();
+  for (const target of targets) {
+    const key = metadataKeyOf(target);
+    if (key !== undefined && !byKey.has(key)) byKey.set(key, target);
+  }
+  const keys = [...byKey.keys()];
   const described = new Map<string, string | undefined>();
-  if (distinct.length === 0) return described;
-  const results = await runPhase(context, distinct, (url, connection) =>
-    connection.makeAdtRequest({
-      url,
-      method: 'GET',
-      timeout: 0,
-      headers: { Accept: '*/*' },
-    }),
+  if (keys.length === 0) return described;
+  const results = await runPhase(context, keys, (key, connection) =>
+    readObjectMetadata(
+      createAdtClient(connection, context.logger),
+      byKey.get(key) as MetadataTarget,
+    ),
   );
   results.forEach((result, i) => {
-    const uri = distinct[i] as string;
-    if (result.ok) {
-      described.set(uri, metadataDescriptionOf(result.value));
+    const key = keys[i] as string;
+    if (!result.ok) {
+      if (endsTheCall(result.error)) throw result.error;
       return;
     }
-    if (endsTheCall(result.error)) throw result.error;
-    if (partStatusOf(result.error) === 401) {
-      const error = requestFailureOf(result.error, { method: 'GET', url: uri });
-      if (error !== undefined) {
-        throw carryingFailure(new Error(error.message), error, METADATA_STEP);
-      }
-      throw result.error;
+    const response = result.value;
+    if (response.ok) {
+      described.set(
+        key,
+        metadataDescriptionOf(rawOf(response.getResult().value)),
+      );
+      return;
+    }
+    const error = response.getError();
+    if (isCredentialPayload(failureEntry(error, METADATA_STEP))) {
+      throw carryingFailure(new Error(error.message), error, METADATA_STEP);
     }
   });
   return described;
@@ -725,31 +724,26 @@ export async function metadataDescriptions(
 /**
  * Every walked object's description from its metadata (spec §11, the batched
  * walks): one phase over the objects of every walk that answered, each
- * object's description its metadata's `adtcore:description`. An object
- * whose metadata address is not known (`metadataUriOf`) or whose read failed
- * has no description.
+ * object's description its metadata's `adtcore:description`. An object of a
+ * type with no metadata read (`metadataKeyOf`), or whose read failed, has no
+ * description.
  */
 export async function describeFromMetadata(
   context: HandlerContext,
   walked: readonly PhaseResult<WalkedItem[]>[],
 ): Promise<PhaseResult<WalkedItem[]>[]> {
-  const uris = walked.flatMap((result) =>
-    result.ok
-      ? result.value.flatMap((item) => {
-          const uri = metadataUriOf(item);
-          return uri === undefined ? [] : [uri];
-        })
-      : [],
+  const described = await metadataDescriptions(
+    context,
+    walked.flatMap((result) => (result.ok ? result.value : [])),
   );
-  const described = await metadataDescriptions(context, uris);
   return walked.map((result) =>
     result.ok
       ? {
           ok: true,
           value: result.value.map((item) => {
-            const uri = metadataUriOf(item);
+            const key = metadataKeyOf(item);
             const description =
-              uri === undefined ? undefined : described.get(uri);
+              key === undefined ? undefined : described.get(key);
             return { ...item, description };
           }),
         }

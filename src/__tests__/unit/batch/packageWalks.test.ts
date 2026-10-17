@@ -158,15 +158,18 @@ const CORPUS = corpusNodes();
 
 /**
  * What each object's metadata says of it, read from the node structure
- * documents the system answers to a request sent alone: the description of
- * every object by its `OBJECT_URI`, and of every package by its name.
+ * documents the system answers to a request sent alone: every object by its
+ * `OBJECT_URI` and by its name (the last segment of its metadata address —
+ * the model's objects carry no real address), with its description.
  */
 function metadataIndex(): {
-  byUri: Map<string, string>;
-  byPackage: Map<string, string>;
+  known: Set<string>;
+  byUri: Map<string, string | undefined>;
+  byName: Map<string, string>;
 } {
-  const byUri = new Map<string, string>();
-  const byPackage = new Map<string, string>();
+  const known = new Set<string>();
+  const byUri = new Map<string, string | undefined>();
+  const byName = new Map<string, string>();
   const bodies = [
     ...Object.values(CORPUS),
     ...Object.values(NODES).map(xmlNode),
@@ -177,16 +180,15 @@ function metadataIndex(): {
     )) {
       const field = (name: string) =>
         new RegExp(`<${name}>([^<]*)</${name}>`).exec(node[1] ?? '')?.[1];
+      const name = field('OBJECT_NAME') ?? '';
+      known.add(name);
       const description = field('DESCRIPTION');
-      if (description === undefined) continue;
       const uri = field('OBJECT_URI');
       if (uri !== undefined) byUri.set(uri, description);
-      if (field('OBJECT_TYPE') === 'DEVC/K') {
-        byPackage.set(field('OBJECT_NAME') ?? '', description);
-      }
+      if (description !== undefined) byName.set(name, description);
     }
   }
-  return { byUri, byPackage };
+  return { known, byUri, byName };
 }
 const METADATA = metadataIndex();
 
@@ -196,11 +198,15 @@ const described = (description: string | undefined) =>
     : ` adtcore:description="${description.replaceAll('"', '&quot;')}"`;
 
 const PACKAGE_XML = (name: string) =>
-  `<?xml version="1.0" encoding="utf-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${name}" adtcore:type="DEVC/K"${described(METADATA.byPackage.get(name))}/>`;
+  `<?xml version="1.0" encoding="utf-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${name}" adtcore:type="DEVC/K"${described(METADATA.byName.get(name))}/>`;
 
 /** An object's metadata document: its root element and its description. */
-const OBJECT_XML = (uri: string) =>
-  `<?xml version="1.0" encoding="utf-8"?><adtcore:mainObject xmlns:adtcore="http://www.sap.com/adt/core" adtcore:uri="${uri}"${described(METADATA.byUri.get(uri))}/>`;
+const OBJECT_XML = (path: string, name: string) =>
+  `<?xml version="1.0" encoding="utf-8"?><adtcore:mainObject xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${name}"${described(METADATA.byUri.has(path) ? METADATA.byUri.get(path) : METADATA.byName.get(name))}/>`;
+
+/** The object a metadata address names: its last segment, upper case. */
+const nameAt = (path: string) =>
+  decodeURIComponent(path.split('/').pop() ?? '').toUpperCase();
 
 const SEARCH_XML = (name: string, type: string) =>
   `<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/x/${name.toLowerCase()}" adtcore:type="${type}" adtcore:name="${name}" adtcore:packageName="ZPARENT" adtcore:description="Found ${name}"/></adtcore:objectReferences>`;
@@ -263,12 +269,15 @@ function answerOf(
     };
   }
   const path = key.startsWith('GET ') ? key.slice('GET '.length) : '';
-  if (METADATA.byUri.has(path) || path.startsWith('/sap/bc/adt/x/')) {
+  if (
+    path !== '' &&
+    (METADATA.byUri.has(path) || METADATA.known.has(nameAt(path)))
+  ) {
     return {
       status: 200,
       statusText: 'OK',
       headers: xml,
-      body: OBJECT_XML(path),
+      body: OBJECT_XML(path, nameAt(path)),
     };
   }
   const corpus = CORPUS[key];
@@ -438,8 +447,8 @@ describe('GetPackageContents', () => {
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
       [
         'GET /sap/bc/adt/packages/zsub_a',
-        'GET /sap/bc/adt/x/zcl_a',
-        'GET /sap/bc/adt/x/zprog_a',
+        'GET /sap/bc/adt/oo/classes/zcl_a',
+        'GET /sap/bc/adt/programs/programs/zprog_a',
       ],
     ]);
     expect(fake.directs).toHaveLength(0);
@@ -599,7 +608,7 @@ describe('HandlerGet part contents', () => {
     expect(fake.envelopes.map(partKeys)).toEqual([
       [nodeKey('DEVC/K', 'ZROOT_A')],
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
-      ['GET /sap/bc/adt/packages/zsub_a', 'GET /sap/bc/adt/x/zcl_a'],
+      ['GET /sap/bc/adt/packages/zsub_a', 'GET /sap/bc/adt/oo/classes/zcl_a'],
     ]);
   });
 
@@ -715,8 +724,8 @@ describe('GetPackageTree', () => {
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
       [
         'GET /sap/bc/adt/packages/zsub_a',
-        'GET /sap/bc/adt/x/zcl_a',
-        'GET /sap/bc/adt/x/zprog_a',
+        'GET /sap/bc/adt/oo/classes/zcl_a',
+        'GET /sap/bc/adt/programs/programs/zprog_a',
       ],
     ]);
   });
@@ -942,7 +951,10 @@ describe('GetObjectInfo', () => {
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
-      ['GET /sap/bc/adt/x/zcl_a', 'GET /sap/bc/adt/x/zprog_a'],
+      [
+        'GET /sap/bc/adt/oo/classes/zcl_a',
+        'GET /sap/bc/adt/programs/programs/zprog_a',
+      ],
       ['SEARCH|ZROOT_A', 'SEARCH|ZSUB_A'],
     ]);
   });
@@ -1333,14 +1345,16 @@ describe.each(DESCRIBING_CALLS)('$tool: descriptions', ({ call }) => {
     const fake = system();
     await withinTurns(call(contextOn(fake)));
     const metadata = fake.envelopes.filter((e) =>
-      partKeys(e).some((k) => k.startsWith('GET /sap/bc/adt/x/')),
+      partKeys(e).includes('GET /sap/bc/adt/oo/classes/zcl_a'),
     );
     expect(metadata).toHaveLength(1);
     const parts = (metadata[0] as SeenEnvelope).parts;
     expect(parts.every((p) => p.method === 'GET')).toBe(true);
     const keys = partKeys(metadata[0] as SeenEnvelope);
     expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toEqual(expect.arrayContaining(['GET /sap/bc/adt/x/zcl_a']));
+    expect(keys).toEqual(
+      expect.arrayContaining(['GET /sap/bc/adt/oo/classes/zcl_a']),
+    );
     // No node structure is read after it.
     const at = fake.envelopes.indexOf(metadata[0] as SeenEnvelope);
     expect(
@@ -1352,7 +1366,9 @@ describe.each(DESCRIBING_CALLS)('$tool: descriptions', ({ call }) => {
   });
 
   it("a metadata part's failure: that object has no description; the call answers", async () => {
-    const fake = system({ refuse: { 'GET /sap/bc/adt/x/zcl_a': 500 } });
+    const fake = system({
+      refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': 500 },
+    });
     const result = await withinTurns(call(contextOn(fake)));
     expect((result as { isError?: boolean }).isError).toBe(false);
     expect(textOf(result)).toContain('ZCL_A');
@@ -1361,7 +1377,9 @@ describe.each(DESCRIBING_CALLS)('$tool: descriptions', ({ call }) => {
   });
 
   it('a 401 SAP answered to a metadata part ends the call as it came', async () => {
-    const fake = system({ refuse: { 'GET /sap/bc/adt/x/zcl_a': 401 } });
+    const fake = system({
+      refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': 401 },
+    });
     const result = await withinTurns(call(contextOn(fake)));
     expect((result as { isError?: boolean }).isError).toBe(true);
     expect(payloadOf(result)).toMatchObject({
@@ -1373,8 +1391,8 @@ describe.each(DESCRIBING_CALLS)('$tool: descriptions', ({ call }) => {
   it("the connection's credential refusal of the metadata envelope ends the call as it came", async () => {
     const fake = envelopeConnection((parts) => {
       if (
-        parts.some((p) =>
-          keyOf(p.method, p.url).startsWith('GET /sap/bc/adt/x/'),
+        parts.some(
+          (p) => keyOf(p.method, p.url) === 'GET /sap/bc/adt/oo/classes/zcl_a',
         )
       ) {
         throw credential();
@@ -1390,9 +1408,9 @@ describe.each(DESCRIBING_CALLS)('$tool: descriptions', ({ call }) => {
     const fake = system();
     const result = await withinTurns(call(contextOn(fake, 'absent')));
     expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs.some((r) => r.url.startsWith('/sap/bc/adt/x/'))).toBe(
-      false,
-    );
+    expect(
+      fake.directs.some((r) => r.url.startsWith('/sap/bc/adt/oo/classes/')),
+    ).toBe(false);
     expect(textOf(result)).toContain('Class A');
   });
 });

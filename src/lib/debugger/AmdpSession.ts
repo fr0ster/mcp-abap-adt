@@ -109,8 +109,6 @@ interface OnceAmdp {
   hanaSession: string;
   /** The stop request was answered ok. */
   stopped: boolean;
-  /** An event read is open. */
-  reading?: boolean;
 }
 
 const bodyOf = (a: IAdtResponse<unknown>): string =>
@@ -733,18 +731,10 @@ export class AmdpSession<O = unknown> {
 
   /**
    * One request: the events SAP answers on the events connection. It runs
-   * outside the serial, so the commands go on while it holds; one read at a time.
+   * outside the serial, so the commands go on while it holds.
    */
   async getEventsOnce(): Promise<DebugView<AmdpEvent[]>> {
-    const once = await this.mutate(async () => {
-      const once = this.requireOnce();
-      if (once.reading)
-        throw new DebugStateError(
-          'an event read is open for this AMDP session: its answer comes first',
-        );
-      once.reading = true;
-      return once;
-    });
+    const once = await this.mutate(async () => this.requireOnce());
     try {
       const answer = await once.onEvents.getEvents(once.mainId);
       if (!answer.ok)
@@ -756,7 +746,6 @@ export class AmdpSession<O = unknown> {
       const raw = bodyOf(answer);
       return { value: readAmdpEvents(raw), raw };
     } finally {
-      once.reading = false;
       this.notify();
     }
   }
@@ -893,6 +882,35 @@ export class AmdpSession<O = unknown> {
       await this.closeOrKeep(c, 'a connection', failures);
       if (failures.length === before) this.retiredOnce.delete(c);
     }
+  }
+
+  /**
+   * The end of the one-request path: one logoff per connection the AMDP
+   * session opened — the events and the commands connection, the retired ones
+   * — and nothing else: no stop, no breakpoint sync. The logoff of both ends
+   * the AMDP debug session (measured 2026-10-17). A close that throws keeps
+   * its connection for a later end or stop, and is answered.
+   */
+  endOnce(): Promise<DebugView<{ ended: true; logoffs: number }>> {
+    return this.mutate(async () => {
+      const failures: DebugFailure[] = [];
+      let logoffs = 0;
+      const once = this.once;
+      this.once = undefined;
+      const connections = [
+        ...(once ? [once.events, once.commands] : []),
+        ...this.retiredOnce,
+        ...this.unclosed,
+      ];
+      this.retiredOnce.clear();
+      for (const c of connections) {
+        logoffs += 1;
+        await this.closeOrKeep(c, 'a connection', failures);
+      }
+      this.cleanupFailures = failures;
+      if (failures.length) throw new DebugCleanupError(failures);
+      return { value: { ended: true, logoffs }, raw: '' };
+    });
   }
 
   // --- lifecycle -------------------------------------------------------------

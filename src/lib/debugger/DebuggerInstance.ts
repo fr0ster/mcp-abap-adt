@@ -1,7 +1,11 @@
 import type { HandlerContext } from '../../handlers/interfaces';
 import type { StatePart } from '../state/InstanceState';
 import { AmdpSession } from './AmdpSession';
-import { DebugCleanupError, DebugSession } from './DebugSession';
+import {
+  DebugCleanupError,
+  DebugSession,
+  type DebugView,
+} from './DebugSession';
 import { type DebugFailure, thrownFailure } from './failures';
 import {
   type BreakpointConflict,
@@ -90,6 +94,31 @@ export class DebuggerInstance implements StatePart {
       );
     }
     return notes;
+  }
+
+  /**
+   * The compact debugger's end: both kinds log off the connections they
+   * opened, and send nothing else. The logoffs together; a failure of either
+   * is answered with the other's done.
+   */
+  async endOnce(): Promise<DebugView<{ ended: true; logoffs: number }>> {
+    const results = await Promise.allSettled([
+      this.abap.endOnce(),
+      this.amdp.endOnce(),
+    ]);
+    const failures = results.flatMap((r) =>
+      r.status === 'rejected'
+        ? r.reason instanceof DebugCleanupError
+          ? [...r.reason.failures]
+          : [thrownFailure(r.reason, 'end')]
+        : [],
+    );
+    if (failures.length) throw new DebugCleanupError(failures);
+    const logoffs = results.reduce(
+      (n, r) => n + (r.status === 'fulfilled' ? r.value.value.logoffs : 0),
+      0,
+    );
+    return { value: { ended: true, logoffs }, raw: '' };
   }
 
   async dispose(): Promise<void> {

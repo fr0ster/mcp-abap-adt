@@ -176,10 +176,10 @@ stack. You chain the calls:
    seconds (measured 2026-10-17) and answers the debuggee it caught (`debuggee_id`, `server`) or
    `caught: false`. A breakpoint stops a program only while a listen is open, so start the
    program while the listen holds; a caught program nobody attaches runs on by itself after about
-   30 seconds (measured 2026-10-10).
-   One listen at a time per debug state; the other calls go on while it holds.
-3. `HandlerDebugSession` `attach` with `debuggee_id` and `server` — on a session of its own, which
-   serves every later step and reading.
+   30 seconds (measured 2026-10-10). The other calls go on while it holds; a listen sent while
+   another holds goes to SAP as it is, and SAP's answer comes back as it came.
+3. `HandlerDebugSession` `attach` with `debuggee_id` and `server` — on the attaching session, which
+   the first attach opens and every later attach, step and reading uses.
 4. `HandlerDebugStep` and `HandlerDebugMaintain` — a step answers SAP's step result, and the
    stopped position is read from the stack (`getStack`): the step answer carries no position
    (measured 2026-10-17). A step answers `ended` when SAP reports the program's end.
@@ -193,22 +193,33 @@ stack. You chain the calls:
    2026-10-17), and the tool passes SAP's answer on as it came: a failure with its `status` and
    step (`terminate debuggee`, `terminate debugger`). The success shows in the next answer, which
    is `noSessionAttached`, or in the program's end.
-6. `HandlerDebugBreakpoints` `deleteBreakpoint`, or `HandlerDebugSession` `stopListener`, which
-   ends the listener and deletes the identity's breakpoints.
+6. `HandlerDebugSession` `end` with the `state_handle`.
+
+**The closing chain:** `detachDebugger` (no id, on the attaching session) → `end`. `end` (either
+kind) logs off each connection the debug state opened, one logoff each — the attaching session,
+the listener, the control connection, the AMDP sessions — and sends nothing else. Then the debug
+state and its handle end: the handle answers `state is not available`, and a new debug state of
+either kind, under any identity, can open. What a logoff does, measured 2026-10-17: the attaching
+session's logoff releases a stopped debuggee at once, and the program runs on; the logoff of both
+AMDP sessions ends the AMDP debug session (measured with no suspended AMDP debuggee). The user's
+breakpoints stay set until removed (`deleteBreakpoint`, or `stopListener`), as in an editor; they
+are the SAP user's, and the next listen of that user catches at them. To remove them, send
+`HandlerDebugBreakpoints` `deleteBreakpoint` or `HandlerDebugSession` `stopListener` before
+`end`.
 
 **The AMDP chain:** `HandlerDebugSession` `start` (answers `main_id`; `take_over: true` ends an
 AMDP session of this user left behind) → `HandlerDebugBreakpoints` `syncBreakpoints` (answers the
 request id; SAP confirms it in a `SYNC_BREAKPOINTS` event) → run the method → `HandlerDebugSession`
 `getEvents` (a break names its debuggee id) → `HandlerDebugStep` `stepOver` / `stepContinue` and
 `HandlerDebugMaintain` `getDataPreview` with that `debuggee_id` → `deleteDebuggee` (a stop alone
-leaves a suspended debuggee held) → `stop`.
+leaves a suspended debuggee held) → `stop` → `end`.
 
 A call of one kind is refused while the instance holds the other. A failure is the method's error
 as it is, with the operation's step (`set breakpoints`, `listen`, `attach`, `detach`, `step`,
-`step to line`, `read stack`, `read events`, …). The connections the calls opened close when the
-debug state ends — the idle bound, the host's stop, the instance's close — so no call sends a
-logoff; that cleanup stops the listener a listen or a breakpoint left, closes the attaching
-session, which ends its attachment, and stops an AMDP session still running.
+`step to line`, `read stack`, `read events`, …). The refusal of the other kind names `end`. Only
+`end` logs off; a debug state that is never ended closes at the idle bound, the host's stop or the
+instance's close, whose cleanup also stops the listener a listen or a breakpoint left and an AMDP
+session still running.
 
 ## Catching, and one debuggee at a time
 

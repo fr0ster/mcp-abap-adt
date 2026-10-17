@@ -93,7 +93,8 @@ server's memory until discarded or the process ends):
 and AMDP (`kind: abap|amdp`); every call sends one SAP request, the one its `operation` names,
 and the consumer chains the calls: `HandlerDebugBreakpoints` (breakpoints and watchpoints),
 `HandlerDebugSession` (check, listen with the caller's `hold_seconds`, stop the listener, attach,
-detach, terminate, settings; AMDP start, events, stop, delete a debuggee), `HandlerDebugStep`
+detach, terminate, settings; AMDP start, events, stop, delete a debuggee; `end`, which logs off
+the debug state and ends its handle), `HandlerDebugStep`
 (the steps, run or jump to a line, the stack position) and `HandlerDebugMaintain` (stack,
 variables, child variables, memory sizes, a snapshot, set a value; an AMDP data preview). The
 first call that opens the debug state answers its `state_handle`. In user mode a

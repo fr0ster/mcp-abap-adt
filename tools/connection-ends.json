@@ -141,13 +141,6 @@
   },
   {
     "file": "src/lib/debugger/DebugSession.ts",
-    "function": "DebugSession.retired",
-    "site": "Map<IAbapConnection, 'close' | 'drop'>",
-    "end": "the debug session's stop (closeConnection / dropConnection = endConnection), the idle bound's stop, the pool's undo (dispose()); the instance's terminal close for any left",
-    "why": "the one-request path's attachments it is done with (detached, terminated, ended, refused), kept for the cleanup so no call sends a logoff"
-  },
-  {
-    "file": "src/lib/debugger/DebugSession.ts",
     "function": "DebugSession.unclosed",
     "site": "Set<IAbapConnection>",
     "end": "the next stop retries; the instance's terminal close ends it whatever the stop answered",

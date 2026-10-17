@@ -173,13 +173,6 @@ type Answer = { isError?: boolean; content: Array<{ text: string }> };
 const jsonOf = (a?: Answer) =>
   JSON.parse(a?.content[0]?.text ?? '{}') as Record<string, any>;
 
-/** The call's answer once the queue has run, or a held marker when it is still open. */
-async function answeredOrHeld(call: Promise<Answer>): Promise<Answer> {
-  call.catch(() => undefined);
-  const held: Answer = { isError: false, content: [{ text: 'held open' }] };
-  return Promise.race([call, settle().then(() => held)]);
-}
-
 async function settle(): Promise<void> {
   for (let i = 0; i < 50; i += 1)
     await new Promise<void>((resolve) => setImmediate(resolve));
@@ -557,8 +550,11 @@ describe('the compact debugger is four tools', () => {
 
   it('every operation of the cases is in its tool, and every tool operation has a case', () => {
     for (const e of entries) {
-      const ops = (e.toolDefinition.inputSchema as any).properties.operation
-        .enum as string[];
+      // end sends logoffs, no ADT request: its own tests below.
+      const ops = (
+        (e.toolDefinition.inputSchema as any).properties.operation
+          .enum as string[]
+      ).filter((op) => op !== 'end');
       const covered = new Set(
         CASES.filter((c) => c.tool === e.toolDefinition.name).map(
           (c) => c.args.operation as string,
@@ -615,6 +611,12 @@ describe('descriptions, positive', () => {
   it("listen holds for the caller's hold_seconds", () => {
     expect(description('HandlerDebugSession')).toContain(
       "listen waits for a debuggee for exactly hold_seconds, SAP's hold,",
+    );
+  });
+
+  it('end logs off: an attached debuggee runs on, an AMDP debug session ends, the breakpoints stay set until removed', () => {
+    expect(description('HandlerDebugSession')).toContain(
+      "end, for either kind, takes state_handle and logs off each connection the debug state opened, one logoff each: an attached debuggee runs on, an AMDP debug session ends, and the user's breakpoints stay set until removed (deleteBreakpoint, or stopListener);",
     );
   });
 
@@ -942,84 +944,6 @@ describe("the chain is the consumer's", () => {
     },
   );
 
-  it('a second attach becomes the one the calls work on; the first attaching session closes at the cleanup', async () => {
-    const t = install();
-    const handle = (await prepare(t, 'attached')).state_handle;
-    const abap = t.instance.abap as unknown as {
-      current?: { connection: IAbapConnection };
-    };
-    const first = abap.current!.connection;
-    const second = await t.call('HandlerDebugSession', {
-      state_handle: handle,
-      kind: 'abap',
-      operation: 'attach',
-      debuggee_id: 'DEBUGGEE2',
-    });
-    expect(second.isError).not.toBe(true);
-    const now = abap.current!.connection;
-    expect(now).not.toBe(first);
-    t.wire.mode = 'document';
-    await t.instance.stop();
-    expect(t.wire.sent).toEqual([]);
-    expect(t.wire.closed).toBe(t.wire.opened);
-  });
-
-  it('one listen at a time: a second listen while one holds is refused before any request', async () => {
-    const t = install();
-    t.wire.mode = 'pending';
-    const first = t.call('HandlerDebugSession', {
-      kind: 'abap',
-      operation: 'listen',
-      hold_seconds: 60,
-    });
-    first.catch(() => undefined);
-    await settle();
-    expect(t.wire.sent).toHaveLength(1);
-    // Held open by a wrong rule, the second call would never answer: it is raced, never awaited alone.
-    const second = await answeredOrHeld(
-      t.call('HandlerDebugSession', {
-        state_handle: t.state.handle,
-        kind: 'abap',
-        operation: 'listen',
-        hold_seconds: 60,
-      }),
-    );
-    await settle();
-    expect(t.wire.sent).toHaveLength(1);
-    expect(second.isError).toBe(true);
-    expect(second.content[0].text).toContain(
-      'a listen is open for this debug session',
-    );
-  });
-
-  it('one AMDP event read at a time: a second getEvents while one holds is refused before any request', async () => {
-    const t = install();
-    const started = await prepare(t, 'amdp');
-    t.wire.mode = 'pending';
-    const first = t.call('HandlerDebugSession', {
-      ...started,
-      kind: 'amdp',
-      operation: 'getEvents',
-    });
-    first.catch(() => undefined);
-    await settle();
-    expect(t.wire.sent).toHaveLength(1);
-    // Held open by a wrong rule, the second call would never answer: it is raced, never awaited alone.
-    const second = await answeredOrHeld(
-      t.call('HandlerDebugSession', {
-        ...started,
-        kind: 'amdp',
-        operation: 'getEvents',
-      }),
-    );
-    await settle();
-    expect(t.wire.sent).toHaveLength(1);
-    expect(second.isError).toBe(true);
-    expect(second.content[0].text).toContain(
-      'an event read is open for this AMDP session',
-    );
-  });
-
   it('AMDP: no background event read, nothing is sent between calls', async () => {
     jest.useFakeTimers({
       doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
@@ -1057,6 +981,193 @@ describe("the chain is the consumer's", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('every attach goes on the one attaching session', async () => {
+    const t = install();
+    const handle = (await prepare(t, 'attached')).state_handle;
+    const opened = t.wire.opened;
+    t.wire.mode = 'document';
+    const second = await t.call('HandlerDebugSession', {
+      state_handle: handle,
+      kind: 'abap',
+      operation: 'attach',
+      debuggee_id: 'DEBUGGEE2',
+    });
+    expect(second.isError).not.toBe(true);
+    expect(t.wire.sent).toHaveLength(1);
+    expect(t.wire.sent[0]).toContain('debuggeeId=DEBUGGEE2');
+    expect(t.wire.opened).toBe(opened);
+  });
+
+  it.each([
+    ['abap', 'listen', { hold_seconds: 60 }],
+    ['amdp', 'getEvents', {}],
+  ] as const)(
+    '%s %s while one holds goes to SAP as it is',
+    async (kind, operation, extra) => {
+      const t = install();
+      const handle =
+        kind === 'amdp' ? (await prepare(t, 'amdp')).state_handle : undefined;
+      t.wire.mode = 'pending';
+      const first = t.call('HandlerDebugSession', {
+        ...(handle ? { state_handle: handle } : {}),
+        kind,
+        operation,
+        ...extra,
+      });
+      first.catch(() => undefined);
+      await settle();
+      const second = t.call('HandlerDebugSession', {
+        state_handle: handle ?? t.state.handle,
+        kind,
+        operation,
+        ...extra,
+      });
+      second.catch(() => undefined);
+      await settle();
+      expect(t.wire.sent).toHaveLength(2);
+      expect(t.wire.sent[1]).toBe(t.wire.sent[0]);
+    },
+  );
+
+  describe('end logs off the debug state', () => {
+    const end = (
+      t: ReturnType<typeof install>,
+      handle: string | undefined,
+      kind = 'abap',
+    ) =>
+      t.call('HandlerDebugSession', {
+        ...(handle !== undefined ? { state_handle: handle } : {}),
+        kind,
+        operation: 'end',
+      });
+
+    async function listening(t: ReturnType<typeof install>) {
+      const armed = await t.call('HandlerDebugBreakpoints', {
+        kind: 'abap',
+        operation: 'setBreakpoints',
+        breakpoints: [{ statement: 'WRITE' }],
+      });
+      const handle = jsonOf(armed).state_handle as string;
+      await t.call('HandlerDebugSession', {
+        state_handle: handle,
+        kind: 'abap',
+        operation: 'listen',
+        hold_seconds: 5,
+      });
+      return handle;
+    }
+
+    it.each([
+      [
+        'ABAP attached: the attaching session, the listener, the control connection',
+        'attached',
+        3,
+      ],
+      [
+        'ABAP listening: the listener and the control connection',
+        'listening',
+        2,
+      ],
+      ['AMDP: the events and the commands connection', 'amdp', 2],
+    ] as const)(
+      '%s — exactly the logoffs, nothing else is sent',
+      async (_label, setup, logoffs) => {
+        const t = install((_m, url) =>
+          url.includes('/listeners?') ? LISTEN_CATCH : '',
+        );
+        let handle: string;
+        if (setup === 'amdp') handle = (await prepare(t, 'amdp')).state_handle!;
+        else {
+          handle = await listening(t);
+          if (setup === 'attached')
+            await t.call('HandlerDebugSession', {
+              state_handle: handle,
+              kind: 'abap',
+              operation: 'attach',
+              debuggee_id: 'DEBUGGEE1',
+            });
+        }
+        expect(t.wire.opened).toBe(logoffs);
+        expect(t.wire.closed).toBe(0);
+        t.wire.mode = 'document';
+        const answer = await end(t, handle, setup === 'amdp' ? 'amdp' : 'abap');
+        expect(answer.isError).not.toBe(true);
+        expect(jsonOf(answer)).toMatchObject({ ended: true, logoffs });
+        expect(jsonOf(answer)).not.toHaveProperty('state_handle');
+        expect(t.wire.sent).toEqual([]);
+        expect(t.wire.closed).toBe(logoffs);
+        expect(t.state.holdsState()).toBe(false);
+        // The handle is gone: every call on it is not available.
+        const after = await t.call('HandlerDebugStep', {
+          state_handle: handle,
+          kind: setup === 'amdp' ? 'amdp' : 'abap',
+          operation: 'stepOver',
+          debuggee_id: 'D1',
+        });
+        expect(after.isError).toBe(true);
+        expect(after.content[0].text).toContain('state is not available');
+        expect(t.wire.sent).toEqual([]);
+      },
+    );
+
+    it('a new debug state of the other kind, and of another identity, opens after end', async () => {
+      const t = install();
+      const handle = await listening(t);
+      t.wire.mode = 'document';
+      await end(t, handle);
+      const started = await t.call('HandlerDebugSession', {
+        kind: 'amdp',
+        operation: 'start',
+      });
+      expect(started.isError).not.toBe(true);
+      const amdpHandle = jsonOf(started).state_handle as string;
+      expect(amdpHandle).toMatch(/^[0-9A-F]{32}$/);
+      expect(amdpHandle).not.toBe(handle);
+      await end(t, amdpHandle, 'amdp');
+      const other = await t.call('HandlerDebugBreakpoints', {
+        kind: 'abap',
+        operation: 'setBreakpoints',
+        breakpoints: [{ statement: 'WRITE' }],
+        request_user: 'another_user',
+      });
+      expect(other.isError).not.toBe(true);
+      expect(jsonOf(other).request_user).toBe('ANOTHER_USER');
+    });
+
+    it('end with the other kind than the state holds ends it all the same', async () => {
+      const t = install();
+      const handle = await listening(t);
+      const answer = await end(t, handle, 'amdp');
+      expect(answer.isError).not.toBe(true);
+      expect(t.state.holdsState()).toBe(false);
+    });
+
+    it('end without a handle is refused before any request', async () => {
+      const t = install();
+      await listening(t);
+      t.wire.mode = 'document';
+      const answer = await end(t, undefined);
+      expect(answer.isError).toBe(true);
+      expect(answer.content[0].text).toContain('state is not available');
+      expect(t.wire.sent).toEqual([]);
+      expect(t.wire.closed).toBe(0);
+      expect(t.state.holdsState()).toBe(true);
+    });
+
+    it('the kind refusal names the end operation', async () => {
+      const t = install();
+      const started = await prepare(t, 'amdp');
+      const answer = await t.call('HandlerDebugStep', {
+        ...started,
+        kind: 'abap',
+        operation: 'stepOver',
+      });
+      expect(answer.content[0].text).toContain(
+        'HandlerDebugSession operation end, with its state_handle, ends it',
+      );
+    });
   });
 
   it('the cleanup closes the connections the calls opened, and the handle ends', async () => {

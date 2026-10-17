@@ -58,7 +58,7 @@ export function refuseOtherKind(
   const other = wanted === 'abap' ? held.amdp : held.abap;
   if (other.holdsState()) {
     throw new Error(
-      `a ${wanted === 'abap' ? 'amdp' : 'abap'} debug session is already open on this server; end it first`,
+      `a ${wanted === 'abap' ? 'amdp' : 'abap'} debug session is already open on this server; HandlerDebugSession operation end, with its state_handle, ends it`,
     );
   }
 }
@@ -78,7 +78,7 @@ export function debuggerFor(
   if (args.state_handle === undefined && opens) {
     if (context.state?.holdsState())
       throw new Error(
-        'state_handle: this server holds a debug state; the call takes its handle',
+        'state_handle: this server holds a debug state; the call takes its handle, and HandlerDebugSession operation end ends that state',
       );
     d = requireDebugger(context, args, { create: kind });
   } else {
@@ -164,5 +164,32 @@ export function refuseOperation(
 ): never {
   throw new Error(
     `operation: kind ${kind} takes ${takes.join(', ')}; ${operation} is outside them`,
+  );
+}
+
+/**
+ * The end of the debug state, whatever kind it holds: the handle is checked,
+ * the connections the state opened are logged off, and the handle ends once
+ * nothing is held.
+ */
+export function endAnswer(
+  context: HandlerContext,
+  args: { state_handle?: string },
+): Promise<McpResult> {
+  return debugAnswer(
+    args,
+    async () => {
+      const d = requireDebugger(
+        context,
+        { state_handle: args.state_handle ?? '' },
+        'use',
+      );
+      context.state?.endWhenEmpty();
+      return d.endOnce();
+    },
+    (v) => v,
+    (v) => v,
+    () => heldExtra(context),
+    () => heldExtra(context),
   );
 }

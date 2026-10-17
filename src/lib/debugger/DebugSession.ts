@@ -1445,18 +1445,16 @@ export class DebugSession<O = unknown> {
    * SAP answered, read; nothing is sent around it and nothing runs after it in
    * the background — no listen loop, no attach on a catch, no stack read after
    * a step. Connections are opened when a role first needs one (an open sends
-   * nothing) and kept until the cleanup, which closes them: a call that ends an
-   * attachment retires its connection there, so the call itself sends no logoff.
+   * nothing) and kept until `endOnce` or the cleanup, which close them, so no
+   * other call sends a logoff.
    */
   /** The listener connection of the one-request path, and its listen while one is open. */
   private onceListener?: {
     connection: IAbapConnection;
-    /** Set inside the serial when a listen is taken, cleared when its answer came. */
-    listening?: boolean;
     open?: Promise<IAdtResponse<string>>;
   };
-  /** Connections the one-request path is done with: the cleanup closes (or drops) them. */
-  private readonly retired = new Map<IAbapConnection, 'close' | 'drop'>();
+  /** The attaching session of the one-request path, opened by its first attach: every attach goes on it. */
+  private onceAttaching?: { connection: IAbapConnection; debugger: Debugger };
 
   /**
    * The identity in force, or one fixed now from the call's arguments. A call
@@ -1495,12 +1493,6 @@ export class DebugSession<O = unknown> {
     await this.controlDebugger();
     const control = this.control as Listener;
     return this.ports.abapDebugger(control.connection, conflict);
-  }
-
-  /** Inside the serial: the attachment ended; its connection waits for the cleanup. */
-  private retireStop(stop: Stop, how: 'close' | 'drop'): void {
-    if (this.current === stop) this.current = undefined;
-    this.retired.set(stop.connection, how);
   }
 
   /** One request: whether another debugger holds this identity's debugging (409 is the conflict). */
@@ -1611,7 +1603,7 @@ export class DebugSession<O = unknown> {
   /**
    * One request: a listen SAP holds for exactly `holdSeconds`, answered with
    * the debuggee it caught or empty. It runs outside the serial, so the other
-   * calls go on while it holds; one listen at a time.
+   * calls go on while it holds.
    */
   async listenOnce(
     options: OnceIdentity,
@@ -1619,14 +1611,9 @@ export class DebugSession<O = unknown> {
     conflict: IDebuggerListenerConflict,
   ): Promise<DebugView<DebuggeeReading | { caught: false }>> {
     const { identity, dbg, listener } = await this.mutate(async () => {
-      if (this.onceListener?.listening)
-        throw new DebugStateError(
-          'a listen is open for this debug session: its answer comes first',
-        );
       const identity = await this.onceIdentity(options);
       if (!this.onceListener)
         this.onceListener = { connection: await this.open() };
-      this.onceListener.listening = true;
       this.changed = true;
       return {
         identity,
@@ -1645,14 +1632,14 @@ export class DebugSession<O = unknown> {
       return { value: caught ?? { caught: false }, raw: bodyOf(answer) };
     } finally {
       if (listener.open === open) listener.open = undefined;
-      listener.listening = false;
       this.notify();
     }
   }
 
   /**
-   * One request: the debuggee attached on a connection of its own, which serves
-   * every later step and reading. An earlier attachment's connection is retired.
+   * One request: the debuggee attached on the attaching session — opened by the
+   * first attach, the same session for every later one — which serves every
+   * step and reading.
    */
   attachOnce(
     options: OnceIdentity,
@@ -1661,22 +1648,25 @@ export class DebugSession<O = unknown> {
   ): Promise<DebugView<AttachReading>> {
     return this.mutate(async () => {
       const identity = await this.onceIdentity(options);
-      const connection = await this.open();
-      const dbg = this.ports.abapDebugger(connection, this.mode);
+      if (!this.onceAttaching) {
+        const connection = await this.open();
+        this.onceAttaching = {
+          connection,
+          debugger: this.ports.abapDebugger(connection, this.mode),
+        };
+      }
+      const { connection, debugger: dbg } = this.onceAttaching;
       const answer = await dbg.attach(
         identity,
         debuggeeId,
         server ? { server } : {},
       );
-      if (!answer.ok) {
-        this.retired.set(connection, 'close');
+      if (!answer.ok)
         throw failedAt(
           new DebugRequestError(messageOf(answer)),
           answer,
           'attach',
         );
-      }
-      if (this.current) this.retireStop(this.current, 'close');
       const attach = readAttach(bodyOf(answer));
       this.current = {
         connection,
@@ -1733,7 +1723,6 @@ export class DebugSession<O = unknown> {
     const raw = bodyOf(answer);
     const end = readDebuggeeEnd(raw);
     if (end) {
-      this.retireStop(stop, 'close');
       return {
         value: {
           ended: end === 'terminateDebuggee' ? 'terminated' : 'debuggee_ended',
@@ -1772,7 +1761,6 @@ export class DebugSession<O = unknown> {
           answer,
           'detach',
         );
-      this.retireStop(stop, 'close');
       return { value: { detached: true }, raw: bodyOf(answer) };
     });
   }
@@ -1791,7 +1779,6 @@ export class DebugSession<O = unknown> {
           answer,
           'terminate debuggee',
         );
-      this.retireStop(stop, 'close');
       return { value: { terminated: true }, raw: bodyOf(answer) };
     });
   }
@@ -1810,7 +1797,6 @@ export class DebugSession<O = unknown> {
           answer,
           'terminate debugger',
         );
-      this.retireStop(stop, 'drop');
       return { value: { freed: true }, raw: bodyOf(answer) };
     });
   }
@@ -1831,6 +1817,50 @@ export class DebugSession<O = unknown> {
       const raw = bodyOf(answer);
       this.effective = readSettings(raw);
       return { value: this.effective, raw };
+    });
+  }
+
+  /**
+   * The end of the one-request path: one logoff per connection the debug state
+   * opened — the attaching session (an attached debuggee runs on), the
+   * listener, the control connection — and nothing else: no
+   * stopListener, no detach, no release step. The user's breakpoints stay set
+   * on the system until a stopListener of that user (measured 2026-10-17).
+   * Then everything the state held is forgotten, the identity with it. A close
+   * that throws keeps its connection for a later end or stop, and is answered.
+   */
+  endOnce(): Promise<DebugView<{ ended: true; logoffs: number }>> {
+    return this.mutate(async () => {
+      const failures: DebugFailure[] = [];
+      let logoffs = 0;
+      const close = async (c: IAbapConnection | undefined, what: string) => {
+        if (!c) return;
+        logoffs += 1;
+        await this.closeOrKeep(c, what, failures);
+      };
+      const attaching = this.onceAttaching;
+      this.onceAttaching = undefined;
+      const stop = this.current;
+      this.current = undefined;
+      await close(attaching?.connection, "the debuggee's connection");
+      if (stop && stop.connection !== attaching?.connection)
+        await close(stop.connection, "the debuggee's connection");
+      const listener = this.onceListener;
+      this.onceListener = undefined;
+      await close(listener?.connection, "the listener's connection");
+      const control = this.control;
+      this.control = undefined;
+      await close(control?.connection, "the breakpoints' connection");
+      for (const connection of [...this.unclosed])
+        await close(connection, 'a connection');
+      this.forgetAll();
+      this.changed = false;
+      this.fixed = undefined;
+      this.preferences = {};
+      this.effective = undefined;
+      this.cleanupFailures = failures;
+      if (failures.length) throw new DebugCleanupError(failures);
+      return { value: { ended: true, logoffs }, raw: '' };
     });
   }
 
@@ -2048,23 +2078,14 @@ export class DebugSession<O = unknown> {
           failures,
         );
       }
-      // The one-request path's connections it is done with.
-      for (const [connection, how] of [...this.retired]) {
-        if (how === 'drop') {
-          this.ports.dropConnection(connection);
-          this.retired.delete(connection);
-          continue;
-        }
-        const before = failures.length;
-        await this.closeOrKeep(connection, 'a connection', failures);
-        if (failures.length === before) this.retired.delete(connection);
-      }
-      // An attachment of the one-request path ends with its connection's logoff.
-      const held = this.current;
-      if (held?.once) {
-        this.current = undefined;
+      // The attaching session of the one-request path ends with its logoff,
+      // which ends its attachment; no release step is sent on it.
+      const attaching = this.onceAttaching;
+      if (this.current?.once) this.current = undefined;
+      if (attaching) {
+        this.onceAttaching = undefined;
         await this.closeOrKeep(
-          held.connection,
+          attaching.connection,
           "the debuggee's connection",
           failures,
         );
@@ -2230,7 +2251,7 @@ export class DebugSession<O = unknown> {
       this.unclosed.size > 0 ||
       this.owed.size > 0 ||
       !!this.onceListener ||
-      this.retired.size > 0
+      !!this.onceAttaching
     );
   }
 
@@ -2270,7 +2291,7 @@ export class DebugSession<O = unknown> {
       this.unclosed.size > 0 ||
       this.owed.size > 0 ||
       !!this.onceListener ||
-      this.retired.size > 0
+      !!this.onceAttaching
     );
   }
 

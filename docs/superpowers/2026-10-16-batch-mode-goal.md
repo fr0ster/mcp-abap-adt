@@ -87,18 +87,20 @@ activates the group afterwards.
   part; run states (activation run status and results, unit test results)
   are `HandlerGet` parts read once — the consumer polls. `HandlerActivate`
   starts an activation run and answers its id. The profiler's schedule and
-  run are separate calls. `HandlerDumpList` reads one page and answers SAP's
-  next link. The debugger is one request per action, chained by the
-  consumer; no background listener. The full chains stay in the full sets.
+  run are separate tools. `HandlerDumpList` reads one page and answers SAP's
+  next link. The debugger is one tool per action, one request each,
+  chained by the consumer, with no mode argument; no background listener.
+  `HandlerWhereUsed` reads one object; several are the consumer's, through
+  batch mode. The full chains stay in the full sets.
   This changes compact's behaviour for its consumers.
 - **Every package has batch mode.** The full, read-only and compact sets all
   serve `BatchBegin`, `BatchEnd` and the answer tool; what a set can do in batch
   mode is whatever of its tools send no request depending on another's answer
   — reads everywhere, and in
-  compact the create, lock, update, unlock and delete as well. In compact a
-  batch is one envelope: the first recorded call decides its kind (LOCK,
-  UNLOCK or stateless), and a call of another kind is refused — the next
-  phase is its own batch. LOCK and UNLOCK
+  compact the create, lock, update, unlock and delete as well. Every batch
+  end sends one envelope: a batch is homogeneous by session kind — the first
+  recorded call decides it (LOCK, UNLOCK or stateless) — and a call of
+  another kind is refused; the next phase is its own batch. LOCK and UNLOCK
   go in stateful envelopes, everything else stateless, as adt-clients' batch
   connection sends them (measured there).
 - **The debugger has its own batch mode**, through its own pair of tools,

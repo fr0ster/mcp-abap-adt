@@ -233,11 +233,12 @@ Recording an eligible call:
   into an envelope: the call has **no number**, and it answers the handler's own answer at once, as
   outside batch mode.
 
-**`HandlerBatch` (compact): one envelope.** In the compact sets `end` sends exactly one envelope: a
-compact batch is homogeneous by session kind — the first recorded call decides it (LOCK, UNLOCK or
-stateless, as adt-clients partitions), and a call of another kind is refused in batch mode
+**Every batch end sends one envelope** (owner's decision): `BatchEnd`, `HandlerBatch` `end`,
+`DebugBatchEnd` and `HandlerDebugBatch` `end` alike. A batch is homogeneous by session kind — the
+first recorded call decides it (LOCK, UNLOCK or stateless, as adt-clients partitions; a debugger
+batch is always one stateful group) — and a call of another kind is refused in batch mode
 (`batch_other_kind`: "<tool> is a <kind> request; this batch holds <kind> requests — record it in
-the next batch"). The full sets' `BatchEnd` keeps adt-clients' several envelopes per `execute()`.
+the next batch"; the code name is a controller decision pending the owner's review at the finish).
 
 **Numbering.** Every call that put a request into an envelope has its own number, from 1, in the
 order made — one number per call, covering all its parts — and only those: a refused call, or a handler that refused before sending, takes none.
@@ -362,13 +363,16 @@ and its MEASURED lines); the plan lists each violator with file and line.
 - **`HandlerActivate`** — the group/run path sends only `POST /activation/runs` and answers the
   `run_id` ("accepted, no verdict yet"); status and results are `HandlerGet` parts. The single-object
   path already is one request.
-- **`HandlerProfileRun`** splits into schedule (answers the `profilerId`) and run with a
-  `profilerId`, one request each; the consumer finds the new trace with `HandlerProfileList`.
+- **The profiler** — two tools, one request each (controller decision pending the owner's review at
+  the finish): `HandlerProfileSchedule` answers the `profilerId`; `HandlerProfileRun` runs with a
+  `profilerId`; no `step` argument. The consumer finds the new trace with `HandlerProfileList`.
+- **`HandlerWhereUsed`** reads one object, one request; several objects are the consumer's job
+  through batch mode (the full set's `GetWhereUsed` takes several, §11).
 - **`HandlerDumpList`** — one page per call (`top` ≤ 100, `to`): the entries and SAP's next link as
   it came; the consumer follows the link and dedups by `dump_id` (MEASURED 2026-10-17: `$top` capped
   at 100; the next link is `to=<timestamp of the last entry>`; the next page starts at that second,
   inclusive).
-- **The compact debugger** — one request per action; the consumer chains them: set breakpoints →
+- **The compact debugger** — **one tool per action**, one request each, no mode argument: `HandlerDebugSetBreakpoints`, `HandlerDebugDeleteBreakpoint`, `HandlerDebugListen`, `HandlerDebugAttach`, `HandlerDebugStepInto`, `HandlerDebugStepOver`, `HandlerDebugStepReturn`, `HandlerDebugStepContinue`, `HandlerDebugStepToLine`, `HandlerDebugJumpToLine`, `HandlerDebugStack`, `HandlerDebugVariables`, `HandlerDebugChildVariables`, `HandlerDebugSetVariable`, `HandlerDebugMemory`, `HandlerDebugTerminate`, `HandlerDebugDetach`, `HandlerDebugStopListener` (variables: by name; child variables: by parent; set value). The old four (`HandlerDebugStart`, `HandlerDebugStep`, `HandlerDebugView`, `HandlerDebugWait`) go, with a migration note. The consumer chains them: set breakpoints →
   listen (with the caller's hold) → attach → step / stack / variables → continue / terminate debuggee
   / detach → delete breakpoint / stop listener. No background listen loop; `HandlerDebugWait` goes.
   `run_to_line` / `jump_to_line` need the address (the consumer reads the stack first). MEASURED
@@ -376,8 +380,8 @@ and its MEASURED lines); the plan lists each violator with file and line.
   position (the stack is its own call); `terminateDebuggee` / `terminateDebugger` answer `500` even
   when they work (the descriptions say so); `detachDebugger` releases the debuggee only **without**
   an id on the attaching session (with an id: `200`, nothing released) — compact's detach sends it
-  without an id on the debuggee connection. The tools' names and the split of today's four
-  (`HandlerDebugStart`, `…Wait`, `…View`, `…Step`) into one-request actions are in the plan.
+  without an id on the debuggee connection. The AMDP debugger's compact actions are not part of this
+  decision and stay until the owner's word.
 - `HandlerLock`, `HandlerUnlock` and the single-object `HandlerActivate` already are one request.
 
 Every compact call is proven to issue exactly one request (§4.2's proof: held, answered with a
@@ -523,13 +527,13 @@ reach them:
 
 | Operation | Full set | Compact |
 |---|---|---|
-| step (into, over, return, continue) | `DebugStep` | `HandlerDebugStep` `action` ∈ into/over/return/continue |
-| step to line | `DebugStepToLine` | `HandlerDebugStep` `run_to_line`/`jump_to_line` with the address (required in compact, §4.6) |
-| stack | `DebugGetStack` | `HandlerDebugView` `what: 'stack'` |
-| variables | `DebugGetVariables` with names | `HandlerDebugView` `what: 'variables'` with names |
-| child variables | `DebugGetVariables` with parents | `HandlerDebugView` `what: 'variables'` without names (`@ROOT`) |
+| step (into, over, return, continue) | `DebugStep` | `HandlerDebugStepInto`, `…StepOver`, `…StepReturn`, `…StepContinue` |
+| step to line | `DebugStepToLine` | `HandlerDebugStepToLine`, `HandlerDebugJumpToLine` (address required) |
+| stack | `DebugGetStack` | `HandlerDebugStack` |
+| variables | `DebugGetVariables` with names | `HandlerDebugVariables` |
+| child variables | `DebugGetVariables` with parents | `HandlerDebugChildVariables` |
 | stack position | `DebugSetStackPosition` | — |
-| set a variable | `DebugSetVariable` | — |
+| set a variable | `DebugSetVariable` | `HandlerDebugSetVariable` |
 
 Every other tool is refused while the debugger batch is open (§4.1): breakpoints, watchpoints, the
 listener, start / wait / take-over / stop, attach, detach, `release_debugger`, terminate, memory
@@ -848,7 +852,7 @@ kind:
 | `ListTransports` | (1) the search configurations GET; (2) the transport-request GET of every saved configuration (up to 5) |
 | `DescribeByList` | (1) the quickSearch of every object; (2) again without its type, for the objects whose first answer was empty |
 | `GetAbapSystemSymbols` | the reads of every symbol found, through the inner handlers (`handleGetClass`, `handleGetFunctionModule`, `handleGetInterface`, generic): each phase holds every symbol's request of that step that is independent of the others, by the rule; a request needing an earlier answer goes in the next phase. If the call fails, the consumer gets the error and remakes the call — nothing is retried |
-| `GetWhereUsed` (with a type filter), `HandlerWhereUsed` | (1) the where-used scope of **every** object asked; (2) every scoped where-used request — two envelopes for any number of objects |
+| `GetWhereUsed` (with a type filter; full set only — compact's `HandlerWhereUsed` is one object, one request) | (1) the where-used scope of **every** object asked; (2) every scoped where-used request — two envelopes for any number of objects |
 | `RuntimeListFeeds` (full set; compact's `HandlerDumpList` is one page per call, §4.6) | (1) the feed (or variants) GET of every feed asked; then per round, the next page of every feed still paging, in one envelope (a page needs its own feed's previous next link) |
 | `GetEnhancements` | (1) the type probes of the object (class → program → include, each only when the earlier answered none — dependent, one per phase); (2) the object's enhancements and its root `nodestructure`; (3) the includes `nodestructure`; (4) with `include_nested`, the enhancements of every include, up to `max_includes`, in one envelope |
 
@@ -862,8 +866,7 @@ object takes several, so one call reads them all in the same envelopes: an optio
 existing single argument (exactly one of them given; the single one keeps today's answer shape, the
 list answers one entry per object, in the order asked):
 
-- `GetWhereUsed`: `objects: [{ object_type, object_name }]` beside `object_type` / `object_name`;
-  `HandlerWhereUsed` the same.
+- `GetWhereUsed`: `objects: [{ object_type, object_name }]` beside `object_type` / `object_name`.
 - `RuntimeListFeeds`: `feed_types: string[]` beside `feed_type`.
 - `GetPackageContents`: `package_names: string[]`; `HandlerGet` part `contents` the same.
 - `GetPackageTree`: `package_names: string[]`.

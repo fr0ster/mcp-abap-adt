@@ -29,7 +29,7 @@
 
 ## Review Focus
 
-1. Recorded calls of LOCK, a read, UNLOCK, a read interleaved: several envelopes in one `execute()`; every number must still map to its own call's answer → test in Task 6.
+1. A call of a kind the batch does not hold (a read after a LOCK) arriving between eligible calls: refused with `batch_other_kind`, and the batch's numbers stay consecutive → test in Task 10.
 2. `BatchAnswers` with `0`, a negative, a non-integer, or duplicates: the first three refused before anything runs, duplicates answered once per occurrence in the order asked → test in Task 6.
 3. `when` rules against argument spelling (`object_type: 'domain'` vs `'DOMAIN'`, `part` absent meaning `source`): eligibility must read arguments as the handler does → test in Task 4.
 4. The idle bound ends held state while a batch is open: nothing sent, recorded handlers released, `BatchEnd` then `batch_mode_off`, `BatchAnswers` "no answer with that number" → test in Task 8.
@@ -138,7 +138,7 @@
 - Consumes: Tasks 3–5.
 - Produces: `executeBatch(owner: InstanceBatch, target: LateBoundConnection, connection: IAbapConnection): Promise<BatchSummary>` with `type BatchSummary = { recorded: number; failed: number[]; came?: unknown }`; `endBeforeExecute(owner: InstanceBatch, failure: McpResult): void` (every recorded call's answer is that failure, mode off); `readAnswers(owner: InstanceBatch, ask: { number?: number; numbers?: number[] }): BatchAnswer[]` with the "no answer with that number" entry `{ number, error: 'no_answer', message: 'no answer with that number' }`.
 
-- [ ] **Step 1: Write the failing tests** — `batchEnd.test.ts`: `envelopes go on the connection BatchEnd took; none on the retired one; the retired one is not logged off under BatchEnd`; `execute rejecting: mode off, a second BatchEnd refused batch_mode_off, each envelope seen once`; `a lock part answers the tool's lock answer with its lock handle; a read part its projection; a 404 part the C6 failure`; `a call with two independent parts answers the handler's one answer built from both, under its one number`; `an envelope answered 500: every part's answer and BatchEnd's carry it as it came`; `not-sent parts answer the not-sent error`; `summary { recorded, failed }`; `empty batch answers { recorded: 0, failed: [] } and replaces the answers with none`; `credential refusal (own refusal.kind, refusal.reason, at; no response): BatchEnd answers it as answerRead does, every number answers it, mode off`; `answered refusal (cause.response.status === 401)`; `a resolve failing at BatchEnd: the call answers it, mode off, every recorded call's answer is it, nothing sent`; `keepRawParts off: no raw; on: raw is one entry per part, in the order sent, each { status, status_text, headers, body: "" for a bodyless 200 }`; `LOCK, read, UNLOCK, read interleaved: several envelopes, each number its own call's answer` (Review Focus 1). `batchAnswers.test.ts`: `number and numbers, in the order asked`; `both or neither refused`; `0, -1, 1.5 refused before anything runs; duplicates answered per occurrence` (Review Focus 2); `before any batch and an unknown number: no answer with that number`; `served while a batch is open`. `noRetry.test.ts` (real `AdtBatchConnection` 34.1.0): `406 (supported Accept named) and 415 parts are the calls' answers; each request sent once; no follow-up envelope`; `an envelope answered 406 is not sent again`; `the instance's plain connection still corrects outside the batch`; `a recorder created without exemptFromAcceptNegotiation is negotiated: its 406 part is corrected and a follow-up envelope sent`.
+- [ ] **Step 1: Write the failing tests** — `batchEnd.test.ts`: `envelopes go on the connection BatchEnd took; none on the retired one; the retired one is not logged off under BatchEnd`; `execute rejecting: mode off, a second BatchEnd refused batch_mode_off, each envelope seen once`; `a lock part answers the tool's lock answer with its lock handle; a read part its projection; a 404 part the C6 failure`; `a call with two independent parts answers the handler's one answer built from both, under its one number`; `an envelope answered 500: every part's answer and BatchEnd's carry it as it came`; `not-sent parts answer the not-sent error`; `summary { recorded, failed }`; `empty batch answers { recorded: 0, failed: [] } and replaces the answers with none`; `credential refusal (own refusal.kind, refusal.reason, at; no response): BatchEnd answers it as answerRead does, every number answers it, mode off`; `answered refusal (cause.response.status === 401)`; `a resolve failing at BatchEnd: the call answers it, mode off, every recorded call's answer is it, nothing sent`; `keepRawParts off: no raw; on: raw is one entry per part, in the order sent, each { status, status_text, headers, body: "" for a bodyless 200 }`; `batchAnswers.test.ts`: `number and numbers, in the order asked`; `both or neither refused`; `0, -1, 1.5 refused before anything runs; duplicates answered per occurrence` (Review Focus 2); `before any batch and an unknown number: no answer with that number`; `served while a batch is open`. `noRetry.test.ts` (real `AdtBatchConnection` 34.1.0): `406 (supported Accept named) and 415 parts are the calls' answers; each request sent once; no follow-up envelope`; `an envelope answered 406 is not sent again`; `the instance's plain connection still corrects outside the batch`; `a recorder created without exemptFromAcceptNegotiation is negotiated: its 406 part is corrected and a follow-up envelope sent`.
 - [ ] **Step 2:** Run — FAIL.
 - [ ] **Step 3:** Implement `executeBatch` per spec §5.2 (try/finally: mode off whatever fails; await every recorded handler's answer; build summary; `owner.end`), `endBeforeExecute` wired in the dispatch's catch for `BatchEnd`, `readAnswers`.
 - [ ] **Step 4:** Run — PASS.
@@ -213,23 +213,23 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 - `HandlerActivate` group/run path polls the run (`compact-modify/src/handlers/handleHandlerActivate.ts`); `HandlerUnitTestResult`, `HandlerCdsUnitTestResult` poll the status before the result (`compact-readonly-entries/src/handlers/handleHandlerUnitTestResult.ts`, `handleHandlerCdsUnitTestResult.ts`); `HandlerProfileRun` chains schedule → run (CLASS: list → schedule → run → poll the trace list) (`compact-modify/src/handlers/handleHandlerProfileRun.ts`); `HandlerDumpList` walks pages for a large `top` (`compact-readonly-entries/src/handlers/handleHandlerDumpList.ts:42`); `HandlerDebugStart` / `HandlerDebugStep` / stop chain requests and run a background listen loop (`src/lib/compact/debug/*.ts`, `src/lib/debugger/DebugSession.ts`).
 - Owner's explicit exception: `HandlerGet` part `urls` stays as it is.
 
-### Task 10: `HandlerBatch`: one envelope, homogeneous by session kind
+### Task 10: Every batch end: one envelope, homogeneous by session kind
 
 **Files:**
-- Modify: `src/lib/compact/batch/handleHandlerBatch.ts`, `src/lib/batch/InstanceBatch.ts` (the batch's kind), `src/embeddable/BaseMcpServer.ts` (the refusal)
-- Test: `src/__tests__/unit/batch/compactOneEnvelope.test.ts`
+- Modify: `src/lib/batch/InstanceBatch.ts` (the batch's kind), `src/lib/batch/execute.ts` (`BatchEnd` and `HandlerBatch` `end`), `src/embeddable/BaseMcpServer.ts` (the refusal); the debugger batch end follows in Task 20
+- Test: `src/__tests__/unit/batch/oneEnvelope.test.ts`
 
 **Interfaces:**
 - Consumes: Tasks 3, 5, 6 (`InstanceBatch`, the recorder, `executeBatch`).
-- Produces: `InstanceBatch.kind(): 'lock' | 'unlock' | 'stateless' | undefined` set by the first recorded call in a compact batch; refusal `batch_other_kind` (spec §4.1 words).
+- Produces: `InstanceBatch.kind(): 'lock' | 'unlock' | 'stateless' | undefined` set by the first recorded call of every batch; refusal `batch_other_kind` (spec §4.1 words; the code name a controller decision pending the owner's review at the finish).
 
-- [ ] **Step 1: Write the failing tests** — `HandlerBatch end sends exactly one envelope`; `the first call decides the kind (LOCK / UNLOCK / stateless)`; `a call of another kind is refused batch_other_kind, nothing recorded, no number`; `the full sets' BatchEnd still sends several envelopes for mixed kinds`.
+- [ ] **Step 1: Write the failing tests** — `BatchEnd and HandlerBatch end each send exactly one envelope`; `the first call decides the kind (LOCK / UNLOCK / stateless)`; `a call of another kind is refused batch_other_kind, nothing recorded, no number` — in the full and the compact sets.
 - [ ] **Step 2:** Run — FAIL.
-- [ ] **Step 3:** Implement the kind and the refusal for the compact sets.
+- [ ] **Step 3:** Implement the kind and the refusal for every batch.
 - [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
 - [ ] **Step 5: Break it:** let a second kind in — each red; revert.
 - [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order) (each phase its own batch); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
-- [ ] **Step 7:** Commit `feat(compact): a compact batch is one envelope`.
+- [ ] **Step 7:** Commit `feat: every batch end is one envelope`.
 
 ### Task 11: Compact one call: `HandlerCreate`
 
@@ -334,22 +334,23 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 - [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
 - [ ] **Step 7:** Commit `feat(compact)!: unit-test results are read once`.
 
-### Task 17: `HandlerProfileRun`: schedule and run
+### Task 17: The profiler: `HandlerProfileSchedule` and `HandlerProfileRun`
 
 **Files:**
-- Modify: `compact-modify/src/handlers/handleHandlerProfileRun.ts`, `src/lib/compact/compactSchemas.ts`, `tools/batch-handlers.json`
-- Test: `compact-modify/src/__tests__/profileRunSplit.test.ts`
+- Create: `compact-modify/src/handlers/handleHandlerProfileSchedule.ts`; its registration in `compact-modify/src/group.ts`
+- Modify: `compact-modify/src/handlers/handleHandlerProfileRun.ts` (`profilerId` required), `src/lib/compact/compactSchemas.ts`, `tools/batch-handlers.json`
+- Test: `compact-modify/src/__tests__/profileTools.test.ts`
 
 **Interfaces:**
-- Produces: `HandlerProfileRun` with `step: 'schedule'` answers the `profilerId` (one request); with `step: 'run'` and `profilerId` runs (one request); the trace is found with `HandlerProfileList`. (The argument's name is this plan's proposal.)
+- Produces: `HandlerProfileSchedule` = one request answering the `profilerId`; `HandlerProfileRun` = one request with `profilerId` (required); no `step` argument (two tools: a controller decision pending the owner's review at the finish). The trace is found with `HandlerProfileList`.
 
-- [ ] **Step 1: Write the failing tests** — `schedule: exactly one request, answers profilerId`; `run with profilerId: exactly one request`; `run without profilerId refused before any request`; `no trace-list poll`.
+- [ ] **Step 1: Write the failing tests** — `HandlerProfileSchedule: exactly one request, answers profilerId`; `HandlerProfileRun with profilerId: exactly one request`; `HandlerProfileRun without profilerId refused before any request`; `no trace-list poll`.
 - [ ] **Step 2:** Run — FAIL.
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
-- [ ] **Step 5: Break it:** chain schedule into run — each red; revert.
-- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
-- [ ] **Step 7:** Commit `feat(compact)!: HandlerProfileRun schedules and runs in separate calls`.
+- [ ] **Step 4:** Run, with Task 4's proof — PASS.
+- [ ] **Step 5: Break it:** chain the schedule into the run — red; revert.
+- [ ] **Step 6:** Docs: compact docs, surface fixture, `MIGRATION-19.0.md` (schedule, then run, then find the trace with `HandlerProfileList`); CHANGELOG 19.0.0 (*Added* `HandlerProfileSchedule`; *Changed* `HandlerProfileRun`, breaking for compact).
+- [ ] **Step 7:** Commit `feat(compact)!: the profiler schedules and runs in two tools`.
 
 ### Task 18: `HandlerDumpList`: one page per call
 
@@ -368,22 +369,24 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 - [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order); CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
 - [ ] **Step 7:** Commit `feat(compact)!: HandlerDumpList reads one page`.
 
-### Task 19: Compact debugger: one request per action
+### Task 19: Compact debugger: one tool per action
 
 **Files:**
-- Modify: `src/lib/compact/debug/*.ts` (`handleHandlerDebugStart.ts`, `handleHandlerDebugStep.ts`, `handleHandlerDebugView.ts`; `handleHandlerDebugWait.ts` deleted), `src/lib/compact/debug/group.ts`, `src/lib/debugger/DebugSession.ts` (a one-request path with no background listen loop), `src/lib/debugger/ownConnectionTools.ts`
-- Test: `src/__tests__/unit/debugger/compactOneRequest.test.ts`
+- Create: one handler per tool under `src/lib/compact/debug/` (`handleHandlerDebugSetBreakpoints.ts`, … one per tool below)
+- Delete: `src/lib/compact/debug/handleHandlerDebugStart.ts`, `handleHandlerDebugStep.ts`, `handleHandlerDebugView.ts`, `handleHandlerDebugWait.ts`
+- Modify: `src/lib/compact/debug/group.ts`, `src/lib/compact/debug/shared.ts`, `src/lib/debugger/DebugSession.ts` (a one-request path with no background listen loop), `src/lib/debugger/ownConnectionTools.ts`, `tools/batch-handlers.json`
+- Test: `src/__tests__/unit/debugger/compactOneToolPerAction.test.ts`
 
 **Interfaces:**
-- Produces: one compact action per request, chained by the consumer: set breakpoints; listen with the caller's `hold_seconds`; attach; step (into / over / return / continue / run_to_line / jump_to_line with the address required); stack / variables / child variables; terminate debuggee; detach (`detachDebugger()` without an id on the debuggee connection); delete breakpoint; stop listener. `HandlerDebugWait` removed. How the actions map onto tools (the existing four re-cut, or one tool per action) is this plan's proposal for the owner's review at the task's start.
+- Produces: tools, one request each, no mode argument — `HandlerDebugSetBreakpoints`, `HandlerDebugDeleteBreakpoint`, `HandlerDebugListen`, `HandlerDebugAttach`, `HandlerDebugStepInto`, `HandlerDebugStepOver`, `HandlerDebugStepReturn`, `HandlerDebugStepContinue`, `HandlerDebugStepToLine`, `HandlerDebugJumpToLine`, `HandlerDebugStack`, `HandlerDebugVariables`, `HandlerDebugChildVariables`, `HandlerDebugSetVariable`, `HandlerDebugMemory`, `HandlerDebugTerminate`, `HandlerDebugDetach`, `HandlerDebugStopListener`. `HandlerDebugListen` holds for the caller's `hold_seconds`; `HandlerDebugStepToLine` / `HandlerDebugJumpToLine` require the address; `HandlerDebugDetach` sends `detachDebugger()` without an id on the debuggee connection. The AMDP compact actions stay as they are (not part of this decision).
 
-- [ ] **Step 1: Write the failing tests** — per action: `exactly one request`; `no background listen loop: nothing is sent between calls`; `listen holds exactly the caller's hold_seconds`; `run_to_line without an address refused before any request`; `detach sends detachDebugger without an id on the debuggee connection`; `terminate's description says SAP answers 500 even when it works`; `a step's answer carries no position (the description sends the consumer to the stack)`.
+- [ ] **Step 1: Write the failing tests** — per tool: `exactly one request (held / document / 404)`; `no background listen loop: nothing is sent between calls`; `HandlerDebugListen holds exactly the caller's hold_seconds`; `HandlerDebugStepToLine without an address refused before any request`; `HandlerDebugDetach sends detachDebugger without an id on the debuggee connection`; `HandlerDebugTerminate's description says SAP answers 500 even when it works`; `a step tool's description sends the consumer to HandlerDebugStack for the position`; `HandlerDebugStart, HandlerDebugStep, HandlerDebugView and HandlerDebugWait are not served`.
 - [ ] **Step 2:** Run — FAIL.
 - [ ] **Step 3:** Implement.
-- [ ] **Step 4:** Run, with Task 4's proof (held / document / `404`, exactly one request) — PASS.
-- [ ] **Step 5: Break it:** send detach with the id; keep the listen loop; read the stack inside run_to_line — each red; revert.
-- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases), README where it describes compact, `docs/MIGRATION-19.0.md` (what a consumer of the old behaviour now calls, in order), `docs/user-guide/DEBUGGER.md`; CHANGELOG 19.0.0 (*Changed*, breaking for compact, unless noted).
-- [ ] **Step 7:** Commit `feat(compact)!: the compact debugger is one request per action`.
+- [ ] **Step 4:** Run, with Task 4's proof — PASS.
+- [ ] **Step 5: Break it:** send detach with the id; keep the listen loop; read the stack inside step-to-line — each red; revert.
+- [ ] **Step 6:** Docs: compact docs, `docs/user-guide/DEBUGGER.md` (the chain), surface fixture, `MIGRATION-19.0.md` (the old four → the new tools, one row each); CHANGELOG 19.0.0 (*Changed*, breaking for compact).
+- [ ] **Step 7:** Commit `feat(compact)!: the compact debugger is one tool per action`.
 
 ### Task 20: The debugger batch
 
@@ -396,7 +399,7 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 - Consumes: Tasks 3, 5, 6; the compact debugger's one-request actions (Task 19).
 - Produces: `DebugBatchBegin` / `DebugBatchEnd` (full), `HandlerDebugBatch` (`action: 'begin' | 'end' | 'answers'`, compact); `DebugSession.openBatch(): AdtBatchConnection` over `Stop.connection` with `endpoint: 'debugger'`.
 
-- [ ] **Step 1: Write the failing tests** — `begin needs an ABAP stop`; `step + stack + variables recorded into one debugger envelope on the stop's connection`; `the second recorded call is recorded while the first waits` (no deadlock); `DebugBatchEnd keeps answers by number, mode off, leaves the stop as it was (no releaseStop, no view change), also when a step's answer says the program ended`; `step to line without object_type/object_name refused`; `AMDP stop refused debug_batch_amdp_unmeasured`; `begin of either batch refused while the other is open`; `breakpoint and listener tools refused while open`; `DebugBatch* only in full, HandlerDebugBatch only in compact`.
+- [ ] **Step 1: Write the failing tests** — `DebugBatchEnd and HandlerDebugBatch end send exactly one envelope`; `begin needs an ABAP stop`; `step + stack + variables recorded into one debugger envelope on the stop's connection`; `the second recorded call is recorded while the first waits` (no deadlock); `DebugBatchEnd keeps answers by number, mode off, leaves the stop as it was (no releaseStop, no view change), also when a step's answer says the program ended`; `step to line without object_type/object_name refused`; `AMDP stop refused debug_batch_amdp_unmeasured`; `begin of either batch refused while the other is open`; `breakpoint and listener tools refused while open`; `DebugBatch* only in full, HandlerDebugBatch only in compact`.
 - [ ] **Step 2:** Run — FAIL.
 - [ ] **Step 3:** Implement.
 - [ ] **Step 4:** Run — PASS.
@@ -488,12 +491,12 @@ The owner's survey of every compact tool (`.superpowers/sdd/2026-10-16-batch-mod
 ### Task 26: Where-used and feeds on batches, several objects per call
 
 **Files:**
-- Modify: `src/handlers/system/readonly/handleGetWhereUsed.ts`, `compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts`, `src/handlers/system/readonly/handleRuntimeListFeeds.ts` (compact's `HandlerDumpList` is one page per call, Task 18)
+- Modify: `src/handlers/system/readonly/handleGetWhereUsed.ts` (full set only; compact's `HandlerWhereUsed` stays one object, one request), `src/handlers/system/readonly/handleRuntimeListFeeds.ts` (compact's `HandlerDumpList` is one page per call, Task 18)
 - Test: `src/__tests__/unit/batch/whereUsedAndFeeds.test.ts`
 
 **Interfaces:**
 - Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 21).
-- Produces: `GetWhereUsed.objects: [{ object_type, object_name }]` (and `HandlerWhereUsed`), `RuntimeListFeeds.feed_types: string[]`.
+- Produces: `GetWhereUsed.objects: [{ object_type, object_name }]`, `RuntimeListFeeds.feed_types: string[]`.
 
 - [ ] **Step 1: Write the failing tests** — `where-used: one envelope of every object's scope, one of every scoped request — two for any number`; `feeds: every feed's first GET in one envelope, then per round the next page of every feed still paging`; single argument keeps today's answer shape; list answers one entry per object in order; part failure; credential refusal.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.

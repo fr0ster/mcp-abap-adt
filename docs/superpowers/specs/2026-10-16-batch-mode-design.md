@@ -162,8 +162,8 @@ executed batch, communication or debugger.
 - `BatchBegin`: "Switches this server into batch mode: from now on each call of a tool none of whose
   requests depends on another's answer is recorded instead of sent, and returns nothing. Every
   recorded call is numbered, in the order made, from 1. A tool that builds a request from an
-  earlier answer is refused in batch mode; use the low-level tools (compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with
-  lock_handle, HandlerUnlock, HandlerGet) and run each phase as its own batch. BatchEnd sends the
+  earlier answer is refused in batch mode; use the compact tools, one operation each (HandlerCreate, HandlerLock, HandlerUpdate,
+  HandlerUnlock, HandlerDelete, HandlerGet) and run each phase as its own batch. BatchEnd sends the
   recorded calls; read their answers by number with BatchAnswers. Over HTTP, send the state_handle
   this answers in the request header on every call of the batch."
 - `BatchEnd`: "Sends every call recorded since BatchBegin, in parallel envelopes, with the
@@ -249,8 +249,7 @@ may be recorded, with:
 - `when` (optional): the arguments under which no request of the call depends on another's
   answer — an equality, a
   membership or a presence on named arguments (as `longTools.ts`' `NOT_A_READ` reads
-  `object_type`), e.g. `HandlerUpdate` only with `lock_handle`, and for DOMAIN, DATA_ELEMENT and
-  PACKAGE only with `document` (§4.6); `HandlerCreate` only with `create_only: true`; `HandlerGet`
+  `object_type`); the compact CRUD tools need no rule — they are single by construction (§4.6); `HandlerGet`
   only for the parts whose reads are independent (not `contents`, not `UNIT_TEST`/`CDS_UNIT_TEST`);
 - `connection` (optional): `http` when the entry holds only over HTTP — `HandlerLock` /
   `HandlerUnlock` of `PACKAGE`: over RFC the package lock opens an ABAP session of its own
@@ -265,18 +264,12 @@ holds 170 entries (single-request write tools, such as `HandlerLock`, included).
 
 What the code settles about the first entries (each still proven by its test):
 
-- **Eligible:** `HandlerCreate` with `create_only` (§4.6). `HandlerLock` and `HandlerUnlock` (all
+- **Eligible:** `HandlerCreate`, `HandlerUpdate`, `HandlerDelete` (§4.6). `HandlerLock` and `HandlerUnlock` (all
   types; `PACKAGE` over HTTP only) — one `lock()`/`unlock()` each (`handleLockObject` /
-  `handleUnlockObject`). `HandlerUpdate` with `lock_handle` for the source-written types (CLASS,
-  PROGRAM, INTERFACE, DDL, TABLE, STRUCTURE, FUNCTION_MODULE, BEHAVIOR_DEFINITION,
-  METADATA_EXTENSION — each proven), and for DOMAIN, DATA_ELEMENT, PACKAGE with `document`
-  (§4.6). The reads of the full and compact sets whose requests are independent — one GET, or a
+  `handleUnlockObject`). The reads of the full and compact sets whose requests are independent — one GET, or a
   source and its metadata together (the twelve `Read<Type>` tools and `GetObjectVersionDiff`, via
   `both()`) — long reads included (§4.4), and `HandlerGet` per part.
-- **Not eligible:** `HandlerUpdate` with `lock_handle` and `properties` for DOMAIN, DATA_ELEMENT,
-  PACKAGE — it reads the metadata, then writes it patched (`handleUpdateDomain`'s `sequence(read,
-  update)`): two requests, the second needing the first's answer. `HandlerCreate` without
-  `create_only` and every high tool (validate → create → lock → write → unlock → check → activate,
+- **Not eligible:** every high tool of the full sets (validate → create → lock → write → unlock → check → activate,
   `handleCreateDomain`), `404` fallbacks, polling. The long reads with a chain (§4.4, §11). Debugger tools, background runs, the leftover-session
   tools.
 
@@ -316,31 +309,44 @@ not the tool's, and it has no number). While recording, `connect()` / `getBaseUr
 connection is a late-bound target (§5.1) pointing, during a recording call's turn, at the connection
 that call holds.
 
-### 4.6 The two new single-request modes in compact
+### 4.6 Compact CRUD: one operation per call
 
-Compact is its own library with its own
-servers: both are added in the compact library — its modify half (`compact-modify`) — as parameters
-of its existing `HandlerCreate` and `HandlerUpdate`, `create_only: boolean` and `document: string`.
-They are served by the `compact` binaries (not `compact-ro`) and are eligible in batch mode. They work outside batch mode too, as one request each.
+**Compact's CRUD handlers make no multi-calls** (the owner's architecture). Each compact tool does its
+one operation; there is no mode parameter. The full chains (validate → create → lock → write →
+unlock → check → activate) stay in the full sets. This is a behaviour change for compact consumers
+(MIGRATION-19.0, CHANGELOG 19.0.0).
 
-- **`HandlerCreate` with `create_only: true`** — sends only the create `POST` of the type's
-  adt-clients `create()` (no validate, lock, write, unlock, check or activate): a new route in
-  `compactWriteRoutes` beside the high create, calling `createAdtClient(connection).get<Type>().create(
-  config, { analyse })` with the arguments the high create already maps for its own create step.
-  Schema (`compactCreateSchema`): `create_only: boolean`, default `false`, "send the create request
-  alone: no validation, lock, write, check or activation; the object is created inactive with what
-  the create carries". Offered for the types whose `create()` sends one request — proven per type
-  (§9.1); a type whose `create()` sends more is refused with `create_only` ("create_only is not
-  available for <type>: its create sends more than one request"). DOMAIN sends one **[code]**.
-- **`HandlerUpdate` with `lock_handle` and `document`** for DOMAIN, DATA_ELEMENT and PACKAGE — the
-  caller gives the whole metadata document, and only the `PUT` is sent:
-  `get<Type>().updateMetadata({ name, transportRequest }, { source: document, lockHandle, analyse })`
-  — nothing read, nothing patched. Schema (`compactUpdateSchema`): `document: string`, "DOMAIN,
-  DATA_ELEMENT, PACKAGE under lock_handle: the whole metadata document to write, sent as given —
-  nothing is read or kept; anything left out is gone". `document` without `lock_handle`, or
-  `document` beside `properties` or the flat fields `properties` covers, is refused before anything
-  is sent. With `properties` (no `document`) the existing read-patch-write stays, and stays
-  ineligible. The source-written types already send one `PUT` under a lock and take no `document`.
+- **`HandlerCreate`** only creates the initial object: the type's adt-clients `create()` — one
+  `POST`. An argument its create does not send is refused, by presence (`!== undefined`), naming
+  it, before anything is sent (the per-type carried lists of `src/handlers/common/low/handleCreateOnly.ts`
+  stay). `create_only` is gone.
+- **`HandlerUpdate`** is only the `PUT` under `lock_handle` (required): no lock or unlock of its own,
+  no check, no activation, no read-patch-write. For DOMAIN, DATA_ELEMENT and PACKAGE the caller
+  passes the whole metadata document in the update's content argument the source types already use,
+  `source_code` (`handleUpdateUnderLock`' `source(args, field)` reads it), sent as given:
+  `get<Type>().updateMetadata({ name, transportRequest }, { source: source_code, lockHandle, analyse })`.
+  `properties` and the flat metadata fields (`FLAT_PROPERTIES`) are no longer arguments of
+  `HandlerUpdate`; given, they are refused by presence, naming them. `document` is not added.
+- **`HandlerDelete`** is only the `DELETE` (no deletion check of its own, no lock). The types whose
+  delete today writes their section empty under a lock of its own (`LOCAL_TEST_CLASS`, `LOCAL_TYPES`,
+  `LOCAL_DEFINITIONS`, `LOCAL_MACROS`, `UNIT_TEST`, `CDS_UNIT_TEST`) send only that `PUT` under the
+  caller's `lock_handle`.
+- **`HandlerGet`'s contract does not change** (the single-call rule is for compact's writes): where an
+  object has both metadata and source, a read may return both, as today. What changes is
+  uniformity: the caller says by the existing `part` what to read, and every type answers the same
+  `part` the same way, without breaking any existing part's answer. Where types differ today (the
+  plan's survey, with file and line): `part: 'source'` answers the source for the source types but
+  the metadata document for DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and PACKAGE (they have no source);
+  `part: 'metadata'` answers metadata **and** source (`both()`) for the source types but metadata
+  alone for those four; FUNCTION_MODULE reads its metadata, then its source with the group the
+  metadata names (a chain, `handleGetFunctionModule.ts:81-93`); the answers' field names differ by
+  type (`<type>_data`, `source`, `payload`, `source_code`/`metadata`). A read sending two independent
+  requests (`metadata` today) stays eligible in batch mode; the FUNCTION_MODULE chain is not.
+- `HandlerLock`, `HandlerUnlock` and `HandlerActivate` already are single.
+
+The handlers that chain today, and what each becomes, are listed in the plan (its compact CRUD
+tasks), with file and line. Every compact CRUD call is proven to issue exactly one request
+(§4.2's proof: held, answered with a document, answered `404`).
 
 ### 4.7 No retries in batch mode
 
@@ -538,8 +544,8 @@ its own request only; the stack is in the batch when the model recorded `stack`.
   existing ones, no `kind`, nothing read from a server): `batch_mode_unavailable`, `batch_mode_on`,
   `batch_mode_other`, `batch_mode_off`, `batch_not_recordable` ("<tool> builds a request from another's
   answer and cannot be recorded in batch mode; record its steps with the low-level tools —
-  compact: HandlerCreate with create_only, HandlerLock, HandlerUpdate with lock_handle,
-  HandlerUnlock, HandlerGet — each phase its own batch"), `batch_no_timeout`; for a tool refused only
+  compact: HandlerCreate, HandlerLock, HandlerUpdate, HandlerUnlock, HandlerDelete, HandlerGet —
+  each phase its own batch"), `batch_no_timeout`; for a tool refused only
   because a batch is open: "<tool> is not served while a batch is open"),
   `debug_batch_amdp_unmeasured`. SAP's answers and errors reach the model as they came: a number's
   answer is the tool's answer built from what came (§5.3), a method's error the C6 shape (the
@@ -598,14 +604,13 @@ watch the test go red, revert (the *Break* line).
   both parts are in the envelope; its answer is the handler's one answer built from both; the next
   call takes the next number; the next call's parts follow both of this call's. *Break:* number per
   request; return after the first request.
-- **`create_only`** — per type in the create route: exactly one `POST`, the create's own, nothing
-  else (no validate, lock, write, check, activate); a type whose `create()` sends more refuses
-  `create_only` before sending; without `create_only` the high create runs unchanged. *Break:*
-  route `create_only` to the high create.
-- **`document` under a lock** — DOMAIN, DATA_ELEMENT, PACKAGE: exactly one `PUT`, its body the given
-  document byte for byte, its lock handle the given one, no read; `document` without `lock_handle`,
-  or beside `properties`, refused before sending; `properties` keeps the read-patch-write. *Break:*
-  read before writing.
+- **Compact CRUD, one request each** — every compact `HandlerCreate` / `HandlerUpdate` /
+  `HandlerDelete` / `HandlerGet` call, per type and part, issues exactly one request (held, answered
+  with a document, answered `404`): create the `POST` alone, an unsent argument refused by presence;
+  update the `PUT` under `lock_handle` (DOMAIN, DATA_ELEMENT, PACKAGE: `source_code` byte for byte, no
+  read; `properties` refused); delete the `DELETE` alone (the section types: the `PUT` under
+  `lock_handle`); each `HandlerGet` part one request. *Break:* route a compact call to its full
+  chain.
 - **Credentials at execution** — a source whose credential object changes between recording and
   `BatchEnd`: the envelopes go on the connection `BatchEnd` took, none on the retired one, and the
   retired one is not logged off under `BatchEnd`. *Break:* wrap the recording call's connection.
@@ -638,7 +643,7 @@ watch the test go red, revert (the *Break* line).
   `HandlerBatch` action behaves as its full-set tool, `begin`/`answers` build no connection, `number`
   with another action refused; no
   batch tool has a `state_handle` property, every tool's description carries its sentence;
-  `compact/tests/fixtures/surface.json` updated (the new `create_only` and `document`).
+  `compact/tests/fixtures/surface.json` updated (compact CRUD's arguments, §4.6).
 - **Close / dispose** — `closeInstance` with a batch open: zero envelopes, no unhandled rejection
   (plain-node recorder). *Break:* omit `dropBatch`.
 - **Debugger batch** — begin needs a stop; step + stack + variables recorded into one debugger
@@ -665,9 +670,9 @@ Gated by `tests/test-config.yaml`, as the existing integration suites, with a te
 
 - Over the compact binaries the same checks run through `HandlerBatch` / `HandlerDebugBatch`.
 - **Communication batch, on-premise over HTTP**, **on-premise over RFC** and **ABAP Cloud** — through
-  the served tools (hard mode): N reads; then compact `HandlerCreate` `create_only` × N,
-  `HandlerLock` × N, `HandlerUpdate` with `lock_handle` (sources; `document` for DOMAIN) × N,
-  `HandlerUnlock` × N, each phase its own batch; answers per number; cleanup deletes the objects. The
+  the served tools (hard mode): N reads; then compact `HandlerCreate` × N, `HandlerLock` × N,
+  `HandlerUpdate` (sources; the whole document in `source_code` for DOMAIN) × N, `HandlerUnlock` × N,
+  `HandlerActivate`, each phase its own batch; answers per number; cleanup deletes the objects. The
   RFC case measures the batch over RFC; a failure there is reported with what came, since it may be
   the RFC transport's rather than the batch's.
 - **Debugger batch, on-premise** and **ABAP Cloud** — at a live stop: step + stack + variables in one
@@ -696,11 +701,13 @@ No unit test talks to SAP; no live test runs in CI.
 - **src/embeddable/docs/ARCHITECTURE.md** — the `batch` option, the owner,
   the pool keeping a batch-holding instance, the close.
 - **http/README.md** (the header), **compact/README.md**, **compact/docs/AVAILABLE_TOOLS.md** (`HandlerBatch`,
-  `HandlerDebugBatch`, `create_only`, `document`).
+  `HandlerDebugBatch`, compact CRUD one operation per call).
 - **docs/MIGRATION-19.0.md** — embedders: the new `batch` constructor option (absent → batch tools
-  answer `batch_mode_unavailable`); the new tools in every set; the compact create and write modes.
+  answer `batch_mode_unavailable`); the new tools in every set; compact consumers: `HandlerCreate`,
+  `HandlerUpdate`, `HandlerDelete` and `HandlerGet` now do one operation each — what a consumer of the
+  old chains must now call in order (create, lock, update, unlock, activate).
 - **CHANGELOG.md** — the 19.0.0 entry (this PR's release) gains under *Added* the batch mode, the
-  debugger batch and the two compact modes, and under *Changed* adt-clients `^34.1.0` with what it
+  debugger batch, and under *Changed* (breaking for compact) compact CRUD one operation per call, and under *Changed* adt-clients `^34.1.0` with what it
   changes for the server (a credential refusal rethrown by every member; a batch corrects and
   resends nothing). No earlier version's
   entry is touched.
@@ -853,4 +860,11 @@ with the date.
 
 ## Open questions for the owner
 
-None.
+1. **One consistent part for "both".** The owner's example (`metadata` → metadata, `source` →
+   source, one part for both) and "no existing answer breaks" pull apart: `metadata` answers both
+   today for the source types. *Recommendation:* add a part `source_and_metadata`, the same for every
+   type that has both; keep `metadata` and `source` answering exactly as today, documented per type;
+   the FUNCTION_MODULE read keeps its chain (it verifies the group) and stays ineligible.
+2. **The deletion check** `HandlerDelete` drops (`deleteIfDeletable`: check, then delete).
+   *Recommendation:* a `HandlerGet` part `deletion_check` (one request), the consumer calling it before
+   the delete.

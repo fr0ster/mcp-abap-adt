@@ -103,9 +103,9 @@
 **Interfaces:**
 - Produces: `eligible(tool: string, args: unknown, connection: 'http' | 'rfc'): Eligibility` with `type Eligibility = { ok: true } | { ok: false; reason: 'not-listed' | 'arguments' | 'connection' }`; entry shape `{ tool, set: 'full' | 'compact', handler: string, sends: string /* may name several independent requests */, when?: WhenRule, connection?: 'http' }`, `WhenRule = { argument: string; equals?: string[]; notEquals?: string[]; present?: boolean }[]` (all must hold; string compare upper-cased as `isLongRead` does; an absent `part` reads as `source`).
 
-- [ ] **Step 1: Write the failing tests** — `eligibility.test.ts`: `a listed tool with no when is eligible`; `HandlerUpdate needs lock_handle; DOMAIN/DATA_ELEMENT/PACKAGE need document`; `HandlerCreate needs create_only true`; `HandlerGet part contents and UNIT_TEST/CDS_UNIT_TEST are not eligible; absent part reads as source`; `HandlerLock PACKAGE over rfc is not eligible`; `object_type 'domain' and 'DOMAIN' read the same` (Review Focus 3); `an unlisted tool is not eligible`. `batchHandlers.test.ts` (source test): every entry names a tool its set serves and a handler that exists; every entry has a proof case. The per-entry proof: for each entry, its handler with the entry's sample arguments sends the same requests while they are held **pending** as when they are **answered** (an answer document, and a `404`), and at least one; a tool that sends none is not listed.
+- [ ] **Step 1: Write the failing tests** — `eligibility.test.ts`: `a listed tool with no when is eligible`; `HandlerGet part contents and UNIT_TEST/CDS_UNIT_TEST are not eligible; absent part reads as source`; `HandlerLock PACKAGE over rfc is not eligible`; `object_type 'domain' and 'DOMAIN' read the same` (Review Focus 3); `an unlisted tool is not eligible`. `batchHandlers.test.ts` (source test): every entry names a tool its set serves and a handler that exists; every entry has a proof case. The per-entry proof: for each entry, its handler with the entry's sample arguments sends the same requests while they are held **pending** as when they are **answered** (an answer document, and a `404`), and at least one; a tool that sends none is not listed.
 - [ ] **Step 2:** Run them — FAIL.
-- [ ] **Step 3:** Write the table per spec §4.2/§4.4 (eligible: every tool none of whose requests depends on another's answer — `HandlerLock`, `HandlerUnlock`, `HandlerUpdate` source types with `lock_handle`, the reads of full and compact, the twelve `Read<Type>` tools and `GetObjectVersionDiff` sending source and metadata together via `both()`, `SearchObject`, `GetSqlQuery`, `GetTableContents`, `GetATCFindings`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`, `HandlerSearch`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` per part; `HandlerCreate`/`create_only` and `HandlerUpdate`/`document` entries are added in Tasks 10 and 11); implement `eligible` reading the file once.
+- [ ] **Step 3:** Write the table per spec §4.2/§4.4 (eligible: every tool none of whose requests depends on another's answer — `HandlerLock`, `HandlerUnlock`, `HandlerUpdate` source types with `lock_handle`, the reads of full and compact, the twelve `Read<Type>` tools and `GetObjectVersionDiff` sending source and metadata together via `both()`, `SearchObject`, `GetSqlQuery`, `GetTableContents`, `GetATCFindings`, `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace`, `HandlerSearch`, `HandlerGetData`, `HandlerProfileView`, `HandlerGet` per part; the compact CRUD entries are settled in Tasks 10–12); implement `eligible` reading the file once.
 - [ ] **Step 4:** Run — PASS.
 - [ ] **Step 5: Break it:** make a listed handler send a request built from the first's answer (pending ≠ answered, red); list a tool that sends none (red); list `SearchSource` (red); revert.
 - [ ] **Step 6:** Commit `feat: batch eligibility table`.
@@ -197,41 +197,63 @@
 - [ ] **Step 6:** Docs: `http/README.md`, `docs/user-guide/CLIENT_CONFIGURATION.md` (the header on every call of a batch).
 - [ ] **Step 7:** Commit `feat(http): x-mcp-state-handle routes a batch`.
 
-### Task 10: Compact `HandlerCreate` `create_only`
+### Task 10: Compact CRUD single-call: `HandlerCreate`
+
+**What chains today** (survey of the compact routes; each line: the handler the compact route reaches, what it sends):
+
+- `HandlerCreate` → the full creates (`compact-modify/src/handlers/compactWriteRoutes.ts`): BEHAVIOR_DEFINITION create → lock → check → unlock → read → activate (`src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts:135-177`); CDS_UNIT_TEST checkCdsTestDoubles → create (`src/handlers/unit_test/high/handleCreateCdsUnitTest.ts:95-104`); DATA_ELEMENT validate → create → lock → readMetadata → updateMetadata → unlock → readMetadata → check → activate (`src/handlers/data_element/high/handleCreateDataElement.ts:213-311`); DOMAIN the same (`src/handlers/domain/high/handleCreateDomain.ts:197-290`); FUNCTION_GROUP create → readMetadata → activate (`src/handlers/function/high/handleCreateFunctionGroup.ts:118-154`); METADATA_EXTENSION create → lock → check → unlock → read → activate (`src/handlers/ddlx/high/handleCreateMetadataExtension.ts:114-158`); SERVICE_BINDING create → activate (`src/handlers/service_binding/high/handleCreateServiceBinding.ts:184-205`); SERVICE_DEFINITION create → lock → update → unlock → activate (`src/handlers/service_definition/high/handleCreateServiceDefinition.ts:129-179`); STRUCTURE validate → create → check → activate (`src/handlers/structure/high/handleCreateStructure.ts:230-264`); UNIT_TEST lock → update → unlock → activate (`writeClassTests`, `src/handlers/unit_test/shared/writeTests.ts:76-97`). One `create()` each (to be proven per type): BEHAVIOR_IMPLEMENTATION, CLASS, DDL, FUNCTION_MODULE, INTERFACE, PACKAGE, PROGRAM, TABLE, TRANSPORT. `create_only` (`src/handlers/common/low/handleCreateOnly.ts`, Task 10 as first implemented) already sends the one `POST` per type.
+- `HandlerUpdate` without `lock_handle` → the full updates, each `withLock` lock → write → (check) → unlock → activate: BEHAVIOR_DEFINITION `:116`, BEHAVIOR_IMPLEMENTATION `:139`, CLASS `:107`, DATA_ELEMENT `:222`, DDL `:96`, DOMAIN `:185`, FUNCTION_GROUP `:97`, FUNCTION_MODULE `:124`, INTERFACE `:102`, LOCAL_DEFINITIONS / LOCAL_MACROS / LOCAL_TYPES `:100`, LOCAL_TEST_CLASS `:116`, METADATA_EXTENSION `:118`, PACKAGE `:94`, PROGRAM `:108`, SERVICE_BINDING `:267`, SERVICE_DEFINITION `:100`, STRUCTURE `:102`, TABLE `:103` (each `src/handlers/<type>/high/handleUpdate<Type>.ts`), UNIT_TEST / CDS_UNIT_TEST (`writeTests.ts:76-97`). With `lock_handle`: DOMAIN, DATA_ELEMENT, PACKAGE readMetadata → updateMetadata (`src/handlers/domain/low/handleUpdateDomain.ts:110-117`, `src/handlers/data_element/low/handleUpdateDataElement.ts:151-158`, `src/handlers/package/low/handleUpdatePackage.ts:130-137`); the source types one `PUT`.
+- `HandlerDelete` → checkDeletion → delete for 19 types (`deleteIfDeletable`, `src/lib/strategies/checkedDeletion.ts:50-64`); LOCAL_TEST_CLASS / LOCAL_TYPES / LOCAL_DEFINITIONS / LOCAL_MACROS lock → update → unlock → activate (`src/handlers/class/high/handleDeleteLocal*.ts:86-121`); UNIT_TEST, CDS_UNIT_TEST (`writeTests.ts:76-97`; `handleDeleteCdsUnitTest.ts:85`).
+- `HandlerGet` (reads; contract unchanged): FUNCTION_MODULE readMetadata → read with the group it names (`src/handlers/function_module/high/handleGetFunctionModule.ts:81-93`, `src/handlers/function_module/readonly/handleReadFunctionModule.ts:83-95`); `UNIT_TEST` / `CDS_UNIT_TEST` polling (`src/handlers/unit_test/high/handleGetUnitTest.ts:57-64`, `handleGetCdsUnitTest.ts:59-63`); part `urls` three reads in sequence (`src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts:195-236`); part `contents` the package walk; `node_structure` of a `DEVC/K` parent reads the package first (`src/handlers/system/low/handleGetNodeStructure.ts:22-27`). Part `metadata` sends source and metadata together via `both()` — independent, eligible.
+
 
 **Files:**
-- Modify: `src/lib/compact/compactSchemas.ts` (`compactCreateSchema.create_only`), `compact-modify/src/handlers/handleHandlerCreate.ts`, `compact-modify/src/handlers/compactWriteRoutes.ts` (create-only routes), `tools/batch-handlers.json`
-- Test: `compact-modify/src/__tests__/createOnly.test.ts`
+- Modify: `compact-modify/src/handlers/handleHandlerCreate.ts` (always the one-create route), `compact-modify/src/handlers/compactWriteRoutes.ts` (the create column → `handleCreateOnly`), `src/lib/compact/compactSchemas.ts` (`compactCreateSchema`: `create_only` removed; per type only what its create sends), `src/handlers/common/low/handleCreateOnly.ts`, `tools/batch-handlers.json` (the `HandlerCreate` entry without a `create_only` rule)
+- Test: `compact-modify/src/__tests__/createSingleCall.test.ts`
 
 **Interfaces:**
-- Produces: `routeCompactCreateOnly(context: HandlerContext, args: HandlerCreateArgs): Promise<unknown>`; schema `create_only: { type: 'boolean', default: false, description: <spec §4.6 words> }`; refusal "create_only is not available for <type>: its create sends more than one request".
+- Produces: `HandlerCreate` = one `POST` per type; the refusal of an unsent argument by presence, naming it (the per-type carried lists kept).
 
-- [ ] **Step 1: Write the failing tests** — per type in the create route: `create_only sends exactly one POST, the create's, nothing else`; `a type whose create() sends more refuses create_only before sending`; `without create_only the high create runs unchanged`.
+- [ ] **Step 1: Write the failing tests** — per type: `HandlerCreate issues exactly one request, the create's POST — held, answered with a document, answered 404`; `an argument its create does not send is refused before any request, naming it, for false / 0 / ''`; `create_only is not in the schema`.
 - [ ] **Step 2:** Run — FAIL.
-- [ ] **Step 3:** Implement; add the `HandlerCreate` entry (`when: create_only true`) to `tools/batch-handlers.json` with its one-request case.
-- [ ] **Step 4:** Run, with Task 4's tests — PASS.
-- [ ] **Step 5: Break it:** route `create_only` to the high create — red; revert.
-- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/tests/fixtures/surface.json`, CHANGELOG 19.0.0 *Added*.
-- [ ] **Step 7:** Commit `feat(compact): HandlerCreate create_only`.
+- [ ] **Step 3:** Implement: remove `create_only` and the routing to the full creates; a type whose create sends more than one request is reported in the step (and stays out until the owner decides).
+- [ ] **Step 4:** Run, with Task 4's proof — PASS.
+- [ ] **Step 5: Break it:** route one type to its full create — red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, `compact/README.md`, `compact/tests/fixtures/surface.json`, `docs/user-guide/BATCH_MODE.md` (the phases: create, lock, update, unlock, activate), README; `docs/MIGRATION-19.0.md` (compact `HandlerCreate` creates only; what to call after); CHANGELOG 19.0.0 *Changed* (breaking for compact).
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerCreate creates only`.
 
-### Task 11: Compact `HandlerUpdate` `document` under a lock
+### Task 11: Compact CRUD single-call: `HandlerUpdate` and `HandlerDelete`
 
 **Files:**
-- Modify: `src/lib/compact/compactSchemas.ts` (`compactUpdateSchema.document`), `src/handlers/common/low/handleUpdateUnderLock.ts`, `tools/batch-handlers.json`
-- Test: `src/__tests__/unit/compact/documentUnderLock.test.ts`
+- Modify: `compact-modify/src/handlers/handleHandlerUpdate.ts` (`lock_handle` required; always `handleUpdateUnderLock`), `src/handlers/common/low/handleUpdateUnderLock.ts` (DOMAIN, DATA_ELEMENT, PACKAGE: `source_code` sent as the whole document; `properties` and `FLAT_PROPERTIES` refused), `compact-modify/src/handlers/handleHandlerDelete.ts` and `compactWriteRoutes.ts` (the DELETE alone; the section types the `PUT` under `lock_handle`), `src/lib/compact/compactSchemas.ts`, `tools/batch-handlers.json`
+- Test: `compact-modify/src/__tests__/updateDeleteSingleCall.test.ts`
 
 **Interfaces:**
-- Produces: schema `document: { type: 'string', description: <spec §4.6 words> }`; for DOMAIN, DATA_ELEMENT, PACKAGE with `lock_handle` + `document`: `get<Type>().updateMetadata({ name, transportRequest }, { source: document, lockHandle, analyse })`.
+- Produces: `HandlerUpdate` = one `PUT` under `lock_handle`; for DOMAIN / DATA_ELEMENT / PACKAGE `get<Type>().updateMetadata({ name, transportRequest }, { source: source_code, lockHandle, analyse })`; `HandlerDelete` = one `DELETE` (the section types: one `PUT` under `lock_handle`). No `document` argument.
 
-- [ ] **Step 1: Write the failing tests** — `one PUT, body the given document byte for byte, the given lock handle, no read`; `document without lock_handle refused before sending`; `document beside properties refused before any request`; parameterised over every flat metadata field `propertiesOf()` reads (`FLAT_PROPERTIES` of `handleUpdateUnderLock.ts`: `description`, `datatype`, `length`, `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`) × the values `false`, `0`, `''`: `document beside <field> = <value> refused before any request` (presence, not truthiness); `transport_request beside document is accepted` (it is the write's transport, not metadata); `properties alone keeps the read-patch-write`.
+- [ ] **Step 1: Write the failing tests** — per type: `HandlerUpdate issues exactly one PUT under the given lock_handle — held, answered, 404`; `no lock_handle refused before any request`; `DOMAIN/DATA_ELEMENT/PACKAGE: the body is source_code byte for byte, no read`; parameterised over `properties` and `FLAT_PROPERTIES` (`description`, `datatype`, `length`, `decimals`, `conversion_exit`, `lowercase`, `sign_exists`, `value_table`, `fixed_values`) × `false`, `0`, `''`: `refused by presence before any request, naming it`; `transport_request is accepted`; per type: `HandlerDelete issues exactly one DELETE, no deletion check`; `the section types send one PUT under the given lock_handle`.
 - [ ] **Step 2:** Run — FAIL.
-- [ ] **Step 3:** Implement: the refusal of `document` beside `properties` or any of those fields (`!== undefined`), before any request; the `document` write; add the three `HandlerUpdate`/`document` entries.
-- [ ] **Step 4:** Run, with Task 4's tests — PASS.
-- [ ] **Step 5: Break it:** read before writing; test the fields by truthiness — each red; revert.
-- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md`, surface fixture, CHANGELOG 19.0.0 *Added*.
-- [ ] **Step 7:** Commit `feat(compact): HandlerUpdate document under a lock`.
+- [ ] **Step 3:** Implement.
+- [ ] **Step 4:** Run, with Task 4's proof — PASS.
+- [ ] **Step 5: Break it:** read before writing; test the fields by truthiness; keep the deletion check — each red; revert.
+- [ ] **Step 6:** Docs as Task 10's (update and delete); `MIGRATION-19.0.md` (lock first, update under the handle, unlock, activate; the delete without its check); CHANGELOG 19.0.0 *Changed*.
+- [ ] **Step 7:** Commit `feat(compact)!: HandlerUpdate and HandlerDelete do one operation`.
 
-### Task 12: The debugger batch
+### Task 12: `HandlerGet` uniform parts
+
+**Files:**
+- Modify: `compact-readonly-entries/src/handlers/handleHandlerGet.ts`, `compact-readonly-entries/src/handlers/compactPartRoutes.ts`, `compact-readonly-entries/src/handlers/compactReadRoutes.ts`, `src/lib/compact/compactSchemas.ts` (`part`), `tools/batch-handlers.json`
+- Test: `compact-readonly-entries/src/__tests__/uniformParts.test.ts`
+
+**Interfaces:**
+- Produces: the same `part` reads the same kind of thing for every type (spec §4.6's survey); no existing part's answer changes; the part for "both" per the owner's answer to the spec's open question 1.
+
+- [ ] **Step 1: Write the failing tests** — `for every type, each existing part answers exactly as before (recorded answers)`; `for every type that has both, the "both" part answers source and metadata with the same field names`; `part metadata stays eligible (two independent requests)`; `FUNCTION_MODULE's chain stays ineligible`.
+- [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.
+- [ ] **Step 5: Break it:** answer one type's "both" part with different field names — red; revert.
+- [ ] **Step 6:** Docs: `compact/docs/AVAILABLE_TOOLS.md` (parts per type), surface fixture, CHANGELOG 19.0.0 *Added*. Commit `feat(compact): HandlerGet parts uniform across types`.
+
+### Task 13: The debugger batch
 
 **Files:**
 - Create: `src/lib/handlers/groups/DebugBatchHandlersGroup.ts`, `src/lib/compact/debug/handleHandlerDebugBatch.ts`
@@ -250,7 +272,7 @@
 - [ ] **Step 6:** Docs: `docs/user-guide/DEBUGGER.md` (the debugger batch, AMDP not offered yet), CHANGELOG 19.0.0 *Added*.
 - [ ] **Step 7:** Commit `feat: debugger batch`.
 
-### Task 13: Internal batches — `runPhase` and batch availability
+### Task 14: Internal batches — `runPhase` and batch availability
 
 **Files:**
 - Create: `src/lib/batch/phases.ts`, `src/lib/batch/availability.ts`
@@ -270,14 +292,14 @@
 - [ ] **Step 5: Break it:** treat every envelope failure as "no batch"; read the parser's error instead of the outer status; key the availability by connection object (the second fresh connection then sends an envelope) — each red; revert.
 - [ ] **Step 6:** Commit `feat: internal batch phases and availability`.
 
-### Task 14: Package walks on batches
+### Task 15: Package walks on batches
 
 **Files:**
 - Modify: `src/lib/strategies/packageWalk.ts` (`walkPackage` by levels), `src/handlers/package/readonly/handleGetPackageContents.ts`, `src/handlers/system/high/handleGetPackageTree.ts`, `src/handlers/search/readonly/handleGetObjectsList.ts`, `src/handlers/system/readonly/handleGetObjectInfo.ts`, `compact-readonly-entries/src/handlers/handleHandlerGet.ts` (part `contents`), `tools/long-handlers.json` (`sends`)
 - Test: `src/__tests__/unit/batch/packageWalks.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 13).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 14).
 - Produces: schemas — `GetPackageContents.package_names: string[]`, `GetPackageTree.package_names: string[]`, `GetObjectsList.objects: [{ parent_type, parent_name }]` (names checked against the tool's current arguments), `GetObjectInfo.objects: [{ object_type, object_name }]`, `HandlerGet` part `contents` `package_names`; exactly one of single/list.
 
 - [ ] **Step 1: Write the failing tests** — per tool on fixtures: `same answer as the sequential version`; `envelopes per spec §11's row (per level: roots, then type nodes)`; `no envelope holds a request needing another of its parts`; `several roots: the envelope count does not grow with their number`; `a part failure is that item's`; `credential refusal ends the call as it came`; `no communication batch → the sequential path`.
@@ -288,28 +310,28 @@
 - [ ] **Step 6:** Docs: `AVAILABLE_TOOLS*.md` (the list arguments; reads in envelopes), compact docs, CHANGELOG 19.0.0 *Changed*.
 - [ ] **Step 7:** Commit `feat: package walks read in envelopes`.
 
-### Task 15: `SearchSource` on batches
+### Task 16: `SearchSource` on batches
 
 **Files:**
 - Modify: `src/handlers/system/readonly/handleSearchSource.ts` (schema: `concurrency` removed), `src/lib/search-source/orchestrator.ts`, `src/lib/search-source/packageResolver.ts`, `src/lib/search-source/sourceReader.ts`
 - Test: `src/__tests__/unit/batch/searchSource.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)` (Task 13); `walkPackage` by levels (Task 14).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)` (Task 14); `walkPackage` by levels (Task 15).
 
 - [ ] **Step 1: Write the failing tests** — `same hits as the sequential version`; `phases: masks, walk levels, sources up to max_objects`; `time_budget_ms checked between phases, truncated.by_timeout as today`; `no concurrency in the schema`; part failure; credential refusal.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.
 - [ ] **Step 5: Break it:** check the budget only at the end — red; revert.
 - [ ] **Step 6:** Docs and CHANGELOG 19.0.0 *Changed* (`concurrency` removed). Commit `feat: SearchSource reads in envelopes`.
 
-### Task 16: Include, structure and enhancement trees on batches
+### Task 17: Include, structure and enhancement trees on batches
 
 **Files:**
 - Modify: `src/handlers/include/readonly/handleGetIncludesList.ts`, `src/handlers/structure/readonly/handleGetStructuresList.ts`, `src/handlers/enhancement/readonly/handleGetEnhancements.ts`, `tools/long-handlers.json`
 - Test: `src/__tests__/unit/batch/includeTrees.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 13).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 14).
 - Produces: `GetIncludesList.objects`, `GetStructuresList.structure_names`, `GetEnhancements.objects` (exactly one of single/list).
 
 - [ ] **Step 1: Write the failing tests** — per tool: same answer; phases per spec §11 (includes per depth up to 20; structure-then-table; where-used pairs; candidates; enhancement probes one per phase, then enhancements + root, includes node, nested up to `max_includes`); several objects; part failure; credential refusal.
@@ -317,28 +339,28 @@
 - [ ] **Step 5: Break it:** join the table read into the structure phase — red; revert.
 - [ ] **Step 6:** Docs, CHANGELOG. Commit `feat: include and structure trees read in envelopes`.
 
-### Task 17: Lists of objects on batches — `ListTransports`, `DescribeByList`, `GetAbapSystemSymbols`
+### Task 18: Lists of objects on batches — `ListTransports`, `DescribeByList`, `GetAbapSystemSymbols`
 
 **Files:**
 - Modify: `src/handlers/transport/readonly/handleListTransports.ts`, `src/handlers/system/readonly/handleDescribeByList.ts`, `src/handlers/system/readonly/handleGetAbapSystemSymbols.ts`
 - Test: `src/__tests__/unit/batch/objectLists.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 13).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 14).
 
 - [ ] **Step 1: Write the failing tests** — `ListTransports: configurations, then every configuration's GET in one envelope`; `DescribeByList: all quickSearches, then the typeless ones for the empty answers`; `GetAbapSystemSymbols: each phase only independent requests; a failed call answers the error, nothing retried`; same answers; part failure; credential refusal.
 - [ ] **Step 2:** Run — FAIL. **Step 3:** Implement. **Step 4:** Run — PASS.
 - [ ] **Step 5: Break it:** put a dependent request in the first envelope — red; revert.
 - [ ] **Step 6:** Docs, CHANGELOG. Commit `feat: object lists read in envelopes`.
 
-### Task 18: Where-used and feeds on batches, several objects per call
+### Task 19: Where-used and feeds on batches, several objects per call
 
 **Files:**
 - Modify: `src/handlers/system/readonly/handleGetWhereUsed.ts`, `compact-readonly-entries/src/handlers/handleHandlerWhereUsed.ts`, `src/handlers/system/readonly/handleRuntimeListFeeds.ts`, `compact-readonly-entries/src/handlers/handleHandlerDumpList.ts`
 - Test: `src/__tests__/unit/batch/whereUsedAndFeeds.test.ts`
 
 **Interfaces:**
-- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 13).
+- Consumes: `runPhase(context, …)`, `withSequentialFallback(context, …)`, `HandlerContext.batchAvailability` (Task 14).
 - Produces: `GetWhereUsed.objects: [{ object_type, object_name }]` (and `HandlerWhereUsed`), `RuntimeListFeeds.feed_types: string[]` (and `HandlerDumpList`).
 
 - [ ] **Step 1: Write the failing tests** — `where-used: one envelope of every object's scope, one of every scoped request — two for any number`; `feeds: every feed's first GET in one envelope, then per round the next page of every feed still paging`; single argument keeps today's answer shape; list answers one entry per object in order; part failure; credential refusal.
@@ -346,40 +368,40 @@
 - [ ] **Step 5: Break it:** read each object's chain on its own — the envelope count grows, red; revert.
 - [ ] **Step 6:** Docs, CHANGELOG. Commit `feat: where-used and feeds read several objects in envelopes`.
 
-### Task 19 (live, needs the owner's VPN/tunnel, run only on his word): communication batch
+### Task 20 (live, needs the owner's VPN/tunnel, run only on his word): communication batch
 
 **Files:**
 - Create: `src/__tests__/integration/batch/communicationBatch.test.ts`; `tests/test-config.yaml.template` (`batch.test_cases.communication`, disabled)
 
-- [ ] **Step 1:** Write the test: hard mode through the served tools; N reads; then compact `HandlerCreate` `create_only` × N, `HandlerLock` × N, `HandlerUpdate` (`document` for DOMAIN, sources) × N, `HandlerUnlock` × N, each phase a batch; answers per number; cleanup. States where it runs (on-premise HTTP, on-premise RFC, ABAP Cloud), skips elsewhere with the reason.
+- [ ] **Step 1:** Write the test: hard mode through the served tools; N reads; then compact `HandlerCreate` × N, `HandlerLock` × N, `HandlerUpdate` (sources; the whole document in `source_code` for DOMAIN) × N, `HandlerUnlock` × N, `HandlerActivate`, each phase a batch; answers per number; cleanup. States where it runs (on-premise HTTP, on-premise RFC, ABAP Cloud), skips elsewhere with the reason.
 - [ ] **Step 2:** On the owner's word, run on each; record the results with the date in `docs/user-guide/BATCH_MODE.md`. Commit.
 
-### Task 20 (live, owner's VPN/tunnel, on his word): debugger batch and AMDP
+### Task 21 (live, owner's VPN/tunnel, on his word): debugger batch and AMDP
 
 - [ ] **Step 1:** `src/__tests__/integration/batch/debuggerBatch.test.ts`: at a live stop, step + stack + variables in one `DebugBatchEnd` (on-premise, ABAP Cloud); and the AMDP gate (on-premise on HANA). States where it runs.
 - [ ] **Step 2:** On the owner's word, run; record in `DEBUGGER.md`. The AMDP refusal stays until the AMDP case passes; lifting it is its own commit then. Commit.
 
-### Task 21 (live, owner's VPN/tunnel, on his word): a system without the communication batch
+### Task 22 (live, owner's VPN/tunnel, on his word): a system without the communication batch
 
 - [ ] **Step 1:** `src/__tests__/integration/batch/noCommunicationBatch.test.ts`: the first envelope's outer status; the destination marked; reads run sequentially. States where it runs.
 - [ ] **Step 2:** On the owner's word, run; record the measured answer in `BATCH_MODE.md`. Commit.
 
-### Task 22 (live, owner's VPN/tunnel, on his word): before/after timing of the internally batched reads
+### Task 23 (live, owner's VPN/tunnel, on his word): before/after timing of the internally batched reads
 
-- [ ] **Step 1:** `src/__tests__/integration/batch/batchedReadsTiming.test.ts`: every tool of Tasks 14–18, sequential (the fallback path) and batched: answers equal, time measured; on-premise HTTP, on-premise RFC, ABAP Cloud. States where it runs.
+- [ ] **Step 1:** `src/__tests__/integration/batch/batchedReadsTiming.test.ts`: every tool of Tasks 15–19, sequential (the fallback path) and batched: answers equal, time measured; on-premise HTTP, on-premise RFC, ABAP Cloud. States where it runs.
 - [ ] **Step 2:** On the owner's word, run; record with the date in `BATCH_MODE.md`. Commit.
 
-### Task 23 (live, owner's VPN/tunnel, on his word): the two earlier checks
+### Task 24 (live, owner's VPN/tunnel, on his word): the two earlier checks
 
 - [ ] **Step 1:** `src/__tests__/integration/batch/refusalFollowUps.test.ts`: the logoff after a credential refusal asks no provider; the debugger stop's second `stopListener` after a refusal. States where each runs.
 - [ ] **Step 2:** On the owner's word, run; record. Commit.
 
-### Task 24 (live, owner's VPN/tunnel, on his word): RFC through a message server
+### Task 25 (live, owner's VPN/tunnel, on his word): RFC through a message server
 
 - [ ] **Step 1:** `src/__tests__/integration/rfc/messageServer.test.ts`: a logon through `mshost` + `sysid` (and `mshost` + `msserv`), `group`, and with `saprouter` where the system needs one; one read through the server. States where it runs (a system with a message server), skips elsewhere with the reason.
 - [ ] **Step 2:** On the owner's word, run; record the result with the date in the RFC docs (whether `mshost` + `msserv` without `sysid` is accepted). Commit.
 
-### Task 25: Final consistency
+### Task 26: Final consistency
 
 - [ ] **Step 1:** Re-read README, `docs/**`, compact docs and the CHANGELOG 19.0.0 entry against the code; fix what drifted. Nothing under `docs/superpowers/` is deleted here (that happens before the release, as a later step).
 - [ ] **Step 2:** All gates on the final tree. Commit `docs: batch mode docs consistent`.

@@ -72,11 +72,24 @@ activates the group afterwards.
   only the batched version is kept; the sequential one runs only on a system
   without the communication batch. A dependent chain is a sequence of
   envelopes, so one call can serve several objects.
+- **Compact's CRUD tools make no multi-calls.** Each compact tool does its
+  one operation, with no mode parameter: `HandlerCreate` only creates the
+  initial object (one `POST`; an argument its create does not send is
+  refused, by presence, naming it); `HandlerUpdate` is only the `PUT` under
+  `lock_handle` (no lock or unlock of its own, no read-patch-write; for a
+  domain, a data element or a package the caller passes the whole document);
+  `HandlerDelete` only the `DELETE`. Lock, unlock and activate already are
+  single. `HandlerGet`'s contract does not change: a read may return an
+  object's metadata and source together, as today; the caller says by `part`
+  what to read, and every type answers the same `part` the same way. A read
+  sending two independent requests stays eligible in batch mode. The
+  full chains stay in the full sets. This changes compact's behaviour for its
+  consumers.
 - **Every package has batch mode.** The full, read-only and compact sets all
   serve `BatchBegin`, `BatchEnd` and the answer tool; what a set can do in batch
   mode is whatever of its tools send no request depending on another's answer
   — reads everywhere, and in
-  compact the low-level create, lock, update and unlock as well. LOCK and UNLOCK
+  compact the create, lock, update, unlock and delete as well. LOCK and UNLOCK
   go in stateful envelopes, everything else stateless, as adt-clients' batch
   connection sends them (measured there).
 - **The debugger has its own batch mode**, through its own pair of tools,

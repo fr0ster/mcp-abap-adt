@@ -202,6 +202,26 @@ again. The system serves the communication batch, so the not-served branch (an o
 destination marked, the reads sequential) is shown by the unit tests only
 (`src/__tests__/unit/batch/availability.test.ts`), not measured.
 
+### A read answered `406` in an envelope
+
+Each read in an envelope is sent with the Accept the connection's accept cache holds for its
+method and URL, when it holds one. Right after a phase's envelope answers, before any answer is
+read, the reads SAP answered `406` naming the types it serves go in one more envelope: only those
+reads, each with the Accept its own `406` names. That Accept is kept in the connection's accept
+cache — the one the correction outside a batch keeps — so a later read with the same method and
+URL, in an envelope or outside one, is sent with it directly. One round: what that envelope
+answers is the read's answer. A `406` that names no type, or names the Accept the read sent, is
+the read's answer. `DescribeByList` answers an object whose typed search stays `406` with that
+search's error, and searches without the type only after an empty or otherwise failed typed
+search.
+
+Outside a batch, the server switches adt-clients' accept correction on for every connection it
+builds: a request SAP answers `406` (`415`) naming the types it serves is sent once more with
+them, and the corrected type is kept in the same cache.
+
+`BatchEnd` corrects nothing: a recorded call's `406` is its answer (see "Credentials and
+failures").
+
 ### Descriptions in the batched walks
 
 The package walks (`GetPackageContents`, compact `HandlerGet` part `contents`, `GetPackageTree`)

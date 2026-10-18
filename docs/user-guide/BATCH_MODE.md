@@ -210,8 +210,21 @@ sends its metadata read (the same URL and Accept header; a package's
 The node structure parts' `DESCRIPTION` is not used: measured 2026-10-18, inside one envelope SAP
 can answer a node structure part after the first with another part's `DESCRIPTION` (everything
 else byte-identical to the request sent alone), while metadata reads in one envelope answer as
-they do alone. An object whose metadata read fails, or of a type with no `Get<Type>` metadata read (a class's
-method, a program's include, …), has no description in the batched answer. `GetObjectsList` and `SearchSource` answer no descriptions and read no metadata.
+they do alone. An access control (`DCLS/DL`), which has no `Get<Type>` tool, is read as
+adt-clients reads its metadata: `GET /sap/bc/adt/acm/dcl/sources/<name>?version=active`, Accept
+`application/vnd.sap.adt.dclSource+xml`. An object whose metadata read fails, or of a type with no
+metadata read (a class's method, a program's include, …), has no description in the batched answer.
+`GetObjectsList` and `SearchSource` answer no descriptions and read no metadata.
+
+Measured 2026-10-18 on the system, for the types the test packages hold that had no metadata read:
+each object's read sent alone, and the same read inside one envelope after three other metadata
+parts and again in reverse order. The access control's answer was byte-identical in every
+envelope, its `adtcore:description` equal to the one sent alone and to the node structure's. Three
+types have no readable metadata: a class enhancement (`ENHO/XH`) and a classic enhancement spot
+(`ENHS/XS`) answer their `OBJECT_URI` with `406` under `application/xml` and `404` under the Accept
+the ADT discovery names, and an OData V4 service group (`G4BA`) answers its `OBJECT_URI` with `400`
+(a required parameter missing). They get no metadata read; the node structure gave none of them a
+description in the sequential answer either.
 Where the destination has no communication batch, the sequential reads answer the descriptions
 of the node structure, as before.
 

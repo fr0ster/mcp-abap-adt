@@ -5,6 +5,7 @@
  * same function, so the two requests cannot drift apart.
  */
 import {
+  accessControlDocuments,
   behaviorDefinitionDocuments,
   classDocuments,
   dataElementDocuments,
@@ -165,6 +166,15 @@ export const readEnhancementSpotMetadata = (
     .getEnhancement()
     .readMetadata({ ...config, enhancementType: 'enhsxsb' as const }, analysed);
 
+/** An access control's metadata (DCL source, `DCLS/DL`). */
+export const readAccessControlMetadata = (
+  c: Client,
+  config: { accessControlName: string },
+) =>
+  c
+    .getAccessControl(resultsFor(accessControlDocuments))
+    .readMetadata(config, analysed);
+
 /** An object whose metadata is read. */
 export interface MetadataTarget {
   type: string;
@@ -228,6 +238,8 @@ const READS: Record<string, ReadOf> = {
   'MSAG/N': (t) => (c) => readMessageClassMetadata(c, { name: t.name }),
   'ENHS/XSB': (t) => (c) =>
     readEnhancementSpotMetadata(c, { enhancementName: t.name }),
+  'DCLS/DL': (t) => (c) =>
+    readAccessControlMetadata(c, { accessControlName: t.name }),
 };
 
 /** The ADT types whose metadata is read. */

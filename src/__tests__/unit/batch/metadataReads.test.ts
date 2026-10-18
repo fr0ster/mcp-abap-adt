@@ -4,7 +4,9 @@
  * - every `handleGet*` handler that reads metadata does it through that
  *   module, or is named here with why it does not;
  * - every type the batch reads has its handler here, and the batch part is
- *   the handler's request whole: method, URL with its query, headers, body.
+ *   the handler's request whole: method, URL with its query, headers, body;
+ *   a type with no `Get<Type>` handler is named with the request its part
+ *   sends.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
@@ -157,6 +159,22 @@ const HANDLERS: Record<string, { file: string; call: Handler }> = {
   },
 };
 
+/**
+ * Types the batch reads that have no `Get<Type>` handler: the request their
+ * part sends (the adt-clients `readMetadata` of the type), measured on
+ * premise with the same bytes alone and inside an envelope.
+ */
+const WITHOUT_HANDLER: Record<
+  string,
+  { method: string; url: string; accept: string }
+> = {
+  'DCLS/DL': {
+    method: 'GET',
+    url: `/sap/bc/adt/acm/dcl/sources/${NAME.toLowerCase()}?version=active`,
+    accept: 'application/vnd.sap.adt.dclSource+xml',
+  },
+};
+
 /** Handlers that read a type above through the shared read, besides its own. */
 const ALSO_SHARED: Record<string, string> = {
   'system/high/handleGetPackageTree.ts': 'DEVC/K',
@@ -265,13 +283,49 @@ describe('one metadata read per type, shared by handler and batch', () => {
     expect(direct).toEqual([]);
   });
 
-  it('the batch reads exactly the types of those handlers', () => {
+  it('the batch reads exactly the types of those handlers, and the types named without one', () => {
     expect([...METADATA_READ_TYPES].sort()).toEqual(
-      Object.keys(HANDLERS).sort(),
+      [...Object.keys(HANDLERS), ...Object.keys(WITHOUT_HANDLER)].sort(),
     );
   });
 
-  it.each(METADATA_READ_TYPES)(
+  it.each(Object.keys(WITHOUT_HANDLER))(
+    "%s: the batch part is the type's metadata request",
+    async (type) => {
+      const expected = WITHOUT_HANDLER[type];
+      const fake = envelopeConnection((parts) =>
+        envelopeResponse(
+          parts.map(() => ({
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'application/xml' },
+            body: DOC,
+          })),
+        ),
+      );
+      const context = {
+        connection: fake.connection,
+        logger: undefined,
+        batchAvailability: createBatchAvailability(),
+      } as unknown as HandlerContext;
+      const { descriptions } = await withinTurns(
+        metadataDescriptions(context, [targetOf(type)]),
+      );
+      expect(fake.envelopes).toHaveLength(1);
+      const parts = fake.envelopes[0]?.parts ?? [];
+      expect(parts).toHaveLength(1);
+      const inner = parts[0];
+      expect({
+        method: inner?.method,
+        url: inner?.url,
+        accept: lowerHeaders(inner?.headers).accept,
+        body: (inner?.body ?? '').trim(),
+      }).toEqual({ ...expected, body: '' });
+      expect([...descriptions.values()]).toEqual(['Placeholder']);
+    },
+  );
+
+  it.each(Object.keys(HANDLERS))(
     "%s: the batch part is the handler's request whole",
     async (type) => {
       const direct = await handlerRequest(type);

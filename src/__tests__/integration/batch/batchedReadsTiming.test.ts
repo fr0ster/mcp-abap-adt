@@ -19,8 +19,7 @@
  *   order alternating per repetition;
  * - every answer equals the reference (compared after the timing is written),
  *   the sequential reads send no envelope, and the batched reads send at
- *   least one; an object of a type with no readable metadata
- *   (`NO_READABLE_METADATA`) is compared without its description;
+ *   least one;
  * - recorded per read: wall time, the requests sent (round trips: envelopes
  *   included), the envelopes, and the requests inside them (parts). The median
  *   of the three is written to stderr, one `batch-timing` line per path.
@@ -146,54 +145,6 @@ const median = (values: number[]): number => {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)] as number;
 };
-
-/**
- * Types the walks meet whose metadata cannot be read (measured on premise):
- * the batched answer carries no description for them, so their objects are
- * compared without one.
- */
-const NO_READABLE_METADATA: Record<string, string> = {
-  'ENHO/XH': 'its OBJECT_URI answers 404 (406 with a plain XML Accept)',
-  'ENHS/XS': 'its OBJECT_URI answers 404 (406 with a plain XML Accept)',
-  G4BA: 'its OBJECT_URI answers 400: a required parameter is missing',
-};
-
-const TYPE_KEYS = ['type', 'OBJECT_TYPE', 'object_type', 'objectType'];
-
-/** `value` with the description of every object of those types left out. */
-function withoutUnreadable(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(withoutUnreadable);
-  if (value === null || typeof value !== 'object') return value;
-  const record = value as Record<string, unknown>;
-  const type = TYPE_KEYS.map((key) => record[key]).find(
-    (t): t is string => typeof t === 'string',
-  );
-  const unreadable =
-    type !== undefined && type.toUpperCase() in NO_READABLE_METADATA;
-  return Object.fromEntries(
-    Object.entries(record)
-      .filter(([key]) => !(unreadable && /description/i.test(key)))
-      .map(([key, v]) => [key, withoutUnreadable(v)]),
-  );
-}
-
-/** A tool's answer as compared: each JSON text read through `withoutUnreadable`. */
-function compared(answer: unknown): unknown {
-  const content = (answer as { content?: unknown } | null)?.content;
-  if (!Array.isArray(content)) return answer;
-  return {
-    ...(answer as object),
-    content: content.map((item) => {
-      const text = (item as { text?: unknown })?.text;
-      if (typeof text !== 'string') return item;
-      try {
-        return { ...item, text: withoutUnreadable(JSON.parse(text)) };
-      } catch {
-        return item;
-      }
-    }),
-  };
-}
 
 const isError = (answer: unknown): boolean =>
   (answer as { isError?: boolean } | null)?.isError === true;
@@ -349,7 +300,7 @@ describe('batched reads timed against the sequential path on the system the test
           }
 
           for (const { answer } of answers) {
-            expect(compared(answer)).toEqual(compared(reference.answer));
+            expect(answer).toEqual(reference.answer);
           }
         },
         getTimeout('long'),

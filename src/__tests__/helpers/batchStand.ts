@@ -11,7 +11,8 @@
  * by the same rule; nothing reaches a system.
  *
  * The test file must mock `lib/connectionFactory` so `createAbapConnection`
- * is the jest mock this helper drives:
+ * is the jest mock this helper drives (each connection it builds has accept
+ * correction switched on by the factory's real `switchAcceptCorrectionOn`):
  *
  *   jest.mock('../../../lib/connectionFactory', () => ({
  *     createAbapConnection: jest.fn(),
@@ -205,6 +206,10 @@ export interface StandOptions {
   groups?: IHandlerGroup[];
 }
 
+/** The factory's accept-correction switch, the real one under the mock. */
+const switchOn: typeof import('../../lib/connectionFactory')['switchAcceptCorrectionOn'] =
+  jest.requireActual('../../lib/connectionFactory').switchAcceptCorrectionOn;
+
 /**
  * `build` is the `createAbapConnection` jest mock of the test file.
  */
@@ -220,6 +225,9 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
       options.envelope ?? partByPart(options.part),
       directBy(options.part),
     );
+    // Switched on as the server's own factory switches every connection it
+    // builds.
+    switchOn(fake.connection as never);
     built.push(fake);
     return fake.connection;
   });

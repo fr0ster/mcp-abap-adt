@@ -19,6 +19,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import { switchAcceptCorrectionOn } from '../../lib/connectionFactory';
 import type {
   HandlerContext,
   HandlerEntry,
@@ -196,6 +197,9 @@ function declared(
 /** The compact requests a row's call(s) send to the stand-in. */
 async function compactRequests(row: LowToCompactRow): Promise<ParityRequest[]> {
   const connection = parityConnection();
+  // The server's connection: accept correction switched on, as its factory
+  // switches it on (the low requests were captured with it on).
+  switchAcceptCorrectionOn(connection as never);
   const context = {
     connection,
     logger: silentLogger,

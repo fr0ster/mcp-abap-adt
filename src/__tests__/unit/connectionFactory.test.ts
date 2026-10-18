@@ -4,6 +4,7 @@
  * holds is the object it was given — never one built from the settings.
  */
 
+import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import {
   AdtCloudConnector,
@@ -150,4 +151,64 @@ describe('createAbapConnection without a stated kind', () => {
       ).toThrow(SYSTEM_TYPE_REQUIRED_WORDS);
     },
   );
+});
+
+describe('accept correction on the connections the factory builds', () => {
+  const previousKind = process.env.SAP_SYSTEM_TYPE;
+  const previousSwitch = process.env.ADT_ACCEPT_CORRECTION;
+  afterEach(() => {
+    jest.restoreAllMocks();
+    if (previousKind === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = previousKind;
+    if (previousSwitch === undefined) delete process.env.ADT_ACCEPT_CORRECTION;
+    else process.env.ADT_ACCEPT_CORRECTION = previousSwitch;
+  });
+
+  const OLD = 'application/vnd.sap.probe.v1+xml';
+  const NEW = 'application/vnd.sap.probe.v2+xml';
+
+  it('a request SAP answers 406 naming a supported type is sent once more with it', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    // Off unless switched on: the switch is the factory's own.
+    delete process.env.ADT_ACCEPT_CORRECTION;
+    const sent: Array<string | undefined> = [];
+    jest
+      .spyOn(AdtOnPremConnector.prototype, 'makeAdtRequest')
+      .mockImplementation(async (request: any) => {
+        const accept = request.headers?.Accept as string | undefined;
+        sent.push(accept);
+        if (accept !== NEW) {
+          throw Object.assign(
+            new Error('Request failed with status code 406'),
+            {
+              response: {
+                status: 406,
+                statusText: 'Not Acceptable',
+                headers: { 'x-sap-adt-supported-accept': NEW },
+                data: '',
+              },
+            },
+          );
+        }
+        return { status: 200, statusText: 'OK', headers: {}, data: 'read' };
+      });
+    const connection = createAbapConnection(
+      settings(),
+      new BasicAuthProvider('user', 'secret') as IAuthProvider,
+    );
+    // Only the switch: the connection's request is its own until a client
+    // is built over it.
+    expect(Object.hasOwn(connection, 'makeAdtRequest')).toBe(false);
+    // A client built later over it, as a handler builds one.
+    new AdtRuntimeClient(connection, undefined);
+
+    const answer = await connection.makeAdtRequest({
+      url: '/sap/bc/adt/probe/item',
+      method: 'GET',
+      timeout: 0,
+      headers: { Accept: OLD },
+    });
+    expect(answer.data).toBe('read');
+    expect(sent).toEqual([OLD, NEW]);
+  });
 });

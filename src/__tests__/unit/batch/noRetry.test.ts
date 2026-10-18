@@ -161,7 +161,12 @@ describe('no retry in batch mode', () => {
       () => {},
       'GetProgram',
     );
-    const read = new modules.adt.AdtClient(recorder as never)
+    // Correction switched on for it (adt-clients 35 corrects nothing
+    // otherwise), as `ADT_ACCEPT_CORRECTION=true` would switch it on: only
+    // the mark keeps a recorder out of it.
+    const read = new modules.adt.AdtClient(recorder as never, undefined, {
+      enableAcceptCorrection: true,
+    })
       .getProgram()
       .read({ programName: 'PROG_A' });
     read.catch(() => undefined);

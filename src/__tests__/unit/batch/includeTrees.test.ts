@@ -238,7 +238,58 @@ const REPOSITORY: Record<string, PartAnswer> = {
   'meta:incl:ZEF1': ok(includeMetaXml('ZEF1', 'ZPROGF')),
   'elements:incl:ZEF1': ok(elementsXml('ZENH_F1', 'WRITE / 4.')),
   'elements:class:ZCLE': ok(elementsXml('ZENH_CLASS', 'WRITE / 5.')),
+  // A function group's main program: read as the group, without probing.
+  'elements:fugr:ZFGE': ok(elementsXml('ZENH_GROUP', 'WRITE / 6.')),
 };
+
+const FAILED: PartAnswer = {
+  status: 500,
+  statusText: 'Internal Server Error',
+  body: '',
+};
+
+/**
+ * A system whose envelope number `failing` fails as a whole (`500`), the
+ * others answered part by part from the model.
+ */
+function failingEnvelope(failing: number) {
+  return system({}, (parts, index) => {
+    if (index === failing) throw statusError(500, 'Internal Server Error');
+    return envelopeResponse(
+      parts.map((p) => answerOf({}, labelOf(p.method, p.url))),
+    );
+  });
+}
+
+/**
+ * An answer's text without the `request` of its failures. Every part of a
+ * failed envelope rejects with the envelope's one error object, and
+ * adt-clients' request trace writes each part's request onto that shared
+ * object (`error.request = asked`, adt-clients 34): the last part's request
+ * is the one every failure of that envelope names. The rest of each failure
+ * is the sequential one's.
+ */
+const withoutRequests = (result: unknown): string =>
+  JSON.stringify(
+    payloadOf(result),
+    (key, value) => (key === 'request' ? undefined : value),
+    2,
+  );
+
+/**
+ * The sequential answer to the reads of a failed envelope: each of those
+ * reads answered `500` on its own.
+ */
+async function sequentialWithFailed(
+  handler: (context: HandlerContext, args: any) => Promise<unknown>,
+  args: Record<string, unknown>,
+  labels: string[],
+) {
+  const fake = system({
+    answers: Object.fromEntries(labels.map((label) => [label, FAILED])),
+  });
+  return withinTurns(handler(contextOn(fake, 'absent'), args), TURNS);
+}
 
 /** A chain of `n` includes, each naming the next: deeper than the walk goes. */
 function chain(n: number): Record<string, PartAnswer> {
@@ -573,6 +624,12 @@ describe('GetIncludesList', () => {
       }),
       TURNS,
     );
+    const expected = await sequentialWithFailed(
+      handleGetIncludesList,
+      { object_name: 'ZPROG', object_type: 'PROG/P' },
+      phasesOf(fake)[1] as string[],
+    );
+    expect(withoutRequests(result)).toBe(withoutRequests(expected));
     expect(payloadOf(result).unreadable).toEqual([
       expect.objectContaining({
         name: 'ZINC_A',
@@ -826,6 +883,27 @@ describe('GetStructuresList', () => {
     expect(fake.envelopes).toHaveLength(1);
   });
 
+  it("an envelope that fails is every part's failure; the answer is the sequential one with those reads failed", async () => {
+    const args = { structure_name: 'ZS', include_extensions: false };
+    const fake = failingEnvelope(2);
+    const result = await withinTurns(
+      handleGetStructuresList(contextOn(fake), args),
+      TURNS,
+    );
+    const failed = phasesOf(fake)[1] as string[];
+    expect(failed).toEqual(['ddl:structure:ZINC1', 'ddl:structure:ZINC2']);
+    const expected = await sequentialWithFailed(
+      handleGetStructuresList,
+      args,
+      failed,
+    );
+    expect(withoutRequests(result)).toBe(withoutRequests(expected));
+    expect(payloadOf(result).tree.children[0].error).toEqual([
+      expect.objectContaining({ status: 500, step: 'read structure' }),
+      expect.objectContaining({ step: 'read table' }),
+    ]);
+  });
+
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
     const fake = system({}, () => {
       throw statusError(404, 'Not Found');
@@ -1022,6 +1100,93 @@ describe('GetEnhancements', () => {
     );
     expect(payloadOf(result).error).toBe('authentication_failed');
     expect(fake.envelopes).toHaveLength(1);
+  });
+
+  it('max_includes: only the first includes are read, as the sequential version reads them', async () => {
+    const args = {
+      object_name: 'ZPROGE',
+      object_type: 'PROG/P',
+      include_nested: true,
+      max_includes: 1,
+    };
+    const { a, b, batched } = await bothWays(handleGetEnhancements, args);
+    expect(textOf(a)).toBe(textOf(b));
+    expect(phasesOf(batched)).toEqual([
+      ['elements:prog:ZPROGE', 'ns:PROG/P:ZPROGE:'],
+      ['ns:PROG/P:ZPROGE:7'],
+      ['meta:incl:ZEI1'],
+      ['elements:incl:ZEI1'],
+    ]);
+    expect(payloadOf(a).total_objects_analyzed).toBe(2);
+  });
+
+  it('a refused class probe, then the program found: the refusal beside the enhancements, as the sequential version', async () => {
+    const model = {
+      answers: {
+        'meta:class:ZPROGE': { status: 403, statusText: 'Forbidden', body: '' },
+      },
+    };
+    const args = { object_name: 'ZPROGE', object_type: 'unknown' };
+    const { a, b, batched } = await bothWays(
+      handleGetEnhancements,
+      args,
+      model,
+    );
+    expect(textOf(a)).toBe(textOf(b));
+    expect(phasesOf(batched)).toEqual([
+      ['meta:class:ZPROGE'],
+      ['meta:prog:ZPROGE'],
+      ['elements:prog:ZPROGE'],
+    ]);
+    const body = payloadOf(a);
+    expect(body.object_type).toBe('program');
+    expect(body.unreadable).toEqual([
+      expect.objectContaining({ status: 403, step: 'read class metadata' }),
+    ]);
+  });
+
+  it.each([
+    [{ object_name: 'SAPLZFGE', object_type: 'unknown' }],
+    [{ object_name: 'SAPLZFGE', include_nested: true }],
+  ])(
+    'an untyped SAPL<fg> is read as its group, without probing: %j',
+    async (args) => {
+      const { a, b, batched } = await bothWays(handleGetEnhancements, args);
+      expect(textOf(a)).toBe(textOf(b));
+      expect(phasesOf(batched)[0]).toContain('elements:fugr:ZFGE');
+      expect(
+        phasesOf(batched)
+          .flat()
+          .some((label) => label.startsWith('meta:')),
+      ).toBe(false);
+      expect(payloadOf(a).enhancements ?? payloadOf(a).objects).toBeDefined();
+    },
+  );
+
+  it("an envelope that fails is every part's failure; the answer is the sequential one with those reads failed", async () => {
+    const args = {
+      object_name: 'ZPROGE',
+      object_type: 'PROG/P',
+      include_nested: true,
+    };
+    const fake = failingEnvelope(1);
+    const result = await withinTurns(
+      handleGetEnhancements(contextOn(fake), args),
+      TURNS,
+    );
+    const failed = phasesOf(fake)[0] as string[];
+    expect(failed).toEqual(['elements:prog:ZPROGE', 'ns:PROG/P:ZPROGE:']);
+    expect(fake.envelopes).toHaveLength(1);
+    const expected = await sequentialWithFailed(
+      handleGetEnhancements,
+      args,
+      failed,
+    );
+    expect(withoutRequests(result)).toBe(withoutRequests(expected));
+    expect(payloadOf(result)).toMatchObject({
+      status: 500,
+      step: 'read enhancements',
+    });
   });
 
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {

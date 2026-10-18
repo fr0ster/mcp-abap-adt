@@ -65,6 +65,7 @@ const server = new EmbeddableMcpServer({
 - **[TOOLS_ARCHITECTURE.md](TOOLS_ARCHITECTURE.md)** — how tools are organized and how `TOOL_DEFINITION` works
 - **[CONNECTION_ISOLATION.md](CONNECTION_ISOLATION.md)** — per-session connection isolation between clients
 - **[HANDLER_EXPORTER.md](HANDLER_EXPORTER.md)** — handler exporter usage
+- **[REQUEST_HEADERS.md](REQUEST_HEADERS.md)** — the request header pairs of the adt-clients members: the defaults, the 406/415 correction, embedders and direct consumers
 
 ## Related Documentation
 

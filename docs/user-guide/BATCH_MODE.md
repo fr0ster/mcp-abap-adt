@@ -250,6 +250,9 @@ the server is given — an embedder's injected one included.
 `BatchEnd` corrects nothing: a recorded call's `406`/`415` is its answer (see "Credentials and
 failures").
 
+The members, their default pairs and the correction in full:
+[Request headers](../architecture/REQUEST_HEADERS.md).
+
 ## Credentials and failures
 
 `BatchEnd` sends on the instance's connection as it is at that moment, with the credential in

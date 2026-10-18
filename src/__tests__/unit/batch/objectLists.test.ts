@@ -273,29 +273,70 @@ async function bothWays(
 }
 
 /**
- * An answer without the `request` of its failures, text and json alike.
- * Every part of a failed envelope rejects with the envelope's one error
- * object, and adt-clients' request trace writes each part's request onto
- * that shared object (`error.request = asked`, adt-clients 34): the last
- * part's request is the one every failure of that envelope names. The rest
- * of each failure is the sequential one's.
+ * The envelope's own request. Every part of an envelope that failed as a
+ * whole rejects with the envelope's one error, whose `request` is the
+ * envelope's POST (adt-clients 34.2.1): each such failure names it.
  */
-const withoutRequests = (result: unknown): unknown => {
+const ENVELOPE_REQUEST = {
+  method: 'POST',
+  url: '/sap/bc/adt/communication/batch',
+};
+
+type Replacer = (key: string, value: unknown) => unknown;
+
+/** An answer's content, whole: each text parsed when it is JSON. */
+const wholeOf = (result: unknown, replacer?: Replacer): unknown[] => {
   const content = (result as { content?: Array<Record<string, unknown>> })
     .content;
-  const drop = (_key: string, value: unknown) =>
-    _key === 'request' ? undefined : value;
   return (content ?? []).map((item) => {
     if (typeof item.text === 'string') {
       try {
-        return JSON.parse(JSON.stringify(JSON.parse(item.text), drop));
+        return JSON.parse(JSON.stringify(JSON.parse(item.text), replacer));
       } catch {
         return item.text;
       }
     }
-    return JSON.parse(JSON.stringify(item, drop));
+    return JSON.parse(JSON.stringify(item, replacer));
   });
 };
+
+/** Every `request` an answer's failures name, in order. */
+const requestsOf = (result: unknown): unknown[] => {
+  const requests: unknown[] = [];
+  wholeOf(result, (key, value) => {
+    if (key === 'request') requests.push(value);
+    return value;
+  });
+  return requests;
+};
+
+/**
+ * The answer of a call whose envelope failed as a whole: the sequential
+ * answer, whole, except that each of the `failures` that went into the
+ * failed envelope names the envelope's own request where the sequential one
+ * names its read's. Every other failure names the same request as the
+ * sequential one.
+ */
+function expectEnvelopeFailure(
+  result: unknown,
+  sequential: unknown,
+  failures: number,
+) {
+  const isEnvelope = (request: unknown) =>
+    JSON.stringify(request) === JSON.stringify(ENVELOPE_REQUEST);
+  const own = requestsOf(sequential);
+  const named = requestsOf(result);
+  expect(own.filter(isEnvelope)).toHaveLength(0);
+  expect(named).toHaveLength(own.length);
+  expect(named.filter(isEnvelope)).toHaveLength(failures);
+  let at = 0;
+  expect(wholeOf(result)).toEqual(
+    wholeOf(sequential, (key, value) => {
+      if (key !== 'request') return value;
+      return isEnvelope(named[at++]) ? ENVELOPE_REQUEST : value;
+    }),
+  );
+}
 
 /**
  * The sequential answer to the reads of a failed envelope: each of those
@@ -483,8 +524,7 @@ describe('ListTransports', () => {
       {},
       phasesOf(fake)[1] as string[],
     );
-    // Compared without `request`: see `withoutRequests`.
-    expect(withoutRequests(result)).toEqual(withoutRequests(expected));
+    expectEnvelopeFailure(result, expected, 1);
     expect(payloadOf(result)).toMatchObject({ status: 500, step: 'list' });
     expect(fake.envelopes).toHaveLength(2);
     expect(fake.directs).toHaveLength(0);
@@ -625,8 +665,7 @@ describe('DescribeByList', () => {
       { objects: OBJECTS },
       phasesOf(fake)[1] as string[],
     );
-    // Compared without `request`: see `withoutRequests`.
-    expect(withoutRequests(result)).toEqual(withoutRequests(expected));
+    expectEnvelopeFailure(result, expected, 1);
     expect(fake.envelopes).toHaveLength(2);
     expect(fake.directs).toHaveLength(0);
   });
@@ -767,8 +806,7 @@ describe('GetAbapSystemSymbols', () => {
       { code: CODE },
       phasesOf(fake)[0] as string[],
     );
-    // Compared without `request`: see `withoutRequests`.
-    expect(withoutRequests(result)).toEqual(withoutRequests(expected));
+    expectEnvelopeFailure(result, expected, 4);
     const symbols = (result as any).content[0].json.symbols;
     expect(
       symbols

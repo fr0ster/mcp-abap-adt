@@ -353,17 +353,70 @@ function expectSame({
 }
 
 /**
- * An answer's text without the `request` of its failures. Every part of a
- * failed envelope rejects with the envelope's one error object, and
- * adt-clients' request trace writes each part's request onto that shared
- * object (`error.request = asked`, adt-clients 34): the last part's request
- * is the one every failure of that envelope names. The rest of each failure
- * is the sequential one's.
+ * The envelope's own request. Every part of an envelope that failed as a
+ * whole rejects with the envelope's one error, whose `request` is the
+ * envelope's POST (adt-clients 34.2.1): each such failure names it.
  */
-const withoutRequests = (result: unknown): unknown =>
-  JSON.parse(textOf(result), (key, value) =>
-    key === 'request' ? undefined : value,
+const ENVELOPE_REQUEST = {
+  method: 'POST',
+  url: '/sap/bc/adt/communication/batch',
+};
+
+type Replacer = (key: string, value: unknown) => unknown;
+
+/** An answer's content, whole: each text parsed when it is JSON. */
+const wholeOf = (result: unknown, replacer?: Replacer): unknown[] => {
+  const content = (result as { content?: Array<Record<string, unknown>> })
+    .content;
+  return (content ?? []).map((item) => {
+    if (typeof item.text === 'string') {
+      try {
+        return JSON.parse(JSON.stringify(JSON.parse(item.text), replacer));
+      } catch {
+        return item.text;
+      }
+    }
+    return JSON.parse(JSON.stringify(item, replacer));
+  });
+};
+
+/** Every `request` an answer's failures name, in order. */
+const requestsOf = (result: unknown): unknown[] => {
+  const requests: unknown[] = [];
+  wholeOf(result, (key, value) => {
+    if (key === 'request') requests.push(value);
+    return value;
+  });
+  return requests;
+};
+
+/**
+ * The answer of a call whose envelope failed as a whole: the sequential
+ * answer, whole, except that each of the `failures` that went into the
+ * failed envelope names the envelope's own request where the sequential one
+ * names its read's. Every other failure names the same request as the
+ * sequential one.
+ */
+function expectEnvelopeFailure(
+  result: unknown,
+  sequential: unknown,
+  failures: number,
+) {
+  const isEnvelope = (request: unknown) =>
+    JSON.stringify(request) === JSON.stringify(ENVELOPE_REQUEST);
+  const own = requestsOf(sequential);
+  const named = requestsOf(result);
+  expect(own.filter(isEnvelope)).toHaveLength(0);
+  expect(named).toHaveLength(own.length);
+  expect(named.filter(isEnvelope)).toHaveLength(failures);
+  let at = 0;
+  expect(wholeOf(result)).toEqual(
+    wholeOf(sequential, (key, value) => {
+      if (key !== 'request') return value;
+      return isEnvelope(named[at++]) ? ENVELOPE_REQUEST : value;
+    }),
   );
+}
 
 /** The sequential answer with each of `labels` answered `500` on its own. */
 async function sequentialWithFailed(
@@ -671,8 +724,7 @@ describe('GetWhereUsed', () => {
         args,
         phasesOf(fake)[failing - 1] as string[],
       );
-      // Compared without `request`: see `withoutRequests`.
-      expect(withoutRequests(result)).toEqual(withoutRequests(expected));
+      expectEnvelopeFailure(result, expected, THREE.length);
       expect(payloadOf(result)[0].error).toMatchObject({ status: 500 });
       expect(fake.envelopes).toHaveLength(failing);
       expect(fake.directs).toHaveLength(0);
@@ -863,9 +915,12 @@ describe('RuntimeListFeeds', () => {
     }
   });
 
-  it.each([[1], [2]])(
+  it.each([
+    [1, 3],
+    [2, 2],
+  ])(
     "envelope %i failing is every part's failure; the answer is the sequential one with those reads failed",
-    async (failing) => {
+    async (failing, failures) => {
       const args = { feed_types: PAGED, max_results: 150 };
       const fake = failingEnvelope(failing);
       const result = await withinTurns(
@@ -877,8 +932,7 @@ describe('RuntimeListFeeds', () => {
         args,
         phasesOf(fake)[failing - 1] as string[],
       );
-      // Compared without `request`: see `withoutRequests`.
-      expect(withoutRequests(result)).toEqual(withoutRequests(expected));
+      expectEnvelopeFailure(result, expected, failures);
       expect(payloadOf(result)[0].error).toMatchObject({ status: 500 });
       expect(fake.envelopes).toHaveLength(failing);
       expect(fake.directs).toHaveLength(0);

@@ -509,6 +509,28 @@ one module, `src/lib/adtHeaders/defaultPairs.ts` (`DEFAULT_ADT_HEADERS`).
 - A member without a header pair (a search, a source or metadata read) is sent as it is; its
   `406` is its answer.
 
+## When SAP checks the headers
+
+SAP's ADT REST framework has no central header check. This was read from its ABAP sources through ADT on an on-premise system on 2026-10-18, and checked against an error corpus measured there the same day. adt-clients' `docs/usage/SAP_HEADER_CHECKS.md` has the classes, the methods and a source tag for each claim.
+
+- **Before any header is read:** the logon (`401`), the authorization and CSRF checks (`403`), the routing (`404`, or `500` when the routed class cannot be created) and the method dispatch (`405`).
+- **`415`:** raised when the resource reads its request body through the checking content handler. That is usually before any change.
+- **`406`:** raised when the resource writes its response body through that handler. For a write, that is usually **after** the change.
+  - Some resources check `Accept` first: the deletion endpoint and the `LOCK` action.
+  - Many never check either header: activation, class create and the deletes of the generic object framework.
+- **`500`:** a router failure or a dump. It says nothing about the headers.
+
+For the correction above, this means:
+
+- **A `415`:** the resend repeats a request whose body SAP refused before using it.
+- **A `406` on a read:** the resend repeats the read.
+- **A `406` on a write:** this usually means the write already ran and only its answer was refused. Making the same member call again makes the write a second time. The likely results are:
+  - an object that already exists;
+  - a second transport entry;
+  - a lock that is already held.
+
+  The corrected pair is still kept, so the next call of that operation sends it from the start.
+
 ## Embedders
 
 An embedder that imports the library (`EmbeddableMcpServer`, `BaseMcpServer`, the handler

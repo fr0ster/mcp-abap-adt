@@ -1514,8 +1514,8 @@ build argument `VARIANT` (the package's name without its scope), installing that
 ## Embedders
 
 - **The chain under lib is the removal chain**: `@mcp-abap-adt/connection` **17.1**,
-  `@mcp-abap-adt/interfaces-adt-connection` **3**, `@mcp-abap-adt/interfaces-adt` **18**,
-  `@mcp-abap-adt/adt-clients` **33** (and `@mcp-abap-adt/adt-strategies` 0.12). None of them takes a
+  `@mcp-abap-adt/interfaces-adt-connection` **3**, `@mcp-abap-adt/interfaces-adt` **20**,
+  `@mcp-abap-adt/adt-clients` **36** (and `@mcp-abap-adt/adt-strategies` 0.13). None of them takes a
   signal: `IAbapRequestOptions.signal` and `IAdtClientOptions.signal` are gone, there is no
   `ADT_REQUEST_ERROR` / `ADT_REQUEST_ABORTED`, and `IAdtError` has no `refusal` — an
   authentication failure inside a tool reaches the model with the connection's own words. A
@@ -1534,8 +1534,12 @@ build argument `VARIANT` (the package's name without its scope), installing that
   stub of `makeAdtRequest` is declared generic (connection's `docs/MIGRATION-15.0.md`).
 - **The chain's own migrations.** From 18.x the chain moved several majors at once; each package's
   note says what a consumer of it changes:
-  - `@mcp-abap-adt/adt-clients` 30 → 33 and `@mcp-abap-adt/interfaces-adt` 15 → 18: adt-clients'
-    `docs/usage/MIGRATION-31.md`, `MIGRATION-32.md` and `MIGRATION-33.md`. From 33, a credential the
+  - `@mcp-abap-adt/adt-clients` 30 → 36 and `@mcp-abap-adt/interfaces-adt` 15 → 20: adt-clients'
+    `docs/usage/MIGRATION-31.md` … `MIGRATION-36.md`. From 36, the 32 members whose request sets
+    both headers take them as `options.headers: IAdtHeaders` (required), and accept negotiation is
+    gone (`enableAcceptCorrection`, `cachedAccept`, `rememberAccept`, `getBaseRequest`,
+    `exemptFromAcceptNegotiation`): call `connection.makeAdtRequest` where you called
+    `getBaseRequest(connection)`. From 33, a credential the
     provider refused before SAP was asked (connection's `AuthRefusedError`) rejects from every member
     — `unlockAll()` and `await using` included — where it answered `ok: false`: catch it where you
     call members and stop. From 32, `EnhancementType` is `enhoxhb |
@@ -1553,6 +1557,13 @@ build argument `VARIANT` (the package's name without its scope), installing that
     carrying a minted `IAuthProviderError` — read it with `failureOf` (below) or auth-errors'
     `readFailure`, never by `instanceof` or its message; the session store reads only its own
     record format (see "stdio users"). Their CHANGELOGs list the rest.
+- **The server sends the request header pairs, and corrects a `406` / `415` once.** Its tools
+  call those members with the server's pairs — a default per member and object type, or the pair
+  a system named in a `406` / `415`, kept for that system — so the correction applies on the
+  connection you inject too. Anything you did with adt-clients' `enableAcceptCorrection` is gone:
+  drop it. To share the corrected pairs between your instances, pass each the same
+  `adtHeaderPairs: new AdtHeaderPairs()` (`@mcp-abap-adt/lib/embeddable`); without it each
+  instance keeps its own.
 - **`makeAdtRequestWithTimeout`, `getTimeout` and `getTimeoutConfig` are gone from
   `@mcp-abap-adt/lib/utils`.** The last two were connection's, re-exported, and connection 17 no
   longer has them; `makeAdtRequestWithTimeout` turned a name (`'default'`, `'csrf'`, `'long'`) into

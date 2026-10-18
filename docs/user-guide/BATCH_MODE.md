@@ -218,139 +218,37 @@ before the refusal, and the two versions answer a different amount before it:
 
 A call that ends without a refusal caches the same objects on both versions.
 
-### A read answered `406` in an envelope
+### Request headers and a request answered `406` or `415`
 
-Each read in an envelope is sent with the Accept the connection's accept cache holds for its
-method and URL, when it holds one. Right after a phase's envelope answers, before any answer is
-read, the reads SAP answered `406` naming the types it serves go in one more envelope: only those
-reads, each with the Accept its own `406` names. That Accept is kept in the connection's accept
-cache — the one the correction outside a batch keeps — so a later read with the same method and
-URL, in an envelope or outside one, is sent with it directly. One round: what that envelope
-answers is the read's answer. A `406` that names no type, or names the Accept the read sent, is
-the read's answer. `DescribeByList` answers an object whose typed search stays `406` with that
-search's error, and searches without the type only after an empty or otherwise failed typed
-search.
+The server sends every request of the adt-clients members that take an `Accept` and
+`Content-Type` pair (adt-clients 36: create, update, delete, check, activate, the deletion check,
+the where-used, node structure and virtual folder reads, the data previews, the transport
+actions, the debugger's requests, the trace scheduling, abapGit's link and pull) with a pair of
+its own: one default pair per member and object type — the pair adt-clients 35 sent, completed
+where it sent one header or none — and a corrected pair once the system named another.
 
-Outside a batch, the server switches adt-clients' accept correction on for every connection it
-builds: a request SAP answers `406` (`415`) naming the types it serves is sent once more with
-them, and the corrected type is kept in the same cache.
+A request SAP answers `406` naming the types it serves is sent once more with them as the
+`Accept` (the `Content-Type` as sent); one answered `415` naming a type, once more with it as the
+`Content-Type` (the `Accept` as sent). The corrected pair is kept for that system and member —
+the system the destination points at, whatever the credentials: two destinations to the same
+system share it — and sent from then on, in an envelope and outside one. It is kept in memory
+for the process and replaced when a later `406`/`415` corrects it again. A `406`/`415` that names
+no type, or names what was sent, is the request's answer; the second request's answer is the
+call's answer.
 
-`BatchEnd` corrects nothing: a recorded call's `406` is its answer (see "Credentials and
+In the tools above that read in envelopes, the correction is the phase's: right after a phase's
+envelope answers, before any answer is read, the requests SAP answered `406`/`415` go in one more
+envelope — only those requests, each sent again by its member with the corrected pair. One round:
+what that envelope answers is the request's answer. A read without a header pair (a search, a
+source or metadata read) is sent as it is, and its `406` is its answer: `DescribeByList` answers an
+object whose typed search is refused `406` with that search's error, and searches without the
+type only after an empty or otherwise failed typed search.
+
+The correction is the server's, around the member calls, so it applies on whatever connection
+the server is given — an embedder's injected one included.
+
+`BatchEnd` corrects nothing: a recorded call's `406`/`415` is its answer (see "Credentials and
 failures").
-
-### Descriptions in the batched walks
-
-The package walks (`GetPackageContents`, compact `HandlerGet` part `contents`, `GetPackageTree`)
-and `GetObjectInfo` read the node structure levels in envelopes and then the metadata of every
-object found in one more envelope: one read per object, sent as that type's `Get<Type>` handler
-sends its metadata read (the same URL and Accept header; a package's
-`/sap/bc/adt/packages/<name>`), whose `adtcore:description` is the description in the answer.
-The node structure parts' `DESCRIPTION` is not used: measured 2026-10-18, inside one envelope SAP
-can answer a node structure part after the first with another part's `DESCRIPTION` (everything
-else byte-identical to the request sent alone), while metadata reads in one envelope answer as
-they do alone. An access control (`DCLS/DL`), which has no `Get<Type>` tool, is read as
-adt-clients reads its metadata: `GET /sap/bc/adt/acm/dcl/sources/<name>?version=active`, Accept
-`application/vnd.sap.adt.dclSource+xml`. An object whose metadata read fails, or of a type with no
-metadata read (a class's method, a program's include, …), has no description in the batched answer.
-`GetObjectsList` and `SearchSource` answer no descriptions and read no metadata; `GetIncludesList`
-and `GetEnhancements` take only the include names from their node structure parts.
-
-Measured 2026-10-18 on the system, for the types the test packages hold that had no metadata read:
-each object's read sent alone, and the same read inside one envelope after three other metadata
-parts and again in reverse order. The access control's answer was byte-identical in every
-envelope, its `adtcore:description` equal to the one sent alone and to the node structure's. Three
-types have no readable metadata: a class enhancement (`ENHO/XH`) and a classic enhancement spot
-(`ENHS/XS`) answer their `OBJECT_URI` with `406` under `application/xml` and `404` under the Accept
-the ADT discovery names, and an OData V4 service group (`G4BA`) answers its `OBJECT_URI` with `400`
-(a required parameter missing). They get no metadata read; the node structure gave none of them a
-description in the sequential answer either.
-Where the destination has no communication batch, the sequential reads answer the descriptions
-of the node structure, as before.
-
-### Batched against sequential: measured 2026-10-18 on the system
-
-`src/__tests__/integration/batch/batchedReadsTiming.test.ts`, on one on-premise system, over HTTP
-and over RFC (the same system through its gateway). Each tool read "the package" (the test
-config's default package) and "a larger package" (the config's super package, its subpackages
-included where the tool walks them); each path three times, alternating which goes first, after
-one untimed sequential read. The sequential path is a destination already marked not served (no
-envelope); the batched path is a fresh destination, which learned "served" from its first
-envelope. ms is the median wall time of the three; requests are the round trips (envelopes
-included); parts are the requests inside the envelopes. Arguments: `GetPackageContents` with
-`include_subpackages: true`; `GetPackageTree` defaults; `GetObjectsList` and `GetObjectInfo`
-(`maxDepth: 5`, enriched) on `DEVC/K`; `HandlerGet` part `contents`; `SearchSource` for `DATA`.
-
-| Tool | Package | Transport | Sequential ms | Sequential requests | Batched ms | Batched requests = envelopes | Batched parts |
-|---|---|---|---:|---:|---:|---:|---:|
-| GetPackageContents | the package | HTTP | 1005 | 8 | 830 | 5 | 10 |
-| GetPackageContents | a larger package | HTTP | 4920 | 38 | 2398 | 5 | 114 |
-| GetPackageTree | the package | HTTP | 1174 | 9 | 921 | 5 | 11 |
-| GetPackageTree | a larger package | HTTP | 4986 | 39 | 2502 | 5 | 115 |
-| GetObjectsList | the package | HTTP | 1240 | 10 | 531 | 3 | 10 |
-| GetObjectsList | a larger package | HTTP | 1242 | 10 | 506 | 3 | 10 |
-| GetObjectInfo | the package | HTTP | 1271 | 10 | 966 | 6 | 12 |
-| GetObjectInfo | a larger package | HTTP | 5525 | 43 | 2654 | 6 | 119 |
-| HandlerGet contents | the package | HTTP | 780 | 6 | 497 | 3 | 8 |
-| HandlerGet contents | a larger package | HTTP | 762 | 6 | 701 | 3 | 17 |
-| SearchSource | the package | HTTP | 1155 | 9 | 776 | 5 | 9 |
-| SearchSource | a larger package | HTTP | 5850 | 69 | 1466 | 6 | 68 |
-| GetPackageContents | the package | RFC | 1701 | 8 | 1172 | 5 | 10 |
-| GetPackageContents | a larger package | RFC | 8036 | 38 | 2913 | 5 | 114 |
-| GetPackageTree | the package | RFC | 1924 | 9 | 1157 | 5 | 11 |
-| GetPackageTree | a larger package | RFC | 8297 | 39 | 2876 | 5 | 115 |
-| GetObjectsList | the package | RFC | 2065 | 10 | 688 | 3 | 10 |
-| GetObjectsList | a larger package | RFC | 2055 | 10 | 669 | 3 | 10 |
-| GetObjectInfo | the package | RFC | 2136 | 10 | 1385 | 6 | 12 |
-| GetObjectInfo | a larger package | RFC | 9112 | 43 | 2938 | 6 | 119 |
-| HandlerGet contents | the package | RFC | 1278 | 6 | 721 | 3 | 8 |
-| HandlerGet contents | a larger package | RFC | 1556 | 6 | 956 | 3 | 17 |
-| SearchSource | the package | RFC | 1890 | 9 | 1101 | 5 | 9 |
-| SearchSource | a larger package | RFC | 14370 | 69 | 1942 | 6 | 68 |
-
-Every batched read was faster; its envelopes did not grow with the subtree (5 or 6 for the larger
-package), while the sequential requests did. The batched package walks and `GetObjectInfo` send
-more parts than the sequential path sends requests: the metadata read per object behind the
-descriptions (above). The answers were equal but for one difference on the larger package, in
-`GetPackageContents`, `GetPackageTree` and `GetObjectInfo` alike: an access control (`DCLS/DL`)
-has its description in the sequential answer and none in the batched one — the "type with no
-`Get<Type>` metadata read" case above. Those three cases fail the test's equality check on this
-system; their timings are written before the check.
-
-Not measured in this run: ABAP Cloud, and the tools of the internal batches not yet built.
-
-## What is refused
-
-While a batch is open only the batch tools and the open batch's recordable calls are served.
-Every other call is answered at once with the server's refusal and takes no number:
-
-| Code | When |
-|---|---|
-| `batch_not_recordable` | the tool builds a request from another's answer, sends no request at all, or is not served while a batch is open (the debugger tools, the background-run tools, the leftover-session tools, a registry's own tools) |
-| `batch_other_kind` | the call's request is of another kind (LOCK, UNLOCK, stateless) than the open batch holds — its first recorded call decided it: record it in the next batch |
-| `batch_no_timeout` | a long read given `timeout` in batch mode: the batch is sent at `BatchEnd`, with no deadline |
-| `batch_mode_on` | `BatchBegin` while a batch is open |
-| `batch_mode_other` | the debugger batch is open |
-| `batch_mode_off` | `BatchEnd` with no batch open — refused before any connection is taken |
-| `batch_mode_unavailable` | the host gave this server instance no batch owner (an embedder's `EmbeddableMcpServer` without `batch`) |
-
-Every tool's description says which applies to it: it ends with one sentence — recorded, recorded
-only for some arguments (which ones), refused (a request of it depends on another's answer), or not
-served in batch mode (a tool that sends no request, a debugger, background-run or leftover-session
-tool, a registry's own tool: run it outside batch mode). The sentence is there where the server
-instance has a batch owner.
-
-## Over Streamable HTTP
-
-Every HTTP request is an MCP session of its own, served by a pooled server instance. Send the
-`state_handle` `BatchBegin` answers in the `x-mcp-state-handle` request header on every call of
-the batch, `BatchEnd` and `BatchAnswers` included: the pool routes the call to the instance that
-holds the batch, one request at a time, in the order they arrive. A call without the header (or
-with a handle the pool does not know) reaches an instance where no batch is open. The header comes
-first; without it the pool routes by a `tools/call`'s `state_handle` argument, which only the
-debugger tools take — no batch tool takes one. The handle is a bearer secret: whoever holds it
-reaches the batch. A client that leaves during `BatchEnd` does not stop it: the answers are kept
-for the next `BatchAnswers` with the header. On stdio and SSE nothing is needed: the batch is the
-process's (stdio) or the connection's (SSE).
 
 ## Credentials and failures
 

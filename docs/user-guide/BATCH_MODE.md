@@ -188,8 +188,8 @@ number answers the same refusal.
 
 The tools that read several independent things inside one call (the package walks,
 `GetObjectInfo`, `SearchSource`, `GetIncludesList`, `GetStructuresList`, `GetEnhancements`,
-`ListTransports`, `DescribeByList`, `GetAbapSystemSymbols`) send them in envelopes to
-`/sap/bc/adt/communication/batch`.
+`ListTransports`, `DescribeByList`, `GetAbapSystemSymbols`, `GetWhereUsed`, `RuntimeListFeeds`)
+send them in envelopes to `/sap/bc/adt/communication/batch`.
 Whether a destination has that endpoint is learned only from the outer status of its first
 envelope: `2xx` means served, for good; `404` means not served, and from then on that
 destination's reads run sequentially, one request after another. Any other status decides
@@ -451,7 +451,7 @@ no raw part.
 | `GetTableVersions` | every call | GET /sap/bc/adt/ddic/tables/{name}/source/main/versions |
 | `GetTableVersionSource` | every call | GET the content_uri given |
 | `GetTransport` | every call | GET /sap/bc/adt/cts/transportrequests/{number}?includeObjects=…&includeTasks=… |
-| `GetWhereUsed` | when enable_all_types is not true and enable_only_types is not given and disable_types is not given | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given) |
+| `GetWhereUsed` | when enable_all_types is not true and enable_only_types is not given and disable_types is not given and objects is not given | POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=… with the default scope (a type filter reads the scope first, so none is given) |
 | `ListServiceBindingTypes` | every call | GET /sap/bc/adt/businessservices/bindings/bindingtypes |
 | `MoveTransportObjects` | every call | POST /sap/bc/adt/cts/transportrequests/{number}/moveobjects with all the objects given |
 | `ReadTransportActionLog` | every call | GET /sap/bc/adt/cts/transportrequests/{number}/actionlogs |
@@ -462,7 +462,7 @@ no raw part.
 | `RuntimeGetDumpById` | every call | GET /sap/bc/adt/runtime/dump/{id} (the view asked) |
 | `RuntimeGetGatewayErrorLog` | every call | GET /sap/bc/adt/gw/errorlog, or the error_url given |
 | `RuntimeGetProfilerTraceData` | every call | GET …/runtime/traces/abaptraces/{id}/hitlist, /statements or /dbAccesses |
-| `RuntimeListFeeds` | when feed_type is one of descriptors, variants (absent reads as descriptors) | GET /sap/bc/adt/feeds (descriptors, or the variants read from the same list; the dumps, system messages and gateway errors feeds are read page by page, so they are not listed) |
+| `RuntimeListFeeds` | when feed_type is one of descriptors, variants (absent reads as descriptors) and feed_types is not given | GET /sap/bc/adt/feeds (descriptors, or the variants read from the same list; the dumps, system messages and gateway errors feeds are read page by page, so they are not listed) |
 | `RuntimeListProfilerTraceFiles` | every call | GET /sap/bc/adt/runtime/traces/abaptraces |
 | `RuntimeListSystemMessages` | every call | GET /sap/bc/adt/runtime/systemmessages |
 | `RuntimeRunClass` | when profile is not true | POST /sap/bc/adt/oo/classrun/{name} (without profile: with it the trace is also scheduled and listed) |

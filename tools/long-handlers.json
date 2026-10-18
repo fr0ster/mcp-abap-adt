@@ -3,7 +3,7 @@
     "tool": "GetWhereUsed",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleGetWhereUsed.ts#handleGetWhereUsed",
-    "sends": "POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=…; with a type filter also POST …/usageReferences/scope?uri=…; read-only RIS queries"
+    "sends": "one object without a type filter: POST /sap/bc/adt/repository/informationsystem/usageReferences?uri=…; otherwise in ADT batch envelopes (POST /sap/bc/adt/communication/batch): with a type filter the POST …/usageReferences/scope?uri=… of every object, then the scoped POST …/usageReferences?uri=… of every object, each scope read once; objects without a filter the POST …/usageReferences?uri=… of every object in one envelope; sequential reads where the system has no communication batch"
   },
   {
     "tool": "SearchObject",
@@ -51,7 +51,7 @@
     "tool": "RuntimeListFeeds",
     "set": "full",
     "handler": "src/handlers/system/readonly/handleRuntimeListFeeds.ts#handleRuntimeListFeeds",
-    "sends": "GET /sap/bc/adt/feeds or /feeds/variants; dumps, system messages and gateway errors paged: up to about 11 GETs of /sap/bc/adt/runtime/dumps (or /runtime/systemmessages, /gw/errorlog)"
+    "sends": "GET /sap/bc/adt/feeds or /feeds/variants; dumps, system messages and gateway errors paged: up to about 11 GETs of /sap/bc/adt/runtime/dumps (or /runtime/systemmessages, /gw/errorlog); the paged feeds and feed_types in ADT batch envelopes (POST /sap/bc/adt/communication/batch): the first GET of every feed, then per round the next page of every feed still paging; sequential reads where the system has no communication batch"
   },
   {
     "tool": "ListTransports",

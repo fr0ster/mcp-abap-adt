@@ -1373,6 +1373,10 @@
           "descriptors",
           "variants"
         ]
+      },
+      {
+        "argument": "feed_types",
+        "present": false
       }
     ]
   },
@@ -1394,6 +1398,10 @@
       },
       {
         "argument": "disable_types",
+        "present": false
+      },
+      {
+        "argument": "objects",
         "present": false
       }
     ]

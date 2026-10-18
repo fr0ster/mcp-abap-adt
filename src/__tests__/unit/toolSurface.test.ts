@@ -197,6 +197,10 @@ describe('the MCP tool surface', () => {
           relaxed: ['object_name', 'object_type'],
           added: ['objects'],
         },
+        'system/GetWhereUsed': {
+          relaxed: ['object_name', 'object_type'],
+          added: ['objects'],
+        },
       };
       const listed = LIST_ARGUMENTS[tool];
       const listRelaxed = (p: string) =>
@@ -246,12 +250,15 @@ describe('the MCP tool surface', () => {
         'compact/HandlerDumpList': ['feed_type'],
         // Issue #261: the dumps feed filters on the attributes its descriptor
         // declares; the user filter was the only one reachable before.
+        // 19.0.0, several feeds per call (spec §11): `feed_types` beside
+        // `feed_type`, which was never required.
         'system/RuntimeListFeeds': [
           'runtime_error',
           'exception',
           'object_name',
           'package',
           'component',
+          'feed_types',
         ],
         'high/CreateTransportTask': ['task_type'],
         // 19.0.0: one Get<Type> per type; a type with a source reads one

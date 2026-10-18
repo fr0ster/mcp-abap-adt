@@ -1,11 +1,31 @@
-import { AdtRuntimeClient, FeedRepository } from '@mcp-abap-adt/adt-clients';
+import {
+  AdtRuntimeClient,
+  exemptFromAcceptNegotiation,
+  FeedRepository,
+} from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   feedEntries,
   feedGatewayErrors,
   feedSystemMessages,
 } from '@mcp-abap-adt/adt-strategies';
-import { answer } from '../../../lib/answer';
+import type {
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
+import {
+  answer,
+  answerThrown,
+  failedPayloadOf,
+  isCredentialPayload,
+  type McpResult,
+} from '../../../lib/answer';
+import { failureOf } from '../../../lib/auth/failures';
+import {
+  type PhaseResult,
+  runPhase,
+  withSequentialFallback,
+} from '../../../lib/batch/phases';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { TIMEOUT_PROPERTY, withLongToolAdvice } from '../../../lib/longTools';
 import {
@@ -25,7 +45,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request.',
+    '[runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }).',
   ),
   inputSchema: {
     type: 'object',
@@ -43,6 +63,21 @@ export const TOOL_DEFINITION = {
         description:
           'Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.',
         default: 'descriptors',
+      },
+      feed_types: {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: [
+            'descriptors',
+            'variants',
+            'dumps',
+            'system_messages',
+            'gateway_errors',
+          ],
+        },
+        description:
+          'Several feeds, read together with the same filters (give this or feed_type).',
       },
       user: {
         type: 'string',
@@ -92,6 +127,7 @@ export const TOOL_DEFINITION = {
 } as const;
 
 interface RuntimeListFeedsArgs {
+  feed_types?: Array<NonNullable<RuntimeListFeedsArgs['feed_type']>>;
   feed_type?:
     | 'descriptors'
     | 'variants'
@@ -175,10 +211,7 @@ function pagedFeeds(
   } as never);
 }
 
-export async function handleRuntimeListFeeds(
-  context: HandlerContext,
-  args: RuntimeListFeedsArgs,
-) {
+async function feedsOf(context: HandlerContext, args: RuntimeListFeedsArgs) {
   const { connection, logger } = context;
   const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
   const feedType = args?.feed_type ?? 'descriptors';
@@ -464,4 +497,278 @@ export async function handleRuntimeListFeedPage(
         shown,
       );
   }
+}
+
+/** A request a feed's read made, waiting for its round. */
+interface Asked {
+  request: IAbapRequestOptions;
+  resolve: (response: IAdtWireResponse) => void;
+  reject: (error: unknown) => void;
+}
+
+/** The fixed words of a request made once the rounds have ended. */
+const ROUNDS_ENDED_WORDS =
+  'the feeds read in envelopes have ended: no further request is sent';
+
+/**
+ * A connection for one feed's read whose requests wait for their round:
+ * `ask` holds each one until the round sends it, and settles it with the
+ * part's answer. Exempt from accept negotiation, as the batch connection is.
+ */
+function roundConnection(
+  connection: HandlerContext['connection'],
+  ask: (request: IAbapRequestOptions) => Promise<IAdtWireResponse>,
+): HandlerContext['connection'] {
+  const view = {
+    connect: () => connection.connect(),
+    getBaseUrl: () => connection.getBaseUrl(),
+    getSessionId: () => connection.getSessionId(),
+    // A feed's requests go in the round's envelope, a stateless read: the
+    // feed sets no session type of its own.
+    setSessionType: (_type: 'stateful' | 'stateless') => undefined,
+    getSessionType: (): 'stateful' | 'stateless' => 'stateless',
+    makeAdtRequest<T = unknown, D = unknown>(
+      request: IAbapRequestOptions,
+    ): Promise<IAdtWireResponse<T, D>> {
+      return ask(request) as Promise<IAdtWireResponse<T, D>>;
+    },
+  };
+  exemptFromAcceptNegotiation(view);
+  return view as HandlerContext['connection'];
+}
+
+/** What the rounds answer: every feed's answer, or the one that ends the call. */
+type RoundsOutcome = { answers: McpResult[] } | { ended: McpResult };
+
+/**
+ * Every feed's read (`read(i, connection)`, the sequential version's call)
+ * on a connection of its own, its requests sent in rounds (spec §11): each
+ * round is one envelope (`runPhase`) holding the one request every feed
+ * still reading has made — the first GET of every feed, then the next page
+ * of every feed still paging, which needs its own feed's previous answer.
+ * A round is sent once every feed has made its request or answered. A
+ * credential failure ends the call: SAP's `401` to any feed, the first in
+ * the order of the feeds, is the call's answer and no further round is
+ * sent; a refusal the connection throws is thrown, as `runPhase` throws it.
+ */
+async function feedsInRounds(
+  context: HandlerContext,
+  count: number,
+  read: (
+    i: number,
+    connection: HandlerContext['connection'],
+  ) => Promise<McpResult>,
+): Promise<RoundsOutcome> {
+  let ended = false;
+  const states = Array.from({ length: count }, () => {
+    let signal!: () => void;
+    const asked = new Promise<void>((resolve) => {
+      signal = resolve;
+    });
+    return { asked, signal, pending: undefined as Asked | undefined };
+  });
+  const settled = states.map((state, i) =>
+    (async () =>
+      read(
+        i,
+        roundConnection(
+          context.connection,
+          (request) =>
+            new Promise<IAdtWireResponse>((resolve, reject) => {
+              if (ended) {
+                reject(new Error(ROUNDS_ENDED_WORDS));
+                return;
+              }
+              state.pending = { request, resolve, reject };
+              state.signal();
+            }),
+        ),
+      ))().then(
+      (value): PhaseResult<McpResult> => ({ ok: true, value }),
+      (error: unknown): PhaseResult<McpResult> => ({ ok: false, error }),
+    ),
+  );
+  /** Ends the rounds: every request waiting is refused, every read settles. */
+  const end = async (error: unknown) => {
+    ended = true;
+    for (const state of states) {
+      state.pending?.reject(error);
+      state.pending = undefined;
+    }
+    await Promise.all(settled);
+  };
+
+  for (;;) {
+    // Every feed has made its request or answered.
+    await Promise.all(
+      states.map((state, i) => Promise.race([state.asked, settled[i]])),
+    );
+    for (const [i, state] of states.entries()) {
+      if (state.pending !== undefined) continue;
+      const result = await settled[i];
+      if (result?.ok && endsList(result.value)) {
+        await end(new Error(ROUNDS_ENDED_WORDS));
+        return { ended: result.value };
+      }
+    }
+    const asking = states.filter((state) => state.pending !== undefined);
+    if (asking.length === 0) break;
+    const round = asking.map((state) => {
+      const asked = state.pending as Asked;
+      state.pending = undefined;
+      state.asked = new Promise<void>((resolve) => {
+        state.signal = resolve;
+      });
+      return asked;
+    });
+    let answers: PhaseResult<IAdtWireResponse>[];
+    try {
+      answers = await runPhase(context, round, (asked, batch) =>
+        batch.makeAdtRequest(asked.request),
+      );
+    } catch (error) {
+      round.forEach((asked) => {
+        asked.reject(error);
+      });
+      await end(error);
+      throw error;
+    }
+    round.forEach((asked, k) => {
+      const answer = answers[k];
+      if (answer?.ok) asked.resolve(answer.value);
+      else asked.reject(answer?.error);
+    });
+  }
+
+  const answers: McpResult[] = [];
+  for (const result of await Promise.all(settled)) {
+    if (!result.ok) throw result.error;
+    answers.push(result.value);
+  }
+  return { answers };
+}
+
+/** An answer's payload: its JSON, else its text. */
+function payloadOfAnswer(result: McpResult): unknown {
+  const text = result.content[0]?.text ?? '';
+  try {
+    return JSON.parse(text);
+  } catch {
+    return text;
+  }
+}
+
+/** Whether an answer is a credential failure: it ends a call for several feeds. */
+function endsList(result: McpResult): boolean {
+  const failed = failedPayloadOf(result, 'read feed');
+  return failed !== undefined && isCredentialPayload(failed);
+}
+
+/** A list call's answer: one entry per feed, in the order asked. */
+function listAnswer(
+  feedTypes: readonly unknown[],
+  results: readonly McpResult[],
+): McpResult {
+  const entries = results.map((result, i) =>
+    result.isError
+      ? { feed_type: feedTypes[i], error: payloadOfAnswer(result) }
+      : payloadOfAnswer(result),
+  );
+  return {
+    isError: false,
+    content: [{ type: 'text', text: JSON.stringify(entries, null, 2) }],
+  };
+}
+
+/** The feeds read page by page: more than one request a call. */
+const PAGED_FEEDS = new Set(['dumps', 'system_messages', 'gateway_errors']);
+
+/**
+ * The runtime feeds, one or several: the paged feeds' requests in ADT batch
+ * envelopes, one round at a time; the sequential reads where the
+ * destination has no communication batch. One feed of one request (the
+ * descriptors or the variants) is sent as itself.
+ */
+export async function handleRuntimeListFeeds(
+  context: HandlerContext,
+  args: RuntimeListFeedsArgs,
+) {
+  const ctx = { tool: 'RuntimeListFeeds', detail: 'terse' as const };
+  const listed = args?.feed_types;
+  if (listed === undefined) {
+    if (!PAGED_FEEDS.has(String(args?.feed_type))) {
+      return feedsOf(context, args);
+    }
+    return withSequentialFallback<McpResult>(
+      context,
+      async () => {
+        try {
+          const outcome = await feedsInRounds(
+            context,
+            1,
+            (_i, connection) =>
+              feedsOf({ ...context, connection }, args) as Promise<McpResult>,
+          );
+          return 'ended' in outcome
+            ? outcome.ended
+            : (outcome.answers[0] as McpResult);
+        } catch (error) {
+          // A refusal the connection threw: as `answer()` renders a throw of
+          // the sequential version's call.
+          if (failureOf(error) === undefined) throw error;
+          return answerThrown(error, ctx);
+        }
+      },
+      () => feedsOf(context, args) as Promise<McpResult>,
+    );
+  }
+  if (
+    args.feed_type !== undefined ||
+    !Array.isArray(listed) ||
+    listed.length === 0
+  ) {
+    return return_error(
+      new Error(
+        'Give exactly one of feed_type or feed_types (a non-empty list of feed types).',
+      ),
+    );
+  }
+  const { feed_types: _list, ...rest } = args;
+  const single = (feedType: unknown): RuntimeListFeedsArgs => ({
+    ...rest,
+    feed_type: feedType as RuntimeListFeedsArgs['feed_type'],
+  });
+  return withSequentialFallback<McpResult>(
+    context,
+    async () => {
+      try {
+        const outcome = await feedsInRounds(
+          context,
+          listed.length,
+          (i, connection) =>
+            feedsOf(
+              { ...context, connection },
+              single(listed[i]),
+            ) as Promise<McpResult>,
+        );
+        return 'ended' in outcome
+          ? outcome.ended
+          : listAnswer(listed, outcome.answers);
+      } catch (error) {
+        if (failureOf(error) === undefined) throw error;
+        return answerThrown(error, ctx);
+      }
+    },
+    async () => {
+      // One feed after another, each as the single call reads it; a
+      // credential failure ends the call, and nothing after it is read.
+      const results: McpResult[] = [];
+      for (const feedType of listed) {
+        const result = (await feedsOf(context, single(feedType))) as McpResult;
+        if (endsList(result)) return result;
+        results.push(result);
+      }
+      return listAnswer(listed, results);
+    },
+  );
 }

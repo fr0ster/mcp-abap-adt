@@ -35,6 +35,7 @@ export const TOOL_DEFINITION = {
 // DescribeByList: Batch description for a list of ABAP objects
 
 import {
+  type FailureEntry,
   failedPayloadOf,
   isCredentialPayload,
   type McpResult,
@@ -205,6 +206,18 @@ function emptyOrFailed(res: unknown): boolean {
   );
 }
 
+/**
+ * A search answer SAP refused `406`, after the phase's correction round:
+ * that search's error, never an empty answer.
+ */
+function notAcceptable(res: unknown): FailureEntry | undefined {
+  const failure = failedPayloadOf(
+    res as { isError?: boolean; content?: unknown },
+    'search',
+  );
+  return failure?.status === 406 ? failure : undefined;
+}
+
 /** A search answer that is a credential failure: it ends the call. */
 function endsDescribe(res: unknown): boolean {
   const failure = failedPayloadOf(
@@ -244,7 +257,12 @@ async function describeInEnvelopes(context: HandlerContext, args: any) {
   const again: number[] = [];
   objects.forEach((_obj, i) => {
     const result = typed[i];
-    if (result?.ok === true && emptyOrFailed(result.value)) again.push(i);
+    if (
+      result?.ok === true &&
+      emptyOrFailed(result.value) &&
+      notAcceptable(result.value) === undefined
+    )
+      again.push(i);
   });
   const untypedResults = await runPhase(context, again, (i, batch) =>
     handleSearchObject(
@@ -271,6 +289,14 @@ async function describeInEnvelopes(context: HandlerContext, args: any) {
       // object fails the call here, as it does there.
       const _type = obj.type;
       let res: any = typedAnswer(i);
+      const refused = notAcceptable(res);
+      if (refused !== undefined) {
+        results.push({
+          type: 'text',
+          text: JSON.stringify({ name: obj.name, error: refused }),
+        });
+        continue;
+      }
       const second = emptyOrFailed(res) ? untypedAnswer(i) : undefined;
       let parsed: any;
       try {

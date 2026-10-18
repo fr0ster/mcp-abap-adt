@@ -12,8 +12,19 @@
  *   item's failure, the envelope's error as it came; a credential refusal (or
  *   another failure the server's reader answers — its own refusal, a closed
  *   instance) ends the call: rethrown as it came, never a result. The batch
- *   connection is exempt from accept negotiation (adt-clients 34), and so is
- *   the forwarding connection under it: nothing is corrected or resent.
+ *   connection is exempt from accept negotiation (adt-clients), and so is the
+ *   forwarding connection under it: adt-clients corrects and resends nothing
+ *   of a phase.
+ * - The 406 correction, the phase's own (`correctNotAcceptable`): each part
+ *   is recorded with the Accept the call's connection's accept cache holds
+ *   for its method and URL (`cachedAccept`), when it holds one. Right after
+ *   the envelope answered, before any answer reaches its read, the parts SAP
+ *   answered `406` go in one envelope of their own — only those parts, each
+ *   with the Accept its own `406` names (`extractSupportedAccept`, joined as
+ *   adt-clients' negotiation joins them), stored in that cache
+ *   (`rememberAccept`). One round: what the correction envelope answers is
+ *   the part's answer, whatever it is. A `406` naming no type, or naming
+ *   the Accept the part sent, is the part's answer.
  * - Each item records through its own view of the batch connection, which
  *   signals its first request; the envelope is sent once every item has
  *   recorded or settled without recording. A request recorded once the
@@ -42,8 +53,11 @@
  */
 import {
   AdtBatchConnection,
+  cachedAccept,
   exemptFromAcceptNegotiation,
+  extractSupportedAccept,
   getBaseRequest,
+  rememberAccept,
 } from '@mcp-abap-adt/adt-clients';
 import type {
   IAbapConnection,
@@ -152,6 +166,7 @@ function itemView(
   batch: AdtBatchConnection,
   sealed: () => boolean,
   recorded: () => void,
+  record: (request: IAbapRequestOptions) => Promise<IAdtWireResponse>,
 ): IAbapConnection {
   const view = {
     connect: () => batch.connect(),
@@ -163,13 +178,103 @@ function itemView(
       request: IAbapRequestOptions,
     ): Promise<IAdtWireResponse<T, D>> {
       if (sealed()) return Promise.reject(new Error(LATE_RECORD_WORDS));
-      const answer = batch.makeAdtRequest<T, D>(request);
+      const answer = record(request) as Promise<IAdtWireResponse<T, D>>;
       recorded();
       return answer;
     },
   } satisfies IAbapConnection & { getSessionType(): Session };
   exemptFromAcceptNegotiation(view);
   return view;
+}
+
+/** A part's answer: SAP's response, or the failure it was rejected with. */
+type PartAnswer =
+  | { ok: true; response: IAdtWireResponse }
+  | { ok: false; error: unknown };
+
+/** One recorded part: the request as recorded, its first answer, and its hand-over. */
+interface RecordedPart {
+  request: IAbapRequestOptions;
+  first: Promise<PartAnswer>;
+  answer(final: PartAnswer): void;
+}
+
+const NOT_ACCEPTABLE = 406;
+
+/** The request's Accept header, whatever its spelling; `undefined` when it has none. */
+function acceptOf(request: IAbapRequestOptions): string | undefined {
+  for (const [key, value] of Object.entries(request.headers ?? {})) {
+    if (key.toLowerCase() === 'accept') return String(value);
+  }
+  return undefined;
+}
+
+/** `request` with `accept` as its one Accept header. */
+function withAccept(
+  request: IAbapRequestOptions,
+  accept: string,
+): IAbapRequestOptions {
+  const headers: Record<string, string> = {};
+  for (const [key, value] of Object.entries(request.headers ?? {})) {
+    if (key.toLowerCase() !== 'accept') headers[key] = value;
+  }
+  headers.Accept = accept;
+  return { ...request, headers };
+}
+
+/** Settles as `answer`, never rejecting. */
+function settledOf(answer: Promise<IAdtWireResponse>): Promise<PartAnswer> {
+  return answer.then(
+    (response): PartAnswer => ({ ok: true, response }),
+    (error: unknown): PartAnswer => ({ ok: false, error }),
+  );
+}
+
+/**
+ * The 406 correction of a phase whose envelope answered: every part SAP
+ * answered `406` naming types its request did not send goes in one envelope
+ * of its own, with the Accept those types make (stored in `connection`'s
+ * accept cache); its answer there is its final answer. Every other part's
+ * final answer is its first. One round; nothing else is sent.
+ */
+async function correctNotAcceptable(
+  context: HandlerContext,
+  parts: readonly RecordedPart[],
+  firsts: readonly PartAnswer[],
+): Promise<PartAnswer[]> {
+  const finals = [...firsts];
+  const corrected: { at: number; request: IAbapRequestOptions }[] = [];
+  firsts.forEach((first, at) => {
+    const part = parts[at];
+    if (part === undefined || first.ok) return;
+    if (statusOf(readOwn(first.error, 'response')) !== NOT_ACCEPTABLE) return;
+    const supported = extractSupportedAccept(first.error);
+    if (supported.length === 0) return;
+    const accept = supported.join(', ');
+    if (acceptOf(part.request) === accept) return;
+    rememberAccept(context.connection, part.request, accept);
+    corrected.push({ at, request: withAccept(part.request, accept) });
+  });
+  if (corrected.length === 0) return finals;
+  const watch = outerStatusWatch(context.connection);
+  const batch = new AdtBatchConnection(watch.forwarding, {
+    endpoint: 'communication',
+    ...(context.logger !== undefined ? { logger: context.logger } : {}),
+  });
+  const answers = corrected.map(({ request }) =>
+    settledOf(batch.makeAdtRequest(request)),
+  );
+  try {
+    await batch.execute();
+  } catch {
+    // Every corrected part settles with the envelope's failure: its answer.
+  }
+  const settled = await Promise.all(answers);
+  corrected.forEach(({ at }, i) => {
+    const answer = settled[i];
+    if (answer !== undefined) finals[at] = answer;
+  });
+  return finals;
 }
 
 /**
@@ -195,12 +300,28 @@ export async function runPhase<I, R>(
     ...(context.logger !== undefined ? { logger: context.logger } : {}),
   });
   let sealed = false;
+  const parts: RecordedPart[] = [];
+  // A part goes in with the Accept the connection's cache holds for it; its
+  // answer reaches its read once the correction decided it.
+  const record = (asked: IAbapRequestOptions): Promise<IAdtWireResponse> => {
+    const cached = cachedAccept(context.connection, asked);
+    const request = cached !== undefined ? withAccept(asked, cached) : asked;
+    const first = settledOf(batch.makeAdtRequest(request));
+    let answer!: (final: PartAnswer) => void;
+    const final = new Promise<PartAnswer>((resolve) => {
+      answer = resolve;
+    });
+    parts.push({ request, first, answer });
+    return final.then((settled) =>
+      settled.ok ? settled.response : Promise.reject(settled.error),
+    );
+  };
   const entries = items.map((item) => {
     let signal!: () => void;
     const recorded = new Promise<void>((resolve) => {
       signal = resolve;
     });
-    const view = itemView(batch, () => sealed, signal);
+    const view = itemView(batch, () => sealed, signal, record);
     const settled = (async () => read(item, view))().then(
       (value): PhaseResult<R> => ({ ok: true, value }),
       (error: unknown): PhaseResult<R> => ({ ok: false, error }),
@@ -221,6 +342,16 @@ export async function runPhase<I, R>(
     failed = true;
     error = thrown;
   }
+  // Every part has its first answer once the envelope settled. An envelope
+  // that answered: its 406 parts are corrected before any answer is handed on.
+  const firsts = await Promise.all(parts.map((part) => part.first));
+  const finals = failed
+    ? firsts
+    : await correctNotAcceptable(context, parts, firsts);
+  parts.forEach((part, at) => {
+    const final = finals[at];
+    if (final !== undefined) part.answer(final);
+  });
   const settled = entries.map((e) => e.settled);
   const refused = watch.refused();
   if (refused !== undefined) {

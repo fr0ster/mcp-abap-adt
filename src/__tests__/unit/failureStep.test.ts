@@ -15,6 +15,7 @@ import { handleGetPackageContents } from '../../handlers/package/readonly/handle
 import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
 import { handleGetAbapSystemSymbols } from '../../handlers/system/readonly/handleGetAbapSystemSymbols';
+import { createBatchAvailability } from '../../lib/batch/availability';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
 import {
   createSourceReaderDeps,
@@ -922,6 +923,12 @@ describe('GetEnhancements: a probe that SAP refused is not replaced by words', (
 });
 
 describe('GetStructuresList: a credential failure ends the whole call', () => {
+  // The sequential version, one request after another: a destination
+  // known to have no communication batch. (The batched version reads a
+  // level in one envelope: `unit/batch/includeTrees.test.ts`.)
+  const notServed = createBatchAvailability();
+  notServed.noteOuterStatus(404);
+  const sequential = { ...context, batchAvailability: notServed };
   const unauthorized = () =>
     refusedResponse('Unauthorized', {
       response: { status: 401, data: '' },
@@ -938,7 +945,7 @@ describe('GetStructuresList: a credential failure ends the whole call', () => {
         return config?.structureName === 'ZS' ? root : unauthorized();
       },
     });
-    const result: any = await handleGetStructuresList(context as any, {
+    const result: any = await handleGetStructuresList(sequential as any, {
       structure_name: 'ZS',
       include_extensions: false,
     });
@@ -963,7 +970,7 @@ describe('GetStructuresList: a credential failure ends the whole call', () => {
         throw failure;
       },
     });
-    const result: any = await handleGetStructuresList(context as any, {
+    const result: any = await handleGetStructuresList(sequential as any, {
       structure_name: 'ZS',
       include_extensions: false,
     });
@@ -980,7 +987,7 @@ describe('GetStructuresList: a credential failure ends the whole call', () => {
         return config?.structureName === 'ZS' ? root : forbidden();
       },
     });
-    const result: any = await handleGetStructuresList(context as any, {
+    const result: any = await handleGetStructuresList(sequential as any, {
       structure_name: 'ZS',
       include_extensions: false,
     });

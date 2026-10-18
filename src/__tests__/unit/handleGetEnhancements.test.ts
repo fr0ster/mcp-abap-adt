@@ -1,4 +1,5 @@
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
+import { createBatchAvailability } from '../../lib/batch/availability';
 
 /**
  * GetEnhancements addresses the object it was told about.
@@ -39,8 +40,19 @@ function connectionAnswering(ok: (url: string) => boolean) {
   return connection;
 }
 
+/**
+ * The sequential version, one request after another: a destination known to
+ * have no communication batch. (The batched version reads in envelopes:
+ * `unit/batch/includeTrees.test.ts`.)
+ */
+const notServed = createBatchAvailability();
+notServed.noteOuterStatus(404);
+
 const run = (connection: unknown, args: Record<string, unknown>) =>
-  handleGetEnhancements({ connection, logger: undefined } as any, args);
+  handleGetEnhancements(
+    { connection, logger: undefined, batchAvailability: notServed } as any,
+    args,
+  );
 
 describe('GetEnhancements', () => {
   it("reads SAPL<fg> as its function group's enhancements, without probing", async () => {

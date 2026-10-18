@@ -17,6 +17,7 @@ import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclu
 import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
 import { handleCreateTransportTask } from '../../handlers/transport/high/handleCreateTransportTask';
+import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
 import { createSourceReaderDeps } from '../../lib/search-source/sourceReader';
@@ -57,8 +58,13 @@ const expectCredentialAnswer = (result: any) => {
 describe('GetEnhancements include_nested: an include whose elements read rejects with AuthRefusedError', () => {
   const EMPTY =
     '<enh:enhancements xmlns:enh="http://www.sap.com/adt/enhancements"/>';
+  // The sequential version, one include after another: a destination known
+  // to have no communication batch. (The batched version reads every
+  // include in one envelope: `unit/batch/includeTrees.test.ts`.)
+  const notServed = createBatchAvailability();
+  notServed.noteOuterStatus(404);
   const run = () =>
-    handleGetEnhancements(context as any, {
+    handleGetEnhancements({ ...context, batchAvailability: notServed } as any, {
       object_name: 'ZPROG',
       object_type: 'program',
       program: 'ZPROG',

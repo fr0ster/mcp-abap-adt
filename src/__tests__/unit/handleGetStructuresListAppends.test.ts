@@ -40,6 +40,7 @@ jest.mock('../../lib/clients', () => ({
 }));
 
 import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
+import { createBatchAvailability } from '../../lib/batch/availability';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -134,7 +135,15 @@ describe('GetStructuresList append handling (#128)', () => {
       } as any),
     );
 
-    const result = await handleGetStructuresList(ctx, { structure_name: 'ZS' });
+    // The sequential version: a destination known to have no communication
+    // batch. (The batched version reads both scopes in one envelope:
+    // `unit/batch/includeTrees.test.ts`.)
+    const notServed = createBatchAvailability();
+    notServed.noteOuterStatus(404);
+    const result = await handleGetStructuresList(
+      { ...ctx, batchAvailability: notServed },
+      { structure_name: 'ZS' },
+    );
 
     expect(result.isError).toBe(true);
     expect(payload(result)).toMatchObject({

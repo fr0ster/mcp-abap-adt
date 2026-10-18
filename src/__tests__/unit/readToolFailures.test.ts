@@ -23,6 +23,7 @@ import { handleGetObjectInfo } from '../../handlers/system/readonly/handleGetObj
 import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
+import { createBatchAvailability } from '../../lib/batch/availability';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import {
   fakeClientOf,
@@ -311,8 +312,12 @@ describe('GetEnhancements include_nested: the nested walk threw', () => {
       error: () => undefined,
       debug: () => undefined,
     };
+    // The sequential version: a destination known to have no communication
+    // batch. (The batched version: `unit/batch/includeTrees.test.ts`.)
+    const notServed = createBatchAvailability();
+    notServed.noteOuterStatus(404);
     const result: any = await handleGetEnhancements(
-      { connection, logger } as any,
+      { connection, logger, batchAvailability: notServed } as any,
       { object_name: 'ZPROG', object_type: 'program', include_nested: true },
     );
     const body = payloadOf(result);
@@ -336,8 +341,17 @@ describe('GetIncludesList: SAP answered 401 to an include', () => {
         return unauthorized();
       },
     });
+    // The sequential version, one include after another: a destination
+    // known to have no communication batch. (The batched version reads a
+    // level in one envelope: `unit/batch/includeTrees.test.ts`.)
+    const notServed = createBatchAvailability();
+    notServed.noteOuterStatus(404);
     const result: any = await handleGetIncludesList(
-      { connection: {} as any, logger: undefined } as any,
+      {
+        connection: {} as any,
+        logger: undefined,
+        batchAvailability: notServed,
+      } as any,
       { object_name: 'ZPROG', object_type: 'PROG/P' },
     );
     expect(result.isError).toBe(true);

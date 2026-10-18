@@ -185,6 +185,18 @@ describe('the MCP tool surface', () => {
           relaxed: ['parent_type', 'parent_name'],
           added: ['objects'],
         },
+        'readonly/GetIncludesList': {
+          relaxed: ['object_name', 'object_type'],
+          added: ['objects'],
+        },
+        'readonly/GetStructuresList': {
+          relaxed: ['structure_name'],
+          added: ['structure_names'],
+        },
+        'readonly/GetEnhancements': {
+          relaxed: ['object_name', 'object_type'],
+          added: ['objects'],
+        },
       };
       const listed = LIST_ARGUMENTS[tool];
       const listRelaxed = (p: string) =>

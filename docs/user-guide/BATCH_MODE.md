@@ -187,7 +187,8 @@ number answers the same refusal.
 ## A system without the communication batch
 
 The tools that read several independent things inside one call (the package walks,
-`GetObjectInfo`, `SearchSource`) send them in envelopes to `/sap/bc/adt/communication/batch`.
+`GetObjectInfo`, `SearchSource`, `GetIncludesList`, `GetStructuresList`, `GetEnhancements`) send
+them in envelopes to `/sap/bc/adt/communication/batch`.
 Whether a destination has that endpoint is learned only from the outer status of its first
 envelope: `2xx` means served, for good; `404` means not served, and from then on that
 destination's reads run sequentially, one request after another. Any other status decides
@@ -214,7 +215,8 @@ they do alone. An access control (`DCLS/DL`), which has no `Get<Type>` tool, is 
 adt-clients reads its metadata: `GET /sap/bc/adt/acm/dcl/sources/<name>?version=active`, Accept
 `application/vnd.sap.adt.dclSource+xml`. An object whose metadata read fails, or of a type with no
 metadata read (a class's method, a program's include, …), has no description in the batched answer.
-`GetObjectsList` and `SearchSource` answer no descriptions and read no metadata.
+`GetObjectsList` and `SearchSource` answer no descriptions and read no metadata; `GetIncludesList`
+and `GetEnhancements` take only the include names from their node structure parts.
 
 Measured 2026-10-18 on the system, for the types the test packages hold that had no metadata read:
 each object's read sent alone, and the same read inside one envelope after three other metadata

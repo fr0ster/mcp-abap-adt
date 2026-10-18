@@ -39,13 +39,13 @@
     "tool": "GetStructuresList",
     "set": "full",
     "handler": "src/handlers/structure/readonly/handleGetStructuresList.ts#handleGetStructuresList",
-    "sends": "1–2 source GETs per node; with include_extensions a where-used POST pair per node and a source GET per candidate; recursive"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch), per level of the tree: the structure source GET of every node, then the table source GET of the nodes not found as structures; with include_extensions then the where-used scope POST pair (structure, table) of every node read, the scoped where-used POST of every scope that answered, and the source GETs of every append candidate; structure_names reads several structures in the same envelopes; sequential reads where the system has no communication batch"
   },
   {
     "tool": "GetIncludesList",
     "set": "full",
     "handler": "src/handlers/include/readonly/handleGetIncludesList.ts#handleGetIncludesList",
-    "sends": "one source GET per include, recursive to depth 20; for a function group the nodestructure POST and every include; for a class one metadata GET"
+    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): every object's first read (a program's or include's source GET, a function group's nodestructure POST, then its includes node), then per depth up to 20 the source GET of every include first reached there; objects reads several objects in the same envelopes; for a single class one metadata GET; sequential reads where the system has no communication batch"
   },
   {
     "tool": "RuntimeListFeeds",
